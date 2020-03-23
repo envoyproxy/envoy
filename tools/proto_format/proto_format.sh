@@ -6,6 +6,10 @@ set -e
 
 [[ "$1" == "check" || "$1" == "fix" ]] || (echo "Usage: $0 <check|fix>"; exit 1)
 
+./tools/git/modified_since_last_github_commit.sh ./api/envoy proto || \
+  [[ "${FORCE_PROTO_FORMAT}" == "yes" ]] || \
+  { echo "Skipping proto_format.sh due to no API change"; exit 0; }
+
 # Clean up any stale files in the API tree output. Bazel remembers valid cached
 # files still.
 # rm -rf bazel-bin/external/envoy_api
