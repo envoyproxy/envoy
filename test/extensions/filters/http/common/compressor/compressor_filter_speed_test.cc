@@ -116,14 +116,14 @@ Benchmark                  Time             CPU   Iterations
 ------------------------------------------------------------
 ....
 
-CompressFull/2                18887569 ns     18783730 ns           37
-CompressFull/2                19108998 ns     19004000 ns           37
-CompressFull/2                18984786 ns     18897703 ns           37
-CompressFull/2                18617854 ns     18543027 ns           37
-CompressFull/2                18555731 ns     18485811 ns           37
-CompressFull/2_mean           18830988 ns     18742854 ns            5
-CompressFull/2_median         18887569 ns     18783730 ns            5
-CompressFull/2_stddev           237348 ns       223522 ns            5
+CompressChunks8192/2          14881254 ns     14861000 ns           46
+CompressChunks8192/2          14956146 ns     14907478 ns           46
+CompressChunks8192/2          15446768 ns     15396283 ns           46
+CompressChunks8192/2          15363712 ns     15323761 ns           46
+CompressChunks8192/2          15265096 ns     15213652 ns           46
+CompressChunks8192/2_mean     15182595 ns     15140435 ns            5
+CompressChunks8192/2_median   15265096 ns     15213652 ns            5
+CompressChunks8192/2_stddev     250740 ns       243300 ns            5
 
 ....
 */
