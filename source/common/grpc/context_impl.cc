@@ -1,9 +1,9 @@
 #include "common/grpc/context_impl.h"
 
-#include "common/grpc/common.h"
-
 #include <cstdint>
 #include <string>
+
+#include "common/grpc/common.h"
 
 namespace Envoy {
 namespace Grpc {
