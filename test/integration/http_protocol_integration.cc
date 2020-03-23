@@ -18,6 +18,22 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
   return ret;
 }
 
+std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getIpv4OnlyProtocolTestParams(
+    const std::vector<Http::CodecClient::Type>& downstream_protocols,
+    const std::vector<FakeHttpConnection::Type>& upstream_protocols) {
+  std::vector<HttpProtocolTestParams> ret;
+  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4) &&
+      Network::Test::supportsIpVersion(Network::Address::IpVersion::v4)) {
+    for (auto downstream_protocol : downstream_protocols) {
+      for (auto upstream_protocol : upstream_protocols) {
+        ret.push_back(HttpProtocolTestParams{Network::Address::IpVersion::v4, downstream_protocol,
+                                             upstream_protocol});
+      }
+    }
+  }
+  return ret;
+}
+
 std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
     const ::testing::TestParamInfo<HttpProtocolTestParams>& params) {
   return absl::StrCat(

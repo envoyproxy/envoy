@@ -14,6 +14,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/drain_manager.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/process_context.h"
@@ -116,6 +117,11 @@ public:
    * @return the server-wide grpc context.
    */
   virtual Grpc::Context& grpcContext() PURE;
+
+  /** @return DrainManager& drain manager which has life no shorter than the life of the current
+   * context.
+   */
+  virtual Envoy::Server::DrainManager& drainManager() PURE;
 };
 
 /**

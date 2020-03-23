@@ -158,6 +158,7 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         ":admin_interface",
+        ":drain_manager_interface",
         ":lifecycle_notifier_interface",
         ":process_context_interface",
         "//include/envoy/access_log:access_log_interface",

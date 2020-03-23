@@ -62,13 +62,23 @@ using BufferingStreamDecoderPtr = std::unique_ptr<BufferingStreamDecoder>;
 class RawConnectionDriver {
 public:
   using ReadCallback = std::function<void(Network::ClientConnection&, const Buffer::Instance&)>;
+  using ExitableReadCallback =
+      std::function<bool(Network::ClientConnection&, const Buffer::Instance&)>;
 
-  RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
+  RawConnectionDriver(uint32_t dst_port, Buffer::Instance& initial_data, ReadCallback data_callback,
                       Network::Address::IpVersion version);
+  RawConnectionDriver(uint8_t src_host_id, uint32_t dst_port, Buffer::Instance& initial_data,
+                      ExitableReadCallback data_callback, Network::Address::IpVersion version);
   ~RawConnectionDriver();
   const Network::Connection& connection() { return *client_; }
   bool connecting() { return callbacks_->connecting_; }
+  void write(absl::string_view payload);
   void run(Event::Dispatcher::RunType run_type = Event::Dispatcher::RunType::Block);
+
+  // runUtil and clearShouldExit are supporting write-and-read
+  void runUntil();
+  void clearShouldExit() { should_exit_ = false; }
+
   void close();
   Network::ConnectionEvent last_connection_event() const {
     return callbacks_->last_connection_event_;
@@ -76,18 +86,21 @@ public:
 
 private:
   struct ForwardingFilter : public Network::ReadFilterBaseImpl {
-    ForwardingFilter(RawConnectionDriver& parent, ReadCallback cb)
+    ForwardingFilter(RawConnectionDriver& parent, ExitableReadCallback cb)
         : parent_(parent), data_callback_(cb) {}
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      data_callback_(*parent_.client_, data);
+      bool want_exit = data_callback_(*parent_.client_, data);
+      if (want_exit) {
+        parent_.setShouldExit();
+      }
       data.drain(data.length());
       return Network::FilterStatus::StopIteration;
     }
 
     RawConnectionDriver& parent_;
-    ReadCallback data_callback_;
+    ExitableReadCallback data_callback_;
   };
 
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -102,11 +115,14 @@ private:
     Network::ConnectionEvent last_connection_event_;
   };
 
+  void setShouldExit() { should_exit_ = true; }
+
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;
+  bool should_exit_{false};
 };
 
 /**

@@ -28,11 +28,11 @@ namespace Server {
 
 namespace {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-  std::unique_ptr<Network::FilterChain>
+  std::shared_ptr<Network::FilterChain>
   buildFilterChain(const envoy::config::listener::v3::FilterChain&,
                    FilterChainFactoryContextCreator&) const override {
     // A place holder to be found
-    return std::make_unique<Network::MockFilterChain>();
+    return std::make_shared<Network::MockFilterChain>();
   }
 };
 
@@ -185,8 +185,10 @@ public:
   envoy::config::listener::v3::Listener listener_config_;
   MockFilterChainFactoryBuilder dummy_builder_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Init::ManagerImpl init_manager_{"fcm_benchmark"};
   FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context};
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
+      init_manager_};
 };
 
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
@@ -194,7 +196,8 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   for (auto _ : state) {
     FilterChainManagerImpl filter_chain_manager{
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context};
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
+        init_manager_};
     filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
   }
 }
@@ -209,7 +212,8 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
   }
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   FilterChainManagerImpl filter_chain_manager{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context};
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
+      init_manager_};
 
   filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
   for (auto _ : state) {
