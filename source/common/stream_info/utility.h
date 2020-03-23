@@ -53,6 +53,13 @@ public:
    */
   static const std::string&
   formatDownstreamAddressNoPort(const Network::Address::Instance& address);
+
+  /**
+   * @param address supplies the downstream address.
+   * @return a port, extracted from the provided downstream address for logs, header expansion, etc.
+   */
+  static const std::string
+  formatDownstreamAddressJustPort(const Network::Address::Instance& address);
 };
 
 } // namespace StreamInfo

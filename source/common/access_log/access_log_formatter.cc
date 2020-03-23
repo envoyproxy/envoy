@@ -438,15 +438,23 @@ public:
       std::function<Network::Address::InstanceConstSharedPtr(const StreamInfo::StreamInfo&)>;
 
   static std::unique_ptr<StreamInfoAddressFieldExtractor> withPort(FieldExtractor f) {
-    return std::make_unique<StreamInfoAddressFieldExtractor>(f, true);
+    return std::make_unique<StreamInfoAddressFieldExtractor>(
+        f, StreamInfoFormatter::StreamInfoAddressFieldExtractionType::WithPort);
   }
 
   static std::unique_ptr<StreamInfoAddressFieldExtractor> withoutPort(FieldExtractor f) {
-    return std::make_unique<StreamInfoAddressFieldExtractor>(f, false);
+    return std::make_unique<StreamInfoAddressFieldExtractor>(
+        f, StreamInfoFormatter::StreamInfoAddressFieldExtractionType::WithoutPort);
   }
 
-  StreamInfoAddressFieldExtractor(FieldExtractor f, bool include_port)
-      : field_extractor_(f), include_port_(include_port) {}
+  static std::unique_ptr<StreamInfoAddressFieldExtractor> justPort(FieldExtractor f) {
+    return std::make_unique<StreamInfoAddressFieldExtractor>(
+        f, StreamInfoFormatter::StreamInfoAddressFieldExtractionType::JustPort);
+  }
+
+  StreamInfoAddressFieldExtractor(
+      FieldExtractor f, StreamInfoFormatter::StreamInfoAddressFieldExtractionType extraction_type)
+      : field_extractor_(f), extraction_type_(extraction_type) {}
 
   // StreamInfoFormatter::FieldExtractor
   std::string extract(const StreamInfo::StreamInfo& stream_info) const override {
@@ -468,15 +476,19 @@ public:
 
 private:
   std::string toString(const Network::Address::Instance& address) const {
-    if (include_port_) {
+    switch (extraction_type_) {
+    case StreamInfoFormatter::StreamInfoAddressFieldExtractionType::WithoutPort:
+      return StreamInfo::Utility::formatDownstreamAddressNoPort(address);
+    case StreamInfoFormatter::StreamInfoAddressFieldExtractionType::JustPort:
+      return StreamInfo::Utility::formatDownstreamAddressJustPort(address);
+    case StreamInfoFormatter::StreamInfoAddressFieldExtractionType::WithPort:
+    default:
       return address.asString();
     }
-
-    return StreamInfo::Utility::formatDownstreamAddressNoPort(address);
   }
 
   FieldExtractor field_extractor_;
-  const bool include_port_;
+  const StreamInfoFormatter::StreamInfoAddressFieldExtractionType extraction_type_;
 };
 
 // Ssl::ConnectionInfo std::string field extractor.
@@ -598,6 +610,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
     field_extractor_ = StreamInfoAddressFieldExtractor::withoutPort(
+        [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+          return stream_info.downstreamLocalAddress();
+        });
+  } else if (field_name == "DOWNSTREAM_LOCAL_PORT") {
+    field_extractor_ = StreamInfoAddressFieldExtractor::justPort(
         [](const Envoy::StreamInfo::StreamInfo& stream_info) {
           return stream_info.downstreamLocalAddress();
         });

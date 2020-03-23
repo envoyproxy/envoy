@@ -514,6 +514,9 @@ Supported variable names are:
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
     Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
 
+%DOWNSTREAM_LOCAL_PORT%
+    Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
+
 %DOWNSTREAM_LOCAL_URI_SAN%
   HTTP
     The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
