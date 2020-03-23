@@ -3,6 +3,7 @@ Version history
 
 1.14.0 (Pending)
 ================
+* access log: added support for DOWNSTREAM_LOCAL_PORT :ref:`access log formatters <config_access_log_format>`.
 * access loggers: access logger extensions use the "envoy.access_loggers" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * access log: fix %DOWSTREAM_DIRECT_REMOTE_ADDRESS% when used with PROXY protocol listener filter
@@ -52,6 +53,7 @@ Version history
 * router: added ability to set attempt count in downstream response, see :ref:`virtual host's include response
   attempt count config <envoy_api_field_route.VirtualHost.include_attempt_count_in_response>`.
 * router: strip whitespace for :ref:`retry_on <envoy_api_field_route.RetryPolicy.retry_on>`, :ref:`grpc-retry-on header <config_http_filters_router_x-envoy-retry-grpc-on>` and :ref:`retry-on header <config_http_filters_router_x-envoy-retry-on>`.
+* router: added support for DOWNSTREAM_LOCAL_PORT :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
 * runtime: enabling the runtime feature "envoy.deprecated_features.allow_deprecated_extension_names"
   disables the use of deprecated extension names.
 * runtime: integer values may now be parsed as booleans.
