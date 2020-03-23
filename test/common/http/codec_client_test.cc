@@ -229,7 +229,10 @@ TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
 }
 
 TEST_F(CodecClientTest, ProtocolError) {
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Throw(CodecProtocolException("protocol error")));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> absl::Status {
+    throw CodecProtocolException("protocol error");
+    return absl::OkStatus();
+  }));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl data;
@@ -239,8 +242,9 @@ TEST_F(CodecClientTest, ProtocolError) {
 }
 
 TEST_F(CodecClientTest, 408Response) {
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> absl::Status {
     throw PrematureResponseException(Code::RequestTimeout);
+    return absl::OkStatus();
   }));
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -252,8 +256,9 @@ TEST_F(CodecClientTest, 408Response) {
 }
 
 TEST_F(CodecClientTest, PrematureResponse) {
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> absl::Status {
     throw PrematureResponseException(Code::OK);
+    return absl::OkStatus();
   }));
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -374,9 +379,10 @@ TEST_P(CodecNetworkTest, SendData) {
   const std::string full_data = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n";
   Buffer::OwnedImpl data(full_data);
   upstream_connection_->write(data, false);
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> absl::Status {
     EXPECT_EQ(full_data, data.toString());
     dispatcher_->exit();
+    return absl::OkStatus();
   }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
@@ -396,9 +402,14 @@ TEST_P(CodecNetworkTest, SendHeadersAndClose) {
   upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
-      .WillOnce(
-          Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ(full_data, data.toString()); }))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ("", data.toString()); }));
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> absl::Status {
+        EXPECT_EQ(full_data, data.toString());
+        return absl::OkStatus();
+      }))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> absl::Status {
+        EXPECT_EQ("", data.toString());
+        return absl::OkStatus();
+      }));
   // Because the headers are not complete, the disconnect will reset the stream.
   // Note even if the final \r\n were appended to the header data, enough of the
   // codec state is mocked out that the data would not be framed and the stream
@@ -429,9 +440,14 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
 
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
-      .WillOnce(
-          Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ(full_data, data.toString()); }))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ("", data.toString()); }));
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> absl::Status {
+        EXPECT_EQ(full_data, data.toString());
+        return absl::OkStatus();
+      }))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> absl::Status {
+        EXPECT_EQ("", data.toString());
+        return absl::OkStatus();
+      }));
   EXPECT_CALL(inner_encoder_.stream_, resetStream(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
     for (auto callbacks : inner_encoder_.stream_.callbacks_) {
       callbacks->onResetStream(StreamResetReason::RemoteReset, absl::string_view());

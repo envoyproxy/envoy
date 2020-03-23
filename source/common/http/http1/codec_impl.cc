@@ -483,10 +483,10 @@ absl::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
     for (const Buffer::RawSlice& slice : slices) {
       dispatching_ = true;
       auto result = dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
-      if (codec_exception_.ok()) {
-        total_parsed += result;
-      } else {
+      if (!codec_exception_.ok()) {
         return codec_exception_;
+      } else {
+        total_parsed += result;
       }
       dispatching_ = false;
     }
@@ -510,8 +510,10 @@ absl::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 
 ssize_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
   ssize_t rc = http_parser_execute(&parser_, &settings_, slice, len);
+  // Avoid overwriting the codec_exception_ we set in the callbacks.
   if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED &&
       codec_exception_.ok()) {
+    // TODO: We should set codec_exception_ to the http_erro_name here.
     sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError);
     throw CodecProtocolException("http/1.1 protocol error: " +
                                  std::string(http_errno_name(HTTP_PARSER_ERRNO(&parser_))));
@@ -953,7 +955,6 @@ int ClientConnectionImpl::onHeadersComplete() {
   // with a 'Connection: close' header). In this case we just let response flush out followed
   // by the remote close.
   if (!pending_response_.has_value() && !resetStreamCalled()) {
-    ENVOY_LOG_MISC(info, "THREW PREMATURE {}", "");
     throw PrematureResponseException(static_cast<Http::Code>(parser_.status_code));
   } else if (pending_response_.has_value()) {
     auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);

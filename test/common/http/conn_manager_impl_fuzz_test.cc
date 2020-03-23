@@ -222,6 +222,7 @@ public:
                 Fuzz::replaceInvalidHostCharacters(headers->Host()->value().getStringView()));
           }
           decoder_->decodeHeaders(std::move(headers), end_stream);
+          return absl::OkStatus();
         }));
     fakeOnData();
     decoder_filter_ = config.decoder_filter_;
@@ -305,6 +306,7 @@ public:
         EXPECT_CALL(*config_.codec_, dispatch(_)).WillOnce(InvokeWithoutArgs([this, &data_action] {
           Buffer::OwnedImpl buf(std::string(data_action.size() % (1024 * 1024), 'a'));
           decoder_->decodeData(buf, data_action.end_stream());
+          return absl::OkStatus();
         }));
         fakeOnData();
         state = data_action.end_stream() ? StreamState::Closed : StreamState::PendingDataOrTrailers;
@@ -326,6 +328,7 @@ public:
             .WillOnce(InvokeWithoutArgs([this, &trailers_action] {
               decoder_->decodeTrailers(std::make_unique<TestRequestTrailerMapImpl>(
                   Fuzz::fromHeaders<TestRequestTrailerMapImpl>(trailers_action.headers())));
+              return absl::OkStatus();
             }));
         fakeOnData();
         state = StreamState::Closed;
@@ -340,6 +343,7 @@ public:
       if (state == StreamState::PendingDataOrTrailers) {
         EXPECT_CALL(*config_.codec_, dispatch(_)).WillOnce(InvokeWithoutArgs([] {
           throw CodecProtocolException("blah");
+          return absl::OkStatus();
         }));
         fakeOnData();
         state = StreamState::Closed;

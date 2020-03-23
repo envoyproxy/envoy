@@ -117,10 +117,11 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
         return decoder;
       }));
 
+  // TODO: Right now this still throws instead of returning an error status.
   EXPECT_THROW(
       {
         auto status = codec_->dispatch(buffer);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
       },
       CodecProtocolException);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);

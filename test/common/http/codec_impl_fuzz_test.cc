@@ -335,10 +335,14 @@ public:
   }
 
   void drain() {
+    absl::Status status = absl::OkStatus();
     while (!bufs_.empty()) {
       Buffer::OwnedImpl& buf = bufs_.front();
       while (buf.length() > 0) {
-        connection_.dispatch(buf);
+        status = connection_.dispatch(buf);
+        if (!status.ok()) {
+          ENVOY_LOG_MISC(trace, "Error status: {}", status.message());
+        }
       }
       bufs_.pop_front();
     }
