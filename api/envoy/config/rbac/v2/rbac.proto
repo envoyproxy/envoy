@@ -203,12 +203,16 @@ message Principal {
     // Authenticated attributes that identify the downstream.
     Authenticated authenticated = 4;
 
-    // A CIDR block that describes the downstream IP.
+    // A CIDR block that describes the downstream direct remote address.
+    // Note: This is always the physical peer even if the
+    // :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>` is inferred from for example
+    // the x-forwarder-for header, proxy protocol, etc.
     api.v2.core.CidrRange source_ip = 5;
 
-    // A CIDR block that describes the remote IP of downstream connection.
-    // This might be different from the source_IP as the remote IP could be
-    // inferred from a proxy proto, x-forwarded-for, etc.
+    // A CIDR block that describes the downstream remote/origin address.
+    // Note: This may not be the physical peer and could be different from the
+    // :ref:`source_ip <envoy_api_field_config.rbac.v2.Principal.source_ip>`. E.g, if the remote
+    // address is inferred from for example the x-forwarder-for header, proxy protocol, etc.
     api.v2.core.CidrRange remote_ip = 10;
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only

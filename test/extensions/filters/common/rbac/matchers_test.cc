@@ -46,16 +46,18 @@ TEST(AndMatcher, Permission_Set) {
   perm->set_destination_port(123);
 
   Envoy::Network::MockConnection conn;
+  Envoy::Http::RequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(conn, localAddress()).WillOnce(ReturnRef(addr));
+  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
 
-  checkMatcher(RBAC::AndMatcher(set), true, conn);
+  checkMatcher(RBAC::AndMatcher(set), true, conn, headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 8080, false);
-  EXPECT_CALL(conn, localAddress()).WillOnce(ReturnRef(addr));
+  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
 
-  checkMatcher(RBAC::AndMatcher(set), false, conn);
+  checkMatcher(RBAC::AndMatcher(set), false, conn, headers, info);
 }
 
 TEST(AndMatcher, Principal_Set) {
@@ -71,16 +73,18 @@ TEST(AndMatcher, Principal_Set) {
   cidr->mutable_prefix_len()->set_value(24);
 
   Envoy::Network::MockConnection conn;
+  Envoy::Http::RequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(conn, remoteAddress()).WillOnce(ReturnRef(addr));
+  EXPECT_CALL(Const(info), downstreamDirectRemoteAddress()).WillOnce(ReturnRef(addr));
 
-  checkMatcher(RBAC::AndMatcher(set), true, conn);
+  checkMatcher(RBAC::AndMatcher(set), true, conn, headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.4.6", 123, false);
-  EXPECT_CALL(conn, remoteAddress()).WillOnce(ReturnRef(addr));
+  EXPECT_CALL(Const(info), downstreamDirectRemoteAddress()).WillOnce(ReturnRef(addr));
 
-  checkMatcher(RBAC::AndMatcher(set), false, conn);
+  checkMatcher(RBAC::AndMatcher(set), false, conn, headers, info);
 }
 
 TEST(OrMatcher, Permission_Set) {
@@ -89,16 +93,18 @@ TEST(OrMatcher, Permission_Set) {
   perm->set_destination_port(123);
 
   Envoy::Network::MockConnection conn;
+  Envoy::Http::RequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(Const(info), downstreamLocalAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
-  checkMatcher(RBAC::OrMatcher(set), false, conn);
+  checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
 
   perm = set.add_rules();
   perm->set_any(true);
 
-  checkMatcher(RBAC::OrMatcher(set), true, conn);
+  checkMatcher(RBAC::OrMatcher(set), true, conn, headers, info);
 }
 
 TEST(OrMatcher, Principal_Set) {
@@ -109,16 +115,20 @@ TEST(OrMatcher, Principal_Set) {
   cidr->mutable_prefix_len()->set_value(24);
 
   Envoy::Network::MockConnection conn;
+  Envoy::Http::RequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.4.6", 456, false);
-  EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(Const(info), downstreamDirectRemoteAddress())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(addr));
 
-  checkMatcher(RBAC::OrMatcher(set), false, conn);
+  checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
 
   id = set.add_ids();
   id->set_any(true);
 
-  checkMatcher(RBAC::OrMatcher(set), true, conn);
+  checkMatcher(RBAC::OrMatcher(set), true, conn, headers, info);
 }
 
 TEST(NotMatcher, Permission) {
@@ -159,57 +169,64 @@ TEST(HeaderMatcher, HeaderMatcher) {
 TEST(IPMatcher, IPMatcher) {
   Envoy::Network::MockConnection conn;
   Envoy::Http::RequestHeaderMapImpl headers;
-  Envoy::Network::Address::InstanceConstSharedPtr connectionLocal =
-      Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  Envoy::Network::Address::InstanceConstSharedPtr connectionRemote =
-      Envoy::Network::Utility::parseInternetAddress("4.5.6.7", 456, false);
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(connectionLocal));
-  EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(connectionRemote));
-
   NiceMock<StreamInfo::MockStreamInfo> info;
+  Envoy::Network::Address::InstanceConstSharedPtr directLocal =
+      Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
+  Envoy::Network::Address::InstanceConstSharedPtr directRemote =
+      Envoy::Network::Utility::parseInternetAddress("4.5.6.7", 456, false);
   Envoy::Network::Address::InstanceConstSharedPtr downstreamRemote =
       Envoy::Network::Utility::parseInternetAddress("8.9.10.11", 456, false);
-  EXPECT_CALL(Const(info), downstreamRemoteAddress()).WillRepeatedly(ReturnRef(downstreamRemote));
+  EXPECT_CALL(Const(info), downstreamLocalAddress())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(directLocal));
+  EXPECT_CALL(Const(info), downstreamDirectRemoteAddress())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(directRemote));
+  EXPECT_CALL(Const(info), downstreamRemoteAddress())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(downstreamRemote));
 
-  envoy::config::core::v3::CidrRange connection_local_cidr;
-  connection_local_cidr.set_address_prefix("1.2.3.0");
-  connection_local_cidr.mutable_prefix_len()->set_value(24);
+  envoy::config::core::v3::CidrRange downstream_local_cidr;
+  downstream_local_cidr.set_address_prefix("1.2.3.0");
+  downstream_local_cidr.mutable_prefix_len()->set_value(24);
 
-  envoy::config::core::v3::CidrRange connection_remote_cidr;
-  connection_remote_cidr.set_address_prefix("4.5.6.7");
-  connection_remote_cidr.mutable_prefix_len()->set_value(32);
+  envoy::config::core::v3::CidrRange downstream_direct_remote_cidr;
+  downstream_direct_remote_cidr.set_address_prefix("4.5.6.7");
+  downstream_direct_remote_cidr.mutable_prefix_len()->set_value(32);
 
   envoy::config::core::v3::CidrRange downstream_remote_cidr;
   downstream_remote_cidr.set_address_prefix("8.9.10.11");
   downstream_remote_cidr.mutable_prefix_len()->set_value(32);
 
-  checkMatcher(IPMatcher(connection_local_cidr, IPMatcher::Type::ConnectionLocal), true, conn,
+  checkMatcher(IPMatcher(downstream_local_cidr, IPMatcher::Type::DownstreamLocal), true, conn,
                headers, info);
-  checkMatcher(IPMatcher(connection_remote_cidr, IPMatcher::Type::ConnectionRemote), true, conn,
-               headers, info);
+  checkMatcher(IPMatcher(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote),
+               true, conn, headers, info);
   checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), true, conn,
                headers, info);
 
-  connection_local_cidr.set_address_prefix("1.2.4.8");
-  connection_remote_cidr.set_address_prefix("4.5.6.0");
+  downstream_local_cidr.set_address_prefix("1.2.4.8");
+  downstream_direct_remote_cidr.set_address_prefix("4.5.6.0");
   downstream_remote_cidr.set_address_prefix("4.5.6.7");
 
-  checkMatcher(IPMatcher(connection_local_cidr, IPMatcher::Type::ConnectionLocal), false, conn,
+  checkMatcher(IPMatcher(downstream_local_cidr, IPMatcher::Type::DownstreamLocal), false, conn,
                headers, info);
-  checkMatcher(IPMatcher(connection_remote_cidr, IPMatcher::Type::ConnectionRemote), false, conn,
-               headers, info);
+  checkMatcher(IPMatcher(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote),
+               false, conn, headers, info);
   checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), false, conn,
                headers, info);
 }
 
 TEST(PortMatcher, PortMatcher) {
   Envoy::Network::MockConnection conn;
+  Envoy::Http::RequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(Const(info), downstreamLocalAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
-  checkMatcher(PortMatcher(123), true, conn);
-  checkMatcher(PortMatcher(456), false, conn);
+  checkMatcher(PortMatcher(123), true, conn, headers, info);
+  checkMatcher(PortMatcher(456), false, conn, headers, info);
 }
 
 TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
@@ -335,6 +352,8 @@ TEST(PolicyMatcher, PolicyMatcher) {
   RBAC::PolicyMatcher matcher(policy, nullptr);
 
   Envoy::Network::MockConnection conn;
+  Envoy::Http::RequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
   auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
@@ -346,19 +365,19 @@ TEST(PolicyMatcher, PolicyMatcher) {
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef("subject"));
 
   EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(ssl));
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(Const(info), downstreamLocalAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
-  checkMatcher(matcher, true, conn);
+  checkMatcher(matcher, true, conn, headers, info);
 
   EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(Const(info), downstreamLocalAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
-  checkMatcher(matcher, false, conn);
+  checkMatcher(matcher, false, conn, headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 789, false);
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(Const(info), downstreamLocalAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
-  checkMatcher(matcher, false, conn);
+  checkMatcher(matcher, false, conn, headers, info);
 }
 
 TEST(RequestedServerNameMatcher, ValidRequestedServerName) {

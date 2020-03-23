@@ -20,7 +20,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
     return std::make_shared<const HeaderMatcher>(permission.header());
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationIp:
     return std::make_shared<const IPMatcher>(permission.destination_ip(),
-                                             IPMatcher::Type::ConnectionLocal);
+                                             IPMatcher::Type::DownstreamLocal);
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPort:
     return std::make_shared<const PortMatcher>(permission.destination_port());
   case envoy::config::rbac::v3::Permission::RuleCase::kAny:
@@ -48,7 +48,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
     return std::make_shared<const AuthenticatedMatcher>(principal.authenticated());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kSourceIp:
     return std::make_shared<const IPMatcher>(principal.source_ip(),
-                                             IPMatcher::Type::ConnectionRemote);
+                                             IPMatcher::Type::DownstreamDirectRemote);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kRemoteIp:
     return std::make_shared<const IPMatcher>(principal.remote_ip(),
                                              IPMatcher::Type::DownstreamRemote);
@@ -127,15 +127,15 @@ bool HeaderMatcher::matches(const Network::Connection&,
   return Envoy::Http::HeaderUtility::matchHeaders(headers, header_);
 }
 
-bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,
+bool IPMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                         const StreamInfo::StreamInfo& info) const {
   Envoy::Network::Address::InstanceConstSharedPtr ip;
   switch (type_) {
-  case ConnectionLocal:
-    ip = connection.localAddress();
+  case DownstreamLocal:
+    ip = info.downstreamLocalAddress();
     break;
-  case ConnectionRemote:
-    ip = connection.remoteAddress();
+  case DownstreamDirectRemote:
+    ip = info.downstreamDirectRemoteAddress();
     break;
   case DownstreamRemote:
     ip = info.downstreamRemoteAddress();
@@ -146,10 +146,9 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
   return range_.isInRange(*ip.get());
 }
 
-bool PortMatcher::matches(const Network::Connection& connection,
-                          const Envoy::Http::RequestHeaderMap&,
-                          const StreamInfo::StreamInfo&) const {
-  const Envoy::Network::Address::Ip* ip = connection.localAddress().get()->ip();
+bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+                          const StreamInfo::StreamInfo& info) const {
+  const Envoy::Network::Address::Ip* ip = info.downstreamLocalAddress().get()->ip();
   return ip && ip->port() == port_;
 }
 
