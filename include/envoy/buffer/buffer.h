@@ -13,7 +13,9 @@
 
 #include "common/common/byte_order.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -27,6 +29,8 @@ struct RawSlice {
 
   bool operator==(const RawSlice& rhs) const { return mem_ == rhs.mem_ && len_ == rhs.len_; }
 };
+
+using RawSliceVector = absl::InlinedVector<RawSlice, 16>;
 
 /**
  * A wrapper class to facilitate passing in externally owned data to a buffer via addBufferFragment.
@@ -124,14 +128,12 @@ public:
   virtual void drain(uint64_t size) PURE;
 
   /**
-   * Fetch the raw buffer slices. This routine is optimized for performance.
-   * @param out supplies an array of RawSlice objects to fill.
-   * @param out_size supplies the size of out.
-   * @return the actual number of slices needed, which may be greater than out_size. Passing
-   *         nullptr for out and 0 for out_size will just return the size of the array needed
-   *         to capture all of the slice data.
+   * Fetch the raw buffer slices.
+   * @param max_slices supplies an optional limit on the number of slices to fetch, for performance.
+   * @return RawSliceVector with non-empty slices in the buffer.
    */
-  virtual uint64_t getRawSlices(RawSlice* out, uint64_t out_size) const PURE;
+  virtual RawSliceVector
+  getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const PURE;
 
   /**
    * @return uint64_t the total length of the buffer (not necessarily contiguous in memory).

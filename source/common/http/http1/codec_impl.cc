@@ -451,10 +451,7 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
   }
 
   ssize_t total_parsed = 0;
-  uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-  data.getRawSlices(slices.begin(), num_slices);
-  for (const Buffer::RawSlice& slice : slices) {
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     total_parsed += slice.len_;
     onBody(static_cast<const char*>(slice.mem_), slice.len_);
   }
@@ -475,10 +472,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
-    uint64_t num_slices = data.getRawSlices(nullptr, 0);
-    absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-    data.getRawSlices(slices.begin(), num_slices);
-    for (const Buffer::RawSlice& slice : slices) {
+    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
       total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
     }
   } else {

@@ -66,11 +66,8 @@ public:
    * Impl note: similar to redis codec, which also keeps state.
    */
   void onData(Buffer::Instance& data) override {
-    // Convert buffer to slices and pass them to `doParse`.
-    uint64_t num_slices = data.getRawSlices(nullptr, 0);
-    absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-    data.getRawSlices(slices.begin(), num_slices);
-    for (const Buffer::RawSlice& slice : slices) {
+    // Pass slices to `doParse`.
+    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
       doParse(slice);
     }
   }

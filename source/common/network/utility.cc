@@ -503,10 +503,9 @@ Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,
                                                const Address::Ip* local_ip,
                                                const Address::Instance& peer_address) {
-  const uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-  buffer.getRawSlices(slices.begin(), num_slices);
-  return writeToSocket(handle, slices.begin(), num_slices, local_ip, peer_address);
+  Buffer::RawSliceVector slices = buffer.getRawSlices();
+  return writeToSocket(handle, !slices.empty() ? &slices[0] : nullptr, slices.size(), local_ip,
+                       peer_address);
 }
 
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlice* slices,

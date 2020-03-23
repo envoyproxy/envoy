@@ -67,11 +67,8 @@ void Decoder::frameDataEnd() {
 }
 
 uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
-  uint64_t count = data.getRawSlices(nullptr, 0);
-  absl::FixedArray<Buffer::RawSlice> slices(count);
-  data.getRawSlices(slices.begin(), count);
   uint64_t delta = 0;
-  for (const Buffer::RawSlice& slice : slices) {
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     uint8_t* mem = reinterpret_cast<uint8_t*>(slice.mem_);
     for (uint64_t j = 0; j < slice.len_;) {
       uint8_t c = *mem;

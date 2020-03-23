@@ -25,10 +25,10 @@ bool ZeroCopyInputStreamImpl::Next(const void** data, int* size) {
     position_ = 0;
   }
 
-  Buffer::RawSlice slice;
-  const uint64_t num_slices = buffer_->getRawSlices(&slice, 1);
+  Buffer::RawSliceVector slices = buffer_->getRawSlices(1);
 
-  if (num_slices > 0 && slice.len_ > 0) {
+  if (slices.size() > 0 && slices[0].len_ > 0) {
+    auto& slice = slices[0];
     *data = slice.mem_;
     *size = slice.len_;
     position_ = slice.len_;
