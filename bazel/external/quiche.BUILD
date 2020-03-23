@@ -59,14 +59,20 @@ quiche_copts = select({
         # Remove these after upstream fix.
         "-Wno-unused-parameter",
         "-Wno-unused-function",
-        "-Wno-unused-const-variable",
-        "-Wno-type-limits",
         # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
         "-Wno-invalid-offsetof",
-        "-Wno-type-limits",
-        "-Wno-return-type",
     ],
 })
+
+test_suite(
+    name = "ci_tests",
+    tests = [
+        "http2_platform_api_test",
+        "quic_platform_api_test",
+        "quiche_common_test",
+        "spdy_platform_api_test",
+    ],
+)
 
 envoy_cc_test_library(
     name = "http2_test_tools_random",
@@ -3489,10 +3495,7 @@ envoy_cc_test(
     srcs = ["quiche/common/simple_linked_hash_map_test.cc"],
     copts = quiche_copts,
     repository = "@envoy",
-    tags = [
-        "nofips",
-        "test_included",
-    ],
+    tags = ["nofips"],
     deps = [
         ":quiche_common_lib",
         ":quiche_common_platform_test",
@@ -3506,10 +3509,7 @@ envoy_cc_test(
         "quiche/http2/test_tools/http2_random_test.cc",
     ],
     repository = "@envoy",
-    tags = [
-        "nofips",
-        "test_included",
-    ],
+    tags = ["nofips"],
     deps = [
         ":http2_platform",
         ":http2_test_tools_random",
@@ -3520,10 +3520,7 @@ envoy_cc_test(
     name = "spdy_platform_api_test",
     srcs = ["quiche/spdy/platform/api/spdy_string_utils_test.cc"],
     repository = "@envoy",
-    tags = [
-        "nofips",
-        "test_included",
-    ],
+    tags = ["nofips"],
     deps = [
         ":quiche_common_test_tools_test_utils_lib",
         ":spdy_platform",
@@ -3584,10 +3581,7 @@ envoy_cc_test(
     ],
     copts = quiche_copts,
     repository = "@envoy",
-    tags = [
-        "nofips",
-        "test_included",
-    ],
+    tags = ["nofips"],
     deps = [
         ":quic_core_buffer_allocator_lib",
         ":quic_platform",
