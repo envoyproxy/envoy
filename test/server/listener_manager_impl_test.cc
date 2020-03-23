@@ -3269,15 +3269,29 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
               routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
+    listener_filters:
+    - name: "envoy.filters.listener.original_dst"
+      config: {}            
   )EOF",
                                                        Network::Address::IpVersion::v4);
+      Configuration::ListenerFactoryContext* listener_factory_context = nullptr;
+      // Extract listener_factory_context without breaking encapulation.                                           
+      ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
+        .WillByDefault(
+            Invoke([&listener_factory_context](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                          filters,
+                      Configuration::ListenerFactoryContext& context)
+                       -> std::vector<Network::ListenerFilterFactoryCb> {
+listener_factory_context = &context;
+              return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
+                                                                                    context);
+            }));                                                     
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
-  auto context = dynamic_cast<Configuration::FactoryContext*>(&manager_->listeners().front().get());
-  ASSERT_NE(nullptr, context);
+  ASSERT_NE(nullptr, listener_factory_context);
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(&context->listenerMetadata(), "com.bar.foo", "baz")
+            Config::Metadata::metadataValue(&listener_factory_context->listenerMetadata(), "com.bar.foo", "baz")
                 .string_value());
-  EXPECT_EQ(envoy::config::core::v3::INBOUND, context->direction());
+  EXPECT_EQ(envoy::config::core::v3::INBOUND, listener_factory_context->direction());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
