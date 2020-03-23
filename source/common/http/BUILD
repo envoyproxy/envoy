@@ -337,6 +337,7 @@ envoy_cc_library(
     external_deps = [
         "abseil_optional",
         "http_parser",
+        "nghttp2",
     ],
     deps = [
         ":exception_lib",

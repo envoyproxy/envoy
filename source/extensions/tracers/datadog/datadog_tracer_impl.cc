@@ -109,12 +109,13 @@ void TraceReporter::flushTraces() {
   }
 }
 
-void TraceReporter::onFailure(Http::AsyncClient::FailureReason) {
+void TraceReporter::onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) {
   ENVOY_LOG(debug, "failure submitting traces to datadog agent");
   driver_.tracerStats().reports_failed_.inc();
 }
 
-void TraceReporter::onSuccess(Http::ResponseMessagePtr&& http_response) {
+void TraceReporter::onSuccess(const Http::AsyncClient::Request&,
+                              Http::ResponseMessagePtr&& http_response) {
   uint64_t responseStatus = Http::Utility::getResponseStatus(http_response->headers());
   if (responseStatus != enumToInt(Http::Code::OK)) {
     // TODO: Consider adding retries for failed submissions.
