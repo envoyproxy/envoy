@@ -31,7 +31,9 @@ message DnsFilterConfig {
       // Load the configuration specified from the control plane
       data.dns.v2alpha.DnsTable inline_dns_table = 1;
 
-      // Seed the filter configuration from an external path
+      // Seed the filter configuration from an external path. This source
+      // is a yaml formatted file that contains the DnsTable driving Envoy's
+      // responses to DNS queries
       api.v2.core.DataSource external_dns_table = 2;
     }
   }

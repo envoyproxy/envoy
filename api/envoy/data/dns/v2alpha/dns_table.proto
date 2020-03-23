@@ -22,7 +22,12 @@ message DnsTable {
   // This message contains a list of IP addresses returned for a query for a known name
   message AddressList {
     // This field contains a well formed IP address that is returned
-    // in the answer for a name query
+    // in the answer for a name query. The address field can be an
+    // IPv4 or IPv6 address. Address family detection is done automatically
+    // when Envoy parses the string. Since this field is repeated,
+    // Envoy will return one randomly chosen entry from this list in the
+    // DNS response. The random index will vary per query so that we prevent
+    // clients pinning on a single address for a configured domain
     repeated string address = 1;
   }
 
@@ -55,6 +60,8 @@ message DnsTable {
   repeated DnsVirtualDomain virtual_domains = 2 [(validate.rules).repeated = {min_items: 1}];
 
   // This field serves to help Envoy determine whether it can authoritatively
-  // answer a query for a name belonging to a domain in this list
+  // answer a query for a name belonging to a domain in this list. If the query
+  // name has a suffix that does not appear in this list, Envoy will forward
+  // the query to an upstream DNS server
   repeated string known_domains = 3;
 }
