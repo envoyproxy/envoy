@@ -417,6 +417,21 @@ TEST(GzipFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName
           deprecated_name));
 }
 
+// Test setting zlib's chunk size.
+TEST_F(GzipFilterTest, ChunkSize) {
+  // Default
+  setUpFilter("{}");
+  EXPECT_EQ(config_->chunkSize(), 4096);
+
+  // Override
+  setUpFilter(R"EOF(
+{
+  "chunk_size": 8192
+}
+)EOF");
+  EXPECT_EQ(config_->chunkSize(), 8192);
+}
+
 } // namespace Gzip
 } // namespace HttpFilters
 } // namespace Extensions

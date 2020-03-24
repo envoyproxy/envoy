@@ -17,8 +17,6 @@ Version history
 * aws_request_signing: a few fixes so that it works with S3.
 * buffer: force copy when appending small slices to OwnedImpl buffer to avoid fragmentation.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
-* grpc-json: added support for building HTTP request into
-  `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 * config: added stat :ref:`update_time <config_cluster_manager_cds>`.
 * datasource: added retry policy for remote async data source.
 * dns: the STRICT_DNS cluster now only resolves to 0 hosts if DNS resolution successfully returns 0 hosts.
@@ -28,6 +26,9 @@ Version history
 * ext_authz: disabled the use of lowercase string matcher for headers matching in HTTP-based `ext_authz`.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher` to false.
 * fault: added support for controlling abort faults with :ref:`HTTP header fault configuration <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
+* grpc-json: added support for building HTTP request into
+  `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
+* gzip filter: added option to set zlib's next output buffer.
 * http: added HTTP/1.1 flood protection. Can be temporarily disabled using the runtime feature `envoy.reloadable_features.http1_flood_protection`
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
 * http: fixed a bug that could send extra METADATA frames and underflow memory when encoding METADATA frames on a connection that was dispatching data.
