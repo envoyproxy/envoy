@@ -283,6 +283,8 @@ void ConnectionManagerImpl::handleCodecException(const char* error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
   read_callbacks_->connection().streamInfo().setResponseCodeDetails(
       absl::StrCat("codec error: ", error));
+  read_callbacks_->connection().streamInfo().setResponseFlag(
+      StreamInfo::ResponseFlag::DownstreamProtocolError);
 
   // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
   // GOAWAY.
@@ -324,14 +326,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     try {
       codec_->dispatch(data);
     } catch (const FrameFloodException& e) {
-      const envoy::type::v3::FractionalPercent default_value; // 0
-      if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
-                                             default_value)) {
-        ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}",
-                       read_callbacks_->connection(),
-                       read_callbacks_->connection().remoteAddress()->asString(), e.what());
-      }
-
       handleCodecException(e.what());
       return Network::FilterStatus::StopIteration;
     } catch (const CodecProtocolException& e) {
