@@ -694,11 +694,7 @@ def _com_github_grpc_grpc():
     )
 
 def _upb():
-    _repository_impl(
-        name = "upb",
-        patches = ["@envoy//bazel:upb.patch"],
-        patch_args = ["-p1"],
-    )
+    _repository_impl("upb")
 
     native.bind(
         name = "upb_lib",
