@@ -23,7 +23,7 @@ namespace {
 // If this default timestamp is wrapped as double (using ValueUtil::numberValue()) and then it is
 // serialized using Protobuf::util::MessageToJsonString, it renders as: 1.58432429547687e+15.
 constexpr uint64_t DEFAULT_TEST_TIMESTAMP = 1584324295476870;
-constexpr uint64_t DEFAULT_TEST_DURATION = 1584324295476870;
+constexpr uint64_t DEFAULT_TEST_DURATION = 2584324295476870;
 const Util::Replacements DEFAULT_TEST_REPLACEMENTS = {
     {"DEFAULT_TEST_TIMESTAMP", std::to_string(DEFAULT_TEST_TIMESTAMP)}};
 const Util::Replacements DEFAULT_TEST_DURATIONS = {
@@ -430,11 +430,11 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
               Not(HasSubstr(R"("timestamp":1.58432429547687e+15)")));
   EXPECT_THAT(bufferDeprecatedJsonV1.serialize(),
               Not(HasSubstr(R"("timestamp":"1584324295476870")")));
-  EXPECT_THAT(bufferDeprecatedJsonV1.serialize(), HasSubstr(R"("duration":1584324295476870)"));
+  EXPECT_THAT(bufferDeprecatedJsonV1.serialize(), HasSubstr(R"("duration":2584324295476870)"));
   EXPECT_THAT(bufferDeprecatedJsonV1.serialize(),
-              Not(HasSubstr(R"("duration":1.58432429547687e+15)")));
+              Not(HasSubstr(R"("duration":2.584324295476870e+15)")));
   EXPECT_THAT(bufferDeprecatedJsonV1.serialize(),
-              Not(HasSubstr(R"("duration":"1584324295476870")")));
+              Not(HasSubstr(R"("duration":"2584324295476870")")));
 
   SpanBuffer bufferJsonV2(
       envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1, true, 2);
@@ -442,9 +442,9 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
   EXPECT_THAT(bufferJsonV2.serialize(), HasSubstr(R"("timestamp":1584324295476870)"));
   EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("timestamp":1.58432429547687e+15)")));
   EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("timestamp":"1584324295476870")")));
-  EXPECT_THAT(bufferJsonV2.serialize(), HasSubstr(R"("duration":1584324295476870)"));
-  EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("duration":1.58432429547687e+15)")));
-  EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("duration":"1584324295476870")")));
+  EXPECT_THAT(bufferJsonV2.serialize(), HasSubstr(R"("duration":2584324295476870)"));
+  EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("duration":2.584324295476870e+15)")));
+  EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("duration":"2584324295476870")")));
 }
 
 } // namespace
