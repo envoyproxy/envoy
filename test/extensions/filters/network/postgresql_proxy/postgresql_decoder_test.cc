@@ -56,7 +56,7 @@ public:
   PostgreSQLProxyDecoderTest() {
     decoder_ = std::make_unique<DecoderImpl>(&callbacks_);
     decoder_->initialize();
-    decoder_->setInitial(false);
+    decoder_->setStartup(false);
   }
 
 protected:
@@ -69,14 +69,14 @@ protected:
   char buf_[256];
 };
 
-// Test processing the initial message from a client.
+// Test processing the startup message from a client.
 // For historical reasons, the first message does not include
-// command (first byte). It starts with length. The initial
+// command (first byte). It starts with length. The startup
 // message contains the protocol version. After processing the
-// initial message the server should start using message format
+// startup message the server should start using message format
 // with command as 1st byte.
-TEST_F(PostgreSQLProxyDecoderTest, InitialMessage) {
-  decoder_->setInitial(true);
+TEST_F(PostgreSQLProxyDecoderTest, StartupMessage) {
+  decoder_->setStartup(true);
 
   // start with length
   length_ = htonl(12);
@@ -271,29 +271,6 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload = "DELETE 88";
   data.add("C");
-  length_ = htonl(4 + payload.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload);
-  decoder_->onData(data, false);
-  data.drain(data.length());
-
-  // T message
-  EXPECT_CALL(callbacks_, incStatements());
-  EXPECT_CALL(callbacks_, incStatementsSelect());
-  EXPECT_CALL(callbacks_, incTransactionsCommit());
-  payload = "blah blah";
-  data.add("T");
-  length_ = htonl(4 + payload.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload);
-  decoder_->onData(data, false);
-  data.drain(data.length());
-
-  // '1' Message
-  EXPECT_CALL(callbacks_, incStatements());
-  EXPECT_CALL(callbacks_, incStatementsOther());
-  payload = "blah blah";
-  data.add("1");
   length_ = htonl(4 + payload.length());
   data.add(&length_, sizeof(length_));
   data.add(payload);

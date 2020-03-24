@@ -42,8 +42,8 @@ DELETE FROM test WHERE f1 = 1;
 DELETE FROM test;
 
 /*
-
 postgresql.egress_postgresql.errors: 0
+postgresql.egress_postgresql.frontend_commands: 12
 postgresql.egress_postgresql.sessions: 1
 postgresql.egress_postgresql.statements: 12
 postgresql.egress_postgresql.statements_delete: 2
@@ -54,8 +54,8 @@ postgresql.egress_postgresql.statements_update: 2
 postgresql.egress_postgresql.transactions: 12
 postgresql.egress_postgresql.transactions_commit: 12
 postgresql.egress_postgresql.transactions_rollback: 0
+postgresql.egress_postgresql.unrecognized: 0
 postgresql.egress_postgresql.warnings: 0
-
 */
 
 /* </IMPLICT_TRANSACTIONS> */
