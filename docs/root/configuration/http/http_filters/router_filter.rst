@@ -409,8 +409,8 @@ statistics:
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the retry budget
   upstream_rq_retry_success, Counter, Total request retry successes
   upstream_rq_time, Histogram, Request time milliseconds
-  upstream_rq_total, Counter, Total requests initiated by the router to the upstream
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
+  upstream_rq_total, Counter, Total requests initiated by the router to the upstream
 
 Runtime
 -------
