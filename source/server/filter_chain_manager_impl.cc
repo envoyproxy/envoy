@@ -194,9 +194,8 @@ void FilterChainManagerImpl::addFilterChain(
     // ListenerImpl maintains the dependencies of FilterChainFactoryContext
     auto filter_chain_impl = findExistingFilterChain(*filter_chain);
     if (filter_chain_impl == nullptr) {
-      // TODO(lambdai): remove static_pointer_cast
-      filter_chain_impl = std::static_pointer_cast<FilterChainImpl>(
-          filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator));
+      filter_chain_impl =
+          filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
       ++new_filter_chain_size;
     }
 
