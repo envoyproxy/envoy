@@ -15,15 +15,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgreSQLProxy {
 
-/**
- * General callbacks for dispatching decoded PostgreSQL messages to a sink.
- */
+// General callbacks for dispatching decoded PostgreSQL messages to a sink.
 class DecoderCallbacks {
 public:
   virtual ~DecoderCallbacks() = default;
 
   virtual void incFrontend() PURE;
-  virtual void incUnrecognized() PURE;
+  virtual void incBackend() PURE;
+  virtual void incUnknown() PURE;
 
   virtual void incErrors() PURE;
   virtual void incSessions() PURE;
@@ -39,31 +38,7 @@ public:
   virtual void incWarnings() PURE;
 };
 
-class DecoderImpl;
-
-using MsgAction = std::function<void(DecoderImpl*)>;
-class MessageImpl {
-public:
-  // using MsgAction = std::add_pointer_t<void(DecoderImpl*)>;
-  // using MsgAction = void(DecoderImpl*);
-
-  MessageImpl(std::string descr, std::string type) : descr_(descr), type_(type) {}
-  std::string getDescr() const { return descr_; }
-  std::string getType() const { return type_; }
-  void addAction(MsgAction action) { actions_.push_back(action); }
-  const std::vector<MsgAction>& getActions() const { return actions_; }
-
-private:
-  std::string descr_;
-  std::string type_;
-  std::vector<MsgAction> actions_;
-};
-
-using Message = std::tuple<std::string, std::string, std::vector<MsgAction>>;
-
-/**
- * PostgreSQL message decoder.
- */
+// PostgreSQL message decoder.
 class Decoder {
 public:
   virtual ~Decoder() = default;
@@ -75,11 +50,9 @@ public:
 using DecoderPtr = std::unique_ptr<Decoder>;
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
-  // friend  MessageImpl;
 public:
   DecoderImpl(DecoderCallbacks* callbacks) : callbacks_(callbacks) { initialize(); }
 
-  // PostgreSQLProxy::Decoder
   bool onData(Buffer::Instance& data, bool frontend) override;
   PostgreSQLSession& getSession() override { return session_; }
 
@@ -100,11 +73,13 @@ protected:
   void decodeBackendErrorResponse();
   void decodeBackendNoticeResponse();
   void decodeFrontendTerminate();
-  void incFrontend();
-  void incUnrecognized();
-  void incStatements();
-  void incStatementsOther();
-  void incSessions();
+
+  void incFrontend() { callbacks_->incFrontend(); }
+  void incBackend() { callbacks_->incBackend(); }
+  void incUnknown() { callbacks_->incUnknown(); }
+  void incStatements() { callbacks_->incStatements(); }
+  void incStatementsOther() { callbacks_->incStatementsOther(); }
+  void incSessions() { callbacks_->incSessions(); }
 
   DecoderCallbacks* callbacks_;
   PostgreSQLSession session_;
@@ -116,12 +91,14 @@ protected:
 
   bool startup_{true}; // startup stage does not have 1st byte command
 
+  // Message action defines the Decoder's method which will be invoked
+  // when a specific message has been decoded.
+  using MsgAction = std::function<void(DecoderImpl*)>;
+  // Message has two fields:
+  // field 0 - string with message description
+  // field 1 - vector of Decoder's methods which are invoked when the message
+  // is processed.
   using Message = std::tuple<std::string, std::vector<MsgAction>>;
-  // Handler for startup postgresql message.
-  // Startup message message which does not start with 1 byte TYPE.
-  // It starts with message length and must be therefore handled
-  // differently.
-  Message first_;
 
   // Frontend and Backend messages
   // Class could be used to group those values, but tuple is used until
@@ -131,6 +108,12 @@ protected:
   // field 2 - data used for processing messages not found in hash map
   std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> FEmessages_;
   std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> BEmessages_;
+  //
+  // Handler for startup postgresql message.
+  // Startup message message which does not start with 1 byte TYPE.
+  // It starts with message length and must be therefore handled
+  // differently.
+  Message first_;
 };
 
 } // namespace PostgreSQLProxy

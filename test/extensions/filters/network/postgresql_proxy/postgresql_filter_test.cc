@@ -98,11 +98,11 @@ TEST_P(PostgreSQLFilterTest, ReadData) {
 // Parameterized test:
 // First value in the tuple is method taking buffer with received data.
 // Second value in the tuple is method returning how many bytes are left after processing.
-INSTANTIATE_TEST_CASE_P(ProcessDataTests, PostgreSQLFilterTest,
-                        ::testing::Values(std::make_tuple(&PostgreSQLFilter::onData,
-                                                          &PostgreSQLFilter::getFrontendBufLength),
-                                          std::make_tuple(&PostgreSQLFilter::onWrite,
-                                                          &PostgreSQLFilter::getBackendBufLength)));
+INSTANTIATE_TEST_SUITE_P(
+    ProcessDataTests, PostgreSQLFilterTest,
+    ::testing::Values(
+        std::make_tuple(&PostgreSQLFilter::onData, &PostgreSQLFilter::getFrontendBufLength),
+        std::make_tuple(&PostgreSQLFilter::onWrite, &PostgreSQLFilter::getBackendBufLength)));
 
 } // namespace PostgreSQLProxy
 } // namespace NetworkFilters

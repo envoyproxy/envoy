@@ -12,7 +12,8 @@ namespace PostgreSQLProxy {
 class DecoderCallbacksMock : public DecoderCallbacks {
 public:
   MOCK_METHOD(void, incFrontend, (), (override));
-  MOCK_METHOD(void, incUnrecognized, (), (override));
+  MOCK_METHOD(void, incBackend, (), (override));
+  MOCK_METHOD(void, incUnknown, (), (override));
   MOCK_METHOD(void, incErrors, (), (override));
   MOCK_METHOD(void, incSessions, (), (override));
   MOCK_METHOD(void, incStatements, (), (override));
@@ -27,29 +28,6 @@ public:
   MOCK_METHOD(void, incWarnings, (), (override));
 };
 
-// Test the Decoder::MessageImpl
-#if 0
-TEST(PostgreSQLMessageTest, Basic) {
-  MessageImpl msg("TestMsg", "Frontend");
-
-  ASSERT_THAT(msg.getDescr(), "TestMsg");
-  ASSERT_THAT(msg.getType(), "Frontend");
-
-  // create a function and add it to the message
-  MessageImpl::MsgAction action1 =  [](DecoderImpl*){};
-  msg.addAction(action1);
-  std::reference_wrapper<const std::vector<MessageImpl::MsgAction>> action_list = msg.getActions();
-  ASSERT_THAT(action1.target<MessageImpl::MsgAction>(), action_list.get().front().target<MessageImpl::MsgAction>());
-
-  // Add another action;
-  MessageImpl::MsgAction action2 = [](DecoderImpl*){};
-  msg.addAction(action2);
-  action_list = msg.getActions();
-  ASSERT_THAT(action_list.get().size(), 2);
-  ASSERT_THAT(action1.target<MessageImpl::MsgAction>(), action_list.get().front().target<MessageImpl::MsgAction>());
-  ASSERT_THAT(action2.target<MessageImpl::MsgAction>(), action_list.get().front().target<MessageImpl::MsgAction>());
-}
-#endif
 // Define fixture class with decoder and mock callbacks.
 class PostgreSQLProxyDecoderTest : public ::testing::TestWithParam<std::string> {
 public:
@@ -68,6 +46,12 @@ protected:
   uint32_t length_;
   char buf_[256];
 };
+
+// Class is used for parameterized tests for frontend messages.
+class PostgreSQLProxyFrontendDecoderTest : public PostgreSQLProxyDecoderTest {};
+
+// Class is used for parameterized tests for backend messages.
+class PostgreSQLProxyBackendDecoderTest : public PostgreSQLProxyDecoderTest {};
 
 // Test processing the startup message from a client.
 // For historical reasons, the first message does not include
@@ -175,10 +159,10 @@ TEST_F(PostgreSQLProxyDecoderTest, TwoMessagesInOneBuffer) {
   ASSERT_THAT(data.length(), 0);
 }
 
-TEST_F(PostgreSQLProxyDecoderTest, Unrecognized) {
+TEST_F(PostgreSQLProxyDecoderTest, Unknown) {
   // Create invalid message. The first byte is invalid "="
   // Message must be at least 5 bytes to be parsed.
-  EXPECT_CALL(callbacks_, incUnrecognized()).Times(1);
+  EXPECT_CALL(callbacks_, incUnknown()).Times(1);
   data.add("=");
   length_ = htonl(50);
   data.add(&length_, sizeof(length_));
@@ -186,7 +170,8 @@ TEST_F(PostgreSQLProxyDecoderTest, Unrecognized) {
   decoder_->onData(data, true);
 }
 
-TEST_P(PostgreSQLProxyDecoderTest, FrontEnd) {
+// Test if each frontend command calls incFrontend method
+TEST_P(PostgreSQLProxyFrontendDecoderTest, FrontendInc) {
   EXPECT_CALL(callbacks_, incFrontend()).Times(1);
   data.add(GetParam());
   length_ = htonl(50);
@@ -195,8 +180,46 @@ TEST_P(PostgreSQLProxyDecoderTest, FrontEnd) {
   decoder_->onData(data, true);
 }
 
-INSTANTIATE_TEST_CASE_P(FrontEndMessagesTests, PostgreSQLProxyDecoderTest,
-                        ::testing::Values("P", "Q", "B"));
+// Run the above test for each frontend message
+INSTANTIATE_TEST_SUITE_P(FrontEndMessagesTests, PostgreSQLProxyFrontendDecoderTest,
+                         ::testing::Values("B", "C", "d", "c", "f", "D", "E", "H", "F", "p", "P",
+                                           "p", "Q", "S", "X"));
+
+// Test if X message triggers incRollback and sets proper state in transaction
+TEST_F(PostgreSQLProxyFrontendDecoderTest, TerminateMessage) {
+  // set decoder state NOT to be in_transaction
+  decoder_->getSession().setInTransaction(false);
+  EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
+  data.add("X");
+  length_ = htonl(4);
+  data.add(&length_, sizeof(length_));
+  decoder_->onData(data, true);
+
+  // Now set the decoder to be in_transaction state.
+  decoder_->getSession().setInTransaction(true);
+  EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(1);
+  data.add("X");
+  length_ = htonl(4);
+  data.add(&length_, sizeof(length_));
+  decoder_->onData(data, true);
+  ASSERT_FALSE(decoder_->getSession().inTransaction());
+}
+
+// Test if each backend command calls incBackend method
+TEST_P(PostgreSQLProxyBackendDecoderTest, BackendInc) {
+  EXPECT_CALL(callbacks_, incBackend()).Times(1);
+  data.add(GetParam());
+  length_ = htonl(50);
+  data.add(&length_, sizeof(length_));
+  data.add(buf_, 46);
+  decoder_->onData(data, false);
+}
+
+// Run the above test for each backend message
+INSTANTIATE_TEST_SUITE_P(BackendMessagesTests, PostgreSQLProxyBackendDecoderTest,
+                         ::testing::Values("R", "K", "2", "3", "C", "d", "c", "G", "H", "D", "I",
+                                           "E", "V", "v", "n", "N", "A", "t", "S", "1", "s", "Z",
+                                           "T"));
 
 // Test Backend messages
 TEST_F(PostgreSQLProxyDecoderTest, Backend) {
@@ -276,26 +299,6 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
   data.add(payload);
   decoder_->onData(data, false);
   data.drain(data.length());
-
-  // E message
-  EXPECT_CALL(callbacks_, incErrors());
-  payload = "blah VERROR blah";
-  data.add("E");
-  length_ = htonl(4 + payload.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload);
-  decoder_->onData(data, false);
-  data.drain(data.length());
-
-  // N message
-  EXPECT_CALL(callbacks_, incWarnings());
-  payload = "blah VWARNING blah";
-  data.add("N");
-  length_ = htonl(4 + payload.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload);
-  decoder_->onData(data, false);
-  data.drain(data.length());
 }
 
 // Test checks deep inspection of the R message
@@ -303,7 +306,7 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
 // multiple R messages. Only payload with length is 8 and
 // payload with uint32 number equal to 0 indicates
 // successful authentication.
-TEST_F(PostgreSQLProxyDecoderTest, AuthenticationMsg) {
+TEST_F(PostgreSQLProxyBackendDecoderTest, AuthenticationMsg) {
   std::string payload;
 
   // Create authentication message which does not
@@ -326,6 +329,63 @@ TEST_F(PostgreSQLProxyDecoderTest, AuthenticationMsg) {
   data.add(&length_, sizeof(length_));
   uint32_t code = 0;
   data.add(&code, sizeof(code));
+  decoder_->onData(data, false);
+  data.drain(data.length());
+}
+
+// Test check parsing of E message. The message
+// indicates error.
+TEST_F(PostgreSQLProxyBackendDecoderTest, ErrorMsg) {
+  std::string payload;
+
+  // Check that even when message type is E,
+  // it must contain specific string to trigger
+  // statistics update.
+  EXPECT_CALL(callbacks_, incErrors()).Times(0);
+  payload = "blah blah";
+  data.add("E");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  // Now for the correct message with specific
+  // string inside.
+  EXPECT_CALL(callbacks_, incErrors()).Times(1);
+  payload = "blah VERROR blah";
+  data.add("E");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+}
+
+// Test N type of message: Notification.
+// The decoder should react only when the message contains
+// warning content.
+TEST_F(PostgreSQLProxyBackendDecoderTest, NotificationMsg) {
+  std::string payload;
+
+  // Nothing should happen if the message does not contain
+  // specific warning  string
+  EXPECT_CALL(callbacks_, incWarnings()).Times(0);
+  payload = "blah blah";
+  data.add("N");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  // Warnings stats should be updated now.
+  EXPECT_CALL(callbacks_, incWarnings());
+  payload = "blah VWARNING blah";
+  data.add("N");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
   decoder_->onData(data, false);
   data.drain(data.length());
 }
