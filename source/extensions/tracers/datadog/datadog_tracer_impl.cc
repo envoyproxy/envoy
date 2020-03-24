@@ -100,7 +100,7 @@ void TraceReporter::flushTraces() {
     ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload size {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 
-    auto* request =
+    Http::AsyncClient::Request* request =
         driver_.clusterManager()
             .httpAsyncClientForCluster(driver_.cluster()->name())
             .send(std::move(message), *this,
