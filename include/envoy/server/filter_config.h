@@ -119,7 +119,7 @@ public:
   virtual Grpc::Context& grpcContext() PURE;
 
   /** 
-   * @return DrainManager& the server-wide singleton manager.
+   * @return DrainManager& the server-wide drain manager.
    */
   virtual Envoy::Server::DrainManager& drainManager() PURE;
 };
