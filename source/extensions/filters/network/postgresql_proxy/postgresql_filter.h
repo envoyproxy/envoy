@@ -19,8 +19,9 @@ namespace PostgreSQLProxy {
  * All PostgreSQL proxy stats. @see stats_macros.h
  */
 #define ALL_POSTGRESQL_PROXY_STATS(COUNTER)                                                        \
-  COUNTER(frontend_commands)                                                                       \
-  COUNTER(unrecognized)                                                                            \
+  COUNTER(frontend_msgs)                                                                           \
+  COUNTER(backend_msgs)                                                                            \
+  COUNTER(unknown)                                                                                 \
   COUNTER(sessions)                                                                                \
   COUNTER(errors)                                                                                  \
   COUNTER(statements)                                                                              \
@@ -77,7 +78,8 @@ public:
 
   // PostgreSQLProxy::DecoderCallback
   void incFrontend() override;
-  void incUnrecognized() override;
+  void incBackend() override;
+  void incUnknown() override;
   void incErrors() override;
   void incSessions() override;
   void incStatements() override;

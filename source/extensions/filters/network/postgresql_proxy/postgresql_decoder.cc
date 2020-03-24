@@ -20,24 +20,23 @@ void DecoderImpl::initialize() {
   absl::flat_hash_map<char, Message>& FE_known_msgs = std::get<1>(FEmessages_);
 
   // Handler for know messages
-  FE_known_msgs['B'] = Message{"Bind", {&DecoderImpl::incFrontend}};
-  FE_known_msgs['F'] = Message{"Close", {&DecoderImpl::incFrontend}};
+  FE_known_msgs['B'] = Message{"Bind", {}};
+  FE_known_msgs['C'] = Message{"Close", {}};
   FE_known_msgs['d'] = Message{"CopyData", {}};
   FE_known_msgs['c'] = Message{"CopyDone", {}};
-  FE_known_msgs['f'] = Message{"CopyFail", {&DecoderImpl::incFrontend}};
-  FE_known_msgs['D'] = Message{"Describe", {&DecoderImpl::incFrontend}};
-  FE_known_msgs['E'] = Message{"Execute", {&DecoderImpl::incFrontend}};
-  FE_known_msgs['H'] = Message{"Flush", {&DecoderImpl::incFrontend}};
-  FE_known_msgs['F'] = Message{"FunctionCall", {&DecoderImpl::incFrontend}};
-  FE_known_msgs['p'] = Message{"GSSResponse", {&DecoderImpl::incFrontend}};
-  FE_known_msgs['P'] = Message{"Parse", {&DecoderImpl::incFrontend}};
-  FE_known_msgs['p'] = Message{"PasswordMessage", {&DecoderImpl::incFrontend}};
-  FE_known_msgs['Q'] = Message{"Query", {&DecoderImpl::incFrontend}};
-  FE_known_msgs['S'] = Message{"Sync", {&DecoderImpl::incFrontend}};
+  FE_known_msgs['f'] = Message{"CopyFail", {}};
+  FE_known_msgs['D'] = Message{"Describe", {}};
+  FE_known_msgs['E'] = Message{"Execute", {}};
+  FE_known_msgs['H'] = Message{"Flush", {}};
+  FE_known_msgs['F'] = Message{"FunctionCall", {}};
+  FE_known_msgs['p'] = Message{"PasswordMessage/GSSResponse/SASLInitialResponse/SASLResponse", {}};
+  FE_known_msgs['P'] = Message{"Parse", {}};
+  FE_known_msgs['Q'] = Message{"Query", {}};
+  FE_known_msgs['S'] = Message{"Sync", {}};
   FE_known_msgs['X'] = Message{"Terminate", {&DecoderImpl::decodeFrontendTerminate}};
 
   // Handler for unknown messages
-  std::get<2>(FEmessages_) = Message{"Other", {&DecoderImpl::incUnrecognized}};
+  std::get<2>(FEmessages_) = Message{"Other", {&DecoderImpl::incUnknown}};
 
   // Backend messages
   std::get<0>(BEmessages_) = "Backend";
@@ -71,7 +70,7 @@ void DecoderImpl::initialize() {
   BE_known_msgs['T'] = Message{"RowDescription", {}};
 
   // Handler for unknown messages
-  std::get<2>(BEmessages_) = Message{"Other", {&DecoderImpl::incUnrecognized}};
+  std::get<2>(BEmessages_) = Message{"Other", {&DecoderImpl::incUnknown}};
 }
 
 bool DecoderImpl::parseMessage(Buffer::Instance& data) {
@@ -128,9 +127,10 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 
   std::tuple<std::string, absl::flat_hash_map<char, Message>, Message>& msg_processor =
       std::ref(frontend ? FEmessages_ : BEmessages_);
+  frontend ? callbacks_->incFrontend() : callbacks_->incBackend();
 
   std::reference_wrapper<Message> msg = std::get<2>(msg_processor);
-  ;
+
   if (startup_) {
     msg = std::ref(first_);
     startup_ = false;
@@ -146,7 +146,8 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
     action(this);
   }
 
-  ENVOY_LOG(debug, "{} command = {} ({})", std::get<0>(msg_processor), command_, std::get<0>(msg.get()));
+  ENVOY_LOG(debug, "{} command = {} ({})", std::get<0>(msg_processor), command_,
+            std::get<0>(msg.get()));
   ENVOY_LOG(debug, "{} length = {}", std::get<0>(msg_processor), getMessageLength());
   ENVOY_LOG(debug, "{} message = {}", std::get<0>(msg_processor), getMessage());
 
@@ -190,19 +191,15 @@ void DecoderImpl::decodeBackendStatements() {
 }
 
 void DecoderImpl::decodeFrontendTerminate() {
-  DecoderImpl::incFrontend();
   if (session_.inTransaction()) {
     session_.setInTransaction(false);
     callbacks_->incTransactionsRollback();
   }
 }
 
-void DecoderImpl::incFrontend() { callbacks_->incFrontend(); }
-void DecoderImpl::incUnrecognized() { callbacks_->incUnrecognized(); }
-void DecoderImpl::incStatements() { callbacks_->incStatements(); }
-void DecoderImpl::incStatementsOther() { callbacks_->incStatementsOther(); }
-void DecoderImpl::incSessions() { callbacks_->incSessions(); }
-
+// Method does deep inspection of Authentication message.
+// It looks for 4 bytes of zeros, which means that login to
+// database was successful.
 void DecoderImpl::decodeAuthentication() {
   // check if auth message indicates successful authentication
   // Length must be 8 and payload must be 0
@@ -211,12 +208,16 @@ void DecoderImpl::decodeAuthentication() {
   }
 }
 
+// Method parses E (Error) message and looks for string
+// indicating that error happened.
 void DecoderImpl::decodeBackendErrorResponse() {
   if (getMessage().find("VERROR") != std::string::npos) {
     callbacks_->incErrors();
   }
 }
 
+// Method parses N (Notice) message and looks for string
+// indicating warning.
 void DecoderImpl::decodeBackendNoticeResponse() {
   if (getMessage().find("VWARNING") != std::string::npos) {
     callbacks_->incWarnings();

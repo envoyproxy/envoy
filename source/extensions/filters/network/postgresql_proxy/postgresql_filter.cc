@@ -26,7 +26,6 @@ Network::FilterStatus PostgreSQLFilter::onData(Buffer::Instance& data, bool) {
 
   // Frontend Buffer
   frontend_buffer_.add(data);
-  // decoder_->getSession().setProtocolDirection(PostgreSQLSession::ProtocolDirection::Frontend);
   doDecode(frontend_buffer_, true);
 
   return Network::FilterStatus::Continue;
@@ -45,7 +44,6 @@ Network::FilterStatus PostgreSQLFilter::onWrite(Buffer::Instance& data, bool) {
 
   // Backend Buffer
   backend_buffer_.add(data);
-  //  decoder_->getSession().setProtocolDirection(PostgreSQLSession::ProtocolDirection::Backend);
   doDecode(backend_buffer_, false);
 
   return Network::FilterStatus::Continue;
@@ -61,9 +59,10 @@ void PostgreSQLFilter::incSessions() { config_->stats_.sessions_.inc(); }
 
 void PostgreSQLFilter::incStatements() { config_->stats_.statements_.inc(); }
 
-void PostgreSQLFilter::incFrontend() { config_->stats_.frontend_commands_.inc(); }
+void PostgreSQLFilter::incFrontend() { config_->stats_.frontend_msgs_.inc(); }
+void PostgreSQLFilter::incBackend() { config_->stats_.backend_msgs_.inc(); }
 
-void PostgreSQLFilter::incUnrecognized() { config_->stats_.unrecognized_.inc(); }
+void PostgreSQLFilter::incUnknown() { config_->stats_.unknown_.inc(); }
 
 void PostgreSQLFilter::incStatementsDelete() {
   config_->stats_.statements_delete_.inc();
