@@ -137,8 +137,8 @@ public:
   }
 
 private:
-  uint32_t32_t start_;
-  uint32_t32_t end_;
+  uint32_t start_;
+  uint32_t end_;
 };
 namespace {
 std::unique_ptr<TwoPhaseMatcher> createFromMessage(
