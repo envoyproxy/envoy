@@ -480,7 +480,8 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
 void HttpIntegrationTest::testRouterVirtualClusters() {
   const std::string matching_header = "x-use-test-vcluster";
   config_helper_.addConfigModifier(
-      [matching_header](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+      [matching_header](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {
         auto* route_config = hcm.mutable_route_config();
         ASSERT_EQ(1, route_config->virtual_hosts_size());
