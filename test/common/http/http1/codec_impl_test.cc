@@ -659,7 +659,8 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
     response_encoder->encodeHeaders(headers, true);
   }
 
-  // Trying to shove a third response in the queue should trigger flood protection.
+  // Trying to accept a third request with two buffered responses in the queue should trigger flood
+  // protection.
   {
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))

@@ -1254,7 +1254,7 @@ TEST_P(IntegrationTest, TestManyBadRequests) {
   Http::TestRequestHeaderMapImpl bad_request{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}};
 
-  for (int i = 0; i < 1; ++i) {
+  for (int i = 0; i < 1000; ++i) {
     IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(bad_request);
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());

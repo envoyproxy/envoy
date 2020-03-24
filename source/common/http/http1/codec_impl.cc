@@ -267,9 +267,11 @@ void ServerConnectionImpl::doFloodProtectionChecks() const {
   if (!flood_protection_) {
     return;
   }
-  // Before sending another response, make sure it won't exceed flood protection thresholds.
+  // Before processing another request, make sure that we are below the response flood protection
+  // threshold.
   if (outbound_responses_ >= max_outbound_responses_) {
-    ENVOY_CONN_LOG(trace, "error sending response: Too many pending responses queued", connection_);
+    ENVOY_CONN_LOG(trace, "error accepting request: Too many pending responses queued",
+                   connection_);
     stats_.response_flood_.inc();
     throw FrameFloodException("Too many responses queued.");
   }
