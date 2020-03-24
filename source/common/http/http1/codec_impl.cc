@@ -9,6 +9,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
+#include "common/common/cleanup.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
@@ -464,6 +465,11 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
 
 absl::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
+  // Make sure that dispatching_ is set to false after dispatching, even when
+  // ConnectionImpl::dispatch throws an exception.
+  Cleanup cleanup([this]() { dispatching_ = false; });
+  ASSERT(!dispatching_);
+  dispatching_ = true;
 
   if (maybeDirectDispatch(data)) {
     return absl::OkStatus();
@@ -475,22 +481,18 @@ absl::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
     for (const Buffer::RawSlice& slice : data.getRawSlices()) {
-      dispatching_ = true;
       auto result = dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
       if (!codec_exception_.ok()) {
         return codec_exception_;
       } else {
         total_parsed += result;
       }
-      dispatching_ = false;
     }
   } else {
-    dispatching_ = true;
     dispatchSlice(nullptr, 0);
     if (!codec_exception_.ok()) {
       return codec_exception_;
     }
-    dispatching_ = false;
   }
 
   ENVOY_CONN_LOG(trace, "parsed {} bytes", connection_, total_parsed);
@@ -503,6 +505,7 @@ absl::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 }
 
 ssize_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
+  ASSERT(codec_exception_.ok());
   ssize_t rc = http_parser_execute(&parser_, &settings_, slice, len);
   // Avoid overwriting the codec_exception_ we set in the callbacks.
   if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED &&

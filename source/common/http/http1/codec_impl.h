@@ -317,7 +317,9 @@ private:
 
   static http_parser_settings settings_;
 
-  bool dispatching_ : 1;
+  bool dispatching_{false};
+  // Codec errors found in callbacks are overridden within the http_parser library. This holds those
+  // errors to propogate them through to dispatch() where we can handle the error.
   absl::Status codec_exception_;
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
