@@ -303,7 +303,7 @@ TEST_F(Http1ServerConnectionImplTest, IdentityEncoding) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-// Verify that data in the two body chunks is merged before the upcall to decodeData.
+// Verify that data in the two body chunks is merged before the call to decodeData.
 TEST_F(Http1ServerConnectionImplTest, ChunkedBody) {
   initialize();
 
@@ -366,7 +366,7 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodySplitOverTwoDispatches) {
 }
 
 // Verify that headers and chunked body are processed correctly and data is merged before the
-// decodeData upcall even if delivered in a buffer that holds 1 byte per slice.
+// decodeData call even if delivered in a buffer that holds 1 byte per slice.
 TEST_F(Http1ServerConnectionImplTest, ChunkedBodyFragmentedBuffer) {
   initialize();
 
@@ -418,7 +418,7 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodyCase) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-// No decodeData upcall for chunk data handled by the same dispatch call that detects a parse error.
+// No decodeData call for chunk data handled by the same dispatch call that detects a parse error.
 TEST_F(Http1ServerConnectionImplTest, InvalidChunkHeader) {
   initialize();
 
@@ -1004,7 +1004,7 @@ TEST_F(Http1ServerConnectionImplTest, PostWithContentLength) {
 }
 
 // Verify that headers and body with content length are processed correctly and data is merged
-// before the decodeData upcall even if delivered in a buffer that holds 1 byte per slice.
+// before the decodeData call even if delivered in a buffer that holds 1 byte per slice.
 TEST_F(Http1ServerConnectionImplTest, PostWithContentLengthFragmentedBuffer) {
   initialize();
 
