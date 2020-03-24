@@ -63,7 +63,7 @@ public:
 
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
-    EXPECT_CALL(callbacks_.connection_, localAddress()).WillRepeatedly(ReturnRef(address_));
+    ON_CALL(stream_info_, downstreamLocalAddress()).WillByDefault(ReturnRef(address_));
   }
 
   void setRequestedServerName(std::string server_name) {
