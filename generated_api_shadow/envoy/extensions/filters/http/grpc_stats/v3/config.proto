@@ -48,7 +48,7 @@ message FilterConfig {
     //   and in a future release, if neither field is set, it will default to
     //   `stats_for_all_methods=false` in order to be safe by default. This behavior can be
     //   controlled with runtime override
-    //   `envoy.reloadable_features.grpc_stats_filter_disable_stats_for_all_methods_by_default`.
+    //   `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
     google.protobuf.BoolValue stats_for_all_methods = 3;
   }
 }

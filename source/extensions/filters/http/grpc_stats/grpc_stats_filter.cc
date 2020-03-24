@@ -83,10 +83,12 @@ struct Config {
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
         PER_METHOD_STAT_SPECIFIER_NOT_SET:
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::kStatsForAllMethods:
-      stats_for_all_methods_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          proto_config, stats_for_all_methods,
-          !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_stats_filter_disable_"
-                                          "stats_for_all_methods_by_default"));
+      stats_for_all_methods_ =
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, stats_for_all_methods,
+                                          context.runtime().snapshot().deprecatedFeatureEnabled(
+                                              "envoy.deprecated_features.grpc_stats_filter_enable_"
+                                              "stats_for_all_methods_by_default",
+                                              true));
       break;
 
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
