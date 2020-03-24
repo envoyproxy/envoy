@@ -10,6 +10,13 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
+namespace ValidationError {
+const char deprecation_error[] =
+    " If continued use of this field is absolutely necessary, see "
+    "https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime"
+    "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and "
+    "highly discouraged override.";
+
 /**
  * Exception class for reporting validation errors due to the presence of unknown
  * fields in a protobuf.
@@ -27,6 +34,8 @@ class DeprecatedProtoFieldException : public EnvoyException {
 public:
   DeprecatedProtoFieldException(const std::string& message) : EnvoyException(message) {}
 };
+
+} // namespace ValidationError
 
 enum ValidationType {
   UnknownFields,
