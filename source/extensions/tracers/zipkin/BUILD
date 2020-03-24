@@ -49,6 +49,7 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
+        "//source/common/http:async_client_utility_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
