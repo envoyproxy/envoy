@@ -6,6 +6,8 @@ set -e
 
 [[ "$1" == "check" || "$1" == "fix" ]] || (echo "Usage: $0 <check|fix>"; exit 1)
 
+# Developers working on protoxform and other proto format tooling changes will need to override the
+# following check by setting FORCE_PROTO_FORMAT=yes in the environment.
 ./tools/git/modified_since_last_github_commit.sh ./api/envoy proto || \
   [[ "${FORCE_PROTO_FORMAT}" == "yes" ]] || \
   { echo "Skipping proto_format.sh due to no API change"; exit 0; }
