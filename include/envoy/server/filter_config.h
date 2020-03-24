@@ -118,8 +118,8 @@ public:
    */
   virtual Grpc::Context& grpcContext() PURE;
 
-  /** @return DrainManager& drain manager which has life no shorter than the life of the current
-   * context.
+  /** 
+   * @return DrainManager& the server-wide singleton manager.
    */
   virtual Envoy::Server::DrainManager& drainManager() PURE;
 };
