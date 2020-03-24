@@ -614,9 +614,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ =
-      createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
-                       config_.random_, callbacks_->dispatcher(), route_entry_->priority());
+  retry_state_ = createRetryState(route_entry_->retryPolicy(), headers, *cluster_,
+                                  request_vcluster_, config_.runtime_, config_.random_,
+                                  callbacks_->dispatcher(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys.
@@ -821,6 +821,9 @@ void Filter::onResponseTimeout() {
     // Don't do work for upstream requests we've already seen headers for.
     if (upstream_request->awaitingHeaders()) {
       cluster_->stats().upstream_rq_timeout_.inc();
+      if (request_vcluster_) {
+        request_vcluster_->stats().upstream_rq_timeout_.inc();
+      }
 
       if (cluster_->timeoutBudgetStats().has_value()) {
         // Cancel firing per-try timeout information, because the per-try timeout did not come into
@@ -1461,11 +1464,11 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 
 RetryStatePtr
 ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
-                             const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
-                             Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                             Upstream::ResourcePriority priority) {
-  return RetryStateImpl::create(policy, request_headers, cluster, runtime, random, dispatcher,
-                                priority);
+                             const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+                             Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                             Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) {
+  return RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
+                                dispatcher, priority);
 }
 
 } // namespace Router

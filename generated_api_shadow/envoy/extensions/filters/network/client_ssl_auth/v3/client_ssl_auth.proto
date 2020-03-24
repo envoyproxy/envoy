@@ -6,13 +6,14 @@ import "envoy/config/core/v3/address.proto";
 
 import "google/protobuf/duration.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.client_ssl_auth.v3";
 option java_outer_classname = "ClientSslAuthProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Client TLS authentication]
 // Client TLS authentication

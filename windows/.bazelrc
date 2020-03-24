@@ -23,7 +23,9 @@ build --define absl=1
 
 # Should not be required after upstream fix, see issue;
 # https://github.com/bazelbuild/rules_foreign_cc/issues/301
+build --copt="-DCARES_STATICLIB"
 build --copt="-DNGHTTP2_STATICLIB"
+build --copt="-DCURL_STATICLIB"
 
 # Required to work around quiche build defect
 # Unguarded gcc pragmas are not recognized by MSVC
