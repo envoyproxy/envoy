@@ -365,7 +365,6 @@ envoy_cc_library(
         "//source/common/init:manager_lib",
         "//source/common/network:filter_matcher_lib",
         "//source/common/network:listen_socket_lib",
-        "//source/common/network:listener_filter_config_impl",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",

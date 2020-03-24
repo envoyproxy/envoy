@@ -254,14 +254,13 @@ public:
    * of general error or a Json::Exception if the json configuration is erroneous. The returned
    * callback should always be initialized.
    * @param config supplies the general protobuf configuration for the filter
-   * @param listener_filter_config supplies the listener filter config commonly owned by each
-   * concrete listener filter
+   * @param listener_filter_matcher supplies the matcher to decide when filter is enabled
    * @param context supplies the filter's context.
    * @return Network::ListenerFilterFactoryCb the factory creation function.
    */
   virtual Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
       const Protobuf::Message& config,
-      Network::ListenerFilterConfigSharedPtr listener_filter_config,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
       ListenerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.filters.listener"; }

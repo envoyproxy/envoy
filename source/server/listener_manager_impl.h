@@ -63,8 +63,8 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context);
 
-  static Network::ListenerFilterConfigSharedPtr
-  createListenerFilterConfig_(const envoy::config::listener::v3::ListenerFilter& listener_filter);
+  static Network::ListenerFilterMatcherSharedPtr
+  createListenerFilterMatcher_(const envoy::config::listener::v3::ListenerFilter& listener_filter);
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) override {

@@ -359,14 +359,3 @@ envoy_cc_library(
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
-
-envoy_cc_library(
-    name = "listener_filter_config_impl",
-    srcs = ["listener_filter_config_impl.cc"],
-    hdrs = ["listener_filter_config_impl.h"],
-    deps = [
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-    ],
-)

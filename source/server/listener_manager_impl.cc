@@ -21,7 +21,6 @@
 #include "common/network/filter_matcher.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
-#include "common/network/listener_filter_config_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -143,10 +142,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
             proto_config);
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
-
-    auto listener_filter_config = createListenerFilterConfig_(proto_config);
-    ret.push_back(
-        factory.createListenerFilterFactoryFromProto(*message, listener_filter_config, context));
+    ret.push_back(factory.createListenerFilterFactoryFromProto(
+        *message, createListenerFilterMatcher_(proto_config), context));
   }
   return ret;
 }
@@ -180,14 +177,12 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
   return ret;
 }
 
-Network::ListenerFilterConfigSharedPtr ProdListenerComponentFactory::createListenerFilterConfig_(
+Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createListenerFilterMatcher_(
     const envoy::config::listener::v3::ListenerFilter& listener_filter) {
   if (!listener_filter.has_filter_disabled()) {
     return nullptr;
   }
-  auto matcher =
-      std::make_shared<Network::OwnedListenerFilterMatcher>(listener_filter.filter_disabled());
-  return std::make_shared<Network::ListenerFilterConfigImpl>(matcher);
+  return std::make_shared<Network::SetListenerFilterMatcher>(listener_filter.filter_disabled());
 }
 
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(

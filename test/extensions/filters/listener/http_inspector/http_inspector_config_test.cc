@@ -36,7 +36,7 @@ TEST(HttpInspectorConfigFactoryTest, TestCreateFactory) {
   Network::MockListenerFilterManager manager;
   Network::ListenerFilterPtr added_filter;
   EXPECT_CALL(manager, addAcceptFilter_(_, _))
-      .WillOnce(Invoke([&added_filter](Network::ListenerFilterConfigSharedPtr,
+      .WillOnce(Invoke([&added_filter](const Network::ListenerFilterMatcherSharedPtr&,
                                        Network::ListenerFilterPtr& filter) {
         added_filter = std::move(filter);
       }));

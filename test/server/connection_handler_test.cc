@@ -356,15 +356,14 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_CALL(*test_filter, destroy_());
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   bool redirected = false;
-  std::shared_ptr<Network::MockListenerFilterConfig> listener_filter_config =
-      std::make_shared<Network::MockListenerFilterConfig>();
+  std::shared_ptr<Network::MockListenerFilterMatcher> listener_filter_matcher =
+      std::make_shared<Network::MockListenerFilterMatcher>();
 
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
         if (!redirected) {
-          EXPECT_CALL(*listener_filter_config, matcher()).WillOnce(Return(nullptr));
-          manager.addAcceptFilter(listener_filter_config, Network::ListenerFilterPtr{test_filter});
+          manager.addAcceptFilter(listener_filter_matcher, Network::ListenerFilterPtr{test_filter});
           redirected = true;
         }
         return true;
@@ -421,14 +420,13 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
   EXPECT_CALL(*test_filter, destroy_());
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   bool redirected = false;
-  std::shared_ptr<Network::MockListenerFilterConfig> listener_filter_config =
-      std::make_shared<Network::MockListenerFilterConfig>();
+  std::shared_ptr<Network::MockListenerFilterMatcher> listener_filter_matcher =
+      std::make_shared<Network::MockListenerFilterMatcher>();
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
         if (!redirected) {
-          EXPECT_CALL(*listener_filter_config, matcher()).WillOnce(Return(nullptr));
-          manager.addAcceptFilter(listener_filter_config, Network::ListenerFilterPtr{test_filter});
+          manager.addAcceptFilter(listener_filter_matcher, Network::ListenerFilterPtr{test_filter});
           redirected = true;
         }
         return true;
@@ -472,14 +470,12 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDst) {
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
-  std::shared_ptr<Network::MockListenerFilterConfig> listener_filter_config =
-      std::make_shared<Network::MockListenerFilterConfig>();
+  std::shared_ptr<Network::MockListenerFilterMatcher> listener_filter_matcher =
+      std::make_shared<Network::MockListenerFilterMatcher>();
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
-        EXPECT_CALL(*listener_filter_config, matcher()).WillOnce(Return(nullptr));
-
-        manager.addAcceptFilter(listener_filter_config, Network::ListenerFilterPtr{test_filter});
+        manager.addAcceptFilter(listener_filter_matcher, Network::ListenerFilterPtr{test_filter});
         return true;
       }));
   EXPECT_CALL(*test_filter, onAccept(_))
@@ -517,15 +513,13 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithNoOriginalDst) {
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
-  std::shared_ptr<Network::MockListenerFilterConfig> listener_filter_config =
-      std::make_shared<Network::MockListenerFilterConfig>();
+  std::shared_ptr<Network::MockListenerFilterMatcher> listener_filter_matcher =
+      std::make_shared<Network::MockListenerFilterMatcher>();
 
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
-        EXPECT_CALL(*listener_filter_config, matcher()).WillOnce(Return(nullptr));
-
-        manager.addAcceptFilter(listener_filter_config, Network::ListenerFilterPtr{test_filter});
+        manager.addAcceptFilter(listener_filter_matcher, Network::ListenerFilterPtr{test_filter});
         return true;
       }));
   EXPECT_CALL(*test_filter, onAccept(_)).WillOnce(Return(Network::FilterStatus::Continue));
@@ -568,13 +562,12 @@ TEST_F(ConnectionHandlerTest, TransportProtocolCustom) {
   handler_->addListener(*test_listener);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
-  std::shared_ptr<Network::MockListenerFilterConfig> listener_filter_config =
-      std::make_shared<Network::MockListenerFilterConfig>();
+  std::shared_ptr<Network::MockListenerFilterMatcher> listener_filter_matcher =
+      std::make_shared<Network::MockListenerFilterMatcher>();
   EXPECT_CALL(*test_filter, destroy_());
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
-        EXPECT_CALL(*listener_filter_config, matcher()).WillOnce(Return(nullptr));
-        manager.addAcceptFilter(listener_filter_config, Network::ListenerFilterPtr{test_filter});
+        manager.addAcceptFilter(listener_filter_matcher, Network::ListenerFilterPtr{test_filter});
         return true;
       }));
   absl::string_view dummy = "dummy";
@@ -604,14 +597,13 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
   handler_->addListener(*test_listener);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
-  std::shared_ptr<Network::MockListenerFilterConfig> listener_filter_config =
-      std::make_shared<Network::MockListenerFilterConfig>();
+  std::shared_ptr<Network::MockListenerFilterMatcher> listener_filter_matcher =
+      std::make_shared<Network::MockListenerFilterMatcher>();
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
-        manager.addAcceptFilter(listener_filter_config, Network::ListenerFilterPtr{test_filter});
+        manager.addAcceptFilter(listener_filter_matcher, Network::ListenerFilterPtr{test_filter});
         return true;
       }));
-  EXPECT_CALL(*listener_filter_config, matcher()).WillOnce(Return(nullptr));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
@@ -652,14 +644,13 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
   handler_->addListener(*test_listener);
 
   Network::MockListenerFilter* test_filter = new NiceMock<Network::MockListenerFilter>();
-  std::shared_ptr<Network::MockListenerFilterConfig> listener_filter_config =
-      std::make_shared<Network::MockListenerFilterConfig>();
+  std::shared_ptr<Network::MockListenerFilterMatcher> listener_filter_matcher =
+      std::make_shared<Network::MockListenerFilterMatcher>();
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
-        manager.addAcceptFilter(listener_filter_config, Network::ListenerFilterPtr{test_filter});
+        manager.addAcceptFilter(listener_filter_matcher, Network::ListenerFilterPtr{test_filter});
         return true;
       }));
-  EXPECT_CALL(*listener_filter_config, matcher()).WillOnce(Return(nullptr));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
@@ -700,15 +691,14 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   handler_->addListener(*test_listener);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
-  std::shared_ptr<Network::MockListenerFilterConfig> listener_filter_config =
-      std::make_shared<Network::MockListenerFilterConfig>();
+  std::shared_ptr<Network::MockListenerFilterMatcher> listener_filter_matcher =
+      std::make_shared<Network::MockListenerFilterMatcher>();
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
-        manager.addAcceptFilter(listener_filter_config, Network::ListenerFilterPtr{test_filter});
+        manager.addAcceptFilter(listener_filter_matcher, Network::ListenerFilterPtr{test_filter});
         return true;
       }));
   Network::ListenerFilterCallbacks* listener_filter_cb{};
-  EXPECT_CALL(*listener_filter_config, matcher()).WillOnce(Return(nullptr));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
         listener_filter_cb = &cb;
@@ -742,14 +732,13 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
   handler_->addListener(*test_listener);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
-  std::shared_ptr<Network::MockListenerFilterConfig> listener_filter_config =
-      std::make_shared<Network::MockListenerFilterConfig>();
+  std::shared_ptr<Network::MockListenerFilterMatcher> listener_filter_matcher =
+      std::make_shared<Network::MockListenerFilterMatcher>();
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
-        manager.addAcceptFilter(listener_filter_config, Network::ListenerFilterPtr{test_filter});
+        manager.addAcceptFilter(listener_filter_matcher, Network::ListenerFilterPtr{test_filter});
         return true;
       }));
-  EXPECT_CALL(*listener_filter_config, matcher()).WillOnce(Return(nullptr));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
@@ -773,25 +762,20 @@ TEST_F(ConnectionHandlerTest, ListenerFilterReportError) {
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(local_address_));
   handler_->addListener(*test_listener);
 
-  std::shared_ptr<Network::MockListenerFilterConfig> first_listener_filter_config =
-      std::make_shared<Network::MockListenerFilterConfig>();
-  std::shared_ptr<Network::MockListenerFilterConfig> last_listener_filter_config =
-      std::make_shared<Network::MockListenerFilterConfig>();
+  std::shared_ptr<Network::MockListenerFilterMatcher> first_listener_filter_matcher =
+      std::make_shared<Network::MockListenerFilterMatcher>();
+  std::shared_ptr<Network::MockListenerFilterMatcher> last_listener_filter_matcher =
+      std::make_shared<Network::MockListenerFilterMatcher>();
   Network::MockListenerFilter* first_filter = new Network::MockListenerFilter();
   Network::MockListenerFilter* last_filter = new Network::MockListenerFilter();
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
-        manager.addAcceptFilter(first_listener_filter_config,
+        manager.addAcceptFilter(first_listener_filter_matcher,
                                 Network::ListenerFilterPtr{first_filter});
-        manager.addAcceptFilter(last_listener_filter_config,
+        manager.addAcceptFilter(last_listener_filter_matcher,
                                 Network::ListenerFilterPtr{last_filter});
         return true;
       }));
-  EXPECT_CALL(*first_listener_filter_config, matcher()).WillOnce(Return(nullptr));
-  // matcher() is invoked at build phase. It is called despite the onAccept on last listener filter
-  // is not invoked.
-  EXPECT_CALL(*last_listener_filter_config, matcher()).WillOnce(Return(nullptr));
-
   // The first filter close the socket
   EXPECT_CALL(*first_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
@@ -847,24 +831,19 @@ TEST_F(ConnectionHandlerTest, ListenerFilterWorks) {
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(local_address_));
   handler_->addListener(*test_listener);
 
-  auto first_listener_filter_config = std::make_shared<Network::MockListenerFilterConfig>();
-  auto last_listener_filter_config = std::make_shared<Network::MockListenerFilterConfig>();
-  auto match_nothing = std::make_shared<Network::MockListenerFilterMatcher>();
+  auto first_listener_filter_matcher = std::make_shared<Network::MockListenerFilterMatcher>();
+  auto all_matcher = std::make_shared<Network::MockListenerFilterMatcher>();
   auto* disabled_listener_filter = new Network::MockListenerFilter();
   auto* enabled_filter = new Network::MockListenerFilter();
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
-        manager.addAcceptFilter(first_listener_filter_config,
-                                Network::ListenerFilterPtr{disabled_listener_filter});
-        manager.addAcceptFilter(last_listener_filter_config,
-                                Network::ListenerFilterPtr{enabled_filter});
+        manager.addAcceptFilter(all_matcher, Network::ListenerFilterPtr{disabled_listener_filter});
+        manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{enabled_filter});
         return true;
       }));
-  EXPECT_CALL(*first_listener_filter_config, matcher()).WillOnce(Return(match_nothing));
-  EXPECT_CALL(*last_listener_filter_config, matcher()).WillOnce(Return(nullptr));
 
-  // The disable matcher match everything, making the listener filter never called.
-  EXPECT_CALL(*match_nothing, matches(_)).WillOnce(Return(true));
+  // The all matcher matches any incoming traffic and disables the listener filter.
+  EXPECT_CALL(*all_matcher, matches(_)).WillOnce(Return(true));
   EXPECT_CALL(*disabled_listener_filter, onAccept(_)).Times(0);
 
   // The non matcher acts as if always enabled.

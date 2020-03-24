@@ -7,14 +7,23 @@
 namespace Envoy {
 namespace Network {
 
-// Introduced to save number of memory allocation at build phase memory usage match phase.
-// Work with OwnedListenerFilterMatcher.
-// The first phase is constructor, requiring only 1 slots.
-// The second phase is complete() which reserves contiguously slots.
+// TwoPhaseMatcher is introduced to save number of memory allocation at build phase memory usage
+// match phase. Work with SetListenerFilterMatcher. The first phase is constructor, and the second
+// phase is finishBuild(). The invariance is that the direct matchers in a set logic matcher should
+// be continuous in the vector.
+//
+// Examples:
+//  `m := A && B && C` where `B := X || Y`
+// The 3 matchers "ABC" should be continuous, while the matchers "XY" should be continuous in the
+// storage of SetListenerFilterMatcher.
 class TwoPhaseMatcher : public ListenerFilterMatcher {
 public:
+  // Construct the matcher. The owning matcher should put this in a vector.
+  TwoPhaseMatcher() = default;
+  // Reserve a continuous spaces in the vector for the direct sub matchers and then recursively
+  // build the sub matchers.
   virtual void
-  complete(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) PURE;
+  finishBuild(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) PURE;
 };
 
 namespace {
@@ -26,7 +35,7 @@ std::unique_ptr<TwoPhaseMatcher> createFromMessage(
 class TrueMatcher final : public TwoPhaseMatcher {
 public:
   bool matches(ListenerFilterCallbacks&) const override { return true; }
-  void complete(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate&) override {
+  void finishBuild(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate&) override {
     // Nothing to do
   }
 };
@@ -37,12 +46,12 @@ public:
     return !matchers_[sub_matcher_offset_]->matches(cb);
   }
   void
-  complete(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) override {
+  finishBuild(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) override {
     std::unique_ptr<TwoPhaseMatcher> sub = createFromMessage(self.not_match(), matchers_);
     sub_matcher_offset_ = matchers_.size();
     auto ptr = sub.get();
     matchers_.emplace_back(std::move(sub));
-    ptr->complete(self.not_match());
+    ptr->finishBuild(self.not_match());
   }
 
 private:
@@ -64,7 +73,7 @@ public:
     return true;
   }
   void
-  complete(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) override {
+  finishBuild(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) override {
     sub_matcher_offset_ = matchers_.size();
     sub_matcher_len_ = self.and_match().rules_size();
     for (const auto& sub : self.and_match().rules()) {
@@ -73,7 +82,7 @@ public:
     TwoPhaseMatcher* matcher{nullptr};
     for (uint32_t i = 0; i < sub_matcher_len_; i++) {
       matcher = static_cast<TwoPhaseMatcher*>(matchers_[i + sub_matcher_offset_].get());
-      matcher->complete(self.and_match().rules(i));
+      matcher->finishBuild(self.and_match().rules(i));
     }
   }
 
@@ -96,7 +105,7 @@ public:
     return false;
   }
   void
-  complete(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) override {
+  finishBuild(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) override {
     sub_matcher_offset_ = matchers_.size();
     sub_matcher_len_ = self.or_match().rules_size();
     for (const auto& sub : self.or_match().rules()) {
@@ -105,7 +114,7 @@ public:
     TwoPhaseMatcher* matcher{nullptr};
     for (uint32_t i = 0; i < sub_matcher_len_; i++) {
       matcher = static_cast<TwoPhaseMatcher*>(matchers_[i + sub_matcher_offset_].get());
-      matcher->complete(self.or_match().rules(i));
+      matcher->finishBuild(self.or_match().rules(i));
     }
   }
 
@@ -129,7 +138,7 @@ public:
     }
   }
   void
-  complete(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) override {
+  finishBuild(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) override {
     ASSERT(self.rule_case() == envoy::config::listener::v3::ListenerFilterChainMatchPredicate::
                                    RuleCase::kDestinationPortRange);
     start_ = self.destination_port_range().start();
@@ -160,26 +169,18 @@ std::unique_ptr<TwoPhaseMatcher> createFromMessage(
       kDestinationPortRange: {
     return std::make_unique<DstPortMatcher>();
   }
-  // Invalid message.
-  case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::RULE_NOT_SET: {
-    throw EnvoyException(
-        absl::StrFormat("invalid listener filter chain matcher: %s", match_config.DebugString()));
-  }
-  // Below could happen if the control plane provides deprecated api or newer api. Should be
-  // considered as corrupted config.
   default:
-    throw EnvoyException(absl::StrFormat("unsupported listener filter chain matcher: %s",
-                                         match_config.DebugString()));
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 } // namespace
 
-OwnedListenerFilterMatcher::OwnedListenerFilterMatcher(
+SetListenerFilterMatcher::SetListenerFilterMatcher(
     const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& match_config) {
   auto uptr = createFromMessage(match_config, matchers_);
   auto& ref = *uptr;
   matchers_.push_back(std::move(uptr));
-  ref.complete(match_config);
+  ref.finishBuild(match_config);
 }
 
 } // namespace Network

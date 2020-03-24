@@ -17,7 +17,7 @@ struct CallbackHandle {
   Address::InstanceConstSharedPtr address_;
 };
 } // namespace
-class OwnedListenerFilterMatcherTest : public testing::Test {
+class SetListenerFilterMatcherTest : public testing::Test {
 public:
   CallbackHandle createCallbackOnPort(int port) {
     CallbackHandle handle;
@@ -38,9 +38,9 @@ public:
   }
 };
 
-TEST_F(OwnedListenerFilterMatcherTest, DstPortMatcher) {
+TEST_F(SetListenerFilterMatcherTest, DstPortMatcher) {
   auto pred = createPortPredicate(80, 81);
-  Network::OwnedListenerFilterMatcher matcher(pred);
+  Network::SetListenerFilterMatcher matcher(pred);
   auto handle79 = createCallbackOnPort(79);
   auto handle80 = createCallbackOnPort(80);
   auto handle81 = createCallbackOnPort(81);
@@ -49,10 +49,10 @@ TEST_F(OwnedListenerFilterMatcherTest, DstPortMatcher) {
   EXPECT_FALSE(matcher.matches(*handle81.callback_));
 }
 
-TEST_F(OwnedListenerFilterMatcherTest, TrueMatcher) {
+TEST_F(SetListenerFilterMatcherTest, TrueMatcher) {
   envoy::config::listener::v3::ListenerFilterChainMatchPredicate pred;
   pred.set_any_match(true);
-  Network::OwnedListenerFilterMatcher matcher(pred);
+  Network::SetListenerFilterMatcher matcher(pred);
   auto handle79 = createCallbackOnPort(79);
   auto handle80 = createCallbackOnPort(80);
   auto handle81 = createCallbackOnPort(81);
@@ -61,11 +61,11 @@ TEST_F(OwnedListenerFilterMatcherTest, TrueMatcher) {
   EXPECT_TRUE(matcher.matches(*handle81.callback_));
 }
 
-TEST_F(OwnedListenerFilterMatcherTest, NotMatcher) {
+TEST_F(SetListenerFilterMatcherTest, NotMatcher) {
   auto pred = createPortPredicate(80, 81);
   envoy::config::listener::v3::ListenerFilterChainMatchPredicate not_pred;
   not_pred.mutable_not_match()->MergeFrom(pred);
-  Network::OwnedListenerFilterMatcher matcher(not_pred);
+  Network::SetListenerFilterMatcher matcher(not_pred);
   auto handle79 = createCallbackOnPort(79);
   auto handle80 = createCallbackOnPort(80);
   auto handle81 = createCallbackOnPort(81);
@@ -74,7 +74,7 @@ TEST_F(OwnedListenerFilterMatcherTest, NotMatcher) {
   EXPECT_TRUE(matcher.matches(*handle81.callback_));
 }
 
-TEST_F(OwnedListenerFilterMatcherTest, OrMatcher) {
+TEST_F(SetListenerFilterMatcherTest, OrMatcher) {
   auto pred80 = createPortPredicate(80, 81);
   auto pred443 = createPortPredicate(443, 444);
 
@@ -82,7 +82,7 @@ TEST_F(OwnedListenerFilterMatcherTest, OrMatcher) {
   pred.mutable_or_match()->mutable_rules()->Add()->MergeFrom(pred80);
   pred.mutable_or_match()->mutable_rules()->Add()->MergeFrom(pred443);
 
-  Network::OwnedListenerFilterMatcher matcher(pred);
+  Network::SetListenerFilterMatcher matcher(pred);
   auto handle80 = createCallbackOnPort(80);
   auto handle443 = createCallbackOnPort(443);
   auto handle3306 = createCallbackOnPort(3306);
@@ -92,7 +92,7 @@ TEST_F(OwnedListenerFilterMatcherTest, OrMatcher) {
   EXPECT_TRUE(matcher.matches(*handle443.callback_));
 }
 
-TEST_F(OwnedListenerFilterMatcherTest, AndMatcher) {
+TEST_F(SetListenerFilterMatcherTest, AndMatcher) {
   auto pred80_3306 = createPortPredicate(80, 3306);
   auto pred443_3306 = createPortPredicate(443, 3306);
 
@@ -100,7 +100,7 @@ TEST_F(OwnedListenerFilterMatcherTest, AndMatcher) {
   pred.mutable_and_match()->mutable_rules()->Add()->MergeFrom(pred80_3306);
   pred.mutable_and_match()->mutable_rules()->Add()->MergeFrom(pred443_3306);
 
-  Network::OwnedListenerFilterMatcher matcher(pred);
+  Network::SetListenerFilterMatcher matcher(pred);
   auto handle80 = createCallbackOnPort(80);
   auto handle443 = createCallbackOnPort(443);
   auto handle3306 = createCallbackOnPort(3306);

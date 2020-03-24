@@ -165,13 +165,13 @@ public:
   MockListenerFilterManager();
   ~MockListenerFilterManager() override;
 
-  void addAcceptFilter(Network::ListenerFilterConfigSharedPtr listener_filter_config,
+  void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
                        ListenerFilterPtr&& filter) override {
-    addAcceptFilter_(listener_filter_config, filter);
+    addAcceptFilter_(listener_filter_matcher, filter);
   }
 
   MOCK_METHOD(void, addAcceptFilter_,
-              (Network::ListenerFilterConfigSharedPtr, Network::ListenerFilterPtr&));
+              (const Network::ListenerFilterMatcherSharedPtr&, Network::ListenerFilterPtr&));
 };
 
 class MockFilterChain : public FilterChain {
@@ -465,14 +465,6 @@ public:
   MOCK_METHOD(void, unregisterHandler, (BalancedConnectionHandler & handler));
   MOCK_METHOD(BalancedConnectionHandler&, pickTargetHandler,
               (BalancedConnectionHandler & current_handler));
-};
-
-class MockListenerFilterConfig : public ListenerFilterConfig {
-public:
-  MockListenerFilterConfig();
-  ~MockListenerFilterConfig() override;
-
-  MOCK_METHOD(ListenerFilterMatcherSharedPtr, matcher, (), (const));
 };
 
 class MockListenerFilterMatcher : public ListenerFilterMatcher {

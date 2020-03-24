@@ -253,16 +253,16 @@ private:
       }
 
     private:
-      Network::ListenerFilterPtr listener_filter_;
-      Network::ListenerFilterMatcherSharedPtr matcher_;
+      const Network::ListenerFilterPtr listener_filter_;
+      const Network::ListenerFilterMatcherSharedPtr matcher_;
     };
     using ListenerFilterWrapperPtr = std::unique_ptr<GenericListenerFilter>;
 
     // Network::ListenerFilterManager
-    void addAcceptFilter(Network::ListenerFilterConfigSharedPtr listener_filter_config,
+    void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
                          Network::ListenerFilterPtr&& filter) override {
-      accept_filters_.emplace_back(std::make_unique<GenericListenerFilter>(
-          listener_filter_config->matcher(), std::move(filter)));
+      accept_filters_.emplace_back(
+          std::make_unique<GenericListenerFilter>(listener_filter_matcher, std::move(filter)));
     }
 
     // Network::ListenerFilterCallbacks

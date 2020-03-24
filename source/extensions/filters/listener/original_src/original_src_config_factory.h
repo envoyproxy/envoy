@@ -17,7 +17,7 @@ public:
   // NamedListenerFilterConfigFactory
   Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
       const Protobuf::Message& message,
-      Network::ListenerFilterConfigSharedPtr listener_filter_config,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
       Server::Configuration::ListenerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;

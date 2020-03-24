@@ -10,9 +10,9 @@ namespace Network {
 /**
  * A non-empty listener filter matcher which aggregates multiple sub matchers.
  */
-class OwnedListenerFilterMatcher : public ListenerFilterMatcher {
+class SetListenerFilterMatcher : public ListenerFilterMatcher {
 public:
-  explicit OwnedListenerFilterMatcher(
+  explicit SetListenerFilterMatcher(
       const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& match_config);
 
   bool matches(ListenerFilterCallbacks& cb) const override { return matchers_[0]->matches(cb); }

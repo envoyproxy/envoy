@@ -218,26 +218,26 @@ message FilterChain {
 //
 // Examples:
 //
-//  disable when the destination port is 3306
+// * Matches if the destination port is 3306.
 //
-//  code-block:: yaml
+// .. code-block:: yaml
 //
 //  destinationPortRange:
-//   start: 80
-//   end: 81
+//   start: 3306
+//   end: 3307
 //
-//  disable when the destination port is 3306
+// * Matches if the destination port is 3306 or 15000.
 //
-//  code-block:: yaml
+// .. code-block:: yaml
 //
-//  andMatch:
+//  orMatch:
 //    rules:
 //      - destinationPortRange:
-//          start: 80
+//          start: 3306
 //          end: 3306
 //      - destinationPortRange:
-//          start: 443
-//          end: 3306
+//          start: 15000
+//          end: 15001
 //
 // [#next-free-field: 6]
 message ListenerFilterChainMatchPredicate {
@@ -294,7 +294,8 @@ message ListenerFilter {
   }
 
   // Decide when to disable this listener filter on incoming traffic.
-  // Clear the field if filter is always enabled.
+  // The filter is enabled when this field is empty.
   // See :ref:`ListenerFilterChainMatchPredicate <envoy_api_msg_config.listener.v3.ListenerFilterChainMatchPredicate>`
+  // for further examples.
   ListenerFilterChainMatchPredicate filter_disabled = 4;
 }

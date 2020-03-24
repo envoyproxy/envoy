@@ -11,7 +11,6 @@
 #include "common/common/assert.h"
 #include "common/config/utility.h"
 #include "common/network/connection_balancer_impl.h"
-#include "common/network/listener_filter_config_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
@@ -269,9 +268,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst);
-    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(),
-        std::make_shared<Network::ListenerFilterConfigImpl>(/*matcher=*/nullptr), *this));
+    listener_filter_factories_.push_back(
+        factory.createListenerFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(),
+                                                     /*listener_filter_matcher=*/nullptr, *this));
   }
   // Add proxy protocol listener filter if 'use_proxy_proto' flag is set.
   // TODO(jrajahalme): This is the last listener filter on purpose. When filter chain matching
@@ -281,9 +280,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
-    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(),
-        std::make_shared<Network::ListenerFilterConfigImpl>(/*matcher=*/nullptr), *this));
+    listener_filter_factories_.push_back(
+        factory.createListenerFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(),
+                                                     /*listener_filter_matcher=*/nullptr, *this));
   }
 
   // TODO(zuercher) remove the deprecated TLS inspector name when the deprecated names are removed.
@@ -315,9 +314,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
-    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(),
-        std::make_shared<Network::ListenerFilterConfigImpl>(/*matcher=*/nullptr), *this));
+    listener_filter_factories_.push_back(
+        factory.createListenerFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(),
+                                                     /*listener_filter_matcher=*/nullptr, *this));
   }
 
   if (!workers_started_) {

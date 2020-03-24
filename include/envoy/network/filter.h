@@ -283,17 +283,6 @@ using ListenerFilterMatcherPtr = std::unique_ptr<ListenerFilterMatcher>;
 using ListenerFilterMatcherSharedPtr = std::shared_ptr<ListenerFilterMatcher>;
 
 /**
- * A mapping from a general listener filter message without `typed_config`.
- */
-class ListenerFilterConfig {
-public:
-  virtual ~ListenerFilterConfig() = default;
-  virtual ListenerFilterMatcherSharedPtr matcher() const PURE;
-};
-
-using ListenerFilterConfigSharedPtr = std::shared_ptr<ListenerFilterConfig>;
-
-/**
  * Listener Filter
  */
 class ListenerFilter {
@@ -321,10 +310,10 @@ public:
   /**
    * Add a filter to the listener. Filters are invoked in FIFO order (the filter added
    * first is called first).
-   * @param listener_filter_config supplies the common listener filter config
-   * @param filter supplies the concrete filter being added.
+   * @param listener_filter_matcher supplies the listener filter matcher to
+   * @param filter supplies the filter being added.
    */
-  virtual void addAcceptFilter(Network::ListenerFilterConfigSharedPtr listener_filter_config,
+  virtual void addAcceptFilter(const ListenerFilterMatcherSharedPtr& listener_filter_matcher,
                                ListenerFilterPtr&& filter) PURE;
 };
 
