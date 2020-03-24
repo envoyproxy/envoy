@@ -27,15 +27,15 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/0a98f4bd8b3eeeaa11a10f6a4fe5c59e7c2e16df.tar.gz"],
     ),
     boringssl = dict(
-        sha256 = "3edf2c38687956f632ba4e0784f999ac2f66feb6c0db8d82b9f8f75d3a9ffae6",
-        strip_prefix = "boringssl-08a0b21059e432352a93c427f1d66bb524ad40ae",
+        sha256 = "a3d4de4f03cb321ef943678d72a045c9a19d26b23d6f4e313f97600c65201a27",
+        strip_prefix = "boringssl-1c2769383f027befac5b75b6cedd25daf3bf4dcf",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-80.0.3987.87
-        urls = ["https://github.com/google/boringssl/archive/08a0b21059e432352a93c427f1d66bb524ad40ae.tar.gz"],
+        # chromium-81.0.4044.69
+        urls = ["https://github.com/google/boringssl/archive/1c2769383f027befac5b75b6cedd25daf3bf4dcf.tar.gz"],
     ),
     boringssl_fips = dict(
         sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
@@ -189,9 +189,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/jwt_verify_lib/archive/40e2cc938f4bcd059a97dc6c73f59ecfa5a71bac.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
-        sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
-        strip_prefix = "http-parser-2.9.0",
-        urls = ["https://github.com/nodejs/http-parser/archive/v2.9.0.tar.gz"],
+        sha256 = "8fa0ab8770fd8425a9b431fdbf91623c4d7a9cdb842b9339289bd2b0b01b0d3d",
+        strip_prefix = "http-parser-2.9.3",
+        urls = ["https://github.com/nodejs/http-parser/archive/v2.9.3.tar.gz"],
     ),
     com_github_pallets_jinja = dict(
         sha256 = "db49236731373e4f3118af880eb91bb0aa6978bc0cf8b35760f6a026f1a9ffc4",
@@ -265,9 +265,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/13b1a2f29f541b6b2c4cb8bc3f6fbf3589d44227.tar.gz"],
     ),
     com_github_curl = dict(
-        sha256 = "1dd7604e418b0b9a9077f62f763f6684c1b092a7bc17e3f354b8ad5c964d7358",
-        strip_prefix = "curl-7.68.0",
-        urls = ["https://github.com/curl/curl/releases/download/curl-7_68_0/curl-7.68.0.tar.gz"],
+        sha256 = "01ae0c123dee45b01bbaef94c0bc00ed2aec89cb2ee0fd598e0d302a6b5e0a98",
+        strip_prefix = "curl-7.69.1",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_69_1/curl-7.69.1.tar.gz"],
     ),
     com_googlesource_chromium_v8 = dict(
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
@@ -276,9 +276,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.0.426.12.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/4f6ba16cf16505f12dc8d2f23cfc6e13c1aa5806.tar.gz
-        sha256 = "2990ca4434a6fc1b63560b1aa000f5765c174ad906642e123a92498f1ad6c03d",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/4f6ba16cf16505f12dc8d2f23cfc6e13c1aa5806.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz
+        sha256 = "75af53154402e1654cfd32d8aaeed5fab4dbb79d3cab8c9866019d5369c1889e",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz"],
     ),
     com_googlesource_googleurl = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/googleurl_d7fd3aeb2321402d0ecab305db6a33e618610a4a.tar.gz

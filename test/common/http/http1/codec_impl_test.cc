@@ -273,7 +273,9 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-TEST_F(Http1ServerConnectionImplTest, IdentityEncoding) {
+// We support the identity encoding, but because it does not end in chunked encoding we reject it
+// per RFC 7230 Section 3.3.3
+TEST_F(Http1ServerConnectionImplTest, IdentityEncodingNoChunked) {
   initialize();
 
   InSequence sequence;
@@ -281,15 +283,22 @@ TEST_F(Http1ServerConnectionImplTest, IdentityEncoding) {
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  TestHeaderMapImpl expected_headers{
-      {":path", "/"},
-      {":method", "GET"},
-      {"transfer-encoding", "identity"},
-  };
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: identity\r\n\r\n");
-  codec_->dispatch(buffer);
-  EXPECT_EQ(0U, buffer.length());
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: unsupported transfer encoding");
+}
+
+TEST_F(Http1ServerConnectionImplTest, UnsupportedEncoding) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: gzip\r\n\r\n");
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: unsupported transfer encoding");
 }
 
 TEST_F(Http1ServerConnectionImplTest, ChunkedBody) {
@@ -340,7 +349,6 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodyCase) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-// Currently http_parser does not support chained transfer encodings.
 TEST_F(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
   initialize();
 
@@ -808,7 +816,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderEmbeddedNulRejection) {
   Buffer::OwnedImpl buffer(
       absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: bar", std::string(1, '\0'), "baz\r\n"));
   EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: header value contains NUL");
+                            "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
 // Mutate an HTTP GET with embedded NULs, this should always be rejected in some
@@ -1069,7 +1077,7 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
   ON_CALL(connection_, write(_, _)).WillByDefault(Invoke([&output](Buffer::Instance& data, bool) {
     // Verify that individual writes into the codec's output buffer were coalesced into a single
     // slice
-    ASSERT_EQ(1, data.getRawSlices(nullptr, 0));
+    ASSERT_EQ(1, data.getRawSlices().size());
     output.append(data.toString());
     data.drain(data.length());
   }));

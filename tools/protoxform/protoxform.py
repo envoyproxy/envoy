@@ -172,12 +172,13 @@ def FormatTypeContextComments(type_context, annotation_xforms=None):
   return leading, trailing
 
 
-def FormatHeaderFromFile(source_code_info, file_proto):
+def FormatHeaderFromFile(source_code_info, file_proto, pkg_version_status):
   """Format proto header.
 
   Args:
     source_code_info: SourceCodeInfo object.
     file_proto: FileDescriptorProto for file.
+    pkg_version_status: package version status (as per UDPA file status annotations).
 
   Returns:
     Formatted proto header as a string.
@@ -229,6 +230,8 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     options.Extensions[status_pb2.file_status].CopyFrom(
         file_proto.options.Extensions[status_pb2.file_status])
 
+  options.Extensions[status_pb2.file_status].package_version_status = pkg_version_status
+
   options_block = FormatOptions(options)
 
   requires_versioning_import = any(
@@ -244,11 +247,7 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     if idx in file_proto.public_dependency:
       public_imports.append(d)
       continue
-    elif d in [
-        'envoy/annotations/resource.proto',
-        'envoy/annotations/deprecation.proto',
-        'udpa/annotations/migrate.proto',
-    ]:
+    elif d.startswith('envoy/annotations') or d.startswith('udpa/annotations'):
       infra_imports.append(d)
     elif d.startswith('envoy/'):
       # We ignore existing envoy/ imports, since these are computed explicitly
@@ -265,15 +264,15 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       misc_imports.append(d)
 
   if options.HasExtension(status_pb2.file_status):
-    misc_imports.append('udpa/annotations/status.proto')
+    infra_imports.append('udpa/annotations/status.proto')
 
   if requires_versioning_import:
-    misc_imports.append('udpa/annotations/versioning.proto')
+    infra_imports.append('udpa/annotations/versioning.proto')
 
   def FormatImportBlock(xs):
     if not xs:
       return ''
-    return FormatBlock('\n'.join(sorted('import "%s";' % x for x in xs)))
+    return FormatBlock('\n'.join(sorted('import "%s";' % x for x in set(xs))))
 
   def FormatPublicImportBlock(xs):
     if not xs:
@@ -523,6 +522,9 @@ class ProtoFormatVisitor(visitor.Visitor):
   See visitor.Visitor for visitor method docs comments.
   """
 
+  def __init__(self, pkg_version_status):
+    self._pkg_version_status = pkg_version_status
+
   def VisitService(self, service_proto, type_context):
     leading_comment, trailing_comment = FormatTypeContextComments(type_context)
     methods = '\n'.join(
@@ -584,7 +586,8 @@ class ProtoFormatVisitor(visitor.Visitor):
                                                   formatted_msgs, reserved_fields, fields)
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
-    header = FormatHeaderFromFile(type_context.source_code_info, file_proto)
+    header = FormatHeaderFromFile(type_context.source_code_info, file_proto,
+                                  self._pkg_version_status)
     formatted_services = FormatBlock('\n'.join(services))
     formatted_enums = FormatBlock('\n'.join(enums))
     formatted_msgs = FormatBlock('\n'.join(msgs))
@@ -599,11 +602,16 @@ def ParameterCallback(parameter):
 
 def Main():
   plugin.Plugin([
-      plugin.DirectOutputDescriptor('.v2.proto', ProtoFormatVisitor),
-      plugin.OutputDescriptor('.v3.proto', ProtoFormatVisitor,
-                              functools.partial(migrate.V3MigrationXform, False)),
-      plugin.OutputDescriptor('.v3.envoy_internal.proto', ProtoFormatVisitor,
-                              functools.partial(migrate.V3MigrationXform, True))
+      plugin.DirectOutputDescriptor('.v2.proto',
+                                    functools.partial(ProtoFormatVisitor, status_pb2.ACTIVE)),
+      plugin.OutputDescriptor(
+          '.v3.proto', functools.partial(ProtoFormatVisitor,
+                                         status_pb2.NEXT_MAJOR_VERSION_CANDIDATE),
+          functools.partial(migrate.V3MigrationXform, False)),
+      plugin.OutputDescriptor(
+          '.v3.envoy_internal.proto',
+          functools.partial(ProtoFormatVisitor, status_pb2.NEXT_MAJOR_VERSION_CANDIDATE),
+          functools.partial(migrate.V3MigrationXform, True))
   ], ParameterCallback)
 
 

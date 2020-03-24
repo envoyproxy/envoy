@@ -508,6 +508,11 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/time:time",
     )
 
+    native.bind(
+        name = "abseil_algorithm",
+        actual = "@com_google_absl//absl/algorithm:algorithm",
+    )
+
 def _com_google_protobuf():
     _repository_impl("rules_python")
     _repository_impl(
@@ -591,6 +596,8 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
+        patches = ["@envoy//bazel/foreign_cc:curl-revert-cmake-minreqver.patch"],
+        patch_args = ["-p1"],
         **location
     )
     native.bind(

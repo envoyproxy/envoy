@@ -25,6 +25,11 @@ namespace Router {
 class RouteEntry;
 } // namespace Router
 
+namespace Upstream {
+class ClusterInfo;
+using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
+} // namespace Upstream
+
 namespace StreamInfo {
 
 enum ResponseFlag {
@@ -137,6 +142,8 @@ struct ResponseCodeDetailValues {
   // indicates that original "success" headers may have been sent downstream
   // despite the subsequent failure.
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
+  // The connection is rejected due to no matching filter chain.
+  const std::string FilterChainNotFound = "filter_chain_not_found";
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
@@ -520,6 +527,19 @@ public:
    * @return request headers.
    */
   virtual const Http::RequestHeaderMap* getRequestHeaders() const PURE;
+
+  /**
+   * @param Upstream Connection's ClusterInfo.
+   */
+  virtual void
+  setUpstreamClusterInfo(const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) PURE;
+
+  /**
+   * @return Upstream Connection's ClusterInfo.
+   * This returns an optional to differentiate between unset(absl::nullopt),
+   * no route or cluster does not exist(nullptr), and set to a valid cluster(not nullptr).
+   */
+  virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
 };
 
 } // namespace StreamInfo

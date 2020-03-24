@@ -12,6 +12,7 @@
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
 
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -285,6 +286,41 @@ TEST(UtilityTest, AnyWrongType) {
                                      ProtobufMessage::getStrictValidationVisitor(), out),
       EnvoyException,
       R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+}
+
+TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+  ProtobufWkt::Any typed_config;
+  typed_config.PackFrom(source_duration);
+
+  MockTypedFactory factory;
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce(Invoke([]() -> ProtobufTypes::MessagePtr {
+    return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
+  }));
+
+  EXPECT_THROW_WITH_REGEX(
+      Utility::translateAnyToFactoryConfig(typed_config,
+                                           ProtobufMessage::getStrictValidationVisitor(), factory),
+      EnvoyException,
+      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+}
+
+TEST(UtilityTest, TranslateAnyToFactoryConfig) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+  ProtobufWkt::Any typed_config;
+  typed_config.PackFrom(source_duration);
+
+  MockTypedFactory factory;
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce(Invoke([]() -> ProtobufTypes::MessagePtr {
+    return ProtobufTypes::MessagePtr{new ProtobufWkt::Duration()};
+  }));
+
+  auto config = Utility::translateAnyToFactoryConfig(
+      typed_config, ProtobufMessage::getStrictValidationVisitor(), factory);
+
+  EXPECT_THAT(*config, ProtoEq(source_duration));
 }
 
 void packTypedStructIntoAny(ProtobufWkt::Any& typed_config, const Protobuf::Message& inner) {
