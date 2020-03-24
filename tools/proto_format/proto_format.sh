@@ -12,6 +12,11 @@ set -e
   [[ "${FORCE_PROTO_FORMAT}" == "yes" ]] || \
   { echo "Skipping proto_format.sh due to no API change"; exit 0; }
 
+if [[ "$2" == "--test" ]]
+then
+  ./tools/protoxform/protoxform_test.sh
+fi
+
 # Clean up any stale files in the API tree output. Bazel remembers valid cached
 # files still.
 # rm -rf bazel-bin/external/envoy_api
