@@ -373,7 +373,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message CommonLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.CommonLbConfig";
@@ -409,6 +409,16 @@ message Cluster {
     message LocalityWeightedLbConfig {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.Cluster.CommonLbConfig.LocalityWeightedLbConfig";
+    }
+
+    // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
+    message ConsistentHashingLbConfig {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.Cluster.CommonLbConfig.ConsistentHashingLbConfig";
+
+      // If set to `true`, the cluster will use hostname instead of the resolved
+      // address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
+      bool use_hostname_for_hashing = 1;
     }
 
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.
@@ -465,6 +475,9 @@ message Cluster {
     // If set to `true`, the cluster manager will drain all existing
     // connections to upstream hosts whenever hosts are added or removed from the cluster.
     bool close_connections_on_host_set_change = 6;
+
+    //Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
+    ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
   }
 
   message RefreshRate {

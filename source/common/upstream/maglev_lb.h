@@ -34,7 +34,8 @@ class MaglevTable : public ThreadAwareLoadBalancerBase::HashingLoadBalancer,
                     Logger::Loggable<Logger::Id::upstream> {
 public:
   MaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
-              double max_normalized_weight, uint64_t table_size, MaglevLoadBalancerStats& stats);
+              double max_normalized_weight, uint64_t table_size, bool use_hostname_for_hashing,
+              MaglevLoadBalancerStats& stats);
 
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
   HostConstSharedPtr chooseHost(uint64_t hash) const override;
@@ -81,7 +82,7 @@ private:
   createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
                      double /* min_normalized_weight */, double max_normalized_weight) override {
     return std::make_shared<MaglevTable>(normalized_host_weights, max_normalized_weight,
-                                         table_size_, stats_);
+                                         table_size_, use_hostname_for_hashing_, stats_);
   }
 
   static MaglevLoadBalancerStats generateStats(Stats::Scope& scope);
@@ -89,6 +90,7 @@ private:
   Stats::ScopePtr scope_;
   MaglevLoadBalancerStats stats_;
   const uint64_t table_size_;
+  const bool use_hostname_for_hashing_;
 };
 
 } // namespace Upstream

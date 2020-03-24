@@ -36,6 +36,7 @@ Version history
 * listener filters: listener filter extensions use the "envoy.filters.listener" name space. A
   mapping of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * listeners: fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` could have been bypassed by a client using only TLS 1.3.
+* loadbalancing: added support for using hostname for consistent hash loadbalancing via :ref:`consistent_hash_lb_config <envoy_api_field_Cluster.CommonLbConfig.consistent_hashing_lb_config>`.
 * lua: added a parameter to `httpCall` that makes it possible to have the call be asynchronous.
 * lua: added moonjit support.
 * mongo: the stat emitted for queries without a max time set in the :ref:`MongoDB filter<config_network_filters_mongo_proxy>` was modified to emit correctly for Mongo v3.2+.
