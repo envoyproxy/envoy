@@ -121,7 +121,17 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
 Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!skip_compression_) {
     config_->stats().total_uncompressed_bytes_.add(data.length());
-    compressor_->compress(data, end_stream ? Compressor::State::Finish : Compressor::State::Flush);
+    if (end_stream) {
+      compressor_->compress(data, Compressor::State::Finish);
+      config_->stats().compressed_finished_.inc();
+    } else {
+      // Note: it's fine that we don't flush here, it'll either happen in a future encodeData
+      // call or in encodeTrailers(). This will not cause a regression for
+      // https://github.com/envoyproxy/envoy/pull/3025, given that before encodeTrailers wasn't
+      // handled.
+      compressor_->compress(data, Compressor::State::NoFlush);
+      config_->stats().compressed_no_flush_.inc();
+    }
     config_->stats().total_compressed_bytes_.add(data.length());
   }
   return Http::FilterDataStatus::Continue;
@@ -131,6 +141,7 @@ Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::ResponseTraile
   if (!skip_compression_) {
     Buffer::OwnedImpl empty_buffer;
     compressor_->compress(empty_buffer, Compressor::State::Finish);
+    config_->stats().compressed_finished_.inc();
     config_->stats().total_compressed_bytes_.add(empty_buffer.length());
     encoder_callbacks_->addEncodedData(empty_buffer, true);
   }

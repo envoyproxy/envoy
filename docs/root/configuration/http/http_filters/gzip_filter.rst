@@ -78,6 +78,8 @@ Every configured Gzip filter has statistics rooted at <stat_prefix>.gzip.* with 
   :widths: 1, 1, 2
 
   compressed, Counter, Number of requests compressed.
+  compressed_finished, Counter, Number of compress calls with finished state.
+  compressed_no_flush, Counter, Number of compress calls without flushing.
   not_compressed, Counter, Number of requests not compressed.
   no_accept_header, Counter, Number of requests with no accept header sent.
   header_identity, Counter, Number of requests sent with "identity" set as the *accept-encoding*.

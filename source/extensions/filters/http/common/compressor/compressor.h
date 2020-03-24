@@ -35,6 +35,8 @@ namespace Compressors {
  */
 #define ALL_COMPRESSOR_STATS(COUNTER)                                                              \
   COUNTER(compressed)                                                                              \
+  COUNTER(compressed_finished)                                                                     \
+  COUNTER(compressed_no_flush)                                                                     \
   COUNTER(not_compressed)                                                                          \
   COUNTER(no_accept_header)                                                                        \
   COUNTER(header_identity)                                                                         \

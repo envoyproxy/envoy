@@ -49,7 +49,9 @@ void ZlibCompressorImpl::compress(Buffer::Instance& buffer, State state) {
     buffer.drain(input_slice.len_);
   }
 
-  process(buffer, state == State::Finish ? Z_FINISH : Z_SYNC_FLUSH);
+  if (state == State::Finish || state == State::Flush) {
+    process(buffer, state == State::Finish ? Z_FINISH : Z_SYNC_FLUSH);
+  }
 }
 
 bool ZlibCompressorImpl::deflateNext(int64_t flush_state) {
