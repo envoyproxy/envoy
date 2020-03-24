@@ -62,6 +62,7 @@ void PostgreSQLFilter::incSessions() { config_->stats_.sessions_.inc(); }
 void PostgreSQLFilter::incStatements() { config_->stats_.statements_.inc(); }
 
 void PostgreSQLFilter::incFrontend() { config_->stats_.frontend_commands_.inc(); }
+
 void PostgreSQLFilter::incUnrecognized() { config_->stats_.unrecognized_.inc(); }
 
 void PostgreSQLFilter::incStatementsDelete() {

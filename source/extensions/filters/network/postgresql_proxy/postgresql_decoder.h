@@ -89,22 +89,22 @@ public:
   void setMessageLength(uint32_t message_len) { message_len_ = message_len; }
   uint32_t getMessageLength() { return message_len_; }
 
-  void setInitial(bool initial) { initial_ = initial; }
+  void setStartup(bool startup) { startup_ = startup; }
   void initialize();
 
 protected:
   bool parseMessage(Buffer::Instance& data);
   void decode(Buffer::Instance& data);
+  void decodeAuthentication();
   void decodeBackendStatements();
   void decodeBackendErrorResponse();
   void decodeBackendNoticeResponse();
-  void decodeBackendRowDescription();
+  void decodeFrontendTerminate();
   void incFrontend();
   void incUnrecognized();
   void incStatements();
   void incStatementsOther();
   void incSessions();
-  void onAuthentication();
 
   DecoderCallbacks* callbacks_;
   PostgreSQLSession session_;
@@ -114,14 +114,13 @@ protected:
   std::string message_;
   uint32_t message_len_;
 
-  bool in_transaction_{false};
-  bool initial_{true}; // initial stage does not have 1st byte command
+  bool startup_{true}; // startup stage does not have 1st byte command
 
   using Message = std::tuple<std::string, std::vector<MsgAction>>;
-  // Handler for initial postgresql message.
-  // Initial message is the only message which does not start with
-  // 1 byte TYPE. It starts with message length and must be
-  // therefore handled differently.
+  // Handler for startup postgresql message.
+  // Startup message message which does not start with 1 byte TYPE.
+  // It starts with message length and must be therefore handled
+  // differently.
   Message first_;
 
   // Frontend and Backend messages

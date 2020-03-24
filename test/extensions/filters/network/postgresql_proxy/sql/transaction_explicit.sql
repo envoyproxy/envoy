@@ -48,8 +48,8 @@ DELETE FROM test;
 COMMIT;
 
 /*
-
 postgresql.egress_postgresql.errors: 0
+postgresql.egress_postgresql.frontend_commands: 14
 postgresql.egress_postgresql.sessions: 1
 postgresql.egress_postgresql.statements: 14
 postgresql.egress_postgresql.statements_delete: 2
@@ -60,8 +60,8 @@ postgresql.egress_postgresql.statements_update: 2
 postgresql.egress_postgresql.transactions: 1
 postgresql.egress_postgresql.transactions_commit: 1
 postgresql.egress_postgresql.transactions_rollback: 0
+postgresql.egress_postgresql.unrecognized: 0
 postgresql.egress_postgresql.warnings: 0
-
 */
 
 /* </EXPLICT_TRANSACTIONS> */
