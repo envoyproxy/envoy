@@ -344,14 +344,13 @@ TEST_P(IntegrationTest, TestSmuggling) {
     EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
               response);
   }
-  // Make sure unsupported transfer encodings are rejected, lest they be abused.
   {
     std::string response;
     const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
                                 "identity,chunked \r\ncontent-length: 36\r\n\r\n" +
                                 smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
-    EXPECT_EQ("HTTP/1.1 501 Not Implemented\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
               response);
   }
 }

@@ -33,9 +33,11 @@ Version history
 * http: fixed a bug that could send extra METADATA frames and underflow memory when encoding METADATA frames on a connection that was dispatching data.
 * http: connection header sanitizing has been modified to always sanitize if there is no upgrade, including when an h2c upgrade attempt has been removed.
 * http: added :ref:`max_stream_duration <envoy_api_field_core.HttpProtocolOptions.max_stream_duration>` to specify the duration of existing streams. See :ref:`connection and stream timeouts <faq_configuration_timeouts>`.
+* http: upgrade parser library, which removes support for "identity" transfer-encoding value.
 * listener filters: listener filter extensions use the "envoy.filters.listener" name space. A
   mapping of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * listeners: fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` could have been bypassed by a client using only TLS 1.3.
+* loadbalancing: added support for using hostname for consistent hash loadbalancing via :ref:`consistent_hash_lb_config <envoy_api_field_Cluster.CommonLbConfig.consistent_hashing_lb_config>`.
 * lua: added a parameter to `httpCall` that makes it possible to have the call be asynchronous.
 * lua: added moonjit support.
 * mongo: the stat emitted for queries without a max time set in the :ref:`MongoDB filter<config_network_filters_mongo_proxy>` was modified to emit correctly for Mongo v3.2+.
@@ -44,6 +46,7 @@ Version history
 * network filters: added a :ref:`direct response filter <config_network_filters_direct_response>`.
 * rbac: added :ref:`url_path <envoy_api_field_config.rbac.v2.Permission.url_path>` for matching URL path without the query and fragment string.
 * retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
+* router: added additional stats for :ref:`virtual clusters <config_http_filters_router_vcluster_stats>`.
 * router: added :ref:`auto_san_validation <envoy_api_field_core.UpstreamHttpProtocolOptions.auto_san_validation>` to support overrriding SAN validation to transport socket for new upstream connections based on the downstream HTTP host/authority header.
 * router: added the ability to match a route based on whether a downstream TLS connection certificate has been
   :ref:`validated <envoy_api_field_route.RouteMatch.TlsContextMatchOptions.validated>`.

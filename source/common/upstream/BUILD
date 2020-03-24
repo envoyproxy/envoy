@@ -331,6 +331,9 @@ envoy_cc_library(
     name = "ring_hash_lb_lib",
     srcs = ["ring_hash_lb.cc"],
     hdrs = ["ring_hash_lb.h"],
+    external_deps = [
+        "abseil_inlined_vector",
+    ],
     deps = [
         ":thread_aware_lb_lib",
         "//source/common/common:minimal_logger_lib",
