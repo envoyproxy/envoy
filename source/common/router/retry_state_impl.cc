@@ -225,6 +225,10 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
   }
 
   if (retries_remaining_ == 0) {
+    cluster_.stats().upstream_rq_retry_limit_exceeded_.inc();
+    if (vcluster_) {
+      vcluster_->stats().upstream_rq_retry_limit_exceeded_.inc();
+    }
     return RetryStatus::NoRetryLimitExceeded;
   }
 
