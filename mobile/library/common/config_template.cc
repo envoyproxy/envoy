@@ -153,6 +153,9 @@ stats_config:
             regex: 'cluster\.[\w]+?\.upstream_cx_active'
         - safe_regex:
             google_re2: {}
+            regex: 'cluster\.[\w]+?\.upstream_rq_[1|2|3|4|5]xx'
+        - safe_regex:
+            google_re2: {}
             regex: 'cluster\.[\w]+?\.upstream_rq_retry'
         - safe_regex:
             google_re2: {}
@@ -166,6 +169,9 @@ stats_config:
         - safe_regex:
             google_re2: {}
             regex: 'cluster\.[\w]+?\.upstream_rq_total'
+        - safe_regex:
+            google_re2: {}
+            regex: 'cluster\.[\w]+?\.upstream_rq_unknown'
 watchdog:
   megamiss_timeout: 60s
   miss_timeout: 60s
