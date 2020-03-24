@@ -51,7 +51,7 @@ public:
         .WillByDefault(Return(std::make_shared<Network::MockFilterChain>()));
   }
 
-  MOCK_METHOD(std::shared_ptr<Network::FilterChain>, buildFilterChain,
+  MOCK_METHOD(std::shared_ptr<Network::DrainableFilterChain>, buildFilterChain,
               (const envoy::config::listener::v3::FilterChain&, FilterChainFactoryContextCreator&),
               (const));
 };

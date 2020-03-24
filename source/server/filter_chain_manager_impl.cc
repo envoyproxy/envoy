@@ -591,7 +591,7 @@ void FilterChainManagerImpl::convertIPsToTries() {
   }
 }
 
-std::shared_ptr<FilterChainImpl> FilterChainManagerImpl::findExistingFilterChain(
+std::shared_ptr<Network::DrainableFilterChain> FilterChainManagerImpl::findExistingFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain_message) {
   // origin filter chain manager is empty. *this is the ancestor.
   if (origin_ == nullptr) {

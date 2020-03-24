@@ -30,7 +30,7 @@ public:
    * @return Shared filter chain where builder is allowed to determine and reuse duplicated filter
    * chain. Throw exception if failed.
    */
-  virtual std::shared_ptr<Network::FilterChain>
+  virtual std::shared_ptr<Network::DrainableFilterChain>
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const PURE;
 };
@@ -86,7 +86,7 @@ private:
   std::atomic<bool> is_draining_{false};
 };
 
-class FilterChainImpl : public Network::FilterChain {
+class FilterChainImpl : public Network::DrainableFilterChain {
 public:
   FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                   std::vector<Network::FilterFactoryCb>&& filters_factory)
@@ -102,7 +102,7 @@ public:
     return filters_factory_;
   }
 
-  void setDrainClose() { factory_context_->setDraining(); }
+  void setDrainClose() override { factory_context_->setDraining(); }
   std::unique_ptr<FilterChainFactoryContextImpl> factory_context_;
 
 private:
@@ -157,15 +157,15 @@ private:
 };
 
 /**
- * Implementation of FilterChainManager.
+ * Implementation of FilterChainManager. It owns and exchange filter chains.
  */
 class FilterChainManagerImpl : public Network::FilterChainManager,
                                public FilterChainFactoryContextCreator,
                                Logger::Loggable<Logger::Id::config> {
 public:
   using FcContextMap =
-      std::unordered_map<envoy::config::listener::v3::FilterChain, std::shared_ptr<FilterChainImpl>,
-                         MessageUtil, MessageUtil>;
+      std::unordered_map<envoy::config::listener::v3::FilterChain,
+                         std::shared_ptr<Network::DrainableFilterChain>, MessageUtil, MessageUtil>;
   FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
                          Configuration::FactoryContext& factory_context,
                          Init::Manager& init_manager)
@@ -283,7 +283,7 @@ private:
                                     const Network::ConnectionSocket& socket) const;
 
   // Duplicate the inherent factory context if any.
-  std::shared_ptr<FilterChainImpl>
+  std::shared_ptr<Network::DrainableFilterChain>
   findExistingFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain_message);
 
   // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols

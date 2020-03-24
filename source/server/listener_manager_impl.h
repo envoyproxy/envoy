@@ -260,12 +260,12 @@ public:
       ListenerComponentFactory& listener_component_factory,
       Server::Configuration::TransportSocketFactoryContextImpl& factory_context);
 
-  std::shared_ptr<Network::FilterChain>
+  std::shared_ptr<Network::DrainableFilterChain>
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const override;
 
 private:
-  std::shared_ptr<Network::FilterChain>
+  std::shared_ptr<Network::DrainableFilterChain>
   buildFilterChainInternal(const envoy::config::listener::v3::FilterChain& filter_chain,
                            std::unique_ptr<Configuration::FilterChainFactoryContext>&&
                                filter_chain_factory_context) const;

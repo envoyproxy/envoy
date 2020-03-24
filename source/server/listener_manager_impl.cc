@@ -804,14 +804,15 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     : validator_(validator), listener_component_factory_(listener_component_factory),
       factory_context_(factory_context) {}
 
-std::shared_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
+std::shared_ptr<Network::DrainableFilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain,
     FilterChainFactoryContextCreator& context_creator) const {
   return buildFilterChainInternal(filter_chain,
                                   context_creator.createFilterChainFactoryContext(&filter_chain));
 }
 
-std::shared_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
+std::shared_ptr<Network::DrainableFilterChain>
+ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
     const envoy::config::listener::v3::FilterChain& filter_chain,
     std::unique_ptr<Configuration::FilterChainFactoryContext>&& filter_chain_factory_context)
     const {
