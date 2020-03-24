@@ -74,7 +74,7 @@ elif [[ "${BUILD_REASON}" != "PullRequest" ]]; then
 else
   echo "Running clang-tidy-diff against master branch..."
   git diff "remotes/origin/${SYSTEM_PULLREQUEST_TARGETBRANCH}" | filter_excludes | \
-    "${LLVM_PREFIX}/share/clang/clang-tidy-diff.py" \
+    python3 "${LLVM_PREFIX}/share/clang/clang-tidy-diff.py" \
       -clang-tidy-binary=${CLANG_TIDY} \
       -export-fixes=${FIX_YAML} \
       -j ${NUM_CPUS:-0} -p 1 -quiet
