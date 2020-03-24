@@ -456,7 +456,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
           span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
           R"(","timestamp":")" + std::to_string(span.timestamp()) +
           R"(")"
-          R"(,"duration":3000,)"
+          R"(,"duration":"3000",)"
           R"("annotations":[)"
           R"({"timestamp":")" +
           std::to_string(span.timestamp()) +
@@ -466,7 +466,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
           R"("binaryAnnotations":[{"key":"lc","value":"my_component_name","endpoint":)"
           R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}]})"),
       span.toStruct(replacements)));
-  EXPECT_EQ(2, replacements.size());
+  EXPECT_EQ(3, replacements.size());
 
   // Test the copy-semantics flavor of addAnnotation and addBinaryAnnotation
 
@@ -498,7 +498,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
           span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
           R"(","timestamp":")" + std::to_string(span.timestamp()) +
           R"(")"
-          R"(,"duration":3000,)"
+          R"(,"duration":"3000",)"
           R"("annotations":[)"
           R"({"timestamp":")" +
           std::to_string(timestamp) +
@@ -526,7 +526,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
           R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
           R"("serviceName":"my_service_name"}}]})"),
       span.toStruct(replacements)));
-  EXPECT_EQ(4, replacements.size());
+  EXPECT_EQ(5, replacements.size());
 
   // Test setSourceServiceName and setDestinationServiceName
 
@@ -540,7 +540,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
           span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
           R"(","timestamp":")" + std::to_string(span.timestamp()) +
           R"(")"
-          R"(,"duration":3000,)"
+          R"(,"duration":"3000",)"
           R"("annotations":[)"
           R"({"timestamp":")" +
           std::to_string(timestamp) +
@@ -573,7 +573,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
           R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
           R"("serviceName":"my_service_name"}}]})"),
       span.toStruct(replacements)));
-  EXPECT_EQ(5, replacements.size());
+  EXPECT_EQ(6, replacements.size());
 }
 
 TEST(ZipkinCoreTypesSpanTest, copyConstructor) {

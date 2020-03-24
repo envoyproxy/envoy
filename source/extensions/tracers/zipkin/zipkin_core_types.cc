@@ -156,11 +156,16 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
   }
 
   if (timestamp_.has_value()) {
+    // Usually we store number to a ProtobufWkt::Struct object via ValueUtil::numberValue.
+    // However, due to the possibility of rendering that to a number with scientific notation, we
+    // chose to store it as a string and keeping track the corresponding replacement.
     (*fields)[SPAN_TIMESTAMP] = Util::uint64Value(timestamp_.value(), replacements);
   }
 
   if (duration_.has_value()) {
-    (*fields)[SPAN_DURATION] = ValueUtil::numberValue(duration_.value());
+    // Since SPAN_DURATION has the same data type with SPAN_TIMESTAMP, we use Util::uint64Value to
+    // store it.
+    (*fields)[SPAN_DURATION] = Util::uint64Value(duration_.value(), replacements);
   }
 
   if (!annotations_.empty()) {

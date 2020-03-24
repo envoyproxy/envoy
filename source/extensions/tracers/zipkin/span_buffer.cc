@@ -155,7 +155,9 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
     }
 
     if (zipkin_span.isSetDuration()) {
-      (*fields)[SPAN_DURATION] = ValueUtil::numberValue(zipkin_span.duration());
+      // Since SPAN_DURATION has the same data type with SPAN_TIMESTAMP, we use Util::uint64Value to
+      // store it.
+      (*fields)[SPAN_DURATION] = Util::uint64Value(zipkin_span.duration(), replacements);
     }
 
     const auto& binary_annotations = zipkin_span.binaryAnnotations();

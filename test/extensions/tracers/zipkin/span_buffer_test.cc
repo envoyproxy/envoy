@@ -12,6 +12,8 @@
 #include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -21,8 +23,11 @@ namespace {
 // If this default timestamp is wrapped as double (using ValueUtil::numberValue()) and then it is
 // serialized using Protobuf::util::MessageToJsonString, it renders as: 1.58432429547687e+15.
 constexpr uint64_t DEFAULT_TEST_TIMESTAMP = 1584324295476870;
+constexpr uint64_t DEFAULT_TEST_DURATION = 1584324295476870;
 const Util::Replacements DEFAULT_TEST_REPLACEMENTS = {
     {"DEFAULT_TEST_TIMESTAMP", std::to_string(DEFAULT_TEST_TIMESTAMP)}};
+const Util::Replacements DEFAULT_TEST_DURATIONS = {
+    {"DEFAULT_TEST_DURATION", std::to_string(DEFAULT_TEST_DURATION)}};
 
 enum class IpType { V4, V6 };
 
@@ -56,7 +61,7 @@ Span createSpan(const std::vector<absl::string_view>& annotation_values, const I
   Span span(simulated_time_system);
   span.setId(1);
   span.setTraceId(1);
-  span.setDuration(100);
+  span.setDuration(DEFAULT_TEST_DURATION);
   std::vector<Annotation> annotations;
   annotations.reserve(annotation_values.size());
   for (absl::string_view value : annotation_values) {
@@ -67,17 +72,20 @@ Span createSpan(const std::vector<absl::string_view>& annotation_values, const I
   return span;
 }
 
-// To render a string with DEFAULT_TEST_TIMESTAMP placeholder with DEFAULT_TEST_TIMESTAMP value;
-std::string withDefaultTimestamp(const std::string& expected) {
-  return absl::StrReplaceAll(expected, DEFAULT_TEST_REPLACEMENTS);
+// To render a string with DEFAULT_TEST_TIMESTAMP and DEFAULT_TEST_DURATION placeholder with
+// DEFAULT_TEST_TIMESTAMP and DEFAULT_TEST_DURATION values.
+std::string withDefaultTimestampAndDuration(const std::string& expected) {
+  const auto with_default_timestamp = absl::StrReplaceAll(expected, DEFAULT_TEST_REPLACEMENTS);
+  return absl::StrReplaceAll(with_default_timestamp, DEFAULT_TEST_DURATIONS);
 }
 
 // To wrap JSON array string in a object for JSON string comparison through JsonStringEq test
-// utility. Every DEFAULT_TEST_TIMESTAMP string found in array_string will be replaced by
-// DEFAULT_TEST_REPLACEMENTS. i.e. to replace every DEFAULT_TEST_TIMESTAMP string occurrence with
-// DEFAULT_TEST_TIMESTAMP value.
+// utility. Every DEFAULT_TEST_TIMESTAMP and DEFAULT_TEST_DURATION strings found in array_string
+// will be replaced by DEFAULT_TEST_REPLACEMENTS and DEFAULT_TEST_DURATIONS respectively. i.e. to
+// replace every DEFAULT_TEST_TIMESTAMP string occurrence with DEFAULT_TEST_TIMESTAMP value (the
+// same with DEFAULT_TEST_DURATION).
 std::string wrapAsObject(absl::string_view array_string) {
-  return withDefaultTimestamp(absl::StrFormat(R"({"root":%s})", array_string));
+  return withDefaultTimestampAndDuration(absl::StrFormat(R"({"root":%s})", array_string));
 }
 
 void expectSerializedBuffer(SpanBuffer& buffer, const bool delay_allocation,
@@ -135,56 +143,56 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestamp) {
 
 TEST(ZipkinSpanBufferTest, ConstructBuffer) {
   const std::string expected1 =
-      withDefaultTimestamp(R"([{"traceId":"0000000000000001",)"
-                           R"("name":"",)"
-                           R"("id":"0000000000000001",)"
-                           R"("duration":100,)"
-                           R"("annotations":[{"timestamp":DEFAULT_TEST_TIMESTAMP,)"
-                           R"("value":"cs",)"
-                           R"("endpoint":{"ipv4":"1.2.3.4",)"
-                           R"("port":8080,)"
-                           R"("serviceName":"service1"}},)"
-                           R"({"timestamp":DEFAULT_TEST_TIMESTAMP,)"
-                           R"("value":"sr",)"
-                           R"("endpoint":{"ipv4":"1.2.3.4",)"
-                           R"("port":8080,)"
-                           R"("serviceName":"service1"}}],)"
-                           R"("binaryAnnotations":[{"key":"component",)"
-                           R"("value":"proxy"}]}])");
+      withDefaultTimestampAndDuration(R"([{"traceId":"0000000000000001",)"
+                                      R"("name":"",)"
+                                      R"("id":"0000000000000001",)"
+                                      R"("duration":DEFAULT_TEST_DURATION,)"
+                                      R"("annotations":[{"timestamp":DEFAULT_TEST_TIMESTAMP,)"
+                                      R"("value":"cs",)"
+                                      R"("endpoint":{"ipv4":"1.2.3.4",)"
+                                      R"("port":8080,)"
+                                      R"("serviceName":"service1"}},)"
+                                      R"({"timestamp":DEFAULT_TEST_TIMESTAMP,)"
+                                      R"("value":"sr",)"
+                                      R"("endpoint":{"ipv4":"1.2.3.4",)"
+                                      R"("port":8080,)"
+                                      R"("serviceName":"service1"}}],)"
+                                      R"("binaryAnnotations":[{"key":"component",)"
+                                      R"("value":"proxy"}]}])");
 
   const std::string expected2 =
-      withDefaultTimestamp(R"([{"traceId":"0000000000000001",)"
-                           R"("name":"",)"
-                           R"("id":"0000000000000001",)"
-                           R"("duration":100,)"
-                           R"("annotations":[{"timestamp":DEFAULT_TEST_TIMESTAMP,)"
-                           R"("value":"cs",)"
-                           R"("endpoint":{"ipv4":"1.2.3.4",)"
-                           R"("port":8080,)"
-                           R"("serviceName":"service1"}},)"
-                           R"({"timestamp":DEFAULT_TEST_TIMESTAMP,)"
-                           R"("value":"sr",)"
-                           R"("endpoint":{"ipv4":"1.2.3.4",)"
-                           R"("port":8080,)"
-                           R"("serviceName":"service1"}}],)"
-                           R"("binaryAnnotations":[{"key":"component",)"
-                           R"("value":"proxy"}]},)"
-                           R"({"traceId":"0000000000000001",)"
-                           R"("name":"",)"
-                           R"("id":"0000000000000001",)"
-                           R"("duration":100,)"
-                           R"("annotations":[{"timestamp":DEFAULT_TEST_TIMESTAMP,)"
-                           R"("value":"cs",)"
-                           R"("endpoint":{"ipv4":"1.2.3.4",)"
-                           R"("port":8080,)"
-                           R"("serviceName":"service1"}},)"
-                           R"({"timestamp":DEFAULT_TEST_TIMESTAMP,)"
-                           R"("value":"sr",)"
-                           R"("endpoint":{"ipv4":"1.2.3.4",)"
-                           R"("port":8080,)"
-                           R"("serviceName":"service1"}}],)"
-                           R"("binaryAnnotations":[{"key":"component",)"
-                           R"("value":"proxy"}]}])");
+      withDefaultTimestampAndDuration(R"([{"traceId":"0000000000000001",)"
+                                      R"("name":"",)"
+                                      R"("id":"0000000000000001",)"
+                                      R"("duration":DEFAULT_TEST_DURATION,)"
+                                      R"("annotations":[{"timestamp":DEFAULT_TEST_TIMESTAMP,)"
+                                      R"("value":"cs",)"
+                                      R"("endpoint":{"ipv4":"1.2.3.4",)"
+                                      R"("port":8080,)"
+                                      R"("serviceName":"service1"}},)"
+                                      R"({"timestamp":DEFAULT_TEST_TIMESTAMP,)"
+                                      R"("value":"sr",)"
+                                      R"("endpoint":{"ipv4":"1.2.3.4",)"
+                                      R"("port":8080,)"
+                                      R"("serviceName":"service1"}}],)"
+                                      R"("binaryAnnotations":[{"key":"component",)"
+                                      R"("value":"proxy"}]},)"
+                                      R"({"traceId":"0000000000000001",)"
+                                      R"("name":"",)"
+                                      R"("id":"0000000000000001",)"
+                                      R"("duration":DEFAULT_TEST_DURATION,)"
+                                      R"("annotations":[{"timestamp":DEFAULT_TEST_TIMESTAMP,)"
+                                      R"("value":"cs",)"
+                                      R"("endpoint":{"ipv4":"1.2.3.4",)"
+                                      R"("port":8080,)"
+                                      R"("serviceName":"service1"}},)"
+                                      R"({"timestamp":DEFAULT_TEST_TIMESTAMP,)"
+                                      R"("value":"sr",)"
+                                      R"("endpoint":{"ipv4":"1.2.3.4",)"
+                                      R"("port":8080,)"
+                                      R"("serviceName":"service1"}}],)"
+                                      R"("binaryAnnotations":[{"key":"component",)"
+                                      R"("value":"proxy"}]}])");
   const bool shared = true;
   const bool delay_allocation = true;
 
@@ -207,7 +215,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                            R"("id":"0000000000000001",)"
                            R"("kind":"CLIENT",)"
                            R"("timestamp":DEFAULT_TEST_TIMESTAMP,)"
-                           R"("duration":100,)"
+                           R"("duration":DEFAULT_TEST_DURATION,)"
                            R"("localEndpoint":{)"
                            R"("serviceName":"service1",)"
                            R"("ipv4":"1.2.3.4",)"
@@ -224,7 +232,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                            R"("id":"0000000000000001",)"
                            R"("kind":"CLIENT",)"
                            R"("timestamp":DEFAULT_TEST_TIMESTAMP,)"
-                           R"("duration":100,)"
+                           R"("duration":DEFAULT_TEST_DURATION,)"
                            R"("localEndpoint":{)"
                            R"("serviceName":"service1",)"
                            R"("ipv6":"2001:db8:85a3::8a2e:370:4444",)"
@@ -241,7 +249,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                            R"("id":"0000000000000001",)"
                            R"("kind":"CLIENT",)"
                            R"("timestamp":DEFAULT_TEST_TIMESTAMP,)"
-                           R"("duration":100,)"
+                           R"("duration":DEFAULT_TEST_DURATION,)"
                            R"("localEndpoint":{)"
                            R"("serviceName":"service1",)"
                            R"("ipv4":"1.2.3.4",)"
@@ -253,7 +261,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                            R"("id":"0000000000000001",)"
                            R"("kind":"SERVER",)"
                            R"("timestamp":DEFAULT_TEST_TIMESTAMP,)"
-                           R"("duration":100,)"
+                           R"("duration":DEFAULT_TEST_DURATION,)"
                            R"("localEndpoint":{)"
                            R"("serviceName":"service1",)"
                            R"("ipv4":"1.2.3.4",)"
@@ -271,7 +279,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                            R"("id":"0000000000000001",)"
                            R"("kind":"CLIENT",)"
                            R"("timestamp":DEFAULT_TEST_TIMESTAMP,)"
-                           R"("duration":100,)"
+                           R"("duration":DEFAULT_TEST_DURATION,)"
                            R"("localEndpoint":{)"
                            R"("serviceName":"service1",)"
                            R"("ipv4":"1.2.3.4",)"
@@ -283,7 +291,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                            R"("id":"0000000000000001",)"
                            R"("kind":"SERVER",)"
                            R"("timestamp":DEFAULT_TEST_TIMESTAMP,)"
-                           R"("duration":100,)"
+                           R"("duration":DEFAULT_TEST_DURATION,)"
                            R"("localEndpoint":{)"
                            R"("serviceName":"service1",)"
                            R"("ipv4":"1.2.3.4",)"
@@ -295,100 +303,140 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
 
   SpanBuffer buffer4(envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO, shared, 2);
   buffer4.addSpan(createSpan({"cs"}, IpType::V4));
-  EXPECT_EQ(withDefaultTimestamp("{"
-                                 R"("spans":[{)"
-                                 R"("traceId":"AAAAAAAAAAE=",)"
-                                 R"("id":"AQAAAAAAAAA=",)"
-                                 R"("kind":"CLIENT",)"
-                                 R"("timestamp":"DEFAULT_TEST_TIMESTAMP",)"
-                                 R"("duration":"100",)"
-                                 R"("localEndpoint":{)"
-                                 R"("serviceName":"service1",)"
-                                 R"("ipv4":"AQIDBA==",)"
-                                 R"("port":8080},)"
-                                 R"("tags":{)"
-                                 R"("component":"proxy"})"
-                                 "}]}"),
+  EXPECT_EQ(withDefaultTimestampAndDuration("{"
+                                            R"("spans":[{)"
+                                            R"("traceId":"AAAAAAAAAAE=",)"
+                                            R"("id":"AQAAAAAAAAA=",)"
+                                            R"("kind":"CLIENT",)"
+                                            R"("timestamp":"DEFAULT_TEST_TIMESTAMP",)"
+                                            R"("duration":"DEFAULT_TEST_DURATION",)"
+                                            R"("localEndpoint":{)"
+                                            R"("serviceName":"service1",)"
+                                            R"("ipv4":"AQIDBA==",)"
+                                            R"("port":8080},)"
+                                            R"("tags":{)"
+                                            R"("component":"proxy"})"
+                                            "}]}"),
             serializedMessageToJson<zipkin::proto3::ListOfSpans>(buffer4.serialize()));
 
   SpanBuffer buffer4_v6(envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO, shared, 2);
   buffer4_v6.addSpan(createSpan({"cs"}, IpType::V6));
-  EXPECT_EQ(withDefaultTimestamp("{"
-                                 R"("spans":[{)"
-                                 R"("traceId":"AAAAAAAAAAE=",)"
-                                 R"("id":"AQAAAAAAAAA=",)"
-                                 R"("kind":"CLIENT",)"
-                                 R"("timestamp":"DEFAULT_TEST_TIMESTAMP",)"
-                                 R"("duration":"100",)"
-                                 R"("localEndpoint":{)"
-                                 R"("serviceName":"service1",)"
-                                 R"("ipv6":"IAENuIWjAAAAAIouA3BERA==",)"
-                                 R"("port":7334},)"
-                                 R"("tags":{)"
-                                 R"("component":"proxy"})"
-                                 "}]}"),
+  EXPECT_EQ(withDefaultTimestampAndDuration("{"
+                                            R"("spans":[{)"
+                                            R"("traceId":"AAAAAAAAAAE=",)"
+                                            R"("id":"AQAAAAAAAAA=",)"
+                                            R"("kind":"CLIENT",)"
+                                            R"("timestamp":"DEFAULT_TEST_TIMESTAMP",)"
+                                            R"("duration":"DEFAULT_TEST_DURATION",)"
+                                            R"("localEndpoint":{)"
+                                            R"("serviceName":"service1",)"
+                                            R"("ipv6":"IAENuIWjAAAAAIouA3BERA==",)"
+                                            R"("port":7334},)"
+                                            R"("tags":{)"
+                                            R"("component":"proxy"})"
+                                            "}]}"),
             serializedMessageToJson<zipkin::proto3::ListOfSpans>(buffer4_v6.serialize()));
 
   SpanBuffer buffer5(envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO, shared, 2);
   buffer5.addSpan(createSpan({"cs", "sr"}, IpType::V4));
-  EXPECT_EQ(withDefaultTimestamp("{"
-                                 R"("spans":[{)"
-                                 R"("traceId":"AAAAAAAAAAE=",)"
-                                 R"("id":"AQAAAAAAAAA=",)"
-                                 R"("kind":"CLIENT",)"
-                                 R"("timestamp":"DEFAULT_TEST_TIMESTAMP",)"
-                                 R"("duration":"100",)"
-                                 R"("localEndpoint":{)"
-                                 R"("serviceName":"service1",)"
-                                 R"("ipv4":"AQIDBA==",)"
-                                 R"("port":8080},)"
-                                 R"("tags":{)"
-                                 R"("component":"proxy"}},)"
-                                 R"({)"
-                                 R"("traceId":"AAAAAAAAAAE=",)"
-                                 R"("id":"AQAAAAAAAAA=",)"
-                                 R"("kind":"SERVER",)"
-                                 R"("timestamp":"DEFAULT_TEST_TIMESTAMP",)"
-                                 R"("duration":"100",)"
-                                 R"("localEndpoint":{)"
-                                 R"("serviceName":"service1",)"
-                                 R"("ipv4":"AQIDBA==",)"
-                                 R"("port":8080},)"
-                                 R"("tags":{)"
-                                 R"("component":"proxy"},)"
-                                 R"("shared":true)"
-                                 "}]}"),
+  EXPECT_EQ(withDefaultTimestampAndDuration("{"
+                                            R"("spans":[{)"
+                                            R"("traceId":"AAAAAAAAAAE=",)"
+                                            R"("id":"AQAAAAAAAAA=",)"
+                                            R"("kind":"CLIENT",)"
+                                            R"("timestamp":"DEFAULT_TEST_TIMESTAMP",)"
+                                            R"("duration":"DEFAULT_TEST_DURATION",)"
+                                            R"("localEndpoint":{)"
+                                            R"("serviceName":"service1",)"
+                                            R"("ipv4":"AQIDBA==",)"
+                                            R"("port":8080},)"
+                                            R"("tags":{)"
+                                            R"("component":"proxy"}},)"
+                                            R"({)"
+                                            R"("traceId":"AAAAAAAAAAE=",)"
+                                            R"("id":"AQAAAAAAAAA=",)"
+                                            R"("kind":"SERVER",)"
+                                            R"("timestamp":"DEFAULT_TEST_TIMESTAMP",)"
+                                            R"("duration":"DEFAULT_TEST_DURATION",)"
+                                            R"("localEndpoint":{)"
+                                            R"("serviceName":"service1",)"
+                                            R"("ipv4":"AQIDBA==",)"
+                                            R"("port":8080},)"
+                                            R"("tags":{)"
+                                            R"("component":"proxy"},)"
+                                            R"("shared":true)"
+                                            "}]}"),
             serializedMessageToJson<zipkin::proto3::ListOfSpans>(buffer5.serialize()));
 
   SpanBuffer buffer6(envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO, !shared, 2);
   buffer6.addSpan(createSpan({"cs", "sr"}, IpType::V4));
-  EXPECT_EQ(withDefaultTimestamp("{"
-                                 R"("spans":[{)"
-                                 R"("traceId":"AAAAAAAAAAE=",)"
-                                 R"("id":"AQAAAAAAAAA=",)"
-                                 R"("kind":"CLIENT",)"
-                                 R"("timestamp":"DEFAULT_TEST_TIMESTAMP",)"
-                                 R"("duration":"100",)"
-                                 R"("localEndpoint":{)"
-                                 R"("serviceName":"service1",)"
-                                 R"("ipv4":"AQIDBA==",)"
-                                 R"("port":8080},)"
-                                 R"("tags":{)"
-                                 R"("component":"proxy"}},)"
-                                 R"({)"
-                                 R"("traceId":"AAAAAAAAAAE=",)"
-                                 R"("id":"AQAAAAAAAAA=",)"
-                                 R"("kind":"SERVER",)"
-                                 R"("timestamp":"DEFAULT_TEST_TIMESTAMP",)"
-                                 R"("duration":"100",)"
-                                 R"("localEndpoint":{)"
-                                 R"("serviceName":"service1",)"
-                                 R"("ipv4":"AQIDBA==",)"
-                                 R"("port":8080},)"
-                                 R"("tags":{)"
-                                 R"("component":"proxy"})"
-                                 "}]}"),
+  EXPECT_EQ(withDefaultTimestampAndDuration("{"
+                                            R"("spans":[{)"
+                                            R"("traceId":"AAAAAAAAAAE=",)"
+                                            R"("id":"AQAAAAAAAAA=",)"
+                                            R"("kind":"CLIENT",)"
+                                            R"("timestamp":"DEFAULT_TEST_TIMESTAMP",)"
+                                            R"("duration":"DEFAULT_TEST_DURATION",)"
+                                            R"("localEndpoint":{)"
+                                            R"("serviceName":"service1",)"
+                                            R"("ipv4":"AQIDBA==",)"
+                                            R"("port":8080},)"
+                                            R"("tags":{)"
+                                            R"("component":"proxy"}},)"
+                                            R"({)"
+                                            R"("traceId":"AAAAAAAAAAE=",)"
+                                            R"("id":"AQAAAAAAAAA=",)"
+                                            R"("kind":"SERVER",)"
+                                            R"("timestamp":"DEFAULT_TEST_TIMESTAMP",)"
+                                            R"("duration":"DEFAULT_TEST_DURATION",)"
+                                            R"("localEndpoint":{)"
+                                            R"("serviceName":"service1",)"
+                                            R"("ipv4":"AQIDBA==",)"
+                                            R"("port":8080},)"
+                                            R"("tags":{)"
+                                            R"("component":"proxy"})"
+                                            "}]}"),
             serializedMessageToJson<zipkin::proto3::ListOfSpans>(buffer6.serialize()));
+}
+
+TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
+  ProtobufWkt::Struct objectWithScientificNotation;
+  auto* objectWithScientificNotationFields = objectWithScientificNotation.mutable_fields();
+  (*objectWithScientificNotationFields)["timestamp"] = ValueUtil::numberValue(
+      DEFAULT_TEST_TIMESTAMP); // the value of DEFAULT_TEST_TIMESTAMP is 1584324295476870.
+  const auto objectWithScientificNotationJson =
+      MessageUtil::getJsonStringFromMessage(objectWithScientificNotation, false, true);
+  // Since we use ValueUtil::numberValue to set the timestamp, we expect to
+  // see the value is rendered with scientific notation (1.58432429547687e+15).
+  EXPECT_EQ(R"({"timestamp":1.58432429547687e+15})", objectWithScientificNotationJson);
+
+  ProtobufWkt::Struct object;
+  auto* objectFields = object.mutable_fields();
+  Util::Replacements replacements;
+  (*objectFields)["timestamp"] = Util::uint64Value(DEFAULT_TEST_TIMESTAMP, replacements);
+  const auto objectJson = MessageUtil::getJsonStringFromMessage(object, false, true);
+  // We still have "1584324295476870" from MessageUtil::getJsonStringFromMessage here.
+  EXPECT_EQ(R"({"timestamp":"1584324295476870"})", objectJson);
+  // However, then the replacement correctly replaces "1584324295476870" with 1584324295476870
+  // (without quotes).
+  EXPECT_EQ(R"({"timestamp":1584324295476870})", absl::StrReplaceAll(objectJson, replacements));
+
+  SpanBuffer bufferDeprecatedJsonV1(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON, true, 2);
+  bufferDeprecatedJsonV1.addSpan(createSpan({"cs"}, IpType::V4));
+  // We do "HasSubstr" here since we could not compare the serialized JSON of a ProtobufWkt::Struct
+  // object, since the positions of keys are not consistent between calls.
+  EXPECT_THAT(bufferDeprecatedJsonV1.serialize(), HasSubstr(R"("timestamp":1584324295476870)"));
+  EXPECT_THAT(bufferDeprecatedJsonV1.serialize(),
+              Not(HasSubstr(R"("timestamp":1.58432429547687e+15)")));
+  EXPECT_THAT(bufferDeprecatedJsonV1.serialize(),
+              Not(HasSubstr(R"("timestamp":"1584324295476870")")));
+
+  SpanBuffer bufferJsonV2(
+      envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1, true, 2);
+  bufferJsonV2.addSpan(createSpan({"cs"}, IpType::V4));
+  EXPECT_THAT(bufferJsonV2.serialize(), HasSubstr(R"("timestamp":1584324295476870)"));
+  EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("timestamp":1.58432429547687e+15)")));
+  EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("timestamp":"1584324295476870")")));
 }
 
 } // namespace
