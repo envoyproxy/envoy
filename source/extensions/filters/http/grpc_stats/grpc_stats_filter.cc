@@ -33,7 +33,7 @@ public:
 
   absl::optional<Grpc::Context::RequestStatNames>
   lookup(const Grpc::Common::RequestNames& request_names) const {
-    auto it = map_.find(ViewKey(request_names.service_, request_names.method_));
+    auto it = map_.find(request_names);
     if (it != map_.end()) {
       return it->second;
     }
@@ -43,15 +43,30 @@ public:
 
 private:
   using OwningKey = std::tuple<std::string, std::string>;
-  using ViewKey = std::tuple<absl::string_view, absl::string_view>;
-  struct MapHash : absl::Hash<OwningKey>, absl::Hash<ViewKey> {
+  using ViewKey = Grpc::Common::RequestNames;
+
+  class MapHash {
+  private:
+    // Use the same type for hashing all variations to ensure the same hash value from all source
+    // types.
+    using ViewTuple = std::tuple<absl::string_view, absl::string_view>;
+    static uint64_t hash(const ViewTuple& key) { return absl::Hash<ViewTuple>()(key); }
+
+  public:
     using is_transparent = void;
+
+    uint64_t operator()(const OwningKey& key) const { return hash(key); }
+    uint64_t operator()(const ViewKey& key) const {
+      return hash(ViewTuple(key.service_, key.method_));
+    }
   };
 
   struct MapEq {
     using is_transparent = void;
     bool operator()(const OwningKey& left, const OwningKey& right) const { return left == right; }
-    bool operator()(const OwningKey& left, const ViewKey& right) const { return left == right; }
+    bool operator()(const OwningKey& left, const ViewKey& right) const {
+      return left == std::make_tuple(right.service_, right.method_);
+    }
   };
   using MapType = absl::flat_hash_map<OwningKey, Grpc::Context::RequestStatNames, MapHash, MapEq>;
 
