@@ -1425,6 +1425,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
 
+  stream_info_.setUpstreamClusterInfo(cached_cluster_info_.value());
   refreshCachedTracingCustomTags();
 }
 

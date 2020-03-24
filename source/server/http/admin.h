@@ -419,12 +419,18 @@ private:
       return envoy::config::core::v3::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+    const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+      return empty_access_logs_;
+    }
 
     AdminImpl& parent_;
     const std::string name_;
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
     Network::NopConnectionBalancerImpl connection_balancer_;
+
+  private:
+    const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 

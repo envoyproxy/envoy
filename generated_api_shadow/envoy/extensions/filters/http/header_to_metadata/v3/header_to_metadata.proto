@@ -77,7 +77,8 @@ message Config {
         "envoy.config.filter.http.header_to_metadata.v2.Config.Rule";
 
     // The header that triggers this rule — required.
-    string header = 1 [(validate.rules).string = {min_bytes: 1}];
+    string header = 1
+        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     // If the header is present, apply this metadata KeyValuePair.
     //
