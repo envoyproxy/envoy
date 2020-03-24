@@ -55,6 +55,7 @@ Version history
 * router: don't ignore :ref:`per_try_timeout <envoy_api_field_route.RetryPolicy.per_try_timeout>` when the :ref:`global route timeout <envoy_api_field_route.RouteAction.timeout>` is disabled.
 * router: added ability to set attempt count in downstream response, see :ref:`virtual host's include response
   attempt count config <envoy_api_field_route.VirtualHost.include_attempt_count_in_response>`.
+* router: introduced :ref:`query parameter <envoy_api_field_route.RouteAction.HashPolicy.retry_count>` to allow mutation of the hash used for ring has or maglev loadbalancers on retry.
 * router: strip whitespace for :ref:`retry_on <envoy_api_field_route.RetryPolicy.retry_on>`, :ref:`grpc-retry-on header <config_http_filters_router_x-envoy-retry-grpc-on>` and :ref:`retry-on header <config_http_filters_router_x-envoy-retry-on>`.
 * router: added support for DOWNSTREAM_LOCAL_PORT :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
 * runtime: enabling the runtime feature "envoy.deprecated_features.allow_deprecated_extension_names"

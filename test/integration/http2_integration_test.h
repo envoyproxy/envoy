@@ -29,10 +29,16 @@ protected:
   }
 };
 
-class Http2RingHashIntegrationTest : public Http2IntegrationTest {
+class Http2ConsistentHashIntegrationTest : public Http2IntegrationTest {
+public:
+  void configureCluster(envoy::config::cluster::v3::Cluster_LbPolicy lb_policy);
+
+  int num_upstreams_ = 5;
+};
+
+class Http2RingHashIntegrationTest : public Http2ConsistentHashIntegrationTest {
 public:
   Http2RingHashIntegrationTest();
-
   ~Http2RingHashIntegrationTest() override;
 
   void createUpstreams() override;
@@ -41,7 +47,14 @@ public:
                             std::function<void(IntegrationStreamDecoder&)> cb);
 
   std::vector<FakeHttpConnectionPtr> fake_upstream_connections_;
-  int num_upstreams_ = 5;
+};
+
+class Http2MaglevIntegrationTest : public Http2ConsistentHashIntegrationTest {
+public:
+  Http2MaglevIntegrationTest();
+  ~Http2MaglevIntegrationTest() override;
+
+  void createUpstreams() override;
 };
 
 class Http2MetadataIntegrationTest : public Http2IntegrationTest {

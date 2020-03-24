@@ -271,7 +271,7 @@ public:
   MOCK_METHOD(absl::optional<uint64_t>, generateHash,
               (const Network::Address::Instance* downstream_address,
                const Http::RequestHeaderMap& headers, const AddCookieCallback add_cookie,
-               const StreamInfo::FilterStateSharedPtr filter_state),
+               const StreamInfo::FilterStateSharedPtr filter_state, int retry),
               (const));
 };
 

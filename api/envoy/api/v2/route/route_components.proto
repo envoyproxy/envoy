@@ -621,7 +621,7 @@ message RouteAction {
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
   // <arch_overview_load_balancing_types>`.
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message HashPolicy {
     message Header {
       // The name of the request header that will be used to obtain the hash
@@ -680,6 +680,19 @@ message RouteAction {
       string key = 1 [(validate.rules).string = {min_bytes: 1}];
     }
 
+    message RetryCount {
+      // Uses the retry count to modify the generated hash. On the first attempt, this policy
+      // does not alter the result of consistent hashing. This policy is stable: for a given
+      // load balancer state, and equal output values from other policies, retries will always
+      // select the same sequence of hosts. Note, however, that because of the retry policy
+      // has no knowledge of the load balancer's state, selection of a different host cannot
+      // be guaranteed.
+      //
+      // .. note::
+      //
+      //   This policy *must* be used in conjunction with at least one other non-terminal policy.
+    }
+
     oneof policy_specifier {
       option (validate.required) = true;
 
@@ -697,6 +710,9 @@ message RouteAction {
 
       // Filter state hash policy.
       FilterState filter_state = 6;
+
+      // Retry count hash policy.
+      RetryCount retry_count = 7;
     }
 
     // The flag that short-circuits the hash computing. This field provides a

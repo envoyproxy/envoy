@@ -10,6 +10,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -1198,23 +1199,29 @@ TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
   ASSERT_TRUE(response->complete());
 }
 
+void Http2ConsistentHashIntegrationTest::configureCluster(
+    envoy::config::cluster::v3::Cluster_LbPolicy lb_policy) {
+  config_helper_.addConfigModifier(
+      [&, lb_policy](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+        cluster->clear_load_assignment();
+        cluster->mutable_load_assignment()->add_endpoints();
+        cluster->mutable_load_assignment()->set_cluster_name(cluster->name());
+        cluster->set_lb_policy(lb_policy);
+        for (int i = 0; i < num_upstreams_; i++) {
+          auto* socket = cluster->mutable_load_assignment()
+                             ->mutable_endpoints(0)
+                             ->add_lb_endpoints()
+                             ->mutable_endpoint()
+                             ->mutable_address()
+                             ->mutable_socket_address();
+          socket->set_address(Network::Test::getLoopbackAddressString(version_));
+        }
+      });
+}
+
 Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->clear_load_assignment();
-    cluster->mutable_load_assignment()->add_endpoints();
-    cluster->mutable_load_assignment()->set_cluster_name(cluster->name());
-    cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::RING_HASH);
-    for (int i = 0; i < num_upstreams_; i++) {
-      auto* socket = cluster->mutable_load_assignment()
-                         ->mutable_endpoints(0)
-                         ->add_lb_endpoints()
-                         ->mutable_endpoint()
-                         ->mutable_address()
-                         ->mutable_socket_address();
-      socket->set_address(Network::Test::getLoopbackAddressString(version_));
-    }
-  });
+  configureCluster(envoy::config::cluster::v3::Cluster::RING_HASH);
 }
 
 Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
@@ -1237,7 +1244,41 @@ void Http2RingHashIntegrationTest::createUpstreams() {
   }
 }
 
+Http2MaglevIntegrationTest::Http2MaglevIntegrationTest() {
+  configureCluster(envoy::config::cluster::v3::Cluster::MAGLEV);
+}
+
+Http2MaglevIntegrationTest::~Http2MaglevIntegrationTest() {
+  if (codec_client_) {
+    codec_client_->close();
+    codec_client_ = nullptr;
+  }
+}
+
+void Http2MaglevIntegrationTest::createUpstreams() {
+  // Use autonomous upstreams since we're not testing retry so much as the manipulation of
+  // the hash generated on retry.
+  for (int i = 0; i < num_upstreams_; i++) {
+    auto upstream = std::make_unique<AutonomousUpstream>(
+        Network::Test::createRawBufferSocketFactory(), 0, FakeHttpConnection::Type::HTTP1, version_,
+        timeSystem(), false);
+    if (i == 0) {
+      upstream->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+          Http::TestHeaderMapImpl({{":status", "500"}})));
+    } else {
+      upstream->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+          Http::TestHeaderMapImpl({{":status", "200"}, {"x-served-by", std::to_string(i)}})));
+    }
+
+    fake_upstreams_.push_back(std::move(upstream));
+  }
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2RingHashIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2MaglevIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -1446,6 +1487,54 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
             response.headers().get(Http::LowerCaseString("x-served-by"))->value().getStringView()));
       });
   EXPECT_EQ(served_by.size(), 1);
+}
+
+TEST_P(Http2MaglevIntegrationTest, RetryCountHashPolicy) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* route = hcm.mutable_route_config()
+                          ->mutable_virtual_hosts(0)
+                          ->mutable_routes(0)
+                          ->mutable_route();
+        auto* hash_policy = route->add_hash_policy();
+        auto* header = hash_policy->mutable_header();
+        header->set_header_name("foo");
+        hash_policy = route->add_hash_policy();
+        hash_policy->mutable_retry_count();
+      });
+
+  initialize();
+
+  std::set<std::string> served_by;
+  const uint32_t num_requests = 50;
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  for (uint32_t i = 0; i < num_requests; i++) {
+    auto response = codec_client_->makeRequestWithBody(
+        Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "host"},
+                                       {"x-forwarded-for", "10.0.0.1"},
+                                       {"x-envoy-retry-on", "5xx"},
+                                       {"x-envoy-max-retries", "50"},
+                                       {"foo", fmt::format("{}", i)}},
+        1024);
+
+    response->waitForEndStream();
+
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+    served_by.insert(std::string(
+        response->headers().get(Http::LowerCaseString("x-served-by"))->value().getStringView()));
+  }
+
+  // Expect all the upstreams were used, but not 0.
+  EXPECT_EQ(num_upstreams_ - 1, served_by.size());
+  EXPECT_TRUE(served_by.find("0") == served_by.end());
 }
 
 namespace {

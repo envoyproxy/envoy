@@ -39,13 +39,15 @@ public:
    * @param headers stores the HTTP headers for the stream
    * @param add_cookie is called to add a set-cookie header on the reply sent to the downstream
    * host
+   * @param filter_state is the shared HTTP filter state
+   * @param retry indicates the current retry count (0 is the initial attempt)
    * @return absl::optional<uint64_t> an optional hash value to route on. A hash value might not be
    * returned if for example the specified HTTP header does not exist.
    */
   virtual absl::optional<uint64_t>
   generateHash(const Network::Address::Instance* downstream_address,
                const RequestHeaderMap& headers, AddCookieCallback add_cookie,
-               const StreamInfo::FilterStateSharedPtr filter_state) const PURE;
+               const StreamInfo::FilterStateSharedPtr filter_state, int retry) const PURE;
 };
 
 } // namespace Http

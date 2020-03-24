@@ -27,7 +27,7 @@ public:
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const RequestHeaderMap& headers,
                                     const HashPolicy::AddCookieCallback,
-                                    const StreamInfo::FilterStateSharedPtr) const override {
+                                    const StreamInfo::FilterStateSharedPtr, int) const override {
     absl::optional<uint64_t> hash;
 
     const HeaderEntry* header = headers.get(header_name_);
@@ -50,7 +50,7 @@ public:
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const RequestHeaderMap& headers,
                                     const HashPolicy::AddCookieCallback add_cookie,
-                                    const StreamInfo::FilterStateSharedPtr) const override {
+                                    const StreamInfo::FilterStateSharedPtr, int) const override {
     absl::optional<uint64_t> hash;
     std::string value = Utility::parseCookieValue(headers, key_);
     if (value.empty() && ttl_.has_value()) {
@@ -75,7 +75,7 @@ public:
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
                                     const RequestHeaderMap&, const HashPolicy::AddCookieCallback,
-                                    const StreamInfo::FilterStateSharedPtr) const override {
+                                    const StreamInfo::FilterStateSharedPtr, int) const override {
     if (downstream_addr == nullptr) {
       return absl::nullopt;
     }
@@ -99,7 +99,7 @@ public:
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const RequestHeaderMap& headers,
                                     const HashPolicy::AddCookieCallback,
-                                    const StreamInfo::FilterStateSharedPtr) const override {
+                                    const StreamInfo::FilterStateSharedPtr, int) const override {
     absl::optional<uint64_t> hash;
 
     const HeaderEntry* header = headers.Path();
@@ -123,10 +123,10 @@ public:
   FilterStateHashMethod(const std::string& key, bool terminal)
       : HashMethodImplBase(terminal), key_(key) {}
 
-  absl::optional<uint64_t>
-  evaluate(const Network::Address::Instance*, const RequestHeaderMap&,
-           const HashPolicy::AddCookieCallback,
-           const StreamInfo::FilterStateSharedPtr filter_state) const override {
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance*, const RequestHeaderMap&,
+                                    const HashPolicy::AddCookieCallback,
+                                    const StreamInfo::FilterStateSharedPtr filter_state,
+                                    int) const override {
     if (filter_state->hasData<Hashable>(key_)) {
       return filter_state->getDataReadOnly<Hashable>(key_).hash();
     }
@@ -137,8 +137,54 @@ private:
   const std::string key_;
 };
 
+class RetryCountHashMethod : public HashMethodImplBase {
+public:
+  RetryCountHashMethod(bool terminal) : HashMethodImplBase(terminal) {}
+
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance*, const RequestHeaderMap&,
+                                    const HashPolicy::AddCookieCallback,
+                                    const StreamInfo::FilterStateSharedPtr,
+                                    int retry) const override {
+    if (retry > 0) {
+      // Return the negated retry count to trigger large variance in the computed hash. Returning
+      // the positive retry count will only vary the hash by +/-1 on the first retry and if the
+      // load balancer just performs modulo arithmetic on the hash, retries are likely to land on
+      // only the adjacent hosts.
+      return absl::make_optional<uint64_t>(static_cast<uint64_t>(-retry));
+    }
+
+    return absl::nullopt;
+  }
+};
+
 HashPolicyImpl::HashPolicyImpl(
     absl::Span<const envoy::config::route::v3::RouteAction::HashPolicy* const> hash_policies) {
+
+  // Iterate over hash policies and check that RetryCountHashMethod is always used in conjunction
+  // with another method.
+  bool sawRetry = false;
+  bool sawNonRetry = false;
+  for (auto* hash_policy : hash_policies) {
+    if (hash_policy->policy_specifier_case() ==
+        envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kRetryCount) {
+      sawRetry = true;
+    } else {
+      sawNonRetry = true;
+    }
+
+    if (hash_policy->terminal()) {
+      if (sawRetry && !sawNonRetry) {
+        throw EnvoyException(
+            "RetryCount hash policy must be used in conjunction with another policy");
+      }
+
+      sawRetry = false;
+      sawNonRetry = false;
+    }
+  }
+  if (sawRetry && !sawNonRetry) {
+    throw EnvoyException("RetryCount hash policy must be used in conjunction with another policy");
+  }
 
   hash_impls_.reserve(hash_policies.size());
   for (auto* hash_policy : hash_policies) {
@@ -171,6 +217,9 @@ HashPolicyImpl::HashPolicyImpl(
       hash_impls_.emplace_back(
           new FilterStateHashMethod(hash_policy->filter_state().key(), hash_policy->terminal()));
       break;
+    case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kRetryCount:
+      hash_impls_.emplace_back(new RetryCountHashMethod(hash_policy->terminal()));
+      break;
     default:
       throw EnvoyException(
           absl::StrCat("Unsupported hash policy ", hash_policy->policy_specifier_case()));
@@ -181,11 +230,11 @@ HashPolicyImpl::HashPolicyImpl(
 absl::optional<uint64_t>
 HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
                              const RequestHeaderMap& headers, const AddCookieCallback add_cookie,
-                             const StreamInfo::FilterStateSharedPtr filter_state) const {
+                             const StreamInfo::FilterStateSharedPtr filter_state, int retry) const {
   absl::optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
     const absl::optional<uint64_t> new_hash =
-        hash_impl->evaluate(downstream_addr, headers, add_cookie, filter_state);
+        hash_impl->evaluate(downstream_addr, headers, add_cookie, filter_state, retry);
     if (new_hash) {
       // Rotating the old value prevents duplicate hash rules from cancelling each other out
       // and preserves all of the entropy

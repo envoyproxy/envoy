@@ -280,7 +280,7 @@ public:
             [this](const std::string& key, const std::string& path, std::chrono::seconds max_age) {
               return addDownstreamSetCookie(key, path, max_age);
             },
-            callbacks_->streamInfo().filterState());
+            callbacks_->streamInfo().filterState(), attempt_count_ - 1);
       }
     }
     return {};
