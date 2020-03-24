@@ -117,7 +117,7 @@ public:
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
 
-  // DrainDescision
+  // DrainDecision
   bool drainClose() const override {
     return drain_manager_->drainClose() || server_.drainManager().drainClose();
   }

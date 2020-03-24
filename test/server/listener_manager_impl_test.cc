@@ -3275,7 +3275,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
   Configuration::ListenerFactoryContext* listener_factory_context = nullptr;
-  // Extract listener_factory_context without breaking encapulation.
+  // Extract listener_factory_context avoid accessing private member.
   ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
       .WillByDefault(
           Invoke([&listener_factory_context](

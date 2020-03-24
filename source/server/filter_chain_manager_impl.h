@@ -282,7 +282,7 @@ private:
   findFilterChainForSourceIpAndPort(const SourceIPsTrie& source_ips_trie,
                                     const Network::ConnectionSocket& socket) const;
 
-  // Duplicate the inheritent factory context if any.
+  // Duplicate the inherent factory context if any.
   std::shared_ptr<FilterChainImpl>
   findExistingFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain_message);
 
@@ -294,8 +294,8 @@ private:
   Configuration::FactoryContext& parent_context_;
   std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
 
-  // Reference to the previous generation of filter chain manager. *this need to copy a subset from
-  // the origin fc_contexts_ Caution: origin_ is not legit all the time.
+  // Reference to the previous generation of filter chain manager to share the filter chains.
+  // Caution: the pointer is legit only during warm up.
   // TODO(lambdai): safer usage
   const FilterChainManagerImpl* origin_{};
 
