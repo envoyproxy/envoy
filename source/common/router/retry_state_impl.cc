@@ -232,6 +232,9 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 
   if (!cluster_.resourceManager(priority_).retries().canCreate()) {
     cluster_.stats().upstream_rq_retry_overflow_.inc();
+    if (vcluster_) {
+      vcluster_->stats().upstream_rq_retry_overflow_.inc();
+    }
     return RetryStatus::NoOverflow;
   }
 
