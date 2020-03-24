@@ -197,11 +197,12 @@ void ReporterImpl::flushSpans() {
   }
 }
 
-void ReporterImpl::onFailure(Http::AsyncClient::FailureReason) {
+void ReporterImpl::onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) {
   driver_.tracerStats().reports_failed_.inc();
 }
 
-void ReporterImpl::onSuccess(Http::ResponseMessagePtr&& http_response) {
+void ReporterImpl::onSuccess(const Http::AsyncClient::Request&,
+                             Http::ResponseMessagePtr&& http_response) {
   if (Http::Utility::getResponseStatus(http_response->headers()) !=
       enumToInt(Http::Code::Accepted)) {
     driver_.tracerStats().reports_dropped_.inc();
