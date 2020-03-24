@@ -281,6 +281,8 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 
 void ConnectionManagerImpl::handleCodecException(const char* error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
+  read_callbacks_->connection().streamInfo().setResponseCodeDetails(
+      absl::StrCat("codec error: ", error));
 
   // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
   // GOAWAY.
@@ -322,11 +324,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     try {
       codec_->dispatch(data);
     } catch (const FrameFloodException& e) {
-      // TODO(mattklein123): This is an emergency substitute for the lack of connection level
-      // logging in the HCM. In a public follow up change we will add full support for connection
-      // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
-      // indicators to be stored in the connection level stream info, and then matched, sampled,
-      // etc. when logged.
       const envoy::type::v3::FractionalPercent default_value; // 0
       if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
                                              default_value)) {
