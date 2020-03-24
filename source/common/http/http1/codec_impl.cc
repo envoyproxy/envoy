@@ -270,7 +270,7 @@ void ServerConnectionImpl::doFloodProtectionChecks() const {
   // Before processing another request, make sure that we are below the response flood protection
   // threshold.
   if (outbound_responses_ >= max_outbound_responses_) {
-    ENVOY_CONN_LOG(trace, "error accepting request: Too many pending responses queued",
+    ENVOY_CONN_LOG(trace, "error accepting request: too many pending responses queued",
                    connection_);
     stats_.response_flood_.inc();
     throw FrameFloodException("Too many responses queued.");
