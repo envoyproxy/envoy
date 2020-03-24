@@ -11,5 +11,6 @@ api_proto_package(
         "//envoy/config/bootstrap/v2:pkg",
         "//envoy/service/tap/v2alpha:pkg",
         "//envoy/type:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

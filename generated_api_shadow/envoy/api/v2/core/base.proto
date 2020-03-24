@@ -14,6 +14,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 import public "envoy/api/v2/core/socket_option.proto";
@@ -22,6 +23,7 @@ option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "BaseProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common types]
 

@@ -9,12 +9,14 @@ import "envoy/config/endpoint/v3/endpoint_components.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.service.health.v3";
 option java_outer_classname = "HdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Health Discovery Service (HDS)]
 

@@ -8,11 +8,13 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/health_check.proto";
 import "envoy/type/v3/percent.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.admin.v3";
 option java_outer_classname = "ClustersProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Clusters]
 

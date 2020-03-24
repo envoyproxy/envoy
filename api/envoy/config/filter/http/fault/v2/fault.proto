@@ -9,12 +9,14 @@ import "envoy/type/percent.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.fault.v2";
 option java_outer_classname = "FaultProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.fault.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Fault Injection]
 // Fault Injection :ref:`configuration overview <config_http_filters_fault_injection>`.

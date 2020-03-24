@@ -11,9 +11,9 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/sensitive.proto";
-
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/sensitive.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.auth";
@@ -21,6 +21,7 @@ option java_outer_classname = "CertProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.transport_sockets.tls.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common TLS configuration]
 

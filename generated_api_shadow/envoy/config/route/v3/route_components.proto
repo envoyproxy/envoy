@@ -14,14 +14,15 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/versioning.proto";
-
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.route.v3";
 option java_outer_classname = "RouteComponentsProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: HTTP route components]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`

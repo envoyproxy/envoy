@@ -9,12 +9,14 @@ import "envoy/api/v2/core/health_check.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.endpoint";
 option java_outer_classname = "EndpointComponentsProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.endpoint.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Endpoints]
 

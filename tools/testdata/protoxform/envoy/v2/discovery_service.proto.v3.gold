@@ -6,14 +6,15 @@ import "";
 
 import "google/api/annotations.proto";
 
-import "udpa/annotations/versioning.proto";
-
 import "envoy/annotations/resource.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.v3";
 option java_outer_classname = "DiscoveryServiceProto";
 option java_multiple_files = true;
 option java_generic_services = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 service SomeDiscoveryService {
   option (envoy.annotations.resource).type = "envoy.v3.SomeResource";

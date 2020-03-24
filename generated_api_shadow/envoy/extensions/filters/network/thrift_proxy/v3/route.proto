@@ -7,13 +7,14 @@ import "envoy/config/route/v3/route_components.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.thrift_proxy.v3";
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Thrift Proxy Route Configuration]
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.

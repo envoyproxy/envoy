@@ -7,6 +7,7 @@ import "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.proto";
 import "google/protobuf/any.proto";
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.network.dubbo_proxy.v2alpha1";
@@ -14,6 +15,7 @@ option java_outer_classname = "DubboProxyProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.dubbo_proxy.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Dubbo Proxy]
 // Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.

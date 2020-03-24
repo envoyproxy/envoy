@@ -2,13 +2,14 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.mysql_proxy.v3;
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.mysql_proxy.v3";
 option java_outer_classname = "MysqlProxyProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: MySQL proxy]
 // MySQL Proxy :ref:`configuration overview <config_network_filters_mysql_proxy>`.

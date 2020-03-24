@@ -8,14 +8,15 @@ import "envoy/config/core/v3/http_uri.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http_status.proto";
 
-import "udpa/annotations/versioning.proto";
-
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_authz.v3";
 option java_outer_classname = "ExtAuthzProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.

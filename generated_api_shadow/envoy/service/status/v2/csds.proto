@@ -9,10 +9,13 @@ import "envoy/type/matcher/node.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
 
+import "udpa/annotations/status.proto";
+
 option java_package = "io.envoyproxy.envoy.service.status.v2";
 option java_outer_classname = "CsdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Client Status Discovery Service (CSDS)]
 
