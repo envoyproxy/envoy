@@ -23,10 +23,11 @@ class AdminFilter : public Http::StreamDecoderFilter,
                     public AdminStream,
                     Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminFilter(std::function<Http::Code(absl::string_view path_and_query,
-                                       Http::ResponseHeaderMap& response_headers,
-                                       Buffer::OwnedImpl& response, AdminFilter& filter)>
-                  admin_server_run_callback_func);
+  using AdminServerCallbackFunction = std::function<Http::Code(
+      absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
+      Buffer::OwnedImpl& response, AdminFilter& filter)>;
+
+  AdminFilter(AdminServerCallbackFunction admin_server_run_callback_func);
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -48,11 +49,6 @@ public:
   const Http::RequestHeaderMap& getRequestHeaders() const override;
 
 private:
-  typedef std::function<Http::Code(absl::string_view path_and_query,
-                                   Http::ResponseHeaderMap& response_headers,
-                                   Buffer::OwnedImpl& response, AdminFilter& filter)>
-      AdminServerCallbackFunction;
-
   /**
    * Called when an admin request has been completely received.
    */

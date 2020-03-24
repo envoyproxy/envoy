@@ -14,35 +14,26 @@ namespace Server {
 
 class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminFilterTest()
-      : admin_server_callback_func_(createAdminServerCallback()),
-        filter_(admin_server_callback_func_), request_headers_{{":path", "/"}} {
+  AdminFilterTest() : filter_(adminServerCallback), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
-  typedef std::function<Http::Code(absl::string_view path_and_query,
-                                   Http::ResponseHeaderMap& response_headers,
-                                   Buffer::OwnedImpl& response, AdminFilter& filter)>
-      AdminServerCallbackFunction;
-
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
-  AdminServerCallbackFunction admin_server_callback_func_;
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
 
-  AdminServerCallbackFunction createAdminServerCallback() {
-    return [](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
-              Buffer::OwnedImpl& response, AdminFilter& filter) -> Http::Code {
-      // silence compiler warnings for unused params
-      (void)path_and_query;
-      (void)response_headers;
-      (void)filter;
+  static Http::Code adminServerCallback(absl::string_view path_and_query,
+                                        Http::ResponseHeaderMap& response_headers,
+                                        Buffer::OwnedImpl& response, AdminFilter& filter) {
+    // silence compiler warnings for unused params
+    (void)path_and_query;
+    (void)response_headers;
+    (void)filter;
 
-      response.add("OK\n");
-      return Http::Code::OK;
-    };
+    response.add("OK\n");
+    return Http::Code::OK;
   }
 };
 
