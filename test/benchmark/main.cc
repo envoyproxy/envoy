@@ -7,8 +7,6 @@
 #include "common/signal/signal_action.h"
 #endif
 
-#include "test/test_common/environment.h"
-
 #include "absl/debugging/symbolize.h"
 
 // Boilerplate main(), which discovers benchmarks and runs them.
@@ -25,6 +23,5 @@ int main(int argc, char** argv) {
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
     return 1;
   }
-  Envoy::TestEnvironment::initializeOptions(argc, argv);
   benchmark::RunSpecifiedBenchmarks();
 }
