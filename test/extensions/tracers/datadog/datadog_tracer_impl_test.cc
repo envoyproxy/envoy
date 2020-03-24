@@ -158,7 +158,7 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   msg->body() = std::make_unique<Buffer::OwnedImpl>("");
 
-  callback->onSuccess(std::move(msg));
+  callback->onSuccess(request, std::move(msg));
 
   EXPECT_EQ(1U, stats_.counter("tracing.datadog.reports_sent").value());
   EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_dropped").value());
