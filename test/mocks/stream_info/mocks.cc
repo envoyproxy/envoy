@@ -24,6 +24,9 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag response_flag) {
     response_flags_ |= response_flag;
   }));
+  ON_CALL(*this, setResponseCodeDetails(_)).WillByDefault(Invoke([this](absl::string_view details) {
+    response_code_details_ = std::string(details);
+  }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
   ON_CALL(*this, lastDownstreamRxByteReceived())
