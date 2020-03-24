@@ -122,8 +122,8 @@ struct HeterogeneousStringEqual {
 using SharedStringSet =
     absl::flat_hash_set<SharedString, HeterogeneousStringHash, HeterogeneousStringEqual>;
 
-template <class Value>
-using StringMap =
-    absl::flat_hash_map<std::string, Value, HeterogeneousStringHash, HeterogeneousStringEqual>;
+// A special heterogeneous comparator is not needed for maps of strings; absl
+// hashes allow for looking up a string-container with a string-view by default.
+template <class Value> using StringMap = absl::flat_hash_map<std::string, Value>;
 
 } // namespace Envoy

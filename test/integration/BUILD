@@ -158,6 +158,8 @@ envoy_cc_test(
         ":filter_manager_integration_proto_cc_proto",
         ":http_integration_lib",
         ":integration_lib",
+        "//source/extensions/filters/listener/original_dst:config",
+        "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/echo:config",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -874,6 +876,22 @@ envoy_cc_test(
         "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "tcp_tunneling_integration_test",
+    srcs = [
+        "tcp_tunneling_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
     ],
 )
 

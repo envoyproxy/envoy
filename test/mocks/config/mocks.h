@@ -5,6 +5,7 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/config_provider_impl.h"
@@ -117,6 +118,16 @@ public:
               (std::vector<std::unique_ptr<const Protobuf::Message>> && config_protos,
                Server::Configuration::ServerFactoryContext& factory_context,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
+};
+
+class MockTypedFactory : public TypedFactory {
+public:
+  ~MockTypedFactory() override;
+
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
+  MOCK_METHOD(std::string, configType, ());
+  MOCK_METHOD(std::string, name, (), (const));
+  MOCK_METHOD(std::string, category, (), (const));
 };
 
 } // namespace Config

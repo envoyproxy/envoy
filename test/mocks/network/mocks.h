@@ -253,6 +253,7 @@ public:
   MOCK_METHOD(bool, localAddressRestored, (), (const));
   MOCK_METHOD(void, setRemoteAddress, (const Address::InstanceConstSharedPtr&));
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, remoteAddress, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directRemoteAddress, (), (const));
   MOCK_METHOD(void, setDetectedTransportProtocol, (absl::string_view));
   MOCK_METHOD(absl::string_view, detectedTransportProtocol, (), (const));
   MOCK_METHOD(void, setRequestedApplicationProtocols, (const std::vector<absl::string_view>&));
@@ -319,11 +320,16 @@ public:
     return envoy::config::core::v3::UNSPECIFIED;
   }
 
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    return empty_access_logs_;
+  }
+
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
   MockListenSocketFactory socket_factory_;
   SocketSharedPtr socket_;
   Stats::IsolatedStoreImpl scope_;
   std::string name_;
+  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
 };
 
 class MockListener : public Listener {

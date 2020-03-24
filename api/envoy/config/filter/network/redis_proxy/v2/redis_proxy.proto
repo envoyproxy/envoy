@@ -7,10 +7,10 @@ import "envoy/api/v2/core/base.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/sensitive.proto";
-
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/sensitive.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.network.redis_proxy.v2";
@@ -18,6 +18,7 @@ option java_outer_classname = "RedisProxyProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.redis_proxy.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Redis Proxy]
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
