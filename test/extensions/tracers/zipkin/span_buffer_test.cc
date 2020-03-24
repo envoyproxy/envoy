@@ -430,6 +430,11 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
               Not(HasSubstr(R"("timestamp":1.58432429547687e+15)")));
   EXPECT_THAT(bufferDeprecatedJsonV1.serialize(),
               Not(HasSubstr(R"("timestamp":"1584324295476870")")));
+  EXPECT_THAT(bufferDeprecatedJsonV1.serialize(), HasSubstr(R"("duration":1584324295476870)"));
+  EXPECT_THAT(bufferDeprecatedJsonV1.serialize(),
+              Not(HasSubstr(R"("duration":1.58432429547687e+15)")));
+  EXPECT_THAT(bufferDeprecatedJsonV1.serialize(),
+              Not(HasSubstr(R"("duration":"1584324295476870")")));
 
   SpanBuffer bufferJsonV2(
       envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1, true, 2);
@@ -437,6 +442,9 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
   EXPECT_THAT(bufferJsonV2.serialize(), HasSubstr(R"("timestamp":1584324295476870)"));
   EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("timestamp":1.58432429547687e+15)")));
   EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("timestamp":"1584324295476870")")));
+  EXPECT_THAT(bufferJsonV2.serialize(), HasSubstr(R"("duration":1584324295476870)"));
+  EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("duration":1.58432429547687e+15)")));
+  EXPECT_THAT(bufferJsonV2.serialize(), Not(HasSubstr(R"("duration":"1584324295476870")")));
 }
 
 } // namespace
