@@ -23,13 +23,14 @@ std::unique_ptr<TwoPhaseMatcher> createFromMessage(
     const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& match_config,
     std::vector<ListenerFilterMatcherPtr>& matchers);
 } // namespace
-struct TrueMatcher final : public TwoPhaseMatcher {
+class TrueMatcher final : public TwoPhaseMatcher {
+public:
   bool matches(ListenerFilterCallbacks&) const override { return true; }
   void complete(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate&) override {
     // Nothing to do
   }
 };
-struct NotMatcher final : public TwoPhaseMatcher {
+class NotMatcher final : public TwoPhaseMatcher {
 public:
   explicit NotMatcher(std::vector<ListenerFilterMatcherPtr>& matchers) : matchers_(matchers) {}
   bool matches(ListenerFilterCallbacks& cb) const override {
@@ -46,15 +47,16 @@ public:
 
 private:
   std::vector<ListenerFilterMatcherPtr>& matchers_;
-  uint sub_matcher_offset_{0};
+  uint32_t sub_matcher_offset_{0};
 };
 
-struct AndMatcher final : public TwoPhaseMatcher {
+class AndMatcher final : public TwoPhaseMatcher {
+public:
   AndMatcher(std::vector<ListenerFilterMatcherPtr>& matchers) : matchers_(matchers) {}
   bool matches(ListenerFilterCallbacks& cb) const override {
     auto end = sub_matcher_offset_ + sub_matcher_len_;
 
-    for (uint i = sub_matcher_offset_; i < end; i++) {
+    for (uint32_t i = sub_matcher_offset_; i < end; i++) {
       if (!matchers_[i]->matches(cb)) {
         return false;
       }
@@ -69,7 +71,7 @@ struct AndMatcher final : public TwoPhaseMatcher {
       matchers_.emplace_back(createFromMessage(sub, matchers_));
     }
     TwoPhaseMatcher* matcher{nullptr};
-    for (uint i = 0; i < sub_matcher_len_; i++) {
+    for (uint32_t i = 0; i < sub_matcher_len_; i++) {
       matcher = static_cast<TwoPhaseMatcher*>(matchers_[i + sub_matcher_offset_].get());
       matcher->complete(self.and_match().rules(i));
     }
@@ -77,15 +79,16 @@ struct AndMatcher final : public TwoPhaseMatcher {
 
 private:
   std::vector<ListenerFilterMatcherPtr>& matchers_;
-  uint sub_matcher_offset_{0};
-  uint sub_matcher_len_{0};
+  uint32_t sub_matcher_offset_{0};
+  uint32_t sub_matcher_len_{0};
 };
 
-struct OrMatcher final : public TwoPhaseMatcher {
+class OrMatcher final : public TwoPhaseMatcher {
+public:
   OrMatcher(std::vector<ListenerFilterMatcherPtr>& matchers) : matchers_(matchers) {}
   bool matches(ListenerFilterCallbacks& cb) const override {
     auto end = sub_matcher_offset_ + sub_matcher_len_;
-    for (uint i = sub_matcher_offset_; i < end; i++) {
+    for (uint32_t i = sub_matcher_offset_; i < end; i++) {
       if (matchers_[i]->matches(cb)) {
         return true;
       }
@@ -100,7 +103,7 @@ struct OrMatcher final : public TwoPhaseMatcher {
       matchers_.emplace_back(createFromMessage(sub, matchers_));
     }
     TwoPhaseMatcher* matcher{nullptr};
-    for (uint i = 0; i < sub_matcher_len_; i++) {
+    for (uint32_t i = 0; i < sub_matcher_len_; i++) {
       matcher = static_cast<TwoPhaseMatcher*>(matchers_[i + sub_matcher_offset_].get());
       matcher->complete(self.or_match().rules(i));
     }
@@ -108,8 +111,8 @@ struct OrMatcher final : public TwoPhaseMatcher {
 
 private:
   std::vector<ListenerFilterMatcherPtr>& matchers_;
-  uint sub_matcher_offset_{0};
-  uint sub_matcher_len_{0};
+  uint32_t sub_matcher_offset_{0};
+  uint32_t sub_matcher_len_{0};
 };
 
 struct DstPortMatcher final : public TwoPhaseMatcher {
@@ -134,8 +137,8 @@ public:
   }
 
 private:
-  uint32_t start_;
-  uint32_t end_;
+  uint32_t32_t start_;
+  uint32_t32_t end_;
 };
 namespace {
 std::unique_ptr<TwoPhaseMatcher> createFromMessage(

@@ -272,10 +272,8 @@ public:
 };
 
 /**
- * Listener Filter
+ *  Interface for a listener filter matching with incoming traffic.
  */
-
-//
 class ListenerFilterMatcher {
 public:
   virtual ~ListenerFilterMatcher() = default;
@@ -285,8 +283,8 @@ using ListenerFilterMatcherPtr = std::unique_ptr<ListenerFilterMatcher>;
 using ListenerFilterMatcherSharedPtr = std::shared_ptr<ListenerFilterMatcher>;
 
 /**
- *  A mapping from a general listener filter message without `typed_config`.
- **/
+ * A mapping from a general listener filter message without `typed_config`.
+ */
 class ListenerFilterConfig {
 public:
   virtual ~ListenerFilterConfig() = default;
@@ -295,6 +293,9 @@ public:
 
 using ListenerFilterConfigSharedPtr = std::shared_ptr<ListenerFilterConfig>;
 
+/**
+ * Listener Filter
+ */
 class ListenerFilter {
 public:
   virtual ~ListenerFilter() = default;
@@ -320,7 +321,8 @@ public:
   /**
    * Add a filter to the listener. Filters are invoked in FIFO order (the filter added
    * first is called first).
-   * @param filter supplies the filter being added.
+   * @param listener_filter_config supplies the common listener filter config
+   * @param filter supplies the concrete filter being added.
    */
   virtual void addAcceptFilter(Network::ListenerFilterConfigSharedPtr listener_filter_config,
                                ListenerFilterPtr&& filter) PURE;

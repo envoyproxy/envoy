@@ -215,6 +215,30 @@ message FilterChain {
 
 // Listener filter chain match configuration. This is a recursive structure which allows complex
 // nested match configurations to be built using various logical operators.
+//
+// Examples:
+//
+//  disable when the destination port is 3306
+//
+//  code-block:: yaml
+//
+//  destinationPortRange:
+//   start: 80
+//   end: 81
+//
+//  disable when the destination port is 3306
+//
+//  code-block:: yaml
+//
+//  andMatch:
+//    rules:
+//      - destinationPortRange:
+//          start: 80
+//          end: 3306
+//      - destinationPortRange:
+//          start: 443
+//          end: 3306
+//
 // [#next-free-field: 6]
 message ListenerFilterChainMatchPredicate {
   option (udpa.annotations.versioning).previous_message_type =
@@ -270,13 +294,7 @@ message ListenerFilter {
   }
 
   // Decide when to disable this listener filter on incoming traffic.
-  //
-  // Examples:
-  //
-  // * clear the field if filter is always enabled
-  // * disable when the destination port is 3306
-  //   ``rule.destination_port_range = Int32Range {start = 3306, end = 3307}``
-  // * disable when the destination port is 3306 or 15000
-  //   See :ref:`ListenerFilterChainMatchPredicate <envoy_api_msg_config.listener.v3.ListenerFilterChainMatchPredicate>`
+  // Clear the field if filter is always enabled.
+  // See :ref:`ListenerFilterChainMatchPredicate <envoy_api_msg_config.listener.v3.ListenerFilterChainMatchPredicate>`
   ListenerFilterChainMatchPredicate filter_disabled = 4;
 }

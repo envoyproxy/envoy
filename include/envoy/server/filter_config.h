@@ -254,7 +254,8 @@ public:
    * of general error or a Json::Exception if the json configuration is erroneous. The returned
    * callback should always be initialized.
    * @param config supplies the general protobuf configuration for the filter
-   * @param
+   * @param listener_filter_config supplies the listener filter config commonly owned by each
+   * concrete listener filter
    * @param context supplies the filter's context.
    * @return Network::ListenerFilterFactoryCb the factory creation function.
    */
