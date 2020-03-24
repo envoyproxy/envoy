@@ -229,10 +229,7 @@ TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
 }
 
 TEST_F(CodecClientTest, ProtocolError) {
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> absl::Status {
-    throw CodecProtocolException("protocol error");
-    return absl::OkStatus();
-  }));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Throw(CodecProtocolException("protocol error")));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl data;
@@ -242,11 +239,8 @@ TEST_F(CodecClientTest, ProtocolError) {
 }
 
 TEST_F(CodecClientTest, 408Response) {
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> absl::Status {
-    throw PrematureResponseException(Code::RequestTimeout);
-    return absl::OkStatus();
-  }));
-
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillOnce(Throw(PrematureResponseException(Code::RequestTimeout)));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl data;
@@ -256,11 +250,7 @@ TEST_F(CodecClientTest, 408Response) {
 }
 
 TEST_F(CodecClientTest, PrematureResponse) {
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> absl::Status {
-    throw PrematureResponseException(Code::OK);
-    return absl::OkStatus();
-  }));
-
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Throw(PrematureResponseException(Code::OK)));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl data;
