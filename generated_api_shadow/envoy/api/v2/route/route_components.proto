@@ -1274,7 +1274,7 @@ message Tracing {
 // statistics are perfect in the sense that they are emitted on the downstream
 // side such that they include network level failures.
 //
-// Documentation for :ref:`virtual cluster statistics <config_http_filters_router_stats>`.
+// Documentation for :ref:`virtual cluster statistics <config_http_filters_router_vcluster_stats>`.
 //
 // .. note::
 //

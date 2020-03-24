@@ -319,6 +319,12 @@ void UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
+  if (parent_.request_vcluster_) {
+    // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
+    // callback. Hence, the upstream request increases the virtual cluster's upstream_rq_total_ stat
+    // here.
+    parent_.request_vcluster_->stats().upstream_rq_total_.inc();
+  }
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 

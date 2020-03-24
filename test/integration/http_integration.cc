@@ -463,6 +463,51 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
   EXPECT_EQ("404", response->headers().Status()->value().getStringView());
 }
 
+// Make sure virtual cluster stats are charged to the appropriate virtual cluster.
+void HttpIntegrationTest::testRouterVirtualClusters() {
+  const std::string matching_header = "x-use-test-vcluster";
+  config_helper_.addConfigModifier(
+      [matching_header](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        auto* route_config = hcm.mutable_route_config();
+        ASSERT_EQ(1, route_config->virtual_hosts_size());
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        {
+          auto* virtual_cluster = virtual_host->add_virtual_clusters();
+          virtual_cluster->set_name("test_vcluster");
+          auto* headers = virtual_cluster->add_headers();
+          headers->set_name(matching_header);
+          headers->set_present_match(true);
+        }
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {matching_header, "true"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  checkSimpleRequestSuccess(0, 0, response.get());
+
+  test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
+  test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 0);
+
+  Http::TestRequestHeaderMapImpl request_headers2{{":method", "POST"},
+                                                  {":path", "/test/long/url"},
+                                                  {":scheme", "http"},
+                                                  {":authority", "host"}};
+
+  auto response2 = sendRequestAndWaitForResponse(request_headers2, 0, default_response_headers_, 0);
+  checkSimpleRequestSuccess(0, 0, response2.get());
+
+  test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
+  test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 1);
+}
+
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

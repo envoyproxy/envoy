@@ -393,12 +393,11 @@ private:
                           bool dropped);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
-  virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
-                                         Http::RequestHeaderMap& request_headers,
-                                         const Upstream::ClusterInfo& cluster,
-                                         Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                         Event::Dispatcher& dispatcher,
-                                         Upstream::ResourcePriority priority) PURE;
+  virtual RetryStatePtr
+  createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
+                   const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                   Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) PURE;
   Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
@@ -493,7 +492,8 @@ public:
 private:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
-                                 const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
+                                 const Upstream::ClusterInfo& cluster,
+                                 const VirtualCluster* vcluster, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                  Upstream::ResourcePriority priority) override;
 };

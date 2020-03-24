@@ -40,8 +40,8 @@ public:
   }
 
   void setup(Http::RequestHeaderMap& request_headers) {
-    state_ = RetryStateImpl::create(policy_, request_headers, cluster_, runtime_, random_,
-                                    dispatcher_, Upstream::ResourcePriority::Default);
+    state_ = RetryStateImpl::create(policy_, request_headers, cluster_, &virtual_cluster_, runtime_,
+                                    random_, dispatcher_, Upstream::ResourcePriority::Default);
   }
 
   void expectTimerCreateAndEnable() {
@@ -91,6 +91,7 @@ public:
 
   NiceMock<TestRetryPolicy> policy_;
   NiceMock<Upstream::MockClusterInfo> cluster_;
+  TestVirtualCluster virtual_cluster_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Event::MockDispatcher dispatcher_;
@@ -825,6 +826,8 @@ TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
 
   EXPECT_EQ(3UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(0UL, cluster_.stats().upstream_rq_retry_success_.value());
+  EXPECT_EQ(3UL, virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(0UL, virtual_cluster_.stats().upstream_rq_retry_success_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, Backoff) {
@@ -858,6 +861,8 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
 
   EXPECT_EQ(3UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_success_.value());
+  EXPECT_EQ(3UL, virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_success_.value());
   EXPECT_EQ(0UL, cluster_.circuit_breakers_stats_.rq_retry_open_.value());
 }
 
