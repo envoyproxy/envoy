@@ -83,10 +83,10 @@ void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers
 void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
   std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
-  if (add_served_by_header_) {
+  if (add_served_by_header_)
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
                           parent_.connection().localAddress()->asString());
-  }
+
   parent_.connection().dispatcher().post([this, headers_copy, end_stream]() -> void {
     encoder_.encodeHeaders(*headers_copy, end_stream);
   });
@@ -107,7 +107,7 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
 }
 
 void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
-  std::shared_ptr<Buffer::Instance> data_copy(new Buffer::OwnedImpl(data));
+  std::shared_ptr<Buffer::Instance> data_copy = std::make_shared<Buffer::OwnedImpl>(data);
   parent_.connection().dispatcher().post(
       [this, data_copy, end_stream]() -> void { encoder_.encodeData(*data_copy, end_stream); });
 }
