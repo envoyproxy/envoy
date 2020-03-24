@@ -121,7 +121,13 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
 Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!skip_compression_) {
     config_->stats().total_uncompressed_bytes_.add(data.length());
-    compressor_->compress(data, end_stream ? Compressor::State::Finish : Compressor::State::Flush);
+    if (end_stream) {
+      compressor_->compress(data, Compressor::State::Finish);
+      config_->stats().compressed_finished_.inc();
+    } else {
+      compressor_->compress(data, Compressor::State::Flush);
+      config_->stats().compressed_flushed_.inc();
+    }
     config_->stats().total_compressed_bytes_.add(data.length());
   }
   return Http::FilterDataStatus::Continue;
@@ -131,6 +137,7 @@ Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::ResponseTraile
   if (!skip_compression_) {
     Buffer::OwnedImpl empty_buffer;
     compressor_->compress(empty_buffer, Compressor::State::Finish);
+    config_->stats().compressed_finished_.inc();
     config_->stats().total_compressed_bytes_.add(empty_buffer.length());
     encoder_callbacks_->addEncodedData(empty_buffer, true);
   }

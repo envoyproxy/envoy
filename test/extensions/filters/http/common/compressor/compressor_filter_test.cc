@@ -134,6 +134,7 @@ protected:
     verifyCompressedData();
     drainBuffer();
     EXPECT_EQ(1U, stats_.counter("test.test.compressed").value());
+    EXPECT_EQ(1U, stats_.counter("test.test.compressed_finished").value());
   }
 
   void doResponseNoCompression(Http::TestResponseHeaderMapImpl&& headers) {
@@ -881,6 +882,36 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
     EXPECT_TRUE(headers.has("accept-encoding"));
     EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));
   }
+}
+
+// Multiple encodeData calls.
+TEST_F(CompressorFilterTest, MultipleEncodeDataCalls) {
+  doRequest({{":method", "get"}, {"accept-encoding", "deflate, test"}}, false);
+
+  Http::TestResponseHeaderMapImpl response_headers = {{":method", "get"},
+                                                      {"content-length", "256"}};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter_->setDecoderFilterCallbacks(decoder_callbacks);
+
+  const uint64_t content_length = 256;
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("", response_headers.get_("content-length"));
+  EXPECT_EQ("test", response_headers.get_("content-encoding"));
+
+  Buffer::OwnedImpl data1;
+  TestUtility::feedBufferWithRandomCharacters(data1, content_length / 2);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data1, false));
+
+  Buffer::OwnedImpl data2;
+  TestUtility::feedBufferWithRandomCharacters(data2, content_length / 2);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data2, true));
+
+  EXPECT_EQ(256, stats_.counter("test.test.total_uncompressed_bytes").value());
+  EXPECT_EQ(256, stats_.counter("test.test.total_compressed_bytes").value());
+  EXPECT_EQ(1U, stats_.counter("test.test.compressed").value());
+  EXPECT_EQ(1U, stats_.counter("test.test.compressed_flushed").value());
+  EXPECT_EQ(1U, stats_.counter("test.test.compressed_finished").value());
 }
 
 } // namespace Compressors
