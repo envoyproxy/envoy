@@ -407,7 +407,7 @@ statistics:
   upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
   upstream_rq_retry, Counter, Total request retries
   upstream_rq_retry_limit_exceeded, Counter, Total requests not retried due to exceeding :ref:`the configured number of maximum retries <common_configuration_transient_failures_retries>`
-  upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the retry budget
+  upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the :ref:`retry budgets <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>`
   upstream_rq_retry_success, Counter, Total request retry successes
   upstream_rq_time, Histogram, Request time milliseconds
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
