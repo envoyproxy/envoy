@@ -2657,10 +2657,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
 
   // Fake a protocol error that races with the drain timeout. This will cause a local close.
   // Also fake the local close not closing immediately.
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> absl::Status {
-    throw CodecProtocolException("protocol error");
-    return absl::OkStatus();
-  }));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Throw(CodecProtocolException("protocol error")));
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay))

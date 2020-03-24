@@ -341,10 +341,7 @@ public:
     }
     case test::common::http::RequestAction::kThrowDecoderException: {
       if (state == StreamState::PendingDataOrTrailers) {
-        EXPECT_CALL(*config_.codec_, dispatch(_)).WillOnce(InvokeWithoutArgs([] {
-          throw CodecProtocolException("blah");
-          return absl::OkStatus();
-        }));
+        EXPECT_CALL(*config_.codec_, dispatch(_)).WillOnce(Throw(CodecProtocolException("blah")));
         fakeOnData();
         state = StreamState::Closed;
       }
