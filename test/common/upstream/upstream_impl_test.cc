@@ -1212,7 +1212,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 
-TEST_F(StaticClusterImplTest, LoadAssignmentNoneEmptyHostname) {
+TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostname) {
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -1245,7 +1245,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNoneEmptyHostname) {
   EXPECT_EQ("foo", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
-TEST_F(StaticClusterImplTest, LoadAssignmentNoneEmptyHostnameWithHealthChecks) {
+
+TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostnameWithHealthChecks) {
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s

@@ -1298,10 +1298,10 @@ TEST_F(HttpHealthCheckerImplTest,
       envoy::config::core::v3::Locality(), health_check_config, 0,
       envoy::config::core::v3::UNKNOWN);
   const std::string path = "/healthcheck";
-  // setup health check config with a different host, to check that we still get the host configured
+  // Setup health check config with a different host, to check that we still get the host configured
   // on the endpoint.
   setupServiceValidationWithCustomHostValueHC("foo.com");
-  // requires non-empty `service_name` in config.
+  // Requires non-empty `service_name` in config.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
@@ -1334,7 +1334,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
   const std::string host = "www.envoyproxy.io";
   const std::string path = "/healthcheck";
   setupServiceValidationWithCustomHostValueHC(host);
-  // requires non-empty `service_name` in config.
+  // Requires non-empty `service_name` in config.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
