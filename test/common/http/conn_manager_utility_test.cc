@@ -49,10 +49,10 @@ public:
                               const Http::RequestHeaderMap& request_headers) {
           return real_->setInResponse(response_headers, request_headers);
         });
-    ON_CALL(*this, modRequestIDBy(_, _, _))
+    ON_CALL(*this, modBy(_, _, _))
         .WillByDefault(
             [this](const Http::RequestHeaderMap& request_headers, uint64_t& out, uint64_t mod) {
-              return real_->modRequestIDBy(request_headers, out, mod);
+              return real_->modBy(request_headers, out, mod);
             });
     ON_CALL(*this, getTraceStatus(_))
         .WillByDefault([this](const Http::RequestHeaderMap& request_headers) {
@@ -67,7 +67,7 @@ public:
   MOCK_METHOD(void, set, (Http::RequestHeaderMap&));
   MOCK_METHOD(void, ensure, (Http::RequestHeaderMap&));
   MOCK_METHOD(void, setInResponse, (Http::ResponseHeaderMap&, const Http::RequestHeaderMap&));
-  MOCK_METHOD(bool, modRequestIDBy, (const Http::RequestHeaderMap&, uint64_t&, uint64_t));
+  MOCK_METHOD(bool, modBy, (const Http::RequestHeaderMap&, uint64_t&, uint64_t));
   MOCK_METHOD(TraceStatus, getTraceStatus, (const Http::RequestHeaderMap&));
   MOCK_METHOD(void, setTraceStatus, (Http::RequestHeaderMap&, TraceStatus));
 

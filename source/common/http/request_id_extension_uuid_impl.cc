@@ -33,7 +33,7 @@ void UUIDRequestIDExtension::setInResponse(ResponseHeaderMap& response_headers,
   }
 }
 
-bool UUIDRequestIDExtension::modRequestIDBy(const RequestHeaderMap& request_headers, uint64_t& out,
+bool UUIDRequestIDExtension::modBy(const RequestHeaderMap& request_headers, uint64_t& out,
                                             uint64_t mod) {
   if (request_headers.RequestId() == nullptr) {
     return false;

@@ -242,7 +242,7 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& requ
   auto rid_extension = config.requestIDExtension();
   uint64_t result;
   // Skip if request-id is corrupted, or non-existent
-  if (!rid_extension->modRequestIDBy(request_headers, result, 10000)) {
+  if (!rid_extension->modBy(request_headers, result, 10000)) {
     return;
   }
 

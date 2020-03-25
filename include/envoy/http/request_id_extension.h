@@ -48,7 +48,7 @@ public:
    * @param mod integer to mod the request ID by.
    * @return true if request ID is valid and out is populated by the result.
    */
-  virtual bool modRequestIDBy(const Http::RequestHeaderMap& request_headers, uint64_t& out,
+  virtual bool modBy(const Http::RequestHeaderMap& request_headers, uint64_t& out,
                               uint64_t mod) PURE;
 
   /**

@@ -1386,7 +1386,7 @@ public:
   void set(Http::RequestHeaderMap&) override {}
   void ensure(Http::RequestHeaderMap&) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
-  bool modRequestIDBy(const Http::RequestHeaderMap&, uint64_t&, uint64_t) override { return false; }
+  bool modBy(const Http::RequestHeaderMap&, uint64_t&, uint64_t) override { return false; }
   Http::TraceStatus getTraceStatus(const Http::RequestHeaderMap&) override {
     return Http::TraceStatus::Sampled;
   }
