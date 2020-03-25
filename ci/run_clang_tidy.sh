@@ -58,10 +58,10 @@ function filter_excludes() {
 
 if [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
   echo "Running full clang-tidy..."
-  "${LLVM_PREFIX}/share/clang/run-clang-tidy.py" \
+  python3 "${LLVM_PREFIX}/share/clang/run-clang-tidy.py" \
     -clang-tidy-binary=${CLANG_TIDY} \
     -clang-apply-replacements-binary=${CLANG_APPLY_REPLACEMENTS} \
-    -export-fixes=tidy.yaml \
+    -export-fixes=${FIX_YAML} \
     -j ${NUM_CPUS:-0} -p 1 -quiet \
     ${APPLY_CLANG_TIDY_FIXES:+-fix}
 elif [[ "${BUILD_REASON}" != "PullRequest" ]]; then
