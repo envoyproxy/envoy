@@ -178,7 +178,7 @@ public:
   // Network::DrainableFilterChain
   MOCK_METHOD(const TransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
-  MOCK_METHOD(void, setDrainClose, ());
+  MOCK_METHOD(void, startDraining, ());
 };
 
 class MockFilterChainManager : public FilterChainManager {

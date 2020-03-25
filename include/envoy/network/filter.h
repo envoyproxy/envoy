@@ -341,7 +341,7 @@ using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
  */
 class DrainableFilterChain : public FilterChain {
 public:
-  virtual void setDrainClose() PURE;
+  virtual void startDraining() PURE;
 };
 
 /**

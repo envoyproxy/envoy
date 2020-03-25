@@ -216,7 +216,7 @@ TEST_F(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
 
   // Drain filter chain 0
   auto* context_impl_0 = dynamic_cast<FilterChainFactoryContextImpl*>(context0.get());
-  context_impl_0->setDraining();
+  context_impl_0->startDraining();
 
   EXPECT_TRUE(context0->drainDecision().drainClose());
   EXPECT_FALSE(context1->drainDecision().drainClose());

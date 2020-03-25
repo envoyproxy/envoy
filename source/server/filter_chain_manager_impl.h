@@ -77,12 +77,11 @@ public:
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
 
-  void setDraining() { is_draining_.store(true, std::memory_order_release); }
+  void startDraining() { is_draining_.store(true); }
 
 private:
   Configuration::FactoryContext& parent_context_;
   Init::Manager& init_manager_;
-  // atomic_flag is guaranteed to be lock free but there is no light weight load().
   std::atomic<bool> is_draining_{false};
 };
 
@@ -102,7 +101,7 @@ public:
     return filters_factory_;
   }
 
-  void setDrainClose() override { factory_context_->setDraining(); }
+  void startDraining() override { factory_context_->startDraining(); }
   std::unique_ptr<FilterChainFactoryContextImpl> factory_context_;
 
 private:
@@ -164,8 +163,8 @@ class FilterChainManagerImpl : public Network::FilterChainManager,
                                Logger::Loggable<Logger::Id::config> {
 public:
   using FcContextMap =
-      std::unordered_map<envoy::config::listener::v3::FilterChain,
-                         std::shared_ptr<Network::DrainableFilterChain>, MessageUtil, MessageUtil>;
+      absl::flat_hash_map<envoy::config::listener::v3::FilterChain,
+                          std::shared_ptr<Network::DrainableFilterChain>, MessageUtil, MessageUtil>;
   FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
                          Configuration::FactoryContext& factory_context,
                          Init::Manager& init_manager)

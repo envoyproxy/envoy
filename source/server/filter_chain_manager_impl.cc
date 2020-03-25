@@ -30,8 +30,7 @@ FilterChainFactoryContextImpl::FilterChainFactoryContextImpl(
     : parent_context_(parent_context), init_manager_(init_manager) {}
 
 bool FilterChainFactoryContextImpl::drainClose() const {
-  return is_draining_.load(std::memory_order_acquire) ||
-         parent_context_.drainDecision().drainClose();
+  return is_draining_.load() || parent_context_.drainDecision().drainClose();
 }
 
 Network::DrainDecision& FilterChainFactoryContextImpl::drainDecision() { return *this; }
@@ -148,7 +147,7 @@ void FilterChainManagerImpl::addFilterChain(
     FilterChainFactoryContextCreator& context_creator) {
   std::unordered_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
-  int new_filter_chain_size = 0;
+  uint32_t new_filter_chain_size = 0;
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
