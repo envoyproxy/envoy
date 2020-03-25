@@ -41,7 +41,7 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
   LightstepTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr lightstep_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, lightstep_tracer);
 }
 

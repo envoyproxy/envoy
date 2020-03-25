@@ -715,7 +715,7 @@ public:
   HttpTracerImplTest() {
     driver_ = new MockDriver();
     DriverPtr driver_ptr(driver_);
-    tracer_ = std::make_unique<HttpTracerImpl>(std::move(driver_ptr), local_info_);
+    tracer_ = std::make_shared<HttpTracerImpl>(std::move(driver_ptr), local_info_);
   }
 
   Http::TestRequestHeaderMapImpl request_headers_{
@@ -726,7 +726,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   MockConfig config_;
   MockDriver* driver_;
-  HttpTracerPtr tracer_;
+  HttpTracerSharedPtr tracer_;
 };
 
 TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {

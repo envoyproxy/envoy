@@ -16,14 +16,25 @@ namespace OpenCensus {
 
 OpenCensusTracerFactory::OpenCensusTracerFactory() : FactoryBase(TracerNames::get().OpenCensus) {}
 
-Tracing::HttpTracerPtr OpenCensusTracerFactory::createHttpTracerTyped(
+Tracing::HttpTracerSharedPtr OpenCensusTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v3::OpenCensusConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
+  // Since OpenCensus can only support a single tracing configuration per entire process,
+  // we need to make sure that it is configured at most once.
+  if (tracer_) {
+    if (Envoy::Protobuf::util::MessageDifferencer::Equals(config_, proto_config)) {
+      return tracer_;
+    } else {
+      throw EnvoyException("Opencensus has already been configured with a different config.");
+    }
+  }
   Tracing::DriverPtr driver =
       std::make_unique<Driver>(proto_config, context.serverFactoryContext().localInfo(),
                                context.serverFactoryContext().api());
-  return std::make_unique<Tracing::HttpTracerImpl>(std::move(driver),
-                                                   context.serverFactoryContext().localInfo());
+  tracer_ = std::make_shared<Tracing::HttpTracerImpl>(std::move(driver),
+                                                      context.serverFactoryContext().localInfo());
+  config_ = proto_config;
+  return tracer_;
 }
 
 /**

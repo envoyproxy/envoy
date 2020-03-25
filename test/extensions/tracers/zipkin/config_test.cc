@@ -40,7 +40,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   ZipkinTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr zipkin_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
@@ -67,7 +67,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   ZipkinTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr zipkin_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 

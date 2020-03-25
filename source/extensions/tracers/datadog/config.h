@@ -21,7 +21,7 @@ public:
 
 private:
   // FactoryBase
-  Tracing::HttpTracerPtr
+  Tracing::HttpTracerSharedPtr
   createHttpTracerTyped(const envoy::config::trace::v3::DatadogConfig& proto_config,
                         Server::Configuration::TracerFactoryContext& context) override;
 };
