@@ -321,6 +321,7 @@ VH
 VHDS
 VLOG
 VM
+WAITFORONE
 WASM
 WAVM
 WIP
@@ -624,6 +625,7 @@ hermeticity
 highp
 hoc
 hostname
+hostnames
 hostset
 hrefs
 huffman
@@ -730,6 +732,7 @@ misconfigured
 mixin
 mkdir
 mmap
+mmsg
 mongo
 moveable
 msec
@@ -941,6 +944,7 @@ sched
 schemas
 scopekey
 sendmsg
+sendmmsg
 sendto
 serializable
 serializer
