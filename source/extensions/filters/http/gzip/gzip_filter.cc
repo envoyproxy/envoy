@@ -31,7 +31,7 @@ GzipFilterConfig::GzipFilterConfig(const envoy::extensions::filters::http::gzip:
       window_bits_(windowBitsUint(gzip.window_bits().value())) {}
 
 std::unique_ptr<Compressor::Compressor> GzipFilterConfig::makeCompressor() {
-  auto compressor = std::make_unique<Compressor::ZlibCompressorImpl>();
+  auto compressor = std::make_unique<Compressor::ZlibCompressorImpl>(8192);
   compressor->init(compressionLevel(), compressionStrategy(), windowBits(), memoryLevel());
   return compressor;
 }
