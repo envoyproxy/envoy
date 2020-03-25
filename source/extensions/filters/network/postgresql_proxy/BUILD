@@ -46,8 +46,8 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "requires_trusted_downstream_and_upstream",
     repository = "@envoy",
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":filter",
         "//source/extensions/filters/network:well_known_names",
