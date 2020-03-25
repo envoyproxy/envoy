@@ -69,15 +69,15 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/circonus-labs/libcircllhist/archive/63a16dd6f2fc7bc841bb17ff92be8318df60e2e1.tar.gz"],
     ),
     com_github_cyan4973_xxhash = dict(
-        sha256 = "7e93d28e81c3e95ff07674a400001d0cdf23b7842d49b211e5582d00d8e3ac3e",
-        strip_prefix = "xxHash-0.7.2",
-        urls = ["https://github.com/Cyan4973/xxHash/archive/v0.7.2.tar.gz"],
+        sha256 = "952ebbf5b11fbf59ae5d760a562d1e9112278f244340ad7714e8556cbe54f7f7",
+        strip_prefix = "xxHash-0.7.3",
+        urls = ["https://github.com/Cyan4973/xxHash/archive/v0.7.3.tar.gz"],
     ),
     com_github_envoyproxy_sqlparser = dict(
-        sha256 = "8ccd2fe9087d96a91eda0929f3a0bdb5d9f877dd9cdc91f9fcf85385fe70cc14",
-        strip_prefix = "sql-parser-85904962d8723bbd3ae280dfb13cf4cc563faabc",
-        # 2020-01-08
-        urls = ["https://github.com/envoyproxy/sql-parser/archive/85904962d8723bbd3ae280dfb13cf4cc563faabc.tar.gz"],
+        sha256 = "b2d3882698cf85b64c87121e208ce0b24d5fe2a00a5d058cf4571f1b25b45403",
+        strip_prefix = "sql-parser-b14d010afd4313f2372a1cc96aa2327e674cc798",
+        # 2020-01-10
+        urls = ["https://github.com/envoyproxy/sql-parser/archive/b14d010afd4313f2372a1cc96aa2327e674cc798.tar.gz"],
     ),
     com_github_mirror_tclap = dict(
         sha256 = "f0ede0721dddbb5eba3a47385a6e8681b14f155e1129dd39d1a959411935098f",
@@ -178,9 +178,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/jbeder/yaml-cpp/archive/yaml-cpp-0.6.3.tar.gz"],
     ),
     com_github_msgpack_msgpack_c = dict(
-        sha256 = "fbaa28c363a316fd7523f31d1745cf03eab0d1e1ea5a1c60aa0dffd4ce551afe",
-        strip_prefix = "msgpack-3.2.0",
-        urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.0/msgpack-3.2.0.tar.gz"],
+        sha256 = "433cbcd741e1813db9ae4b2e192b83ac7b1d2dd7968a3e11470eacc6f4ab58d2",
+        strip_prefix = "msgpack-3.2.1",
+        urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.1/msgpack-3.2.1.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
         sha256 = "d422a6eadd4bcdd0f9b122cd843a4015f8b18aebea6e1deb004bd4d401a8ef92",
@@ -235,10 +235,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.10.1/protobuf-all-3.10.1.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
-        sha256 = "a447458b47ea4dc1d31499f555769af437c5d129d988ec1e13d5fdd0a6a36b4e",
-        strip_prefix = "grpc-httpjson-transcoding-2feabd5d64436e670084091a937855972ee35161",
-        # 2019-08-28
-        urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/2feabd5d64436e670084091a937855972ee35161.tar.gz"],
+        sha256 = "62c8cb5ea2cca1142cde9d4a0778c52c6022345c3268c60ef81666946b958ad5",
+        strip_prefix = "grpc-httpjson-transcoding-faf8af1e9788cd4385b94c8f85edab5ea5d4b2d6",
+        # 2020-03-02
+        urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/faf8af1e9788cd4385b94c8f85edab5ea5d4b2d6.tar.gz"],
     ),
     io_bazel_rules_go = dict(
         sha256 = "e88471aea3a3a4f19ec1310a55ba94772d087e9ce46e41ae38ecebe17935de7b",
@@ -287,9 +287,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/cel-cpp/archive/80e1cca533190d537a780ad007e8db64164c582e.tar.gz"],
     ),
     com_googlesource_code_re2 = dict(
-        sha256 = "7268e1b4254d9ffa5ccf010fee954150dbb788fd9705234442e7d9f0ee5a42d3",
-        strip_prefix = "re2-2019-12-01",
-        urls = ["https://github.com/google/re2/archive/2019-12-01.tar.gz"],
+        sha256 = "04ee2aaebaa5038554683329afc494e684c30f82f2a1e47eb62450e59338f84d",
+        strip_prefix = "re2-2020-03-03",
+        urls = ["https://github.com/google/re2/archive/2020-03-03.tar.gz"],
     ),
     # Included to access FuzzedDataProvider.h. This is compiler agnostic but
     # provided as part of the compiler-rt source distribution. We can't use the
