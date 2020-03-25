@@ -114,6 +114,9 @@ protected:
   // It starts with message length and must be therefore handled
   // differently.
   Message first_;
+
+  // hash map for dispatching backend transaction messages
+  absl::flat_hash_map<std::string, MsgAction> BE_statements_;
 };
 
 } // namespace PostgreSQLProxy

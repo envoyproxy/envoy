@@ -45,6 +45,7 @@ protected:
   Buffer::OwnedImpl data;
   uint32_t length_;
   char buf_[256];
+  std::string payload_;
 };
 
 // Class is used for parameterized tests for frontend messages.
@@ -221,82 +222,128 @@ INSTANTIATE_TEST_SUITE_P(BackendMessagesTests, PostgreSQLProxyBackendDecoderTest
                                            "E", "V", "v", "n", "N", "A", "t", "S", "1", "s", "Z",
                                            "T"));
 
-// Test Backend messages
+// Test parsing backend messages.
+// The parser should react only to the first word until the space.
+TEST_F(PostgreSQLProxyBackendDecoderTest, ParseStatement) {
+  // Payload contains a space after the keyword
+  // Rollback counter should be bumped up
+  EXPECT_CALL(callbacks_, incTransactionsRollback());
+  payload_ = "ROLLBACK 123";
+  data.add("C");
+  length_ = htonl(4 + payload_.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload_);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  // Now try just keyword without a space at the end
+  EXPECT_CALL(callbacks_, incTransactionsRollback());
+  payload_ = "ROLLBACK";
+  data.add("C");
+  length_ = htonl(4 + payload_.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload_);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  // Partial message should be ignored
+  EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
+  EXPECT_CALL(callbacks_, incStatementsOther());
+  payload_ = "ROLL";
+  data.add("C");
+  length_ = htonl(4 + payload_.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload_);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  // Keyword without a space  should be ignored
+  EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
+  EXPECT_CALL(callbacks_, incStatementsOther());
+  payload_ = "ROLLBACK123";
+  data.add("C");
+  length_ = htonl(4 + payload_.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload_);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+}
+
+// Test Backend messages and make sure that they
+// trigger proper stats updates.
 TEST_F(PostgreSQLProxyDecoderTest, Backend) {
-  std::string payload;
   // C message
   EXPECT_CALL(callbacks_, incStatements());
   EXPECT_CALL(callbacks_, incStatementsOther());
-  payload = "BEGIN 123";
+  payload_ = "BEGIN 123";
   data.add("C");
-  length_ = htonl(4 + payload.length());
+  length_ = htonl(4 + payload_.length());
   data.add(&length_, sizeof(length_));
-  data.add(payload);
+  data.add(payload_);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+  ASSERT_TRUE(decoder_->getSession().inTransaction());
+
+  EXPECT_CALL(callbacks_, incStatements());
+  EXPECT_CALL(callbacks_, incStatementsOther());
+  payload_ = "START TR";
+  data.add("C");
+  length_ = htonl(4 + payload_.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload_);
   decoder_->onData(data, false);
   data.drain(data.length());
 
   EXPECT_CALL(callbacks_, incStatements());
-  EXPECT_CALL(callbacks_, incStatementsOther());
-  payload = "START TR";
-  data.add("C");
-  length_ = htonl(4 + payload.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload);
-  decoder_->onData(data, false);
-  data.drain(data.length());
-
-  EXPECT_CALL(callbacks_, incStatements());
-  EXPECT_CALL(callbacks_, incStatementsOther());
   EXPECT_CALL(callbacks_, incTransactionsCommit());
-  payload = "COMMIT";
+  payload_ = "COMMIT";
   data.add("C");
-  length_ = htonl(4 + payload.length());
+  length_ = htonl(4 + payload_.length());
   data.add(&length_, sizeof(length_));
-  data.add(payload);
+  data.add(payload_);
   decoder_->onData(data, false);
   data.drain(data.length());
 
   EXPECT_CALL(callbacks_, incStatements());
-  EXPECT_CALL(callbacks_, incStatementsOther());
   EXPECT_CALL(callbacks_, incTransactionsRollback());
-  payload = "ROLLBACK";
+  payload_ = "ROLLBACK";
   data.add("C");
-  length_ = htonl(4 + payload.length());
+  length_ = htonl(4 + payload_.length());
   data.add(&length_, sizeof(length_));
-  data.add(payload);
+  data.add(payload_);
   decoder_->onData(data, false);
   data.drain(data.length());
 
   EXPECT_CALL(callbacks_, incStatements());
   EXPECT_CALL(callbacks_, incStatementsInsert());
   EXPECT_CALL(callbacks_, incTransactionsCommit());
-  payload = "INSERT 1";
+  payload_ = "INSERT 1";
   data.add("C");
-  length_ = htonl(4 + payload.length());
+  length_ = htonl(4 + payload_.length());
   data.add(&length_, sizeof(length_));
-  data.add(payload);
+  data.add(payload_);
   decoder_->onData(data, false);
   data.drain(data.length());
 
   EXPECT_CALL(callbacks_, incStatements());
   EXPECT_CALL(callbacks_, incStatementsUpdate());
   EXPECT_CALL(callbacks_, incTransactionsCommit());
-  payload = "UPDATE 1i23";
+  payload_ = "UPDATE 1i23";
   data.add("C");
-  length_ = htonl(4 + payload.length());
+  length_ = htonl(4 + payload_.length());
   data.add(&length_, sizeof(length_));
-  data.add(payload);
+  data.add(payload_);
   decoder_->onData(data, false);
   data.drain(data.length());
 
   EXPECT_CALL(callbacks_, incStatements());
   EXPECT_CALL(callbacks_, incStatementsDelete());
   EXPECT_CALL(callbacks_, incTransactionsCommit());
-  payload = "DELETE 88";
+  payload_ = "DELETE 88";
   data.add("C");
-  length_ = htonl(4 + payload.length());
+  length_ = htonl(4 + payload_.length());
   data.add(&length_, sizeof(length_));
-  data.add(payload);
+  data.add(payload_);
   decoder_->onData(data, false);
   data.drain(data.length());
 }
@@ -307,17 +354,15 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
 // payload with uint32 number equal to 0 indicates
 // successful authentication.
 TEST_F(PostgreSQLProxyBackendDecoderTest, AuthenticationMsg) {
-  std::string payload;
-
   // Create authentication message which does not
   // mean that authentication was OK. The number of
   // sessions must not be increased.
   EXPECT_CALL(callbacks_, incSessions()).Times(0);
-  payload = "blah blah";
+  payload_ = "blah blah";
   data.add("R");
-  length_ = htonl(4 + payload.length());
+  length_ = htonl(4 + payload_.length());
   data.add(&length_, sizeof(length_));
-  data.add(payload);
+  data.add(payload_);
   decoder_->onData(data, false);
   data.drain(data.length());
 
@@ -336,28 +381,26 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, AuthenticationMsg) {
 // Test check parsing of E message. The message
 // indicates error.
 TEST_F(PostgreSQLProxyBackendDecoderTest, ErrorMsg) {
-  std::string payload;
-
   // Check that even when message type is E,
   // it must contain specific string to trigger
   // statistics update.
   EXPECT_CALL(callbacks_, incErrors()).Times(0);
-  payload = "blah blah";
+  payload_ = "blah blah";
   data.add("E");
-  length_ = htonl(4 + payload.length());
+  length_ = htonl(4 + payload_.length());
   data.add(&length_, sizeof(length_));
-  data.add(payload);
+  data.add(payload_);
   decoder_->onData(data, false);
   data.drain(data.length());
 
   // Now for the correct message with specific
   // string inside.
   EXPECT_CALL(callbacks_, incErrors()).Times(1);
-  payload = "blah VERROR blah";
+  payload_ = "blah VERROR blah";
   data.add("E");
-  length_ = htonl(4 + payload.length());
+  length_ = htonl(4 + payload_.length());
   data.add(&length_, sizeof(length_));
-  data.add(payload);
+  data.add(payload_);
   decoder_->onData(data, false);
   data.drain(data.length());
 }
@@ -366,26 +409,24 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, ErrorMsg) {
 // The decoder should react only when the message contains
 // warning content.
 TEST_F(PostgreSQLProxyBackendDecoderTest, NotificationMsg) {
-  std::string payload;
-
   // Nothing should happen if the message does not contain
   // specific warning  string
   EXPECT_CALL(callbacks_, incWarnings()).Times(0);
-  payload = "blah blah";
+  payload_ = "blah blah";
   data.add("N");
-  length_ = htonl(4 + payload.length());
+  length_ = htonl(4 + payload_.length());
   data.add(&length_, sizeof(length_));
-  data.add(payload);
+  data.add(payload_);
   decoder_->onData(data, false);
   data.drain(data.length());
 
   // Warnings stats should be updated now.
   EXPECT_CALL(callbacks_, incWarnings());
-  payload = "blah VWARNING blah";
+  payload_ = "blah VWARNING blah";
   data.add("N");
-  length_ = htonl(4 + payload.length());
+  length_ = htonl(4 + payload_.length());
   data.add(&length_, sizeof(length_));
-  data.add(payload);
+  data.add(payload_);
   decoder_->onData(data, false);
   data.drain(data.length());
 }

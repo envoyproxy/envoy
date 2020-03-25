@@ -71,6 +71,40 @@ void DecoderImpl::initialize() {
 
   // Handler for unknown messages
   std::get<2>(BEmessages_) = Message{"Other", {&DecoderImpl::incUnknown}};
+
+  // Setup hash map for handling backend statements.
+  BE_statements_["BEGIN"] = [this](DecoderImpl*) -> void {
+    callbacks_->incStatementsOther();
+    session_.setInTransaction(true);
+  };
+  BE_statements_["ROLLBACK"] = [this](DecoderImpl*) -> void {
+    callbacks_->incTransactionsRollback();
+    session_.setInTransaction(false);
+  };
+  BE_statements_["START"] = [this](DecoderImpl*) -> void {
+    callbacks_->incStatementsOther();
+    session_.setInTransaction(true);
+  };
+  BE_statements_["COMMIT"] = [this](DecoderImpl*) -> void {
+    session_.setInTransaction(false);
+    callbacks_->incTransactionsCommit();
+  };
+  BE_statements_["SELECT"] = [this](DecoderImpl*) -> void {
+    callbacks_->incStatementsSelect();
+    callbacks_->incTransactionsCommit();
+  };
+  BE_statements_["INSERT"] = [this](DecoderImpl*) -> void {
+    callbacks_->incStatementsInsert();
+    callbacks_->incTransactionsCommit();
+  };
+  BE_statements_["UPDATE"] = [this](DecoderImpl*) -> void {
+    callbacks_->incStatementsUpdate();
+    callbacks_->incTransactionsCommit();
+  };
+  BE_statements_["DELETE"] = [this](DecoderImpl*) -> void {
+    callbacks_->incStatementsDelete();
+    callbacks_->incTransactionsCommit();
+  };
 }
 
 bool DecoderImpl::parseMessage(Buffer::Instance& data) {
@@ -156,40 +190,28 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   return true;
 }
 
+// Method is called when C (CommandComplete) message has been
+// decoded. It extracts the keyword from message's payload
+// and updates stats associated with that keyword.
 void DecoderImpl::decodeBackendStatements() {
   callbacks_->incStatements();
-  if (getMessage().find("BEGIN") != std::string::npos) {
-    callbacks_->incStatementsOther();
-    session_.setInTransaction(true);
-  } else if (getMessage().find("START") != std::string::npos) {
-    callbacks_->incStatementsOther();
-    session_.setInTransaction(true);
-  } else if (getMessage().find("ROLLBACK") != std::string::npos) {
-    callbacks_->incStatementsOther();
-    session_.setInTransaction(false);
-    callbacks_->incTransactionsRollback();
-  } else if (getMessage().find("COMMIT") != std::string::npos) {
-    callbacks_->incStatementsOther();
-    session_.setInTransaction(false);
-    callbacks_->incTransactionsCommit();
-  } else if (getMessage().find("SELECT") != std::string::npos) {
-    callbacks_->incStatementsSelect();
-    callbacks_->incTransactionsCommit();
-  } else if (getMessage().find("INSERT") != std::string::npos) {
-    callbacks_->incStatementsInsert();
-    callbacks_->incTransactionsCommit();
-  } else if (getMessage().find("UPDATE") != std::string::npos) {
-    callbacks_->incStatementsUpdate();
-    callbacks_->incTransactionsCommit();
-  } else if (getMessage().find("DELETE") != std::string::npos) {
-    callbacks_->incStatementsDelete();
-    callbacks_->incTransactionsCommit();
+
+  // The message_ contains the statement. Find space character
+  // and the statement is the first word. If space cannot be found
+  // take the whole message
+  std::string statement = message_.substr(0, message_.find(" "));
+
+  auto it = BE_statements_.find(statement);
+  if (it != BE_statements_.end()) {
+    (*it).second(this);
   } else {
     callbacks_->incStatementsOther();
     callbacks_->incTransactionsCommit();
   }
 }
 
+// Method is called when X (Terminate) message
+// is encountered by the decoder.
 void DecoderImpl::decodeFrontendTerminate() {
   if (session_.inTransaction()) {
     session_.setInTransaction(false);
