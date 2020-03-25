@@ -622,7 +622,10 @@ TEST_F(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
       .WillOnce(Invoke([&](ResponseEncoder&, bool) -> RequestDecoder& { return decoder; }));
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(decoder, decodeData(_, false));
+  // Verify that body is delivered as soon as the final chunk marker is found, even if an error is
+  // found while processing trailers.
+  Buffer::OwnedImpl expected_data("body");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
 
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\n"
                            "Host: host\r\n"
