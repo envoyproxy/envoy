@@ -52,7 +52,7 @@ cluster doesn't support ``LoadBalancer`` services, you'll need to change to a
     type: LoadBalancer
     ports:
     - port: 80
-      targetPort: 80
+      targetPort: 8080
     selector:
       service: ambassador
 
