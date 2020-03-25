@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/request_id_extension/request_id_extension.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/protobuf/protobuf.h"
@@ -12,7 +12,7 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Implemented for each RequestIDExtension::Utilities and registered via Registry::registerFactory
+ * Implemented for each RequestIDExtension and registered via Registry::registerFactory
  * or the convenience class RegisterFactory.
  */
 class RequestIDExtensionFactory : public Envoy::Config::TypedFactory {
@@ -20,12 +20,12 @@ public:
   virtual ~RequestIDExtensionFactory() = default;
 
   /**
-   * Create a Request ID Utilities instance from the provided config proto.
-   * @param config the custom configuration for this request id utilities type.
+   * Create a Request ID Extension instance from the provided config proto.
+   * @param config the custom configuration for this request id extension type.
    * @param context general filter context through which persistent resources can be accessed.
    */
-  virtual RequestIDExtension::UtilitiesSharedPtr
-  createUtilitiesInstance(const Protobuf::Message& config, FactoryContext& context) PURE;
+  virtual Http::RequestIDExtensionSharedPtr createExtensionInstance(const Protobuf::Message& config,
+                                                                    FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.request_id_extension"; }
 };

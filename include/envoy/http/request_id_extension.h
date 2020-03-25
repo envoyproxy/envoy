@@ -7,36 +7,36 @@
 #include "envoy/http/header_map.h"
 
 namespace Envoy {
-namespace RequestIDExtension {
+namespace Http {
 
 enum class TraceStatus { NoTrace, Sampled, Client, Forced };
 
 /**
  * Abstract request id utilities for getting/setting the request IDs and tracing status of requests
  */
-class Utilities {
+class RequestIDExtension {
 public:
-  virtual ~Utilities() = default;
+  virtual ~RequestIDExtension() = default;
 
   /**
    * Directly set a request ID into the provided request headers. Override any previous request ID
    * if any.
    * @param request_headers supplies the incoming request headers for setting a request ID.
    */
-  virtual void setRequestID(Http::RequestHeaderMap& request_headers) PURE;
+  virtual void set(Http::RequestHeaderMap& request_headers) PURE;
 
   /**
    * Ensure that a request is configured with a request id.
    * @param request_headers supplies the incoming request headers for setting a request ID.
    */
-  virtual void ensureRequestID(Http::RequestHeaderMap& request_headers) PURE;
+  virtual void ensure(Http::RequestHeaderMap& request_headers) PURE;
 
   /**
    * Preserve request ID in response headers if any is set in the request headers.
    * @param response_headers supplies the downstream response headers for setting the request ID.
    * @param request_headers supplies the incoming request headers for retrieving the request ID.
    */
-  virtual void preserveRequestIDInResponse(Http::ResponseHeaderMap& response_headers,
+  virtual void setInResponse(Http::ResponseHeaderMap& response_headers,
                                            const Http::RequestHeaderMap& request_headers) PURE;
 
   /**
@@ -65,7 +65,7 @@ public:
   virtual void setTraceStatus(Http::RequestHeaderMap& request_headers, TraceStatus status) PURE;
 };
 
-using UtilitiesSharedPtr = std::shared_ptr<Utilities>;
+using RequestIDExtensionSharedPtr = std::shared_ptr<RequestIDExtension>;
 
-} // namespace RequestIDExtension
+} // namespace Http
 } // namespace Envoy

@@ -11,7 +11,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
-#include "envoy/request_id_extension/request_id_extension.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/tracing/http_tracer_manager.h"
 
@@ -99,9 +99,7 @@ public:
                                 Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
-  RequestIDExtension::UtilitiesSharedPtr requestIDExtension() override {
-    return request_id_extension_;
-  }
+  Http::RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
@@ -176,7 +174,7 @@ private:
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           filter_config);
 
-  RequestIDExtension::UtilitiesSharedPtr request_id_extension_;
+  Http::RequestIDExtensionSharedPtr request_id_extension_;
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;

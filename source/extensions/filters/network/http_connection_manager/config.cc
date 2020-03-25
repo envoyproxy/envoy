@@ -25,7 +25,7 @@
 #include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/request_id_extension/request_id_extension_impl.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
@@ -230,11 +230,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   // If we are provided a different request_id_extension implementation to use try and create a new
   // instance of it, otherwise use default one.
   if (config.request_id_extension().has_typed_config()) {
-    request_id_extension_ = Envoy::RequestIDExtension::RequestIDExtensionFactory::fromProto(
-        config.request_id_extension(), context_);
-  } else {
     request_id_extension_ =
-        RequestIDExtension::RequestIDExtensionFactory::defaultInstance(context_.random());
+        Http::RequestIDExtensionFactory::fromProto(config.request_id_extension(), context_);
+  } else {
+    request_id_extension_ = Http::RequestIDExtensionFactory::defaultInstance(context_.random());
   }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will

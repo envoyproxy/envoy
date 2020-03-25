@@ -1,25 +1,23 @@
 #pragma once
 
-#include "envoy/request_id_extension/request_id_extension.h"
+#include "envoy/http/request_id_extension.h"
 
 #include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
-namespace RequestIDExtension {
+namespace Http {
 
-class UUIDUtils : public Envoy::RequestIDExtension::Utilities {
+class UUIDRequestIDExtension : public RequestIDExtension {
 public:
-  explicit UUIDUtils(Envoy::Runtime::RandomGenerator& random) : random_(random) {}
+  explicit UUIDRequestIDExtension(Envoy::Runtime::RandomGenerator& random) : random_(random) {}
 
-  void setRequestID(Http::RequestHeaderMap& request_headers);
-  void ensureRequestID(Http::RequestHeaderMap& request_headers);
-  void preserveRequestIDInResponse(Http::ResponseHeaderMap& response_headers,
-                                   const Http::RequestHeaderMap& request_headers);
-  bool modRequestIDBy(const Http::RequestHeaderMap& request_headers, uint64_t& out, uint64_t mod);
-  Envoy::RequestIDExtension::TraceStatus
-  getTraceStatus(const Http::RequestHeaderMap& request_headers);
-  void setTraceStatus(Http::RequestHeaderMap& request_headers,
-                      Envoy::RequestIDExtension::TraceStatus status);
+  void set(RequestHeaderMap& request_headers);
+  void ensure(RequestHeaderMap& request_headers);
+  void setInResponse(ResponseHeaderMap& response_headers,
+                     const RequestHeaderMap& request_headers);
+  bool modRequestIDBy(const RequestHeaderMap& request_headers, uint64_t& out, uint64_t mod);
+  TraceStatus getTraceStatus(const RequestHeaderMap& request_headers);
+  void setTraceStatus(RequestHeaderMap& request_headers, TraceStatus status);
 
 private:
   // Reference to the random generator used to generate new request IDs
@@ -44,5 +42,5 @@ private:
   static const char NO_TRACE = '4';
 };
 
-} // namespace RequestIDExtension
+} // namespace Http
 } // namespace Envoy

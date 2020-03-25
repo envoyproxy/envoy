@@ -1,4 +1,4 @@
-#include "common/request_id_extension/uuid_impl.h"
+#include "common/http/request_id_extension_uuid_impl.h"
 
 #include <cstdint>
 #include <string>
@@ -11,30 +11,30 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace RequestIDExtension {
+namespace Http {
 
-void UUIDUtils::setRequestID(Http::RequestHeaderMap& request_headers) {
+void UUIDRequestIDExtension::set(RequestHeaderMap& request_headers) {
   // TODO(PiotrSikora) PERF: Write UUID directly to the header map.
   std::string uuid = random_.uuid();
   ASSERT(!uuid.empty());
   request_headers.setRequestId(uuid);
 }
 
-void UUIDUtils::ensureRequestID(Http::RequestHeaderMap& request_headers) {
+void UUIDRequestIDExtension::ensure(RequestHeaderMap& request_headers) {
   if (!request_headers.RequestId()) {
-    setRequestID(request_headers);
+    set(request_headers);
   }
 }
 
-void UUIDUtils::preserveRequestIDInResponse(Http::ResponseHeaderMap& response_headers,
-                                            const Http::RequestHeaderMap& request_headers) {
+void UUIDRequestIDExtension::setInResponse(ResponseHeaderMap& response_headers,
+                                           const RequestHeaderMap& request_headers) {
   if (request_headers.RequestId()) {
     response_headers.setRequestId(request_headers.RequestId()->value().getStringView());
   }
 }
 
-bool UUIDUtils::modRequestIDBy(const Http::RequestHeaderMap& request_headers, uint64_t& out,
-                               uint64_t mod) {
+bool UUIDRequestIDExtension::modRequestIDBy(const RequestHeaderMap& request_headers, uint64_t& out,
+                                            uint64_t mod) {
   if (request_headers.RequestId() == nullptr) {
     return false;
   }
@@ -52,30 +52,28 @@ bool UUIDUtils::modRequestIDBy(const Http::RequestHeaderMap& request_headers, ui
   return true;
 }
 
-Envoy::RequestIDExtension::TraceStatus
-UUIDUtils::getTraceStatus(const Http::RequestHeaderMap& request_headers) {
+TraceStatus UUIDRequestIDExtension::getTraceStatus(const RequestHeaderMap& request_headers) {
   if (request_headers.RequestId() == nullptr) {
-    return Envoy::RequestIDExtension::TraceStatus::NoTrace;
+    return TraceStatus::NoTrace;
   }
   absl::string_view uuid = request_headers.RequestId()->value().getStringView();
   if (uuid.length() != Runtime::RandomGeneratorImpl::UUID_LENGTH) {
-    return Envoy::RequestIDExtension::TraceStatus::NoTrace;
+    return TraceStatus::NoTrace;
   }
 
   switch (uuid[TRACE_BYTE_POSITION]) {
   case TRACE_FORCED:
-    return Envoy::RequestIDExtension::TraceStatus::Forced;
+    return TraceStatus::Forced;
   case TRACE_SAMPLED:
-    return Envoy::RequestIDExtension::TraceStatus::Sampled;
+    return TraceStatus::Sampled;
   case TRACE_CLIENT:
-    return Envoy::RequestIDExtension::TraceStatus::Client;
+    return TraceStatus::Client;
   default:
-    return Envoy::RequestIDExtension::TraceStatus::NoTrace;
+    return TraceStatus::NoTrace;
   }
 }
 
-void UUIDUtils::setTraceStatus(Http::RequestHeaderMap& request_headers,
-                               Envoy::RequestIDExtension::TraceStatus status) {
+void UUIDRequestIDExtension::setTraceStatus(RequestHeaderMap& request_headers, TraceStatus status) {
   if (request_headers.RequestId() == nullptr) {
     return;
   }
@@ -86,21 +84,21 @@ void UUIDUtils::setTraceStatus(Http::RequestHeaderMap& request_headers,
   std::string uuid(uuid_view);
 
   switch (status) {
-  case Envoy::RequestIDExtension::TraceStatus::Forced:
+  case TraceStatus::Forced:
     uuid[TRACE_BYTE_POSITION] = TRACE_FORCED;
     break;
-  case Envoy::RequestIDExtension::TraceStatus::Client:
+  case TraceStatus::Client:
     uuid[TRACE_BYTE_POSITION] = TRACE_CLIENT;
     break;
-  case Envoy::RequestIDExtension::TraceStatus::Sampled:
+  case TraceStatus::Sampled:
     uuid[TRACE_BYTE_POSITION] = TRACE_SAMPLED;
     break;
-  case Envoy::RequestIDExtension::TraceStatus::NoTrace:
+  case TraceStatus::NoTrace:
     uuid[TRACE_BYTE_POSITION] = NO_TRACE;
     break;
   }
   request_headers.setRequestId(uuid);
 }
 
-} // namespace RequestIDExtension
+} // namespace Http
 } // namespace Envoy

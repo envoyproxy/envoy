@@ -9,7 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
-#include "envoy/request_id_extension/request_id_extension.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
@@ -545,12 +545,12 @@ public:
   /**
    * @param utils The requestID utils implementation this stream uses
    */
-  virtual void setRequestIDExtension(RequestIDExtension::UtilitiesSharedPtr utils) PURE;
+  virtual void setRequestIDExtension(Http::RequestIDExtensionSharedPtr utils) PURE;
 
   /**
    * @return A shared pointer to the request ID utils for this stream
    */
-  virtual RequestIDExtension::UtilitiesSharedPtr getRequestIDExtension() const PURE;
+  virtual Http::RequestIDExtensionSharedPtr getRequestIDExtension() const PURE;
 };
 
 } // namespace StreamInfo

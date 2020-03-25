@@ -69,21 +69,21 @@ Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
     return {Reason::HealthCheck, false};
   }
 
-  RequestIDExtension::UtilitiesSharedPtr rid_extension = stream_info.getRequestIDExtension();
+  Http::RequestIDExtensionSharedPtr rid_extension = stream_info.getRequestIDExtension();
   if (rid_extension == nullptr) {
     return {Reason::NotTraceableRequestId, false};
   }
 
-  RequestIDExtension::TraceStatus trace_status = rid_extension->getTraceStatus(request_headers);
+  Http::TraceStatus trace_status = rid_extension->getTraceStatus(request_headers);
 
   switch (trace_status) {
-  case RequestIDExtension::TraceStatus::Client:
+  case Http::TraceStatus::Client:
     return {Reason::ClientForced, true};
-  case RequestIDExtension::TraceStatus::Forced:
+  case Http::TraceStatus::Forced:
     return {Reason::ServiceForced, true};
-  case RequestIDExtension::TraceStatus::Sampled:
+  case Http::TraceStatus::Sampled:
     return {Reason::Sampling, true};
-  case RequestIDExtension::TraceStatus::NoTrace:
+  case Http::TraceStatus::NoTrace:
     return {Reason::NotTraceableRequestId, false};
   }
 

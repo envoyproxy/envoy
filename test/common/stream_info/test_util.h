@@ -4,7 +4,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
-#include "common/request_id_extension/request_id_extension_impl.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
@@ -20,8 +20,7 @@ public:
     // Use 1999-01-01 00:00:00 +0
     time_t fake_time = 915148800;
     start_time_ = std::chrono::system_clock::from_time_t(fake_time);
-    Runtime::RandomGeneratorImpl random;
-    request_id_extension_ = RequestIDExtension::RequestIDExtensionFactory::defaultInstance(random);
+    request_id_extension_ = Http::RequestIDExtensionFactory::defaultInstance(random_);
 
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;
@@ -211,10 +210,10 @@ public:
 
   const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
-  void setRequestIDExtension(RequestIDExtension::UtilitiesSharedPtr utils) override {
-    request_id_extension_ = utils;
+  void setRequestIDExtension(Http::RequestIDExtensionSharedPtr request_id_extension) override {
+    request_id_extension_ = request_id_extension;
   }
-  RequestIDExtension::UtilitiesSharedPtr getRequestIDExtension() const override {
+  Http::RequestIDExtensionSharedPtr getRequestIDExtension() const override {
     return request_id_extension_;
   }
 
@@ -228,6 +227,7 @@ public:
     return upstream_cluster_info_;
   }
 
+  Runtime::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
@@ -265,7 +265,7 @@ public:
   const Http::RequestHeaderMap* request_headers_{};
   Envoy::Event::SimulatedTimeSystem test_time_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_{};
-  RequestIDExtension::UtilitiesSharedPtr request_id_extension_;
+  Http::RequestIDExtensionSharedPtr request_id_extension_;
 };
 
 } // namespace Envoy

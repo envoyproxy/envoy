@@ -249,7 +249,7 @@ envoy_cc_library(
     hdrs = ["request_id_extension_config.h"],
     deps = [
         ":filter_config_interface",
-        "//include/envoy/request_id_extension:request_id_extension_interface",
+        "//include/envoy/http:request_id_extension_interface",
         "//source/common/protobuf",
     ],
 )

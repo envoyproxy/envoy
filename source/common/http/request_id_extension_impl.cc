@@ -1,13 +1,13 @@
-#include "common/request_id_extension/request_id_extension_impl.h"
+#include "common/http/request_id_extension_impl.h"
 
 #include "common/common/utility.h"
 #include "common/config/utility.h"
-#include "common/request_id_extension/uuid_impl.h"
+#include "common/http/request_id_extension_uuid_impl.h"
 
 namespace Envoy {
-namespace RequestIDExtension {
+namespace Http {
 
-UtilitiesSharedPtr RequestIDExtensionFactory::fromProto(
+RequestIDExtensionSharedPtr RequestIDExtensionFactory::fromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension&
         config,
     Server::Configuration::FactoryContext& context) {
@@ -22,13 +22,13 @@ UtilitiesSharedPtr RequestIDExtensionFactory::fromProto(
 
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), context.messageValidationVisitor(), *factory);
-  return factory->createUtilitiesInstance(*message, context);
+  return factory->createExtensionInstance(*message, context);
 }
 
-UtilitiesSharedPtr
+RequestIDExtensionSharedPtr
 RequestIDExtensionFactory::defaultInstance(Envoy::Runtime::RandomGenerator& random) {
-  return std::make_shared<UUIDUtils>(random);
+  return std::make_shared<UUIDRequestIDExtension>(random);
 }
 
-} // namespace RequestIDExtension
+} // namespace Http
 } // namespace Envoy

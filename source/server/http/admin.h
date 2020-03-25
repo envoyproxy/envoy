@@ -15,7 +15,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/request_id_extension/request_id_extension.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
@@ -33,7 +33,7 @@
 #include "common/http/utility.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/raw_buffer_socket.h"
-#include "common/request_id_extension/request_id_extension_impl.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/router/scoped_config_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
@@ -107,9 +107,7 @@ public:
   }
 
   // Http::ConnectionManagerConfig
-  RequestIDExtension::UtilitiesSharedPtr requestIDExtension() override {
-    return request_id_extension_;
-  }
+  Http::RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
@@ -460,7 +458,7 @@ private:
   };
 
   Server::Instance& server_;
-  RequestIDExtension::UtilitiesSharedPtr request_id_extension_;
+  Http::RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string profile_path_;
   Http::ConnectionManagerStats stats_;

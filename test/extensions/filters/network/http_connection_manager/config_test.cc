@@ -6,7 +6,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/date_provider_impl.h"
-#include "common/request_id_extension/uuid_impl.h"
+#include "common/http/request_id_extension_uuid_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
 
@@ -1378,20 +1378,19 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtens
 
 namespace {
 
-class TestRequestIDExtension : public RequestIDExtension::Utilities {
+class TestRequestIDExtension : public Http::RequestIDExtension {
 public:
   TestRequestIDExtension(const test::http_connection_manager::CustomRequestIDExtension& config)
       : config_(config) {}
 
-  void setRequestID(Http::RequestHeaderMap&) override {}
-  void ensureRequestID(Http::RequestHeaderMap&) override {}
-  void preserveRequestIDInResponse(Http::ResponseHeaderMap&,
-                                   const Http::RequestHeaderMap&) override {}
+  void set(Http::RequestHeaderMap&) override {}
+  void ensure(Http::RequestHeaderMap&) override {}
+  void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
   bool modRequestIDBy(const Http::RequestHeaderMap&, uint64_t&, uint64_t) override { return false; }
-  RequestIDExtension::TraceStatus getTraceStatus(const Http::RequestHeaderMap&) override {
-    return RequestIDExtension::TraceStatus::Sampled;
+  Http::TraceStatus getTraceStatus(const Http::RequestHeaderMap&) override {
+    return Http::TraceStatus::Sampled;
   }
-  void setTraceStatus(Http::RequestHeaderMap&, RequestIDExtension::TraceStatus) override {}
+  void setTraceStatus(Http::RequestHeaderMap&, Http::TraceStatus) override {}
 
   std::string testField() { return config_.test_field(); }
 
@@ -1409,8 +1408,8 @@ public:
     return std::make_unique<test::http_connection_manager::CustomRequestIDExtension>();
   }
 
-  RequestIDExtension::UtilitiesSharedPtr
-  createUtilitiesInstance(const Protobuf::Message& config,
+  Http::RequestIDExtensionSharedPtr
+  createExtensionInstance(const Protobuf::Message& config,
                           Server::Configuration::FactoryContext& context) override {
     const auto& custom_config = MessageUtil::downcastAndValidate<
         const test::http_connection_manager::CustomRequestIDExtension&>(
@@ -1479,7 +1478,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
   auto request_id_extension =
-      dynamic_cast<RequestIDExtension::UUIDUtils*>(config.requestIDExtension().get());
+      dynamic_cast<Http::UUIDRequestIDExtension*>(config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
 }
 

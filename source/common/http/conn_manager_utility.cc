@@ -220,9 +220,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     // Unconditionally set a request ID if we are allowed to override it from
     // the edge. Otherwise just ensure it is set.
     if (!config.preserveExternalRequestId() && edge_request) {
-      rid_extension->setRequestID(request_headers);
+      rid_extension->set(request_headers);
     } else {
-      rid_extension->ensureRequestID(request_headers);
+      rid_extension->ensure(request_headers);
     }
   }
 
@@ -260,20 +260,20 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& requ
   }
 
   // Do not apply tracing transformations if we are currently tracing.
-  if (RequestIDExtension::TraceStatus::NoTrace == rid_extension->getTraceStatus(request_headers)) {
+  if (TraceStatus::NoTrace == rid_extension->getTraceStatus(request_headers)) {
     if (request_headers.ClientTraceId() &&
         runtime.snapshot().featureEnabled("tracing.client_enabled", *client_sampling)) {
-      rid_extension->setTraceStatus(request_headers, RequestIDExtension::TraceStatus::Client);
+      rid_extension->setTraceStatus(request_headers, TraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
-      rid_extension->setTraceStatus(request_headers, RequestIDExtension::TraceStatus::Forced);
+      rid_extension->setTraceStatus(request_headers, TraceStatus::Forced);
     } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", *random_sampling,
                                                  result)) {
-      rid_extension->setTraceStatus(request_headers, RequestIDExtension::TraceStatus::Sampled);
+      rid_extension->setTraceStatus(request_headers, TraceStatus::Sampled);
     }
   }
 
   if (!runtime.snapshot().featureEnabled("tracing.global_enabled", *overall_sampling, result)) {
-    rid_extension->setTraceStatus(request_headers, RequestIDExtension::TraceStatus::NoTrace);
+    rid_extension->setTraceStatus(request_headers, TraceStatus::NoTrace);
   }
 }
 
@@ -365,7 +365,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
 
 void ConnectionManagerUtility::mutateResponseHeaders(
     ResponseHeaderMap& response_headers, const RequestHeaderMap* request_headers,
-    const RequestIDExtension::UtilitiesSharedPtr& rid_extension, const std::string& via) {
+    const RequestIDExtensionSharedPtr& rid_extension, const std::string& via) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.
@@ -383,7 +383,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(
   response_headers.removeTransferEncoding();
 
   if (request_headers != nullptr && request_headers->EnvoyForceTrace()) {
-    rid_extension->preserveRequestIDInResponse(response_headers, *request_headers);
+    rid_extension->setInResponse(response_headers, *request_headers);
   }
   response_headers.removeKeepAlive();
   response_headers.removeProxyConnection();
