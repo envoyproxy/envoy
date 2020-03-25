@@ -31,6 +31,15 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add);
 
   /*
+   * @param headers_to_add defines headers to add during calls to evaluateHeaders.
+   * @param append defines whether headers will be appended or replaced.
+   * @return HeaderParserPtr a configured HeaderParserPtr.
+   */
+  static HeaderParserPtr
+  configure(const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers_to_add,
+            bool append);
+
+  /*
    * @param headers_to_add defines headers to add during calls to evaluateHeaders
    * @param headers_to_remove defines headers to remove during calls to evaluateHeaders
    * @return HeaderParserPtr a configured HeaderParserPtr
