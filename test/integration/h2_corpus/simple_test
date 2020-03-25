@@ -1,15 +1,47 @@
 events {
   downstream_send_event {
-    frames: EmptySettings
-    frames: EmptySettingsAck
-    frames: Request
+    h2_frames {
+      settings {
+        flags: None
+      }
+    }
+    h2_frames {
+      settings {
+        flags: Ack
+      }
+    }
+    h2_frames {
+      request {
+        stream_index: 1
+        host: "host"
+        path: "/path/to/long/url"
+      }
+    }
   }
 }
 events {
   upstream_send_event {
-    frames: EmptySettings
-    frames: EmptySettingsAck
-    frames: EmptyHeaders
-    frames: EmptyData
+    h2_frames {
+      settings {
+        flags: None
+      }
+    }
+    h2_frames {
+      settings {
+        flags: Ack
+      }
+    }
+    h2_frames {
+      headers {
+      	flags: None
+	stream_index: 1
+      }
+    }
+    h2_frames {
+      data {
+        flags: None
+	stream_index: 1
+      }
+    }
   }
 }

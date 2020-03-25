@@ -2,34 +2,99 @@ syntax = "proto3";
 
 package test.integration;
 
-enum H2TestFrame {
+message H2FramePing {
+  bytes data = 1;
+}
+
+message H2FrameSettings {
+  enum Flags {
+    None = 0;
+    Ack = 1;
+  }
+  Flags flags = 1;
+}
+
+enum HeadersFlags {
+  None = 0;
+  EndStream = 1;
+  EndHeaders = 4;
+}
+
+message H2FrameHeaders {
+  HeadersFlags flags = 1;
+  uint32 stream_index = 2;
+}
+
+message H2FrameContinuation {
+  HeadersFlags flags = 1;
+  uint32 stream_index = 2;
+}
+
+message H2FrameData {
+  enum Flags {
+    None = 0;
+    EndStream = 1;
+  }
+  Flags flags = 1;
+  uint32 stream_index = 2;
+}
+
+message H2FramePriority {
+  uint32 stream_index = 1;
+  uint32 dependent_index = 2;
+}
+
+message H2FrameWindowUpdate {
+  uint32 stream_index = 1;
+  uint32 increment = 2;
+}
+
+message H2FrameMalformedRequest {
+  uint32 stream_index = 1;
+}
+
+message H2FrameMalformedRequestWithZerolenHeader {
+  uint32 stream_index = 1;
+  bytes host = 2;
+  bytes path = 3;
+}
+
+message H2FrameRequest {
+  uint32 stream_index = 1;
+  bytes host = 2;
+  bytes path = 3;
+}
+
+message H2FramePostRequest {
+  uint32 stream_index = 1;
+  bytes host = 2;
+  bytes path = 3;
+}
+
+message H2TestFrame {
   // These values map to the frame creation methods in:
   // test/common/http/http2/http2_frame.h
-  PING = 0;
-  EmptySettings = 1;
-  EmptySettingsAck = 2;
-  EmptyHeaders = 3;
-  EmptyHeadersEndStream = 4;
-  EmptyHeadersEndHeaders = 5;
-  EmptyContinuation = 6;
-  EmptyContinuationEndStream = 7;
-  EmptyContinuationEndHeaders = 8;
-  EmptyData = 9;
-  EmptyDataEndStream = 10;
-  Priority = 11;
-  WindowUpdate = 12;
-  MalformedRequest = 13;
-  MalformedRequestWithZerolenHeader = 14;
-  Request = 15;
-  PostRequest = 16;
+  oneof frame_type {
+    H2FramePing ping = 1;
+    H2FrameSettings settings = 2;
+    H2FrameHeaders headers = 3;
+    H2FrameContinuation continuation = 4;
+    H2FrameData data = 5;
+    H2FramePriority priority = 6;
+    H2FrameWindowUpdate window_update = 7;
+    H2FrameMalformedRequest malformed_request = 8;
+    H2FrameMalformedRequestWithZerolenHeader malformed_request_with_zerolen_header = 9;
+    H2FrameRequest request = 10;
+    H2FramePostRequest post_request = 11;
+  }
 }
 
 message DownstreamSendEvent {
-  repeated H2TestFrame frames = 1;
+  repeated H2TestFrame h2_frames = 1;
 }
 
 message UpstreamSendEvent {
-  repeated H2TestFrame frames = 1;
+  repeated H2TestFrame h2_frames = 1;
 }
 
 message Event {
@@ -38,7 +103,6 @@ message Event {
     DownstreamSendEvent downstream_send_event = 1;
     // Upstream sent given frames.
     UpstreamSendEvent upstream_send_event = 2;
-    // TODO(adip): Downstream/Upstream receive bytes should be added
   }
 }
 
