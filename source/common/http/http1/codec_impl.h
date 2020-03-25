@@ -45,12 +45,17 @@ class ConnectionImpl;
 class StreamEncoderImpl : public virtual StreamEncoder,
                           public Stream,
                           Logger::Loggable<Logger::Id::http>,
-                          public StreamCallbackHelper {
+                          public StreamCallbackHelper,
+                          public Http1StreamEncoderOptions {
 public:
   // Http::StreamEncoder
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeMetadata(const MetadataMapVector&) override;
   Stream& getStream() override { return *this; }
+  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return *this; }
+
+  // Http::Http1StreamEncoderOptions
+  void disableChunkEncoding() override { disable_chunk_encoding_ = true; }
 
   // Http::Stream
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
@@ -74,6 +79,7 @@ protected:
   static const std::string LAST_CHUNK;
 
   ConnectionImpl& connection_;
+  bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
