@@ -335,7 +335,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   EXPECT_CALL(*child_span, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
   EXPECT_CALL(*child_span, setTag(Eq("ext_authz_http_status"), Eq("OK")));
   EXPECT_CALL(*child_span, finishSpan());
-  client_->onSuccess(std::move(check_response));
+  client_->onSuccess(async_request_, std::move(check_response));
 }
 
 // Verify client response headers when authorization_headers_to_add is configured with value from

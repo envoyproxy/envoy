@@ -1005,14 +1005,14 @@ TEST_F(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(1);
   EXPECT_CALL(connection_, remoteAddress()).Times(0);
   EXPECT_CALL(connection_, localAddress()).Times(0);
-  EXPECT_CALL(*client_, check(_, _, _)).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
 
   // To test that disabling the filter works.
   test_disable(true);
-  EXPECT_CALL(*client_, check(_, _, _)).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
   // Make sure that setDecoderBufferLimit is skipped.
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
