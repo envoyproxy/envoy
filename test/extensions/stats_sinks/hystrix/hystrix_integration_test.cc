@@ -44,6 +44,7 @@ TEST_P(HystrixIntegrationTest, NoChunkEncoding) {
     EXPECT_THAT(response, Not(HasSubstr("chunked")));
     EXPECT_THAT(response, Not(HasSubstr("3\r\n:\n\n")));
     EXPECT_THAT(response, HasSubstr(":\n\n"));
+    connection.close();
   } else {
     codec_client_ = makeHttpConnection(lookupPort("admin"));
     auto response = codec_client_->makeHeaderOnlyRequest(
@@ -53,6 +54,7 @@ TEST_P(HystrixIntegrationTest, NoChunkEncoding) {
                                        {":authority", "admin"}});
     response->waitForBodyData(1);
     EXPECT_THAT(response->body(), HasSubstr("rollingCountCollapsedRequests"));
+    codec_client_->close();
   }
 }
 
