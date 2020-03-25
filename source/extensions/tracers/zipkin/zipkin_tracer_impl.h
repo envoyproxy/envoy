@@ -23,6 +23,7 @@ namespace Zipkin {
 #define ZIPKIN_TRACER_STATS(COUNTER)                                                               \
   COUNTER(spans_sent)                                                                              \
   COUNTER(timer_flushed)                                                                           \
+  COUNTER(reports_skipped)                                                                         \
   COUNTER(reports_sent)                                                                            \
   COUNTER(reports_dropped)                                                                         \
   COUNTER(reports_failed)
@@ -116,7 +117,7 @@ public:
 
   // Getters to return the ZipkinDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
-  Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
+  const std::string& cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   ZipkinTracerStats& tracerStats() { return tracer_stats_; }
 
@@ -132,7 +133,7 @@ private:
   };
 
   Upstream::ClusterManager& cm_;
-  Upstream::ClusterInfoConstSharedPtr cluster_;
+  std::string cluster_;
   ZipkinTracerStats tracer_stats_;
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;
@@ -171,7 +172,9 @@ struct CollectorInfo {
  *
  * The default values for the runtime parameters are 5 spans and 5000ms.
  */
-class ReporterImpl : public Reporter, Http::AsyncClient::Callbacks {
+class ReporterImpl : Logger::Loggable<Logger::Id::tracing>,
+                     public Reporter,
+                     public Http::AsyncClient::Callbacks {
 public:
   /**
    * Constructor.

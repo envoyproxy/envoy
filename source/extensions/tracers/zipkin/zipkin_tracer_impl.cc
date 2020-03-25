@@ -74,8 +74,9 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                                 POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
       time_source_(time_source) {
-  Config::Utility::checkCluster(TracerNames::get().Zipkin, zipkin_config.collector_cluster(), cm_);
-  cluster_ = cm_.get(zipkin_config.collector_cluster())->info();
+  Config::Utility::checkCluster(TracerNames::get().Zipkin, zipkin_config.collector_cluster(), cm_,
+                                /* allow_added_via_api */ true);
+  cluster_ = zipkin_config.collector_cluster();
 
   CollectorInfo collector;
   if (!zipkin_config.collector_endpoint().empty()) {
@@ -176,7 +177,7 @@ void ReporterImpl::flushSpans() {
     Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>();
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     message->headers().setPath(collector_.endpoint_);
-    message->headers().setHost(driver_.cluster()->name());
+    message->headers().setHost(driver_.cluster());
     message->headers().setReferenceContentType(
         collector_.version_ == envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO
             ? Http::Headers::get().ContentTypeValues.Protobuf
@@ -188,13 +189,20 @@ void ReporterImpl::flushSpans() {
 
     const uint64_t timeout =
         driver_.runtime().snapshot().getInteger("tracing.zipkin.request_timeout", 5000U);
-    Http::AsyncClient::Request* request = driver_.clusterManager()
-                                              .httpAsyncClientForCluster(driver_.cluster()->name())
-                                              .send(std::move(message), *this,
-                                                    Http::AsyncClient::RequestOptions().setTimeout(
-                                                        std::chrono::milliseconds(timeout)));
-    if (request) {
-      active_requests_.add(*request);
+
+    if (driver_.clusterManager().get(driver_.cluster())) {
+      Http::AsyncClient::Request* request =
+          driver_.clusterManager()
+              .httpAsyncClientForCluster(driver_.cluster())
+              .send(std::move(message), *this,
+                    Http::AsyncClient::RequestOptions().setTimeout(
+                        std::chrono::milliseconds(timeout)));
+      if (request) {
+        active_requests_.add(*request);
+      }
+    } else {
+      ENVOY_LOG(debug, "collector cluster '{}' does not exist", driver_.cluster());
+      driver_.tracerStats().reports_skipped_.inc();
     }
 
     span_buffer_->clear();

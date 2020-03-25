@@ -117,6 +117,7 @@ public:
     callback->onSuccess(request, std::move(msg));
 
     EXPECT_EQ(2U, stats_.counter("tracing.zipkin.spans_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_skipped").value());
     EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_sent").value());
     EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
     EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
@@ -161,7 +162,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
   }
 
   {
-    // Valid config but not valid cluster.
+    // Valid config but collector cluster doesn't exists.
     EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
@@ -187,6 +188,21 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 
     setup(zipkin_config, true);
   }
+}
+
+TEST_F(ZipkinDriverTest, AllowCollectorClusterToBeAddedViaApi) {
+  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint: /api/v1/spans
+  )EOF";
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+  setup(zipkin_config, true);
 }
 
 TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
@@ -242,8 +258,35 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
   callback->onSuccess(request, std::move(msg));
 
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_skipped").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_dropped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
+}
+
+TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
+  setupValidDriver("HTTP_JSON_V1");
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
+      .WillOnce(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
+  // Simulate removal of a cluster.
+  EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(nullptr));
+  // Verify that no report will be sent.
+  EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
+  EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+
+  // Trigger flush of a span.
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
+
+  EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_skipped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
 }
 
