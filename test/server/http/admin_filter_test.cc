@@ -28,9 +28,9 @@ public:
                                         Http::ResponseHeaderMap& response_headers,
                                         Buffer::OwnedImpl& response, AdminFilter& filter) {
     // silence compiler warnings for unused params
-    (void)path_and_query;
-    (void)response_headers;
-    (void)filter;
+    UNREFERENCED_PARAMETER(path_and_query);
+    UNREFERENCED_PARAMETER(response_headers);
+    UNREFERENCED_PARAMETER(filter);
 
     response.add("OK\n");
     return Http::Code::OK;
