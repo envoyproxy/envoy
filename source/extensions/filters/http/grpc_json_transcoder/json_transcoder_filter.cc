@@ -588,7 +588,8 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
   }
 
   // remove Trailer headers if the client connection was http/1
-  if (encoder_callbacks_->streamInfo().protocol() < Http::Protocol::Http2) {
+  if (Http::Utility::getProtocol(encoder_callbacks_->streamInfo().protocols()) <
+      Http::Protocol::Http2) {
     response_headers_->remove(trailerHeader());
   }
 
@@ -724,7 +725,8 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
   }
 
   // remove Trailer headers if the client connection was http/1
-  if (encoder_callbacks_->streamInfo().protocol() < Http::Protocol::Http2) {
+  if (Http::Utility::getProtocol(encoder_callbacks_->streamInfo().protocols()) <
+      Http::Protocol::Http2) {
     response_headers_->remove(trailerHeader());
   }
 

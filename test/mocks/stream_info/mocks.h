@@ -46,8 +46,8 @@ public:
   MOCK_METHOD(uint64_t, bytesReceived, (), (const));
   MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
-  MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
-  MOCK_METHOD(void, protocol, (Http::Protocol protocol));
+  MOCK_METHOD(absl::Span<const std::string>, protocols, (), (const));
+  MOCK_METHOD(void, addProtocol, (absl::string_view protocol));
   MOCK_METHOD(absl::optional<uint32_t>, responseCode, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, responseCodeDetails, (), (const));
   MOCK_METHOD(void, addBytesSent, (uint64_t));
@@ -79,6 +79,7 @@ public:
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
   MOCK_METHOD(void, setDynamicMetadata,
               (const std::string&, const std::string&, const std::string&));
+  MOCK_METHOD(FilterStateSharedPtr&, mutableFilterState, ());
   MOCK_METHOD(const FilterStateSharedPtr&, filterState, ());
   MOCK_METHOD(const FilterState&, filterState, (), (const));
   MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
@@ -106,7 +107,7 @@ public:
   absl::optional<std::chrono::nanoseconds> first_downstream_tx_byte_sent_;
   absl::optional<std::chrono::nanoseconds> last_downstream_tx_byte_sent_;
   absl::optional<std::chrono::nanoseconds> end_time_;
-  absl::optional<Http::Protocol> protocol_;
+  std::vector<std::string> protocols_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   uint64_t response_flags_{};

@@ -5091,7 +5091,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
           object->dumpState(out);
           std::string state = out.str();
           EXPECT_THAT(state, testing::HasSubstr("request_headers_: null"));
-          EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
+          EXPECT_THAT(state, testing::HasSubstr("protocols_): 1"));
           return nullptr;
         }))
         .WillRepeatedly(Return(nullptr));
@@ -5114,7 +5114,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
           std::string state = out.str();
           EXPECT_THAT(state, testing::HasSubstr("request_headers_: \n"));
           EXPECT_THAT(state, testing::HasSubstr("':authority', 'host'\n"));
-          EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
+          EXPECT_THAT(state, testing::HasSubstr("protocols_): 1"));
           return nullptr;
         }))
         .WillRepeatedly(Return(nullptr));
@@ -5304,15 +5304,16 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
 TEST_F(HttpConnectionManagerImplTest, NewConnection) {
   setup(false, "", true, true);
 
-  filter_callbacks_.connection_.stream_info_.protocol_ = absl::nullopt;
-  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol());
+  filter_callbacks_.connection_.stream_info_.protocols_.clear();
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocols());
   EXPECT_EQ(Network::FilterStatus::Continue, conn_manager_->onNewConnection());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_total_.value());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_active_.value());
 
-  filter_callbacks_.connection_.stream_info_.protocol_ = Envoy::Http::Protocol::Http3;
+  filter_callbacks_.connection_.stream_info_.protocols_ =
+      std::vector<std::string>({StreamInfo::ProtocolStrings::get().Http3String});
   codec_->protocol_ = Http::Protocol::Http3;
-  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol());
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocols());
   EXPECT_CALL(*codec_, protocol()).Times(AtLeast(1));
   EXPECT_EQ(Network::FilterStatus::StopIteration, conn_manager_->onNewConnection());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_total_.value());
@@ -5322,7 +5323,8 @@ TEST_F(HttpConnectionManagerImplTest, NewConnection) {
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
   setup(false, "envoy-custom-server", false);
 
-  filter_callbacks_.connection_.stream_info_.protocol_ = Envoy::Http::Protocol::Http3;
+  filter_callbacks_.connection_.stream_info_.protocols_ =
+      std::vector<std::string>({StreamInfo::ProtocolStrings::get().Http3String});
   codec_->protocol_ = Http::Protocol::Http3;
   EXPECT_EQ(Network::FilterStatus::StopIteration, conn_manager_->onNewConnection());
 

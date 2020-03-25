@@ -517,7 +517,7 @@ TEST_F(HttpFilterTest, H2UpgradeRequest) {
 
   request_headers_.addCopy(Http::Headers::get().Method, Http::Headers::get().MethodValues.Connect);
   request_headers_.addCopy(Http::Headers::get().Protocol,
-                           Http::Headers::get().ProtocolStrings.Http2String);
+                           StreamInfo::ProtocolStrings::get().Http2String);
 
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
       .WillOnce(

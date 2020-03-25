@@ -110,8 +110,9 @@ void CheckRequestUtils::setHttpRequest(
   httpreq.set_scheme(getHeaderStr(headers.Scheme()));
   httpreq.set_size(stream_info.bytesReceived());
 
-  if (stream_info.protocol()) {
-    httpreq.set_protocol(Envoy::Http::Utility::getProtocolString(stream_info.protocol().value()));
+  auto protocol = Envoy::Http::Utility::getProtocol(stream_info.protocols());
+  if (protocol.has_value()) {
+    httpreq.set_protocol(Envoy::Http::Utility::getProtocolString(protocol.value()));
   }
 
   // Fill in the headers.

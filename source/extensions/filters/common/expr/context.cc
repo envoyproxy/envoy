@@ -82,8 +82,9 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
       return CelValue::CreateDuration(absl::FromChrono(duration.value()));
     }
   } else if (value == Protocol) {
-    if (info_.protocol().has_value()) {
-      return CelValue::CreateString(&Http::Utility::getProtocolString(info_.protocol().value()));
+    auto protocol = Http::Utility::getProtocol(info_.protocols());
+    if (protocol.has_value()) {
+      return CelValue::CreateString(&Http::Utility::getProtocolString(protocol.value()));
     } else {
       return {};
     }

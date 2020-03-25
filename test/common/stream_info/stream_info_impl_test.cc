@@ -6,6 +6,7 @@
 #include "envoy/upstream/host_description.h"
 
 #include "common/common/fmt.h"
+#include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/stream_info/stream_info_impl.h"
 
@@ -134,10 +135,10 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
   {
     StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
 
-    EXPECT_EQ(Http::Protocol::Http2, stream_info.protocol().value());
+    EXPECT_EQ(Http::Protocol::Http2, Http::Utility::getProtocol(stream_info.protocols()).value());
 
-    stream_info.protocol(Http::Protocol::Http10);
-    EXPECT_EQ(Http::Protocol::Http10, stream_info.protocol().value());
+    stream_info.addProtocol(Http::Utility::getProtocolString(Http::Protocol::Http10));
+    EXPECT_EQ(Http::Protocol::Http10, Http::Utility::getProtocol(stream_info.protocols()).value());
 
     EXPECT_FALSE(stream_info.responseCode());
     stream_info.response_code_ = 200;
@@ -223,7 +224,7 @@ TEST_F(StreamInfoImplTest, DumpStateTest) {
     stream_info.dumpState(out, i);
     std::string state = out.str();
     EXPECT_TRUE(absl::StartsWith(state, prefix));
-    EXPECT_THAT(state, testing::HasSubstr("protocol_: 2"));
+    EXPECT_THAT(state, testing::HasSubstr("protocols_): 2"));
     prefix = prefix + "  ";
   }
 }

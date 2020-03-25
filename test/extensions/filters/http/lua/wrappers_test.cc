@@ -10,7 +10,7 @@
 #include "test/test_common/utility.h"
 
 using testing::InSequence;
-using testing::ReturnPointee;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -239,7 +239,8 @@ protected:
     setup(SCRIPT);
 
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-    ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
+    std::vector<std::string> protocols({Envoy::Http::Utility::getProtocolString(protocol.value())});
+    ON_CALL(stream_info, protocols()).WillByDefault(Return(protocols));
     Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
         StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
     EXPECT_CALL(*this,

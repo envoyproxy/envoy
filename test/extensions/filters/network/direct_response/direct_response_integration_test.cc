@@ -25,7 +25,7 @@ public:
    * Initializer for an individual test.
    */
   void SetUp() override {
-    useListenerAccessLog("%RESPONSE_CODE_DETAILS%");
+    useListenerAccessLog("%RESPONSE_CODE_DETAILS% %PROTOCOL%");
     BaseIntegrationTest::initialize();
   }
 
@@ -54,9 +54,10 @@ TEST_P(DirectResponseIntegrationTest, Hello) {
       version_);
 
   connection.run();
+  auto expected = absl::StrCat(StreamInfo::ResponseCodeDetails::get().DirectResponse, " ",
+                               StreamInfo::ProtocolStrings::get().TcpString);
   EXPECT_EQ("hello, world!\n", response);
-  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
-              testing::HasSubstr(StreamInfo::ResponseCodeDetails::get().DirectResponse));
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr(expected));
 }
 
 } // namespace Envoy

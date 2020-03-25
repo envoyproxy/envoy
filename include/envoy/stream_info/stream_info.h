@@ -18,6 +18,7 @@
 #include "common/singleton/const_singleton.h"
 
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 
@@ -148,6 +149,18 @@ struct ResponseCodeDetailValues {
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
 
+struct ProtocolStringValues {
+  const std::string TcpString{"TCP"};
+  const std::string UdpString{"UDP"};
+  const std::string HttpString{"HTTP"};
+  const std::string Http10String{"HTTP/1.0"};
+  const std::string Http11String{"HTTP/1.1"};
+  const std::string Http2String{"HTTP/2"};
+  const std::string Http3String{"HTTP/3"};
+};
+
+using ProtocolStrings = ConstSingleton<ProtocolStringValues>;
+
 struct UpstreamTiming {
   /**
    * Sets the time when the first byte of the request was sent upstream.
@@ -238,14 +251,14 @@ public:
   virtual uint64_t bytesReceived() const PURE;
 
   /**
-   * @return the protocol of the request.
+   * @return the set of protocols detected for a stream.
    */
-  virtual absl::optional<Http::Protocol> protocol() const PURE;
+  virtual absl::Span<const std::string> protocols() const PURE;
 
   /**
-   * @param protocol the request's protocol.
+   * @param protocol the request's protocol
    */
-  virtual void protocol(Http::Protocol protocol) PURE;
+  virtual void addProtocol(absl::string_view protocol) PURE;
 
   /**
    * @return the response code.
@@ -486,6 +499,7 @@ public:
    * filters (append only). Both object types can be consumed by multiple filters.
    * @return the filter state associated with this request.
    */
+  virtual FilterStateSharedPtr& mutableFilterState() PURE;
   virtual const FilterStateSharedPtr& filterState() PURE;
   virtual const FilterState& filterState() const PURE;
 

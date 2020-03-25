@@ -29,7 +29,7 @@ class CheckRequestUtilsTest : public testing::Test {
 public:
   CheckRequestUtilsTest() {
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
-    protocol_ = Envoy::Http::Protocol::Http10;
+    protocol_ = {StreamInfo::ProtocolStrings::get().Http10String};
     buffer_ = CheckRequestUtilsTest::newTestBuffer(8192);
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
   };
@@ -42,7 +42,7 @@ public:
     EXPECT_CALL(callbacks_, streamId()).Times(1).WillOnce(Return(0));
     EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
     EXPECT_CALL(callbacks_, streamInfo()).Times(1).WillOnce(ReturnRef(req_info_));
-    EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
+    EXPECT_CALL(req_info_, protocols()).Times(1).WillRepeatedly(Return(protocol_));
     EXPECT_CALL(req_info_, startTime()).Times(1).WillOnce(Return(SystemTime()));
   }
 
@@ -91,7 +91,7 @@ public:
   }
 
   Network::Address::InstanceConstSharedPtr addr_;
-  absl::optional<Http::Protocol> protocol_;
+  std::vector<std::string> protocol_;
   CheckRequestUtils check_request_generator_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Envoy::Network::MockReadFilterCallbacks> net_callbacks_;
@@ -216,7 +216,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
   EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
-  EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
+  EXPECT_CALL(req_info_, protocols()).WillRepeatedly(Return(protocol_));
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));

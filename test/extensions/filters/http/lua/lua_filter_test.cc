@@ -1720,7 +1720,8 @@ TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
   setup(SCRIPT);
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, protocol()).WillOnce(Return(Http::Protocol::Http11));
+  std::vector<std::string> protocols({StreamInfo::ProtocolStrings::get().Http11String});
+  EXPECT_CALL(stream_info_, protocols()).WillOnce(Return(protocols));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/1.1")));

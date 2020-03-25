@@ -15,7 +15,7 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnec
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
-  stream_info_.protocol(Http::Protocol::Http3);
+  stream_info_.addProtocol(Http::Utility::getProtocolString(Http::Protocol::Http3));
 }
 
 void QuicFilterManagerConnectionImpl::addWriteFilter(Network::WriteFilterSharedPtr filter) {

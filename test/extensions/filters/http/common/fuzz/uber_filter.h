@@ -45,7 +45,8 @@ public:
     ON_CALL(callbacks_, connection()).WillByDefault(testing::Return(&connection_));
     ON_CALL(callbacks_, activeSpan())
         .WillByDefault(testing::ReturnRef(Tracing::NullSpan::instance()));
-    callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
+    callbacks_.stream_info_.protocols_ =
+        std::vector<std::string>({StreamInfo::ProtocolStrings::get().Http2String});
   }
 
   void prepareCache() {

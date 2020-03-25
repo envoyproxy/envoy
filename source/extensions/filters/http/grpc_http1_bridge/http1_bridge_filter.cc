@@ -12,6 +12,7 @@
 #include "common/grpc/context_impl.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,7 +30,8 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMa
     setupStatTracking(headers);
   }
 
-  const absl::optional<Http::Protocol>& protocol = decoder_callbacks_->streamInfo().protocol();
+  const absl::optional<Http::Protocol>& protocol =
+      Http::Utility::getProtocol(decoder_callbacks_->streamInfo().protocols());
   ASSERT(protocol);
   if (protocol.value() < Http::Protocol::Http2 && grpc_request) {
     do_bridging_ = true;

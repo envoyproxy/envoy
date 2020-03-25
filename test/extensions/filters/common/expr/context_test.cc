@@ -47,7 +47,8 @@ TEST(Context, RequestAttributes) {
   EXPECT_CALL(info, startTime()).WillRepeatedly(Return(start_time));
   absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
   EXPECT_CALL(info, requestComplete()).WillRepeatedly(Return(dur));
-  EXPECT_CALL(info, protocol()).WillRepeatedly(Return(Http::Protocol::Http2));
+  std::vector<std::string> protocols({StreamInfo::ProtocolStrings::get().Http2String});
+  EXPECT_CALL(info, protocols()).WillRepeatedly(Return(protocols));
 
   // stub methods
   EXPECT_EQ(0, request.size());

@@ -144,7 +144,8 @@ public:
     // Setup read filter.
     envoy_quic_session_.addReadFilter(read_filter_);
     EXPECT_EQ(Http::Protocol::Http3,
-              read_filter_->callbacks_->connection().streamInfo().protocol().value());
+              Http::Utility::getProtocol(
+                  read_filter_->callbacks_->connection().streamInfo().protocols()));
     EXPECT_EQ(envoy_quic_session_.id(), read_filter_->callbacks_->connection().id());
     EXPECT_EQ(&envoy_quic_session_, &read_filter_->callbacks_->connection());
     read_filter_->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks_);

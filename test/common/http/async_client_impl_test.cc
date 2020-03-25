@@ -1354,7 +1354,7 @@ TEST_F(AsyncClientImplTest, DumpState) {
   std::stringstream out;
   filter_callbacks->scope().dumpState(out);
   std::string state = out.str();
-  EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
+  EXPECT_THAT(state, testing::HasSubstr("protocols_): 1"));
 
   EXPECT_CALL(stream_callbacks_, onReset());
 }

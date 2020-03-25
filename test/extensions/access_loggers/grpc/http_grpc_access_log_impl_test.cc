@@ -231,7 +231,7 @@ response: {}
 
     stream_info.setUpstreamLocalAddress(
         std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2"));
-    stream_info.protocol_ = Http::Protocol::Http10;
+    stream_info.protocols_ = {StreamInfo::ProtocolStrings::get().Http10String};
     stream_info.addBytesReceived(10);
     stream_info.addBytesSent(20);
     stream_info.response_code_ = 200;

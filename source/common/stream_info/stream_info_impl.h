@@ -10,6 +10,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
+#include "common/http/utility.h"
 #include "common/stream_info/filter_state_impl.h"
 
 namespace Envoy {
@@ -23,17 +24,22 @@ struct StreamInfoImpl : public StreamInfo {
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source)
       : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
+        start_time_monotonic_(time_source.monotonicTime()),
+        protocols_({Http::Utility::getProtocolString(protocol)}),
         filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
-  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
-                 std::shared_ptr<FilterState>& parent_filter_state)
+  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source, StreamInfo& parent)
       : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
+        start_time_monotonic_(time_source.monotonicTime()),
         filter_state_(std::make_shared<FilterStateImpl>(
-            FilterStateImpl::LazyCreateAncestor(parent_filter_state,
+            FilterStateImpl::LazyCreateAncestor(parent.mutableFilterState(),
                                                 FilterState::LifeSpan::DownstreamConnection),
-            FilterState::LifeSpan::FilterChain)) {}
+            FilterState::LifeSpan::FilterChain)) {
+    for (const auto& protocol : parent.protocols()) {
+      protocols_.push_back(protocol);
+    }
+    protocols_.push_back(Http::Utility::getProtocolString(protocol));
+  }
 
   SystemTime startTime() const override { return start_time_; }
 
@@ -108,9 +114,11 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
-  absl::optional<Http::Protocol> protocol() const override { return protocol_; }
+  absl::Span<const std::string> protocols() const override { return protocols_; }
 
-  void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
+  void addProtocol(absl::string_view protocol) override {
+    protocols_.push_back(std::string(protocol));
+  }
 
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
 
@@ -216,6 +224,7 @@ struct StreamInfoImpl : public StreamInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
+  FilterStateSharedPtr& mutableFilterState() override { return filter_state_; }
   const FilterStateSharedPtr& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return *filter_state_; }
 
@@ -248,7 +257,8 @@ struct StreamInfoImpl : public StreamInfo {
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
+    os << spaces << "StreamInfoImpl " << this
+       << DUMP_OPTIONAL_MEMBER(Http::Utility::getProtocol(protocols_))
        << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
        << DUMP_MEMBER(health_check_request_) << DUMP_MEMBER(route_name_) << "\n";
   }
@@ -271,7 +281,7 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
   absl::optional<MonotonicTime> final_time_;
 
-  absl::optional<Http::Protocol> protocol_;
+  std::vector<std::string> protocols_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   uint64_t response_flags_{};

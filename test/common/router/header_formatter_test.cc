@@ -131,8 +131,8 @@ TEST_F(StreamInfoHeaderFormatterTest, TestformatWithHostnameVariable) {
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
-  ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
+  std::vector<std::string> protocols = {StreamInfo::ProtocolStrings::get().Http11String};
+  ON_CALL(stream_info, protocols()).WillByDefault(Return(protocols));
 
   testFormatting(stream_info, "PROTOCOL", "HTTP/1.1");
 }
@@ -839,8 +839,8 @@ TEST(HeaderParserTest, TestParseInternal) {
   };
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
-  ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
+  std::vector<std::string> protocols = {StreamInfo::ProtocolStrings::get().Http11String};
+  ON_CALL(stream_info, protocols()).WillByDefault(Return(protocols));
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
@@ -1020,8 +1020,8 @@ request_headers_to_remove: ["x-nope"]
       HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
   Http::TestHeaderMapImpl header_map{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
-  ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
+  std::vector<std::string> protocols = {StreamInfo::ProtocolStrings::get().Http11String};
+  ON_CALL(stream_info, protocols()).WillByDefault(Return(protocols));
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());

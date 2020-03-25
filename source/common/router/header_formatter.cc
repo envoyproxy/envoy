@@ -222,7 +222,7 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     : append_(append) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-      return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol());
+      return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocols());
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {

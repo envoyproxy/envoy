@@ -76,9 +76,15 @@ private:
 };
 
 TEST(AccessLogFormatUtilsTest, protocolToString) {
-  EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(Http::Protocol::Http10));
-  EXPECT_EQ("HTTP/1.1", AccessLogFormatUtils::protocolToString(Http::Protocol::Http11));
-  EXPECT_EQ("HTTP/2", AccessLogFormatUtils::protocolToString(Http::Protocol::Http2));
+  EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(
+                            {StreamInfo::ProtocolStrings::get().Http10String}));
+  EXPECT_EQ("HTTP/1.1", AccessLogFormatUtils::protocolToString(
+                            {StreamInfo::ProtocolStrings::get().Http11String}));
+  EXPECT_EQ("HTTP/2", AccessLogFormatUtils::protocolToString(
+                          {StreamInfo::ProtocolStrings::get().Http2String}));
+  EXPECT_EQ("TCP,HTTP", AccessLogFormatUtils::protocolToString(
+                            {StreamInfo::ProtocolStrings::get().TcpString,
+                             StreamInfo::ProtocolStrings::get().HttpString}));
   EXPECT_EQ("-", AccessLogFormatUtils::protocolToString({}));
 }
 
@@ -190,8 +196,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter protocol_format("PROTOCOL");
-    absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+    std::vector<std::string> protocols = {StreamInfo::ProtocolStrings::get().Http11String};
+    EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
     EXPECT_EQ("HTTP/1.1", protocol_format.format(request_headers, response_headers,
                                                  response_trailers, stream_info));
     EXPECT_THAT(protocol_format.formatValue(request_headers, response_headers, response_trailers,
@@ -1368,8 +1374,8 @@ TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+  std::vector<std::string> protocols = {StreamInfo::ProtocolStrings::get().Http11String};
+  EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
 
   std::unordered_map<std::string, std::string> expected_json_map = {
       {"plain_string", "plain_string_value"}};
@@ -1390,8 +1396,8 @@ TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+  std::vector<std::string> protocols = {StreamInfo::ProtocolStrings::get().Http11String};
+  EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
 
   std::unordered_map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1"}};
 
@@ -1421,8 +1427,8 @@ TEST(AccessLogFormatterTest, JsonFormatterNonExistentHeaderTest) {
       {"some_response_header", "%RESP(some_response_header)%"}};
   JsonFormatterImpl formatter(key_mapping, false);
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+  std::vector<std::string> protocols = {StreamInfo::ProtocolStrings::get().Http11String};
+  EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
 
   verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
                    expected_json_map);
@@ -1453,8 +1459,8 @@ TEST(AccessLogFormatterTest, JsonFormatterAlternateHeaderTest) {
        "%RESP(response_present_header?response_absent_header)%"}};
   JsonFormatterImpl formatter(key_mapping, false);
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+  std::vector<std::string> protocols = {StreamInfo::ProtocolStrings::get().Http11String};
+  EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
 
   verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
                    expected_json_map);
@@ -1619,8 +1625,8 @@ TEST(AccessLogFormatterTest, JsonFormatterMultiTokenTest) {
     for (const bool preserve_types : {false, true}) {
       JsonFormatterImpl formatter(key_mapping, preserve_types);
 
-      absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-      EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+      std::vector<std::string> protocols = {StreamInfo::ProtocolStrings::get().Http11String};
+      EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
 
       const auto parsed = Json::Factory::loadFromString(
           formatter.format(request_header, response_header, response_trailer, stream_info));
@@ -1685,8 +1691,8 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
                                "\t@%TRAILER(THIRD)%@\t%TRAILER(TEST?TEST-2)%[]";
     FormatterImpl formatter(format);
 
-    absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+    std::vector<std::string> protocols = {StreamInfo::ProtocolStrings::get().Http11String};
+    EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
 
     EXPECT_EQ("{{HTTP/1.1}}   -++test GET PUT\t@POST@\ttest-2[]",
               formatter.format(request_header, response_header, response_trailer, stream_info));

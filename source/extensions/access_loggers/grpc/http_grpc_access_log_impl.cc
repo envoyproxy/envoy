@@ -5,6 +5,7 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
 #include "common/common/assert.h"
+#include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/stream_info/utility.h"
 
@@ -53,8 +54,9 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
                                                         stream_info, config_.common_config());
 
-  if (stream_info.protocol()) {
-    switch (stream_info.protocol().value()) {
+  auto protocol = Http::Utility::getProtocol(stream_info.protocols());
+  if (protocol.has_value()) {
+    switch (protocol.value()) {
     case Http::Protocol::Http10:
       log_entry.set_protocol_version(envoy::data::accesslog::v3::HTTPAccessLogEntry::HTTP10);
       break;

@@ -25,6 +25,7 @@ envoy_cc_test(
         ":test_int_accessor_lib",
         "//include/envoy/http:protocol_interface",
         "//include/envoy/upstream:host_description_interface",
+        "//source/common/http:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/upstream:upstream_mocks",

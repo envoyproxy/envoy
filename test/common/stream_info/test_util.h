@@ -29,8 +29,10 @@ public:
 
   void addBytesReceived(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   uint64_t bytesReceived() const override { return 1; }
-  absl::optional<Http::Protocol> protocol() const override { return protocol_; }
-  void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
+  absl::Span<const std::string> protocols() const override { return protocols_; }
+  void addProtocol(absl::string_view protocol) override {
+    protocols_.push_back(std::string(protocol));
+  }
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
   const absl::optional<std::string>& responseCodeDetails() const override {
     return response_code_details_;
@@ -176,6 +178,7 @@ public:
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
+  Envoy::StreamInfo::FilterStateSharedPtr& mutableFilterState() override { return filter_state_; }
   const Envoy::StreamInfo::FilterStateSharedPtr& filterState() override { return filter_state_; }
   const Envoy::StreamInfo::FilterState& filterState() const override { return *filter_state_; }
 
@@ -229,7 +232,7 @@ public:
   absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
   absl::optional<MonotonicTime> end_time_;
 
-  absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
+  std::vector<std::string> protocols_{Envoy::StreamInfo::ProtocolStrings::get().Http11String};
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   uint64_t response_flags_{};

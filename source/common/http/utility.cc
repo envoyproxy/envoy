@@ -3,6 +3,7 @@
 #include <http_parser.h>
 
 #include <cstdint>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -636,16 +637,32 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
 const std::string& Utility::getProtocolString(const Protocol protocol) {
   switch (protocol) {
   case Protocol::Http10:
-    return Headers::get().ProtocolStrings.Http10String;
+    return StreamInfo::ProtocolStrings::get().Http10String;
   case Protocol::Http11:
-    return Headers::get().ProtocolStrings.Http11String;
+    return StreamInfo::ProtocolStrings::get().Http11String;
   case Protocol::Http2:
-    return Headers::get().ProtocolStrings.Http2String;
+    return StreamInfo::ProtocolStrings::get().Http2String;
   case Protocol::Http3:
-    return Headers::get().ProtocolStrings.Http3String;
+    return StreamInfo::ProtocolStrings::get().Http3String;
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+absl::optional<const Protocol> Utility::getProtocol(absl::Span<const std::string> protocols) {
+  for (auto it = protocols.rbegin(); it != protocols.rend(); it++) {
+    if (*it == StreamInfo::ProtocolStrings::get().Http10String) {
+      return Protocol::Http10;
+    } else if (*it == StreamInfo::ProtocolStrings::get().Http11String) {
+      return Protocol::Http11;
+    } else if (*it == StreamInfo::ProtocolStrings::get().Http2String) {
+      return Protocol::Http2;
+    } else if (*it == StreamInfo::ProtocolStrings::get().Http3String) {
+      return Protocol::Http3;
+    }
+  }
+
+  return {};
 }
 
 void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,

@@ -103,8 +103,12 @@ void HeaderMapWrapper::checkModifiable(lua_State* state) {
 }
 
 int StreamInfoWrapper::luaProtocol(lua_State* state) {
-  lua_pushstring(state, Http::Utility::getProtocolString(stream_info_.protocol().value()).c_str());
-  return 1;
+  auto protocol = Http::Utility::getProtocol(stream_info_.protocols());
+  if (protocol.has_value()) {
+    lua_pushstring(state, Http::Utility::getProtocolString(protocol.value()).c_str());
+    return 1;
+  }
+  return 0;
 }
 
 int StreamInfoWrapper::luaDynamicMetadata(lua_State* state) {

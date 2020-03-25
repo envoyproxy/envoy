@@ -153,10 +153,10 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
       }
 
       if (parser_.http_major == 1 && parser_.http_minor == 1) {
-        protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
+        protocol_ = StreamInfo::ProtocolStrings::get().Http11String;
       } else {
         // Set other HTTP protocols to HTTP/1.0
-        protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
+        protocol_ = StreamInfo::ProtocolStrings::get().Http10String;
       }
       return ParseState::Done;
     } else {
@@ -179,10 +179,10 @@ void Filter::done(bool success) {
 
   if (success) {
     absl::string_view protocol;
-    if (protocol_ == Http::Headers::get().ProtocolStrings.Http10String) {
+    if (protocol_ == StreamInfo::ProtocolStrings::get().Http10String) {
       config_->stats().http10_found_.inc();
       protocol = "http/1.0";
-    } else if (protocol_ == Http::Headers::get().ProtocolStrings.Http11String) {
+    } else if (protocol_ == StreamInfo::ProtocolStrings::get().Http11String) {
       config_->stats().http11_found_.inc();
       protocol = "http/1.1";
     } else {

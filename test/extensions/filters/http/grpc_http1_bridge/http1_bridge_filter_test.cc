@@ -29,7 +29,8 @@ public:
   GrpcHttp1BridgeFilterTest() : context_(*symbol_table_), filter_(context_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
-    ON_CALL(decoder_callbacks_.stream_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
+    ON_CALL(decoder_callbacks_.stream_info_, protocols())
+        .WillByDefault(Return(absl::Span<const std::string>(protocols_)));
   }
 
   ~GrpcHttp1BridgeFilterTest() override { filter_.onDestroy(); }
@@ -39,11 +40,11 @@ public:
   Http1BridgeFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
+  std::vector<std::string> protocols_{StreamInfo::ProtocolStrings::get().Http11String};
 };
 
 TEST_F(GrpcHttp1BridgeFilterTest, NoRoute) {
-  protocol_ = Http::Protocol::Http2;
+  protocols_ = {StreamInfo::ProtocolStrings::get().Http2String};
   ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -58,7 +59,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, NoRoute) {
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, NoCluster) {
-  protocol_ = Http::Protocol::Http2;
+  protocols_ = {StreamInfo::ProtocolStrings::get().Http2String};
   ON_CALL(decoder_callbacks_, clusterInfo()).WillByDefault(Return(nullptr));
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -71,7 +72,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, NoCluster) {
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
-  protocol_ = Http::Protocol::Http2;
+  protocols_ = {StreamInfo::ProtocolStrings::get().Http2String};
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},
@@ -98,7 +99,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2NormalResponse) {
-  protocol_ = Http::Protocol::Http2;
+  protocols_ = {StreamInfo::ProtocolStrings::get().Http2String};
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},
@@ -123,7 +124,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2NormalResponse) {
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2ContentTypeGrpcPlusProto) {
-  protocol_ = Http::Protocol::Http2;
+  protocols_ = {StreamInfo::ProtocolStrings::get().Http2String};
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc+proto"},
@@ -146,7 +147,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2ContentTypeGrpcPlusProto) {
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, NotHandlingHttp2) {
-  protocol_ = Http::Protocol::Http2;
+  protocols_ = {StreamInfo::ProtocolStrings::get().Http2String};
 
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/foo"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));

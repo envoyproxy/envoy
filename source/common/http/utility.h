@@ -315,6 +315,13 @@ bool sanitizeConnectionHeader(Http::RequestHeaderMap& headers);
 const std::string& getProtocolString(const Protocol p);
 
 /**
+ * Get the http protocol from the given protocol list.
+ * @param protocol list from the stream info.
+ * @return the last (most-specific) http protocol in the list.
+ */
+absl::optional<const Protocol> getProtocol(absl::Span<const std::string> protocols);
+
+/**
  * Extract host and path from a URI. The host may contain port.
  * This function doesn't validate if the URI is valid. It only parses the URI with following
  * format: scheme://host/path.

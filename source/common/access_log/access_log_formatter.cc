@@ -61,12 +61,15 @@ FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
   return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT)};
 }
 
-const std::string&
-AccessLogFormatUtils::protocolToString(const absl::optional<Http::Protocol>& protocol) {
-  if (protocol) {
+const std::string AccessLogFormatUtils::protocolToString(absl::Span<const std::string> protocols) {
+  auto protocol = Http::Utility::getProtocol(protocols);
+  if (protocol.has_value()) {
     return Http::Utility::getProtocolString(protocol.value());
   }
-  return UnspecifiedValueString;
+  if (protocols.empty()) {
+    return UnspecifiedValueString;
+  }
+  return absl::StrJoin(protocols, ",");
 }
 
 const std::string AccessLogFormatUtils::getHostname() {
@@ -558,7 +561,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "PROTOCOL") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          return AccessLogFormatUtils::protocolToString(stream_info.protocol());
+          return AccessLogFormatUtils::protocolToString(stream_info.protocols());
         });
   } else if (field_name == "RESPONSE_CODE") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(

@@ -158,10 +158,10 @@ TEST_F(HttpConnManFinalizerImplTest, OriginalAndLongPath) {
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  std::vector<std::string> protocols({StreamInfo::ProtocolStrings::get().Http2String});
+  EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, downstreamDirectRemoteAddress())
@@ -190,10 +190,10 @@ TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  std::vector<std::string> protocols({StreamInfo::ProtocolStrings::get().Http2String});
+  EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, downstreamDirectRemoteAddress())
@@ -316,9 +316,9 @@ TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
   const auto remote_address =
       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(expected_ip, 0)};
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  std::vector<std::string> protocols({StreamInfo::ProtocolStrings::get().Http10String});
+  EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
   EXPECT_CALL(stream_info, downstreamDirectRemoteAddress())
       .WillRepeatedly(ReturnPointee(&remote_address));
 
@@ -401,9 +401,9 @@ ree:
   (*stream_info.host_->cluster_.metadata_.mutable_filter_metadata())["m.cluster"].MergeFrom(
       fake_struct);
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  std::vector<std::string> protocols({StreamInfo::ProtocolStrings::get().Http10String});
+  EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
@@ -506,8 +506,8 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   request_headers.setEnvoyDownstreamServiceCluster("downstream_cluster");
   request_headers.setClientTraceId("client_trace_id");
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  std::vector<std::string> protocols({StreamInfo::ProtocolStrings::get().Http10String});
+  EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, downstreamDirectRemoteAddress())
       .WillRepeatedly(ReturnPointee(&remote_address));
@@ -563,12 +563,12 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
                                                    {"content-type", "application/grpc"}};
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}, {"grpc-message", ""}};
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   absl::optional<uint32_t> response_code(200);
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  std::vector<std::string> protocols({StreamInfo::ProtocolStrings::get().Http2String});
+  EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
   EXPECT_CALL(stream_info, downstreamDirectRemoteAddress())
       .WillRepeatedly(ReturnPointee(&remote_address));
 
@@ -615,12 +615,12 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "7"},
                                                      {"grpc-message", "permission denied"}};
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   absl::optional<uint32_t> response_code(200);
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  std::vector<std::string> protocols({StreamInfo::ProtocolStrings::get().Http2String});
+  EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
   EXPECT_CALL(stream_info, downstreamDirectRemoteAddress())
       .WillRepeatedly(ReturnPointee(&remote_address));
 
@@ -661,12 +661,12 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
                                                    {"grpc-message", "permission denied"}};
   Http::TestResponseTrailerMapImpl response_trailers;
 
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   absl::optional<uint32_t> response_code(200);
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
-  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  std::vector<std::string> protocols({StreamInfo::ProtocolStrings::get().Http2String});
+  EXPECT_CALL(stream_info, protocols()).WillRepeatedly(Return(protocols));
   EXPECT_CALL(stream_info, downstreamDirectRemoteAddress())
       .WillRepeatedly(ReturnPointee(&remote_address));
 

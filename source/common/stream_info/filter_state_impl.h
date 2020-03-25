@@ -22,12 +22,12 @@ public:
    * @param ancestor a std::shared_ptr storing an already created ancestor.
    * @param life_span the life span this is handling.
    */
-  FilterStateImpl(std::shared_ptr<FilterState> ancestor, FilterState::LifeSpan life_span)
+  FilterStateImpl(FilterStateSharedPtr ancestor, FilterState::LifeSpan life_span)
       : ancestor_(ancestor), life_span_(life_span) {
     maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 
-  using LazyCreateAncestor = std::pair<std::shared_ptr<FilterState>&, FilterState::LifeSpan>;
+  using LazyCreateAncestor = std::pair<FilterStateSharedPtr&, FilterState::LifeSpan>;
   /**
    * @param ancestor a std::pair storing an ancestor, that can be passed in as a way to lazy
    * initialize a FilterState that's owned by an object with bigger scope than this. This is to
@@ -49,7 +49,7 @@ public:
   bool hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const override;
 
   FilterState::LifeSpan lifeSpan() const override { return life_span_; }
-  std::shared_ptr<FilterState> parent() const override { return parent_; }
+  FilterStateSharedPtr parent() const override { return parent_; }
 
 private:
   // This only checks the local data_storage_ for data_name existence.
@@ -62,8 +62,8 @@ private:
     FilterState::StateType state_type_;
   };
 
-  absl::variant<std::shared_ptr<FilterState>, LazyCreateAncestor> ancestor_;
-  std::shared_ptr<FilterState> parent_;
+  absl::variant<FilterStateSharedPtr, LazyCreateAncestor> ancestor_;
+  FilterStateSharedPtr parent_;
   const FilterState::LifeSpan life_span_;
   absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>> data_storage_;
 };

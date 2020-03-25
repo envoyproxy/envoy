@@ -83,7 +83,9 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, upstreamSslConnection()).WillByDefault(Invoke([this]() {
     return upstream_connection_info_;
   }));
-  ON_CALL(*this, protocol()).WillByDefault(ReturnPointee(&protocol_));
+  ON_CALL(*this, protocols()).WillByDefault(Invoke([this]() {
+    return absl::Span<const std::string>(protocols_);
+  }));
   ON_CALL(*this, responseCode()).WillByDefault(ReturnPointee(&response_code_));
   ON_CALL(*this, responseCodeDetails()).WillByDefault(ReturnPointee(&response_code_details_));
   ON_CALL(*this, addBytesReceived(_)).WillByDefault(Invoke([this](uint64_t bytes_received) {
@@ -108,6 +110,7 @@ MockStreamInfo::MockStreamInfo()
 
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
+  ON_CALL(*this, mutableFilterState()).WillByDefault(ReturnRef(filter_state_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
   ON_CALL(Const(*this), filterState()).WillByDefault(ReturnRef(*filter_state_));
   ON_CALL(*this, upstreamFilterState()).WillByDefault(ReturnRef(upstream_filter_state_));
