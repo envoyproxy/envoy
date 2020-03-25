@@ -26,7 +26,8 @@ public:
   virtual void set(Http::RequestHeaderMap& request_headers) PURE;
 
   /**
-   * Ensure that a request is configured with a request id.
+   * Ensure that a request is configured with a request id. If request does already have an ID it is
+   * left as is.
    * @param request_headers supplies the incoming request headers for setting a request ID.
    */
   virtual void ensure(Http::RequestHeaderMap& request_headers) PURE;
@@ -37,7 +38,7 @@ public:
    * @param request_headers supplies the incoming request headers for retrieving the request ID.
    */
   virtual void setInResponse(Http::ResponseHeaderMap& response_headers,
-                                           const Http::RequestHeaderMap& request_headers) PURE;
+                             const Http::RequestHeaderMap& request_headers) PURE;
 
   /**
    * Perform a mod operation across the request id within a request and store the result in the
