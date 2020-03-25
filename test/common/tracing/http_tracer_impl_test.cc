@@ -10,8 +10,8 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
-#include "common/network/utility.h"
 #include "common/http/request_id_extension_impl.h"
+#include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 

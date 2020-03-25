@@ -17,8 +17,8 @@ envoy_cc_library(
         "http_tracer_impl.h",
     ],
     deps = [
-        "//include/envoy/local_info:local_info_interface",
         "//include/envoy/http:request_id_extension_interface",
+        "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",

@@ -24,9 +24,9 @@
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/http/request_id_extension_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"

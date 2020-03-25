@@ -7,9 +7,9 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/http/request_id_extension_impl.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "test/mocks/http/mocks.h"
@@ -50,10 +50,8 @@ public:
           return real_->setInResponse(response_headers, request_headers);
         });
     ON_CALL(*this, modBy(_, _, _))
-        .WillByDefault(
-            [this](const Http::RequestHeaderMap& request_headers, uint64_t& out, uint64_t mod) {
-              return real_->modBy(request_headers, out, mod);
-            });
+        .WillByDefault([this](const Http::RequestHeaderMap& request_headers, uint64_t& out,
+                              uint64_t mod) { return real_->modBy(request_headers, out, mod); });
     ON_CALL(*this, getTraceStatus(_))
         .WillByDefault([this](const Http::RequestHeaderMap& request_headers) {
           return real_->getTraceStatus(request_headers);

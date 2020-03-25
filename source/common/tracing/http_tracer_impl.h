@@ -4,8 +4,8 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/local_info/local_info.h"
 #include "envoy/http/request_id_extension.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"

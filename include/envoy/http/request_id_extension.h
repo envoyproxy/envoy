@@ -26,8 +26,8 @@ public:
   virtual void set(Http::RequestHeaderMap& request_headers) PURE;
 
   /**
-   * Ensure that a request is configured with a request id. If request does already have an ID it is
-   * left as is.
+   * Ensure that a request is configured with a request id. Do not override an ID if request has one
+   * already.
    * @param request_headers supplies the incoming request headers for setting a request ID.
    */
   virtual void ensure(Http::RequestHeaderMap& request_headers) PURE;
@@ -49,7 +49,7 @@ public:
    * @return true if request ID is valid and out is populated by the result.
    */
   virtual bool modBy(const Http::RequestHeaderMap& request_headers, uint64_t& out,
-                              uint64_t mod) PURE;
+                     uint64_t mod) PURE;
 
   /**
    * Get the current tracing status of a request given its headers.

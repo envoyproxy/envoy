@@ -13,8 +13,7 @@ public:
 
   void set(RequestHeaderMap& request_headers);
   void ensure(RequestHeaderMap& request_headers);
-  void setInResponse(ResponseHeaderMap& response_headers,
-                     const RequestHeaderMap& request_headers);
+  void setInResponse(ResponseHeaderMap& response_headers, const RequestHeaderMap& request_headers);
   bool modBy(const RequestHeaderMap& request_headers, uint64_t& out, uint64_t mod);
   TraceStatus getTraceStatus(const RequestHeaderMap& request_headers);
   void setTraceStatus(RequestHeaderMap& request_headers, TraceStatus status);
