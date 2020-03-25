@@ -33,7 +33,8 @@ namespace Lightstep {
 #define LIGHTSTEP_TRACER_STATS(COUNTER)                                                            \
   COUNTER(spans_sent)                                                                              \
   COUNTER(spans_dropped)                                                                           \
-  COUNTER(timer_flushed)
+  COUNTER(timer_flushed)                                                                           \
+  COUNTER(reports_skipped)
 
 struct LightstepTracerStats {
   LIGHTSTEP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
@@ -62,7 +63,7 @@ public:
                   PropagationMode propagation_mode, Grpc::Context& grpc_context);
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
-  Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
+  const std::string& cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
@@ -75,7 +76,9 @@ public:
   PropagationMode propagationMode() const override { return propagation_mode_; }
 
 private:
-  class LightStepTransporter : public lightstep::AsyncTransporter, Http::AsyncClient::Callbacks {
+  class LightStepTransporter : Logger::Loggable<Logger::Id::tracing>,
+                               public lightstep::AsyncTransporter,
+                               public Http::AsyncClient::Callbacks {
   public:
     explicit LightStepTransporter(LightStepDriver& driver);
 
@@ -95,6 +98,7 @@ private:
   private:
     std::unique_ptr<lightstep::BufferChain> active_report_;
     Callback* active_callback_ = nullptr;
+    Upstream::ClusterInfoConstSharedPtr active_cluster_;
     Http::AsyncClient::Request* active_request_ = nullptr;
     LightStepDriver& driver_;
 
@@ -129,7 +133,7 @@ private:
   };
 
   Upstream::ClusterManager& cm_;
-  Upstream::ClusterInfoConstSharedPtr cluster_;
+  std::string cluster_;
   LightstepTracerStats tracer_stats_;
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;

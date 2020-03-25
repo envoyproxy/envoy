@@ -187,6 +187,21 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
   }
 }
 
+TEST_F(LightStepDriverTest, AllowCollectorClusterToBeAddedViaApi) {
+  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  )EOF";
+  envoy::config::trace::v3::LightstepConfig lightstep_config;
+  TestUtility::loadFromYaml(yaml_string, lightstep_config);
+
+  setup(lightstep_config, true);
+}
+
 TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   setupValidDriver(2);
 
@@ -239,6 +254,30 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
                     .counter("grpc.lightstep.collector.CollectorService.Report.total")
                     .value());
   EXPECT_EQ(2U, stats_.counter("tracing.lightstep.spans_sent").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.lightstep.reports_skipped").value());
+}
+
+TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
+  setupValidDriver(1);
+
+  // Simulate removal of a cluster.
+  EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(nullptr));
+  // Verify that no report will be sent.
+  EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
+  EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
+
+  // Trigger flush of a span.
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
+  driver_->flush();
+
+  EXPECT_EQ(0U, stats_.counter("tracing.lightstep.spans_sent").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.lightstep.reports_skipped").value());
 }
 
 TEST_F(LightStepDriverTest, FlushOneFailure) {
@@ -286,6 +325,7 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
                     .counter("grpc.lightstep.collector.CollectorService.Report.total")
                     .value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_dropped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.lightstep.reports_skipped").value());
 }
 
 TEST_F(LightStepDriverTest, FlushWithActiveReport) {
@@ -327,6 +367,7 @@ TEST_F(LightStepDriverTest, FlushWithActiveReport) {
   driver_->flush();
 
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_dropped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.lightstep.reports_skipped").value());
 
   EXPECT_CALL(request, cancel());
 
@@ -375,6 +416,7 @@ TEST_F(LightStepDriverTest, OnFullWithActiveReport) {
       ->finishSpan();
 
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_dropped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.lightstep.reports_skipped").value());
 
   EXPECT_CALL(request, cancel());
 
@@ -415,6 +457,7 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
 
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.timer_flushed").value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.lightstep.reports_skipped").value());
 }
 
 TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
