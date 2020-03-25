@@ -375,6 +375,7 @@ using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
  */
 #define ALL_VIRTUAL_CLUSTER_STATS(COUNTER)                                                         \
   COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_timeout)                                                                     \
