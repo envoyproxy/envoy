@@ -254,11 +254,9 @@ void UpstreamRequest::resetStream() {
     span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
   }
 
-  if (conn_pool_) {
-    if (conn_pool_->cancelAnyPendingRequest()) {
-      ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.callbacks_);
-      ASSERT(!upstream_);
-    }
+  if (conn_pool_->cancelAnyPendingRequest()) {
+    ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.callbacks_);
+    ASSERT(!upstream_);
   }
 
   if (upstream_) {
@@ -342,7 +340,7 @@ void UpstreamRequest::onPoolReady(
     create_per_try_timeout_on_request_complete_ = true;
   }
 
-  // Now that there is an encoder, have the connection manager inform the manager when the
+  // Make sure the connection manager will inform the downstream watermark manager when the
   // downstream buffers are overrun. This may result in immediate watermark callbacks referencing
   // the encoder.
   parent_.callbacks_->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);

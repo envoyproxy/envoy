@@ -541,7 +541,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  Http::ConnectionPool::Instance* http_pool = getConnPool();
+  Http::ConnectionPool::Instance* http_pool = getHttpConnPool();
   Upstream::HostDescriptionConstSharedPtr host;
   if (http_pool) {
     host = http_pool->host();
@@ -646,7 +646,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::ConnectionPool::Instance* Filter::getConnPool() {
+Http::ConnectionPool::Instance* Filter::getHttpConnPool() {
   // Choose protocol based on cluster configuration and downstream connection
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
@@ -1431,7 +1431,7 @@ void Filter::doRetry() {
   pending_retries_--;
   UpstreamRequestPtr upstream_request;
 
-  Http::ConnectionPool::Instance* conn_pool = getConnPool();
+  Http::ConnectionPool::Instance* conn_pool = getHttpConnPool();
   if (conn_pool) {
     upstream_request =
         std::make_unique<UpstreamRequest>(*this, std::make_unique<HttpConnPool>(*conn_pool));
