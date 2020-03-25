@@ -453,8 +453,7 @@ typed_config:
 
   {
     Http::TestRequestHeaderMapImpl forced_header{{"x-request-id", random.uuid()}};
-    stream_info_.getRequestIDExtension()->setTraceStatus(forced_header,
-                                                         RequestIDExtension::TraceStatus::Forced);
+    stream_info_.getRequestIDExtension()->setTraceStatus(forced_header, Http::TraceStatus::Forced);
     EXPECT_CALL(*file_, write(_));
     log->log(&forced_header, &response_headers_, &response_trailers_, stream_info_);
   }
@@ -468,7 +467,7 @@ typed_config:
   {
     Http::TestRequestHeaderMapImpl sampled_header{{"x-request-id", random.uuid()}};
     stream_info_.getRequestIDExtension()->setTraceStatus(sampled_header,
-                                                         RequestIDExtension::TraceStatus::Sampled);
+                                                         Http::TraceStatus::Sampled);
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&sampled_header, &response_headers_, &response_trailers_, stream_info_);
   }
