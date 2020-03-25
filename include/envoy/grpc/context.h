@@ -32,7 +32,7 @@ public:
    * @return the request names, expressed as StatName.
    */
   virtual absl::optional<RequestStatNames>
-  resolveServiceAndMethod(const Http::HeaderEntry* path) PURE;
+  resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) PURE;
 
   /**
    * Charge a success/failure stat to a cluster/service/method.

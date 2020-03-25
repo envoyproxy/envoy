@@ -70,14 +70,14 @@ LightStepDriver::LightStepTransporter::~LightStepTransporter() {
 
 void LightStepDriver::LightStepTransporter::onSuccess(const Http::AsyncClient::Request&,
                                                       Http::ResponseMessagePtr&& /*response*/) {
-  driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_names_, true);
+  driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_stat_names_, true);
   active_callback_->OnSuccess(*active_report_);
   reset();
 }
 
 void LightStepDriver::LightStepTransporter::onFailure(
     const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason /*failure_reason*/) {
-  driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_names_, false);
+  driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_stat_names_, false);
   active_callback_->OnFailure(*active_report_);
   reset();
 }
@@ -159,8 +159,9 @@ LightStepDriver::LightStepDriver(const envoy::config::trace::v3::LightstepConfig
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(scope, "tracing.lightstep."))},
       tls_{tls.allocateSlot()}, runtime_{runtime}, options_{std::move(options)},
       propagation_mode_{propagation_mode}, grpc_context_(grpc_context),
-      pool_(scope.symbolTable()), request_names_{pool_.add(lightstep::CollectorServiceFullName()),
-                                                 pool_.add(lightstep::CollectorMethodName())} {
+      pool_(scope.symbolTable()), request_stat_names_{
+                                      pool_.add(lightstep::CollectorServiceFullName()),
+                                      pool_.add(lightstep::CollectorMethodName())} {
 
   Config::Utility::checkCluster(TracerNames::get().Lightstep, lightstep_config.collector_cluster(),
                                 cm_);

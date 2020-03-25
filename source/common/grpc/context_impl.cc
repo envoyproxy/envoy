@@ -115,7 +115,7 @@ void ContextImpl::chargeResponseMessageStat(const Upstream::ClusterInfo& cluster
 }
 
 absl::optional<ContextImpl::RequestStatNames>
-ContextImpl::resolveServiceAndMethod(const Http::HeaderEntry* path) {
+ContextImpl::resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) {
   absl::optional<Common::RequestNames> request_names = Common::resolveServiceAndMethod(path);
   if (!request_names) {
     return {};

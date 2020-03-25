@@ -70,20 +70,21 @@ TEST(GrpcContextTest, ResolveServiceAndMethod) {
   const Http::HeaderEntry* path = headers.Path();
   Stats::TestSymbolTable symbol_table;
   ContextImpl context(*symbol_table);
-  absl::optional<Context::RequestStatNames> request_names = context.resolveServiceAndMethod(path);
+  absl::optional<Context::RequestStatNames> request_names =
+      context.resolveDynamicServiceAndMethod(path);
   EXPECT_TRUE(request_names);
   EXPECT_EQ("service_name", symbol_table->toString(request_names->service_));
   EXPECT_EQ("method_name", symbol_table->toString(request_names->method_));
   headers.setPath("");
-  EXPECT_FALSE(context.resolveServiceAndMethod(path));
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethod(path));
   headers.setPath("/");
-  EXPECT_FALSE(context.resolveServiceAndMethod(path));
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethod(path));
   headers.setPath("//");
-  EXPECT_FALSE(context.resolveServiceAndMethod(path));
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethod(path));
   headers.setPath("/service_name");
-  EXPECT_FALSE(context.resolveServiceAndMethod(path));
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethod(path));
   headers.setPath("/service_name/");
-  EXPECT_FALSE(context.resolveServiceAndMethod(path));
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethod(path));
 }
 
 } // namespace Grpc

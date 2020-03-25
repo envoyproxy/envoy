@@ -45,7 +45,8 @@ public:
    * @return if both gRPC serve and method have been resolved successfully returns
    *   a populated RequestStatNames, otherwise returns an empty optional.
    */
-  absl::optional<RequestStatNames> resolveServiceAndMethod(const Http::HeaderEntry* path) override;
+  absl::optional<RequestStatNames>
+  resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) override;
 
   Stats::StatName successStatName(bool success) const { return success ? success_ : failure_; }
   Stats::StatName protocolStatName(Protocol protocol) const {

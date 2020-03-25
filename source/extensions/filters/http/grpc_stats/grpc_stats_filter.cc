@@ -131,7 +131,7 @@ public:
       if (cluster_) {
         if (config_->stats_for_all_methods_) {
           // Get dynamically-allocated Context::RequestStatNames from the context.
-          request_names_ = config_->context_.resolveServiceAndMethod(headers.Path());
+          request_names_ = config_->context_.resolveDynamicServiceAndMethod(headers.Path());
           do_stat_tracking_ = request_names_.has_value();
         } else {
           // This case handles both proto_config.stats_for_all_methods() == false,
