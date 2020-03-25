@@ -160,19 +160,18 @@ message HttpConnectionManager {
 
     // Configuration for an external tracing provider.
     // If not specified, Envoy will fall back to using tracing provider configuration
-    // from the bootstrap config.
+    // from the bootstrap config (for short-term backwards compatibility).
+    //
+    // The advantage of using this field over relying on the bootstrap config is that now
+    // tracing provider configuration can be completely dynamic and get delivered over xDS.
     //
     // .. attention::
-    //   Please be aware that *envoy.tracers.opencensus* provider behaves differently than the
-    //   others.
-    //   By design, OpenCensus only supports a single tracing configuration per entire process;
-    //   most parts of that configuration cannot be updated or reset.
-    //   If you try to give a unique *envoy.tracers.opencensus* configuration to multiple filters,
-    //   the end result will be different from what you naturally expect.
-    //   Having said that, if your intent is to have exactly the same OpenCensus configuration
-    //   throughout the entire lifecycle of Envoy process, you can still benefit from defining that
-    //   configuration in here and get it delivered via xDS rather than put it into bootstrap
-    //   config.
+    //   Please be aware that *envoy.tracers.opencensus* provider can only be configured once
+    //   in Envoy lifetime.
+    //   Any attempts to reconfigure it or to use different configurations for different HCM filters
+    //   will be rejected.
+    //   Such a constraint is inherent to OpenCensus itself. It cannot be overcome without changes
+    //   on OpenCensus side.
     trace.v2.Tracing.Http provider = 9;
   }
 

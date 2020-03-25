@@ -92,6 +92,9 @@ Deprecated items below are listed in chronological order.
   been deprecated in favor of `compressor`.
 * The statistics counter `header_gzip` in :ref:`HTTP Gzip filter <config_http_filters_gzip>`
   has been deprecated in favor of `header_compressor_used`.
+* Tracing provider configuration as part of :ref:`bootstrap config <envoy_api_field_config.bootstrap.v2.Bootstrap.tracing>`
+  has been deprecated in favor of configuration as part of :ref:`HTTP connection manager
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing.provider>`.
 
 1.13.0 (January 20, 2020)
 =========================
