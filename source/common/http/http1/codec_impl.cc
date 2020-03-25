@@ -65,9 +65,9 @@ const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
-    : connection_(connection), chunk_encoding_(true), processing_100_continue_(false),
-      is_response_to_head_request_(false), is_content_length_allowed_(true),
-      header_key_formatter_(header_key_formatter) {
+    : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
+      processing_100_continue_(false), is_response_to_head_request_(false),
+      is_content_length_allowed_(true), header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -138,14 +138,14 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
   // response. Upper layers generally should strip transfer-encoding since it only applies to
   // HTTP/1.1. The codec will infer it based on the type of response.
   // for streaming (e.g. SSE stream sent to hystrix dashboard), we do not want
-  // chunk transfer encoding but we don't have a content-length so we pass "envoy only"
-  // header to avoid adding chunks
+  // chunk transfer encoding but we don't have a content-length so disable_chunk_encoding_ is
+  // consulted before enabling chunk encoding.
   //
   // Note that for HEAD requests Envoy does best-effort guessing when there is no
   // content-length. If a client makes a HEAD request for an upstream resource
   // with no bytes but the upstream response doesn't include "Content-length: 0",
   // Envoy will incorrectly assume a subsequent response to GET will be chunk encoded.
-  if (saw_content_length || headers.NoChunks()) {
+  if (saw_content_length || disable_chunk_encoding_) {
     chunk_encoding_ = false;
   } else {
     if (processing_100_continue_) {
