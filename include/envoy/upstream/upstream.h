@@ -579,6 +579,7 @@ public:
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_rx_reset)                                                                    \
   COUNTER(upstream_rq_timeout)                                                                     \
+  COUNTER(upstream_rq_max_duration_reached)                                                        \
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \
   GAUGE(lb_subsets_active, Accumulate)                                                             \
@@ -697,6 +698,11 @@ public:
    * @return the connect timeout for upstream hosts that belong to this cluster.
    */
   virtual std::chrono::milliseconds connectTimeout() const PURE;
+
+  /**
+   * @return maximum duration time to keep alive stream
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
 
   /**
    * @return the idle timeout for upstream connection pool connections.

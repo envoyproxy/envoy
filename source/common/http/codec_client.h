@@ -120,6 +120,8 @@ public:
 
   const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
 
+  Event::Dispatcher& dispatcher_;
+
 protected:
   /**
    * Create a codec client and connect to a remote host/port.
@@ -188,7 +190,14 @@ private:
                          public StreamCallbacks,
                          public ResponseDecoderWrapper {
     ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
-        : ResponseDecoderWrapper(inner), parent_(parent) {}
+        : ResponseDecoderWrapper(inner), parent_(parent),
+          max_stream_duration_(parent_.host_->cluster().maxStreamDuration()) {
+      if (max_stream_duration_.has_value()) {
+        max_stream_duration_timer_ =
+            parent.dispatcher_.createTimer([this]() -> void { onStreamMaxDurationReached(); });
+        max_stream_duration_timer_->enableTimer(max_stream_duration_.value());
+      }
+    }
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason, absl::string_view) override {
@@ -201,8 +210,17 @@ private:
     void onPreDecodeComplete() override { parent_.responseDecodeComplete(*this); }
     void onDecodeComplete() override {}
 
+    void onStreamMaxDurationReached() {
+      parent_.host_->cluster().stats().upstream_rq_max_duration_reached_.inc();
+      max_stream_duration_timer_->disableTimer();
+      max_stream_duration_timer_.reset();
+      onResetStream(StreamResetReason::ConnectionTermination, "");
+    }
+
     RequestEncoder* encoder_{};
     CodecClient& parent_;
+    Event::TimerPtr max_stream_duration_timer_;
+    const absl::optional<std::chrono::milliseconds> max_stream_duration_;
   };
 
   using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;

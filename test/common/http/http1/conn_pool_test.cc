@@ -64,6 +64,7 @@ public:
     Network::MockClientConnection* connection_;
     CodecClient* codec_client_;
     Event::MockTimer* connect_timer_;
+    Event::MockTimer* max_stream_duration_timer_;
     Event::DispatcherPtr client_dispatcher_;
   };
 

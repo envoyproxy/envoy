@@ -527,6 +527,9 @@ public:
     return common_lb_config_;
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+    return max_stream_duration_;
+  }
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return idle_timeout_;
   }
@@ -614,6 +617,7 @@ private:
   const uint64_t max_requests_per_connection_;
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
+  const absl::optional<std::chrono::milliseconds> max_stream_duration_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;

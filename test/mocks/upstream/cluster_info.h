@@ -85,6 +85,7 @@ public:
   // Upstream::ClusterInfo
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
   MOCK_METHOD(uint64_t, features, (), (const));
@@ -158,12 +159,19 @@ public:
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
+  absl::optional<std::chrono::milliseconds> max_stream_duration_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
 public:
   MockIdleTimeEnabledClusterInfo();
   ~MockIdleTimeEnabledClusterInfo() override;
+};
+
+class MockMaxStreamDurationEnabledClusterInfo : public MockClusterInfo {
+public:
+  MockMaxStreamDurationEnabledClusterInfo();
+  ~MockMaxStreamDurationEnabledClusterInfo() override;
 };
 
 } // namespace Upstream
