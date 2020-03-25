@@ -119,7 +119,7 @@ public:
     client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
     EXPECT_CALL(request_callbacks_,
                 onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
-    client_->onSuccess(std::move(check_response));
+    client_->onSuccess(async_request_, std::move(check_response));
 
     return message_ptr;
   }
@@ -300,7 +300,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   EXPECT_CALL(*child_span, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
   EXPECT_CALL(*child_span, setTag(Eq("ext_authz_http_status"), Eq("OK")));
   EXPECT_CALL(*child_span, finishSpan());
-  client_->onSuccess(std::move(check_response));
+  client_->onSuccess(async_request_, std::move(check_response));
 }
 
 // Verify client response headers when authorization_headers_to_add is configured.
@@ -329,7 +329,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   EXPECT_CALL(*child_span, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
   EXPECT_CALL(*child_span, setTag(Eq("ext_authz_http_status"), Eq("OK")));
   EXPECT_CALL(*child_span, finishSpan());
-  client_->onSuccess(std::move(check_response));
+  client_->onSuccess(async_request_, std::move(check_response));
 }
 
 // Verify client response headers when allow_upstream_headers is configured.
@@ -363,7 +363,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   EXPECT_CALL(*child_span, setTag(Eq("ext_authz_http_status"), Eq("OK")));
   EXPECT_CALL(*child_span, finishSpan());
   auto message_response = TestCommon::makeMessageResponse(check_response_headers);
-  client_->onSuccess(std::move(message_response));
+  client_->onSuccess(async_request_, std::move(message_response));
 }
 
 // Test the client when a denied response is received.
@@ -385,7 +385,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   EXPECT_CALL(*child_span, finishSpan());
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
-  client_->onSuccess(TestCommon::makeMessageResponse(expected_headers));
+  client_->onSuccess(async_request_, TestCommon::makeMessageResponse(expected_headers));
 }
 
 // Verify client response headers and body when the authorization server denies the request.
@@ -410,7 +410,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
   EXPECT_CALL(*child_span, finishSpan());
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
-  client_->onSuccess(TestCommon::makeMessageResponse(expected_headers, expected_body));
+  client_->onSuccess(async_request_,
+                     TestCommon::makeMessageResponse(expected_headers, expected_body));
 }
 
 // Verify client response headers when the authorization server denies the request and
@@ -439,7 +440,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
                                                                          {"x-foo", "bar", false},
                                                                          {":status", "401", false},
                                                                          {"foo", "bar", false}});
-  client_->onSuccess(TestCommon::makeMessageResponse(check_response_headers, expected_body));
+  client_->onSuccess(async_request_,
+                     TestCommon::makeMessageResponse(check_response_headers, expected_body));
 }
 
 // Test the client when an unknown error occurs.
@@ -458,7 +460,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, finishSpan());
-  client_->onFailure(Http::AsyncClient::FailureReason::Reset);
+  client_->onFailure(async_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
 // Test the client when a call to authorization server returns a 5xx error status.
@@ -479,7 +481,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   EXPECT_CALL(*child_span, setTag(Eq("ext_authz_http_status"), Eq("Service Unavailable")));
   EXPECT_CALL(*child_span, finishSpan());
-  client_->onSuccess(std::move(check_response));
+  client_->onSuccess(async_request_, std::move(check_response));
 }
 
 // Test the client when a call to authorization server returns a status code that cannot be
@@ -501,7 +503,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestErrorParsingStatusCode) {
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, finishSpan());
-  client_->onSuccess(std::move(check_response));
+  client_->onSuccess(async_request_, std::move(check_response));
 }
 
 // Test the client when the request is canceled.

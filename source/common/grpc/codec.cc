@@ -22,6 +22,14 @@ void Encoder::newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& o
   output[4] = static_cast<uint8_t>(length);
 }
 
+void Encoder::prependFrameHeader(uint8_t flags, Buffer::Instance& buffer) {
+  // Compute the size of the payload and construct the length prefix.
+  std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
+  Grpc::Encoder().newFrame(flags, buffer.length(), frame);
+  Buffer::OwnedImpl frame_buffer(frame.data(), frame.size());
+  buffer.prepend(frame_buffer);
+}
+
 bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
   decoding_error_ = false;
   output_ = &output;
@@ -59,11 +67,8 @@ void Decoder::frameDataEnd() {
 }
 
 uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
-  uint64_t count = data.getRawSlices(nullptr, 0);
-  absl::FixedArray<Buffer::RawSlice> slices(count);
-  data.getRawSlices(slices.begin(), count);
   uint64_t delta = 0;
-  for (const Buffer::RawSlice& slice : slices) {
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     uint8_t* mem = reinterpret_cast<uint8_t*>(slice.mem_);
     for (uint64_t j = 0; j < slice.len_;) {
       uint8_t c = *mem;

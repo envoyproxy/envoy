@@ -5,10 +5,12 @@ package envoy.config.grpc_credential.v2alpha;
 import "envoy/api/v2/core/base.proto";
 
 import "udpa/annotations/sensitive.proto";
+import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.config.grpc_credential.v2alpha";
 option java_outer_classname = "FileBasedMetadataProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Grpc Credentials File Based Metadata]
 // Configuration for File Based Metadata Grpc Credentials Plugin

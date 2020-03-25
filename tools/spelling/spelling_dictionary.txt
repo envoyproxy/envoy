@@ -385,6 +385,8 @@ backgrounded
 backoff
 backpressure
 backticks
+backtraces
+backtracing
 balancer
 balancers
 barbaz
@@ -622,6 +624,7 @@ hermeticity
 highp
 hoc
 hostname
+hostnames
 hostset
 hrefs
 huffman
