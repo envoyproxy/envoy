@@ -187,7 +187,7 @@ using os_fd_t = int;
 #endif
 
 // Note: chromium disabled recvmmsg regardless of ndk version. However, the only Android target
-// currently actively using Envoy is Envoy Mobile, where recvmmsg is not actively disbled. In fact,
+// currently actively using Envoy is Envoy Mobile, where recvmmsg is not actively disabled. In fact,
 // defining mmsghdr here caused a conflicting definition with the ndk's definition of the struct
 // (https://github.com/lyft/envoy-mobile/pull/772/checks?check_run_id=534152886#step:4:64).
 // Therefore, we decided to remove the Android check introduced here in
