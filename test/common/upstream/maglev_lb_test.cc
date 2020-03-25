@@ -81,6 +81,44 @@ TEST_F(MaglevLoadBalancerTest, Basic) {
   }
 }
 
+// Basic with hostname.
+TEST_F(MaglevLoadBalancerTest, BasicWithHostName) {
+  host_set_.hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHost(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHost(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHost(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHost(info_, "95", "tcp://127.0.0.1:95")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  common_config_ = envoy::config::cluster::v3::Cluster::CommonLbConfig();
+  auto chc = envoy::config::cluster::v3::Cluster::CommonLbConfig::ConsistentHashingLbConfig();
+  chc.set_use_hostname_for_hashing(true);
+  common_config_.set_allocated_consistent_hashing_lb_config(&chc);
+  init(7);
+  common_config_.release_consistent_hashing_lb_config();
+
+  EXPECT_EQ("maglev_lb.min_entries_per_host", lb_->stats().min_entries_per_host_.name());
+  EXPECT_EQ("maglev_lb.max_entries_per_host", lb_->stats().max_entries_per_host_.name());
+  EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(2, lb_->stats().max_entries_per_host_.value());
+
+  // maglev: i=0 host=92
+  // maglev: i=1 host=95
+  // maglev: i=2 host=90
+  // maglev: i=3 host=93
+  // maglev: i=4 host=94
+  // maglev: i=5 host=91
+  // maglev: i=6 host=90
+  LoadBalancerPtr lb = lb_->factory()->create();
+  const std::vector<uint32_t> expected_assignments{2, 5, 0, 3, 4, 1, 0};
+  for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
+    TestLoadBalancerContext context(i);
+    EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
+              lb->chooseHost(&context));
+  }
+}
+
 // Weighted sanity test.
 TEST_F(MaglevLoadBalancerTest, Weighted) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
