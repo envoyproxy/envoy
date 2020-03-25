@@ -171,14 +171,15 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
 
+  Buffer::OwnedImpl expected_data("Hello World");
   if (enable_trailers) {
-    EXPECT_CALL(decoder, decodeData(_, false));
+    // Verify that body data is delivered before trailers.
+    EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
     EXPECT_CALL(decoder, decodeTrailers_);
   } else {
-    EXPECT_CALL(decoder, decodeData(_, false));
+    EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
     EXPECT_CALL(decoder, decodeData(_, true));
   }
-
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
                            "6\r\nHello \r\n"
                            "5\r\nWorld\r\n"
@@ -359,17 +360,20 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodySplitOverTwoDispatches) {
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   Buffer::OwnedImpl expected_data1("Hello Worl");
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data1), false));
-  Buffer::OwnedImpl expected_data2("d");
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), false));
-  EXPECT_CALL(decoder, decodeData(_, true));
 
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
                            "6\r\nHello \r\n"
                            "5\r\nWorl");
-  Buffer::OwnedImpl buffer2("d\r\n"
-                            "0\r\n\r\n");
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
+
+  // Process the rest of the body and final chunk.
+  Buffer::OwnedImpl expected_data2("d");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), false));
+  EXPECT_CALL(decoder, decodeData(_, true));
+
+  Buffer::OwnedImpl buffer2("d\r\n"
+                            "0\r\n\r\n");
   codec_->dispatch(buffer2);
   EXPECT_EQ(0U, buffer2.length());
 }
@@ -427,6 +431,8 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodyCase) {
   EXPECT_EQ(0U, buffer.length());
 }
 
+// Verify that body dispatch does not happen after detecting a parse error processing a chunk
+// header.
 TEST_F(Http1ServerConnectionImplTest, InvalidChunkHeader) {
   initialize();
 

@@ -396,6 +396,10 @@ http_parser_settings ConnectionImpl::settings_{
       return 0;
     },
     [](http_parser* parser) -> int {
+      // A 0-byte chunk header is used to signal the end of the chunked body.
+      // When this function is called, http-parser holds the size of the chunk in
+      // parser->content_length. See
+      // https://github.com/nodejs/http-parser/blob/v2.9.3/http_parser.h#L336
       const bool is_final_chunk = (parser->content_length == 0);
       static_cast<ConnectionImpl*>(parser->data)->onChunkHeader(is_final_chunk);
       return 0;
@@ -476,6 +480,9 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
     for (const Buffer::RawSlice& slice : data.getRawSlices()) {
       total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
       if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK) {
+        // Parse errors trigger an exception in dispatchSlice so we are guaranteed to be paused at
+        // this point.
+        ASSERT(HTTP_PARSER_ERRNO(&parser_) == HPE_PAUSED);
         break;
       }
     }
