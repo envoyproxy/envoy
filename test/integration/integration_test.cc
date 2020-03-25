@@ -8,6 +8,7 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -1219,8 +1220,14 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::move(response_headers));
 
-  // Set up a raw connection to easily send requests without reading responses.
-  Network::ClientConnectionPtr raw_connection = makeClientConnection(lookupPort("http"));
+  // Set up a raw connection to easily send requests without reading responses. Also, set a small
+  // TCP receive buffer to speed up connection backup while proxying the response flood.
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
+  Network::ClientConnectionPtr raw_connection =
+      makeClientConnectionWithOptions(lookupPort("http"), options);
   raw_connection->connect();
 
   // Read disable so responses will queue up.
