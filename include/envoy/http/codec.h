@@ -27,6 +27,23 @@ const char MaxResponseHeadersCountOverrideKey[] =
 class Stream;
 
 /**
+ * Stream encoder options specific to HTTP/1.
+ */
+class Http1StreamEncoderOptions {
+public:
+  virtual ~Http1StreamEncoderOptions() = default;
+
+  /**
+   * Force disable chunk encoding, even if there is no known content length. This effectively forces
+   * HTTP/1.0 behavior in which the connection will need to be closed to indicate end of stream.
+   */
+  virtual void disableChunkEncoding() PURE;
+};
+
+using Http1StreamEncoderOptionsOptRef =
+    absl::optional<std::reference_wrapper<Http1StreamEncoderOptions>>;
+
+/**
  * Encodes an HTTP stream. This interface contains methods common to both the request and response
  * path.
  * TODO(mattklein123): Consider removing the StreamEncoder interface entirely and just duplicating
@@ -53,6 +70,12 @@ public:
    * @param metadata_map_vector is the vector of metadata maps to encode.
    */
   virtual void encodeMetadata(const MetadataMapVector& metadata_map_vector) PURE;
+
+  /**
+   * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
+   * absl::nullopt.
+   */
+  virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 };
 
 /**

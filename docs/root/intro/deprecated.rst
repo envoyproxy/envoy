@@ -92,6 +92,8 @@ Deprecated items below are listed in chronological order.
   been deprecated in favor of `compressor`.
 * The statistics counter `header_gzip` in :ref:`HTTP Gzip filter <config_http_filters_gzip>`
   has been deprecated in favor of `header_compressor_used`.
+* Support for the undocumented HTTP/1.1 `:no-chunks` pseudo-header has been removed. If an extension
+  was using this it can achieve the same behavior via the new `http1StreamEncoderOptions()` API.
 
 1.13.0 (January 20, 2020)
 =========================

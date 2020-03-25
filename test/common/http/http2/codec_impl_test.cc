@@ -262,6 +262,7 @@ protected:
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
   initialize();
+  EXPECT_EQ(absl::nullopt, request_encoder_->http1StreamEncoderOptions());
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);

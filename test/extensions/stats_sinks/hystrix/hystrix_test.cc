@@ -39,7 +39,7 @@ public:
 
     // Set gauge value.
     membership_total_gauge_.name_ = "membership_total";
-    ON_CALL(cluster_stats_scope_, gauge("membership_total", Stats::Gauge::ImportMode::Accumulate))
+    ON_CALL(cluster_stats_scope_, gauge("membership_total", Stats::Gauge::ImportMode::NeverImport))
         .WillByDefault(ReturnRef(membership_total_gauge_));
     ON_CALL(membership_total_gauge_, value()).WillByDefault(Return(5));
 
@@ -513,10 +513,14 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
 
   auto addr_instance_ = Envoy::Network::Utility::parseInternetAddress("2.3.4.5", 123, false);
 
+  Http::MockHttp1StreamEncoderOptions stream_encoder_options;
   ON_CALL(admin_stream_mock, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(callbacks_));
+  ON_CALL(admin_stream_mock, http1StreamEncoderOptions())
+      .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options)));
   ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_mock));
   ON_CALL(connection_mock, remoteAddress()).WillByDefault(ReturnRef(addr_instance_));
 
+  EXPECT_CALL(stream_encoder_options, disableChunkEncoding());
   ASSERT_EQ(
       sink_->handlerHystrixEventStream(path_and_query, response_headers, buffer, admin_stream_mock),
       Http::Code::OK);

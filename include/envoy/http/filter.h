@@ -676,6 +676,12 @@ public:
    * @return the buffer limit the filter should apply.
    */
   virtual uint32_t encoderBufferLimit() PURE;
+
+  /**
+   * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
+   * absl::nullopt.
+   */
+  virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 };
 
 /**
