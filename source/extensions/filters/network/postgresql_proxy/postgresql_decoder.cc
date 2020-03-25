@@ -2,8 +2,6 @@
 
 #include <vector>
 
-#include "extensions/filters/network/postgresql_proxy/postgresql_utils.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -14,10 +12,10 @@ void DecoderImpl::initialize() {
   first_ = Message{"Startup", {}};
 
   // Frontend messages
-  std::get<0>(FEmessages_) = "Frontend";
+  std::get<0>(FE_messages_) = "Frontend";
 
   // Setup handlers for known messages
-  absl::flat_hash_map<char, Message>& FE_known_msgs = std::get<1>(FEmessages_);
+  absl::flat_hash_map<char, Message>& FE_known_msgs = std::get<1>(FE_messages_);
 
   // Handler for know messages
   FE_known_msgs['B'] = Message{"Bind", {}};
@@ -36,13 +34,13 @@ void DecoderImpl::initialize() {
   FE_known_msgs['X'] = Message{"Terminate", {&DecoderImpl::decodeFrontendTerminate}};
 
   // Handler for unknown messages
-  std::get<2>(FEmessages_) = Message{"Other", {&DecoderImpl::incUnknown}};
+  std::get<2>(FE_messages_) = Message{"Other", {&DecoderImpl::incUnknown}};
 
   // Backend messages
-  std::get<0>(BEmessages_) = "Backend";
+  std::get<0>(BE_messages_) = "Backend";
 
   // Setup handlers for known messages
-  absl::flat_hash_map<char, Message>& BE_known_msgs = std::get<1>(BEmessages_);
+  absl::flat_hash_map<char, Message>& BE_known_msgs = std::get<1>(BE_messages_);
 
   // Handler for know messages
   BE_known_msgs['R'] = Message{"Authentication", {&DecoderImpl::decodeAuthentication}};
@@ -70,7 +68,7 @@ void DecoderImpl::initialize() {
   BE_known_msgs['T'] = Message{"RowDescription", {}};
 
   // Handler for unknown messages
-  std::get<2>(BEmessages_) = Message{"Other", {&DecoderImpl::incUnknown}};
+  std::get<2>(BE_messages_) = Message{"Other", {&DecoderImpl::incUnknown}};
 
   // Setup hash map for handling backend statements.
   BE_statements_["BEGIN"] = [this](DecoderImpl*) -> void {
@@ -117,14 +115,12 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   }
 
   if (!startup_) {
-    char com;
-    data.copyOut(0, 1, &com);
-    ENVOY_LOG(trace, "postgresql_proxy: command is {}", com);
+    data.copyOut(0, 1, &command_);
+    ENVOY_LOG(trace, "postgresql_proxy: command is {}", command_);
   }
 
   // The 1 byte message type and message length should be in the buffer
   // Check if the entire message has been read.
-  std::string cmd;
   std::string message;
   uint32_t length;
   data.copyOut(startup_ ? 0 : 1, 4, &length);
@@ -138,14 +134,11 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
 
   setMessageLength(length);
 
-  if (!startup_) {
-    BufferHelper::readStringBySize(data, 1, cmd);
-    command_ = cmd[0];
-  }
+  data.drain(startup_ ? 4 : 5); // length plus optional 1st byte
 
-  data.drain(4); // this is length which we already know.
-
-  BufferHelper::readStringBySize(data, length - 4, message);
+  auto bytesToRead = length - 4;
+  message.assign(std::string(static_cast<char*>(data.linearize(bytesToRead)), bytesToRead));
+  data.drain(bytesToRead);
   setMessage(message);
 
   ENVOY_LOG(trace, "postgresql_proxy: msg parsed");
@@ -160,7 +153,7 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   }
 
   std::tuple<std::string, absl::flat_hash_map<char, Message>, Message>& msg_processor =
-      std::ref(frontend ? FEmessages_ : BEmessages_);
+      std::ref(frontend ? FE_messages_ : BE_messages_);
   frontend ? callbacks_->incFrontend() : callbacks_->incBackend();
 
   std::reference_wrapper<Message> msg = std::get<2>(msg_processor);
@@ -180,10 +173,10 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
     action(this);
   }
 
-  ENVOY_LOG(debug, "{} command = {} ({})", std::get<0>(msg_processor), command_,
+  ENVOY_LOG(debug, "({}) command = {} ({})", std::get<0>(msg_processor), command_,
             std::get<0>(msg.get()));
-  ENVOY_LOG(debug, "{} length = {}", std::get<0>(msg_processor), getMessageLength());
-  ENVOY_LOG(debug, "{} message = {}", std::get<0>(msg_processor), getMessage());
+  ENVOY_LOG(debug, "({}) length = {}", std::get<0>(msg_processor), getMessageLength());
+  ENVOY_LOG(debug, "({}) message = {}", std::get<0>(msg_processor), getMessage());
 
   ENVOY_LOG(trace, "postgresql_proxy: {} bytes remaining in buffer", data.length());
 

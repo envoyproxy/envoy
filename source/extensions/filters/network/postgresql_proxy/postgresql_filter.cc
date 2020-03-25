@@ -4,7 +4,6 @@
 #include "envoy/network/connection.h"
 
 #include "extensions/filters/network/postgresql_proxy/postgresql_decoder.h"
-#include "extensions/filters/network/postgresql_proxy/postgresql_utils.h"
 
 namespace Envoy {
 namespace Extensions {

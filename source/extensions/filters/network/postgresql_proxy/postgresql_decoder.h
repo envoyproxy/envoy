@@ -106,8 +106,8 @@ protected:
   // field 0 - string describing direction (Frontend or Backend)
   // field 1 - hash map indexed by messages'1 1st byte points to data used for processing messages
   // field 2 - data used for processing messages not found in hash map
-  std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> FEmessages_;
-  std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> BEmessages_;
+  std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> FE_messages_;
+  std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> BE_messages_;
   //
   // Handler for startup postgresql message.
   // Startup message message which does not start with 1 byte TYPE.

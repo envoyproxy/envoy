@@ -23,13 +23,11 @@ envoy_cc_library(
     srcs = [
         "postgresql_decoder.cc",
         "postgresql_filter.cc",
-        "postgresql_utils.cc",
     ],
     hdrs = [
         "postgresql_decoder.h",
         "postgresql_filter.h",
         "postgresql_session.h",
-        "postgresql_utils.h",
     ],
     repository = "@envoy",
     deps = [
