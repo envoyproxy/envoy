@@ -3,6 +3,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/config/datasource.h"
+
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/direct_response/filter.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -23,9 +25,10 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::direct_response::v3::Config& config,
-      Server::Configuration::FactoryContext&) override {
-    return [config](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<DirectResponseFilter>(config.response()));
+      Server::Configuration::FactoryContext& context) override {
+    return [config, &context](Network::FilterManager& filter_manager) -> void {
+      auto content = Config::DataSource::read(config.response(), true, context.api());
+      filter_manager.addReadFilter(std::make_shared<DirectResponseFilter>(content));
     };
   }
 

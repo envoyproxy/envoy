@@ -29,11 +29,14 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::DoAll;
 using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
+using testing::WithArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -111,14 +114,14 @@ public:
     Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
         Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "202"}}}));
 
-    callback->onSuccess(std::move(msg));
+    callback->onSuccess(request, std::move(msg));
 
     EXPECT_EQ(2U, stats_.counter("tracing.zipkin.spans_sent").value());
     EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_sent").value());
     EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
     EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
 
-    callback->onFailure(Http::AsyncClient::FailureReason::Reset);
+    callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
 
     EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_failed").value());
   }
@@ -236,12 +239,72 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "404"}}}));
 
   // AsyncClient can fail with valid HTTP headers
-  callback->onSuccess(std::move(msg));
+  callback->onSuccess(request, std::move(msg));
 
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_dropped").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
+}
+
+TEST_F(ZipkinDriverTest, CancelInflightRequestsOnDestruction) {
+  setupValidDriver("HTTP_JSON_V1");
+
+  StrictMock<Http::MockAsyncClientRequest> request1(&cm_.async_client_),
+      request2(&cm_.async_client_), request3(&cm_.async_client_), request4(&cm_.async_client_);
+  Http::AsyncClient::Callbacks* callback{};
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+
+  // Expect 4 separate report requests to be made.
+  EXPECT_CALL(cm_.async_client_,
+              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
+      .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request1)))
+      .WillOnce(Return(&request2))
+      .WillOnce(Return(&request3))
+      .WillOnce(Return(&request4));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
+      .Times(4)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
+      .Times(4)
+      .WillRepeatedly(Return(5000U));
+
+  // Trigger 1st report request.
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
+  // Trigger 2nd report request.
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
+  // Trigger 3rd report request.
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
+  // Trigger 4th report request.
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
+
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "404"}}}));
+
+  // Simulate completion of the 2nd report request.
+  callback->onSuccess(request2, std::move(msg));
+
+  // Simulate failure of the 3rd report request.
+  callback->onFailure(request3, Http::AsyncClient::FailureReason::Reset);
+
+  // Expect 1st and 4th requests to be cancelled on destruction.
+  EXPECT_CALL(request1, cancel());
+  EXPECT_CALL(request4, cancel());
+
+  // Trigger destruction.
+  driver_.reset();
 }
 
 TEST_F(ZipkinDriverTest, FlushSpansTimer) {

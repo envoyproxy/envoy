@@ -9,6 +9,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/http/async_client_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
@@ -107,8 +108,8 @@ public:
   TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver, Event::Dispatcher& dispatcher);
 
   // Http::AsyncClient::Callbacks.
-  void onSuccess(Http::ResponseMessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason) override;
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
 
 private:
   /**
@@ -127,6 +128,9 @@ private:
   TraceEncoderSharedPtr encoder_;
 
   std::map<std::string, Http::LowerCaseString> lower_case_headers_;
+
+  // Track active HTTP requests to be able to cancel them on destruction.
+  Http::AsyncClientRequestTracker active_requests_;
 };
 } // namespace Datadog
 } // namespace Tracers

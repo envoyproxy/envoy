@@ -11,6 +11,7 @@
 
 #include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
@@ -175,6 +176,12 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     absl::string_view sni_name = "stubserver.org";
     stream_info.setRequestedServerName(sni_name);
     EXPECT_EQ(std::string(sni_name), stream_info.requestedServerName());
+
+    EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
+    Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
+    stream_info.setUpstreamClusterInfo(cluster_info);
+    EXPECT_NE(absl::nullopt, stream_info.upstreamClusterInfo());
+    EXPECT_EQ("fake_cluster", stream_info.upstreamClusterInfo().value()->name());
   }
 }
 
