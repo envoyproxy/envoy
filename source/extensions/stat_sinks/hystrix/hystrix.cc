@@ -304,7 +304,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   //       See: https://github.com/envoyproxy/envoy/issues/9749
   if (Http::Utility::getProtocol(stream_decoder_filter_callbacks.streamInfo().protocols()) <
       Http::Protocol::Http2) {
-    response_headers.setNoChunks(0);
+    admin_stream.http1StreamEncoderOptions().value().get().disableChunkEncoding();
   }
 
   registerConnection(&stream_decoder_filter_callbacks);
@@ -382,7 +382,7 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
         *cluster_stats_cache_ptr, cluster_info->name(),
         cluster_info->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().max(),
         cluster_info->statsScope()
-            .gaugeFromStatName(membership_total_, Stats::Gauge::ImportMode::Accumulate)
+            .gaugeFromStatName(membership_total_, Stats::Gauge::ImportMode::NeverImport)
             .value(),
         server_.statsFlushInterval(), time_histograms[cluster_info->name()], ss);
   }

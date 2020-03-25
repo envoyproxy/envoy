@@ -14,7 +14,7 @@ namespace Common {
 template <class ConfigProto> class FactoryBase : public Server::Configuration::TracerFactory {
 public:
   // Server::Configuration::TracerFactory
-  Tracing::HttpTracerPtr
+  Tracing::HttpTracerSharedPtr
   createHttpTracer(const Protobuf::Message& config,
                    Server::Configuration::TracerFactoryContext& context) override {
     return createHttpTracerTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
@@ -32,7 +32,7 @@ protected:
   FactoryBase(const std::string& name) : name_(name) {}
 
 private:
-  virtual Tracing::HttpTracerPtr
+  virtual Tracing::HttpTracerSharedPtr
   createHttpTracerTyped(const ConfigProto& proto_config,
                         Server::Configuration::TracerFactoryContext& context) PURE;
 
