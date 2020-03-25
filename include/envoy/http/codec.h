@@ -338,6 +338,8 @@ public:
   /**
    * Dispatch incoming connection data.
    * @param data supplies the data to dispatch. The codec will drain as many bytes as it processes.
+   * @return absl::Status indicating the status of the codec. Holds any errors found in the
+   * callbacks.
    */
   virtual absl::Status dispatch(Buffer::Instance& data) PURE;
 

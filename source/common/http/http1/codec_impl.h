@@ -234,7 +234,7 @@ private:
   /**
    * Called in order to complete an in progress header decode.
    */
-  int completeLastHeader();
+  absl::Status completeLastHeader();
 
   /**
    * Dispatch a memory span.
@@ -262,7 +262,7 @@ private:
    * @param data supplies the start address.
    * @param length supplies the length.
    */
-  int onHeaderField(const char* data, size_t length);
+  absl::Status onHeaderField(const char* data, size_t length);
 
   /**
    * Called when header value data is received.
@@ -277,8 +277,8 @@ private:
    * trailers are signaled via onMessageCompleteBase().
    * @return 0 if no error, 1 if there should be no body.
    */
-  int onHeadersCompleteBase();
-  virtual int onHeadersComplete() PURE;
+  absl::Status onHeadersCompleteBase();
+  virtual absl::Status onHeadersComplete() PURE;
 
   /**
    * Called when body data is received.
@@ -290,7 +290,7 @@ private:
   /**
    * Called when the request/response is complete.
    */
-  int onMessageCompleteBase();
+  absl::Status onMessageCompleteBase();
   virtual void onMessageComplete() PURE;
 
   /**
@@ -320,7 +320,7 @@ private:
   bool dispatching_{false};
   // Codec errors found in callbacks are overridden within the http_parser library. This holds those
   // errors to propogate them through to dispatch() where we can handle the error.
-  absl::Status codec_exception_;
+  absl::Status codec_status_;
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
   HeaderString current_header_value_;
@@ -371,7 +371,7 @@ private:
   void onEncodeComplete() override;
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
-  int onHeadersComplete() override;
+  absl::Status onHeadersComplete() override;
   void onBody(const char* data, size_t length) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
@@ -450,7 +450,7 @@ private:
   void onEncodeComplete() override {}
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  int onHeadersComplete() override;
+  absl::Status onHeadersComplete() override;
   void onBody(const char* data, size_t length) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
