@@ -23,7 +23,8 @@ class UpgradeVisitor(visitor.Visitor):
   See visitor.Visitor for visitor method docs comments.
   """
 
-  def __init__(self, typedb, envoy_internal_shadow):
+  def __init__(self, n, typedb, envoy_internal_shadow):
+    self._base_version = n
     self._typedb = typedb
     self._envoy_internal_shadow = envoy_internal_shadow
 
@@ -74,7 +75,7 @@ class UpgradeVisitor(visitor.Visitor):
     return re.sub(ENVOY_COMMENT_WITH_TYPE_REGEX, UpgradeType, c)
 
   def _UpgradedPostMethod(self, m):
-    return re.sub(r'^/v2/', '/v3/', m)
+    return re.sub(r'^/v%d/' % self._base_version, '/v%d/' % (self._base_version + 1), m)
 
   # Upgraded type using canonical type naming, e.g. foo.bar.
   def _UpgradedTypeCanonical(self, t):
@@ -231,15 +232,16 @@ class UpgradeVisitor(visitor.Visitor):
     return upgraded_proto
 
 
-def V3MigrationXform(envoy_internal_shadow, file_proto):
-  """Transform a FileDescriptorProto from v2[alpha\d] to v3.
+def VersionUpgradeXform(n, envoy_internal_shadow, file_proto):
+  """Transform a FileDescriptorProto from vN[alpha\d] to v(N+1).
 
   Args:
+    n: version N to upgrade from.
     envoy_internal_shadow: generate a shadow for Envoy internal use containing deprecated fields.
-    file_proto: v2[alpha\d] FileDescriptorProto message.
+    file_proto: vN[alpha\d] FileDescriptorProto message.
 
   Returns:
-    v3 FileDescriptorProto message.
+    v(N+1) FileDescriptorProto message.
   """
   # Load type database.
   typedb = utils.GetTypeDb()
@@ -248,4 +250,4 @@ def V3MigrationXform(envoy_internal_shadow, file_proto):
       file_proto.name]:
     return None
   # Otherwise, this .proto needs upgrading, do it.
-  return traverse.TraverseFile(file_proto, UpgradeVisitor(typedb, envoy_internal_shadow))
+  return traverse.TraverseFile(file_proto, UpgradeVisitor(n, typedb, envoy_internal_shadow))

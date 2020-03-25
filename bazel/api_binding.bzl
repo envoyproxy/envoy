@@ -3,11 +3,11 @@ def _default_envoy_api_impl(ctx):
     api_dirs = [
         "BUILD",
         "bazel",
-        "docs",
         "envoy",
         "examples",
         "test",
         "tools",
+        "versioning",
     ]
     for d in api_dirs:
         ctx.symlink(ctx.path(ctx.attr.envoy_root).dirname.get_child(ctx.attr.reldir).get_child(d), d)

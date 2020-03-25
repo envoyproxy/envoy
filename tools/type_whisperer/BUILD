@@ -57,8 +57,7 @@ py_binary(
 
 label_flag(
     name = "api_type_db_target",
-    # TODO(htuch): break dependence of API type DB on docs target.
-    build_setting_default = "@envoy_api_canonical//docs:protos",
+    build_setting_default = "@envoy_api_canonical//versioning:active_protos",
     visibility = ["//visibility:public"],
 )
 
