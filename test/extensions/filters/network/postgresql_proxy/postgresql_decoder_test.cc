@@ -2,7 +2,6 @@
 #include <gtest/gtest.h>
 
 #include "extensions/filters/network/postgresql_proxy/postgresql_decoder.h"
-#include "extensions/filters/network/postgresql_proxy/postgresql_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,7 +41,7 @@ protected:
   std::unique_ptr<DecoderImpl> decoder_;
 
   // fields often used
-  Buffer::OwnedImpl data;
+  Buffer::OwnedImpl data_;
   uint32_t length_;
   char buf_[256];
   std::string payload_;
@@ -65,19 +64,19 @@ TEST_F(PostgreSQLProxyDecoderTest, StartupMessage) {
 
   // start with length
   length_ = htonl(12);
-  data.add(&length_, sizeof(length_));
+  data_.add(&length_, sizeof(length_));
   // add 8 bytes of some data
-  data.add(buf_, 8);
-  decoder_->onData(data, true);
-  ASSERT_THAT(data.length(), 0);
+  data_.add(buf_, 8);
+  decoder_->onData(data_, true);
+  ASSERT_THAT(data_.length(), 0);
 
   // Now feed normal message with 1bytes as command
-  data.add("P");
+  data_.add("P");
   length_ = htonl(6); // 4 bytes of length + 2 bytes of data
-  data.add(&length_, sizeof(length_));
-  data.add("AB");
-  decoder_->onData(data, true);
-  ASSERT_THAT(data.length(), 0);
+  data_.add(&length_, sizeof(length_));
+  data_.add("AB");
+  decoder_->onData(data_, true);
+  ASSERT_THAT(data_.length(), 0);
 }
 
 // Test processing messages which map 1:1 with buffer.
@@ -86,28 +85,28 @@ TEST_F(PostgreSQLProxyDecoderTest, StartupMessage) {
 TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferSingleMessages) {
 
   // Feed empty buffer - should not crash
-  decoder_->onData(data, true);
+  decoder_->onData(data_, true);
 
   // Put one byte. This is not enough to parse the message and that byte
   // should stay in the buffer.
-  data.add("P");
-  decoder_->onData(data, true);
-  ASSERT_THAT(data.length(), 1);
+  data_.add("P");
+  decoder_->onData(data_, true);
+  ASSERT_THAT(data_.length(), 1);
 
   // Add length of 4 bytes. It would mean completely empty message.
   // but it should be consumed.
   length_ = htonl(4);
-  data.add(&length_, sizeof(length_));
-  decoder_->onData(data, true);
-  ASSERT_THAT(data.length(), 0);
+  data_.add(&length_, sizeof(length_));
+  decoder_->onData(data_, true);
+  ASSERT_THAT(data_.length(), 0);
 
   // Create a message with 5 additional bytes.
-  data.add("P");
+  data_.add("P");
   length_ = htonl(9); // 4 bytes of length field + 5 of data
-  data.add(&length_, sizeof(length_));
-  data.add(buf_, 5);
-  decoder_->onData(data, true);
-  ASSERT_THAT(data.length(), 0);
+  data_.add(&length_, sizeof(length_));
+  data_.add(buf_, 5);
+  decoder_->onData(data_, true);
+  ASSERT_THAT(data_.length(), 0);
 }
 
 // Test simulates situation when decoder is called with incomplete message.
@@ -117,18 +116,18 @@ TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferLargeMessages) {
   // fill the buffer with message of 100 bytes long
   // but the buffer contains only 98 bytes.
   // It should not be processed.
-  data.add("P");
+  data_.add("P");
   length_ = htonl(100); // This also includes length field
-  data.add(&length_, sizeof(length_));
-  data.add(buf_, 94);
-  decoder_->onData(data, true);
+  data_.add(&length_, sizeof(length_));
+  data_.add(buf_, 94);
+  decoder_->onData(data_, true);
   // The buffer contains command (1 byte), length (4 bytes) and 94 bytes of message
-  ASSERT_THAT(data.length(), 99);
+  ASSERT_THAT(data_.length(), 99);
 
   // Add 2 missing bytes and feed again to decoder
-  data.add("AB");
-  decoder_->onData(data, true);
-  ASSERT_THAT(data.length(), 0);
+  data_.add("AB");
+  decoder_->onData(data_, true);
+  ASSERT_THAT(data_.length(), 0);
 }
 
 // Test simulates situation when a buffer contains more than one
@@ -136,49 +135,49 @@ TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferLargeMessages) {
 // at a time and only when the buffer contains the entire message.
 TEST_F(PostgreSQLProxyDecoderTest, TwoMessagesInOneBuffer) {
   // create the first message of 50 bytes long (+1 for command)
-  data.add("P");
+  data_.add("P");
   length_ = htonl(50);
-  data.add(&length_, sizeof(length_));
-  data.add(buf_, 46);
+  data_.add(&length_, sizeof(length_));
+  data_.add(buf_, 46);
 
   // create the second message of 50 + 46 bytes (+1 for command)
-  data.add("P");
+  data_.add("P");
   length_ = htonl(96);
-  data.add(&length_, sizeof(length_));
-  data.add(buf_, 46);
-  data.add(buf_, 46);
+  data_.add(&length_, sizeof(length_));
+  data_.add(buf_, 46);
+  data_.add(buf_, 46);
 
   // The buffer contains two messaged:
   // 1st: command (1 byte), length (4 bytes), 46 bytes of data
   // 2nd: command (1 byte), length (4 bytes), 92 bytes of data
-  ASSERT_THAT(data.length(), 148);
+  ASSERT_THAT(data_.length(), 148);
   // Process the first message
-  decoder_->onData(data, true);
-  ASSERT_THAT(data.length(), 97);
+  decoder_->onData(data_, true);
+  ASSERT_THAT(data_.length(), 97);
   // Process the second message
-  decoder_->onData(data, true);
-  ASSERT_THAT(data.length(), 0);
+  decoder_->onData(data_, true);
+  ASSERT_THAT(data_.length(), 0);
 }
 
 TEST_F(PostgreSQLProxyDecoderTest, Unknown) {
   // Create invalid message. The first byte is invalid "="
   // Message must be at least 5 bytes to be parsed.
   EXPECT_CALL(callbacks_, incUnknown()).Times(1);
-  data.add("=");
+  data_.add("=");
   length_ = htonl(50);
-  data.add(&length_, sizeof(length_));
-  data.add(buf_, 46);
-  decoder_->onData(data, true);
+  data_.add(&length_, sizeof(length_));
+  data_.add(buf_, 46);
+  decoder_->onData(data_, true);
 }
 
 // Test if each frontend command calls incFrontend method
 TEST_P(PostgreSQLProxyFrontendDecoderTest, FrontendInc) {
   EXPECT_CALL(callbacks_, incFrontend()).Times(1);
-  data.add(GetParam());
+  data_.add(GetParam());
   length_ = htonl(50);
-  data.add(&length_, sizeof(length_));
-  data.add(buf_, 46);
-  decoder_->onData(data, true);
+  data_.add(&length_, sizeof(length_));
+  data_.add(buf_, 46);
+  decoder_->onData(data_, true);
 }
 
 // Run the above test for each frontend message
@@ -191,29 +190,29 @@ TEST_F(PostgreSQLProxyFrontendDecoderTest, TerminateMessage) {
   // set decoder state NOT to be in_transaction
   decoder_->getSession().setInTransaction(false);
   EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
-  data.add("X");
+  data_.add("X");
   length_ = htonl(4);
-  data.add(&length_, sizeof(length_));
-  decoder_->onData(data, true);
+  data_.add(&length_, sizeof(length_));
+  decoder_->onData(data_, true);
 
   // Now set the decoder to be in_transaction state.
   decoder_->getSession().setInTransaction(true);
   EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(1);
-  data.add("X");
+  data_.add("X");
   length_ = htonl(4);
-  data.add(&length_, sizeof(length_));
-  decoder_->onData(data, true);
+  data_.add(&length_, sizeof(length_));
+  decoder_->onData(data_, true);
   ASSERT_FALSE(decoder_->getSession().inTransaction());
 }
 
 // Test if each backend command calls incBackend method
 TEST_P(PostgreSQLProxyBackendDecoderTest, BackendInc) {
   EXPECT_CALL(callbacks_, incBackend()).Times(1);
-  data.add(GetParam());
+  data_.add(GetParam());
   length_ = htonl(50);
-  data.add(&length_, sizeof(length_));
-  data.add(buf_, 46);
-  decoder_->onData(data, false);
+  data_.add(&length_, sizeof(length_));
+  data_.add(buf_, 46);
+  decoder_->onData(data_, false);
 }
 
 // Run the above test for each backend message
@@ -229,44 +228,44 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, ParseStatement) {
   // Rollback counter should be bumped up
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   payload_ = "ROLLBACK 123";
-  data.add("C");
+  data_.add("C");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 
   // Now try just keyword without a space at the end
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   payload_ = "ROLLBACK";
-  data.add("C");
+  data_.add("C");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 
   // Partial message should be ignored
   EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
   EXPECT_CALL(callbacks_, incStatementsOther());
   payload_ = "ROLL";
-  data.add("C");
+  data_.add("C");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 
   // Keyword without a space  should be ignored
   EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
   EXPECT_CALL(callbacks_, incStatementsOther());
   payload_ = "ROLLBACK123";
-  data.add("C");
+  data_.add("C");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 }
 
 // Test Backend messages and make sure that they
@@ -276,76 +275,76 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
   EXPECT_CALL(callbacks_, incStatements());
   EXPECT_CALL(callbacks_, incStatementsOther());
   payload_ = "BEGIN 123";
-  data.add("C");
+  data_.add("C");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
   ASSERT_TRUE(decoder_->getSession().inTransaction());
 
   EXPECT_CALL(callbacks_, incStatements());
   EXPECT_CALL(callbacks_, incStatementsOther());
   payload_ = "START TR";
-  data.add("C");
+  data_.add("C");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 
   EXPECT_CALL(callbacks_, incStatements());
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload_ = "COMMIT";
-  data.add("C");
+  data_.add("C");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 
   EXPECT_CALL(callbacks_, incStatements());
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   payload_ = "ROLLBACK";
-  data.add("C");
+  data_.add("C");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 
   EXPECT_CALL(callbacks_, incStatements());
   EXPECT_CALL(callbacks_, incStatementsInsert());
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload_ = "INSERT 1";
-  data.add("C");
+  data_.add("C");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 
   EXPECT_CALL(callbacks_, incStatements());
   EXPECT_CALL(callbacks_, incStatementsUpdate());
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload_ = "UPDATE 1i23";
-  data.add("C");
+  data_.add("C");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 
   EXPECT_CALL(callbacks_, incStatements());
   EXPECT_CALL(callbacks_, incStatementsDelete());
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload_ = "DELETE 88";
-  data.add("C");
+  data_.add("C");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 }
 
 // Test checks deep inspection of the R message
@@ -359,23 +358,23 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, AuthenticationMsg) {
   // sessions must not be increased.
   EXPECT_CALL(callbacks_, incSessions()).Times(0);
   payload_ = "blah blah";
-  data.add("R");
+  data_.add("R");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 
   // Create the correct payload which means that
   // authentication completed successfully.
   EXPECT_CALL(callbacks_, incSessions());
-  data.add("R");
+  data_.add("R");
   length_ = htonl(8);
-  data.add(&length_, sizeof(length_));
+  data_.add(&length_, sizeof(length_));
   uint32_t code = 0;
-  data.add(&code, sizeof(code));
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&code, sizeof(code));
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 }
 
 // Test check parsing of E message. The message
@@ -386,23 +385,23 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, ErrorMsg) {
   // statistics update.
   EXPECT_CALL(callbacks_, incErrors()).Times(0);
   payload_ = "blah blah";
-  data.add("E");
+  data_.add("E");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 
   // Now for the correct message with specific
   // string inside.
   EXPECT_CALL(callbacks_, incErrors()).Times(1);
   payload_ = "blah VERROR blah";
-  data.add("E");
+  data_.add("E");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 }
 
 // Test N type of message: Notification.
@@ -413,22 +412,22 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, NotificationMsg) {
   // specific warning  string
   EXPECT_CALL(callbacks_, incWarnings()).Times(0);
   payload_ = "blah blah";
-  data.add("N");
+  data_.add("N");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 
   // Warnings stats should be updated now.
   EXPECT_CALL(callbacks_, incWarnings());
   payload_ = "blah VWARNING blah";
-  data.add("N");
+  data_.add("N");
   length_ = htonl(4 + payload_.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload_);
-  decoder_->onData(data, false);
-  data.drain(data.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
 }
 
 } // namespace PostgreSQLProxy
