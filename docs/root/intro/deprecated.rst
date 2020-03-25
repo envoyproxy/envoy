@@ -92,6 +92,8 @@ Deprecated items below are listed in chronological order.
   been deprecated in favor of `compressor`.
 * The statistics counter `header_gzip` in :ref:`HTTP Gzip filter <config_http_filters_gzip>`
   has been deprecated in favor of `header_compressor_used`.
+* Support for the undocumented HTTP/1.1 `:no-chunks` pseudo-header has been removed. If an extension
+  was using this it can achieve the same behavior via the new `http1StreamEncoderOptions()` API.
 * The grpc_stats filter behavior of by default creating a new stat for every message type seen is deprecated.
   The default will switch to only creating a fixed set of stats. The previous behavior can be enabled by enabling
   :ref:`stats_for_all_methods <envoy_api_field_config.filter.http.grpc_stats.v2alpha.FilterConfig.stats_for_all_methods>`,

@@ -9,6 +9,14 @@
 namespace Envoy {
 namespace Http {
 
+class MockHttp1StreamEncoderOptions : public Http1StreamEncoderOptions {
+public:
+  MockHttp1StreamEncoderOptions();
+  ~MockHttp1StreamEncoderOptions();
+
+  MOCK_METHOD(void, disableChunkEncoding, ());
+};
+
 class MockStreamEncoder : public virtual StreamEncoder {
 public:
   MockStreamEncoder();
@@ -18,6 +26,7 @@ public:
   MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, encodeMetadata, (const MetadataMapVector& metadata_map_vector));
   MOCK_METHOD(Stream&, getStream, ());
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 
   testing::NiceMock<MockStream> stream_;
 };
