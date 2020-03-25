@@ -65,7 +65,6 @@ quiche_copts = select({
         "-Wno-invalid-offsetof",
         "-Wno-type-limits",
         "-Wno-return-type",
-        "-Wno-sign-compare",
     ],
 })
 
