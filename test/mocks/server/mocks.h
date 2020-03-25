@@ -335,9 +335,16 @@ public:
     remove_listener_completion_ = nullptr;
   }
 
+  void callDrainFilterChainsComplete() {
+    EXPECT_NE(nullptr, remove_filter_chains_completion_);
+    remove_filter_chains_completion_();
+    remove_filter_chains_completion_ = nullptr;
+  }
+
   // Server::Worker
   MOCK_METHOD(void, addListener,
-              (Network::ListenerConfig & listener, AddListenerCompletion completion));
+              (absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
+               AddListenerCompletion completion));
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, removeListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
@@ -346,9 +353,13 @@ public:
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(void, stopListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
+  MOCK_METHOD(void, removeFilterChains,
+              (const Network::DrainingFilterChains& draining_filter_chains,
+               std::function<void()> completion));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;
+  std::function<void()> remove_filter_chains_completion_;
 };
 
 class MockOverloadManager : public OverloadManager {
