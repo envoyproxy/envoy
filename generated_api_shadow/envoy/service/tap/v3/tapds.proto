@@ -7,14 +7,15 @@ import "envoy/service/discovery/v3/discovery.proto";
 
 import "google/api/annotations.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.tap.v3";
 option java_outer_classname = "TapdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Tap discovery service]
 

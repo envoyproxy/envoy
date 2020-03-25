@@ -189,9 +189,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/jwt_verify_lib/archive/40e2cc938f4bcd059a97dc6c73f59ecfa5a71bac.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
-        sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
-        strip_prefix = "http-parser-2.9.0",
-        urls = ["https://github.com/nodejs/http-parser/archive/v2.9.0.tar.gz"],
+        sha256 = "8fa0ab8770fd8425a9b431fdbf91623c4d7a9cdb842b9339289bd2b0b01b0d3d",
+        strip_prefix = "http-parser-2.9.3",
+        urls = ["https://github.com/nodejs/http-parser/archive/v2.9.3.tar.gz"],
     ),
     com_github_pallets_jinja = dict(
         sha256 = "db49236731373e4f3118af880eb91bb0aa6978bc0cf8b35760f6a026f1a9ffc4",
@@ -259,15 +259,15 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/dd/bf/4138e7bfb757de47d1f4b6994648ec67a51efe58fa907c1e11e350cddfca/six-1.12.0.tar.gz"],
     ),
     io_opencensus_cpp = dict(
-        sha256 = "a9ba6027436cfa1264860c6be602da7633d9a1f9abcb8838f2ae6bda8c2c14f6",
-        strip_prefix = "opencensus-cpp-13b1a2f29f541b6b2c4cb8bc3f6fbf3589d44227",
-        # 2019-12-01
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/13b1a2f29f541b6b2c4cb8bc3f6fbf3589d44227.tar.gz"],
+        sha256 = "193ffb4e13bd7886757fd22b61b7f7a400634412ad8e7e1071e73f57bedd7fc6",
+        strip_prefix = "opencensus-cpp-04ed0211931f12b03c1a76b3907248ca4db7bc90",
+        # 2020-03-24
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/04ed0211931f12b03c1a76b3907248ca4db7bc90.tar.gz"],
     ),
     com_github_curl = dict(
-        sha256 = "1dd7604e418b0b9a9077f62f763f6684c1b092a7bc17e3f354b8ad5c964d7358",
-        strip_prefix = "curl-7.68.0",
-        urls = ["https://github.com/curl/curl/releases/download/curl-7_68_0/curl-7.68.0.tar.gz"],
+        sha256 = "01ae0c123dee45b01bbaef94c0bc00ed2aec89cb2ee0fd598e0d302a6b5e0a98",
+        strip_prefix = "curl-7.69.1",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_69_1/curl-7.69.1.tar.gz"],
     ),
     com_googlesource_chromium_v8 = dict(
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
@@ -276,9 +276,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.0.426.12.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/4f6ba16cf16505f12dc8d2f23cfc6e13c1aa5806.tar.gz
-        sha256 = "2990ca4434a6fc1b63560b1aa000f5765c174ad906642e123a92498f1ad6c03d",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/4f6ba16cf16505f12dc8d2f23cfc6e13c1aa5806.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz
+        sha256 = "75af53154402e1654cfd32d8aaeed5fab4dbb79d3cab8c9866019d5369c1889e",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz"],
     ),
     com_google_cel_cpp = dict(
         sha256 = "326ec397b55e39f48bd5380ccded1af5b04653ee96e769cd4d694f9a3bacef50",
