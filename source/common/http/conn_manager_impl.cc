@@ -230,6 +230,10 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
+  if (stream.max_stream_duration_timer_) {
+    stream.max_stream_duration_timer_->disableTimer();
+    stream.max_stream_duration_timer_ = nullptr;
+  }
   if (stream.stream_idle_timer_ != nullptr) {
     stream.stream_idle_timer_->disableTimer();
     stream.stream_idle_timer_ = nullptr;
@@ -277,6 +281,10 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 
 void ConnectionManagerImpl::handleCodecException(const char* error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
+  read_callbacks_->connection().streamInfo().setResponseCodeDetails(
+      absl::StrCat("codec error: ", error));
+  read_callbacks_->connection().streamInfo().setResponseFlag(
+      StreamInfo::ResponseFlag::DownstreamProtocolError);
 
   // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
   // GOAWAY.
@@ -318,19 +326,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     try {
       codec_->dispatch(data);
     } catch (const FrameFloodException& e) {
-      // TODO(mattklein123): This is an emergency substitute for the lack of connection level
-      // logging in the HCM. In a public follow up change we will add full support for connection
-      // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
-      // indicators to be stored in the connection level stream info, and then matched, sampled,
-      // etc. when logged.
-      const envoy::type::v3::FractionalPercent default_value; // 0
-      if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
-                                             default_value)) {
-        ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}",
-                       read_callbacks_->connection(),
-                       read_callbacks_->connection().remoteAddress()->asString(), e.what());
-      }
-
       handleCodecException(e.what());
       return Network::FilterStatus::StopIteration;
     } catch (const CodecProtocolException& e) {
@@ -602,6 +597,15 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     request_timer_->enableTimer(request_timeout_ms_, this);
   }
 
+  const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
+  if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
+    max_stream_duration_timer_ =
+        connection_manager.read_callbacks_->connection().dispatcher().createTimer(
+            [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_->enableTimer(connection_manager_.config_.maxStreamDuration().value(),
+                                            this);
+  }
+
   stream_info_.setRequestedServerName(
       connection_manager_.read_callbacks_->connection().requestedServerName());
 }
@@ -671,6 +675,12 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   sendLocalReply(request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_),
                  Http::Code::RequestTimeout, "request timeout", nullptr, state_.is_head_request_,
                  absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
+}
+
+void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
+  ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
+  connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
+  connection_manager_.doEndStream(*this);
 }
 
 void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
@@ -1406,6 +1416,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
 
+  stream_info_.setUpstreamClusterInfo(cached_cluster_info_.value());
   refreshCachedTracingCustomTags();
 }
 

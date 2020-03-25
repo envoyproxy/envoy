@@ -248,6 +248,8 @@ public:
   };
   using FieldExtractorPtr = std::unique_ptr<FieldExtractor>;
 
+  enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort };
+
 private:
   FieldExtractorPtr field_extractor_;
 };

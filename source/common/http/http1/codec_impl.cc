@@ -451,10 +451,7 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
   }
 
   ssize_t total_parsed = 0;
-  uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-  data.getRawSlices(slices.begin(), num_slices);
-  for (const Buffer::RawSlice& slice : slices) {
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     total_parsed += slice.len_;
     onBody(static_cast<const char*>(slice.mem_), slice.len_);
   }
@@ -475,10 +472,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
-    uint64_t num_slices = data.getRawSlices(nullptr, 0);
-    absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-    data.getRawSlices(slices.begin(), num_slices);
-    for (const Buffer::RawSlice& slice : slices) {
+    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
       total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
     }
   } else {
@@ -543,12 +537,6 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
       throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
     }
-  } else if (header_value.find('\0') != absl::string_view::npos) {
-    // http-parser should filter for this
-    // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
-    // have an invariant that they must not contain embedded zero characters
-    // (NUL, ASCII 0x0).
-    throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
   }
 
   header_parsing_state_ = HeaderParsingState::Value;
@@ -605,11 +593,10 @@ int ConnectionImpl::onHeadersCompleteBase() {
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
   if (request_or_response_headers.TransferEncoding()) {
-    absl::string_view encoding =
+    const absl::string_view encoding =
         request_or_response_headers.TransferEncoding()->value().getStringView();
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
-        !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Identity) &&
         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
