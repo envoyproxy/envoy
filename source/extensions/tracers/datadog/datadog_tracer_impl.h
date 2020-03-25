@@ -23,6 +23,7 @@ namespace Datadog {
 #define DATADOG_TRACER_STATS(COUNTER)                                                              \
   COUNTER(traces_sent)                                                                             \
   COUNTER(timer_flushed)                                                                           \
+  COUNTER(reports_skipped)                                                                         \
   COUNTER(reports_sent)                                                                            \
   COUNTER(reports_dropped)                                                                         \
   COUNTER(reports_failed)
@@ -49,7 +50,7 @@ public:
 
   // Getters to return the DatadogDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
-  Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
+  const std::string& cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   DatadogTracerStats& tracerStats() { return tracer_stats_; }
   const datadog::opentracing::TracerOptions& tracerOptions() { return tracer_options_; }
@@ -74,7 +75,7 @@ private:
   };
 
   Upstream::ClusterManager& cm_;
-  Upstream::ClusterInfoConstSharedPtr cluster_;
+  std::string cluster_;
   DatadogTracerStats tracer_stats_;
   datadog::opentracing::TracerOptions tracer_options_;
   ThreadLocal::SlotPtr tls_;

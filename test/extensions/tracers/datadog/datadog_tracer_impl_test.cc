@@ -125,6 +125,21 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
   }
 }
 
+TEST_F(DatadogDriverTest, AllowCollectorClusterToBeAddedViaApi) {
+  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  )EOF";
+  envoy::config::trace::v3::DatadogConfig datadog_config;
+  TestUtility::loadFromYaml(yaml_string, datadog_config);
+
+  setup(datadog_config, true);
+}
+
 TEST_F(DatadogDriverTest, FlushSpansTimer) {
   setupValidDriver();
 
@@ -163,7 +178,34 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
 
   callback->onSuccess(request, std::move(msg));
 
+  EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_skipped").value());
   EXPECT_EQ(1U, stats_.counter("tracing.datadog.reports_sent").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_dropped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_failed").value());
+}
+
+TEST_F(DatadogDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
+  setupValidDriver();
+
+  // Simulate removal of a cluster.
+  EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(nullptr));
+  // Verify that no report will be sent.
+  EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
+  EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+  // Expect timer to be re-enabled.
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(900), _));
+
+  // Trigger flush of a span.
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
+  timer_->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.counter("tracing.datadog.timer_flushed").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.datadog.traces_sent").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.datadog.reports_skipped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_sent").value());
   EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_dropped").value());
   EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_failed").value());
 }
