@@ -102,6 +102,7 @@ message Gzip {
   compressor.v3.Compressor compressor = 10;
 
   // Value for Zlib's next output buffer. If not set, defaults to 4096.
-  // See https://www.zlib.net/manual.html.
+  // See https://www.zlib.net/manual.html for more details. Also see
+  // https://github.com/envoyproxy/envoy/issues/8448 for context on this filter's performance.
   google.protobuf.UInt64Value chunk_size = 11 [(validate.rules).uint64 = {lte: 65536 gte: 4096}];
 }
