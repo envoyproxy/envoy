@@ -7,6 +7,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/http/async_client_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
@@ -194,8 +195,8 @@ public:
 
   // Http::AsyncClient::Callbacks.
   // The callbacks below record Zipkin-span-related stats.
-  void onSuccess(Http::ResponseMessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason) override;
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
 
   /**
    * Creates a heap-allocated ZipkinReporter.
@@ -226,6 +227,8 @@ private:
   Event::TimerPtr flush_timer_;
   const CollectorInfo collector_;
   SpanBufferPtr span_buffer_;
+  // Track active HTTP requests to be able to cancel them on destruction.
+  Http::AsyncClientRequestTracker active_requests_;
 };
 } // namespace Zipkin
 } // namespace Tracers

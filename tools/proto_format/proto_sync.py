@@ -245,17 +245,22 @@ def GenerateCurrentApiDir(api_dir, dst_dir):
   shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
 
 
+def GitStatus(path):
+  return subprocess.check_output(['git', 'status', '--porcelain', str(path)]).decode()
+
+
 def Sync(api_root, mode, labels, shadow):
   pkg_deps = []
   with tempfile.TemporaryDirectory() as tmp:
     dst_dir = pathlib.Path(tmp).joinpath("b")
     for label in labels:
-      pkg_deps += SyncProtoFile(mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'),
+      pkg_deps += SyncProtoFile(mode, utils.BazelBinPathForOutputArtifact(label, '.active.proto'),
                                 dst_dir)
       pkg_deps += SyncProtoFile(
           mode,
           utils.BazelBinPathForOutputArtifact(
-              label, '.v3.envoy_internal.proto' if shadow else '.v3.proto'), dst_dir)
+              label, '.next_major_version_candidate.envoy_internal.proto'
+              if shadow else '.next_major_version_candidate.proto'), dst_dir)
     SyncBuildFiles(mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")
@@ -280,6 +285,14 @@ def Sync(api_root, mode, labels, shadow):
         print(diff.decode(), file=sys.stderr)
         sys.exit(1)
       if mode == "fix":
+        git_status = GitStatus(api_root)
+        if git_status:
+          print('git status indicates a dirty API tree:\n%s' % git_status)
+          print(
+              'Proto formatting may overwrite or delete files in the above list with no git backup.'
+          )
+          if input('Continue? [yN] ').strip().lower() != 'y':
+            sys.exit(1)
         src_files = set(str(p.relative_to(current_api_dir)) for p in current_api_dir.rglob('*'))
         dst_files = set(str(p.relative_to(dst_dir)) for p in dst_dir.rglob('*'))
         deleted_files = src_files.difference(dst_files)

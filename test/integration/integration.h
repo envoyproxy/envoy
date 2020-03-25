@@ -217,6 +217,13 @@ public:
   Api::ApiPtr api_for_server_stat_store_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
 
+  // Enable the listener access log
+  void useListenerAccessLog(absl::string_view format = "");
+  // Waits for the first access log entry.
+  std::string waitForAccessLog(const std::string& filename);
+
+  std::string listener_access_log_name_;
+
   // Functions for testing reloadable config (xDS)
   void createXdsUpstream();
   void createXdsConnection();

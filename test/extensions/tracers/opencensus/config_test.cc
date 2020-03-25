@@ -29,7 +29,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracer) {
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, tracer);
 }
 
@@ -67,7 +67,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, tracer);
 
   // Reset TraceParams back to default.
@@ -107,12 +107,148 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerGrpc) {
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, tracer);
 
   // Reset TraceParams back to default.
   ::opencensus::trace::TraceConfig::SetCurrentTraceParams(
       {32, 32, 128, 32, ::opencensus::trace::ProbabilitySampler(1e-4)});
+}
+
+TEST(OpenCensusTracerConfigTest, ShouldCreateAtMostOneOpenCensusTracer) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  OpenCensusTracerFactory factory;
+
+  const std::string yaml_string = R"EOF(
+  http:
+    name: envoy.tracers.opencensus
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      trace_config:
+        rate_limiting_sampler:
+          qps: 123
+  )EOF";
+  envoy::config::trace::v3::Tracing configuration;
+  TestUtility::loadFromYaml(yaml_string, configuration);
+
+  auto message_one = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  Tracing::HttpTracerSharedPtr tracer_one = factory.createHttpTracer(*message_one, context);
+  EXPECT_NE(nullptr, tracer_one);
+
+  auto message_two = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  Tracing::HttpTracerSharedPtr tracer_two = factory.createHttpTracer(*message_two, context);
+  // Verify that no new tracer has been created.
+  EXPECT_EQ(tracer_two, tracer_one);
+}
+
+TEST(OpenCensusTracerConfigTest, ShouldCacheFirstCreatedTracerUsingStrongReference) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  OpenCensusTracerFactory factory;
+
+  const std::string yaml_string = R"EOF(
+  http:
+    name: envoy.tracers.opencensus
+  )EOF";
+  envoy::config::trace::v3::Tracing configuration;
+  TestUtility::loadFromYaml(yaml_string, configuration);
+
+  auto message_one = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  std::weak_ptr<Tracing::HttpTracer> tracer_one = factory.createHttpTracer(*message_one, context);
+  // Verify that tracer factory keeps a strong reference.
+  EXPECT_NE(nullptr, tracer_one.lock());
+
+  auto message_two = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  Tracing::HttpTracerSharedPtr tracer_two = factory.createHttpTracer(*message_two, context);
+  EXPECT_NE(nullptr, tracer_two);
+  // Verify that no new tracer has been created.
+  EXPECT_EQ(tracer_two, tracer_one.lock());
+}
+
+TEST(OpenCensusTracerConfigTest, ShouldNotCacheInvalidConfiguration) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  OpenCensusTracerFactory factory;
+
+  const std::string yaml_one = R"EOF(
+  http:
+    name: envoy.tracers.opencensus
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      ocagent_exporter_enabled: true
+      ocagent_grpc_service:
+        envoy_grpc:
+          cluster_name: opencensus
+  )EOF";
+  envoy::config::trace::v3::Tracing configuration_one;
+  TestUtility::loadFromYaml(yaml_one, configuration_one);
+
+  auto message_one = Config::Utility::translateToFactoryConfig(
+      configuration_one.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message_one, context)), EnvoyException,
+                            "Opencensus ocagent tracer only supports GoogleGrpc.");
+
+  const std::string yaml_two = R"EOF(
+  http:
+    name: envoy.tracers.opencensus
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      ocagent_exporter_enabled: true
+      ocagent_grpc_service:
+        google_grpc:
+          target_uri: 127.0.0.1:55678
+          stat_prefix: test
+  )EOF";
+  envoy::config::trace::v3::Tracing configuration_two;
+  TestUtility::loadFromYaml(yaml_two, configuration_two);
+
+  auto message_two = Config::Utility::translateToFactoryConfig(
+      configuration_two.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  Tracing::HttpTracerSharedPtr tracer_two = factory.createHttpTracer(*message_two, context);
+  // Verify that a new tracer has been created despite an earlier failed attempt.
+  EXPECT_NE(nullptr, tracer_two);
+}
+
+TEST(OpenCensusTracerConfigTest, ShouldRejectSubsequentCreateAttemptsWithDifferentConfig) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  OpenCensusTracerFactory factory;
+
+  const std::string yaml_one = R"EOF(
+  http:
+    name: envoy.tracers.opencensus
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      trace_config:
+        rate_limiting_sampler:
+          qps: 123
+  )EOF";
+  envoy::config::trace::v3::Tracing configuration_one;
+  TestUtility::loadFromYaml(yaml_one, configuration_one);
+
+  auto message_one = Config::Utility::translateToFactoryConfig(
+      configuration_one.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  Tracing::HttpTracerSharedPtr tracer_one = factory.createHttpTracer(*message_one, context);
+  EXPECT_NE(nullptr, tracer_one);
+
+  const std::string yaml_two = R"EOF(
+  http:
+    name: envoy.tracers.opencensus
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      trace_config:
+        rate_limiting_sampler:
+          qps: 321
+  )EOF";
+  envoy::config::trace::v3::Tracing configuration_two;
+  TestUtility::loadFromYaml(yaml_two, configuration_two);
+
+  auto message_two = Config::Utility::translateToFactoryConfig(
+      configuration_two.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  // Verify that OpenCensus is only configured once in a lifetime.
+  EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message_two, context)), EnvoyException,
+                            "Opencensus has already been configured with a different config.");
 }
 
 TEST(OpenCensusTracerConfigTest, DoubleRegistrationTest) {

@@ -19,14 +19,14 @@ namespace Datadog {
 
 DatadogTracerFactory::DatadogTracerFactory() : FactoryBase(TracerNames::get().Datadog) {}
 
-Tracing::HttpTracerPtr DatadogTracerFactory::createHttpTracerTyped(
+Tracing::HttpTracerSharedPtr DatadogTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v3::DatadogConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
   Tracing::DriverPtr datadog_driver = std::make_unique<Driver>(
       proto_config, context.serverFactoryContext().clusterManager(),
       context.serverFactoryContext().scope(), context.serverFactoryContext().threadLocal(),
       context.serverFactoryContext().runtime());
-  return std::make_unique<Tracing::HttpTracerImpl>(std::move(datadog_driver),
+  return std::make_shared<Tracing::HttpTracerImpl>(std::move(datadog_driver),
                                                    context.serverFactoryContext().localInfo());
 }
 

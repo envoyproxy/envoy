@@ -97,9 +97,19 @@ public:
     virtual Listener* listener() PURE;
 
     /**
-     * Destroy the actual Listener it wraps.
+     * Temporarily stop listening according to implementation's own definition.
      */
-    virtual void destroy() PURE;
+    virtual void pauseListening() PURE;
+
+    /**
+     * Resume listening according to implementation's own definition.
+     */
+    virtual void resumeListening() PURE;
+
+    /**
+     * Stop listening according to implementation's own definition.
+     */
+    virtual void shutdownListener() PURE;
   };
 
   using ActiveListenerPtr = std::unique_ptr<ActiveListener>;

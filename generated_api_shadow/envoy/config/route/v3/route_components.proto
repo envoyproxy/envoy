@@ -14,14 +14,15 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/versioning.proto";
-
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.route.v3";
 option java_outer_classname = "RouteComponentsProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: HTTP route components]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
@@ -32,7 +33,7 @@ option java_multiple_files = true;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -164,6 +165,13 @@ message VirtualHost {
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
   RetryPolicy retry_policy = 16;
+
+  // [#not-implemented-hide:]
+  // Specifies the configuration for retry policy extension. Note that setting a route level entry
+  // will take precedence over this config and it'll be treated independently (e.g.: values are not
+  // inherited). :ref:`Retry policy <envoy_api_field_config.route.v3.VirtualHost.retry_policy>` should not be
+  // set if this field is used.
+  google.protobuf.Any retry_policy_typed_config = 20;
 
   // Indicates the hedge policy for all routes in this virtual host. Note that setting a
   // route level entry will take precedence over this config and it'll be treated
@@ -570,7 +578,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -946,6 +954,13 @@ message RouteAction {
   // it'll take precedence over the virtual host level retry policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   RetryPolicy retry_policy = 9;
+
+  // [#not-implemented-hide:]
+  // Specifies the configuration for retry policy extension. Note that if this is set, it'll take
+  // precedence over the virtual host level retry policy entirely (e.g.: policies are not merged,
+  // most internal one becomes the enforced policy). :ref:`Retry policy <envoy_api_field_config.route.v3.VirtualHost.retry_policy>`
+  // should not be set if this field is used.
+  google.protobuf.Any retry_policy_typed_config = 33;
 
   // Indicates that the route has a request mirroring policy.
   //
@@ -1328,7 +1343,7 @@ message Tracing {
 // statistics are perfect in the sense that they are emitted on the downstream
 // side such that they include network level failures.
 //
-// Documentation for :ref:`virtual cluster statistics <config_http_filters_router_stats>`.
+// Documentation for :ref:`virtual cluster statistics <config_http_filters_router_vcluster_stats>`.
 //
 // .. note::
 //

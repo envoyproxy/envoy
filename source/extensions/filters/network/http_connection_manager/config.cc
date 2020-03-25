@@ -174,7 +174,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
-      http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
+      http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
@@ -185,6 +185,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       max_connection_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
+      max_stream_duration_(
+          PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
@@ -395,10 +397,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   const auto& filters = config.http_filters();
   for (int32_t i = 0; i < filters.size(); i++) {
-    bool is_terminal = false;
-    processFilter(filters[i], i, "http", filter_factories_, is_terminal);
-    Config::Utility::validateTerminalFilters(filters[i].name(), "http", is_terminal,
-                                             i == filters.size() - 1);
+    processFilter(filters[i], i, "http", filter_factories_, "http", i == filters.size() - 1);
   }
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -412,11 +411,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
       for (int32_t j = 0; j < upgrade_config.filters().size(); j++) {
-        bool is_terminal = false;
-        processFilter(upgrade_config.filters(j), j, name, *factories, is_terminal);
-        Config::Utility::validateTerminalFilters(upgrade_config.filters(j).name(), "http upgrade",
-                                                 is_terminal,
-                                                 j == upgrade_config.filters().size() - 1);
+        processFilter(upgrade_config.filters(j), j, name, *factories, "http upgrade",
+                      j == upgrade_config.filters().size() - 1);
       }
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
@@ -432,7 +428,7 @@ void HttpConnectionManagerConfig::processFilter(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
         proto_config,
     int i, absl::string_view prefix, std::list<Http::FilterFactoryCb>& filter_factories,
-    bool& is_terminal) {
+    const char* filter_chain_type, bool last_filter_in_current_config) {
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
   ENVOY_LOG(debug, "      name: {}", proto_config.name());
   ENVOY_LOG(debug, "    config: {}",
@@ -451,7 +447,9 @@ void HttpConnectionManagerConfig::processFilter(
       proto_config, context_.messageValidationVisitor(), factory);
   Http::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  is_terminal = factory.isTerminalFilter();
+  bool is_terminal = factory.isTerminalFilter();
+  Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
+                                           is_terminal, last_filter_in_current_config);
   filter_factories.push_back(callback);
 }
 
@@ -466,7 +464,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         maxRequestHeadersCount());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
-        connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
+        connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount());
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
@@ -479,7 +477,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
             .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,
+        connection, data, callbacks, context_.scope(), http1_settings_, http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount());
   }
 

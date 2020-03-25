@@ -371,6 +371,24 @@ public:
 using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
 
 /**
+ * All virtual cluster stats. @see stats_macro.h
+ */
+#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER)                                                         \
+  COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
+  COUNTER(upstream_rq_retry_overflow)                                                              \
+  COUNTER(upstream_rq_retry_success)                                                               \
+  COUNTER(upstream_rq_timeout)                                                                     \
+  COUNTER(upstream_rq_total)
+
+/**
+ * Struct definition for all virtual cluster stats. @see stats_macro.h
+ */
+struct VirtualClusterStats {
+  ALL_VIRTUAL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
  * routes for stat tracking and priority purposes).
  */
@@ -382,6 +400,15 @@ public:
    * @return the stat-name of the virtual cluster.
    */
   virtual Stats::StatName statName() const PURE;
+
+  /**
+   * @return VirtualClusterStats& strongly named stats for this virtual cluster.
+   */
+  virtual VirtualClusterStats& stats() const PURE;
+
+  static VirtualClusterStats generateStats(Stats::Scope& scope) {
+    return {ALL_VIRTUAL_CLUSTER_STATS(POOL_COUNTER(scope))};
+  }
 };
 
 class RateLimitPolicy;
