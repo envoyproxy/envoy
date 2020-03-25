@@ -34,7 +34,7 @@ Example Configuration
       server_config:
         dns_table:
           external_retry_count: 3
-          known_domains:
+          known_suffixes:
             - "domain1.com"
             - "domain2.com"
             - "domain3.com"

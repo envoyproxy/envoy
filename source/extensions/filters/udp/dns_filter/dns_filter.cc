@@ -43,12 +43,12 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
 
 void DnsFilter::onData(Network::UdpRecvData& client_request) {
   // Handle incoming request and respond with an answer
-  (void)client_request;
+  UNREFERENCED_PARAMETER(client_request);
 }
 
 void DnsFilter::onReceiveError(Api::IoError::IoErrorCode error_code) {
   // Increment error stats
-  (void)error_code;
+  UNREFERENCED_PARAMETER(error_code);
 }
 
 } // namespace DnsFilter

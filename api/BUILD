@@ -152,7 +152,7 @@ proto_library(
         "//envoy/data/accesslog/v3:pkg",
         "//envoy/data/cluster/v3:pkg",
         "//envoy/data/core/v3:pkg",
-        "//envoy/data/dns/v2alpha:pkg",
+        "//envoy/data/dns/v3:pkg",
         "//envoy/data/tap/v3:pkg",
         "//envoy/extensions/access_loggers/file/v3:pkg",
         "//envoy/extensions/access_loggers/grpc/v3:pkg",
