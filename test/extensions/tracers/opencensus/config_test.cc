@@ -29,7 +29,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracer) {
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, tracer);
 }
 
@@ -67,7 +67,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, tracer);
 
   // Reset TraceParams back to default.
@@ -107,7 +107,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerGrpc) {
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, tracer);
 
   // Reset TraceParams back to default.
