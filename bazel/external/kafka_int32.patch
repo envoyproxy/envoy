@@ -1,0 +1,27 @@
+--- DescribeGroupsResponse.json	2020-03-25 16:12:16.373302600 -0400
++++ DescribeGroupsResponse.json	2020-03-25 16:11:16.184156200 -0400
+@@ -63,7 +63,7 @@
+         { "name": "MemberAssignment", "type": "bytes", "versions": "0+",
+           "about": "The current assignment provided by the group leader." }
+       ]},
+-      { "name": "AuthorizedOperations", "type": "int32", "versions": "3+",  "default": "-2147483648",
++      { "name": "AuthorizedOperations", "type": "int32", "versions": "3+",  "default": "INT32_MIN",
+         "about": "32-bit bitfield to represent authorized operations for this group." }
+     ]}
+   ]
+
+--- MetadataResponse.json	2020-03-25 15:53:36.319161000 -0400
++++ MetadataResponse.json	2020-03-25 15:54:11.510400000 -0400
+@@ -81,10 +81,10 @@
+         { "name": "OfflineReplicas", "type": "[]int32", "versions": "5+", "ignorable": true,
+           "about": "The set of offline replicas of this partition." }
+       ]},
+-      { "name": "TopicAuthorizedOperations", "type": "int32", "versions": "8+", "default": "-2147483648",
++      { "name": "TopicAuthorizedOperations", "type": "int32", "versions": "8+", "default": "INT32_MIN",
+         "about": "32-bit bitfield to represent authorized operations for this topic." }
+     ]},
+-    { "name": "ClusterAuthorizedOperations", "type": "int32", "versions": "8+", "default": "-2147483648",
++    { "name": "ClusterAuthorizedOperations", "type": "int32", "versions": "8+", "default": "INT32_MIN",
+       "about": "32-bit bitfield to represent authorized operations for this cluster." }
+   ]
+ }
