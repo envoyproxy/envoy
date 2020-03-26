@@ -10,12 +10,8 @@ envoy_package()
 
 envoy_cc_library(
     name = "admin_lib",
-    srcs = [
-        "admin.cc",
-    ],
-    hdrs = [
-        "admin.h",
-    ],
+    srcs = ["admin.cc"],
+    hdrs = ["admin.h"],
     deps = [
         ":admin_filter_lib",
         ":config_tracker_lib",
@@ -75,12 +71,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "admin_filter_lib",
-    srcs = [
-        "admin_filter.cc",
-    ],
-    hdrs = [
-        "admin_filter.h",
-    ],
+    srcs = ["admin_filter.cc"],
+    hdrs = ["admin_filter.h"],
     deps = [
         ":utils_lib",
         "//include/envoy/http:filter_interface",
@@ -94,12 +86,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "utils_lib",
-    srcs = [
-        "utils.cc",
-    ],
-    hdrs = [
-        "utils.h",
-    ],
+    srcs = ["utils.cc"],
+    hdrs = ["utils.h"],
     deps = [
         "//include/envoy/init:manager_interface",
         "//source/common/common:enum_to_int",
