@@ -51,7 +51,7 @@ do
     # If this is a fuzz target, set args to be the temp corpus.
     TARGET_BINARY="${t/://}"
     CORPUS_LOCATION="${TARGET_BINARY:2}"
-    TEST_ARGS="--test_arg=${FUZZ_TEMPDIR}/${CORPUS_LOCATION////_}_corpus --test_arg=-runs=0 --test_output=all"
+    TEST_ARGS=(--test_arg="${FUZZ_TEMPDIR}/${CORPUS_LOCATION////_}_corpus" --test_arg="-runs=0")
     if [[ -z "${OBJECTS}" ]]; then
       # The first object needs to be passed without -object= flag.
       OBJECTS="bazel-bin/${TARGET_BINARY:2}_with_libfuzzer"
