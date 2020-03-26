@@ -94,19 +94,14 @@ DefaultResponseEvaluator::DefaultResponseEvaluator(
     grpc_success_codes_.emplace(enumToSignedInt(Grpc::Status::WellKnownGrpcStatus::Ok));
   }
 }
+bool DefaultResponseEvaluator::isGrpcSuccess(Grpc::Status::GrpcStatus status) const {
+  // The HTTP status code is meaningless if the request has a GRPC content type.
+  return grpc_success_codes_.count(enumToSignedInt(status)) > 0;
+}
 
-bool DefaultResponseEvaluator::isSuccess(Http::ResponseHeaderMap& headers) const {
-  if (Grpc::Common::hasGrpcContentType(headers)) {
-    // The HTTP status code is meaningless if the request has a GRPC content type.
-    absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
-    return grpc_status && grpc_success_codes_.count(enumToSignedInt(grpc_status.value())) > 0;
-  }
-
-  // If any of the HTTP success functions return a match to the response status, the request was a
-  // success.
-  const uint64_t http_status = Http::Utility::getResponseStatus(headers);
+bool DefaultResponseEvaluator::isHttpSuccess(uint64_t code) const {
   for (const auto& fn : http_success_fns_) {
-    if (fn(http_status)) {
+    if (fn(code)) {
       return true;
     }
   }
@@ -136,15 +131,48 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
 }
 
 Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
-                                                                bool) {
-  if (config_->response_evaluator()->isSuccess(headers)) {
-    config_->getController().recordSuccess();
-    ASSERT(deferred_record_failure_);
-    deferred_record_failure_->cancel();
+                                                                bool end_stream) {
+  bool successful_response = false;
+  if (Grpc::Common::isGrpcResponseHeader(headers, end_stream)) {
+    absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
+
+    // If the GRPC status isn't found in the headers, it must be found in the trailers.
+    expect_grpc_status_in_trailer_ = !grpc_status.has_value();
+    if (expect_grpc_status_in_trailer_) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+
+    successful_response = config_->response_evaluator()->isGrpcSuccess(grpc_status.value());
   } else {
-    deferred_record_failure_.reset();
+    // HTTP response.
+    const uint64_t http_status = Http::Utility::getResponseStatus(headers);
+    successful_response = config_->response_evaluator()->isHttpSuccess(http_status);
   }
+
+  if (successful_response) {
+    recordSuccess();
+  } else {
+    recordFailure();
+  }
+
   return Http::FilterHeadersStatus::Continue;
+}
+
+Http::FilterTrailersStatus AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  if (expect_grpc_status_in_trailer_) {
+    absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(trailers, false);
+
+    // Status code must be sent in trailers.
+    ASSERT(grpc_status.has_value());
+
+    if (config_->response_evaluator()->isGrpcSuccess(grpc_status.value())) {
+      recordSuccess();
+    } else {
+      recordFailure();
+    }
+  }
+
+  return Http::FilterTrailersStatus::Continue;
 }
 
 bool AdmissionControlFilter::shouldRejectRequest() const {

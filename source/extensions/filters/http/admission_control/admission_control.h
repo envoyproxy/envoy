@@ -128,13 +128,15 @@ using AdmissionControlProto =
 class ResponseEvaluator {
 public:
   virtual ~ResponseEvaluator() = default;
-  virtual bool isSuccess(Http::ResponseHeaderMap& headers) const PURE;
+  virtual bool isHttpSuccess(uint64_t code) const PURE;
+  virtual bool isGrpcSuccess(Grpc::Status::GrpcStatus status) const PURE;
 };
 
 class DefaultResponseEvaluator : public ResponseEvaluator {
 public:
   DefaultResponseEvaluator(AdmissionControlProto::DefaultSuccessCriteria success_criteria);
-  virtual bool isSuccess(Http::ResponseHeaderMap& headers) const;
+  virtual bool isHttpSuccess(uint64_t code) const override;
+  virtual bool isGrpcSuccess(Grpc::Status::GrpcStatus status) const override;
 
 private:
   std::vector<std::function<bool(uint64_t)>> http_success_fns_;
@@ -191,6 +193,7 @@ public:
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
 private:
   static AdmissionControlStats generateStats(Stats::Scope& scope, const std::string& prefix) {
@@ -199,9 +202,20 @@ private:
 
   bool shouldRejectRequest() const;
 
+  void recordSuccess() {
+    config_->getController().recordSuccess();
+    ASSERT(deferred_record_failure_);
+    deferred_record_failure_->cancel();
+  }
+
+  void recordFailure() {
+    deferred_record_failure_.reset();
+  }
+
   AdmissionControlFilterConfigSharedPtr config_;
   AdmissionControlStats stats_;
   std::unique_ptr<Cleanup> deferred_record_failure_;
+  bool expect_grpc_status_in_trailer_;
 };
 
 } // namespace AdmissionControl
