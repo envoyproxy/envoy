@@ -20,7 +20,12 @@ df -h
 # rules_foreign_cc does not currently use bazel output/temp directories by default, it uses mktemp
 # which respects the value of the TMPDIR environment variable
 drive="$(readlink -f $TMPDIR | cut -d '/' -f2)"
-/c/windows/system32/cmd.exe "/c mklink /d $drive:\\$drive $drive:\\"
+/c/windows/system32/cmd.exe "/c if not exist $drive:\\$drive mklink /d $drive:\\$drive $drive:\\"
+
+# Set up PATH to ensure executables from installed software and system to not conflict with those
+# from MSVC (e.g. link.exe from mingw64 or find.exe from C:\windows\system32 do not conflict with
+# desired executables with those same names).
+export PATH=$(echo $PATH | sed "s#::#:#g;s#:/usr/bin:#:#g;s#:/mingw64/bin:#:#ig;s/$/:\/mingw64\/bin/;s#:/c/windows/system32:#:#ig;s/$/:\/usr\/bin:\/c\/windows\/system32/;")
 
 BAZEL_STARTUP_OPTIONS="--noworkspace_rc --bazelrc=windows/.bazelrc --output_base=c:/_eb"
 BAZEL_BUILD_OPTIONS="-c opt --config=msvc-cl --show_task_finish --verbose_failures \
