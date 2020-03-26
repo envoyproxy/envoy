@@ -34,7 +34,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
@@ -55,6 +54,8 @@
 #include "common/router/config_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/upstream/host_utility.h"
+
+#include "server/http/utils.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 
@@ -135,22 +136,6 @@ const char AdminHtmlEnd[] = R"(
 const std::regex PromRegex("[^a-zA-Z0-9_]");
 
 const uint64_t RecentLookupsCapacity = 100;
-
-void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map) {
-  header_map.setStatus(std::to_string(enumToInt(code)));
-  const auto& headers = Http::Headers::get();
-  if (header_map.ContentType() == nullptr) {
-    // Default to text-plain if unset.
-    header_map.setReferenceContentType(headers.ContentTypeValues.TextUtf8);
-  }
-  // Default to 'no-cache' if unset, but not 'no-store' which may break the back button.
-  if (header_map.CacheControl() == nullptr) {
-    header_map.setReferenceCacheControl(headers.CacheControlValues.NoCacheMaxAge0);
-  }
-
-  // Under no circumstance should browsers sniff content-type.
-  header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
-}
 
 // Helper method to get filter parameter, or report an error for an invalid regex.
 bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
@@ -315,61 +300,6 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
 }
 
 } // namespace
-
-AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
-
-Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
-                                                     bool end_stream) {
-  request_headers_ = &headers;
-  if (end_stream) {
-    onComplete();
-  }
-
-  return Http::FilterHeadersStatus::StopIteration;
-}
-
-Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  // Currently we generically buffer all admin request data in case a handler wants to use it.
-  // If we ever support streaming admin requests we may need to revisit this. Note, we must use
-  // addDecodedData() here since we might need to perform onComplete() processing if end_stream is
-  // true.
-  decoder_callbacks_->addDecodedData(data, false);
-
-  if (end_stream) {
-    onComplete();
-  }
-
-  return Http::FilterDataStatus::StopIterationNoBuffer;
-}
-
-Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::RequestTrailerMap&) {
-  onComplete();
-  return Http::FilterTrailersStatus::StopIteration;
-}
-
-void AdminFilter::onDestroy() {
-  for (const auto& callback : on_destroy_callbacks_) {
-    callback();
-  }
-}
-
-void AdminFilter::addOnDestroyCallback(std::function<void()> cb) {
-  on_destroy_callbacks_.push_back(std::move(cb));
-}
-
-Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() const {
-  ASSERT(decoder_callbacks_ != nullptr);
-  return *decoder_callbacks_;
-}
-
-const Buffer::Instance* AdminFilter::getRequestBody() const {
-  return decoder_callbacks_->decodingBuffer();
-}
-
-const Http::RequestHeaderMap& AdminFilter::getRequestHeaders() const {
-  ASSERT(request_headers_ != nullptr);
-  return *request_headers_;
-}
 
 bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
   if (params.size() != 1) {
@@ -1355,23 +1285,6 @@ Http::Code AdminImpl::handlerReopenLogs(absl::string_view, Http::ResponseHeaderM
 
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
-void AdminFilter::onComplete() {
-  absl::string_view path = request_headers_->Path()->value().getStringView();
-  ENVOY_STREAM_LOG(debug, "request complete: path: {}", *decoder_callbacks_, path);
-
-  Buffer::OwnedImpl response;
-  Http::ResponseHeaderMapPtr header_map{new Http::ResponseHeaderMapImpl};
-  RELEASE_ASSERT(request_headers_, "");
-  Http::Code code = parent_.runCallback(path, *header_map, response, *this);
-  populateFallbackResponseHeaders(code, *header_map);
-  decoder_callbacks_->encodeHeaders(std::move(header_map),
-                                    end_stream_on_complete_ && response.length() == 0);
-
-  if (response.length() > 0) {
-    decoder_callbacks_->encodeData(response, end_stream_on_complete_);
-  }
-}
-
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
@@ -1485,12 +1398,13 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
 }
 
 void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
+  callbacks.addStreamFilter(std::make_shared<AdminFilter>(createCallbackFunction()));
 }
 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
+
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
 
@@ -1639,14 +1553,15 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
-  AdminFilter filter(*this);
+  AdminFilter filter(createCallbackFunction());
+
   Http::RequestHeaderMapImpl request_headers;
   request_headers.setMethod(method);
   filter.decodeHeaders(request_headers, false);
   Buffer::OwnedImpl response;
 
   Http::Code code = runCallback(path_and_query, response_headers, response, filter);
-  populateFallbackResponseHeaders(code, response_headers);
+  Utility::populateFallbackResponseHeaders(code, response_headers);
   body = response.toString();
   return code;
 }
@@ -1661,20 +1576,6 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
     handler->addListener(*listener_);
   }
-}
-
-envoy::admin::v3::ServerInfo::State Utility::serverState(Init::Manager::State state,
-                                                         bool health_check_failed) {
-  switch (state) {
-  case Init::Manager::State::Uninitialized:
-    return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
-  case Init::Manager::State::Initializing:
-    return envoy::admin::v3::ServerInfo::INITIALIZING;
-  case Init::Manager::State::Initialized:
-    return health_check_failed ? envoy::admin::v3::ServerInfo::DRAINING
-                               : envoy::admin::v3::ServerInfo::LIVE;
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Server

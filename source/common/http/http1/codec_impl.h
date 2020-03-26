@@ -118,11 +118,8 @@ private:
  */
 class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
-  using FloodChecks = std::function<void()>;
-
-  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
-                      FloodChecks& flood_checks)
-      : StreamEncoderImpl(connection, header_key_formatter), flood_checks_(flood_checks) {}
+  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+      : StreamEncoderImpl(connection, header_key_formatter) {}
 
   bool startedResponse() { return started_response_; }
 
@@ -132,7 +129,6 @@ public:
   void encodeTrailers(const ResponseTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
-  FloodChecks& flood_checks_;
   bool started_response_{};
 };
 
@@ -337,7 +333,6 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  using FloodChecks = std::function<void()>;
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count);
@@ -349,9 +344,8 @@ private:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
-                  FloodChecks& flood_checks)
-        : response_encoder_(connection, header_key_formatter, flood_checks) {}
+    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+        : response_encoder_(connection, header_key_formatter) {}
 
     HeaderString request_url_;
     RequestDecoder* request_decoder_{};
@@ -406,7 +400,6 @@ private:
   void doFloodProtectionChecks() const;
 
   ServerConnectionCallbacks& callbacks_;
-  std::function<void()> flood_checks_{[&]() { this->doFloodProtectionChecks(); }};
   absl::optional<ActiveRequest> active_request_;
   Http1Settings codec_settings_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
