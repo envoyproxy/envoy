@@ -111,6 +111,7 @@ private:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(const ResponseTrailerMap& trailers) override;
     Stream& getStream() override;
+    Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
     // TODO: implement
     void encode100ContinueHeaders(const ResponseHeaderMap&) override {}
     void encodeMetadata(const MetadataMapVector&) override {}
