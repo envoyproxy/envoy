@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AdaptiveConcurrency {
-namespace ConcurrencyController {
+namespace Controller {
 
 /**
  * The controller's decision on whether a request will be forwarded.
@@ -57,7 +57,7 @@ public:
   virtual uint32_t concurrencyLimit() const PURE;
 };
 
-} // namespace ConcurrencyController
+} // namespace Controller
 } // namespace AdaptiveConcurrency
 } // namespace HttpFilters
 } // namespace Extensions
