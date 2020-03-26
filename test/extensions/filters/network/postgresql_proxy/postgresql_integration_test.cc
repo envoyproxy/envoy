@@ -53,8 +53,9 @@ TEST_P(PostgreSQLIntegrationTest, Login) {
   Buffer::OwnedImpl data;
   uint32_t length = htonl(12);
   std::string rcvd;
-  char buf[256];
+  char buf[32];
 
+  memset(buf, 0, sizeof(buf));
   data.add(&length, sizeof(length));
   // add 8 bytes of some data
   data.add(buf, 8);

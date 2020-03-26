@@ -62,6 +62,7 @@ void PostgreSQLFilter::incFrontend() { config_->stats_.frontend_msgs_.inc(); }
 void PostgreSQLFilter::incBackend() { config_->stats_.backend_msgs_.inc(); }
 
 void PostgreSQLFilter::incUnknown() { config_->stats_.unknown_.inc(); }
+void PostgreSQLFilter::incEncryptedSessions() { config_->stats_.encrypted_sessions_.inc(); }
 
 void PostgreSQLFilter::incStatementsDelete() {
   config_->stats_.statements_delete_.inc();
