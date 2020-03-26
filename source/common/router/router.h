@@ -398,7 +398,7 @@ private:
                    const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                    Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) PURE;
-  Http::ConnectionPool::Instance* getConnPool();
+  Http::ConnectionPool::Instance* getHttpConnPool();
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
   uint32_t numRequestsAwaitingHeaders();
