@@ -251,7 +251,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       !oc_config.ocagent_grpc_service().has_google_grpc()) {
     throw EnvoyException("Opencensus ocagent tracer only supports GoogleGrpc.");
   }
-  // process-wide side effects
+  // Process-wide side effects.
   if (oc_config.has_trace_config()) {
     applyTraceConfig(oc_config.trace_config());
   }
