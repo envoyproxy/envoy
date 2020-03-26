@@ -33,7 +33,8 @@ namespace PostgreSQLProxy {
   COUNTER(transactions)                                                                            \
   COUNTER(transactions_commit)                                                                     \
   COUNTER(transactions_rollback)                                                                   \
-  COUNTER(warnings)
+  COUNTER(warnings)                                                                                \
+  COUNTER(encrypted_sessions)
 
 /**
  * Struct definition for all PostgreSQL proxy stats. @see stats_macros.h
@@ -92,6 +93,7 @@ public:
   void incTransactionsCommit() override;
   void incTransactionsRollback() override;
   void incWarnings() override;
+  void incEncryptedSessions() override;
 
   void doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);

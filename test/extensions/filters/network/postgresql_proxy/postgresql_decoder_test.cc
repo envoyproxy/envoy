@@ -25,12 +25,13 @@ public:
   MOCK_METHOD(void, incTransactionsCommit, (), (override));
   MOCK_METHOD(void, incTransactionsRollback, (), (override));
   MOCK_METHOD(void, incWarnings, (), (override));
+  MOCK_METHOD(void, incEncryptedSessions, (), (override));
 };
 
 // Define fixture class with decoder and mock callbacks.
-class PostgreSQLProxyDecoderTest : public ::testing::TestWithParam<std::string> {
+class PostgreSQLProxyDecoderTestBase {
 public:
-  PostgreSQLProxyDecoderTest() {
+  PostgreSQLProxyDecoderTestBase() {
     decoder_ = std::make_unique<DecoderImpl>(&callbacks_);
     decoder_->initialize();
     decoder_->setStartup(false);
@@ -47,11 +48,19 @@ protected:
   std::string payload_;
 };
 
+class PostgreSQLProxyDecoderTest : public PostgreSQLProxyDecoderTestBase, public ::testing::Test {};
+
 // Class is used for parameterized tests for frontend messages.
-class PostgreSQLProxyFrontendDecoderTest : public PostgreSQLProxyDecoderTest {};
+class PostgreSQLProxyFrontendDecoderTest : public PostgreSQLProxyDecoderTestBase,
+                                           public ::testing::TestWithParam<std::string> {};
+
+// Class is used for parameterized tests for encrypted messages.
+class PostgreSQLProxyFrontendEncrDecoderTest : public PostgreSQLProxyDecoderTestBase,
+                                               public ::testing::TestWithParam<uint32_t> {};
 
 // Class is used for parameterized tests for backend messages.
-class PostgreSQLProxyBackendDecoderTest : public PostgreSQLProxyDecoderTest {};
+class PostgreSQLProxyBackendDecoderTest : public PostgreSQLProxyDecoderTestBase,
+                                          public ::testing::TestWithParam<std::string> {};
 
 // Test processing the startup message from a client.
 // For historical reasons, the first message does not include
@@ -220,7 +229,6 @@ INSTANTIATE_TEST_SUITE_P(BackendMessagesTests, PostgreSQLProxyBackendDecoderTest
                          ::testing::Values("R", "K", "2", "3", "C", "d", "c", "G", "H", "D", "I",
                                            "E", "V", "v", "n", "N", "A", "t", "S", "1", "s", "Z",
                                            "T"));
-
 // Test parsing backend messages.
 // The parser should react only to the first word until the space.
 TEST_F(PostgreSQLProxyBackendDecoderTest, ParseStatement) {
@@ -429,6 +437,45 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, NotificationMsg) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 }
+
+// Test checks if the decoder can detect initial message which indicates
+// that protocol uses encryption
+TEST_P(PostgreSQLProxyFrontendEncrDecoderTest, EncyptedTraffic) {
+  // set decoder to wait for initial message
+  decoder_->setStartup(true);
+
+  // Initial state is no-encryption
+  ASSERT_FALSE(decoder_->encrypted());
+
+  // Create SSLRequest
+  EXPECT_CALL(callbacks_, incEncryptedSessions());
+  length_ = htonl(8);
+  data_.add(&length_, sizeof(length_));
+  // 1234 in the most significant 16 bits, and some code in the least significant 16 bits
+  uint32_t code = htonl(GetParam());
+  data_.add(&code, sizeof(code));
+  decoder_->onData(data_, false);
+  ASSERT_TRUE(decoder_->encrypted());
+  // Decoder should drain data
+  ASSERT_THAT(data_.length(), 0);
+
+  // Now when decoder detected encrypted traffic is should not
+  // react to any messages (even not encrypted ones)
+  EXPECT_CALL(callbacks_, incFrontend()).Times(0);
+  data_.add("P");
+  length_ = htonl(50);
+  data_.add(&length_, sizeof(length_));
+  data_.add(buf_, 46);
+  decoder_->onData(data_, true);
+  // Decoder should drain data
+  ASSERT_THAT(data_.length(), 0);
+}
+
+// Run encryption tests.
+// 80877103 is SSL code
+// 80877104 is GSS code
+INSTANTIATE_TEST_SUITE_P(FrontendEncryptedMessagesTests, PostgreSQLProxyFrontendEncrDecoderTest,
+                         ::testing::Values(80877103, 80877104));
 
 } // namespace PostgreSQLProxy
 } // namespace NetworkFilters

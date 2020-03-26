@@ -36,6 +36,7 @@ public:
   virtual void incTransactionsCommit() PURE;
   virtual void incTransactionsRollback() PURE;
   virtual void incWarnings() PURE;
+  virtual void incEncryptedSessions() PURE;
 };
 
 // PostgreSQL message decoder.
@@ -65,6 +66,8 @@ public:
   void setStartup(bool startup) { startup_ = startup; }
   void initialize();
 
+  bool encrypted() const { return encrypted_; }
+
 protected:
   bool parseMessage(Buffer::Instance& data);
   void decode(Buffer::Instance& data);
@@ -80,6 +83,7 @@ protected:
   void incStatements() { callbacks_->incStatements(); }
   void incStatementsOther() { callbacks_->incStatementsOther(); }
   void incSessions() { callbacks_->incSessions(); }
+  void incEncryptedSessions() { callbacks_->incEncryptedSessions(); }
 
   DecoderCallbacks* callbacks_;
   PostgreSQLSession session_;
@@ -89,7 +93,8 @@ protected:
   std::string message_;
   uint32_t message_len_;
 
-  bool startup_{true}; // startup stage does not have 1st byte command
+  bool startup_{true};    // startup stage does not have 1st byte command
+  bool encrypted_{false}; // tells is exchange is encrypted
 
   // Message action defines the Decoder's method which will be invoked
   // when a specific message has been decoded.

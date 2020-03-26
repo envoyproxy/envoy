@@ -6,6 +6,9 @@ PostgreSQL proxy
 The PostgreSQL proxy filter decodes the wire protocol between PostgreSQL client
 and server. The decoded info is currently used only to produce statistics.
 
+When the PostgreSQL filter detects that a session is encrypted, the messages
+are ignored and no decoding takes place.
+
 
 .. attention::
 
@@ -60,3 +63,4 @@ Every configured PostgreSQL proxy filter has statistics rooted at postgresql.<st
   errors, Counter, Number of times the server replied with error
   warnings, Counter, Number of time the server replied with warning
   unknown, Counter, Number of times the proxy successfully decoded a message but did not know what to do with it.
+  encrypted_sessions, Counter, Number of times the proxy detected encrypted sessions.

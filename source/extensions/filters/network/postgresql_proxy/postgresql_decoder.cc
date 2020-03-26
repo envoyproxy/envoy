@@ -132,6 +132,24 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
     return false;
   }
 
+  if (startup_) {
+    uint32_t code;
+    data.copyOut(4, 4, &code);
+    code = ntohl(code);
+    // Startup message with 1234 in the most significant 16 bits
+    // indicate request to encrypt.
+    if (code >= 0x04d20000) {
+      ENVOY_LOG(trace, "postgresql_proxy: detected encrypted traffic.");
+      encrypted_ = true;
+      startup_ = false;
+      incEncryptedSessions();
+      data.drain(data.length());
+      return false;
+    } else {
+      ENVOY_LOG(debug, "Detected version {}.{} of PostgreSQL", code >> 16, code & 0x0000FFFF);
+    }
+  }
+
   setMessageLength(length);
 
   data.drain(startup_ ? 4 : 5); // length plus optional 1st byte
@@ -146,6 +164,13 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
 }
 
 bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
+  // If encrypted, just drain the traffic
+  if (encrypted_) {
+    ENVOY_LOG(trace, "postgresql_proxy: ignoring {} bytes of encrypted data", data.length());
+    data.drain(data.length());
+    return true;
+  }
+
   ENVOY_LOG(trace, "postgresql_proxy: decoding {} bytes", data.length());
 
   if (!parseMessage(data)) {
