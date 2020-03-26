@@ -93,7 +93,8 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
   write_func(h2_frame);
 }
 
-void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCase& input) {
+void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCase& input,
+                                   bool ignore_response) {
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
@@ -130,6 +131,9 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
       }
     } break;
     case test::integration::Event::kUpstreamSendEvent:
+      if (ignore_response) {
+        break;
+      }
       if (fake_upstream_connection == nullptr) {
         if (!fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection, max_wait_ms_)) {
           // If we timed out, we fail out.

@@ -13,7 +13,7 @@ DEFINE_PROTO_FUZZER(const test::integration::H2CaptureFuzzTestCase& input) {
   FUZZ_ASSERT(!TestEnvironment::getIpVersionsForTest().empty());
   const auto ip_version = TestEnvironment::getIpVersionsForTest()[0];
   H2FuzzIntegrationTest h2_fuzz_integration_test(ip_version);
-  h2_fuzz_integration_test.replay(input);
+  h2_fuzz_integration_test.replay(input, false);
 }
 
 } // namespace Envoy

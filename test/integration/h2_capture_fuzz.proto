@@ -49,22 +49,27 @@ message H2FrameWindowUpdate {
   uint32 increment = 2;
 }
 
+// A header that contains invalid status
 message H2FrameMalformedRequest {
   uint32 stream_index = 1;
 }
 
+// A request that is comprised of a header that has http GET request with a given host and path and
+// an additional zero length header (making this a malformed request)
 message H2FrameMalformedRequestWithZerolenHeader {
   uint32 stream_index = 1;
   bytes host = 2;
   bytes path = 3;
 }
 
+// A request that is comprised of a header that has http GET request with a given host and path
 message H2FrameRequest {
   uint32 stream_index = 1;
   bytes host = 2;
   bytes path = 3;
 }
 
+// A request that is comprised of a header that has http POST request with a given host and path
 message H2FramePostRequest {
   uint32 stream_index = 1;
   bytes host = 2;
