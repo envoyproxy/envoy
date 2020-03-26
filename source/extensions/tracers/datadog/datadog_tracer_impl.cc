@@ -100,21 +100,29 @@ void TraceReporter::flushTraces() {
     ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload size {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 
-    driver_.clusterManager()
-        .httpAsyncClientForCluster(driver_.cluster()->name())
-        .send(std::move(message), *this,
-              Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000U)));
+    Http::AsyncClient::Request* request =
+        driver_.clusterManager()
+            .httpAsyncClientForCluster(driver_.cluster()->name())
+            .send(std::move(message), *this,
+                  Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000U)));
+    if (request) {
+      active_requests_.add(*request);
+    }
 
     encoder_->clearTraces();
   }
 }
 
-void TraceReporter::onFailure(Http::AsyncClient::FailureReason) {
+void TraceReporter::onFailure(const Http::AsyncClient::Request& request,
+                              Http::AsyncClient::FailureReason) {
+  active_requests_.remove(request);
   ENVOY_LOG(debug, "failure submitting traces to datadog agent");
   driver_.tracerStats().reports_failed_.inc();
 }
 
-void TraceReporter::onSuccess(Http::ResponseMessagePtr&& http_response) {
+void TraceReporter::onSuccess(const Http::AsyncClient::Request& request,
+                              Http::ResponseMessagePtr&& http_response) {
+  active_requests_.remove(request);
   uint64_t responseStatus = Http::Utility::getResponseStatus(http_response->headers());
   if (responseStatus != enumToInt(Http::Code::OK)) {
     // TODO: Consider adding retries for failed submissions.

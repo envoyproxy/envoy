@@ -96,47 +96,7 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 }
 
 // Validates that the drain actually drains the listeners.
-TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
-  initialize();
-
-  uint32_t http_port = lookupPort("http");
-  codec_client_ = makeHttpConnection(http_port);
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "HEAD"},
-                                                 {":path", "/test/long/url"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "host"}};
-  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  waitForNextUpstreamRequest(0);
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-
-  // Invoke drain listeners endpoint and validate that we can still work on inflight requests.
-  BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
-  EXPECT_TRUE(admin_response->complete());
-  EXPECT_EQ("200", admin_response->headers().Status()->value().getStringView());
-  EXPECT_EQ("OK\n", admin_response->body());
-
-  upstream_request_->encodeData(512, true);
-
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-
-  // Wait for the response to be read by the codec client.
-  response->waitForEndStream();
-
-  ASSERT_TRUE(response->complete());
-  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
-
-  // Validate that the listeners have been stopped.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
-
-  // Validate that port is closed and can be bound by other sockets.
-  EXPECT_NO_THROW(Network::TcpListenSocket(
-      Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                           http_port),
-      nullptr, true));
-}
+TEST_P(IntegrationTest, AdminDrainDrainsListeners) { testAdminDrain(downstreamProtocol()); }
 
 TEST_P(IntegrationTest, RouterDirectResponse) {
   const std::string body = "Response body";
@@ -236,10 +196,8 @@ TEST_P(IntegrationTest, ResponseFramedByConnectionCloseWithReadLimits) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   // Disable chunk encoding to trigger framing by connection close.
-  // TODO: This request should be propagated to codecs via API, instead of using a pseudo-header.
-  //       See: https://github.com/envoyproxy/envoy/issues/9749
-  upstream_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "200"}, {":no-chunks", "1"}}, false);
+  upstream_request_->http1StreamEncoderOptions().value().get().disableChunkEncoding();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(512, true);
   ASSERT_TRUE(fake_upstream_connection_->close());
 
@@ -384,14 +342,13 @@ TEST_P(IntegrationTest, TestSmuggling) {
     EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
               response);
   }
-  // Make sure unsupported transfer encodings are rejected, lest they be abused.
   {
     std::string response;
     const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
                                 "identity,chunked \r\ncontent-length: 36\r\n\r\n" +
                                 smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
-    EXPECT_EQ("HTTP/1.1 501 Not Implemented\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
               response);
   }
 }

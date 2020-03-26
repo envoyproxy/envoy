@@ -81,6 +81,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
 

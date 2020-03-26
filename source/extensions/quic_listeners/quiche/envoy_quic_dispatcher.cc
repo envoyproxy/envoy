@@ -1,5 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
 
+#include "common/http/utility.h"
+
 #include "extensions/quic_listeners/quiche/envoy_quic_server_connection.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
 
@@ -30,8 +32,9 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
   // TODO(#8826) Ideally we should use the negotiated value from upstream which is not accessible
   // for now. 512MB is way to large, but the actual bytes buffered should be bound by the negotiated
   // upstream flow control window.
-  SetQuicFlag(FLAGS_quic_buffered_data_threshold,
-              2 * Http::Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE); // 512MB
+  SetQuicFlag(
+      FLAGS_quic_buffered_data_threshold,
+      2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE); // 512MB
 }
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,

@@ -11,6 +11,7 @@ ALS
 AMZ
 APC
 API
+ARN
 ASAN
 ASCII
 ASSERTs
@@ -320,6 +321,7 @@ VH
 VHDS
 VLOG
 VM
+WAITFORONE
 WASM
 WAVM
 WIP
@@ -384,6 +386,8 @@ backgrounded
 backoff
 backpressure
 backticks
+backtraces
+backtracing
 balancer
 balancers
 barbaz
@@ -621,6 +625,7 @@ hermeticity
 highp
 hoc
 hostname
+hostnames
 hostset
 hrefs
 huffman
@@ -727,6 +732,7 @@ misconfigured
 mixin
 mkdir
 mmap
+mmsg
 mongo
 moveable
 msec
@@ -938,6 +944,7 @@ sched
 schemas
 scopekey
 sendmsg
+sendmmsg
 sendto
 serializable
 serializer

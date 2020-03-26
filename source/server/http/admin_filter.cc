@@ -23,7 +23,7 @@ Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_
   // If we ever support streaming admin requests we may need to revisit this. Note, we must use
   // addDecodedData() here since we might need to perform onComplete() processing if end_stream is
   // true.
-  callbacks_->addDecodedData(data, false);
+  decoder_callbacks_->addDecodedData(data, false);
 
   if (end_stream) {
     onComplete();
@@ -48,11 +48,13 @@ void AdminFilter::addOnDestroyCallback(std::function<void()> cb) {
 }
 
 Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() const {
-  ASSERT(callbacks_ != nullptr);
-  return *callbacks_;
+  ASSERT(decoder_callbacks_ != nullptr);
+  return *decoder_callbacks_;
 }
 
-const Buffer::Instance* AdminFilter::getRequestBody() const { return callbacks_->decodingBuffer(); }
+const Buffer::Instance* AdminFilter::getRequestBody() const {
+  return decoder_callbacks_->decodingBuffer();
+}
 
 const Http::RequestHeaderMap& AdminFilter::getRequestHeaders() const {
   ASSERT(request_headers_ != nullptr);
@@ -61,18 +63,18 @@ const Http::RequestHeaderMap& AdminFilter::getRequestHeaders() const {
 
 void AdminFilter::onComplete() {
   absl::string_view path = request_headers_->Path()->value().getStringView();
-  ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
+  ENVOY_STREAM_LOG(debug, "request complete: path: {}", *decoder_callbacks_, path);
 
   Buffer::OwnedImpl response;
   Http::ResponseHeaderMapPtr header_map{new Http::ResponseHeaderMapImpl};
   RELEASE_ASSERT(request_headers_, "");
   Http::Code code = admin_server_callback_func_(path, *header_map, response, *this);
   Utility::populateFallbackResponseHeaders(code, *header_map);
-  callbacks_->encodeHeaders(std::move(header_map),
-                            end_stream_on_complete_ && response.length() == 0);
+  decoder_callbacks_->encodeHeaders(std::move(header_map),
+                                    end_stream_on_complete_ && response.length() == 0);
 
   if (response.length() > 0) {
-    callbacks_->encodeData(response, end_stream_on_complete_);
+    decoder_callbacks_->encodeData(response, end_stream_on_complete_);
   }
 }
 
