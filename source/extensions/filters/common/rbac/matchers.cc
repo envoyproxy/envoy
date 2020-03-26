@@ -46,8 +46,11 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
     return std::make_shared<const OrMatcher>(principal.or_ids());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAuthenticated:
     return std::make_shared<const AuthenticatedMatcher>(principal.authenticated());
-  case envoy::config::rbac::v3::Principal::IdentifierCase::kSourceIp:
-    return std::make_shared<const IPMatcher>(principal.source_ip(),
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kHiddenEnvoyDeprecatedSourceIp:
+    return std::make_shared<const IPMatcher>(principal.hidden_envoy_deprecated_source_ip(),
+                                             IPMatcher::Type::ConnectionRemote);
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kPeerIp:
+    return std::make_shared<const IPMatcher>(principal.peer_ip(),
                                              IPMatcher::Type::DownstreamDirectRemote);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kRemoteIp:
     return std::make_shared<const IPMatcher>(principal.remote_ip(),
@@ -127,10 +130,13 @@ bool HeaderMatcher::matches(const Network::Connection&,
   return Envoy::Http::HeaderUtility::matchHeaders(headers, header_);
 }
 
-bool IPMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,
                         const StreamInfo::StreamInfo& info) const {
   Envoy::Network::Address::InstanceConstSharedPtr ip;
   switch (type_) {
+  case ConnectionRemote:
+    ip = connection.remoteAddress();
+    break;
   case DownstreamLocal:
     ip = info.downstreamLocalAddress();
     break;

@@ -132,17 +132,17 @@ private:
 };
 
 /**
- * Perform a match against an IP CIDR range. This rule can be applied to
+ * Perform a match against an IP CIDR range. This rule can be applied to connection remote,
  * downstream local address, downstream direct remote address or downstream remote address.
  */
 class IPMatcher : public Matcher {
 public:
-  enum Type { DownstreamLocal = 0, DownstreamDirectRemote, DownstreamRemote };
+  enum Type { ConnectionRemote = 0, DownstreamLocal, DownstreamDirectRemote, DownstreamRemote };
 
   IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type)
       : range_(Network::Address::CidrRange::create(range)), type_(type) {}
 
-  bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info) const override;
 
 private:

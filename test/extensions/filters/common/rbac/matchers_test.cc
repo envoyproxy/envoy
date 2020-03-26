@@ -68,7 +68,7 @@ TEST(AndMatcher, Principal_Set) {
   checkMatcher(RBAC::AndMatcher(set), true);
 
   principal = set.add_ids();
-  auto* cidr = principal->mutable_source_ip();
+  auto* cidr = principal->mutable_peer_ip();
   cidr->set_address_prefix("1.2.3.0");
   cidr->mutable_prefix_len()->set_value(24);
 
@@ -110,7 +110,7 @@ TEST(OrMatcher, Permission_Set) {
 TEST(OrMatcher, Principal_Set) {
   envoy::config::rbac::v3::Principal::Set set;
   envoy::config::rbac::v3::Principal* id = set.add_ids();
-  auto* cidr = id->mutable_source_ip();
+  auto* cidr = id->mutable_peer_ip();
   cidr->set_address_prefix("1.2.3.0");
   cidr->mutable_prefix_len()->set_value(24);
 
@@ -170,12 +170,15 @@ TEST(IPMatcher, IPMatcher) {
   Envoy::Network::MockConnection conn;
   Envoy::Http::RequestHeaderMapImpl headers;
   NiceMock<StreamInfo::MockStreamInfo> info;
+  Envoy::Network::Address::InstanceConstSharedPtr connectionRemote =
+      Envoy::Network::Utility::parseInternetAddress("12.13.14.15", 789, false);
   Envoy::Network::Address::InstanceConstSharedPtr directLocal =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   Envoy::Network::Address::InstanceConstSharedPtr directRemote =
       Envoy::Network::Utility::parseInternetAddress("4.5.6.7", 456, false);
   Envoy::Network::Address::InstanceConstSharedPtr downstreamRemote =
       Envoy::Network::Utility::parseInternetAddress("8.9.10.11", 456, false);
+  EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(connectionRemote));
   EXPECT_CALL(Const(info), downstreamLocalAddress())
       .Times(2)
       .WillRepeatedly(ReturnRef(directLocal));
@@ -185,6 +188,10 @@ TEST(IPMatcher, IPMatcher) {
   EXPECT_CALL(Const(info), downstreamRemoteAddress())
       .Times(2)
       .WillRepeatedly(ReturnRef(downstreamRemote));
+
+  envoy::config::core::v3::CidrRange connection_remote_cidr;
+  connection_remote_cidr.set_address_prefix("12.13.14.15");
+  connection_remote_cidr.mutable_prefix_len()->set_value(32);
 
   envoy::config::core::v3::CidrRange downstream_local_cidr;
   downstream_local_cidr.set_address_prefix("1.2.3.0");
@@ -198,6 +205,8 @@ TEST(IPMatcher, IPMatcher) {
   downstream_remote_cidr.set_address_prefix("8.9.10.11");
   downstream_remote_cidr.mutable_prefix_len()->set_value(32);
 
+  checkMatcher(IPMatcher(connection_remote_cidr, IPMatcher::Type::ConnectionRemote), true, conn,
+               headers, info);
   checkMatcher(IPMatcher(downstream_local_cidr, IPMatcher::Type::DownstreamLocal), true, conn,
                headers, info);
   checkMatcher(IPMatcher(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote),
@@ -205,10 +214,13 @@ TEST(IPMatcher, IPMatcher) {
   checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), true, conn,
                headers, info);
 
+  connection_remote_cidr.set_address_prefix("4.5.6.7");
   downstream_local_cidr.set_address_prefix("1.2.4.8");
   downstream_direct_remote_cidr.set_address_prefix("4.5.6.0");
   downstream_remote_cidr.set_address_prefix("4.5.6.7");
 
+  checkMatcher(IPMatcher(connection_remote_cidr, IPMatcher::Type::ConnectionRemote), false, conn,
+               headers, info);
   checkMatcher(IPMatcher(downstream_local_cidr, IPMatcher::Type::DownstreamLocal), false, conn,
                headers, info);
   checkMatcher(IPMatcher(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote),
