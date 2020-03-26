@@ -281,10 +281,15 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
           version, config) {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
+  return makeClientConnectionWithOptions(port, nullptr);
+}
+
+Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOptions(
+    uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
 
   connection->enableHalfClose(enable_half_close_);
   return connection;

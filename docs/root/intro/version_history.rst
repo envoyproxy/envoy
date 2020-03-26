@@ -34,6 +34,7 @@ Version history
 * http: connection header sanitizing has been modified to always sanitize if there is no upgrade, including when an h2c upgrade attempt has been removed.
 * http: added :ref:`max_stream_duration <envoy_api_field_core.HttpProtocolOptions.max_stream_duration>` to specify the duration of existing streams. See :ref:`connection and stream timeouts <faq_configuration_timeouts>`.
 * http: upgrade parser library, which removes support for "identity" transfer-encoding value.
+* http: the runtime feature `http.connection_manager.log_flood_exception` is removed and replaced with a connection access log response code.
 * listener filters: listener filter extensions use the "envoy.filters.listener" name space. A
   mapping of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * listeners: fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` could have been bypassed by a client using only TLS 1.3.
@@ -69,6 +70,7 @@ Version history
 * tracers: tracer extensions use the "envoy.tracers" name space. A mapping of extension names is
   available in the :ref:`deprecated <deprecated>` documentation.
 * tracing: added gRPC service configuration to the OpenCensus Stackdriver and OpenCensus Agent tracers.
+* upstream: added ``upstream_rq_retry_limit_exceeded`` to :ref:`cluster <config_cluster_manager_cluster_stats>`, and :ref:`virtual cluster <config_http_filters_router_vcluster_stats>` stats.
 * upstream: combined HTTP/1 and HTTP/2 connection pool code. This means that circuit breaker
   limits for both requests and connections apply to both pool types. Also, HTTP/2 now has
   the option to limit concurrent requests on a connection, and allow multiple draining
