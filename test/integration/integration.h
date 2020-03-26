@@ -197,7 +197,10 @@ public:
   void setUpstreamAddress(uint32_t upstream_index,
                           envoy::config::endpoint::v3::LbEndpoint& endpoint) const;
 
-  virtual Network::ClientConnectionPtr makeClientConnection(uint32_t port);
+  Network::ClientConnectionPtr makeClientConnection(uint32_t port);
+  virtual Network::ClientConnectionPtr
+  makeClientConnectionWithOptions(uint32_t port,
+                                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);

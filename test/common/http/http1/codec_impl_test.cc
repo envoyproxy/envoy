@@ -667,7 +667,8 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
     response_encoder->encodeHeaders(headers, true);
   }
 
-  // Trying to shove a third response in the queue should trigger flood protection.
+  // Trying to accept a third request with two buffered responses in the queue should trigger flood
+  // protection.
   {
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
@@ -677,10 +678,7 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
         }));
 
     Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-    codec_->dispatch(buffer);
-
-    TestResponseHeaderMapImpl headers{{":status", "200"}};
-    EXPECT_THROW_WITH_MESSAGE(response_encoder->encodeHeaders(headers, true), FrameFloodException,
+    EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), FrameFloodException,
                               "Too many responses queued.");
     EXPECT_EQ(1, store_.counter("http1.response_flood").value());
   }

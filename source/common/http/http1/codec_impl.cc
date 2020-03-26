@@ -267,9 +267,11 @@ void ServerConnectionImpl::doFloodProtectionChecks() const {
   if (!flood_protection_) {
     return;
   }
-  // Before sending another response, make sure it won't exceed flood protection thresholds.
+  // Before processing another request, make sure that we are below the response flood protection
+  // threshold.
   if (outbound_responses_ >= max_outbound_responses_) {
-    ENVOY_CONN_LOG(trace, "error sending response: Too many pending responses queued", connection_);
+    ENVOY_CONN_LOG(trace, "error accepting request: too many pending responses queued",
+                   connection_);
     stats_.response_flood_.inc();
     throw FrameFloodException("Too many responses queued.");
   }
@@ -311,9 +313,6 @@ static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
 void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
-  // Do flood checks before attempting to write any responses.
-  flood_checks_();
-
   started_response_ = true;
 
   // The contract is that client codecs must ensure that :status is present.
@@ -790,9 +789,14 @@ int ServerConnectionImpl::onHeadersComplete() {
 void ServerConnectionImpl::onMessageBegin() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_.has_value());
-    active_request_.emplace(*this, header_key_formatter_.get(), flood_checks_);
+    active_request_.emplace(*this, header_key_formatter_.get());
     auto& active_request = active_request_.value();
     active_request.request_decoder_ = &callbacks_.newStream(active_request.response_encoder_);
+
+    // Check for pipelined request flood as we prepare to accept a new request.
+    // Parse errors that happen prior to onMessageBegin result in stream termination, it is not
+    // possible to overflow output buffers with early parse errors.
+    doFloodProtectionChecks();
   }
 }
 
