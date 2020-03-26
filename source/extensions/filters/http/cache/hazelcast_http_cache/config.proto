@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package envoy.source.extensions.filters.http.cache;
+
+// [#protodoc-title: HazelcastHttpCache CacheFilter storage plugin]
+// CacheFilter plugin backed by Hazelcast IMDG.
+// [#extension: envoy.extensions.http.cache]
+
+// Hazelcast Http Cache configuration
+// TODO: Mention defaults.
+message HazelcastHttpCacheConfig {
+    // Group name of Hazelcast cluster to be connected.
+    string group_name = 1;
+    // Group password of Hazelcast cluster to be connected.
+    string group_password = 2;
+
+    // IP address of Hazelcast member to be connected.
+    string ip = 3;
+    // Port of Hazelcast member to be connected.
+    int32 port = 4;
+
+    // Application specific name for the cache. Different deployments should
+    // use the same prefix if they want to share the same cache and connect
+    // to the same Hazelcast cluster.
+    string app_prefix = 5;
+
+    // In unified mode, cached responses will be stored as a single entry.
+    // On a range HTTP request, regardless of the request range, all the
+    // body will be called from the remote cache and then the requested
+    // range will be served.
+    // In divided mode, cached responses will be stored in two different
+    // maps: header map and body map. For a response to be cached, its
+    // header is stored in the header map and its body is stored in body
+    // map partitioned with body_partition_size. On a range request, only
+    // required body partitions are called from the distributed map. This
+    // option causes extra memory usage per partition on the cache.
+    bool unified = 6;
+
+    // Body partition size for divided cache. Ignored in unified mode.
+    int64 body_partition_size = 7;
+
+    // Maximum allowed body size per response. If insertion for a larger
+    // value than the limit is attempted, the first max_body_size bytes
+    // of the response will be cached and the remaining will be ignored.
+    int64 max_body_size = 8;
+}

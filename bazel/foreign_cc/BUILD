@@ -177,6 +177,20 @@ envoy_cmake_external(
 )
 
 envoy_cmake_external(
+    name = "hazelcast_cpp_client",
+    cache_entries = {
+        "HZ_LIB_TYPE": "STATIC",
+        "CMAKE_BUILD_TYPE": "RELEASE",
+        "CMAKE_CXX_FLAGS" : "-Wno-deprecated",
+    },
+    lib_source = "@com_github_hazelcast_cpp_client//:all",
+    static_libraries = select({
+        "//bazel:windows_x86_64": ["libHazelcastClient3.12.1_64.lib"],
+        "//conditions:default": ["libHazelcastClient3.12.1_64.a"],
+    }),
+)
+
+envoy_cmake_external(
     name = "nghttp2",
     cache_entries = {
         "ENABLE_LIB_ONLY": "on",

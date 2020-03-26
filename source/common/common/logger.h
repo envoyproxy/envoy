@@ -38,6 +38,7 @@ namespace Logger {
   FUNCTION(filter)                                                                                 \
   FUNCTION(forward_proxy)                                                                          \
   FUNCTION(grpc)                                                                                   \
+  FUNCTION(hazelcast_http_cache)                                                                   \
   FUNCTION(hc)                                                                                     \
   FUNCTION(health_checker)                                                                         \
   FUNCTION(http)                                                                                   \

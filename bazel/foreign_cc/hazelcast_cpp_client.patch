@@ -1,0 +1,12 @@
+--- CMakeLists.txt	2020-02-27 11:35:35.000000000 +0300
++++ CMakeLists.txt	2020-02-27 11:37:15.000000000 +0300
+@@ -279,3 +279,9 @@
+ 	ADD_SUBDIRECTORY(examples)
+ 	message(STATUS "Configured to build the examples.")
+ ENDIF(HZ_BUILD_EXAMPLES)
++INSTALL(TARGETS ${HZ_LIB_NAME} DESTINATION lib)
++INSTALL(DIRECTORY ${PROJECT_SOURCE_DIR}/hazelcast/generated-sources/include/hazelcast DESTINATION include FILES_MATCHING PATTERN "*.h")
++INSTALL(DIRECTORY ${PROJECT_SOURCE_DIR}/hazelcast/include/hazelcast DESTINATION include FILES_MATCHING PATTERN "*.h" PATTERN "*.inl")
++INSTALL(DIRECTORY ${PROJECT_SOURCE_DIR}/external/release_include/boost DESTINATION include FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
++INSTALL(DIRECTORY ${PROJECT_SOURCE_DIR}/external/release_include/easylogging++ DESTINATION include FILES_MATCHING PATTERN "*.h")
++INSTALL(DIRECTORY ${PROJECT_SOURCE_DIR}/external/include/asio/asio/include/asio DESTINATION include FILES_MATCHING PATTERN "*.hpp")

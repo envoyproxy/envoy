@@ -128,6 +128,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_libprotobuf_mutator()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
+    _com_github_hazelcast_cpp_client()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
@@ -287,6 +288,20 @@ def _com_github_google_libprotobuf_mutator():
     _repository_impl(
         name = "com_github_google_libprotobuf_mutator",
         build_file = "@envoy//bazel/external:libprotobuf_mutator.BUILD",
+    )
+
+def _com_github_hazelcast_cpp_client():
+    location = REPOSITORY_LOCATIONS["com_github_hazelcast_cpp_client"]
+    http_archive(
+        name = "com_github_hazelcast_cpp_client",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p0"],
+        patches = ["@envoy//bazel/foreign_cc:hazelcast_cpp_client.patch"],
+        **location
+    )
+    native.bind(
+        name = "hazelcast_cpp_client",
+        actual = "@envoy//bazel/foreign_cc:hazelcast_cpp_client",
     )
 
 def _com_github_jbeder_yaml_cpp():
