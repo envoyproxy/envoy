@@ -174,7 +174,8 @@ struct CollectorInfo {
  */
 class ReporterImpl : Logger::Loggable<Logger::Id::tracing>,
                      public Reporter,
-                     public Http::AsyncClient::Callbacks {
+                     public Http::AsyncClient::Callbacks,
+                     public Upstream::ClusterUpdateCallbacks {
 public:
   /**
    * Constructor.
@@ -200,6 +201,10 @@ public:
   // The callbacks below record Zipkin-span-related stats.
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
+
+  // Upstream::ClusterUpdateCallbacks
+  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
+  void onClusterRemoval(const std::string& cluster_name) override;
 
   /**
    * Creates a heap-allocated ZipkinReporter.
@@ -230,6 +235,8 @@ private:
   Event::TimerPtr flush_timer_;
   const CollectorInfo collector_;
   SpanBufferPtr span_buffer_;
+  const Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_handle_;
+  Upstream::ClusterInfoConstSharedPtr collector_cluster_;
   // Track active HTTP requests to be able to cancel them on destruction.
   Http::AsyncClientRequestTracker active_requests_;
 };

@@ -134,7 +134,12 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
                            const CollectorInfo& collector)
     : driver_(driver),
       collector_(collector), span_buffer_{std::make_unique<SpanBuffer>(
-                                 collector.version_, collector.shared_span_context_)} {
+                                 collector.version_, collector.shared_span_context_)},
+      cluster_update_callbacks_handle_(
+          driver_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
+  Upstream::ThreadLocalCluster* cluster = driver_.clusterManager().get(driver_.cluster());
+  collector_cluster_ = cluster ? cluster->info() : nullptr;
+
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
     flushSpans();
@@ -190,10 +195,10 @@ void ReporterImpl::flushSpans() {
     const uint64_t timeout =
         driver_.runtime().snapshot().getInteger("tracing.zipkin.request_timeout", 5000U);
 
-    if (driver_.clusterManager().get(driver_.cluster())) {
+    if (collector_cluster_) {
       Http::AsyncClient::Request* request =
           driver_.clusterManager()
-              .httpAsyncClientForCluster(driver_.cluster())
+              .httpAsyncClientForCluster(collector_cluster_->name())
               .send(std::move(message), *this,
                     Http::AsyncClient::RequestOptions().setTimeout(
                         std::chrono::milliseconds(timeout)));
@@ -224,6 +229,22 @@ void ReporterImpl::onSuccess(const Http::AsyncClient::Request& request,
   } else {
     driver_.tracerStats().reports_sent_.inc();
   }
+}
+
+void ReporterImpl::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
+  if (cluster.info()->name() != driver_.cluster()) {
+    return;
+  }
+  ENVOY_LOG(debug, "attaching to cluster {}", cluster.info()->name());
+  collector_cluster_ = cluster.info();
+}
+
+void ReporterImpl::onClusterRemoval(const std::string& cluster) {
+  if (cluster != driver_.cluster()) {
+    return;
+  }
+  ENVOY_LOG(debug, "detaching from cluster {}", cluster);
+  collector_cluster_.reset();
 }
 
 } // namespace Zipkin
