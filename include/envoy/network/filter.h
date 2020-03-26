@@ -310,7 +310,7 @@ public:
   /**
    * Add a filter to the listener. Filters are invoked in FIFO order (the filter added
    * first is called first).
-   * @param listener_filter_matcher supplies the listener filter matcher to
+   * @param listener_filter_matcher supplies the matcher to decide when filter is enabled.
    * @param filter supplies the filter being added.
    */
   virtual void addAcceptFilter(const ListenerFilterMatcherSharedPtr& listener_filter_matcher,

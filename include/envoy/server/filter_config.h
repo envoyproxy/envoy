@@ -253,8 +253,8 @@ public:
    * produce a factory with the provided parameters, it should throw an EnvoyException in the case
    * of general error or a Json::Exception if the json configuration is erroneous. The returned
    * callback should always be initialized.
-   * @param config supplies the general protobuf configuration for the filter
-   * @param listener_filter_matcher supplies the matcher to decide when filter is enabled
+   * @param config supplies the general protobuf configuration for the filter.
+   * @param listener_filter_matcher supplies the matcher to decide when filter is enabled.
    * @param context supplies the filter's context.
    * @return Network::ListenerFilterFactoryCb the factory creation function.
    */
