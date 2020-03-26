@@ -12,6 +12,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/container/fixed_array.h"
@@ -41,7 +42,7 @@ protected:
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     envoy::extensions::filters::http::gzip::v3::Gzip gzip;
     TestUtility::loadFromJson(json, gzip);
-    config_.reset(new GzipFilterConfig(gzip, "test.", stats_, runtime_));
+    config_.reset(new GzipFilterConfig(gzip, "test.", stats_, runtime_, time_system_));
     filter_ = std::make_unique<Common::Compressors::CompressorFilter>(config_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -151,13 +152,14 @@ protected:
     EXPECT_EQ(1, stats_.counter("test.gzip.not_compressed").value());
   }
 
+  Stats::IsolatedStoreImpl stats_;
+  Event::SimulatedTimeSystem time_system_;
   std::shared_ptr<GzipFilterConfig> config_;
   std::unique_ptr<Common::Compressors::CompressorFilter> filter_;
   Buffer::OwnedImpl data_;
   Decompressor::ZlibDecompressorImpl decompressor_;
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
-  Stats::IsolatedStoreImpl stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

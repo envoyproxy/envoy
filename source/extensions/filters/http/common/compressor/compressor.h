@@ -8,6 +8,7 @@
 
 #include "common/protobuf/protobuf.h"
 #include "common/runtime/runtime_protos.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 
@@ -72,12 +73,16 @@ public:
   uint32_t minimumLength() const { return content_length_; }
   const std::string contentEncoding() const { return content_encoding_; };
   const std::map<std::string, uint32_t> registeredCompressors() const;
+  TimeSource& timeSource() { return time_source_; }
+  Stats::Scope& scope() { return scope_; }
+  Stats::StatName compressionLatencyStatName() { return compression_latency_; }
+  Stats::StatName statsPrefix() { return stats_prefix_; }
 
 protected:
   CompressorFilterConfig(
       const envoy::extensions::filters::http::compressor::v3::Compressor& compressor,
       const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-      const std::string& content_encoding);
+      const std::string& content_encoding, TimeSource& time_source);
 
 private:
   static StringUtil::CaseUnorderedSet
@@ -97,6 +102,11 @@ private:
   const CompressorStats stats_;
   Runtime::FeatureFlag enabled_;
   const std::string content_encoding_;
+  TimeSource& time_source_;
+  Stats::Scope& scope_;
+  Stats::StatNameSetPtr stat_name_set_;
+  const Stats::StatName compression_latency_;
+  const Stats::StatName stats_prefix_;
 };
 using CompressorFilterConfigSharedPtr = std::shared_ptr<CompressorFilterConfig>;
 
@@ -148,6 +158,7 @@ private:
 
   std::unique_ptr<EncodingDecision> chooseEncoding(const Http::ResponseHeaderMap& headers) const;
   bool shouldCompress(const EncodingDecision& decision) const;
+  void compress(Buffer::Instance& data, Compressor::State state);
 
   bool skip_compression_;
   std::unique_ptr<Compressor::Compressor> compressor_;

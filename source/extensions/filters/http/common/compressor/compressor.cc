@@ -37,13 +37,16 @@ const std::string& compressorRegistryKey() { CONSTRUCT_ON_FIRST_USE(std::string,
 CompressorFilterConfig::CompressorFilterConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& compressor,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-    const std::string& content_encoding)
+    const std::string& content_encoding, TimeSource& time_source)
     : content_length_(contentLengthUint(compressor.content_length().value())),
       content_type_values_(contentTypeSet(compressor.content_type())),
       disable_on_etag_header_(compressor.disable_on_etag_header()),
       remove_accept_encoding_header_(compressor.remove_accept_encoding_header()),
       stats_(generateStats(stats_prefix, scope)), enabled_(compressor.runtime_enabled(), runtime),
-      content_encoding_(content_encoding) {}
+      content_encoding_(content_encoding), time_source_(time_source), scope_(scope),
+      stat_name_set_(scope.symbolTable().makeSet("Gzip")),
+      compression_latency_(stat_name_set_->add("compression_latency")),
+      stats_prefix_(stat_name_set_->add(stats_prefix)) {}
 
 StringUtil::CaseUnorderedSet
 CompressorFilterConfig::contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types) {
@@ -118,19 +121,35 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
   return Http::FilterHeadersStatus::Continue;
 }
 
+void CompressorFilter::compress(Buffer::Instance& data, Compressor::State state) {
+  const auto start_time = config_->timeSource().monotonicTime();
+  compressor_->compress(data, state);
+  const auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(
+      config_->timeSource().monotonicTime() - start_time);
+  auto& scope = config_->scope();
+  Stats::SymbolTable::StoragePtr storage =
+      scope.symbolTable().join({config_->statsPrefix(), config_->compressionLatencyStatName()});
+  scope.histogramFromStatName(Stats::StatName(storage.get()), Stats::Histogram::Unit::Milliseconds)
+      .recordValue(latency.count());
+
+  if (state == Compressor::State::NoFlush) {
+    config_->stats().compressed_no_flush_.inc();
+  } else if (state == Compressor::State::Finish) {
+    config_->stats().compressed_finished_.inc();
+  }
+}
+
 Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!skip_compression_) {
     config_->stats().total_uncompressed_bytes_.add(data.length());
     if (end_stream) {
-      compressor_->compress(data, Compressor::State::Finish);
-      config_->stats().compressed_finished_.inc();
+      compress(data, Compressor::State::Finish);
     } else {
       // Note: it's fine that we don't flush here, it'll either happen in a future encodeData
       // call or in encodeTrailers(). This will not cause a regression for
       // https://github.com/envoyproxy/envoy/pull/3025, given that before encodeTrailers wasn't
       // handled.
-      compressor_->compress(data, Compressor::State::NoFlush);
-      config_->stats().compressed_no_flush_.inc();
+      compress(data, Compressor::State::NoFlush);
     }
     config_->stats().total_compressed_bytes_.add(data.length());
   }
@@ -140,8 +159,7 @@ Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool
 Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::ResponseTrailerMap&) {
   if (!skip_compression_) {
     Buffer::OwnedImpl empty_buffer;
-    compressor_->compress(empty_buffer, Compressor::State::Finish);
-    config_->stats().compressed_finished_.inc();
+    compress(empty_buffer, Compressor::State::Finish);
     config_->stats().total_compressed_bytes_.add(empty_buffer.length());
     encoder_callbacks_->addEncodedData(empty_buffer, true);
   }

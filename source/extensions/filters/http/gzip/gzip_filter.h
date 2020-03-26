@@ -18,7 +18,8 @@ class GzipFilterConfig : public Common::Compressors::CompressorFilterConfig {
 
 public:
   GzipFilterConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip,
-                   const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+                   const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+                   TimeSource& time_source);
 
   std::unique_ptr<Compressor::Compressor> makeCompressor() override;
 

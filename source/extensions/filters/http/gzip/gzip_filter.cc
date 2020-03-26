@@ -22,9 +22,9 @@ const uint64_t GzipHeaderValue = 16;
 
 GzipFilterConfig::GzipFilterConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip,
                                    const std::string& stats_prefix, Stats::Scope& scope,
-                                   Runtime::Loader& runtime)
+                                   Runtime::Loader& runtime, TimeSource& time_source)
     : CompressorFilterConfig(compressorConfig(gzip), stats_prefix + "gzip.", scope, runtime,
-                             Http::Headers::get().ContentEncodingValues.Gzip),
+                             Http::Headers::get().ContentEncodingValues.Gzip, time_source),
       compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
       memory_level_(memoryLevelUint(gzip.memory_level().value())),
