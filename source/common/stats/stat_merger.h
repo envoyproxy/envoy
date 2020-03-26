@@ -14,8 +14,6 @@ namespace Stats {
 // (typically hot restart parent+child) Envoy processes.
 class StatMerger {
 public:
-  using DynamicSpan = std::pair<uint32_t, uint32_t>;
-  using DynamicSpans = std::vector<DynamicSpan>;
   using DynamicsMap = absl::flat_hash_map<std::string, DynamicSpans>;
 
   // Holds state needed to construct StatName with mixed dynamic/symbolic
@@ -24,19 +22,6 @@ public:
   public:
     DynamicContext(SymbolTable& symbol_table)
         : symbol_table_(symbol_table), symbolic_pool_(symbol_table), dynamic_pool_(symbol_table) {}
-
-    /**
-     * Identifies the dynamic components of a stat_name into an array of integer
-     * pairs, indicating the begin/end of spans of tokens in the stat-name that
-     * are created from StatNameDynamicStore or StatNameDynamicPool.
-     *
-     * This can be used to reconstruct the same exact StatNames in mergeStats(),
-     * to enable stat continuity across hot-restart.
-     *
-     * @param stat_name the input stat name.
-     * @return the array pair indicating the bounds.
-     */
-    static DynamicSpans encodeSegments(StatName stat_name);
 
     /**
      * Generates a StatName with mixed dynamic/symbolic components based on

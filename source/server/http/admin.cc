@@ -333,7 +333,7 @@ Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_
   // If we ever support streaming admin requests we may need to revisit this. Note, we must use
   // addDecodedData() here since we might need to perform onComplete() processing if end_stream is
   // true.
-  callbacks_->addDecodedData(data, false);
+  decoder_callbacks_->addDecodedData(data, false);
 
   if (end_stream) {
     onComplete();
@@ -358,11 +358,13 @@ void AdminFilter::addOnDestroyCallback(std::function<void()> cb) {
 }
 
 Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() const {
-  ASSERT(callbacks_ != nullptr);
-  return *callbacks_;
+  ASSERT(decoder_callbacks_ != nullptr);
+  return *decoder_callbacks_;
 }
 
-const Buffer::Instance* AdminFilter::getRequestBody() const { return callbacks_->decodingBuffer(); }
+const Buffer::Instance* AdminFilter::getRequestBody() const {
+  return decoder_callbacks_->decodingBuffer();
+}
 
 const Http::RequestHeaderMap& AdminFilter::getRequestHeaders() const {
   ASSERT(request_headers_ != nullptr);
@@ -1344,22 +1346,29 @@ Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::Response
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerReopenLogs(absl::string_view, Http::ResponseHeaderMap&,
+                                        Buffer::Instance& response, AdminStream&) {
+  server_.accessLogManager().reopen();
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 void AdminFilter::onComplete() {
   absl::string_view path = request_headers_->Path()->value().getStringView();
-  ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
+  ENVOY_STREAM_LOG(debug, "request complete: path: {}", *decoder_callbacks_, path);
 
   Buffer::OwnedImpl response;
   Http::ResponseHeaderMapPtr header_map{new Http::ResponseHeaderMapImpl};
   RELEASE_ASSERT(request_headers_, "");
   Http::Code code = parent_.runCallback(path, *header_map, response, *this);
   populateFallbackResponseHeaders(code, *header_map);
-  callbacks_->encodeHeaders(std::move(header_map),
-                            end_stream_on_complete_ && response.length() == 0);
+  decoder_callbacks_->encodeHeaders(std::move(header_map),
+                                    end_stream_on_complete_ && response.length() == 0);
 
   if (response.length() > 0) {
-    callbacks_->encodeData(response, end_stream_on_complete_);
+    decoder_callbacks_->encodeData(response, end_stream_on_complete_);
   }
 }
 
@@ -1449,6 +1458,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
+          {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false,
+           true},
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
@@ -1457,7 +1468,9 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
                                                  const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
-      connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings(),
+      connection, data, callbacks, server_.stats(), Http::Http1Settings(),
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions()),
       maxRequestHeadersKb(), maxRequestHeadersCount());
 }
 
@@ -1472,7 +1485,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
 }
 
 void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{new AdminFilter(*this)});
+  callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
 }
 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,

@@ -158,6 +158,8 @@ private:
   std::unordered_map<std::string, ClusterStatsCachePtr> cluster_stats_cache_map_;
 
   // Saved StatNames for fast comparisons in loop.
+  // TODO(mattklein123): Many/all of these stats should just be pulled directly from the cluster
+  // stats directly. This needs some cleanup.
   Stats::StatNamePool stat_name_pool_;
   const Stats::StatName cluster_name_;
   const Stats::StatName cluster_upstream_rq_time_;

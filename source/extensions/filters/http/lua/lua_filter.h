@@ -253,8 +253,8 @@ private:
   }
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::ResponseMessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason) override;
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
 
   Filters::Common::Lua::Coroutine& coroutine_;
   Http::HeaderMap& headers_;
@@ -283,8 +283,8 @@ private:
 class NoopCallbacks : public Http::AsyncClient::Callbacks {
 public:
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::ResponseMessagePtr&&) override {}
-  void onFailure(Http::AsyncClient::FailureReason) override {}
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {}
 };
 
 /**

@@ -233,6 +233,7 @@ public:
   MOCK_METHOD(void, continueEncoding, ());
   MOCK_METHOD(const Buffer::Instance*, encodingBuffer, ());
   MOCK_METHOD(void, modifyEncodingBuffer, (std::function<void(Buffer::Instance&)>));
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 
   Buffer::InstancePtr buffer_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
@@ -334,11 +335,15 @@ public:
   MockAsyncClientCallbacks();
   ~MockAsyncClientCallbacks() override;
 
-  void onSuccess(ResponseMessagePtr&& response) override { onSuccess_(response.get()); }
+  void onSuccess(const Http::AsyncClient::Request& request,
+                 ResponseMessagePtr&& response) override {
+    onSuccess_(request, response.get());
+  }
 
   // Http::AsyncClient::Callbacks
-  MOCK_METHOD(void, onSuccess_, (ResponseMessage * response));
-  MOCK_METHOD(void, onFailure, (Http::AsyncClient::FailureReason reason));
+  MOCK_METHOD(void, onSuccess_, (const Http::AsyncClient::Request&, ResponseMessage*));
+  MOCK_METHOD(void, onFailure,
+              (const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason));
 };
 
 class MockAsyncClientStreamCallbacks : public AsyncClient::StreamCallbacks {

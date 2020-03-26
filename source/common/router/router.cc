@@ -405,7 +405,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Initialize the `modify_headers` function as a no-op (so we don't have to remember to check it
   // against nullptr before calling it), and feed it behavior later if/when we have cluster info
   // headers to append.
-  std::function<void(Http::HeaderMap&)> modify_headers = [](Http::HeaderMap&) {};
+  std::function<void(Http::ResponseHeaderMap&)> modify_headers = [](Http::ResponseHeaderMap&) {};
 
   // Determine if there is a route entry or a direct response for the request.
   route_ = callbacks_->route();
@@ -453,7 +453,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   callbacks_->streamInfo().setRouteName(route_entry_->routeName());
   if (debug_config && debug_config->append_cluster_) {
     // The cluster name will be appended to any local or upstream responses from this point.
-    modify_headers = [this, debug_config](Http::HeaderMap& headers) {
+    modify_headers = [this, debug_config](Http::ResponseHeaderMap& headers) {
       headers.addCopy(debug_config->cluster_header_.value_or(Http::Headers::get().EnvoyCluster),
                       route_entry_->clusterName());
     };
@@ -550,7 +550,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (debug_config && debug_config->append_upstream_host_) {
     // The hostname and address will be appended to any local or upstream responses from this point,
     // possibly in addition to the cluster name.
-    modify_headers = [modify_headers, debug_config, conn_pool](Http::HeaderMap& headers) {
+    modify_headers = [modify_headers, debug_config, conn_pool](Http::ResponseHeaderMap& headers) {
       modify_headers(headers);
       headers.addCopy(
           debug_config->hostname_header_.value_or(Http::Headers::get().EnvoyUpstreamHostname),
@@ -563,7 +563,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // If we've been instructed not to forward the request upstream, send an empty local response.
   if (debug_config && debug_config->do_not_forward_) {
-    modify_headers = [modify_headers, debug_config](Http::HeaderMap& headers) {
+    modify_headers = [modify_headers, debug_config](Http::ResponseHeaderMap& headers) {
       modify_headers(headers);
       headers.addCopy(
           debug_config->not_forwarded_header_.value_or(Http::Headers::get().EnvoyNotForwarded),
@@ -585,9 +585,22 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
   }
 
-  include_attempt_count_ = route_entry_->includeAttemptCount();
-  if (include_attempt_count_) {
+  include_attempt_count_in_request_ = route_entry_->includeAttemptCountInRequest();
+  if (include_attempt_count_in_request_) {
     headers.setEnvoyAttemptCount(attempt_count_);
+  }
+
+  // The router has reached a point where it is going to try to send a request upstream,
+  // so now modify_headers should attach x-envoy-attempt-count to the downstream response if the
+  // config flag is true.
+  if (route_entry_->includeAttemptCountInResponse()) {
+    modify_headers = [modify_headers, this](Http::ResponseHeaderMap& headers) {
+      modify_headers(headers);
+
+      // This header is added without checking for config_.suppress_envoy_headers_ to mirror what is
+      // done for upstream requests.
+      headers.setEnvoyAttemptCount(attempt_count_);
+    };
   }
 
   // Inject the active span's tracing context into the request headers.
@@ -601,9 +614,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ =
-      createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
-                       config_.random_, callbacks_->dispatcher(), route_entry_->priority());
+  retry_state_ = createRetryState(route_entry_->retryPolicy(), headers, *cluster_,
+                                  request_vcluster_, config_.runtime_, config_.random_,
+                                  callbacks_->dispatcher(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys.
@@ -750,8 +763,12 @@ void Filter::maybeDoShadowing() {
       request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*downstream_trailers_));
     }
 
-    config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request),
-                                  timeout_.global_timeout_);
+    auto options = Http::AsyncClient::RequestOptions()
+                       .setTimeout(timeout_.global_timeout_)
+                       .setParentSpan(callbacks_->activeSpan())
+                       .setChildSpanName("mirror")
+                       .setSampled(shadow_policy.traceSampled());
+    config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request), options);
   }
 }
 
@@ -804,6 +821,9 @@ void Filter::onResponseTimeout() {
     // Don't do work for upstream requests we've already seen headers for.
     if (upstream_request->awaitingHeaders()) {
       cluster_->stats().upstream_rq_timeout_.inc();
+      if (request_vcluster_) {
+        request_vcluster_->stats().upstream_rq_timeout_.inc();
+      }
 
       if (cluster_->timeoutBudgetStats().has_value()) {
         // Cancel firing per-try timeout information, because the per-try timeout did not come into
@@ -1412,7 +1432,7 @@ void Filter::doRetry() {
     return;
   }
 
-  if (include_attempt_count_) {
+  if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 
@@ -1444,11 +1464,11 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 
 RetryStatePtr
 ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
-                             const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
-                             Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                             Upstream::ResourcePriority priority) {
-  return RetryStateImpl::create(policy, request_headers, cluster, runtime, random, dispatcher,
-                                priority);
+                             const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+                             Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                             Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) {
+  return RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
+                                dispatcher, priority);
 }
 
 } // namespace Router

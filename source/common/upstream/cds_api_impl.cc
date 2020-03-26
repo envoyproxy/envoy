@@ -32,8 +32,9 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, 
                        Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
+  const auto resource_name = getResourceName(cds_config.resource_api_version());
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-      cds_config, loadTypeUrl(cds_config.resource_api_version()), *scope_, *this);
+      cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -124,21 +125,6 @@ void CdsApiImpl::runInitializeCallbackIfAny() {
   if (initialize_callback_) {
     initialize_callback_();
     initialize_callback_ = nullptr;
-  }
-}
-
-std::string CdsApiImpl::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3::ApiVersion::AUTO:
-  case envoy::config::core::v3::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::Cluster().GetDescriptor()->full_name()));
-  case envoy::config::core::v3::ApiVersion::V3:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::config::cluster::v3::Cluster().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

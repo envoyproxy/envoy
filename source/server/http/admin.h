@@ -37,6 +37,8 @@
 
 #include "server/http/config_tracker_impl.h"
 
+#include "extensions/filters/http/common/pass_through_filter.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -124,6 +126,9 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
   std::chrono::milliseconds requestTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+    return max_stream_duration_;
+  }
   Router::RouteConfigProvider* routeConfigProvider() override { return &route_config_provider_; }
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return &scoped_route_config_provider_;
@@ -357,6 +362,9 @@ private:
   Http::Code handlerRuntimeModify(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream&);
+  Http::Code handlerReopenLogs(absl::string_view path_and_query,
+                               Http::ResponseHeaderMap& response_headers,
+                               Buffer::Instance& response, AdminStream&);
   bool isFormUrlEncoded(const Http::HeaderEntry* content_type) const;
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
@@ -413,12 +421,18 @@ private:
       return envoy::config::core::v3::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+    const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+      return empty_access_logs_;
+    }
 
     AdminImpl& parent_;
     const std::string name_;
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
     Network::NopConnectionBalancerImpl connection_balancer_;
+
+  private:
+    const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
@@ -457,6 +471,7 @@ private:
   const uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  absl::optional<std::chrono::milliseconds> max_stream_duration_;
   absl::optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
@@ -472,13 +487,16 @@ private:
 /**
  * A terminal HTTP filter that implements server admin functionality.
  */
-class AdminFilter : public Http::StreamDecoderFilter,
+class AdminFilter : public Http::PassThroughFilter,
                     public AdminStream,
                     Logger::Loggable<Logger::Id::admin> {
 public:
   AdminFilter(AdminImpl& parent);
 
   // Http::StreamFilterBase
+  // Handlers relying on the reference should use addOnDestroyCallback()
+  // to add a callback that will notify them when the reference is no
+  // longer valid.
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
@@ -486,9 +504,6 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
-    callbacks_ = &callbacks;
-  }
 
   // AdminStream
   void setEndStreamOnComplete(bool end_stream) override { end_stream_on_complete_ = end_stream; }
@@ -496,6 +511,9 @@ public:
   Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override;
   const Buffer::Instance* getRequestBody() const override;
   const Http::RequestHeaderMap& getRequestHeaders() const override;
+  Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
+    return encoder_callbacks_->http1StreamEncoderOptions();
+  }
 
 private:
   /**
@@ -504,10 +522,6 @@ private:
   void onComplete();
 
   AdminImpl& parent_;
-  // Handlers relying on the reference should use addOnDestroyCallback()
-  // to add a callback that will notify them when the reference is no
-  // longer valid.
-  Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::RequestHeaderMap* request_headers_{};
   std::list<std::function<void()>> on_destroy_callbacks_;
   bool end_stream_on_complete_ = true;
