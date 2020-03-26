@@ -233,6 +233,7 @@ public:
   MOCK_METHOD(void, continueEncoding, ());
   MOCK_METHOD(const Buffer::Instance*, encodingBuffer, ());
   MOCK_METHOD(void, modifyEncodingBuffer, (std::function<void(Buffer::Instance&)>));
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 
   Buffer::InstancePtr buffer_;
   testing::NiceMock<Tracing::MockSpan> active_span_;

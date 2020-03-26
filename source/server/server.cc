@@ -41,6 +41,7 @@
 #include "server/configuration_impl.h"
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
+#include "server/http/utils.h"
 #include "server/listener_hooks.h"
 #include "server/ssl_context_manager.h"
 

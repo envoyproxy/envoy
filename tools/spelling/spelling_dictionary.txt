@@ -321,6 +321,7 @@ VH
 VHDS
 VLOG
 VM
+WAITFORONE
 WASM
 WAVM
 WIP
@@ -731,6 +732,8 @@ misconfigured
 mixin
 mkdir
 mmap
+mmsg
+mmsghdr
 mongo
 moveable
 msec
@@ -752,6 +755,7 @@ namespaces
 namespacing
 nan
 natively
+ndk
 netblock
 netblocks
 netfilter
@@ -942,6 +946,7 @@ sched
 schemas
 scopekey
 sendmsg
+sendmmsg
 sendto
 serializable
 serializer
