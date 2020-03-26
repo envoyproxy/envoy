@@ -66,24 +66,17 @@ grpc::ByteBuffer GoogleGrpcUtils::makeByteBuffer(Buffer::InstancePtr&& buffer_in
   if (!buffer_instance) {
     return {};
   }
-  Buffer::RawSlice on_raw_slice;
-  // NB: we need to pass in >= 1 in order to get the real "n" (see Buffer::Instance for details).
-  const int n_slices = buffer_instance->getRawSlices(&on_raw_slice, 1);
-  if (n_slices <= 0) {
+  Buffer::RawSliceVector raw_slices = buffer_instance->getRawSlices();
+  if (raw_slices.empty()) {
     return {};
   }
-  auto* container = new BufferInstanceContainer{n_slices, std::move(buffer_instance)};
-  if (n_slices == 1) {
-    grpc::Slice one_slice(on_raw_slice.mem_, on_raw_slice.len_,
-                          &BufferInstanceContainer::derefBufferInstanceContainer, container);
-    return {&one_slice, 1};
-  }
-  absl::FixedArray<Buffer::RawSlice> many_raw_slices(n_slices);
-  container->buffer_->getRawSlices(many_raw_slices.begin(), n_slices);
+
+  auto* container =
+      new BufferInstanceContainer{static_cast<int>(raw_slices.size()), std::move(buffer_instance)};
   std::vector<grpc::Slice> slices;
-  slices.reserve(n_slices);
-  for (int i = 0; i < n_slices; i++) {
-    slices.emplace_back(many_raw_slices[i].mem_, many_raw_slices[i].len_,
+  slices.reserve(raw_slices.size());
+  for (Buffer::RawSlice& raw_slice : raw_slices) {
+    slices.emplace_back(raw_slice.mem_, raw_slice.len_,
                         &BufferInstanceContainer::derefBufferInstanceContainer, container);
   }
   return {&slices[0], slices.size()};
