@@ -16,6 +16,7 @@ mock_template:
   os: {{ device_os }}
   app_version: {{ app_version }}
   app_id: {{ app_id }}
+  virtual_clusters: {{ virtual_clusters }}
 """
 
 
@@ -23,7 +24,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `resolving with default configuration resolves with values`() {
-    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, 567, "v1.2.3", "com.mydomain.myapp")
+    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, 567, "v1.2.3", "com.mydomain.myapp", "[test]");
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(TEST_CONFIG)
     assertThat(resolvedTemplate).contains("stats_domain: stats.foo.com")
@@ -35,12 +36,13 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("os: Android")
     assertThat(resolvedTemplate).contains("app_version: v1.2.3")
     assertThat(resolvedTemplate).contains("app_id: com.mydomain.myapp")
+    assertThat(resolvedTemplate).contains("virtual_clusters: [test]")
   }
 
 
   @Test(expected = EnvoyConfiguration.ConfigurationException::class)
   fun `resolve templates with invalid templates will throw on build`() {
-    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, 567, "v1.2.3", "com.mydomain.myapp")
+    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, 567, "v1.2.3", "com.mydomain.myapp", "[test]")
 
     envoyConfiguration.resolveTemplate("{{ }}")
   }

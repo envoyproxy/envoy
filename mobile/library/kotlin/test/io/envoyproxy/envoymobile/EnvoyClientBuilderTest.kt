@@ -94,4 +94,15 @@ class EnvoyBuilderTest {
     val envoy = clientBuilder.build()
     assertThat(envoy.envoyConfiguration!!.appId).isEqualTo("com.mydomain.myapp")
   }
+
+  @Test
+  fun `specifying virtual clusters overrides default`() {
+    clientBuilder = EnvoyClientBuilder(Standard())
+    clientBuilder.addEngineType { engine }
+
+    clientBuilder.addVirtualClusters("[test]")
+    clientBuilder.build()
+    val envoy = clientBuilder.build()
+    assertThat(envoy.envoyConfiguration!!.virtualClusters).isEqualTo("[test]")
+  }
 }

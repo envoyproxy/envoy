@@ -15,6 +15,7 @@ mock_template:
   stats_flush_interval: {{ stats_flush_interval_seconds }}s
   app_version: {{ app_version }}
   app_id: {{ app_id }}
+  virtual_clusters: {{ virtual_clusters }}
 """
 
 private final class MockEnvoyEngine: NSObject, EnvoyEngine {
@@ -169,6 +170,20 @@ final class EnvoyClientBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+  func testAddingVirtualClustersAddsToConfigurationWhenRunningEnvoy() throws {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual("[test]", config.virtualClusters)
+      expectation.fulfill()
+    }
+
+    _ = try EnvoyClientBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .addVirtualClusters("[test]")
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
   func testResolvesYAMLWithIndividuallySetValues() throws {
     let config = EnvoyConfiguration(statsDomain: "stats.foo.com",
                                     connectTimeoutSeconds: 200,
@@ -177,7 +192,8 @@ final class EnvoyClientBuilderTests: XCTestCase {
                                     dnsFailureRefreshSecondsMax: 500,
                                     statsFlushSeconds: 600,
                                     appVersion: "v1.2.3",
-                                    appId: "com.mydomain.myapp")
+                                    appId: "com.mydomain.myapp",
+                                    virtualClusters: "[test]")
     guard let resolvedYAML = config.resolveTemplate(kMockTemplate) else {
       XCTFail("Resolved template YAML is nil")
       return
@@ -192,6 +208,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("device_os: iOS"))
     XCTAssertTrue(resolvedYAML.contains("app_version: v1.2.3"))
     XCTAssertTrue(resolvedYAML.contains("app_id: com.mydomain.myapp"))
+    XCTAssertTrue(resolvedYAML.contains("virtual_clusters: [test]"))
   }
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
@@ -202,7 +219,8 @@ final class EnvoyClientBuilderTests: XCTestCase {
                                     dnsFailureRefreshSecondsMax: 500,
                                     statsFlushSeconds: 600,
                                     appVersion: "v1.2.3",
-                                    appId: "com.mydomain.myapp")
+                                    appId: "com.mydomain.myapp",
+                                    virtualClusters: "[test]")
     XCTAssertNil(config.resolveTemplate("{{ missing }}"))
   }
 }
