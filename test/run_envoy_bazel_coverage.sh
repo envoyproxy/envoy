@@ -21,25 +21,24 @@ elif [[ -n "${COVERAGE_TARGET}" ]]; then
   COVERAGE_TARGETS=${COVERAGE_TARGET}
 else
   # For fuzz builds, this overrides to just fuzz targets.
-  echo $(bazel --version)
-  COVERAGE_TARGETS=//test/... && [[ ${FUZZ_COVERAGE} ]] &&
+  COVERAGE_TARGETS=//test/... && [[ ${FUZZ_COVERAGE} == "true" ]] &&
     COVERAGE_TARGETS="$(bazel query 'attr("tags", "fuzz_target", //test/...)')"
 fi
 
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 TEMP_CORPORA=""
-if [ "$FUZZ_COVERAGE" == false ]
+if [ "$FUZZ_COVERAGE" == "true" ]
 then
+  # Build and run libfuzzer linked target, grab collect temp directories.
+  FUZZ_TEMPDIR="$(mktemp -d)"
+  FUZZ_TEMPDIR=${FUZZ_TEMPDIR} "${SCRIPT_DIR}"/build_and_run_fuzz_targets.sh ${COVERAGE_TARGETS}
+else
   # Make sure //test/coverage:coverage_tests is up-to-date.
   "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
-else
-  # Build and run libfuzzer linked target, grab collect temp directories.
-  TEMP_CORPORA="$("${SCRIPT_DIR}"/build_and_run_fuzz_targets.sh ${COVERAGE_TARGETS})"
-  echo ${TEMP_CORPORA}
 fi
 
 # Set the bazel targets to run.
-BAZEL_TARGET=//test/coverage:coverage_tests && [[ FUZZ_COVERAGE ]] && BAZEL_TARGET=${COVERAGE_TARGETS}
+BAZEL_TARGET=//test/coverage:coverage_tests && [[ ${FUZZ_COVERAGE} == "true" ]] && BAZEL_TARGET=${COVERAGE_TARGETS}
 
 # Using GTEST_SHUFFLE here to workaround https://github.com/envoyproxy/envoy/issues/10108
 # Add binaries to OBJECTS to pass in to llvm-cov
@@ -47,33 +46,30 @@ OBJECTS=""
 for t in ${BAZEL_TARGET}
 do
   # Set test args. If normal coverage run, this is --log-path /dev/null
-  if [ "$FUZZ_COVERAGE" == false ]
+  if [ "$FUZZ_COVERAGE" == "true" ]
   then
-    TEST_ARGS="--test_arg=--log-path /dev/null --test_arg=-l trace"
-    OBJECTS="bazel-bin/test/coverage/coverage_tests"
-  else
     # If this is a fuzz target, set args to be the temp corpus.
     TARGET_BINARY="${t/://}"
-    CORPUS_LOCATION=${TAGET_BINARY:2}
-    TEST_ARGS="--test_arg=/tmp/${CORPUS_LOCATION///_}_corpus --test_arg=-runs=0"
-    if [[ -z $OBJECTS ]]; then
+    CORPUS_LOCATION="${TARGET_BINARY:2}"
+    TEST_ARGS="--test_arg=${FUZZ_TEMPDIR}/${CORPUS_LOCATION////_}_corpus --test_arg=-runs=0 --test_output=all"
+    if [[ -z "${OBJECTS}" ]]; then
       # The first object needs to be passed without -object= flag.
       OBJECTS="bazel-bin/${TARGET_BINARY:2}_with_libfuzzer"
     else
       OBJECTS="$OBJECTS -object=bazel-bin/${TARGET_BINARY:2}_with_libfuzzer"
     fi
+    TARGET="${t}_with_libfuzzer"
+  else
+    TEST_ARGS=(--test_arg="--log-path /dev/null" --test_arg="-l trace")
+    OBJECTS="bazel-bin/test/coverage/coverage_tests"
+    TARGET="${t}"
   fi
 
-  BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
+  BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata /usr/local/bin/bazel coverage ${BAZEL_BUILD_OPTIONS} \
     -c fastbuild --copt=-DNDEBUG --instrumentation_filter=//source/...,//include/... \
     --test_timeout=2000 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --test_output=errors \
-    ${TEST_ARGS} --test_env=HEAPCHECK= \
-    --test_env=GTEST_SHUFFLE=1 --flaky_test_attempts=5 ${t}_with_libfuzzer
-done
-
-for corpus in ${TEMP_CORPORA}
-do
-  rm -rf "${corpus}"
+    "${TEST_ARGS[@]}" --test_env=HEAPCHECK= \
+    --test_env=GTEST_SHUFFLE=1 --flaky_test_attempts=5 ${TARGET}
 done
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
@@ -87,7 +83,7 @@ BAZEL_OUT=test/coverage/coverage_tests/ && [[ ${FUZZ_COVERAGE} ]] && BAZEL_OUT=t
 llvm-profdata merge -sparse -o ${COVERAGE_DATA} $(find -L bazel-out/k8-fastbuild/testlogs/${BAZEL_OUT} -name coverage.dat)
 
 echo "Generating report..."
-llvm-cov show "${OBJECTS}" -instr-profile="${COVERAGE_DATA}" -Xdemangler=c++filt \
+llvm-cov show -instr-profile="${COVERAGE_DATA}" ${OBJECTS} -Xdemangler=c++filt \
   -ignore-filename-regex="${COVERAGE_IGNORE_REGEX}" -output-dir=${COVERAGE_DIR} -format=html
 sed -i -e 's|>proc/self/cwd/|>|g' "${COVERAGE_DIR}/index.html"
 sed -i -e 's|>bazel-out/[^/]*/bin/\([^/]*\)/[^<]*/_virtual_includes/[^/]*|>\1|g' "${COVERAGE_DIR}/index.html"
@@ -96,7 +92,7 @@ sed -i -e 's|>bazel-out/[^/]*/bin/\([^/]*\)/[^<]*/_virtual_includes/[^/]*|>\1|g'
 
 if [ "$VALIDATE_COVERAGE" == "true" ]
 then
-  COVERAGE_VALUE=$(llvm-cov export "${COVERAGE_BINARY}" -instr-profile="${COVERAGE_DATA}" \
+  COVERAGE_VALUE=$(llvm-cov export "${OBJECTS}" -instr-profile="${COVERAGE_DATA}" \
     -ignore-filename-regex="${COVERAGE_IGNORE_REGEX}" -summary-only | \
     python3 -c "import sys, json; print(json.load(sys.stdin)['data'][0]['totals']['lines']['percent'])")
   COVERAGE_THRESHOLD=97.0
