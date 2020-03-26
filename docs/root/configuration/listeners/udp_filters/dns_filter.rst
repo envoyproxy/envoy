@@ -32,12 +32,12 @@ Example Configuration
       "@type": "type.googleapis.com/envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig"
       stat_prefix: "dns_filter_prefix"
       server_config:
-        dns_table:
+        inline_dns_table:
           external_retry_count: 3
           known_suffixes:
-            - "domain1.com"
-            - "domain2.com"
-            - "domain3.com"
+            - suffix: "domain1.com"
+            - suffix: "domain2.com"
+            - suffix: "domain3.com"
           virtual_domains:
             - name: "www.domain1.com"
               endpoint:
