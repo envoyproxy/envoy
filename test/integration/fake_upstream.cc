@@ -45,7 +45,6 @@ FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encode
 }
 
 void FakeStream::decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) {
-  std::cout << "@tallen decode headers\n";
   Thread::LockGuard lock(lock_);
   headers_ = std::move(headers);
   setEndStream(end_stream);
@@ -61,7 +60,6 @@ void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void FakeStream::decodeTrailers(Http::RequestTrailerMapPtr&& trailers) {
-  std::cout << "@tallen decode trailers\n";
   Thread::LockGuard lock(lock_);
   setEndStream(true);
   trailers_ = std::move(trailers);
@@ -83,7 +81,6 @@ void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers
 }
 
 void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
-  std::cout << "@tallen encode headers\n";
   std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   if (add_served_by_header_) {
@@ -116,7 +113,6 @@ void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
-  std::cout << "@tallen encode trailers " << trailers << std::endl;
   std::shared_ptr<Http::ResponseTrailerMap> trailers_copy(
       Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers));
   parent_.connection().dispatcher().post(
@@ -182,7 +178,6 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
 
 AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher,
                                              milliseconds timeout) {
-  std::cout << "@tallen wait for end stream\n";
   Thread::LockGuard lock(lock_);
   auto start_time = time_system_.monotonicTime();
   while (!end_stream_) {

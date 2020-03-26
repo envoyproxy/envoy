@@ -35,7 +35,6 @@ AutonomousStream::~AutonomousStream() {
 void AutonomousStream::setEndStream(bool end_stream) {
   FakeStream::setEndStream(end_stream);
   if (end_stream) {
-    std::cout << "@tallen ending stream\n";
     sendResponse();
   }
 }
@@ -52,7 +51,6 @@ void AutonomousStream::sendResponse() {
   }
 
   if (!headers.get_(RESET_AFTER_REQUEST).empty()) {
-    std::cout << "@tallen resetting?\n";
     encodeResetStream();
     return;
   }
@@ -115,7 +113,6 @@ std::unique_ptr<Http::TestRequestHeaderMapImpl> AutonomousUpstream::lastRequestH
 void AutonomousUpstream::setResponseTrailers(
     std::unique_ptr<Http::TestResponseTrailerMapImpl>&& response_trailers) {
   Thread::LockGuard lock(headers_lock_);
-  std::cout << std::boolalpha << "@tallen trailers 1: " << response_trailers->has("grpc-status") << std::endl;
   response_trailers_ = std::move(response_trailers);
 }
 
@@ -128,7 +125,6 @@ void AutonomousUpstream::setResponseHeaders(
 Http::TestResponseTrailerMapImpl AutonomousUpstream::responseTrailers() {
   Thread::LockGuard lock(headers_lock_);
   Http::TestResponseTrailerMapImpl return_trailers = *response_trailers_;
-  std::cout << std::boolalpha << "@tallen trailers 2: " << return_trailers.has("grpc-status") << std::endl;
   return return_trailers;
 }
 

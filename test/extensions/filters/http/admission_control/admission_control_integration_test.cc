@@ -58,32 +58,24 @@ protected:
   void waitFor(std::chrono::microseconds us) { timeSystem().sleep(us); }
 
   IntegrationStreamDecoderPtr sendGrpcRequestWithReturnCode(uint64_t code) {
-    if (!codec_client_) {
-      codec_client_ = makeHttpConnection(lookupPort("http"));
-    }
+    codec_client_ = makeHttpConnection(lookupPort("http"));
 
     // Set the response headers on the autonomous upstream.
-    Http::TestResponseHeaderMapImpl headers;
-    headers.setStatus(200);
-    headers.setContentType("application/grpc");
+    auto headers = std::make_unique<Http::TestResponseHeaderMapImpl>();
+    headers->setStatus(200);
+    headers->setContentType("application/grpc");
 
-    Http::TestResponseTrailerMapImpl trailers;
-    trailers.setGrpcMessage("this is a message");
-    trailers.setGrpcStatus(code);
+    auto trailers = std::make_unique<Http::TestResponseTrailerMapImpl>();
+    trailers->setGrpcMessage("this is a message");
+    trailers->setGrpcStatus(code);
+
+    auto* au = reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get());
+    au->setResponseHeaders(std::move(headers));
+    au->setResponseTrailers(std::move(trailers));
 
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    waitForNextUpstreamRequest();
-    auto result = upstream_request_->waitForEndStream(*dispatcher_);
-    RELEASE_ASSERT(result, result.message());
-    upstream_request_->encodeHeaders(headers, false);
-    upstream_request_->encodeData(512, false);
-    upstream_request_->encodeTrailers(trailers);
     response->waitForEndStream();
-    EXPECT_TRUE(upstream_request_->complete());
-
-    EXPECT_TRUE(response->complete());
-
-    std::cout << "@tallen sent it all YOOOO\n";
+    codec_client_->close();
     return response;
   }
 
@@ -144,34 +136,30 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
 }
 
 TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
+  autonomous_upstream_ = true;
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   initialize();
 
   // Drop the success rate to a very low value.
-  std::cout << "@tallen dropping SR\n";
-  std::cout << "@tallen one call to send\n";
   for (int i = 0; i < 100; ++i) {
-    sendGrpcRequestWithReturnCode(0);
+    sendGrpcRequestWithReturnCode(7);
   }
 
   // Measure throttling rate from the admission control filter.
   double throttle_count = 0;
   double request_count = 0;
   for (int i = 0; i < 1000; ++i) {
-    std::cout << "@tallen throttling loop\n";
-    auto response = sendGrpcRequestWithReturnCode(0);
-    std::cout << "@tallen checking status\n";
-    //auto grpc_status = Grpc::Common::getGrpcStatus(response->headers());
-    auto grpc_status = Grpc::Common::getGrpcStatus(*(response->trailers()));
-    if (grpc_status == Grpc::Status::WellKnownGrpcStatus::Unavailable) {
-      std::cout << "@tallen throttling\n";
+    auto response = sendGrpcRequestWithReturnCode(2);
+
+    // When the filter is throttling, it returns an HTTP code 503 and the GRPC status is unset.
+    // Otherwise, we expect a GRPC status of "Unknown" as set above.
+    if (response->headers().Status()->value().getStringView() == "503") {
       ++throttle_count;
     } else {
-      std::cout << "@tallen unknown\n";
+      auto grpc_status = Grpc::Common::getGrpcStatus(*(response->trailers()));
       ASSERT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::Unknown);
     }
     ++request_count;
-    waitFor(std::chrono::milliseconds(10));
   }
 
   // Given the current throttling rate formula with an aggression of 1, it should result in a ~98%
@@ -186,8 +174,6 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
     verifyGrpcSuccess(sendGrpcRequestWithReturnCode(0));
   }
 }
-
-// TODO (tonya11en): GRPC test.
 
 } // namespace
 } // namespace Envoy
