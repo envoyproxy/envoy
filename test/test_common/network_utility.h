@@ -1,5 +1,6 @@
 #pragma once
 
+#include <list>
 #include <string>
 
 #include "envoy/network/address.h"
@@ -167,6 +168,27 @@ const FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
  */
 Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
                                        UdpRecvData& data);
+
+/**
+ * A synchronous UDP peer that can be used for testing.
+ */
+class UdpSyncPeer {
+public:
+  UdpSyncPeer(Network::Address::IpVersion version);
+
+  // Writer a datagram to a remote peer.
+  void write(const std::string& buffer, const Network::Address::Instance& peer);
+
+  // Receive a datagram.
+  void recv(Network::UdpRecvData& datagram);
+
+  // Return the local peer's socket address.
+  const Network::Address::InstanceConstSharedPtr& localAddress() { return socket_->localAddress(); }
+
+private:
+  const Network::SocketPtr socket_;
+  std::list<Network::UdpRecvData> received_datagrams_;
+};
 
 } // namespace Test
 } // namespace Network

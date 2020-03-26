@@ -20,9 +20,9 @@ public:
   ~MockConnectionCallbacks() override;
 
   // Network::ConnectionCallbacks
-  MOCK_METHOD1(onEvent, void(Network::ConnectionEvent event));
-  MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
-  MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
+  MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
 };
 
 class MockConnectionBase {
@@ -51,39 +51,40 @@ public:
   ~MockConnection() override;
 
   // Network::Connection
-  MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
-  MOCK_METHOD1(addBytesSentCallback, void(BytesSentCb cb));
-  MOCK_METHOD1(addWriteFilter, void(WriteFilterSharedPtr filter));
-  MOCK_METHOD1(addFilter, void(FilterSharedPtr filter));
-  MOCK_METHOD1(addReadFilter, void(ReadFilterSharedPtr filter));
-  MOCK_METHOD1(enableHalfClose, void(bool enabled));
-  MOCK_METHOD1(close, void(ConnectionCloseType type));
-  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
-  MOCK_CONST_METHOD0(id, uint64_t());
-  MOCK_METHOD0(initializeReadFilters, bool());
-  MOCK_CONST_METHOD0(nextProtocol, std::string());
-  MOCK_METHOD1(noDelay, void(bool enable));
-  MOCK_METHOD1(readDisable, void(bool disable));
-  MOCK_METHOD1(detectEarlyCloseWhenReadDisabled, void(bool));
-  MOCK_CONST_METHOD0(readEnabled, bool());
-  MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
-  MOCK_CONST_METHOD0(unixSocketPeerCredentials,
-                     absl::optional<Connection::UnixDomainSocketPeerCredentials>());
-  MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
-  MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_CONST_METHOD0(ssl, Ssl::ConnectionInfoConstSharedPtr());
-  MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
-  MOCK_CONST_METHOD0(state, State());
-  MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
-  MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
-  MOCK_CONST_METHOD0(bufferLimit, uint32_t());
-  MOCK_CONST_METHOD0(localAddressRestored, bool());
-  MOCK_CONST_METHOD0(aboveHighWatermark, bool());
-  MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
-  MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
-  MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
-  MOCK_CONST_METHOD0(transportFailureReason, absl::string_view());
+  MOCK_METHOD(void, addConnectionCallbacks, (ConnectionCallbacks & cb));
+  MOCK_METHOD(void, addBytesSentCallback, (BytesSentCb cb));
+  MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));
+  MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));
+  MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));
+  MOCK_METHOD(void, enableHalfClose, (bool enabled));
+  MOCK_METHOD(void, close, (ConnectionCloseType type));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(uint64_t, id, (), (const));
+  MOCK_METHOD(bool, initializeReadFilters, ());
+  MOCK_METHOD(std::string, nextProtocol, (), (const));
+  MOCK_METHOD(void, noDelay, (bool enable));
+  MOCK_METHOD(void, readDisable, (bool disable));
+  MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));
+  MOCK_METHOD(bool, readEnabled, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, remoteAddress, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directRemoteAddress, (), (const));
+  MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,
+              unixSocketPeerCredentials, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));
+  MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));
+  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
+  MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
+  MOCK_METHOD(State, state, (), (const));
+  MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, setBufferLimits, (uint32_t limit));
+  MOCK_METHOD(uint32_t, bufferLimit, (), (const));
+  MOCK_METHOD(bool, localAddressRestored, (), (const));
+  MOCK_METHOD(bool, aboveHighWatermark, (), (const));
+  MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, socketOptions, (), (const));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
+  MOCK_METHOD(void, setDelayedCloseTimeout, (std::chrono::milliseconds));
+  MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));
 };
 
 /**
@@ -96,42 +97,43 @@ public:
   ~MockClientConnection() override;
 
   // Network::Connection
-  MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
-  MOCK_METHOD1(addBytesSentCallback, void(BytesSentCb cb));
-  MOCK_METHOD1(addWriteFilter, void(WriteFilterSharedPtr filter));
-  MOCK_METHOD1(addFilter, void(FilterSharedPtr filter));
-  MOCK_METHOD1(addReadFilter, void(ReadFilterSharedPtr filter));
-  MOCK_METHOD1(enableHalfClose, void(bool enabled));
-  MOCK_METHOD1(close, void(ConnectionCloseType type));
-  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
-  MOCK_CONST_METHOD0(id, uint64_t());
-  MOCK_METHOD0(initializeReadFilters, bool());
-  MOCK_CONST_METHOD0(nextProtocol, std::string());
-  MOCK_METHOD1(noDelay, void(bool enable));
-  MOCK_METHOD1(readDisable, void(bool disable));
-  MOCK_METHOD1(detectEarlyCloseWhenReadDisabled, void(bool));
-  MOCK_CONST_METHOD0(readEnabled, bool());
-  MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
-  MOCK_CONST_METHOD0(unixSocketPeerCredentials,
-                     absl::optional<Connection::UnixDomainSocketPeerCredentials>());
-  MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
-  MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_CONST_METHOD0(ssl, Ssl::ConnectionInfoConstSharedPtr());
-  MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
-  MOCK_CONST_METHOD0(state, State());
-  MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
-  MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
-  MOCK_CONST_METHOD0(bufferLimit, uint32_t());
-  MOCK_CONST_METHOD0(localAddressRestored, bool());
-  MOCK_CONST_METHOD0(aboveHighWatermark, bool());
-  MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
-  MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
-  MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
-  MOCK_CONST_METHOD0(transportFailureReason, absl::string_view());
+  MOCK_METHOD(void, addConnectionCallbacks, (ConnectionCallbacks & cb));
+  MOCK_METHOD(void, addBytesSentCallback, (BytesSentCb cb));
+  MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));
+  MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));
+  MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));
+  MOCK_METHOD(void, enableHalfClose, (bool enabled));
+  MOCK_METHOD(void, close, (ConnectionCloseType type));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(uint64_t, id, (), (const));
+  MOCK_METHOD(bool, initializeReadFilters, ());
+  MOCK_METHOD(std::string, nextProtocol, (), (const));
+  MOCK_METHOD(void, noDelay, (bool enable));
+  MOCK_METHOD(void, readDisable, (bool disable));
+  MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));
+  MOCK_METHOD(bool, readEnabled, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, remoteAddress, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directRemoteAddress, (), (const));
+  MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,
+              unixSocketPeerCredentials, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));
+  MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));
+  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
+  MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
+  MOCK_METHOD(State, state, (), (const));
+  MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, setBufferLimits, (uint32_t limit));
+  MOCK_METHOD(uint32_t, bufferLimit, (), (const));
+  MOCK_METHOD(bool, localAddressRestored, (), (const));
+  MOCK_METHOD(bool, aboveHighWatermark, (), (const));
+  MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, socketOptions, (), (const));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
+  MOCK_METHOD(void, setDelayedCloseTimeout, (std::chrono::milliseconds));
+  MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));
 
   // Network::ClientConnection
-  MOCK_METHOD0(connect, void());
+  MOCK_METHOD(void, connect, ());
 };
 
 /**
@@ -144,44 +146,45 @@ public:
   ~MockFilterManagerConnection() override;
 
   // Network::Connection
-  MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
-  MOCK_METHOD1(addBytesSentCallback, void(BytesSentCb cb));
-  MOCK_METHOD1(addWriteFilter, void(WriteFilterSharedPtr filter));
-  MOCK_METHOD1(addFilter, void(FilterSharedPtr filter));
-  MOCK_METHOD1(addReadFilter, void(ReadFilterSharedPtr filter));
-  MOCK_METHOD1(enableHalfClose, void(bool enabled));
-  MOCK_METHOD1(close, void(ConnectionCloseType type));
-  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
-  MOCK_CONST_METHOD0(id, uint64_t());
-  MOCK_METHOD0(initializeReadFilters, bool());
-  MOCK_CONST_METHOD0(nextProtocol, std::string());
-  MOCK_METHOD1(noDelay, void(bool enable));
-  MOCK_METHOD1(readDisable, void(bool disable));
-  MOCK_METHOD1(detectEarlyCloseWhenReadDisabled, void(bool));
-  MOCK_CONST_METHOD0(readEnabled, bool());
-  MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
-  MOCK_CONST_METHOD0(unixSocketPeerCredentials,
-                     absl::optional<Connection::UnixDomainSocketPeerCredentials>());
-  MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
-  MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_CONST_METHOD0(ssl, Ssl::ConnectionInfoConstSharedPtr());
-  MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
-  MOCK_CONST_METHOD0(state, State());
-  MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
-  MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
-  MOCK_CONST_METHOD0(bufferLimit, uint32_t());
-  MOCK_CONST_METHOD0(localAddressRestored, bool());
-  MOCK_CONST_METHOD0(aboveHighWatermark, bool());
-  MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
-  MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
-  MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
-  MOCK_CONST_METHOD0(transportFailureReason, absl::string_view());
+  MOCK_METHOD(void, addConnectionCallbacks, (ConnectionCallbacks & cb));
+  MOCK_METHOD(void, addBytesSentCallback, (BytesSentCb cb));
+  MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));
+  MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));
+  MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));
+  MOCK_METHOD(void, enableHalfClose, (bool enabled));
+  MOCK_METHOD(void, close, (ConnectionCloseType type));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(uint64_t, id, (), (const));
+  MOCK_METHOD(bool, initializeReadFilters, ());
+  MOCK_METHOD(std::string, nextProtocol, (), (const));
+  MOCK_METHOD(void, noDelay, (bool enable));
+  MOCK_METHOD(void, readDisable, (bool disable));
+  MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));
+  MOCK_METHOD(bool, readEnabled, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, remoteAddress, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directRemoteAddress, (), (const));
+  MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,
+              unixSocketPeerCredentials, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));
+  MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));
+  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
+  MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
+  MOCK_METHOD(State, state, (), (const));
+  MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, setBufferLimits, (uint32_t limit));
+  MOCK_METHOD(uint32_t, bufferLimit, (), (const));
+  MOCK_METHOD(bool, localAddressRestored, (), (const));
+  MOCK_METHOD(bool, aboveHighWatermark, (), (const));
+  MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, socketOptions, (), (const));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
+  MOCK_METHOD(void, setDelayedCloseTimeout, (std::chrono::milliseconds));
+  MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));
 
   // Network::FilterManagerConnection
-  MOCK_METHOD0(getReadBuffer, StreamBuffer());
-  MOCK_METHOD0(getWriteBuffer, StreamBuffer());
-  MOCK_METHOD2(rawWrite, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(StreamBuffer, getReadBuffer, ());
+  MOCK_METHOD(StreamBuffer, getWriteBuffer, ());
+  MOCK_METHOD(void, rawWrite, (Buffer::Instance & data, bool end_stream));
 };
 
 } // namespace Network

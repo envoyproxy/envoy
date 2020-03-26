@@ -1,5 +1,7 @@
 #include "extensions/filters/common/expr/context.h"
 
+#include "common/grpc/common.h"
+#include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
 
 #include "absl/strings/numbers.h"
@@ -11,14 +13,14 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
-namespace {
-
 absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header) {
   if (header == nullptr) {
     return {};
   }
   return CelValue::CreateStringView(header->value().getStringView());
 }
+
+namespace {
 
 absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
                                         absl::string_view value) {
@@ -50,14 +52,6 @@ absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
 
 } // namespace
 
-absl::optional<CelValue> HeadersWrapper::operator[](CelValue key) const {
-  if (value_ == nullptr || !key.IsString()) {
-    return {};
-  }
-  auto out = value_->get(Http::LowerCaseString(std::string(key.StringOrDie().value())));
-  return convertHeaderEntry(out);
-}
-
 absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
@@ -79,6 +73,9 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     } else {
       return CelValue::CreateInt64(info_.bytesReceived());
     }
+  } else if (value == TotalSize) {
+    return CelValue::CreateInt64(info_.bytesReceived() +
+                                 (headers_.value_ ? headers_.value_->byteSize() : 0));
   } else if (value == Duration) {
     auto duration = info_.requestComplete();
     if (duration.has_value()) {
@@ -114,8 +111,6 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
       return convertHeaderEntry(headers_.value_->RequestId());
     } else if (value == UserAgent) {
       return convertHeaderEntry(headers_.value_->UserAgent());
-    } else if (value == TotalSize) {
-      return CelValue::CreateInt64(info_.bytesReceived() + headers_.value_->byteSize());
     }
   }
   return {};
@@ -139,6 +134,19 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     return CelValue::CreateMap(&trailers_);
   } else if (value == Flags) {
     return CelValue::CreateInt64(info_.responseFlags());
+  } else if (value == GrpcStatus) {
+    auto const& optional_status = Grpc::Common::getGrpcStatus(
+        trailers_.value_ ? *trailers_.value_ : ConstSingleton<Http::ResponseTrailerMapImpl>::get(),
+        headers_.value_ ? *headers_.value_ : ConstSingleton<Http::ResponseHeaderMapImpl>::get(),
+        info_);
+    if (optional_status.has_value()) {
+      return CelValue::CreateInt64(optional_status.value());
+    }
+    return {};
+  } else if (value == TotalSize) {
+    return CelValue::CreateInt64(info_.bytesSent() +
+                                 (headers_.value_ ? headers_.value_->byteSize() : 0) +
+                                 (trailers_.value_ ? trailers_.value_->byteSize() : 0));
   }
   return {};
 }

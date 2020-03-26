@@ -48,7 +48,7 @@ using ClusterStatsCachePtr = std::unique_ptr<ClusterStatsCache>;
 class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hystrix> {
 public:
   HystrixSink(Server::Instance& server, uint64_t num_buckets);
-  Http::Code handlerHystrixEventStream(absl::string_view, Http::HeaderMap& response_headers,
+  Http::Code handlerHystrixEventStream(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance&, Server::AdminStream& admin_stream);
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override{};
@@ -158,6 +158,8 @@ private:
   std::unordered_map<std::string, ClusterStatsCachePtr> cluster_stats_cache_map_;
 
   // Saved StatNames for fast comparisons in loop.
+  // TODO(mattklein123): Many/all of these stats should just be pulled directly from the cluster
+  // stats directly. This needs some cleanup.
   Stats::StatNamePool stat_name_pool_;
   const Stats::StatName cluster_name_;
   const Stats::StatName cluster_upstream_rq_time_;

@@ -1,8 +1,8 @@
 #include <iostream>
 #include <unordered_map>
 
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/protobuf/message_validator.h"
@@ -12,6 +12,7 @@
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -26,10 +27,10 @@ namespace Envoy {
 namespace Server {
 
 namespace {
-
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
+  buildFilterChain(const envoy::config::listener::v3::FilterChain&,
+                   FilterChainFactoryContextCreator&) const override {
     // A place holder to be found
     return std::make_unique<Network::MockFilterChain>();
   }
@@ -63,6 +64,10 @@ public:
   }
 
   const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
+    return remote_address_;
+  }
+
+  const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
     return remote_address_;
   }
 
@@ -111,13 +116,13 @@ const char YamlHeader[] = R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
         # empty
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -132,7 +137,7 @@ const char YamlSingleServer[] = R"EOF(
         server_names: "server1.example.com"
         transport_protocol: "tls"
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -147,7 +152,7 @@ const char YamlSingleDstPortTop[] = R"EOF(
         destination_port: )EOF";
 const char YamlSingleDstPortBottom[] = R"EOF(
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -175,20 +180,22 @@ public:
     TestUtility::loadFromYaml(listener_yaml_config_, listener_config_);
     filter_chains_ = listener_config_.filter_chains();
   }
-  absl::Span<const envoy::api::v2::listener::FilterChain* const> filter_chains_;
+  absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
   std::string listener_yaml_config_;
-  envoy::api::v2::Listener listener_config_;
+  envoy::config::listener::v3::Listener listener_config_;
   MockFilterChainFactoryBuilder dummy_builder_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context};
 };
 
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
 (::benchmark::State& state) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   for (auto _ : state) {
     FilterChainManagerImpl filter_chain_manager{
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
-    filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_);
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context};
+    filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
   }
 }
 
@@ -200,9 +207,11 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
     sockets.push_back(std::move(*MockConnectionSocket::createMockConnectionSocket(
         10000 + i, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111)));
   }
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   FilterChainManagerImpl filter_chain_manager{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
-  filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_);
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context};
+
+  filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
   for (auto _ : state) {
     for (int i = 0; i < state.range(0); i++) {
       filter_chain_manager.findFilterChain(sockets[i]);

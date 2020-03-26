@@ -1,6 +1,8 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
 
-#include "envoy/api/v2/core/base.pb.h"
+#include <memory>
+
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
@@ -56,12 +58,10 @@ void EnvoyQuicClientConnection::processPacket(
       quic::QuicTime::Delta::FromMicroseconds(
           std::chrono::duration_cast<std::chrono::microseconds>(receive_time.time_since_epoch())
               .count());
-  uint64_t num_slice = buffer->getRawSlices(nullptr, 0);
-  ASSERT(num_slice == 1);
-  Buffer::RawSlice slice;
-  buffer->getRawSlices(&slice, 1);
-  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
-                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
+  ASSERT(buffer->getRawSlices().size() == 1);
+  Buffer::RawSliceVector slices = buffer->getRawSlices(/*max_slices=*/1);
+  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slices[0].mem_), slices[0].len_,
+                                  timestamp, /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
   ProcessUdpPacket(envoyAddressInstanceToQuicSocketAddress(local_address),
@@ -81,7 +81,7 @@ void EnvoyQuicClientConnection::setUpConnectionSocket() {
         Event::FileReadyType::Read | Event::FileReadyType::Write);
 
     if (!Network::Socket::applyOptions(connectionSocket()->options(), *connectionSocket(),
-                                       envoy::api::v2::core::SocketOption::STATE_LISTENING)) {
+                                       envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
       ENVOY_CONN_LOG(error, "Fail to apply listening options", *this);
       connectionSocket()->close();
     }
@@ -90,6 +90,14 @@ void EnvoyQuicClientConnection::setUpConnectionSocket() {
     CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to set up connection socket.",
                     quic::ConnectionCloseBehavior::SILENT_CLOSE);
   }
+}
+
+void EnvoyQuicClientConnection::switchConnectionSocket(
+    Network::ConnectionSocketPtr&& connection_socket) {
+  auto writer = std::make_unique<EnvoyQuicPacketWriter>(*connection_socket);
+  setConnectionSocket(std::move(connection_socket));
+  setUpConnectionSocket();
+  SetQuicPacketWriter(writer.release(), true);
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {

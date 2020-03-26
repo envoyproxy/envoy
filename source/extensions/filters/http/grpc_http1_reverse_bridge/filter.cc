@@ -26,7 +26,7 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
-Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::HeaderMap& headers) {
+Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::ResponseHeaderMap& headers) {
   const auto http_response_status = Http::Utility::getResponseStatus(headers);
 
   // Notably, we treat an upstream 200 as a successful response. This differs
@@ -39,7 +39,7 @@ Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::HeaderMap& headers) {
   }
 }
 
-std::string badContentTypeMessage(const Http::HeaderMap& headers) {
+std::string badContentTypeMessage(const Http::ResponseHeaderMap& headers) {
   if (headers.ContentType() != nullptr) {
     return fmt::format(
         "envoy reverse bridge: upstream responded with unsupported content-type {}, status code {}",
@@ -51,7 +51,7 @@ std::string badContentTypeMessage(const Http::HeaderMap& headers) {
   }
 }
 
-void adjustContentLength(Http::HeaderMap& headers,
+void adjustContentLength(Http::RequestOrResponseHeaderMap& headers,
                          const std::function<uint64_t(uint64_t value)>& adjustment) {
   auto length_header = headers.ContentLength();
   if (length_header != nullptr) {
@@ -63,7 +63,7 @@ void adjustContentLength(Http::HeaderMap& headers,
 }
 } // namespace
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   // Short circuit if header only.
   if (end_stream) {
     return Http::FilterHeadersStatus::Continue;
@@ -124,7 +124,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (enabled_) {
     auto content_type = headers.ContentType();
 
@@ -190,7 +190,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
   }
 }
 
-Http::FilterTrailersStatus Filter::encodeTrailers(Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   trailers.setGrpcStatus(grpc_status_);
 
   if (withhold_grpc_frames_) {
@@ -202,18 +202,12 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::HeaderMap& trailers) {
 }
 
 void Filter::buildGrpcFrameHeader(Buffer::Instance& buffer) {
-  // Compute the size of the payload and construct the length prefix.
-  //
   // We do this even if the upstream failed: If the response returned non-200,
   // we'll respond with a grpc-status with an error, so clients will know that the request
   // was unsuccessful. Since we're guaranteed at this point to have a valid response
   // (unless upstream lied in content-type) we attempt to return a well-formed gRPC
   // response body.
-  const auto length = buffer.length();
-  std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
-  Grpc::Encoder().newFrame(Grpc::GRPC_FH_DEFAULT, length, frame);
-  Buffer::OwnedImpl frame_buffer(frame.data(), frame.size());
-  buffer.prepend(frame_buffer);
+  Grpc::Encoder().prependFrameHeader(Grpc::GRPC_FH_DEFAULT, buffer);
 }
 
 } // namespace GrpcHttp1ReverseBridge

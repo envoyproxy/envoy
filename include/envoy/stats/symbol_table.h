@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "envoy/common/pure.h"
@@ -25,6 +26,14 @@ class StatNameList;
 class StatNameSet;
 
 using StatNameSetPtr = std::unique_ptr<StatNameSet>;
+
+/**
+ * Holds a range of indexes indicating which parts of a stat-name are
+ * dynamic. This is used to transfer stats from hot-restart parent to child,
+ * retaining the same name structure.
+ */
+using DynamicSpan = std::pair<uint32_t, uint32_t>;
+using DynamicSpans = std::vector<DynamicSpan>;
 
 /**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
@@ -120,8 +129,7 @@ public:
    * @param num_names The number of names.
    * @param symbol_table The symbol table in which to encode the names.
    */
-  virtual void populateList(const absl::string_view* names, uint32_t num_names,
-                            StatNameList& list) PURE;
+  virtual void populateList(const StatName* names, uint32_t num_names, StatNameList& list) PURE;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   virtual void debugPrint() const PURE;
@@ -180,8 +188,22 @@ public:
    */
   virtual StatNameSetPtr makeSet(absl::string_view name) PURE;
 
+  /**
+   * Identifies the dynamic components of a stat_name into an array of integer
+   * pairs, indicating the begin/end of spans of tokens in the stat-name that
+   * are created from StatNameDynamicStore or StatNameDynamicPool.
+   *
+   * This can be used to reconstruct the same exact StatNames in
+   * StatNames::mergeStats(), to enable stat continuity across hot-restart.
+   *
+   * @param stat_name the input stat name.
+   * @return the array of pairs indicating the bounds.
+   */
+  virtual DynamicSpans getDynamicSpans(StatName stat_name) const PURE;
+
 private:
   friend struct HeapStatData;
+  friend class StatNameDynamicStorage;
   friend class StatNameStorage;
   friend class StatNameList;
   friend class StatNameSet;
@@ -222,12 +244,7 @@ private:
    */
   virtual StoragePtr encode(absl::string_view name) PURE;
 
-  /**
-   * Called by StatNameSet's destructor.
-   *
-   * @param stat_name_set the set.
-   */
-  virtual void forgetSet(StatNameSet& stat_name_set) PURE;
+  virtual StoragePtr makeDynamicStorage(absl::string_view name) PURE;
 };
 
 using SymbolTablePtr = std::unique_ptr<SymbolTable>;

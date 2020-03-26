@@ -8,11 +8,10 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/stack_array.h"
-
+#include "absl/container/fixed_array.h"
+#include "quiche/common/platform/api/quiche_string_piece.h"
 #include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/platform/api/quic_mem_slice.h"
-#include "quiche/quic/platform/api/quic_string_piece.h"
 
 namespace quic {
 
@@ -44,9 +43,9 @@ public:
   }
 
   // QuicMemSliceSpan
-  QuicStringPiece GetData(size_t index);
+  quiche::QuicheStringPiece GetData(size_t index);
   QuicByteCount total_length() { return buffer_->length(); };
-  size_t NumSlices() { return buffer_->getRawSlices(nullptr, 0); }
+  size_t NumSlices() { return buffer_->getRawSlices().size(); }
   template <typename ConsumeFunction> QuicByteCount ConsumeAll(ConsumeFunction consume);
   bool empty() const { return buffer_->length() == 0; }
 
@@ -56,11 +55,8 @@ private:
 
 template <typename ConsumeFunction>
 QuicByteCount QuicMemSliceSpanImpl::ConsumeAll(ConsumeFunction consume) {
-  uint64_t num_slices = buffer_->getRawSlices(nullptr, 0);
-  Envoy::STACK_ARRAY(slices, Envoy::Buffer::RawSlice, num_slices);
-  buffer_->getRawSlices(slices.begin(), num_slices);
   size_t saved_length = 0;
-  for (auto& slice : slices) {
+  for (auto& slice : buffer_->getRawSlices()) {
     if (slice.len_ == 0) {
       continue;
     }

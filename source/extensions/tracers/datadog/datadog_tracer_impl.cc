@@ -1,6 +1,6 @@
 #include "extensions/tracers/datadog/datadog_tracer_impl.h"
 
-#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -21,12 +21,12 @@ Driver::TlsTracer::TlsTracer(const std::shared_ptr<opentracing::Tracer>& tracer,
                              TraceReporterPtr&& reporter, Driver& driver)
     : tracer_(tracer), reporter_(std::move(reporter)), driver_(driver) {}
 
-Driver::Driver(const envoy::config::trace::v2::DatadogConfig& datadog_config,
-               Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+Driver::Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
+               Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime)
-    : OpenTracingDriver{stats},
+    : OpenTracingDriver{scope},
       cm_(cluster_manager), tracer_stats_{DATADOG_TRACER_STATS(
-                                POOL_COUNTER_PREFIX(stats, "tracing.datadog."))},
+                                POOL_COUNTER_PREFIX(scope, "tracing.datadog."))},
       tls_(tls.allocateSlot()), runtime_(runtime) {
 
   Config::Utility::checkCluster(TracerNames::get().Datadog, datadog_config.collector_cluster(),
@@ -86,7 +86,7 @@ void TraceReporter::flushTraces() {
     ENVOY_LOG(debug, "flushing traces: {} traces", pendingTraces);
     driver_.tracerStats().traces_sent_.add(pendingTraces);
 
-    Http::MessagePtr message(new Http::RequestMessageImpl());
+    Http::RequestMessagePtr message(new Http::RequestMessageImpl());
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     message->headers().setReferencePath(encoder_->path());
     message->headers().setReferenceHost(driver_.cluster()->name());
@@ -100,21 +100,29 @@ void TraceReporter::flushTraces() {
     ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload size {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 
-    driver_.clusterManager()
-        .httpAsyncClientForCluster(driver_.cluster()->name())
-        .send(std::move(message), *this,
-              Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000U)));
+    Http::AsyncClient::Request* request =
+        driver_.clusterManager()
+            .httpAsyncClientForCluster(driver_.cluster()->name())
+            .send(std::move(message), *this,
+                  Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000U)));
+    if (request) {
+      active_requests_.add(*request);
+    }
 
     encoder_->clearTraces();
   }
 }
 
-void TraceReporter::onFailure(Http::AsyncClient::FailureReason) {
+void TraceReporter::onFailure(const Http::AsyncClient::Request& request,
+                              Http::AsyncClient::FailureReason) {
+  active_requests_.remove(request);
   ENVOY_LOG(debug, "failure submitting traces to datadog agent");
   driver_.tracerStats().reports_failed_.inc();
 }
 
-void TraceReporter::onSuccess(Http::MessagePtr&& http_response) {
+void TraceReporter::onSuccess(const Http::AsyncClient::Request& request,
+                              Http::ResponseMessagePtr&& http_response) {
+  active_requests_.remove(request);
   uint64_t responseStatus = Http::Utility::getResponseStatus(http_response->headers());
   if (responseStatus != enumToInt(Http::Code::OK)) {
     // TODO: Consider adding retries for failed submissions.

@@ -12,6 +12,9 @@ namespace Quic {
 EnvoyQuicStream* quicStreamToEnvoyStream(quic::QuicStream* stream) {
   return dynamic_cast<EnvoyQuicStream*>(stream);
 }
+EnvoyQuicClientStream* quicStreamToEnvoyClientStream(quic::QuicStream* stream) {
+  return dynamic_cast<EnvoyQuicClientStream*>(stream);
+}
 
 bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.bytesToSend() > 0; }
 
@@ -49,7 +52,11 @@ void QuicHttpServerConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWate
 }
 
 void QuicHttpServerConnectionImpl::goAway() {
-  quic_server_session_.SendGoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
+  if (quic::VersionUsesHttp3(quic_server_session_.transport_version())) {
+    quic_server_session_.SendHttp3GoAway();
+  } else {
+    quic_server_session_.SendGoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
+  }
 }
 
 QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(EnvoyQuicClientSession& session,
@@ -58,15 +65,15 @@ QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(EnvoyQuicClientSessio
   session.setHttpConnectionCallbacks(callbacks);
 }
 
-Http::StreamEncoder&
-QuicHttpClientConnectionImpl::newStream(Http::StreamDecoder& response_decoder) {
-  EnvoyQuicStream* stream =
-      quicStreamToEnvoyStream(quic_client_session_.CreateOutgoingBidirectionalStream());
+Http::RequestEncoder&
+QuicHttpClientConnectionImpl::newStream(Http::ResponseDecoder& response_decoder) {
+  EnvoyQuicClientStream* stream =
+      quicStreamToEnvoyClientStream(quic_client_session_.CreateOutgoingBidirectionalStream());
   // TODO(danzh) handle stream creation failure gracefully. This can happen when
   // there are already 100 open streams. In such case, caller should hold back
   // the stream creation till an existing stream is closed.
   ASSERT(stream != nullptr, "Fail to create QUIC stream.");
-  stream->setDecoder(response_decoder);
+  stream->setResponseDecoder(response_decoder);
   if (quic_client_session_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }

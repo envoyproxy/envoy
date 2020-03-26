@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <string>
@@ -8,7 +9,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"
 #include "common/singleton/threadsafe_singleton.h"
@@ -76,7 +77,7 @@ public:
     std::string raw_string_value_;
     absl::optional<uint64_t> uint_value_;
     absl::optional<double> double_value_;
-    absl::optional<envoy::type::FractionalPercent> fractional_percent_value_;
+    absl::optional<envoy::type::v3::FractionalPercent> fractional_percent_value_;
     absl::optional<bool> bool_value_;
   };
 
@@ -103,13 +104,18 @@ public:
 
   using OverrideLayerConstPtr = std::unique_ptr<const OverrideLayer>;
 
-  // Returns true if a deprecated feature is allowed.
-  //
-  // Fundamentally, deprecated features are boolean values.
-  // They are allowed by default or with explicit configuration to "true" via runtime configuration.
-  // They can be disallowed either by inclusion in the hard-coded disallowed_features[] list, or by
-  // configuration of "false" in runtime config.
-  virtual bool deprecatedFeatureEnabled(const std::string& key) const PURE;
+  /**
+   * Returns true if a deprecated feature is allowed.
+   *
+   * Fundamentally, deprecated features are boolean values.
+   * They are allowed by default or with explicit configuration to "true" via runtime configuration.
+   * They can be disallowed either by inclusion in the hard-coded disallowed_features[] list, or by
+   * configuration of "false" in runtime config.
+   * @param key supplies the key to lookup.
+   * @param default_value supplies the default value that will be used if either the key
+   *        does not exist or it is not a boolean.
+   */
+  virtual bool deprecatedFeatureEnabled(absl::string_view key, bool default_enabled) const PURE;
 
   // Returns true if a runtime feature is enabled.
   //
@@ -130,7 +136,7 @@ public:
    *        does not exist or it is not an integer.
    * @return true if the feature is enabled.
    */
-  virtual bool featureEnabled(const std::string& key, uint64_t default_value) const PURE;
+  virtual bool featureEnabled(absl::string_view key, uint64_t default_value) const PURE;
 
   /**
    * Test if a feature is enabled using a supplied stable random value. This variant is used if
@@ -142,7 +148,7 @@ public:
    *        is enabled.
    * @return true if the feature is enabled.
    */
-  virtual bool featureEnabled(const std::string& key, uint64_t default_value,
+  virtual bool featureEnabled(absl::string_view key, uint64_t default_value,
                               uint64_t random_value) const PURE;
 
   /**
@@ -159,7 +165,7 @@ public:
    *        of [0, num_buckets).
    * @return true if the feature is enabled.
    */
-  virtual bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
+  virtual bool featureEnabled(absl::string_view key, uint64_t default_value, uint64_t random_value,
                               uint64_t num_buckets) const PURE;
 
   /**
@@ -179,8 +185,8 @@ public:
    *        does not exist or it is not a fractional percent.
    * @return true if the feature is enabled.
    */
-  virtual bool featureEnabled(const std::string& key,
-                              const envoy::type::FractionalPercent& default_value) const PURE;
+  virtual bool featureEnabled(absl::string_view key,
+                              const envoy::type::v3::FractionalPercent& default_value) const PURE;
 
   /**
    * Test if a feature is enabled using a supplied stable random value. This variant is used if
@@ -196,16 +202,17 @@ public:
    *        is enabled.
    * @return true if the feature is enabled.
    */
-  virtual bool featureEnabled(const std::string& key,
-                              const envoy::type::FractionalPercent& default_value,
+  virtual bool featureEnabled(absl::string_view key,
+                              const envoy::type::v3::FractionalPercent& default_value,
                               uint64_t random_value) const PURE;
 
+  using ConstStringOptRef = absl::optional<std::reference_wrapper<const std::string>>;
   /**
    * Fetch raw runtime data based on key.
    * @param key supplies the key to fetch.
-   * @return const std::string& the value or empty string if the key does not exist.
+   * @return absl::nullopt if the key does not exist or reference to the value std::string.
    */
-  virtual const std::string& get(const std::string& key) const PURE;
+  virtual ConstStringOptRef get(absl::string_view key) const PURE;
 
   /**
    * Fetch an integer runtime key. Runtime keys larger than ~2^53 may not be accurately converted
@@ -215,7 +222,7 @@ public:
    *        contain an integer.
    * @return uint64_t the runtime value or the default value.
    */
-  virtual uint64_t getInteger(const std::string& key, uint64_t default_value) const PURE;
+  virtual uint64_t getInteger(absl::string_view key, uint64_t default_value) const PURE;
 
   /**
    * Fetch a double runtime key.
@@ -224,7 +231,7 @@ public:
    *        contain a double.
    * @return double the runtime value or the default value.
    */
-  virtual double getDouble(const std::string& key, double default_value) const PURE;
+  virtual double getDouble(absl::string_view key, double default_value) const PURE;
 
   /**
    * Fetch a boolean runtime key.

@@ -72,7 +72,7 @@ BENCHMARK(HeaderMapImplGet)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
  */
 static void HeaderMapImplGetInline(benchmark::State& state) {
   const std::string value("01234567890123456789");
-  HeaderMapImpl headers;
+  RequestHeaderMapImpl headers;
   addDummyHeaders(headers, state.range(0));
   headers.setReferenceConnection(value);
   size_t size = 0;
@@ -89,7 +89,7 @@ BENCHMARK(HeaderMapImplGetInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
  */
 static void HeaderMapImplSetInlineMacro(benchmark::State& state) {
   const std::string value("01234567890123456789");
-  HeaderMapImpl headers;
+  RequestHeaderMapImpl headers;
   addDummyHeaders(headers, state.range(0));
   for (auto _ : state) {
     headers.setReferenceConnection(value);
@@ -104,7 +104,7 @@ BENCHMARK(HeaderMapImplSetInlineMacro)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
  */
 static void HeaderMapImplSetInlineInteger(benchmark::State& state) {
   uint64_t value = 12345;
-  HeaderMapImpl headers;
+  RequestHeaderMapImpl headers;
   addDummyHeaders(headers, state.range(0));
   for (auto _ : state) {
     headers.setConnection(value);
@@ -222,13 +222,3 @@ BENCHMARK(HeaderMapImplPopulate);
 
 } // namespace Http
 } // namespace Envoy
-
-// Boilerplate main(), which discovers benchmarks in the same file and runs them.
-int main(int argc, char** argv) {
-  benchmark::Initialize(&argc, argv);
-
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
-  }
-  benchmark::RunSpecifiedBenchmarks();
-}

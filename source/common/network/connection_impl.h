@@ -46,7 +46,8 @@ public:
 class ConnectionImpl : public ConnectionImplBase, public TransportSocketCallbacks {
 public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                 TransportSocketPtr&& transport_socket, bool connected);
+                 TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
+                 bool connected);
 
   ~ConnectionImpl() override;
 
@@ -67,6 +68,9 @@ public:
   bool readEnabled() const override;
   const Address::InstanceConstSharedPtr& remoteAddress() const override {
     return socket_->remoteAddress();
+  }
+  const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return socket_->directRemoteAddress();
   }
   const Address::InstanceConstSharedPtr& localAddress() const override {
     return socket_->localAddress();
@@ -112,6 +116,7 @@ public:
   // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
   // Reconsider how to make fairness happen.
   void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
+  void flushWriteBuffer() override;
 
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
@@ -127,8 +132,8 @@ protected:
 
   TransportSocketPtr transport_socket_;
   ConnectionSocketPtr socket_;
+  StreamInfo::StreamInfo& stream_info_;
   FilterManagerImpl filter_manager_;
-  StreamInfo::StreamInfoImpl stream_info_;
 
   Buffer::OwnedImpl read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
@@ -193,6 +198,9 @@ public:
 
   // Network::ClientConnection
   void connect() override;
+
+private:
+  StreamInfo::StreamInfoImpl stream_info_;
 };
 
 } // namespace Network

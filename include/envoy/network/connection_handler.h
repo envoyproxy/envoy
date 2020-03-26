@@ -22,7 +22,7 @@ public:
   /**
    * @return uint64_t the number of active connections owned by the handler.
    */
-  virtual uint64_t numConnections() PURE;
+  virtual uint64_t numConnections() const PURE;
 
   /**
    * Increment the return value of numConnections() by one.
@@ -77,7 +77,7 @@ public:
   /**
    * @return the stat prefix used for per-handler stats.
    */
-  virtual const std::string& statPrefix() PURE;
+  virtual const std::string& statPrefix() const PURE;
 
   /**
    * Used by ConnectionHandler to manage listeners.
@@ -97,9 +97,19 @@ public:
     virtual Listener* listener() PURE;
 
     /**
-     * Destroy the actual Listener it wraps.
+     * Temporarily stop listening according to implementation's own definition.
      */
-    virtual void destroy() PURE;
+    virtual void pauseListening() PURE;
+
+    /**
+     * Resume listening according to implementation's own definition.
+     */
+    virtual void resumeListening() PURE;
+
+    /**
+     * Stop listening according to implementation's own definition.
+     */
+    virtual void shutdownListener() PURE;
   };
 
   using ActiveListenerPtr = std::unique_ptr<ActiveListener>;
@@ -125,7 +135,7 @@ public:
    */
   virtual ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(ConnectionHandler& parent, Event::Dispatcher& disptacher,
-                          Network::ListenerConfig& config) const PURE;
+                          Network::ListenerConfig& config) PURE;
 
   /**
    * @return true if the UDP passing through listener doesn't form stateful connections.

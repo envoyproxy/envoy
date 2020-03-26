@@ -7,9 +7,9 @@
 #include <string>
 #include <unordered_set>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -41,6 +41,7 @@
 #include "server/configuration_impl.h"
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
+#include "server/http/utils.h"
 #include "server/listener_hooks.h"
 #include "server/ssl_context_manager.h"
 
@@ -60,7 +61,7 @@ InstanceImpl::InstanceImpl(
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
-                         process_context ? OptProcessContextRef(std::ref(*process_context))
+                         process_context ? ProcessContextOptRef(std::ref(*process_context))
                                          : absl::nullopt)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
@@ -74,7 +75,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-      server_context_(*this) {
+      server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -194,6 +195,7 @@ void InstanceImpl::updateServerStats() {
   server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
                                        parent_stats.parent_memory_allocated_);
   server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
+  server_stats_->memory_physical_size_.set(Memory::Stats::totalPhysicalBytes());
   server_stats_->parent_connections_.set(parent_stats.parent_connections_);
   server_stats_->total_connections_.set(listener_manager_->numConnections() +
                                         parent_stats.parent_connections_);
@@ -216,12 +218,13 @@ void InstanceImpl::flushStatsInternal() {
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
-InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
-    envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
+void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                       const Options& options,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
-  const envoy::config::bootstrap::v2::Bootstrap& config_proto = options.configProto();
+  const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
 
   // Exactly one of config_path and config_yaml should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSize() == 0) {
@@ -233,7 +236,7 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
   }
   if (!config_yaml.empty()) {
-    envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
+    envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     bootstrap.MergeFrom(bootstrap_override);
   }
@@ -241,7 +244,6 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);
-  return BootstrapVersion::V2;
 }
 
 void InstanceImpl::initialize(const Options& options,
@@ -304,7 +306,21 @@ void InstanceImpl::initialize(const Options& options,
   }
   server_stats_->version_.set(version_int);
 
-  bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
+  bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
+  bootstrap_.mutable_node()->set_user_agent_name("envoy");
+  *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
+  for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
+    for (const auto& name : ext.second->allRegisteredNames()) {
+      auto* extension = bootstrap_.mutable_node()->add_extensions();
+      extension->set_name(std::string(name));
+      extension->set_category(ext.first);
+      auto const version = ext.second->getFactoryVersion(name);
+      if (version) {
+        *extension->mutable_version() = version.value();
+      }
+      extension->set_disabled(ext.second->isFactoryDisabled(name));
+    }
+  }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
@@ -368,7 +384,7 @@ void InstanceImpl::initialize(const Options& options,
   hooks.onRuntimeCreated();
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = createContextManager(Ssl::ContextManagerFactory::name(), time_source_);
+  ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
   const bool use_tcp_for_dns_lookups = bootstrap_.use_tcp_for_dns_lookups();
   dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
@@ -376,14 +392,14 @@ void InstanceImpl::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
       dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
-      messageValidationContext(), *api_, http_context_, access_log_manager_, *singleton_manager_);
+      messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
+      *singleton_manager_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
   // is constructed as part of the InstanceImpl and then populated once
   // cluster_manager_factory_ is available.
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
-  http_context_.setTracer(config_.httpTracer());
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
@@ -398,15 +414,15 @@ void InstanceImpl::initialize(const Options& options,
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        *config_.clusterManager(), thread_local_, time_source_, *api_);
+        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
     hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
         stats_store_,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                        stats_store_)
             ->create(),
-        *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
-        *random_generator_, info_factory_, access_log_manager_, *config_.clusterManager(),
-        *local_info_, *admin_, *singleton_manager_, thread_local_,
+        hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
+        stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
+        *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
         messageValidationContext().dynamicValidationVisitor(), *api_);
   }
 
@@ -468,6 +484,9 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       }) {
   // Setup signals.
   if (options.signalHandlingEnabled()) {
+// TODO(Pivotal): Figure out solution to graceful shutdown on Windows. None of these signals exist
+// on Windows.
+#ifndef WIN32
     sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
       ENVOY_LOG(warn, "caught SIGTERM");
       instance.shutdown();
@@ -486,6 +505,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
       ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
     });
+#endif
   }
 
   // Start overload manager before workers.
@@ -560,6 +580,13 @@ void InstanceImpl::terminate() {
 
   // Shutdown all the workers now that the main dispatch loop is done.
   if (listener_manager_ != nullptr) {
+    // Also shutdown the listener manager's ApiListener, if there is one, which runs on the main
+    // thread. This needs to happen ahead of calling thread_local_.shutdown() below to prevent any
+    // objects in the ApiListener destructor to reference any objects in thread local storage.
+    if (listener_manager_->apiListener().has_value()) {
+      listener_manager_->apiListener()->get().shutdown();
+    }
+
     listener_manager_->stopWorkers();
   }
 
@@ -623,12 +650,8 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
 
   // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
   // have finished their work.
-  std::shared_ptr<Event::PostCb> cb_guard(new Event::PostCb([] {}),
-                                          [this, completion_cb](Event::PostCb* cb) {
-                                            ASSERT(std::this_thread::get_id() == main_thread_id_);
-                                            completion_cb();
-                                            delete cb;
-                                          });
+  std::shared_ptr<void> cb_guard(
+      new Cleanup([this, completion_cb]() { dispatcher_->post(completion_cb); }));
 
   // Registrations which take a completion callback are typically implemented by executing a
   // callback on all worker threads using Slot::runOnAllThreads which will hang indefinitely if
@@ -639,14 +662,14 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
     if (it2 != stage_completable_callbacks_.end()) {
       ENVOY_LOG(info, "Notifying {} callback(s) with completion.", it2->second.size());
       for (const StageCallbackWithCompletion& callback : it2->second) {
-        callback([cb_guard] { (*cb_guard)(); });
+        callback([cb_guard] {});
       }
     }
   }
 }
 
 ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
-  auto config_dump = std::make_unique<envoy::admin::v2alpha::BootstrapConfigDump>();
+  auto config_dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
   config_dump->mutable_bootstrap()->MergeFrom(bootstrap_);
   TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
                                         *(config_dump->mutable_last_updated()));

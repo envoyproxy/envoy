@@ -48,7 +48,8 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), state_(SocketState::PreHandshake) {
   bssl::UniquePtr<SSL> ssl = ctx_->newSsl(transport_socket_options_.get());
   ssl_ = ssl.get();
-  info_ = std::make_shared<SslSocketInfo>(std::move(ssl));
+  info_ = std::make_shared<SslSocketInfo>(std::move(ssl), ctx_);
+
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_);
   } else {
@@ -151,8 +152,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     }
   }
 
-  ENVOY_CONN_LOG(trace, "ssl read {} bytes into {} slices", callbacks_->connection(), bytes_read,
-                 read_buffer.getRawSlices(nullptr, 0));
+  ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);
 
   return {action, bytes_read, end_stream};
 }
@@ -301,9 +301,28 @@ void SslSocket::shutdownSsl() {
   }
 }
 
+void SslExtendedSocketInfoImpl::setCertificateValidationStatus(
+    Envoy::Ssl::ClientValidationStatus validated) {
+  certificate_validation_status_ = validated;
+}
+
+Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidationStatus() const {
+  return certificate_validation_status_;
+}
+
+SslSocketInfo::SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx)
+    : ssl_(std::move(ssl)) {
+  SSL_set_ex_data(ssl_.get(), ctx->sslExtendedSocketInfoIndex(), &(this->extended_socket_info_));
+}
+
 bool SslSocketInfo::peerCertificatePresented() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   return cert != nullptr;
+}
+
+bool SslSocketInfo::peerCertificateValidated() const {
+  return extended_socket_info_.certificateValidationStatus() ==
+         Envoy::Ssl::ClientValidationStatus::Validated;
 }
 
 absl::Span<const std::string> SslSocketInfo::uriSanLocalCertificate() const {
@@ -481,6 +500,14 @@ const std::string& SslSocketInfo::tlsVersion() const {
   }
   cached_tls_version_ = SSL_get_version(ssl_.get());
   return cached_tls_version_;
+}
+
+absl::optional<std::string> SslSocketInfo::x509Extension(absl::string_view extension_name) const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return absl::nullopt;
+  }
+  return Utility::getX509ExtensionValue(*cert, extension_name);
 }
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }

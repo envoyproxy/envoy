@@ -27,20 +27,20 @@ std::string formatUpstreamMetadataParseException(absl::string_view params,
                                                  const EnvoyException* cause = nullptr) {
   std::string reason;
   if (cause != nullptr) {
-    reason = fmt::format(", because {}", cause->what());
+    reason = absl::StrCat(", because ", cause->what());
   }
 
-  return fmt::format("Invalid header configuration. Expected format "
-                     "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                     "UPSTREAM_METADATA{}{}",
-                     params, reason);
+  return absl::StrCat("Invalid header configuration. Expected format "
+                      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+                      "UPSTREAM_METADATA",
+                      params, reason);
 }
 
 std::string formatPerRequestStateParseException(absl::string_view params) {
-  return fmt::format("Invalid header configuration. Expected format "
-                     "PER_REQUEST_STATE(<data_name>), actual format "
-                     "PER_REQUEST_STATE{}",
-                     params);
+  return absl::StrCat("Invalid header configuration. Expected format "
+                      "PER_REQUEST_STATE(<data_name>), actual format "
+                      "PER_REQUEST_STATE",
+                      params);
 }
 
 // Parses the parameters for UPSTREAM_METADATA and returns a function suitable for accessing the
@@ -79,7 +79,7 @@ parseUpstreamMetadataField(absl::string_view params_str) {
     }
 
     const ProtobufWkt::Value* value =
-        &::Envoy::Config::Metadata::metadataValue(*host->metadata(), params[0], params[1]);
+        &::Envoy::Config::Metadata::metadataValue(host->metadata().get(), params[0], params[1]);
     if (value->kind_case() == ProtobufWkt::Value::KIND_NOT_SET) {
       // No kind indicates default ProtobufWkt::Value which means namespace or key not
       // found.
@@ -242,6 +242,11 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       return StreamInfo::Utility::formatDownstreamAddressNoPort(
           *stream_info.downstreamLocalAddress());
     };
+  } else if (field_name == "DOWNSTREAM_LOCAL_PORT") {
+    field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+      return StreamInfo::Utility::formatDownstreamAddressJustPort(
+          *stream_info.downstreamLocalAddress());
+    };
   } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
     field_extractor_ =
         sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
@@ -318,11 +323,13 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     }
     field_extractor_ = [this, pattern](const Envoy::StreamInfo::StreamInfo& stream_info) {
       const auto& formatters = start_time_formatters_.at(pattern);
-      Http::HeaderMapImpl empty_map;
+      static const Http::RequestHeaderMapImpl empty_request_headers;
+      static const Http::ResponseHeaderMapImpl empty_response_headers;
+      static const Http::ResponseTrailerMapImpl empty_response_trailers;
       std::string formatted;
       for (const auto& formatter : formatters) {
-        absl::StrAppend(&formatted,
-                        formatter->format(empty_map, empty_map, empty_map, stream_info));
+        absl::StrAppend(&formatted, formatter->format(empty_request_headers, empty_response_headers,
+                                                      empty_response_trailers, stream_info));
       }
       return formatted;
     };
@@ -334,6 +341,9 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
         parsePerRequestStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));
   } else if (absl::StartsWith(field_name, "REQ")) {
     field_extractor_ = parseRequestHeader(field_name.substr(STATIC_STRLEN("REQ")));
+  } else if (field_name == "HOSTNAME") {
+    std::string hostname = Envoy::AccessLog::AccessLogFormatUtils::getHostname();
+    field_extractor_ = [hostname](const StreamInfo::StreamInfo&) { return hostname; };
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }

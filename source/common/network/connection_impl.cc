@@ -4,12 +4,13 @@
 #include <cstdint>
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -42,10 +43,11 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                               TransportSocketPtr&& transport_socket, bool connected)
+                               TransportSocketPtr&& transport_socket,
+                               StreamInfo::StreamInfo& stream_info, bool connected)
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
-      filter_manager_(*this), stream_info_(dispatcher.timeSource()),
+      stream_info_(stream_info), filter_manager_(*this),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
@@ -54,17 +56,23 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
-  RELEASE_ASSERT(ioHandle().fd() != -1, "");
+  RELEASE_ASSERT(SOCKET_VALID(ioHandle().fd()), "");
 
   if (!connected) {
     connecting_ = true;
   }
 
+  // Libevent only supports Level trigger on Windows.
+#ifdef WIN32
+  Event::FileTriggerType trigger = Event::FileTriggerType::Level;
+#else
+  Event::FileTriggerType trigger = Event::FileTriggerType::Edge;
+#endif
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
   file_event_ = dispatcher_.createFileEvent(
-      ioHandle().fd(), [this](uint32_t events) -> void { onFileEvent(events); },
-      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
+      ioHandle().fd(), [this](uint32_t events) -> void { onFileEvent(events); }, trigger,
+      Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
 }
@@ -195,9 +203,17 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
   updateWriteBufferStats(0, 0);
+
+  // As the socket closes, drain any remaining data.
+  // The data won't be written out at this point, and where there are reference
+  // counted buffer fragments, it helps avoid lifetime issues with the
+  // connection outlasting the subscriber.
+  write_buffer_->drain(write_buffer_->length());
+
   connection_stats_.reset();
 
   file_event_.reset();
+
   socket_->close();
 
   raiseEvent(close_type);
@@ -216,27 +232,39 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 
   // Don't set NODELAY for unix domain sockets
-  sockaddr addr;
+  sockaddr_storage addr;
   socklen_t len = sizeof(addr);
-  int rc = getsockname(ioHandle().fd(), &addr, &len);
-  RELEASE_ASSERT(rc == 0, "");
 
-  if (addr.sa_family == AF_UNIX) {
+  auto os_sys_calls = Api::OsSysCallsSingleton::get();
+  Api::SysCallIntResult result =
+      os_sys_calls.getsockname(ioHandle().fd(), reinterpret_cast<struct sockaddr*>(&addr), &len);
+
+  RELEASE_ASSERT(result.rc_ == 0, "");
+
+  if (addr.ss_family == AF_UNIX) {
     return;
   }
 
   // Set NODELAY
   int new_value = enable;
-  rc = setsockopt(ioHandle().fd(), IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
-#ifdef __APPLE__
-  if (-1 == rc && errno == EINVAL) {
+  result = os_sys_calls.setsockopt(ioHandle().fd(), IPPROTO_TCP, TCP_NODELAY, &new_value,
+                                   sizeof(new_value));
+#if defined(__APPLE__)
+  if (SOCKET_FAILURE(result.rc_) && result.errno_ == EINVAL) {
+    // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
+    // enabled despite this result.
+    return;
+  }
+#elif defined(WIN32)
+  if (SOCKET_FAILURE(result.rc_) &&
+      (result.errno_ == WSAEWOULDBLOCK || result.errno_ == WSAEINVAL)) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
     return;
   }
 #endif
 
-  RELEASE_ASSERT(0 == rc, "");
+  RELEASE_ASSERT(result.rc_ == 0, "");
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
@@ -279,13 +307,12 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
 }
 
 void ConnectionImpl::readDisable(bool disable) {
+  // Calls to readEnabled on a closed socket are considered to be an error.
   ASSERT(state() == State::Open);
-  if (state() != State::Open || file_event_ == nullptr) {
-    // If readDisable is called on a closed connection in error, do not crash.
-    return;
-  }
+  ASSERT(file_event_ != nullptr);
 
-  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={}", *this, read_enabled_, disable);
+  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={} state={}", *this, read_enabled_,
+                 disable, static_cast<int>(state()));
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
@@ -302,6 +329,11 @@ void ConnectionImpl::readDisable(bool disable) {
     ASSERT(read_enabled_);
     read_enabled_ = false;
 
+    if (state() != State::Open || file_event_ == nullptr) {
+      // If readDisable is called on a closed connection, do not crash.
+      return;
+    }
+
     // If half-close semantics are enabled, we never want early close notifications; we
     // always want to read all available data, even if the other side has closed.
     if (detect_early_close_ && !enable_half_close_) {
@@ -316,6 +348,12 @@ void ConnectionImpl::readDisable(bool disable) {
     }
     ASSERT(!read_enabled_);
     read_enabled_ = true;
+
+    if (state() != State::Open || file_event_ == nullptr) {
+      // If readDisable is called on a closed connection, do not crash.
+      return;
+    }
+
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -336,13 +374,17 @@ void ConnectionImpl::raiseEvent(ConnectionEvent event) {
   // where no check of the write buffer is made. Provide an opportunity to flush
   // here. If connection write is not ready, this is harmless. We should only do
   // this if we're still open (the above callbacks may have closed).
-  if (state() == State::Open && event == ConnectionEvent::Connected &&
-      write_buffer_->length() > 0) {
-    onWriteReady();
+  if (event == ConnectionEvent::Connected) {
+    flushWriteBuffer();
   }
 }
 
-bool ConnectionImpl::readEnabled() const { return read_enabled_; }
+bool ConnectionImpl::readEnabled() const {
+  // Calls to readEnabled on a closed socket are considered to be an error.
+  ASSERT(state() == State::Open);
+  ASSERT(file_event_ != nullptr);
+  return read_enabled_;
+}
 
 void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
   bytes_sent_callbacks_.emplace_back(cb);
@@ -541,8 +583,10 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    int rc = getsockopt(ioHandle().fd(), SOL_SOCKET, SO_ERROR, &error, &error_size);
-    ASSERT(0 == rc);
+    RELEASE_ASSERT(Api::OsSysCallsSingleton::get()
+                           .getsockopt(ioHandle().fd(), SOL_SOCKET, SO_ERROR, &error, &error_size)
+                           .rc_ == 0,
+                   "");
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
@@ -630,18 +674,25 @@ absl::string_view ConnectionImpl::transportFailureReason() const {
   return transport_socket_->failureReason();
 }
 
+void ConnectionImpl::flushWriteBuffer() {
+  if (state() == State::Open && write_buffer_->length() > 0) {
+    onWriteReady();
+  }
+}
+
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
-                     std::move(transport_socket), false) {
+                     std::move(transport_socket), stream_info_, false),
+      stream_info_(dispatcher.timeSource()) {
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
   if (remote_address->ip() != nullptr) {
     if (!Network::Socket::applyOptions(options, *socket_,
-                                       envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
+                                       envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
       immediate_error_event_ = ConnectionEvent::LocalClose;

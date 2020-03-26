@@ -1,5 +1,5 @@
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/lds.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 
 #include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 
@@ -36,19 +36,20 @@ filter_chains:
         validation_context:
           trusted_ca:
             filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-          verify_subject_alt_name:
-          - localhost
-          - 127.0.0.1
+          match_subject_alt_names:
+          - exact: localhost
+          - exact: 127.0.0.1
+reuse_port: true
 udp_listener_config:
   udp_listener_name: "quiche_quic_listener"
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  envoy::api::v2::Listener listener_proto = parseListenerFromV2Yaml(yaml);
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV2Yaml(yaml);
   EXPECT_CALL(server_.random_, uuid());
-  expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL
-                           /* expected_num_options */ 3, // SO_REUSEPORT is on forcibly for UDP
+                           /* expected_num_options */ 3, // SO_REUSEPORT is on as configured
 #else
                            /* expected_num_options */ 2,
 #endif

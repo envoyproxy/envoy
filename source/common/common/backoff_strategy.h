@@ -33,7 +33,7 @@ public:
 private:
   const uint64_t base_interval_;
   const uint64_t max_interval_{};
-  uint64_t current_retry_{1};
+  uint64_t next_interval_;
   Runtime::RandomGenerator& random_;
 };
 

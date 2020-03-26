@@ -43,8 +43,8 @@ envoy_cc_library(
     srcs = ["base64.cc"],
     hdrs = ["base64.h"],
     deps = [
+        ":assert_lib",
         ":empty_string",
-        ":stack_array",
         "//include/envoy/buffer:buffer_interface",
     ],
 )
@@ -133,10 +133,41 @@ envoy_cc_library(
     hdrs = ["logger.h"],
     external_deps = ["abseil_synchronization"],
     deps = [
+        ":base_logger_lib",
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
-    ],
+    ] + select({
+        "//bazel:android_logger": ["logger_impl_lib_android"],
+        "//conditions:default": ["logger_impl_lib_standard"],
+    }),
+)
+
+envoy_cc_library(
+    name = "base_logger_lib",
+    srcs = ["base_logger.cc"],
+    hdrs = ["base_logger.h"],
+)
+
+envoy_cc_library(
+    name = "logger_impl_lib_standard",
+    hdrs = ["standard/logger_impl.h"],
+    strip_include_prefix = "standard",
+    deps = [":base_logger_lib"],
+)
+
+envoy_cc_library(
+    name = "logger_impl_lib_android",
+    srcs = select({
+        "//bazel:android_logger": ["android/logger_impl.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "//bazel:android_logger": ["android/logger_impl.h"],
+        "//conditions:default": [],
+    }),
+    strip_include_prefix = "android",
+    deps = [":base_logger_lib"],
 )
 
 envoy_cc_library(
@@ -179,9 +210,10 @@ envoy_cc_library(
         "//include/envoy/common:matchers_interface",
         "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/http:path_utility_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -194,7 +226,7 @@ envoy_cc_library(
         "//include/envoy/common:regex_interface",
         "//source/common/protobuf:utility_lib",
         "@com_googlesource_code_re2//:re2",
-        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -223,17 +255,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "stack_array",
-    hdrs = ["stack_array.h"],
-    deps = [
-        ":assert_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "thread_annotations",
     hdrs = ["thread_annotations.h"],
     external_deps = ["abseil_base"],
+)
+
+envoy_cc_library(
+    name = "thread_synchronizer_lib",
+    srcs = ["thread_synchronizer.cc"],
+    hdrs = ["thread_synchronizer.h"],
+    external_deps = ["abseil_synchronization"],
+    deps = [
+        ":assert_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -318,6 +352,10 @@ envoy_cc_library(
         "version.h",
         ":generate_version_number",
     ],
+    deps = [
+        "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -341,13 +379,8 @@ envoy_cc_library(
     deps = [
         ":version_includes",
         "//source/common/common:macros",
+        "//source/common/protobuf:utility_lib",
     ],
-)
-
-envoy_cc_library(
-    name = "to_lower_table_lib",
-    srcs = ["to_lower_table.cc"],
-    hdrs = ["to_lower_table.h"],
 )
 
 envoy_cc_library(

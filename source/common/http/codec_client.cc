@@ -58,7 +58,7 @@ void CodecClient::deleteRequest(ActiveRequest& request) {
   }
 }
 
-StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
+RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
   ActiveRequestPtr request(new ActiveRequest(*this, response_decoder));
   request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);
@@ -132,8 +132,7 @@ void CodecClient::onData(Buffer::Instance& data) {
     close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
-    if (!active_requests_.empty() ||
-        Utility::getResponseStatus(e.headers()) != enumToInt(Code::RequestTimeout)) {
+    if (!active_requests_.empty() || e.responseCode() != Code::RequestTimeout) {
       protocol_error = true;
     }
   }
@@ -156,13 +155,13 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
   }
   case Type::HTTP2: {
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-        *connection_, *this, host->cluster().statsScope(), host->cluster().http2Settings(),
+        *connection_, *this, host->cluster().statsScope(), host->cluster().http2Options(),
         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
     break;
   }
   case Type::HTTP3: {
     codec_ = std::unique_ptr<ClientConnection>(
-        Config::Utility::getAndCheckFactory<Http::QuicHttpClientConnectionFactory>(
+        Config::Utility::getAndCheckFactoryByName<Http::QuicHttpClientConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
             .createQuicClientConnection(*connection_, *this));
   }

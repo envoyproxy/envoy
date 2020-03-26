@@ -31,7 +31,7 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_99, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -47,12 +47,13 @@ public:
         stream_id_(VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
         quic_stream_(new EnvoyQuicServerStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         response_headers_{{":status", "200"}} {
-    quic_stream_->setDecoder(stream_decoder_);
+    quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
-    EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _))
-        .WillRepeatedly(Invoke([](quic::QuicStream*, quic::QuicStreamId, size_t write_length,
-                                  quic::QuicStreamOffset, quic::StreamSendingState state) {
+    EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
+        .WillRepeatedly(Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
+                                  quic::StreamSendingState state, bool,
+                                  quiche::QuicheOptional<quic::EncryptionLevel>) {
           return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
         }));
     EXPECT_CALL(writer_, WritePacket(_, _, _, _, _))
@@ -92,7 +93,7 @@ public:
       std::unique_ptr<char[]> data_buffer;
       quic::QuicByteCount data_frame_header_length =
           quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &data_buffer);
-      quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
+      quiche::QuicheStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
       data = absl::StrCat(data_frame_header, body);
     }
     return data;
@@ -100,7 +101,7 @@ public:
 
   size_t sendRequest(const std::string& payload, bool fin, size_t decoder_buffer_high_watermark) {
     EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-        .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
+        .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
           EXPECT_EQ(host_, headers->Host()->value().getStringView());
           EXPECT_EQ("/", headers->Path()->value().getStringView());
           EXPECT_EQ(Http::Headers::get().MethodValues.Post,
@@ -138,10 +139,10 @@ protected:
   MockEnvoyQuicSession quic_session_;
   quic::QuicStreamId stream_id_;
   EnvoyQuicServerStream* quic_stream_;
-  Http::MockStreamDecoder stream_decoder_;
+  Http::MockRequestDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
   quic::QuicHeaderList request_headers_;
-  Http::TestHeaderMapImpl response_headers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
   quic::QuicHeaderList trailers_;
   std::string host_{"www.abc.com"};
   std::string request_body_{"Hello world"};
@@ -160,7 +161,7 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
                                    /*compressed_header_bytes=*/0);
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/true))
-      .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
+      .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->Host()->value().getStringView());
         EXPECT_EQ("/", headers->Path()->value().getStringView());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
@@ -173,6 +174,7 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
 }
 
 TEST_P(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
+  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   sendRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }
@@ -180,7 +182,7 @@ TEST_P(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
 TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
   sendRequest(request_body_, false, request_body_.size() * 2);
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
-      .WillOnce(Invoke([](const Http::HeaderMapPtr& headers) {
+      .WillOnce(Invoke([](const Http::RequestTrailerMapPtr& headers) {
         Http::LowerCaseString key1("key1");
         Http::LowerCaseString key2(":final-offset");
         EXPECT_EQ("value1", headers->get(key1)->value().getStringView());
@@ -196,7 +198,7 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
     return;
   }
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
+      .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->Host()->value().getStringView());
         EXPECT_EQ("/", headers->Path()->value().getStringView());
         EXPECT_EQ(Http::Headers::get().MethodValues.Post,
@@ -218,7 +220,7 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
       }));
 
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
-      .WillOnce(Invoke([](const Http::HeaderMapPtr& headers) {
+      .WillOnce(Invoke([](const Http::RequestTrailerMapPtr& headers) {
         Http::LowerCaseString key1("key1");
         Http::LowerCaseString key2(":final-offset");
         EXPECT_EQ("value1", headers->get(key1)->value().getStringView());
@@ -269,7 +271,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
 // Tests that ReadDisable() doesn't cause re-entry of OnBodyAvailable().
 TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
+      .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->Host()->value().getStringView());
         EXPECT_EQ("/", headers->Path()->value().getStringView());
         EXPECT_EQ(Http::Headers::get().MethodValues.Post,

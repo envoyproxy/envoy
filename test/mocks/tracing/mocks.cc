@@ -26,5 +26,8 @@ MockHttpTracer::~MockHttpTracer() = default;
 MockDriver::MockDriver() = default;
 MockDriver::~MockDriver() = default;
 
+MockHttpTracerManager::MockHttpTracerManager() = default;
+MockHttpTracerManager::~MockHttpTracerManager() = default;
+
 } // namespace Tracing
 } // namespace Envoy

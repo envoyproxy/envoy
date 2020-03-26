@@ -78,7 +78,7 @@ Example configuration
       address: { socket_address: { address: 127.0.0.1, port_value: 10000 } }
       filter_chains:
       - filters:
-        - name: envoy.http_connection_manager
+        - name: envoy.filters.network.http_connection_manager
           # ...
         transport_socket:
           name: envoy.transport_sockets.tls

@@ -1,142 +1,221 @@
 #include "common/config/version_converter.h"
 
-#include "common/common/assert.h"
+#include "envoy/common/exception.h"
 
-// Protobuf reflection is on a per-scalar type basis, i.e. there are method to
-// get/set uint32. So, we need to use macro magic to reduce boiler plate below
-// when copying fields.
-#define UPGRADE_SCALAR(type, method_fragment)                                                      \
-  case Protobuf::FieldDescriptor::TYPE_##type: {                                                   \
-    if (prev_field_descriptor->is_repeated()) {                                                    \
-      const int field_size = prev_reflection->FieldSize(prev_message, prev_field_descriptor);      \
-      for (int n = 0; n < field_size; ++n) {                                                       \
-        const auto& v =                                                                            \
-            prev_reflection->GetRepeated##method_fragment(prev_message, prev_field_descriptor, n); \
-        target_reflection->Add##method_fragment(target_message, target_field_descriptor, v);       \
-      }                                                                                            \
-    } else {                                                                                       \
-      const auto v = prev_reflection->Get##method_fragment(prev_message, prev_field_descriptor);   \
-      target_reflection->Set##method_fragment(target_message, target_field_descriptor, v);         \
-    }                                                                                              \
-    break;                                                                                         \
-  }
+#include "common/common/assert.h"
+#include "common/config/api_type_oracle.h"
+#include "common/protobuf/visitor.h"
+#include "common/protobuf/well_known.h"
+
+#include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Config {
 
-// TODO(htuch): make the unknown field validators aware of this distinguished
-// field, and don't reject if present.
-constexpr uint32_t DeprecatedMessageFieldNumber = 100000;
+namespace {
 
-void VersionConverter::upgrade(const Protobuf::Message& prev_message,
-                               Protobuf::Message& next_message) {
-  // Wow, why so complicated? Could we just do this conversion with:
-  //
-  //   next_message.MergeFromString(prev_message.SerializeAsString())
-  //
-  // and then some clever mangling of the UnknownFieldSet?
-  //
-  // Hold your horses! There's a few reasons that the approach below has been
-  // adopted:
-  // 1. We can ensure all unknown fields are placed in a distinguished
-  //    DeprecatedMessageFieldNumber, so that the static/dynamic proto
-  //    validators that look at unknown fields are capable of knowing the
-  //    difference between deprecated fields smuggled in from previous versions
-  //    and fields in the new version that are genuinely unknown by the Envoy.
-  // 2. We can do proto wire breaking changes between major versions. An example
-  //    of this is promotion/demotion between wrapped (e.g.
-  //    google.protobuf.UInt32) and unwrapped types (e.g. uint32). This isn't
-  //    done below yet, but should be possible to automate via "next version"
-  //    annotations on fields.
-  const Protobuf::Descriptor* next_descriptor = next_message.GetDescriptor();
-  const Protobuf::Reflection* prev_reflection = prev_message.GetReflection();
-  std::vector<const Protobuf::FieldDescriptor*> prev_field_descriptors;
-  prev_reflection->ListFields(prev_message, &prev_field_descriptors);
-  Protobuf::DynamicMessageFactory dmf;
-  std::unique_ptr<Protobuf::Message> deprecated_message;
+const char DeprecatedFieldShadowPrefix[] = "hidden_envoy_deprecated_";
 
-  // Iterate over all the set fields in the previous version message.
-  for (const auto* prev_field_descriptor : prev_field_descriptors) {
-    const Protobuf::Reflection* target_reflection = next_message.GetReflection();
-    Protobuf::Message* target_message = &next_message;
+class ProtoVisitor {
+public:
+  virtual ~ProtoVisitor() = default;
 
-    // Does the field exist in the new version message?
-    const std::string& prev_name = prev_field_descriptor->name();
-    const auto* target_field_descriptor = next_descriptor->FindFieldByName(prev_name);
-    // If we can't find this field in the next version, it must be deprecated.
-    // So, use deprecated_message and its reflection instead.
-    if (target_field_descriptor == nullptr) {
-      ASSERT(prev_field_descriptor->options().deprecated());
-      if (!deprecated_message) {
-        deprecated_message.reset(dmf.GetPrototype(prev_message.GetDescriptor())->New());
-      }
-      target_field_descriptor = prev_field_descriptor;
-      target_reflection = deprecated_message->GetReflection();
-      target_message = deprecated_message.get();
-    }
-    ASSERT(target_field_descriptor != nullptr);
-
-    // These properties are guaranteed by protoxform.
-    ASSERT(prev_field_descriptor->type() == target_field_descriptor->type());
-    ASSERT(prev_field_descriptor->number() == target_field_descriptor->number());
-    ASSERT(prev_field_descriptor->type_name() == target_field_descriptor->type_name());
-    ASSERT(prev_field_descriptor->is_repeated() == target_field_descriptor->is_repeated());
-
-    // Message fields need special handling, as we need to recurse.
-    if (prev_field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
-      if (prev_field_descriptor->is_repeated()) {
-        const int field_size = prev_reflection->FieldSize(prev_message, prev_field_descriptor);
-        for (int n = 0; n < field_size; ++n) {
-          const Protobuf::Message& prev_nested_message =
-              prev_reflection->GetRepeatedMessage(prev_message, prev_field_descriptor, n);
-          Protobuf::Message* target_nested_message =
-              target_reflection->AddMessage(target_message, target_field_descriptor);
-          upgrade(prev_nested_message, *target_nested_message);
-        }
-      } else {
-        const Protobuf::Message& prev_nested_message =
-            prev_reflection->GetMessage(prev_message, prev_field_descriptor);
-        Protobuf::Message* target_nested_message =
-            target_reflection->MutableMessage(target_message, target_field_descriptor);
-        upgrade(prev_nested_message, *target_nested_message);
-      }
-    } else {
-      // Scalar types.
-      switch (prev_field_descriptor->type()) {
-        UPGRADE_SCALAR(STRING, String)
-        UPGRADE_SCALAR(BYTES, String)
-        UPGRADE_SCALAR(INT32, Int32)
-        UPGRADE_SCALAR(INT64, Int64)
-        UPGRADE_SCALAR(UINT32, UInt32)
-        UPGRADE_SCALAR(UINT64, UInt64)
-        UPGRADE_SCALAR(DOUBLE, Double)
-        UPGRADE_SCALAR(FLOAT, Float)
-        UPGRADE_SCALAR(BOOL, Bool)
-        UPGRADE_SCALAR(ENUM, EnumValue)
-      default:
-        NOT_REACHED_GCOVR_EXCL_LINE;
-      }
-    }
+  // Invoked when a field is visited, with the message, field descriptor and
+  // context. Returns a new context for use when traversing the sub-message in a
+  // field.
+  virtual const void* onField(Protobuf::Message&, const Protobuf::FieldDescriptor&,
+                              const void* ctxt) {
+    return ctxt;
   }
 
-  if (deprecated_message) {
-    const Protobuf::Reflection* next_reflection = next_message.GetReflection();
-    auto* unknown_field_set = next_reflection->MutableUnknownFields(&next_message);
-    ASSERT(unknown_field_set->empty());
-    std::string* s = unknown_field_set->AddLengthDelimited(DeprecatedMessageFieldNumber);
-    deprecated_message->SerializeToString(s);
+  // Invoked when a message is visited, with the message and a context.
+  virtual void onMessage(Protobuf::Message&, const void*){};
+};
+
+// Reinterpret a Protobuf message as another Protobuf message by converting to wire format and back.
+// This only works for messages that can be effectively duck typed this way, e.g. with a subtype
+// relationship modulo field name.
+void wireCast(const Protobuf::Message& src, Protobuf::Message& dst) {
+  // This should should generally succeed, but if there are malformed UTF-8 strings in a message,
+  // this can fail.
+  if (!dst.ParseFromString(src.SerializeAsString())) {
+    throw EnvoyException("Unable to deserialize during wireCast()");
   }
 }
 
-void VersionConverter::unpackDeprecated(const Protobuf::Message& upgraded_message,
-                                        Protobuf::Message& deprecated_message) {
+// Create a new dynamic message based on some message wire cast to the target
+// descriptor. If the descriptor is null, a copy is performed.
+DynamicMessagePtr createForDescriptorWithCast(const Protobuf::Message& message,
+                                              const Protobuf::Descriptor* desc) {
+  auto dynamic_message = std::make_unique<DynamicMessage>();
+  if (desc != nullptr) {
+    dynamic_message->msg_.reset(dynamic_message->dynamic_msg_factory_.GetPrototype(desc)->New());
+    wireCast(message, *dynamic_message->msg_);
+    return dynamic_message;
+  }
+  // Unnecessary copy, since the existing message is being treated as
+  // "dynamic". However, we want to transfer an owned object, so this is the
+  // best we can do.
+  dynamic_message->msg_.reset(message.New());
+  dynamic_message->msg_->MergeFrom(message);
+  return dynamic_message;
+}
+
+// This needs to be recursive, since sub-messages are consumed and stored
+// internally, we later want to recover their original types.
+void annotateWithOriginalType(const Protobuf::Descriptor& prev_descriptor,
+                              Protobuf::Message& next_message) {
+  class TypeAnnotatingProtoVisitor : public ProtobufMessage::ProtoVisitor {
+  public:
+    void onMessage(Protobuf::Message& message, const void* ctxt) override {
+      const Protobuf::Descriptor* descriptor = message.GetDescriptor();
+      const Protobuf::Reflection* reflection = message.GetReflection();
+      const Protobuf::Descriptor& prev_descriptor = *static_cast<const Protobuf::Descriptor*>(ctxt);
+      // If they are the same type, there's no possibility of any different type
+      // further down, so we're done.
+      if (descriptor->full_name() == prev_descriptor.full_name()) {
+        return;
+      }
+      auto* unknown_field_set = reflection->MutableUnknownFields(&message);
+      unknown_field_set->AddLengthDelimited(ProtobufWellKnown::OriginalTypeFieldNumber,
+                                            prev_descriptor.full_name());
+    }
+
+    const void* onField(Protobuf::Message&, const Protobuf::FieldDescriptor& field,
+                        const void* ctxt) override {
+      const Protobuf::Descriptor& prev_descriptor = *static_cast<const Protobuf::Descriptor*>(ctxt);
+      // TODO(htuch): This is a terrible hack, there should be no per-resource
+      // business logic in this file. The reason this is required is that
+      // endpoints, when captured in configuration such as inlined hosts in
+      // Clusters for config dump purposes, can potentially contribute a
+      // significant amount to memory consumption. stats_integration_test
+      // complains as a result if we increase any memory due to type annotations.
+      // In theory, we should be able to just clean up these annotations in
+      // ClusterManagerImpl with type erasure, but protobuf doesn't free up memory
+      // as expected, we probably need some arena level trick to address this.
+      if (prev_descriptor.full_name() == "envoy.api.v2.Cluster" &&
+          (field.name() == "hidden_envoy_deprecated_hosts" || field.name() == "load_assignment")) {
+        // This will cause the sub-message visit to abort early.
+        return field.message_type();
+      }
+      const Protobuf::FieldDescriptor* prev_field =
+          prev_descriptor.FindFieldByNumber(field.number());
+      return prev_field->message_type();
+    }
+  };
+  TypeAnnotatingProtoVisitor proto_visitor;
+  ProtobufMessage::traverseMutableMessage(proto_visitor, next_message, &prev_descriptor);
+}
+
+} // namespace
+
+void VersionConverter::upgrade(const Protobuf::Message& prev_message,
+                               Protobuf::Message& next_message) {
+  wireCast(prev_message, next_message);
+  // Track original type to support recoverOriginal().
+  annotateWithOriginalType(*prev_message.GetDescriptor(), next_message);
+}
+
+void VersionConverter::eraseOriginalTypeInformation(Protobuf::Message& message) {
+  class TypeErasingProtoVisitor : public ProtobufMessage::ProtoVisitor {
+  public:
+    void onMessage(Protobuf::Message& message, const void*) override {
+      const Protobuf::Reflection* reflection = message.GetReflection();
+      auto* unknown_field_set = reflection->MutableUnknownFields(&message);
+      unknown_field_set->DeleteByNumber(ProtobufWellKnown::OriginalTypeFieldNumber);
+    }
+  };
+  TypeErasingProtoVisitor proto_visitor;
+  ProtobufMessage::traverseMutableMessage(proto_visitor, message, nullptr);
+}
+
+DynamicMessagePtr VersionConverter::recoverOriginal(const Protobuf::Message& upgraded_message) {
   const Protobuf::Reflection* reflection = upgraded_message.GetReflection();
   const auto& unknown_field_set = reflection->GetUnknownFields(upgraded_message);
-  ASSERT(unknown_field_set.field_count() == 1);
-  const auto& unknown_field = unknown_field_set.field(0);
-  ASSERT(unknown_field.number() == DeprecatedMessageFieldNumber);
-  const std::string& s = unknown_field.length_delimited();
-  deprecated_message.ParseFromString(s);
+  for (int i = 0; i < unknown_field_set.field_count(); ++i) {
+    const auto& unknown_field = unknown_field_set.field(i);
+    if (unknown_field.number() == ProtobufWellKnown::OriginalTypeFieldNumber) {
+      ASSERT(unknown_field.type() == Protobuf::UnknownField::TYPE_LENGTH_DELIMITED);
+      const std::string& original_type = unknown_field.length_delimited();
+      const Protobuf::Descriptor* original_descriptor =
+          Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(original_type);
+      auto result = createForDescriptorWithCast(upgraded_message, original_descriptor);
+      // We should clear out the OriginalTypeFieldNumber in the recovered message.
+      eraseOriginalTypeInformation(*result->msg_);
+      return result;
+    }
+  }
+  return createForDescriptorWithCast(upgraded_message, nullptr);
+}
+
+DynamicMessagePtr VersionConverter::downgrade(const Protobuf::Message& message) {
+  const Protobuf::Descriptor* prev_desc =
+      ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
+  return createForDescriptorWithCast(message, prev_desc);
+}
+
+std::string
+VersionConverter::getJsonStringFromMessage(const Protobuf::Message& message,
+                                           envoy::config::core::v3::ApiVersion api_version) {
+  DynamicMessagePtr dynamic_message;
+  switch (api_version) {
+  case envoy::config::core::v3::ApiVersion::AUTO:
+  case envoy::config::core::v3::ApiVersion::V2: {
+    // TODO(htuch): this works as long as there are no new fields in the v3+
+    // DiscoveryRequest. When they are added, we need to do a full v2 conversion
+    // and also discard unknown fields. Tracked at
+    // https://github.com/envoyproxy/envoy/issues/9619.
+    dynamic_message = downgrade(message);
+    break;
+  }
+  case envoy::config::core::v3::ApiVersion::V3: {
+    // We need to scrub the hidden fields.
+    dynamic_message = std::make_unique<DynamicMessage>();
+    dynamic_message->msg_.reset(message.New());
+    dynamic_message->msg_->MergeFrom(message);
+    VersionUtil::scrubHiddenEnvoyDeprecated(*dynamic_message->msg_);
+    break;
+  }
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+  eraseOriginalTypeInformation(*dynamic_message->msg_);
+  std::string json;
+  Protobuf::util::JsonPrintOptions json_options;
+  json_options.preserve_proto_field_names = true;
+  const auto status =
+      Protobuf::util::MessageToJsonString(*dynamic_message->msg_, &json, json_options);
+  // This should always succeed unless something crash-worthy such as out-of-memory.
+  RELEASE_ASSERT(status.ok(), "");
+  return json;
+}
+
+void VersionConverter::prepareMessageForGrpcWire(Protobuf::Message& message,
+                                                 envoy::config::core::v3::ApiVersion api_version) {
+  // TODO(htuch): this works as long as there are no new fields in the v3+
+  // DiscoveryRequest. When they are added, we need to do a full v2 conversion
+  // and also discard unknown fields. Tracked at
+  // https://github.com/envoyproxy/envoy/issues/9619.
+  if (api_version == envoy::config::core::v3::ApiVersion::V3) {
+    VersionUtil::scrubHiddenEnvoyDeprecated(message);
+  }
+  eraseOriginalTypeInformation(message);
+}
+
+void VersionUtil::scrubHiddenEnvoyDeprecated(Protobuf::Message& message) {
+  class HiddenFieldScrubbingProtoVisitor : public ProtobufMessage::ProtoVisitor {
+  public:
+    const void* onField(Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
+                        const void*) override {
+      const Protobuf::Reflection* reflection = message.GetReflection();
+      if (absl::StartsWith(field.name(), DeprecatedFieldShadowPrefix)) {
+        reflection->ClearField(&message, &field);
+      }
+      return nullptr;
+    }
+  };
+  HiddenFieldScrubbingProtoVisitor proto_visitor;
+  ProtobufMessage::traverseMutableMessage(proto_visitor, message, nullptr);
 }
 
 } // namespace Config

@@ -8,9 +8,9 @@
 
 #include "common/buffer/buffer_impl.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
 
 #include "gtest/gtest.h"
@@ -26,7 +26,7 @@ public:
   // Returns Http::FilterHeadersStatus::StopAllIterationAndBuffer or
   // Http::FilterHeadersStatus::StopAllIterationAndWatermark for headers. Triggers a timer to
   // continue iteration after 5s.
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& header_map, bool) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& header_map, bool) override {
     const Http::HeaderEntry* entry_content =
         header_map.get(Envoy::Http::LowerCaseString("content_size"));
     const Http::HeaderEntry* entry_added =
@@ -72,7 +72,7 @@ public:
     return Http::FilterDataStatus::Continue;
   }
 
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
     ASSERT(timer_triggered_);
     Http::MetadataMap metadata_map = {{"trailers", "trailers"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);

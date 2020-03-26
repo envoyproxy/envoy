@@ -7,8 +7,9 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
     "envoy_extension_cc_test",
-    "envoy_extension_cc_test_binary",
 )
 
 envoy_package()
@@ -50,9 +51,9 @@ envoy_extension_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/redis:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -70,7 +71,7 @@ envoy_extension_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -97,11 +98,12 @@ envoy_extension_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )
 
-envoy_extension_cc_test_binary(
+envoy_extension_cc_benchmark_binary(
     name = "command_lookup_speed_test",
     srcs = ["command_lookup_speed_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
@@ -118,6 +120,12 @@ envoy_extension_cc_test_binary(
     ],
 )
 
+envoy_extension_benchmark_test(
+    name = "command_lookup_speed_test_benchmark_test",
+    benchmark_binary = "command_lookup_speed_test",
+    extension_name = "envoy.filters.network.redis_proxy",
+)
+
 envoy_extension_cc_test(
     name = "router_impl_test",
     srcs = ["router_impl_test.cc"],
@@ -128,8 +136,8 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
-        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -143,7 +151,7 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_extension_cc_test_binary(
+envoy_extension_cc_benchmark_binary(
     name = "command_split_speed_test",
     srcs = ["command_split_speed_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
@@ -159,4 +167,10 @@ envoy_extension_cc_test_binary(
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
+)
+
+envoy_extension_benchmark_test(
+    name = "command_split_speed_test_benchmark_test",
+    benchmark_binary = "command_split_speed_test",
+    extension_name = "envoy.filters.network.redis_proxy",
 )

@@ -14,7 +14,6 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
-#include "common/common/to_lower_table.h"
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -27,7 +26,9 @@ namespace Http1 {
 /**
  * All stats for the HTTP/1 codec. @see stats_macros.h
  */
-#define ALL_HTTP1_CODEC_STATS(COUNTER) COUNTER(metadata_not_supported_error)
+#define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
+  COUNTER(metadata_not_supported_error)                                                            \
+  COUNTER(response_flood)
 
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
@@ -41,18 +42,20 @@ class ConnectionImpl;
 /**
  * Base class for HTTP/1.1 request and response encoders.
  */
-class StreamEncoderImpl : public StreamEncoder,
+class StreamEncoderImpl : public virtual StreamEncoder,
                           public Stream,
                           Logger::Loggable<Logger::Id::http>,
-                          public StreamCallbackHelper {
+                          public StreamCallbackHelper,
+                          public Http1StreamEncoderOptions {
 public:
   // Http::StreamEncoder
-  void encode100ContinueHeaders(const HeaderMap& headers) override;
-  void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
-  void encodeTrailers(const HeaderMap& trailers) override;
   void encodeMetadata(const MetadataMapVector&) override;
   Stream& getStream() override { return *this; }
+  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return *this; }
+
+  // Http::Http1StreamEncoderOptions
+  void disableChunkEncoding() override { disable_chunk_encoding_ = true; }
 
   // Http::Stream
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
@@ -61,18 +64,26 @@ public:
   void readDisable(bool disable) override;
   uint32_t bufferLimit() override;
   absl::string_view responseDetails() override { return details_; }
+  const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
 
   void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
+  void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
+  void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, bool end_stream);
+  void encodeTrailersBase(const HeaderMap& headers);
 
   static const std::string CRLF;
   static const std::string LAST_CHUNK;
 
   ConnectionImpl& connection_;
-  void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
+  bool disable_chunk_encoding_ : 1;
+  bool chunk_encoding_ : 1;
+  bool processing_100_continue_ : 1;
+  bool is_response_to_head_request_ : 1;
+  bool is_content_length_allowed_ : 1;
 
 private:
   /**
@@ -99,25 +110,23 @@ private:
   void encodeFormattedHeader(absl::string_view key, absl::string_view value);
 
   const HeaderKeyFormatter* const header_key_formatter_;
-  bool chunk_encoding_ : 1;
-  bool processing_100_continue_ : 1;
-  bool is_response_to_head_request_ : 1;
-  bool is_content_length_allowed_ : 1;
   absl::string_view details_;
 };
 
 /**
  * HTTP/1.1 response encoder.
  */
-class ResponseStreamEncoderImpl : public StreamEncoderImpl {
+class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
-  ResponseStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
       : StreamEncoderImpl(connection, header_key_formatter) {}
 
   bool startedResponse() { return started_response_; }
 
-  // Http::StreamEncoder
-  void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
+  // Http::ResponseEncoder
+  void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
+  void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
+  void encodeTrailers(const ResponseTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
   bool started_response_{};
@@ -126,14 +135,15 @@ private:
 /**
  * HTTP/1.1 request encoder.
  */
-class RequestStreamEncoderImpl : public StreamEncoderImpl {
+class RequestEncoderImpl : public StreamEncoderImpl, public RequestEncoder {
 public:
-  RequestStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+  RequestEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
       : StreamEncoderImpl(connection, header_key_formatter) {}
   bool headRequest() { return head_request_; }
 
-  // Http::StreamEncoder
-  void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
+  // Http::RequestEncoder
+  void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
+  void encodeTrailers(const RequestTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
   bool head_request_{};
@@ -157,11 +167,6 @@ public:
   virtual void onEncodeComplete() PURE;
 
   /**
-   * Called when headers are encoded.
-   */
-  virtual void onEncodeHeaders(const HeaderMap& headers) PURE;
-
-  /**
    * Called when resetStream() has been called on an active stream. In HTTP/1.1 the only
    * valid operation after this point is for the connection to get blown away, but we will not
    * fire any more callbacks in case some stack has to unwind.
@@ -171,14 +176,22 @@ public:
   /**
    * Flush all pending output from encoding.
    */
-  void flushOutput();
+  void flushOutput(bool end_encode = false);
 
+  void addToBuffer(absl::string_view data);
   void addCharToBuffer(char c);
   void addIntToBuffer(uint64_t i);
   Buffer::WatermarkBuffer& buffer() { return output_buffer_; }
   uint64_t bufferRemainingSize();
   void copyToBuffer(const char* data, uint64_t length);
   void reserveBuffer(uint64_t size);
+  void readDisable(bool disable) { connection_.readDisable(disable); }
+  uint32_t bufferLimit() { return connection_.bufferLimit(); }
+  virtual bool supports_http_10() { return false; }
+  bool maybeDirectDispatch(Buffer::Instance& data);
+  virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
+  CodecStats& stats() { return stats_; }
+  bool enableTrailers() const { return enable_trailers_; }
 
   // Http::Connection
   void dispatch(Buffer::Instance& data) override;
@@ -188,16 +201,6 @@ public:
   bool wantsToWrite() override { return false; }
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
-
-  void readDisable(bool disable) { connection_.readDisable(disable); }
-  uint32_t bufferLimit() { return connection_.bufferLimit(); }
-  virtual bool supports_http_10() { return false; }
-
-  bool maybeDirectDispatch(Buffer::Instance& data);
-
-  CodecStats& stats() { return stats_; }
-
-  bool enableTrailers() const { return enable_trailers_; }
 
 protected:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
@@ -209,18 +212,27 @@ protected:
   Network::Connection& connection_;
   CodecStats stats_;
   http_parser parser_;
-  HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterPtr header_key_formatter_;
   bool processing_trailers_ : 1;
   bool handling_upgrade_ : 1;
   bool reset_stream_called_ : 1;
+  // Deferred end stream headers indicate that we are not going to raise headers until the full
+  // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
+  // block with end stream set to true with no further protocol data remaining.
+  bool deferred_end_stream_headers_ : 1;
   const bool strict_header_validation_ : 1;
   const bool connection_header_sanitization_ : 1;
   const bool enable_trailers_ : 1;
+  const bool reject_unsupported_transfer_encodings_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
+
+  virtual HeaderMap& headersOrTrailers() PURE;
+  virtual RequestOrResponseHeaderMap& requestOrResponseHeaders() PURE;
+  virtual void allocHeaders() PURE;
+  virtual void maybeAllocTrailers() PURE;
 
   /**
    * Called in order to complete an in progress header decode.
@@ -269,7 +281,7 @@ private:
    * @return 0 if no error, 1 if there should be no body.
    */
   int onHeadersCompleteBase();
-  virtual int onHeadersComplete(HeaderMapImplPtr&& headers) PURE;
+  virtual int onHeadersComplete() PURE;
 
   /**
    * Called when body data is received.
@@ -282,7 +294,7 @@ private:
    * Called when the request/response is complete.
    */
   void onMessageCompleteBase();
-  virtual void onMessageComplete(HeaderMapImplPtr&& trailers) PURE;
+  virtual void onMessageComplete() PURE;
 
   /**
    * @see onResetStreamBase().
@@ -292,7 +304,7 @@ private:
   /**
    * Send a protocol error response to remote.
    */
-  virtual void sendProtocolError(absl::string_view details = "") PURE;
+  virtual void sendProtocolError(absl::string_view details) PURE;
 
   /**
    * Called when output_buffer_ or the underlying connection go from below a low watermark to over
@@ -307,15 +319,11 @@ private:
   virtual void onBelowLowWatermark() PURE;
 
   static http_parser_settings settings_;
-  static const ToLowerTable& toLowerTable();
 
-  HeaderMapImplPtr current_header_map_;
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
   HeaderString current_header_value_;
   Buffer::WatermarkBuffer output_buffer_;
-  Buffer::RawSlice reserved_iovec_;
-  char* reserved_current_{};
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
@@ -341,8 +349,8 @@ private:
         : response_encoder_(connection, header_key_formatter) {}
 
     HeaderString request_url_;
-    StreamDecoder* request_decoder_{};
-    ResponseStreamEncoderImpl response_encoder_;
+    RequestDecoder* request_decoder_{};
+    ResponseEncoderImpl response_encoder_;
     bool remote_complete_{};
   };
 
@@ -354,24 +362,60 @@ private:
    * @param headers the request's headers
    * @throws CodecProtocolException on an invalid url in the request line
    */
-  void handlePath(HeaderMapImpl& headers, unsigned int method);
+  void handlePath(RequestHeaderMap& headers, unsigned int method);
 
   // ConnectionImpl
   void onEncodeComplete() override;
-  void onEncodeHeaders(const HeaderMap&) override {}
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
-  int onHeadersComplete(HeaderMapImplPtr&& headers) override;
+  int onHeadersComplete() override;
   void onBody(const char* data, size_t length) override;
-  void onMessageComplete(HeaderMapImplPtr&& trailers) override;
+  void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
+  HeaderMap& headersOrTrailers() override {
+    if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
+      return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
+    } else {
+      return *absl::get<RequestTrailerMapPtr>(headers_or_trailers_);
+    }
+  }
+  RequestOrResponseHeaderMap& requestOrResponseHeaders() override {
+    return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
+  }
+  void allocHeaders() override {
+    ASSERT(nullptr == absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
+    headers_or_trailers_.emplace<RequestHeaderMapPtr>(std::make_unique<RequestHeaderMapImpl>());
+  }
+  void maybeAllocTrailers() override {
+    ASSERT(processing_trailers_);
+    if (!absl::holds_alternative<RequestTrailerMapPtr>(headers_or_trailers_)) {
+      headers_or_trailers_.emplace<RequestTrailerMapPtr>(std::make_unique<RequestTrailerMapImpl>());
+    }
+  }
+
+  void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
+  void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
+  void doFloodProtectionChecks() const;
 
   ServerConnectionCallbacks& callbacks_;
-  std::unique_ptr<ActiveRequest> active_request_;
+  absl::optional<ActiveRequest> active_request_;
   Http1Settings codec_settings_;
+  const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
+  uint32_t outbound_responses_{};
+  // This defaults to 2, which functionally disables pipelining. If any users
+  // of Envoy wish to enable pipelining (which is dangerous and ill supported)
+  // we could make this configurable.
+  uint32_t max_outbound_responses_{};
+  bool flood_protection_{};
+  // TODO(mattklein123): This should be a member of ActiveRequest but this change needs dedicated
+  // thought as some of the reset and no header code paths make this difficult. Headers are
+  // populated on message begin. Trailers are populated on the first parsed trailer field (if
+  // trailers are enabled). The variant is reset to null headers on message complete for assertion
+  // purposes.
+  absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
 };
 
 /**
@@ -384,35 +428,62 @@ public:
                        const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
-  StreamEncoder& newStream(StreamDecoder& response_decoder) override;
+  RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
 
 private:
   struct PendingResponse {
-    PendingResponse(StreamDecoder* decoder) : decoder_(decoder) {}
+    PendingResponse(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
+                    ResponseDecoder* decoder)
+        : encoder_(connection, header_key_formatter), decoder_(decoder) {}
 
-    StreamDecoder* decoder_;
-    bool head_request_{};
+    RequestEncoderImpl encoder_;
+    ResponseDecoder* decoder_;
   };
 
   bool cannotHaveBody();
 
   // ConnectionImpl
   void onEncodeComplete() override {}
-  void onEncodeHeaders(const HeaderMap& headers) override;
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  int onHeadersComplete(HeaderMapImplPtr&& headers) override;
+  int onHeadersComplete() override;
   void onBody(const char* data, size_t length) override;
-  void onMessageComplete(HeaderMapImplPtr&& trailers) override;
+  void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
+  HeaderMap& headersOrTrailers() override {
+    if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
+      return *absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
+    } else {
+      return *absl::get<ResponseTrailerMapPtr>(headers_or_trailers_);
+    }
+  }
+  RequestOrResponseHeaderMap& requestOrResponseHeaders() override {
+    return *absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
+  }
+  void allocHeaders() override {
+    ASSERT(nullptr == absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
+    headers_or_trailers_.emplace<ResponseHeaderMapPtr>(std::make_unique<ResponseHeaderMapImpl>());
+  }
+  void maybeAllocTrailers() override {
+    ASSERT(processing_trailers_);
+    if (!absl::holds_alternative<ResponseTrailerMapPtr>(headers_or_trailers_)) {
+      headers_or_trailers_.emplace<ResponseTrailerMapPtr>(
+          std::make_unique<ResponseTrailerMapImpl>());
+    }
+  }
 
-  std::unique_ptr<RequestStreamEncoderImpl> request_encoder_;
-  std::list<PendingResponse> pending_responses_;
+  absl::optional<PendingResponse> pending_response_;
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
+  // TODO(mattklein123): This should be a member of PendingResponse but this change needs dedicated
+  // thought as some of the reset and no header code paths make this difficult. Headers are
+  // populated on message begin. Trailers are populated on the first parsed trailer field (if
+  // trailers are enabled). The variant is reset to null headers on message complete for assertion
+  // purposes.
+  absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
 
   // The default limit of 80 KiB is the vanilla http_parser behaviour.
   static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;

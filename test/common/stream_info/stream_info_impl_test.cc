@@ -11,6 +11,7 @@
 
 #include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
@@ -162,15 +163,25 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.route_entry_ = &route_entry;
     EXPECT_EQ(&route_entry, stream_info.routeEntry());
 
-    stream_info.filterState().setData("test", std::make_unique<TestIntAccessor>(1),
-                                      FilterState::StateType::ReadOnly,
-                                      FilterState::LifeSpan::FilterChain);
-    EXPECT_EQ(1, stream_info.filterState().getDataReadOnly<TestIntAccessor>("test").access());
+    stream_info.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
+                                       FilterState::StateType::ReadOnly,
+                                       FilterState::LifeSpan::FilterChain);
+    EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test").access());
+
+    stream_info.setUpstreamFilterState(stream_info.filterState());
+    EXPECT_EQ(1,
+              stream_info.upstreamFilterState()->getDataReadOnly<TestIntAccessor>("test").access());
 
     EXPECT_EQ("", stream_info.requestedServerName());
     absl::string_view sni_name = "stubserver.org";
     stream_info.setRequestedServerName(sni_name);
     EXPECT_EQ(std::string(sni_name), stream_info.requestedServerName());
+
+    EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
+    Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
+    stream_info.setUpstreamClusterInfo(cluster_info);
+    EXPECT_NE(absl::nullopt, stream_info.upstreamClusterInfo());
+    EXPECT_EQ("fake_cluster", stream_info.upstreamClusterInfo().value()->name());
   }
 }
 
@@ -180,19 +191,19 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   stream_info.setDynamicMetadata("com.test", MessageUtil::keyValueStruct("test_key", "test_value"));
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(stream_info.dynamicMetadata(), "com.test", "test_key")
+            Config::Metadata::metadataValue(&stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
   ProtobufWkt::Struct struct_obj2;
   ProtobufWkt::Value val2;
   val2.set_string_value("another_value");
   (*struct_obj2.mutable_fields())["another_key"] = val2;
   stream_info.setDynamicMetadata("com.test", struct_obj2);
-  EXPECT_EQ("another_value", Config::Metadata::metadataValue(stream_info.dynamicMetadata(),
+  EXPECT_EQ("another_value", Config::Metadata::metadataValue(&stream_info.dynamicMetadata(),
                                                              "com.test", "another_key")
                                  .string_value());
   // make sure "test_key:test_value" still exists
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(stream_info.dynamicMetadata(), "com.test", "test_key")
+            Config::Metadata::metadataValue(&stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
   std::string json;
   const auto test_struct = stream_info.dynamicMetadata().filter_metadata().at("com.test");
@@ -221,7 +232,7 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
   EXPECT_FALSE(stream_info.getRequestHeaders());
 
-  Http::HeaderMapImpl headers;
+  Http::RequestHeaderMapImpl headers;
   stream_info.setRequestHeaders(headers);
   EXPECT_EQ(&headers, stream_info.getRequestHeaders());
 }

@@ -176,14 +176,8 @@ bool RedisLoadBalancerContextImpl::isReadRequest(
       command->type() != NetworkFilters::Common::Redis::RespType::BulkString) {
     return false;
   }
-  std::string to_lower_string(command->asString());
-  toLowerTable().toLowerCase(to_lower_string);
+  std::string to_lower_string = absl::AsciiStrToLower(command->asString());
   return NetworkFilters::Common::Redis::SupportedCommands::isReadCommand(to_lower_string);
-}
-
-const ToLowerTable& RedisLoadBalancerContextImpl::toLowerTable() {
-  static auto* table = new ToLowerTable();
-  return *table;
 }
 
 RedisLoadBalancerContextImpl::RedisLoadBalancerContextImpl(

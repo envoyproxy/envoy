@@ -1,9 +1,9 @@
 #include "test/tools/schema_validator/validator.h"
 
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/discovery.pb.validate.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/rds.pb.validate.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route.pb.validate.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.validate.h"
 
 #include "common/protobuf/utility.h"
 
@@ -57,13 +57,13 @@ void Validator::validate(const std::string& config_path, Schema::Type schema_typ
 
   switch (schema_type) {
   case Schema::Type::DiscoveryResponse: {
-    envoy::api::v2::DiscoveryResponse discovery_response_config;
+    envoy::service::discovery::v3::DiscoveryResponse discovery_response_config;
     TestUtility::loadFromFile(config_path, discovery_response_config, *api_);
     TestUtility::validate(discovery_response_config);
     break;
   }
   case Schema::Type::Route: {
-    envoy::api::v2::RouteConfiguration route_config;
+    envoy::config::route::v3::RouteConfiguration route_config;
     TestUtility::loadFromFile(config_path, route_config, *api_);
     TestUtility::validate(route_config);
     break;

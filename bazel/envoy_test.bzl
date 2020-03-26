@@ -70,6 +70,7 @@ def _envoy_test_linkopts():
 def envoy_cc_fuzz_test(
         name,
         corpus,
+        dictionaries = [],
         repository = "",
         size = "medium",
         deps = [],
@@ -84,11 +85,15 @@ def envoy_cc_fuzz_test(
         )
     else:
         corpus_name = corpus
+    tar_src = [corpus_name]
+    if dictionaries:
+        tar_src += dictionaries
     pkg_tar(
         name = name + "_corpus_tar",
-        srcs = [corpus_name],
+        srcs = tar_src,
         testonly = 1,
     )
+    fuzz_copts = ["-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION"]
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
@@ -101,14 +106,15 @@ def envoy_cc_fuzz_test(
     )
     native.cc_test(
         name = name,
-        copts = envoy_copts("@envoy", test = True),
+        copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = _envoy_test_linkopts(),
         linkstatic = 1,
         args = ["$(locations %s)" % corpus_name],
         data = [corpus_name],
-        # No fuzzing on macOS.
+        # No fuzzing on macOS or Windows
         deps = select({
             "@envoy//bazel:apple": [repository + "//test:dummy_main"],
+            "@envoy//bazel:windows_x86_64": [repository + "//test:dummy_main"],
             "//conditions:default": [
                 ":" + test_lib_name,
                 repository + "//test/fuzz:main",
@@ -124,7 +130,7 @@ def envoy_cc_fuzz_test(
     # provide a path to FuzzingEngine.
     native.cc_binary(
         name = name + "_driverless",
-        copts = envoy_copts("@envoy", test = True),
+        copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = ["-lFuzzingEngine"] + _envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
@@ -134,7 +140,7 @@ def envoy_cc_fuzz_test(
 
     native.cc_test(
         name = name + "_with_libfuzzer",
-        copts = envoy_copts("@envoy", test = True),
+        copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = ["-fsanitize=fuzzer"] + _envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
@@ -158,7 +164,8 @@ def envoy_cc_test(
         shard_count = None,
         coverage = True,
         local = False,
-        size = "medium"):
+        size = "medium",
+        flaky = False):
     if coverage:
         coverage_tags = tags + ["coverage_test_lib"]
     else:
@@ -194,6 +201,7 @@ def envoy_cc_test(
         local = local,
         shard_count = shard_count,
         size = size,
+        flaky = flaky,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
@@ -237,8 +245,31 @@ def envoy_cc_test_binary(
         name,
         testonly = 1,
         linkopts = _envoy_test_linkopts(),
-        tags = tags + ["compilation_db_implied"],
+        tags = tags + ["compilation_db_dep"],
         **kargs
+    )
+
+# Envoy benchmark binaries should be specified with this function.
+def envoy_cc_benchmark_binary(
+        name,
+        deps = [],
+        **kargs):
+    envoy_cc_test_binary(
+        name,
+        deps = deps + ["//test/benchmark:main"],
+        **kargs
+    )
+
+# Tests to validate that Envoy benchmarks run successfully should be specified with this function.
+def envoy_benchmark_test(
+        name,
+        benchmark_binary,
+        data = []):
+    native.sh_test(
+        name = name,
+        srcs = ["//bazel:test_for_benchmark_wrapper.sh"],
+        data = [":" + benchmark_binary] + data,
+        args = ["%s/%s" % (native.package_name(), benchmark_binary)],
     )
 
 # Envoy Python test binaries should be specified with this function.

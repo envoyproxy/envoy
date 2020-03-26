@@ -216,10 +216,30 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%REQUEST_DURATION%
+  HTTP
+    Total duration in milliseconds of the request from the start time to the last byte of
+    the request received from the downstream.
+
+  TCP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 %RESPONSE_DURATION%
   HTTP
     Total duration in milliseconds of the request from the start time to the first byte read from the
     upstream host.
+
+  TCP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
+%RESPONSE_TX_DURATION%
+  HTTP
+    Total duration in milliseconds of the request from the first byte read from the upstream host to the last
+    byte sent downstream.
 
   TCP
     Not implemented ("-").
@@ -236,7 +256,7 @@ The following command operators are supported:
     * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
     * **UF**: Upstream connection failure in addition to 503 response code.
     * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
-    * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
+    * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
     * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_api_field_route.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.max_connect_attempts>` was reached.
   HTTP only
     * **DC**: Downstream connection termination.
@@ -254,16 +274,6 @@ The following command operators are supported:
       :ref:`strictly-checked header <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>` in addition to 400 response code.
     * **SI**: Stream idle timeout in addition to 408 response code.
     * **DPE**: The downstream request had an HTTP protocol error.
-
-%RESPONSE_TX_DURATION%
-  HTTP
-    Total duration in milliseconds of the request from the first byte read from the upstream host to the last
-    byte sent downstream.
-
-  TCP
-    Not implemented ("-").
-
-  Renders a numeric value in typed JSON logs.
 
 %ROUTE_NAME%
   Name of the route.
@@ -340,6 +350,9 @@ The following command operators are supported:
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
     Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+
+%DOWNSTREAM_LOCAL_PORT%
+    Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
 
 %REQ(X?Y):Z%
   HTTP
@@ -494,3 +507,6 @@ The following command operators are supported:
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
+
+%HOSTNAME%
+  The system hostname.

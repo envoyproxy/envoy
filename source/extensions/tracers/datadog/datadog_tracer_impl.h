@@ -2,13 +2,14 @@
 
 #include <datadog/opentracing.h>
 
-#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/http/async_client_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
@@ -42,8 +43,8 @@ public:
   /**
    * Constructor. It adds itself and a newly-created Datadog::Tracer object to a thread-local store.
    */
-  Driver(const envoy::config::trace::v2::DatadogConfig& datadog_config,
-         Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+  Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
+         Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime);
 
   // Getters to return the DatadogDriver's key members.
@@ -107,8 +108,8 @@ public:
   TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver, Event::Dispatcher& dispatcher);
 
   // Http::AsyncClient::Callbacks.
-  void onSuccess(Http::MessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason) override;
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
 
 private:
   /**
@@ -127,6 +128,9 @@ private:
   TraceEncoderSharedPtr encoder_;
 
   std::map<std::string, Http::LowerCaseString> lower_case_headers_;
+
+  // Track active HTTP requests to be able to cancel them on destruction.
+  Http::AsyncClientRequestTracker active_requests_;
 };
 } // namespace Datadog
 } // namespace Tracers

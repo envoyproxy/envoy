@@ -5,7 +5,8 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
-#include "common/common/stack_array.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Compressor {
@@ -37,11 +38,7 @@ void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy c
 uint64_t ZlibCompressorImpl::checksum() { return zstream_ptr_->adler; }
 
 void ZlibCompressorImpl::compress(Buffer::Instance& buffer, State state) {
-  const uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-  buffer.getRawSlices(slices.begin(), num_slices);
-
-  for (const Buffer::RawSlice& input_slice : slices) {
+  for (const Buffer::RawSlice& input_slice : buffer.getRawSlices()) {
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
     // Z_NO_FLUSH tells the compressor to take the data in and compresses it as much as possible

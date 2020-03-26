@@ -8,15 +8,18 @@
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 
+#include "absl/strings/ascii.h"
+
 using Envoy::Fuzz::replaceInvalidCharacters;
 
 namespace Envoy {
 
 // Fuzz the header map implementation.
 DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) {
-  Http::HeaderMapImplPtr header_map = std::make_unique<Http::HeaderMapImpl>();
+  auto header_map = std::make_unique<Http::HeaderMapImpl>();
   std::vector<std::unique_ptr<Http::LowerCaseString>> lower_case_strings;
   std::vector<std::unique_ptr<std::string>> strings;
+  uint64_t set_integer;
   constexpr auto max_actions = 128;
   for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
     const auto& action = input.actions(i);
@@ -95,8 +98,20 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
     }
     case test::common::http::Action::kMutateAndMove: {
       const auto& mutate_and_move = action.mutate_and_move();
-      Http::HeaderString header_field(
-          Http::LowerCaseString(replaceInvalidCharacters(mutate_and_move.key())));
+      lower_case_strings.emplace_back(
+          std::make_unique<Http::LowerCaseString>(replaceInvalidCharacters(mutate_and_move.key())));
+      // Randomly (using fuzzer data) set the header_field to either be of type Reference or Inline
+      const auto& str = lower_case_strings.back();
+      Http::HeaderString header_field; // By default it's Inline
+      if ((str->get().size() > 0) && (str->get().at(0) & 0x1)) {
+        // Keeping header_field as Inline
+        header_field.setCopy(str->get());
+        // inlineTransform can only be applied to Inline type!
+        header_field.inlineTransform(absl::ascii_tolower);
+      } else {
+        // Changing header_field to Reference
+        header_field.setReference(str->get());
+      }
       Http::HeaderString header_value;
       // Do some mutation or parameterized action.
       switch (mutate_and_move.mutate_selector_case()) {
@@ -108,7 +123,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
         header_value.setCopy(replaceInvalidCharacters(mutate_and_move.set_copy()));
         break;
       case test::common::http::MutateAndMove::kSetInteger:
-        header_value.setInteger(mutate_and_move.set_integer());
+        set_integer = mutate_and_move.set_integer();
+        header_value.setInteger(set_integer);
         break;
       case test::common::http::MutateAndMove::kSetReference:
         strings.emplace_back(std::make_unique<std::string>(
@@ -133,8 +149,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       break;
     }
     case test::common::http::Action::kCopy: {
-      header_map = std::make_unique<Http::HeaderMapImpl>(
-          *reinterpret_cast<Http::HeaderMap*>(header_map.get()));
+      header_map = Http::createHeaderMap<Http::HeaderMapImpl>(*header_map);
       break;
     }
     case test::common::http::Action::kLookup: {

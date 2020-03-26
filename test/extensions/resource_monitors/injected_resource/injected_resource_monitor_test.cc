@@ -41,8 +41,8 @@ private:
 
 class MockedCallbacks : public Server::ResourceMonitor::Callbacks {
 public:
-  MOCK_METHOD1(onSuccess, void(const Server::ResourceUsage&));
-  MOCK_METHOD1(onFailure, void(const EnvoyException&));
+  MOCK_METHOD(void, onSuccess, (const Server::ResourceUsage&));
+  MOCK_METHOD(void, onFailure, (const EnvoyException&));
 };
 
 class InjectedResourceMonitorTest : public testing::Test {

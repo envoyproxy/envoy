@@ -37,7 +37,7 @@ InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t
  * @param fd socket file descriptor
  * @return InstanceConstSharedPtr for bound address.
  */
-InstanceConstSharedPtr addressFromFd(int fd);
+InstanceConstSharedPtr addressFromFd(os_fd_t fd);
 
 /**
  * Obtain the address of the peer of the socket with the specified file descriptor.
@@ -45,7 +45,7 @@ InstanceConstSharedPtr addressFromFd(int fd);
  * @param fd socket file descriptor
  * @return InstanceConstSharedPtr for peer address.
  */
-InstanceConstSharedPtr peerAddressFromFd(int fd);
+InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd);
 
 /**
  * Base class for all address types.
@@ -100,8 +100,8 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(int fd) const override;
-  Api::SysCallIntResult connect(int fd) const override;
+  Api::SysCallIntResult bind(os_fd_t fd) const override;
+  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return &ip_; }
   IoHandlePtr socket(SocketType type) const override;
 
@@ -174,8 +174,8 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(int fd) const override;
-  Api::SysCallIntResult connect(int fd) const override;
+  Api::SysCallIntResult bind(os_fd_t fd) const override;
+  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return &ip_; }
   IoHandlePtr socket(SocketType type) const override;
 
@@ -237,8 +237,8 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(int fd) const override;
-  Api::SysCallIntResult connect(int fd) const override;
+  Api::SysCallIntResult bind(os_fd_t fd) const override;
+  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return nullptr; }
   IoHandlePtr socket(SocketType type) const override;
 

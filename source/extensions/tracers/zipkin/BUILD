@@ -35,7 +35,6 @@ envoy_cc_library(
         "zipkin_tracer_impl.h",
     ],
     external_deps = [
-        "rapidjson",
         "abseil_optional",
     ],
     deps = [
@@ -50,6 +49,7 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
+        "//source/common/http:async_client_utility_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
@@ -59,7 +59,7 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers:well_known_names",
         "@com_github_openzipkin_zipkinapi//:zipkin_cc_proto",
-        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -72,6 +72,6 @@ envoy_cc_extension(
         ":zipkin_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
-        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )

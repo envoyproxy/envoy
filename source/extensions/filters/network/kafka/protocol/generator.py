@@ -3,7 +3,7 @@
 # Main library file containing all the protocol generation logic.
 
 
-def generate_main_code(type, main_header_file, resolver_cc_file, input_files):
+def generate_main_code(type, main_header_file, resolver_cc_file, metrics_header_file, input_files):
   """
   Main code generator.
 
@@ -13,9 +13,11 @@ def generate_main_code(type, main_header_file, resolver_cc_file, input_files):
   These responses are then used to create:
   - main_header_file - contains definitions of Kafka structures and their deserializers
   - resolver_cc_file - contains request api key & version mapping to deserializer (from header file)
+  - metrics_header_file - contains metrics with names corresponding to messages
   """
+  processor = StatefulProcessor()
   # Parse provided input files.
-  messages = parse_messages(input_files)
+  messages = processor.parse_messages(input_files)
 
   complex_type_template = RenderingHelper.get_template('complex_type_template.j2')
   parsers_template = RenderingHelper.get_template("%s_parser.j2" % type)
@@ -24,7 +26,8 @@ def generate_main_code(type, main_header_file, resolver_cc_file, input_files):
 
   for message in messages:
     # For each child structure that is used by request/response, render its matching C++ code.
-    for dependency in message.declaration_chain:
+    dependencies = message.compute_declaration_chain()
+    for dependency in dependencies:
       main_header_contents += complex_type_template.render(complex_type=dependency)
     # Each top-level structure (e.g. FetchRequest/FetchResponse) needs corresponding parsers.
     main_header_contents += parsers_template.render(complex_type=message)
@@ -37,15 +40,21 @@ def generate_main_code(type, main_header_file, resolver_cc_file, input_files):
   with open(main_header_file, 'w') as fd:
     fd.write(contents)
 
+  # Generate ...resolver.cc file.
   template = RenderingHelper.get_template("kafka_%s_resolver_cc.j2" % type)
   contents = template.render(message_types=messages)
-
-  # Generate ...resolver.cc file.
   with open(resolver_cc_file, 'w') as fd:
     fd.write(contents)
 
+  # Generate ...metrics.h file.
+  template = RenderingHelper.get_template("%s_metrics_h.j2" % type)
+  contents = template.render(message_types=messages)
+  with open(metrics_header_file, 'w') as fd:
+    fd.write(contents)
 
-def generate_test_code(type, header_test_cc_file, codec_test_cc_file, input_files):
+
+def generate_test_code(type, header_test_cc_file, codec_test_cc_file, utilities_cc_file,
+                       input_files):
   """
   Test code generator.
 
@@ -53,11 +62,13 @@ def generate_test_code(type, header_test_cc_file, codec_test_cc_file, input_file
   response).
 
   These responses are then used to create:
-  - header_test_cc_file - tests for basic message serialization deserialization
-  - codec_test_cc_file - tests involving codec and Request/ResponseParserResolver
+  - header_test_cc_file - tests for basic message serialization deserialization,
+  - codec_test_cc_file - tests involving codec and Request/ResponseParserResolver,
+  - utilities_cc_file - utilities for creating sample messages.
   """
+  processor = StatefulProcessor()
   # Parse provided input files.
-  messages = parse_messages(input_files)
+  messages = processor.parse_messages(input_files)
 
   # Generate header-test file.
   template = RenderingHelper.get_template("%ss_test_cc.j2" % type)
@@ -71,81 +82,165 @@ def generate_test_code(type, header_test_cc_file, codec_test_cc_file, input_file
   with open(codec_test_cc_file, 'w') as fd:
     fd.write(contents)
 
+  # Generate utilities file.
+  template = RenderingHelper.get_template("%s_utilities_cc.j2" % type)
+  contents = template.render(message_types=messages)
+  with open(utilities_cc_file, 'w') as fd:
+    fd.write(contents)
 
-def parse_messages(input_files):
+
+class StatefulProcessor:
   """
-  Parse request/response structures from provided input files.
+  Helper entity that keeps state during the processing.
+  Some state needs to be shared across multiple message types, as we need to handle identical
+  sub-type names (e.g. both AlterConfigsRequest & IncrementalAlterConfigsRequest have child
+  AlterConfigsResource, what would cause a compile-time error if we were to handle it trivially).
   """
-  import re
-  import json
 
-  messages = []
-  # For each specification file, remove comments, and parse the remains.
-  for input_file in input_files:
-    with open(input_file, 'r') as fd:
-      raw_contents = fd.read()
-      without_comments = re.sub(r'//.*\n', '', raw_contents)
-      message_spec = json.loads(without_comments)
-      message = parse_top_level_element(message_spec)
-      messages.append(message)
+  def __init__(self):
+    # Complex types that have been encountered during processing.
+    self.known_types = set()
+    # Name of parent message type that's being processed right now.
+    self.currently_processed_message_type = None
+    # Common structs declared in this message type.
+    self.common_structs = {}
 
-  # Sort messages by api_key.
-  messages.sort(key=lambda x: x.get_extra('api_key'))
-  return messages
+  def parse_messages(self, input_files):
+    """
+    Parse request/response structures from provided input files.
+    """
+    import re
+    import json
 
+    messages = []
+    # Sort the input files, as the processing is stateful, as we want the same order every time.
+    input_files.sort()
+    # For each specification file, remove comments, and parse the remains.
+    for input_file in input_files:
+      try:
+        with open(input_file, 'r') as fd:
+          raw_contents = fd.read()
+          without_comments = re.sub(r'\s*//.*\n', '\n', raw_contents)
+          without_empty_newlines = re.sub(r'^\s*$', '', without_comments, flags=re.MULTILINE)
+          message_spec = json.loads(without_empty_newlines)
+          message = self.parse_top_level_element(message_spec)
+          messages.append(message)
+      except Exception as e:
+        print('could not process %s' % input_file)
+        raise
 
-def parse_top_level_element(spec):
-  """
-  Parse a given structure into a request/response.
-  Request/response is just a complex type, that has name & version information kept in differently
-  named fields, compared to sub-structures in a message.
-  """
-  type_name = spec['name']
-  versions = Statics.parse_version_string(spec['validVersions'], 2 << 16 - 1)
-  return parse_complex_type(type_name, spec, versions).with_extra('api_key', spec['apiKey'])
+    # Sort messages by api_key.
+    messages.sort(key=lambda x: x.get_extra('api_key'))
+    return messages
 
+  def parse_top_level_element(self, spec):
+    """
+    Parse a given structure into a request/response.
+    Request/response is just a complex type, that has name & version information kept in differently
+    named fields, compared to sub-structures in a message.
+    """
+    self.currently_processed_message_type = spec['name']
 
-def parse_complex_type(type_name, field_spec, versions):
-  """
-  Parse given complex type, returning a structure that holds its name, field specification and
-  allowed versions.
-  """
-  fields = []
-  for child_field in field_spec['fields']:
-    child = parse_field(child_field, versions[-1])
-    fields.append(child)
-  return Complex(type_name, fields, versions)
+    # Figure out all versions of this message type.
+    versions = Statics.parse_version_string(spec['validVersions'], 2 << 16 - 1)
 
-
-def parse_field(field_spec, highest_possible_version):
-  """
-  Parse given field, returning a structure holding the name, type, and versions when this field is
-  actually used (nullable or not). Obviously, field cannot be used in version higher than its
-  type's usage.
-  """
-  version_usage = Statics.parse_version_string(field_spec['versions'], highest_possible_version)
-  version_usage_as_nullable = Statics.parse_version_string(
-      field_spec['nullableVersions'],
-      highest_possible_version) if 'nullableVersions' in field_spec else range(-1)
-  parsed_type = parse_type(field_spec['type'], field_spec, highest_possible_version)
-  return FieldSpec(field_spec['name'], parsed_type, version_usage, version_usage_as_nullable)
-
-
-def parse_type(type_name, field_spec, highest_possible_version):
-  """
-  Parse a given type element - returns an array type, primitive (e.g. uint32_t) or complex one.
-  """
-  if (type_name.startswith('[]')):
-    # In spec files, array types are defined as `[]underlying_type` instead of having its own
-    # element with type inside.
-    underlying_type = parse_type(type_name[2:], field_spec, highest_possible_version)
-    return Array(underlying_type)
-  else:
-    if (type_name in Primitive.PRIMITIVE_TYPE_NAMES):
-      return Primitive(type_name, field_spec.get('default'))
+    # Figure out the flexible versions.
+    flexible_versions_string = spec.get('flexibleVersions', 'none')
+    if 'none' != flexible_versions_string:
+      flexible_versions = Statics.parse_version_string(flexible_versions_string, versions[-1])
     else:
-      versions = Statics.parse_version_string(field_spec['versions'], highest_possible_version)
-      return parse_complex_type(type_name, field_spec, versions)
+      flexible_versions = []
+
+    # Sanity check - all flexible versions need to be versioned.
+    if [x for x in flexible_versions if x not in versions]:
+      raise ValueError('invalid flexible versions')
+
+    try:
+      # In 2.4 some types are declared at top level, and only referenced inside.
+      # So let's parse them and store them in state.
+      common_structs = spec.get('commonStructs')
+      if common_structs is not None:
+        for common_struct in common_structs:
+          common_struct_name = common_struct['name']
+          common_struct_versions = Statics.parse_version_string(common_struct['versions'],
+                                                                versions[-1])
+          parsed_complex = self.parse_complex_type(common_struct_name, common_struct,
+                                                   common_struct_versions)
+          self.common_structs[parsed_complex.name] = parsed_complex
+
+      # Parse the type itself.
+      complex_type = self.parse_complex_type(self.currently_processed_message_type, spec, versions)
+      complex_type.register_flexible_versions(flexible_versions)
+
+      # Request / response types need to carry api key version.
+      result = complex_type.with_extra('api_key', spec['apiKey'])
+      return result
+
+    finally:
+      self.common_structs = {}
+      self.currently_processed_message_type = None
+
+  def parse_complex_type(self, type_name, field_spec, versions):
+    """
+    Parse given complex type, returning a structure that holds its name, field specification and
+    allowed versions.
+    """
+    fields_el = field_spec.get('fields')
+
+    if fields_el is not None:
+      fields = []
+      for child_field in field_spec['fields']:
+        child = self.parse_field(child_field, versions[-1])
+        if child is not None:
+          fields.append(child)
+
+      # Some of the types repeat multiple times (e.g. AlterableConfig).
+      # In such a case, every second or later occurrence of the same name is going to be prefixed
+      # with parent type, e.g. we have AlterableConfig (for AlterConfigsRequest) and then
+      # IncrementalAlterConfigsRequestAlterableConfig (for IncrementalAlterConfigsRequest).
+      # This keeps names unique, while keeping non-duplicate ones short.
+      if type_name not in self.known_types:
+        self.known_types.add(type_name)
+      else:
+        type_name = self.currently_processed_message_type + type_name
+        self.known_types.add(type_name)
+
+      return Complex(type_name, fields, versions)
+
+    else:
+      return self.common_structs[type_name]
+
+  def parse_field(self, field_spec, highest_possible_version):
+    """
+    Parse given field, returning a structure holding the name, type, and versions when this field is
+    actually used (nullable or not). Obviously, field cannot be used in version higher than its
+    type's usage.
+    """
+    if field_spec.get('tag') is not None:
+      return None
+
+    version_usage = Statics.parse_version_string(field_spec['versions'], highest_possible_version)
+    version_usage_as_nullable = Statics.parse_version_string(
+        field_spec['nullableVersions'],
+        highest_possible_version) if 'nullableVersions' in field_spec else range(-1)
+    parsed_type = self.parse_type(field_spec['type'], field_spec, highest_possible_version)
+    return FieldSpec(field_spec['name'], parsed_type, version_usage, version_usage_as_nullable)
+
+  def parse_type(self, type_name, field_spec, highest_possible_version):
+    """
+    Parse a given type element - returns an array type, primitive (e.g. uint32_t) or complex one.
+    """
+    if (type_name.startswith('[]')):
+      # In spec files, array types are defined as `[]underlying_type` instead of having its own
+      # element with type inside.
+      underlying_type = self.parse_type(type_name[2:], field_spec, highest_possible_version)
+      return Array(underlying_type)
+    else:
+      if (type_name in Primitive.USABLE_PRIMITIVE_TYPE_NAMES):
+        return Primitive(type_name, field_spec.get('default'))
+      else:
+        versions = Statics.parse_version_string(field_spec['versions'], highest_possible_version)
+        return self.parse_complex_type(type_name, field_spec, versions)
 
 
 class Statics:
@@ -169,11 +264,12 @@ class Statics:
 class FieldList:
   """
   List of fields used by given entity (request or child structure) in given message version
-  (as fields get added or removed across versions).
+  (as fields get added or removed across versions and/or they change compaction level).
   """
 
-  def __init__(self, version, fields):
+  def __init__(self, version, uses_compact_fields, fields):
     self.version = version
+    self.uses_compact_fields = uses_compact_fields
     self.fields = fields
 
   def used_fields(self):
@@ -269,7 +365,12 @@ class FieldSpec:
 
   def default_value(self):
     if self.is_nullable():
-      return '{%s}' % self.type.default_value()
+      type_default_value = self.type.default_value()
+      # For nullable fields, it's possible to have (Java) null as default value.
+      if type_default_value != 'null':
+        return '{%s}' % type_default_value
+      else:
+        return 'absl::nullopt'
     else:
       return str(self.type.default_value())
 
@@ -280,11 +381,11 @@ class FieldSpec:
     else:
       return str(self.type.example_value_for_test(version))
 
-  def deserializer_name_in_version(self, version):
+  def deserializer_name_in_version(self, version, compact):
     if self.is_nullable_in_version(version):
-      return 'Nullable%s' % self.type.deserializer_name_in_version(version)
+      return 'Nullable%s' % self.type.deserializer_name_in_version(version, compact)
     else:
-      return self.type.deserializer_name_in_version(version)
+      return self.type.deserializer_name_in_version(version, compact)
 
   def is_printable(self):
     return self.type.is_printable()
@@ -292,7 +393,13 @@ class FieldSpec:
 
 class TypeSpecification:
 
-  def deserializer_name_in_version(self, version):
+  def compute_declaration_chain(self):
+    """
+    Computes types that need to be declared before this type can be declared, in C++ sense.
+    """
+    raise NotImplementedError()
+
+  def deserializer_name_in_version(self, version, compact):
     """
     Renders the deserializer name of given type, in message with given version.
     """
@@ -301,6 +408,12 @@ class TypeSpecification:
   def default_value(self):
     """
     Returns a default value for given type.
+    """
+    raise NotImplementedError()
+
+  def has_flexible_handling(self):
+    """
+    Whether the given type has special encoding when carrying message is using flexible encoding.
     """
     raise NotImplementedError()
 
@@ -320,18 +433,25 @@ class Array(TypeSpecification):
 
   def __init__(self, underlying):
     self.underlying = underlying
-    self.declaration_chain = self.underlying.declaration_chain
 
   @property
   def name(self):
     return 'std::vector<%s>' % self.underlying.name
 
-  def deserializer_name_in_version(self, version):
-    return 'ArrayDeserializer<%s, %s>' % (self.underlying.name,
-                                          self.underlying.deserializer_name_in_version(version))
+  def compute_declaration_chain(self):
+    # To use an array of type T, we just need to be capable of using type T.
+    return self.underlying.compute_declaration_chain()
+
+  def deserializer_name_in_version(self, version, compact):
+    # For arrays, deserializer name is (Compact)(Nullable)ArrayDeserializer<ElementDeserializer>.
+    element_deserializer_name = self.underlying.deserializer_name_in_version(version, compact)
+    return '%sArrayDeserializer<%s>' % ("Compact" if compact else "", element_deserializer_name)
 
   def default_value(self):
     return 'std::vector<%s>{}' % (self.underlying.name)
+
+  def has_flexible_handling(self):
+    return True
 
   def example_value_for_test(self, version):
     return 'std::vector<%s>{ %s }' % (self.underlying.name,
@@ -346,7 +466,7 @@ class Primitive(TypeSpecification):
   Represents a Kafka primitive value.
   """
 
-  PRIMITIVE_TYPE_NAMES = ['bool', 'int8', 'int16', 'int32', 'int64', 'string', 'bytes']
+  USABLE_PRIMITIVE_TYPE_NAMES = ['bool', 'int8', 'int16', 'int32', 'int64', 'string', 'bytes']
 
   KAFKA_TYPE_TO_ENVOY_TYPE = {
       'string': 'std::string',
@@ -356,6 +476,7 @@ class Primitive(TypeSpecification):
       'int32': 'int32_t',
       'int64': 'int64_t',
       'bytes': 'Bytes',
+      'tagged_fields': 'TaggedFields',
   }
 
   KAFKA_TYPE_TO_DESERIALIZER = {
@@ -366,6 +487,12 @@ class Primitive(TypeSpecification):
       'int32': 'Int32Deserializer',
       'int64': 'Int64Deserializer',
       'bytes': 'BytesDeserializer',
+      'tagged_fields': 'TaggedFieldsDeserializer',
+  }
+
+  KAFKA_TYPE_TO_COMPACT_DESERIALIZER = {
+      'string': 'CompactStringDeserializer',
+      'bytes': 'CompactBytesDeserializer'
   }
 
   # See https://github.com/apache/kafka/tree/trunk/clients/src/main/resources/common/message#deserializing-messages
@@ -377,25 +504,33 @@ class Primitive(TypeSpecification):
       'int32': '0',
       'int64': '0',
       'bytes': '{}',
+      'tagged_fields': 'TaggedFields({})',
   }
 
   # Custom values that make test code more readable.
   KAFKA_TYPE_TO_EXAMPLE_VALUE_FOR_TEST = {
-      'string': '"string"',
-      'bool': 'false',
-      'int8': 'static_cast<int8_t>(8)',
-      'int16': 'static_cast<int16_t>(16)',
-      'int32': 'static_cast<int32_t>(32)',
-      'int64': 'static_cast<int64_t>(64)',
-      'bytes': 'Bytes({0, 1, 2, 3})',
+      'string':
+          '"string"',
+      'bool':
+          'false',
+      'int8':
+          'static_cast<int8_t>(8)',
+      'int16':
+          'static_cast<int16_t>(16)',
+      'int32':
+          'static_cast<int32_t>(32)',
+      'int64':
+          'static_cast<int64_t>(64)',
+      'bytes':
+          'Bytes({0, 1, 2, 3})',
+      'tagged_fields':
+          'TaggedFields{std::vector<TaggedField>{{10, Bytes({1, 2, 3})}, {20, Bytes({4, 5, 6})}}}',
   }
 
   def __init__(self, name, custom_default_value):
     self.original_name = name
     self.name = Primitive.compute(name, Primitive.KAFKA_TYPE_TO_ENVOY_TYPE)
     self.custom_default_value = custom_default_value
-    self.declaration_chain = []
-    self.deserializer_name = Primitive.compute(name, Primitive.KAFKA_TYPE_TO_DESERIALIZER)
 
   @staticmethod
   def compute(name, map):
@@ -404,8 +539,15 @@ class Primitive(TypeSpecification):
     else:
       raise ValueError(name)
 
-  def deserializer_name_in_version(self, version):
-    return self.deserializer_name
+  def compute_declaration_chain(self):
+    # Primitives need no declarations.
+    return []
+
+  def deserializer_name_in_version(self, version, compact):
+    if compact and self.original_name in Primitive.KAFKA_TYPE_TO_COMPACT_DESERIALIZER.keys():
+      return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_COMPACT_DESERIALIZER)
+    else:
+      return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_DESERIALIZER)
 
   def default_value(self):
     if self.custom_default_value is not None:
@@ -413,11 +555,23 @@ class Primitive(TypeSpecification):
     else:
       return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_DEFAULT_VALUE)
 
+  def has_flexible_handling(self):
+    return self.original_name in ['string', 'bytes', 'tagged_fields']
+
   def example_value_for_test(self, version):
     return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_EXAMPLE_VALUE_FOR_TEST)
 
   def is_printable(self):
     return self.name not in ['Bytes']
+
+
+class FieldSerializationSpec():
+
+  def __init__(self, field, versions, compute_size_method_name, encode_method_name):
+    self.field = field
+    self.versions = versions
+    self.compute_size_method_name = compute_size_method_name
+    self.encode_method_name = encode_method_name
 
 
 class Complex(TypeSpecification):
@@ -430,17 +584,30 @@ class Complex(TypeSpecification):
     self.name = name
     self.fields = fields
     self.versions = versions
-    self.declaration_chain = self.__compute_declaration_chain()
+    self.flexible_versions = None  # Will be set in 'register_flexible_versions'.
     self.attributes = {}
 
-  def __compute_declaration_chain(self):
+  def register_flexible_versions(self, flexible_versions):
+    # If flexible versions are present, so we need to add placeholder 'tagged_fields' field to
+    # *every* type that's used in by this message type.
+    for type in self.compute_declaration_chain():
+      type.flexible_versions = flexible_versions
+      if len(flexible_versions) > 0:
+        tagged_fields_field = FieldSpec('tagged_fields', Primitive('tagged_fields', None),
+                                        flexible_versions, [])
+        type.fields.append(tagged_fields_field)
+
+  def compute_declaration_chain(self):
     """
     Computes all dependencies, what means all non-primitive types used by this type.
     They need to be declared before this struct is declared.
     """
     result = []
     for field in self.fields:
-      result.extend(field.type.declaration_chain)
+      field_dependencies = field.type.compute_declaration_chain()
+      for field_dependency in field_dependencies:
+        if field_dependency not in result:
+          result.append(field_dependency)
     result.append(self)
     return result
 
@@ -481,15 +648,38 @@ class Complex(TypeSpecification):
     """
     field_lists = []
     for version in self.versions:
-      field_list = FieldList(version, self.fields)
+      field_list = FieldList(version, version in self.flexible_versions, self.fields)
       field_lists.append(field_list)
     return field_lists
 
-  def deserializer_name_in_version(self, version):
+  def compute_serialization_specs(self):
+    result = []
+    for field in self.fields:
+      if field.type.has_flexible_handling():
+        flexible = [x for x in field.version_usage if x in self.flexible_versions]
+        non_flexible = [x for x in field.version_usage if x not in flexible]
+        if non_flexible:
+          result.append(FieldSerializationSpec(field, non_flexible, 'computeSize', 'encode'))
+        if flexible:
+          result.append(
+              FieldSerializationSpec(field, flexible, 'computeCompactSize', 'encodeCompact'))
+      else:
+        result.append(FieldSerializationSpec(field, field.version_usage, 'computeSize', 'encode'))
+    return result
+
+  def deserializer_name_in_version(self, version, compact):
     return '%sV%dDeserializer' % (self.name, version)
+
+  def name_in_c_case(self):
+    import re
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', self.name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
   def default_value(self):
     raise NotImplementedError('unable to create default value of complex type')
+
+  def has_flexible_handling(self):
+    return False
 
   def example_value_for_test(self, version):
     field_list = next(fl for fl in self.compute_field_lists() if fl.version == version)

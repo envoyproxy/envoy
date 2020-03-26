@@ -15,6 +15,7 @@ from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
 
+from udpa.annotations import status_pb2
 from validate import validate_pb2
 
 # Namespace prefix for Envoy core APIs.
@@ -404,6 +405,7 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
   if field.options.HasExtension(validate_pb2.rules):
     rule = field.options.Extensions[validate_pb2.rules]
     if ((rule.HasField('message') and rule.message.required) or
+        (rule.HasField('duration') and rule.duration.required) or
         (rule.HasField('string') and rule.string.min_bytes > 0) or
         (rule.HasField('repeated') and rule.repeated.min_items > 0)):
       field_annotations = ['*REQUIRED*']
@@ -554,11 +556,34 @@ class RstFormatVisitor(visitor.Visitor):
             type_context, msg_proto) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
+    has_messages = True
+    if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
+      has_messages = False
+
+    # TODO(mattklein123): The logic in both the doc and transform tool around files without messages
+    # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs
+    # in the common case.
+    if (has_messages and
+        not annotations.DOC_TITLE_ANNOTATION in type_context.source_code_info.file_level_annotations
+        and file_proto.name.startswith('envoy')):
+      raise ProtodocError('Envoy API proto file missing [#protodoc-title:] annotation: {}'.format(
+          file_proto.name))
+
     # Find the earliest detached comment, attribute it to file level.
     # Also extract file level titles if any.
     header, comment = FormatHeaderFromFile('=', type_context.source_code_info, file_proto.name)
+    # If there are no messages, we don't include in the doc tree (no support for
+    # service rendering yet). We allow these files to be missing from the
+    # toctrees.
+    if not has_messages:
+      header = ':orphan:\n\n' + header
+    warnings = ''
+    if file_proto.options.HasExtension(status_pb2.file_status):
+      if file_proto.options.Extensions[status_pb2.file_status].work_in_progress:
+        warnings += ('.. warning::\n   This API is work-in-progress and is '
+                     'subject to breaking changes.\n\n')
     debug_proto = FormatProtoAsBlockComment(file_proto)
-    return header + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
+    return header + warnings + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
 
 
 def Main():

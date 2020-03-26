@@ -101,10 +101,11 @@ void DispatcherImpl::clearDeferredDeleteList() {
 
 Network::ConnectionPtr
 DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                       Network::TransportSocketPtr&& transport_socket) {
+                                       Network::TransportSocketPtr&& transport_socket,
+                                       StreamInfo::StreamInfo& stream_info) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::ConnectionImpl>(*this, std::move(socket),
-                                                   std::move(transport_socket), true);
+                                                   std::move(transport_socket), stream_info, true);
 }
 
 Network::ClientConnectionPtr
@@ -125,7 +126,7 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
       new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
 }
 
-FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                              uint32_t events) {
   ASSERT(isThreadSafe());
   return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};
@@ -133,7 +134,7 @@ FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTrigger
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   ASSERT(isThreadSafe());
-  return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
+  return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, api_)};
 }
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,

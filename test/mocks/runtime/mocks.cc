@@ -18,6 +18,7 @@ MockSnapshot::MockSnapshot() {
   ON_CALL(*this, getInteger(_, _)).WillByDefault(ReturnArg<1>());
   ON_CALL(*this, getDouble(_, _)).WillByDefault(ReturnArg<1>());
   ON_CALL(*this, getBoolean(_, _)).WillByDefault(ReturnArg<1>());
+  ON_CALL(*this, get(_)).WillByDefault(Return(absl::nullopt));
 }
 
 MockSnapshot::~MockSnapshot() = default;

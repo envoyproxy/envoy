@@ -11,7 +11,7 @@ following are the command line options that Envoy supports.
   *(optional)* The path to the v2 :ref:`JSON/YAML/proto3 configuration
   file <config>`. If this flag is missing, :option:`--config-yaml` is required.
   This will be parsed as a :ref:`v2 bootstrap configuration file
-  <config_overview_v2_bootstrap>`.
+  <config_overview_bootstrap>`.
   Valid extensions are ``.json``, ``.yaml``, ``.pb`` and ``.pb_text``, which indicate
   JSON, YAML, `binary proto3
   <https://developers.google.com/protocol-buffers/docs/encoding>`_ and `text
@@ -218,7 +218,7 @@ following are the command line options that Envoy supports.
   the parent shutdown time set via the :option:`--parent-shutdown-time-s` option. How the two 
   settings are configured depends on the specific deployment. In edge scenarios, it might be
   desirable to have a very long drain time. In service to service scenarios, it might be possible
-  to make the drain and shutdown ime much shorter (e.g., 60s/90s).
+  to make the drain and shutdown time much shorter (e.g., 60s/90s).
 
 .. option:: --parent-shutdown-time-s <integer>
 

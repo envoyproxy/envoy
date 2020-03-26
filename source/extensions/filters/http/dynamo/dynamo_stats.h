@@ -16,8 +16,9 @@ class DynamoStats {
 public:
   DynamoStats(Stats::Scope& scope, const std::string& prefix);
 
-  Stats::Counter& counter(const Stats::StatNameVec& names);
-  Stats::Histogram& histogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit);
+  void incCounter(const Stats::StatNameVec& names);
+  void recordHistogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
+                       uint64_t value);
 
   /**
    * Creates the partition id stats string. The stats format is
@@ -32,15 +33,13 @@ public:
   static size_t groupIndex(uint64_t status);
 
   /**
-   * Finds or creates a StatName by string, taking a global lock if needed.
-   *
-   * TODO(jmarantz): Potential perf issue here with mutex contention for names
-   * that have not been remembered as builtins in the constructor.
+   * Finds a StatName by string.
    */
-  Stats::StatName getDynamic(const std::string& str) { return stat_name_set_->getDynamic(str); }
   Stats::StatName getBuiltin(const std::string& str, Stats::StatName fallback) {
     return stat_name_set_->getBuiltin(str, fallback);
   }
+
+  Stats::SymbolTable& symbolTable() { return scope_.symbolTable(); }
 
 private:
   Stats::SymbolTable::StoragePtr addPrefix(const Stats::StatNameVec& names);

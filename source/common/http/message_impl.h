@@ -15,34 +15,38 @@ namespace Http {
 /**
  * Implementation of Http::Message. This implementation does not support streaming.
  */
-class MessageImpl : public Http::Message {
+template <class HeadersInterfaceType, class HeadersImplType, class TrailersInterfaceType,
+          class TrailersImplType>
+class MessageImpl : public Message<HeadersInterfaceType, TrailersInterfaceType> {
 public:
-  // Http::Message
-  HeaderMap& headers() override { return *headers_; }
-  Buffer::InstancePtr& body() override { return body_; }
-  HeaderMap* trailers() override { return trailers_.get(); }
-  void trailers(HeaderMapPtr&& trailers) override { trailers_ = std::move(trailers); }
-  std::string bodyAsString() const override;
+  MessageImpl() : headers_(std::make_unique<HeadersImplType>()) {}
+  MessageImpl(std::unique_ptr<HeadersInterfaceType>&& headers) : headers_(std::move(headers)) {}
 
-protected:
-  MessageImpl(HeaderMapPtr&& headers) : headers_(std::move(headers)) {}
+  // Http::Message
+  HeadersInterfaceType& headers() override { return *headers_; }
+  Buffer::InstancePtr& body() override { return body_; }
+  TrailersInterfaceType* trailers() override { return trailers_.get(); }
+  void trailers(std::unique_ptr<TrailersInterfaceType>&& trailers) override {
+    trailers_ = std::move(trailers);
+  }
+  std::string bodyAsString() const override {
+    if (body_) {
+      return body_->toString();
+    } else {
+      return "";
+    }
+  }
 
 private:
-  HeaderMapPtr headers_;
+  std::unique_ptr<HeadersInterfaceType> headers_;
   Buffer::InstancePtr body_;
-  HeaderMapPtr trailers_;
+  std::unique_ptr<TrailersInterfaceType> trailers_;
 };
 
-class RequestMessageImpl : public MessageImpl {
-public:
-  RequestMessageImpl() : MessageImpl(HeaderMapPtr{new HeaderMapImpl()}) {}
-  RequestMessageImpl(HeaderMapPtr&& headers) : MessageImpl(std::move(headers)) {}
-};
-
-class ResponseMessageImpl : public MessageImpl {
-public:
-  ResponseMessageImpl(HeaderMapPtr&& headers) : MessageImpl(std::move(headers)) {}
-};
+using RequestMessageImpl =
+    MessageImpl<RequestHeaderMap, RequestHeaderMapImpl, RequestTrailerMap, RequestTrailerMapImpl>;
+using ResponseMessageImpl = MessageImpl<ResponseHeaderMap, ResponseHeaderMapImpl,
+                                        ResponseTrailerMap, ResponseTrailerMapImpl>;
 
 } // namespace Http
 } // namespace Envoy

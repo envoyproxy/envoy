@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/filter/http/original_src/v2alpha1/original_src.pb.h"
+#include "envoy/extensions/filters/http/original_src/v3/original_src.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,7 +9,7 @@ namespace OriginalSrc {
 class Config {
 public:
   Config() = default;
-  explicit Config(const envoy::config::filter::http::original_src::v2alpha1::OriginalSrc& config);
+  explicit Config(const envoy::extensions::filters::http::original_src::v3::OriginalSrc& config);
 
   uint32_t mark() const { return mark_; }
 

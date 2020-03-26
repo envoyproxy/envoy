@@ -44,9 +44,9 @@ public:
   TimeSource& timeSource() override { return api_.timeSource(); }
   void initializeStats(Stats::Scope& scope, const std::string& prefix) override;
   void clearDeferredDeleteList() override;
-  Network::ConnectionPtr
-  createServerConnection(Network::ConnectionSocketPtr&& socket,
-                         Network::TransportSocketPtr&& transport_socket) override;
+  Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
+                                                Network::TransportSocketPtr&& transport_socket,
+                                                StreamInfo::StreamInfo& stream_info) override;
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
                          Network::Address::InstanceConstSharedPtr source_address,
@@ -55,7 +55,7 @@ public:
   Network::DnsResolverSharedPtr
   createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
                     const bool use_tcp_for_dns_lookups) override;
-  FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+  FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,

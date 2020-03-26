@@ -1,4 +1,4 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
 
@@ -26,7 +26,7 @@ public:
     thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
-        - name: envoy.filters.network.thrift_proxy
+        - name: thrift
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy
             stat_prefix: thrift_stats
@@ -111,11 +111,11 @@ public:
   void initializeCommon() {
     setUpstreamCount(4);
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       for (int i = 1; i < 4; i++) {
         auto* c = bootstrap.mutable_static_resources()->add_clusters();
         c->MergeFrom(bootstrap.static_resources().clusters()[0]);
-        c->set_name(fmt::format("cluster_{}", i));
+        c->set_name(absl::StrCat("cluster_", i));
       }
     });
 

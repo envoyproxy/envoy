@@ -2,8 +2,9 @@
 
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/lds.pb.h"
+#include "envoy/access_log/access_log.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
@@ -12,6 +13,7 @@
 
 #include "common/common/logger.h"
 #include "common/init/manager_impl.h"
+#include "common/init/target_impl.h"
 
 #include "server/filter_chain_manager_impl.h"
 
@@ -42,7 +44,7 @@ public:
   /**
    * @return the socket shared by worker threads; otherwise return null.
    */
-  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+  Network::SocketOptRef sharedSocket() const override {
     if (!reuse_port_) {
       ASSERT(socket_ != nullptr);
       return *socket_;
@@ -93,10 +95,9 @@ public:
    * @param hash supplies the hash to use for duplicate checking.
    * @param validation_visitor message validation visitor instance.
    */
-  ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
+  ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash,
-               ProtobufMessage::ValidationVisitor& validation_visitor);
+               bool workers_started, uint64_t hash, uint32_t concurrency);
   ~ListenerImpl() override;
 
   /**
@@ -116,7 +117,7 @@ public:
   }
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
-  const envoy::api::v2::Listener& config() const { return config_; }
+  const envoy::config::listener::v3::Listener& config() const { return config_; }
   const Network::ListenSocketFactorySharedPtr& getSocketFactory() const { return socket_factory_; }
   void debugLog(const std::string& message);
   void initialize();
@@ -146,10 +147,13 @@ public:
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
-  const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+  Network::ActiveUdpListenerFactory* udpListenerFactory() override {
     return udp_listener_factory_.get();
   }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    return access_logs_;
+  }
 
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
@@ -158,7 +162,6 @@ public:
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
-  Tracing::HttpTracer& httpTracer() override;
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
@@ -169,15 +172,17 @@ public:
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
   Admin& admin() override;
-  const envoy::api::v2::core::Metadata& listenerMetadata() const override;
-  envoy::api::v2::core::TrafficDirection direction() const override;
+  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   const Network::ListenerConfig& listenerConfig() const override;
+  ProtobufMessage::ValidationContext& messageValidationContext() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
-  OptProcessContextRef processContext() override;
+  ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
@@ -224,18 +229,21 @@ private:
   const uint64_t hash_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
+  // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
+  // listener initialization is complete.
+  Init::WatcherImpl local_init_watcher_;
+  // A target is added to Server's InitManager if workers_started_ is false.
+  Init::TargetImpl listener_init_target_;
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   Init::ManagerImpl dynamic_init_manager_;
 
-  // This init watcher, if available, notifies the "parent" listener manager when listener
-  // initialization is complete. It may be reset to cancel interest.
-  std::unique_ptr<Init::WatcherImpl> init_watcher_;
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
+  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};
-  const envoy::api::v2::Listener config_;
+  const envoy::config::listener::v3::Listener config_;
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
