@@ -411,11 +411,11 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_header_sanitization")),
       enable_trailers_(enable_trailers),
+      reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                      [&]() -> void { this->onAboveHighWatermark(); }),
-      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
-      reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.reject_unsupported_transfer_encodings")) {
+      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;

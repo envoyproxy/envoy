@@ -228,6 +228,7 @@ protected:
   const bool strict_header_validation_ : 1;
   const bool connection_header_sanitization_ : 1;
   const bool enable_trailers_ : 1;
+  const bool reject_unsupported_transfer_encodings_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -330,7 +331,6 @@ private:
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
-  const bool reject_unsupported_transfer_encodings_ : 1;
 };
 
 /**
