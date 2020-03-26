@@ -158,7 +158,8 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHe
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterTrailersStatus AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+Http::FilterTrailersStatus
+AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   if (expect_grpc_status_in_trailer_) {
     absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(trailers, false);
 

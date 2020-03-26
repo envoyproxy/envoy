@@ -208,9 +208,7 @@ private:
     deferred_record_failure_->cancel();
   }
 
-  void recordFailure() {
-    deferred_record_failure_.reset();
-  }
+  void recordFailure() { deferred_record_failure_.reset(); }
 
   AdmissionControlFilterConfigSharedPtr config_;
   AdmissionControlStats stats_;

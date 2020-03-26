@@ -29,8 +29,7 @@ public:
   AdmissionControlIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 
-  void SetUp() override {
-  }
+  void SetUp() override {}
 
   void initialize() override {
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
