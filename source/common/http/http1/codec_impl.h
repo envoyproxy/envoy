@@ -224,6 +224,7 @@ protected:
   const bool strict_header_validation_ : 1;
   const bool connection_header_sanitization_ : 1;
   const bool enable_trailers_ : 1;
+  const bool reject_unsupported_transfer_encodings_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };

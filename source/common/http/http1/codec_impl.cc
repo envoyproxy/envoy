@@ -410,6 +410,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_header_sanitization")),
       enable_trailers_(enable_trailers),
+      reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                      [&]() -> void { this->onAboveHighWatermark(); }),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
@@ -594,8 +596,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding =
         request_or_response_headers.TransferEncoding()->value().getStringView();
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
+    if (reject_unsupported_transfer_encodings_ &&
         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
