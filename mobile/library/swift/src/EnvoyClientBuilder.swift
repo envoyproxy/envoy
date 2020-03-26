@@ -20,6 +20,7 @@ public final class EnvoyClientBuilder: NSObject {
   private var statsFlushSeconds: UInt32 = 60
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
+  private var virtualClusters: String = "[]"
 
   // MARK: - Public
 
@@ -127,6 +128,18 @@ public final class EnvoyClientBuilder: NSObject {
     return self
   }
 
+  ///
+  /// Add virtual cluster configuration.
+  ///
+  /// - paramenter virtualClusters: The JSON configuration string for virtual clusters.
+  ///
+  /// returns: This builder.
+  @discardableResult
+  public func addVirtualClusters(_ virtualClusters: String) -> EnvoyClientBuilder {
+    self.virtualClusters = virtualClusters
+    return self
+  }
+
   /// Builds a new instance of EnvoyClient using the provided configurations.
   ///
   /// - returns: A new instance of EnvoyClient.
@@ -144,7 +157,8 @@ public final class EnvoyClientBuilder: NSObject {
         dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
         statsFlushSeconds: self.statsFlushSeconds,
         appVersion: self.appVersion,
-        appId: self.appId)
+        appId: self.appId,
+        virtualClusters: self.virtualClusters)
       return EnvoyClient(config: config, logLevel: self.logLevel, engine: engine)
     }
   }

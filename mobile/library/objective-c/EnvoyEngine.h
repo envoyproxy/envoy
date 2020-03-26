@@ -138,6 +138,7 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
 @property (nonatomic, strong) NSString *appVersion;
 @property (nonatomic, strong) NSString *appId;
+@property (nonatomic, strong) NSString *virtualClusters;
 
 /**
  Create a new instance of the configuration.
@@ -149,7 +150,8 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
         dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                   statsFlushSeconds:(UInt32)statsFlushSeconds
                          appVersion:(NSString *)appVersion
-                              appId:(NSString *)appId;
+                              appId:(NSString *)appId
+                    virtualClusters:(NSString *)virtualClusters;
 
 /**
  Resolves the provided configuration template using properties on this configuration.

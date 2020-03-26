@@ -11,7 +11,8 @@
         dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                   statsFlushSeconds:(UInt32)statsFlushSeconds
                          appVersion:(NSString *)appVersion
-                              appId:(NSString *)appId {
+                              appId:(NSString *)appId
+                    virtualClusters:(NSString *)virtualClusters {
   self = [super init];
   if (!self) {
     return nil;
@@ -25,6 +26,7 @@
   self.statsFlushSeconds = statsFlushSeconds;
   self.appVersion = appVersion;
   self.appId = appId;
+  self.virtualClusters = virtualClusters;
   return self;
 }
 
@@ -43,7 +45,8 @@
         [NSString stringWithFormat:@"%lu", (unsigned long)self.statsFlushSeconds],
     @"device_os" : @"iOS",
     @"app_version" : self.appVersion,
-    @"app_id" : self.appId
+    @"app_id" : self.appId,
+    @"virtual_clusters" : self.virtualClusters
   };
 
   for (NSString *templateKey in templateKeysToValues) {

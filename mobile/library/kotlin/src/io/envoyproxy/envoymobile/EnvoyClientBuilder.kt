@@ -23,6 +23,7 @@ open class EnvoyClientBuilder(
   private var statsFlushSeconds = 60
   private var appVersion = "unspecified"
   private var appId = "unspecified"
+  private var virtualClusters = "[]"
 
   /**
    * Add a log level to use with Envoy.
@@ -123,6 +124,18 @@ open class EnvoyClientBuilder(
   }
 
   /**
+   * Add virtual cluster configuration.
+   *
+   * @param virtualClusters the JSON configuration string for virtual clusters.
+   *
+   * @return this builder.
+   */
+  fun addVirtualClusters(virtualClusters: String): EnvoyClientBuilder {
+    this.virtualClusters = virtualClusters
+    return this
+  }
+
+  /**
    * Builds a new instance of Envoy using the provided configurations.
    *
    * @return A new instance of Envoy.
@@ -133,7 +146,7 @@ open class EnvoyClientBuilder(
         return Envoy(engineType(), configuration.yaml, logLevel)
       }
       is Standard -> {
-        Envoy(engineType(), EnvoyConfiguration(statsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, statsFlushSeconds, appVersion, appId), logLevel)
+        Envoy(engineType(), EnvoyConfiguration(statsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, statsFlushSeconds, appVersion, appId, virtualClusters), logLevel)
       }
     }
   }
