@@ -13,9 +13,11 @@ jobs:
     - powershell: |
         .\ci\windows_ci_setup.ps1
         Write-Host "##vso[task.prependpath]$env:TOOLS_BIN_DIR"
+        Write-Host "##vso[task.prependpath]$env:VC_TOOLS_BIN_X64"
       displayName: "Install dependencies"
       env:
         TOOLS_BIN_DIR: $(Pipeline.Workspace)\bin
+        VC_TOOLS_BIN_X64: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\VCTools\\MSVC\\14.24.28314\\bin\\HostX64\\x64"
 
     - bash: ci/windows_ci_steps.sh
       displayName: "Run Windows CI"
