@@ -271,7 +271,7 @@ def envoy_benchmark_test(
         srcs = ["//bazel:test_for_benchmark_wrapper.sh"],
         data = [":" + benchmark_binary] + data,
         args = ["%s/%s" % (native.package_name(), benchmark_binary)],
-        **kargs,
+        **kargs
     )
 
 # Envoy Python test binaries should be specified with this function.
