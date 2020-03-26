@@ -313,6 +313,7 @@ TEST_F(CodecMaxStreamDurationTest, Basic) {
   client_->newStream(outer_decoder);
   EXPECT_CALL(*timer, disableTimer());
   timer->invokeCallback();
+  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_max_duration_reached_.value());
 }
 
 // Test the codec getting input from a real TCP connection.
