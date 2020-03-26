@@ -1,6 +1,5 @@
 #pragma once
 
-#include <list>
 #include <memory>
 
 #include "envoy/buffer/buffer.h"

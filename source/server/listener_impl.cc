@@ -128,7 +128,6 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
     : server_(server), metadata_(config.metadata()), direction_(config.traffic_direction()),
       global_scope_(server.stats().createScope("")),
-      // Not ideal
       listener_scope_(server_.stats().createScope(fmt::format(
           "listener.{}.", Network::Address::resolveProtoAddress(config.address())->asString()))),
       validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)) {}
@@ -525,7 +524,9 @@ ListenerImpl::~ListenerImpl() {
     // parent's initManager to get ready().
     listener_init_target_.ready();
   }
-  // destruct immediately to prevent other member destruction triggered the ready().
+
+  // TODO(lambdai): Reorder the members to simplify the dtor.
+  // Destroy immediately to prevent other member destruction triggered the ready().
   dynamic_init_manager_ = nullptr;
 }
 

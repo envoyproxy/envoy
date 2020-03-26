@@ -187,11 +187,6 @@ public:
       FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
   static bool isWildcardServerName(const std::string& name);
 
-  // TODO(lambdai): move to private
-  // Mapping from filter chain message to filter chain. This is used by LDS response handler to
-  // detect the filter chains in the intersection of existing listener and new listener.
-  FcContextMap fc_contexts_;
-
 private:
   void convertIPsToTries();
   using SourcePortsMap = absl::flat_hash_map<uint16_t, Network::FilterChainSharedPtr>;
@@ -285,21 +280,25 @@ private:
   std::shared_ptr<Network::DrainableFilterChain>
   findExistingFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain_message);
 
+  // Mapping from filter chain message to filter chain. This is used by LDS response handler to
+  // detect the filter chains in the intersection of existing listener and new listener.
+  FcContextMap fc_contexts_;
+
   // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
   const Network::Address::InstanceConstSharedPtr address_;
-  // This is the reference to a factory context where all the generations of listener share.
+  // This is the reference to a factory context which all the generations of listener share.
   Configuration::FactoryContext& parent_context_;
   std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
 
   // Reference to the previous generation of filter chain manager to share the filter chains.
-  // Caution: the pointer is legit only during warm up.
+  // Caution: the pointer is valid only during warm up.
   // TODO(lambdai): safer usage
   const FilterChainManagerImpl* origin_{};
 
   // For FilterChainFactoryContextCreator
-  // init manager owned by the corresponding listener. The reference is legit when building the
+  // init manager owned by the corresponding listener. The reference is valid when building the
   // filter chain.
   Init::Manager& init_manager_;
 };

@@ -558,10 +558,17 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
         // main thread to avoid locking. This makes sure that we don't destroy the listener
         // while filters might still be using its context (stats, etc.).
         server_.dispatcher().post([this, draining_it]() -> void {
-          // TODO(lambdai): Resolve race condition. The below refcount dec is too early. The active
-          // listener at worker thread could be destroyed before active connection.
-          // As a consequence, the listener at master thread and the connection at worker thread are
-          // destroyed concurrently.
+          // TODO(lambdai): Resolve race condition below.
+          // Consider the below events in global sequence order
+          // master thread: calling drainListener
+          // work thread: deferred delete the active connection
+          // work thread: post to master that the drain is done
+          // master thread: erase the listener
+          // worker thread: execute destroying connection when the shared listener config is
+          // destroyed at step 4 (could be worse such as access the connection because connection is
+          // not yet started to deleted). The race condition is introduced because 3 occurs too
+          // early. My solution is to defer schedule the callback posting to master thread, by
+          // introducing DeferTaskUtil. So that 5 should always happen before 3.
           if (--draining_it->workers_pending_removal_ == 0) {
             draining_it->listener_->debugLog("draining listener removal complete");
             draining_listeners_.erase(draining_it);

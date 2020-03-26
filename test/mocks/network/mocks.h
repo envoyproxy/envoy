@@ -469,5 +469,6 @@ public:
   MOCK_METHOD(BalancedConnectionHandler&, pickTargetHandler,
               (BalancedConnectionHandler & current_handler));
 };
+
 } // namespace Network
 } // namespace Envoy
