@@ -456,5 +456,14 @@ public:
                                             UdpReadFilterCallbacks& callbacks) PURE;
 };
 
+class DrainingFilterChains {
+public:
+  virtual ~DrainingFilterChains() = default;
+  virtual uint64_t getDrainingListenerTag() const PURE;
+  virtual const std::list<const FilterChain*>& getDrainingFilterChains() const PURE;
+};
+
+using DrainingFilterChainsPtr = std::unique_ptr<DrainingFilterChains>;
+
 } // namespace Network
 } // namespace Envoy

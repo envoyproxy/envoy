@@ -115,13 +115,46 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   GAUGE(total_listeners_active, NeverImport)                                                       \
   GAUGE(total_listeners_draining, NeverImport)                                                     \
   GAUGE(total_listeners_warming, NeverImport)                                                      \
-  GAUGE(workers_started, NeverImport)
+  GAUGE(workers_started, NeverImport)                                                              \
+  GAUGE(total_filter_chains_draining, NeverImport)
 
 /**
  * Struct definition for all listener manager stats. @see stats_macros.h
  */
 struct ListenerManagerStats {
   ALL_LISTENER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+/**
+ * Struct to bind the draining listener instance and the filter chains. Due to the decedent of the
+ * listener could take over some of the filter chains, the draining filter chains are a subset of
+ * which listener manages.
+ */
+struct DrainingFilterChains : public Network::DrainingFilterChains {
+  DrainingFilterChains(ListenerImplPtr&& draining_listener, uint64_t workers_pending_removal);
+  virtual ~DrainingFilterChains() = default;
+  virtual uint64_t getDrainingListenerTag() const override {
+    return draining_listener_->listenerTag();
+  }
+  virtual const std::list<const Network::FilterChain*>& getDrainingFilterChains() const override {
+    return draining_filter_chains_;
+  }
+  void startDrainSequence(std::chrono::seconds drain_time, Event::Dispatcher& dispatcher,
+                          std::function<void()> completion) {
+    ENVOY_LOG_MISC(debug, "draintime = {}", drain_time.count());
+    drain_sequence_completion_ = completion;
+    ASSERT(!drain_timer_);
+
+    drain_timer_ = dispatcher.createTimer([this]() -> void { drain_sequence_completion_(); });
+    drain_timer_->enableTimer(drain_time);
+  }
+
+  ListenerImplPtr draining_listener_;
+  std::list<const Network::FilterChain*> draining_filter_chains_;
+  uint64_t workers_pending_removal_;
+
+  Event::TimerPtr drain_timer_;
+  std::function<void()> drain_sequence_completion_;
 };
 
 /**
@@ -173,8 +206,11 @@ private:
     uint64_t workers_pending_removal_;
   };
 
-  void addListenerToWorker(Worker& worker, ListenerImpl& listener,
-                           ListenerCompletionCallback completion_callback);
+void addListenerToWorker(Worker& worker,
+                                              absl::optional<uint64_t> overridden_listener,
+                                              ListenerImpl& listener,
+                                              ListenerCompletionCallback completion_callback) ;
+
   ProtobufTypes::MessagePtr dumpListenerConfigs();
   static ListenerManagerStats generateStats(Stats::Scope& scope);
   static bool hasListenerWithAddress(const ListenerList& list,
@@ -203,6 +239,14 @@ private:
    * @param listener supplies the listener to drain.
    */
   void drainListener(ListenerImplPtr&& listener);
+
+  /**
+   * Mark filter chains which owned by listener for draining. Expecting the decendent of the
+   * listener took over the listener socket but these filter chains are not attached by that
+   * decendent.
+   * @param listener supplies the listener to drain.
+   */
+  void drainFilterChains(ListenerImplPtr&& listener, ListenerImpl& new_listener);
 
   /**
    * Stop a listener. The listener will stop accepting new connections and its socket will be
@@ -237,6 +281,8 @@ private:
   // connections are drained. Then after that time period the listener is removed from all workers
   // and any remaining connections are closed.
   std::list<DrainingListener> draining_listeners_;
+  std::list<DrainingFilterChains> draining_filter_groups_;
+
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
   absl::optional<StopListenersType> stop_listeners_type_;
