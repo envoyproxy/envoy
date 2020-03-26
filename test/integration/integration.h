@@ -198,7 +198,7 @@ public:
                           envoy::config::endpoint::v3::LbEndpoint& endpoint) const;
 
   Network::ClientConnectionPtr makeClientConnection(uint32_t port);
-  Network::ClientConnectionPtr
+  virtual Network::ClientConnectionPtr
   makeClientConnectionWithOptions(uint32_t port,
                                   const Network::ConnectionSocket::OptionsSharedPtr& options);
 
