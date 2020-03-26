@@ -117,7 +117,7 @@ public:
     callback->onSuccess(request, std::move(msg));
 
     EXPECT_EQ(2U, stats_.counter("tracing.zipkin.spans_sent").value());
-    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_skipped").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
     EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_sent").value());
     EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
     EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
@@ -258,7 +258,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
   callback->onSuccess(request, std::move(msg));
 
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());
-  EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_skipped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_dropped").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
@@ -284,7 +284,7 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
       ->finishSpan();
 
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());
-  EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_skipped").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());

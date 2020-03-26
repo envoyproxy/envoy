@@ -178,7 +178,7 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
 
   callback->onSuccess(request, std::move(msg));
 
-  EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_skipped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_skipped_no_cluster").value());
   EXPECT_EQ(1U, stats_.counter("tracing.datadog.reports_sent").value());
   EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_dropped").value());
   EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_failed").value());
@@ -204,7 +204,7 @@ TEST_F(DatadogDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
   EXPECT_EQ(1U, stats_.counter("tracing.datadog.timer_flushed").value());
   EXPECT_EQ(1U, stats_.counter("tracing.datadog.traces_sent").value());
-  EXPECT_EQ(1U, stats_.counter("tracing.datadog.reports_skipped").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.datadog.reports_skipped_no_cluster").value());
   EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_sent").value());
   EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_dropped").value());
   EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_failed").value());

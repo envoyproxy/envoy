@@ -112,7 +112,7 @@ void TraceReporter::flushTraces() {
       }
     } else {
       ENVOY_LOG(debug, "collector cluster '{}' does not exist", driver_.cluster());
-      driver_.tracerStats().reports_skipped_.inc();
+      driver_.tracerStats().reports_skipped_no_cluster_.inc();
     }
 
     encoder_->clearTraces();

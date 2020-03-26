@@ -34,7 +34,7 @@ namespace Lightstep {
   COUNTER(spans_sent)                                                                              \
   COUNTER(spans_dropped)                                                                           \
   COUNTER(timer_flushed)                                                                           \
-  COUNTER(reports_skipped)
+  COUNTER(reports_skipped_no_cluster)
 
 struct LightstepTracerStats {
   LIGHTSTEP_TRACER_STATS(GENERATE_COUNTER_STRUCT)

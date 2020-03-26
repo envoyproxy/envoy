@@ -23,7 +23,7 @@ namespace Zipkin {
 #define ZIPKIN_TRACER_STATS(COUNTER)                                                               \
   COUNTER(spans_sent)                                                                              \
   COUNTER(timer_flushed)                                                                           \
-  COUNTER(reports_skipped)                                                                         \
+  COUNTER(reports_skipped_no_cluster)                                                              \
   COUNTER(reports_sent)                                                                            \
   COUNTER(reports_dropped)                                                                         \
   COUNTER(reports_failed)
