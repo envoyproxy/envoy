@@ -294,7 +294,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerCertificate) {
   callHttpCheckAndValidateRequestAttributes(request_headers_, true);
 }
 
-// Verify that the source certificate is populated correctly.
+// Verify that the http request scheme attribute is populated correctly.
 TEST_F(CheckRequestUtilsTest, CheckScheme) {
   expectBasicHttp(4);
 
@@ -307,14 +307,14 @@ TEST_F(CheckRequestUtilsTest, CheckScheme) {
   // This request has scheme entry.
   const Http::TestRequestHeaderMapImpl request_headers_scheme_http{
       {":scheme", "https"}, {"x-envoy-downstream-service-cluster", "foo"}, {":path", "/bar"}};
-  callHttpCheckAndValidateRequestAttributes(request_headers_scheme_http, true, "https");
+  callHttpCheckAndValidateRequestAttributes(request_headers_scheme_http, false, "https");
 
   // This request has empty scheme entry, but it has x-forwarded-proto set.
   const Http::TestRequestHeaderMapImpl request_headers_xfp_http{
       {"x-forwarded-proto", "http"},
       {"x-envoy-downstream-service-cluster", "foo"},
       {":path", "/bar"}};
-  callHttpCheckAndValidateRequestAttributes(request_headers_xfp_http, true, "http");
+  callHttpCheckAndValidateRequestAttributes(request_headers_xfp_http, false, "http");
 
   // This request has both scheme and x-forwarded-proto set.
   const Http::TestRequestHeaderMapImpl request_headers_scheme_xfp_http{
@@ -322,7 +322,7 @@ TEST_F(CheckRequestUtilsTest, CheckScheme) {
       {"x-forwarded-proto", "http"},
       {"x-envoy-downstream-service-cluster", "foo"},
       {":path", "/bar"}};
-  callHttpCheckAndValidateRequestAttributes(request_headers_scheme_xfp_http, true, "http");
+  callHttpCheckAndValidateRequestAttributes(request_headers_scheme_xfp_http, false, "http");
 
   // This request has both scheme and x-forwarded-proto set. However, the x-forwarded-proto is set
   // to empty.
@@ -331,7 +331,7 @@ TEST_F(CheckRequestUtilsTest, CheckScheme) {
       {"x-forwarded-proto", ""},
       {"x-envoy-downstream-service-cluster", "foo"},
       {":path", "/bar"}};
-  callHttpCheckAndValidateRequestAttributes(request_headers_scheme_xfp_empty_http, true, "https");
+  callHttpCheckAndValidateRequestAttributes(request_headers_scheme_xfp_empty_http, false, "https");
 }
 
 } // namespace ExtAuthz
