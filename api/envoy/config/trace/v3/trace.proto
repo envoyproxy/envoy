@@ -95,7 +95,7 @@ message LightstepConfig {
   string access_token_file = 2 [(validate.rules).string = {min_bytes: 1}];
 
   // Propagation modes to use by LightStep's tracer.
-  repeated PropagationMode propagation_modes = 3;
+  repeated PropagationMode propagation_modes = 3 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Configuration for the Zipkin tracer.
