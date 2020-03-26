@@ -11,8 +11,7 @@ PlatformImpl::PlatformImpl()
       file_system_(std::make_unique<Filesystem::InstanceImplWin32>()) {
   const WORD wVersionRequested = MAKEWORD(2, 2);
   WSADATA wsaData;
-  const int rc = ::WSAStartup(wVersionRequested, &wsaData);
-  RELEASE_ASSERT(rc == 0, "WSAStartup failed with error");
+  RELEASE_ASSERT(WSAStartup(wVersionRequested, &wsaData) == 0, "WSAStartup failed with error");
 }
 
 PlatformImpl::~PlatformImpl() { ::WSACleanup(); }

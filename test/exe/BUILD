@@ -43,8 +43,8 @@ envoy_sh_test(
     data = ["//source/exe:envoy-static"],
     # Since VS2015 or even earlier, link.exe defaults to PIE generation
     tags = [
-        "skip_on_windows",
         "nofips",
+        "skip_on_windows",
     ],
 )
 
