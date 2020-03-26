@@ -84,6 +84,7 @@ private:
                                     const Envoy::Http::RequestHeaderMap& headers,
                                     uint64_t max_request_bytes);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
+  static std::string getScheme(const Envoy::Http::RequestHeaderMap& headers);
   static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);
 };
 

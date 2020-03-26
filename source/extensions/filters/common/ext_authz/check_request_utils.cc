@@ -81,6 +81,14 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeCo
   }
 }
 
+std::string CheckRequestUtils::getScheme(const Envoy::Http::RequestHeaderMap& headers) {
+  const auto* scheme_xfp = headers.ForwardedProto();
+  if (scheme_xfp == nullptr || scheme_xfp->value().empty()) {
+    return getHeaderStr(headers.Scheme());
+  }
+  return std::string(scheme_xfp->value().getStringView());
+}
+
 std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entry) {
   if (entry) {
     // TODO(jmarantz): plumb absl::string_view further here; there's no need
@@ -107,7 +115,7 @@ void CheckRequestUtils::setHttpRequest(
   httpreq.set_method(getHeaderStr(headers.Method()));
   httpreq.set_path(getHeaderStr(headers.Path()));
   httpreq.set_host(getHeaderStr(headers.Host()));
-  httpreq.set_scheme(getHeaderStr(headers.Scheme()));
+  httpreq.set_scheme(getScheme(headers));
   httpreq.set_size(stream_info.bytesReceived());
 
   if (stream_info.protocol()) {

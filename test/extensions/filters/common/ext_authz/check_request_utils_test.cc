@@ -23,7 +23,6 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
-namespace {
 
 class CheckRequestUtilsTest : public testing::Test {
 public:
@@ -34,21 +33,29 @@ public:
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
   };
 
-  void expectBasicHttp() {
-    EXPECT_CALL(callbacks_, connection()).Times(2).WillRepeatedly(Return(&connection_));
-    EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-    EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
-    EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
-    EXPECT_CALL(callbacks_, streamId()).Times(1).WillOnce(Return(0));
-    EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
-    EXPECT_CALL(callbacks_, streamInfo()).Times(1).WillOnce(ReturnRef(req_info_));
-    EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
-    EXPECT_CALL(req_info_, startTime()).Times(1).WillOnce(Return(SystemTime()));
+  void expectBasicHttp(int required_count = 1) {
+    const int times = required_count * 2;
+    EXPECT_CALL(callbacks_, connection()).Times(times).WillRepeatedly(Return(&connection_));
+    EXPECT_CALL(connection_, remoteAddress())
+        .Times(required_count)
+        .WillRepeatedly(ReturnRef(addr_));
+    EXPECT_CALL(connection_, localAddress()).Times(required_count).WillRepeatedly(ReturnRef(addr_));
+    EXPECT_CALL(Const(connection_), ssl()).Times(times).WillRepeatedly(Return(ssl_));
+    EXPECT_CALL(callbacks_, streamId()).Times(required_count).WillRepeatedly(Return(0));
+    EXPECT_CALL(callbacks_, decodingBuffer())
+        .Times(required_count)
+        .WillRepeatedly(Return(buffer_.get()));
+    EXPECT_CALL(callbacks_, streamInfo())
+        .Times(required_count)
+        .WillRepeatedly(ReturnRef(req_info_));
+    EXPECT_CALL(req_info_, protocol()).Times(times).WillRepeatedly(ReturnPointee(&protocol_));
+    EXPECT_CALL(req_info_, startTime()).Times(required_count).WillRepeatedly(Return(SystemTime()));
   }
 
-  void callHttpCheckAndValidateRequestAttributes(bool include_peer_certificate) {
-    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
-                                                   {":path", "/bar"}};
+  void
+  callHttpCheckAndValidateRequestAttributes(const Http::TestRequestHeaderMapImpl& request_headers,
+                                            bool include_peer_certificate,
+                                            const std::string& expected_scheme = "") {
     envoy::service::auth::v3::CheckRequest request;
     Protobuf::Map<std::string, std::string> context_extensions;
     context_extensions["key"] = "value";
@@ -61,6 +68,7 @@ public:
                                        std::move(metadata_context), request, false,
                                        include_peer_certificate);
 
+    EXPECT_EQ(expected_scheme, request.attributes().request().http().scheme());
     EXPECT_EQ("source", request.attributes().source().principal());
     EXPECT_EQ("destination", request.attributes().destination().principal());
     EXPECT_EQ("foo", request.attributes().source().service());
@@ -100,6 +108,8 @@ public:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   Buffer::InstancePtr buffer_;
   const std::string cert_data_{"cert-data"};
+  const Http::TestRequestHeaderMapImpl request_headers_{
+      {"x-envoy-downstream-service-cluster", "foo"}, {":path", "/bar"}};
 };
 
 // Verify that createTcpCheck's dependencies are invoked when it's called.
@@ -221,7 +231,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
-  callHttpCheckAndValidateRequestAttributes(false);
+  callHttpCheckAndValidateRequestAttributes(request_headers_, false);
 }
 
 // Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
@@ -233,7 +243,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerUriSans) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
-  callHttpCheckAndValidateRequestAttributes(false);
+  callHttpCheckAndValidateRequestAttributes(request_headers_, false);
 }
 
 // Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
@@ -251,7 +261,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerDnsSans) {
   Protobuf::Map<std::string, std::string> context_extensions;
   context_extensions["key"] = "value";
 
-  callHttpCheckAndValidateRequestAttributes(false);
+  callHttpCheckAndValidateRequestAttributes(request_headers_, false);
 }
 
 // Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
@@ -269,7 +279,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextSubject) {
   std::string subject_local = "destination";
   EXPECT_CALL(*ssl_, subjectLocalCertificate()).WillOnce(ReturnRef(subject_local));
 
-  callHttpCheckAndValidateRequestAttributes(false);
+  callHttpCheckAndValidateRequestAttributes(request_headers_, false);
 }
 
 // Verify that the source certificate is populated correctly.
@@ -281,10 +291,49 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerCertificate) {
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   EXPECT_CALL(*ssl_, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(cert_data_));
 
-  callHttpCheckAndValidateRequestAttributes(true);
+  callHttpCheckAndValidateRequestAttributes(request_headers_, true);
 }
 
-} // namespace
+// Verify that the source certificate is populated correctly.
+TEST_F(CheckRequestUtilsTest, CheckScheme) {
+  expectBasicHttp(4);
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate())
+      .WillRepeatedly(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillRepeatedly(Return(std::vector<std::string>{"destination"}));
+  EXPECT_CALL(*ssl_, urlEncodedPemEncodedPeerCertificate()).WillRepeatedly(ReturnRef(cert_data_));
+
+  // This request has scheme entry.
+  const Http::TestRequestHeaderMapImpl request_headers_scheme_http{
+      {":scheme", "https"}, {"x-envoy-downstream-service-cluster", "foo"}, {":path", "/bar"}};
+  callHttpCheckAndValidateRequestAttributes(request_headers_scheme_http, true, "https");
+
+  // This request has empty scheme entry, but it has x-forwarded-proto set.
+  const Http::TestRequestHeaderMapImpl request_headers_xfp_http{
+      {"x-forwarded-proto", "http"},
+      {"x-envoy-downstream-service-cluster", "foo"},
+      {":path", "/bar"}};
+  callHttpCheckAndValidateRequestAttributes(request_headers_xfp_http, true, "http");
+
+  // This request has both scheme and x-forwarded-proto set.
+  const Http::TestRequestHeaderMapImpl request_headers_scheme_xfp_http{
+      {":scheme", "https"},
+      {"x-forwarded-proto", "http"},
+      {"x-envoy-downstream-service-cluster", "foo"},
+      {":path", "/bar"}};
+  callHttpCheckAndValidateRequestAttributes(request_headers_scheme_xfp_http, true, "http");
+
+  // This request has both scheme and x-forwarded-proto set. However, the x-forwarded-proto is set
+  // to empty.
+  const Http::TestRequestHeaderMapImpl request_headers_scheme_xfp_empty_http{
+      {":scheme", "https"},
+      {"x-forwarded-proto", ""},
+      {"x-envoy-downstream-service-cluster", "foo"},
+      {":path", "/bar"}};
+  callHttpCheckAndValidateRequestAttributes(request_headers_scheme_xfp_empty_http, true, "https");
+}
+
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters
