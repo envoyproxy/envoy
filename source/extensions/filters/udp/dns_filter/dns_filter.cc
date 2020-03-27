@@ -36,7 +36,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         }
       }
 
-      virtual_domains_.emplace(std::make_pair(virtual_domain.name(), addresses));
+      virtual_domains_.emplace(virtual_domain.name(), std::move(addresses));
     }
   }
 }
