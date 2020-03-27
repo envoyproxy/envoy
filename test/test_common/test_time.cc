@@ -23,6 +23,8 @@ void TestRealTimeSystem::sleep(const Duration& duration) {
   std::this_thread::sleep_for(duration);
 }
 
+void TestRealTimeSystem::advanceTime(const Duration& duration) { sleep(duration); }
+
 Thread::CondVar::WaitStatus TestRealTimeSystem::waitFor(Thread::MutexBasicLockable& lock,
                                                         Thread::CondVar& condvar,
                                                         const Duration& duration) noexcept {

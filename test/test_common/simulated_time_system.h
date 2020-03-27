@@ -27,6 +27,7 @@ public:
 
   // TestTimeSystem
   void sleep(const Duration& duration) override;
+  void advanceTime(const Duration& duration) override;
   Thread::CondVar::WaitStatus
   waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
           const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
@@ -95,8 +96,14 @@ private:
   // Keeps track of how many alarms have been activated but not yet called,
   // which helps waitFor() determine when to give up and declare a timeout.
   void incPendingLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_) { ++pending_alarms_; }
-  void decPending() { absl::MutexLock lock(&mutex_); --pending_alarms_; }
-  bool hasPending() const { absl::MutexLock lock(&mutex_); return pending_alarms_ > 0; }
+  void decPending() {
+    absl::MutexLock lock(&mutex_);
+    --pending_alarms_;
+  }
+  bool hasPending() const {
+    absl::MutexLock lock(&mutex_);
+    return pending_alarms_ > 0;
+  }
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ GUARDED_BY(mutex_);
@@ -106,7 +113,7 @@ private:
   mutable absl::Mutex mutex_;
   uint32_t pending_alarms_ GUARDED_BY(mutex_);
   absl::flat_hash_map<Thread::ThreadId, uint32_t> thread_pending_map_;
-  //uint32_t pending_alarms_on_other_threads_ GUARDED_BY(mutex_);
+  // uint32_t pending_alarms_on_other_threads_ GUARDED_BY(mutex_);
   Thread::OnlyOneThread only_one_thread_;
 };
 

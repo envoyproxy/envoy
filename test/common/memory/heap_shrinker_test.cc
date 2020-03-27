@@ -23,8 +23,8 @@ protected:
       : api_(Api::createApiForTest(stats_, time_system_)), dispatcher_(*api_, time_system_) {}
 
   void step() {
-    time_system_.sleep(std::chrono::milliseconds(10000));
-    //dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+    time_system_.advanceTime(std::chrono::milliseconds(10000));
+    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   }
 
   Envoy::Stats::IsolatedStoreImpl stats_;

@@ -10,8 +10,6 @@
 namespace Envoy {
 namespace Event {
 
-class TestTimeSystem;
-
 // Adds sleep() and waitFor() interfaces to Event::TimeSystem.
 class TestTimeSystem : public Event::TimeSystem {
 public:
@@ -19,13 +17,25 @@ public:
 
   /**
    * Advances time forward by the specified duration, running any timers
-   * along the way that have been scheduled to fire.
+   * along the way that have been scheduled to fire, blocking until they
+   * are run.
    *
    * @param duration The amount of time to sleep.
    */
   virtual void sleep(const Duration& duration) PURE;
   template <class D> void sleep(const D& duration) {
     sleep(std::chrono::duration_cast<Duration>(duration));
+  }
+
+  /**
+   * Advances time forward by the specified duration. Timers may be triggered
+   * on their threads, but this method does not block until they are run.
+   *
+   * @param duration The amount of time to sleep.
+   */
+  virtual void advanceTime(const Duration& duration) PURE;
+  template <class D> void advanceTime(const D& duration) {
+    advanceTime(std::chrono::duration_cast<Duration>(duration));
   }
 
   /**
@@ -82,6 +92,7 @@ private:
 template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public TestTimeSystem {
 public:
   void sleep(const Duration& duration) override { timeSystem().sleep(duration); }
+  void advanceTime(const Duration& duration) override { timeSystem().advanceTime(duration); }
 
   Thread::CondVar::WaitStatus
   waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,

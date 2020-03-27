@@ -230,10 +230,13 @@ void SimulatedTimeSystemHelper::sleep(const Duration& duration) {
   MonotonicTime monotonic_time =
       monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
   setMonotonicTimeLockHeld(monotonic_time);
-  mutex_.Await(absl::Condition(+[](uint32_t* pending_alarms) -> bool {
-                                  return *pending_alarms == 0;
-                                },
-      &pending_alarms_));
+  mutex_.Await(absl::Condition(
+      +[](uint32_t* pending_alarms) -> bool { return *pending_alarms == 0; }, &pending_alarms_));
+}
+
+void SimulatedTimeSystemHelper::advanceTime(const Duration& duration) {
+  only_one_thread_.checkOneThread();
+  setMonotonicTime(duration + monotonicTime());
 }
 
 Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
