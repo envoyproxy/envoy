@@ -29,8 +29,8 @@ public:
   void sleep(const Duration& duration) override;
   void advanceTime(const Duration& duration) override;
   Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
+      waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+              const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // TimeSource
   SystemTime systemTime() override;
@@ -100,10 +100,13 @@ private:
     absl::MutexLock lock(&mutex_);
     --pending_alarms_;
   }
+  /*
   bool hasPendingLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     //absl::MutexLock lock(&mutex_);
     return pending_alarms_ > 0;
   }
+  */
+  void waitForNoPendingLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ GUARDED_BY(mutex_);

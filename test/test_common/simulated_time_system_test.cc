@@ -73,8 +73,8 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
       base_scheduler_.run(Dispatcher::RunType::Block);
     }
   });
-  Thread::CondVar condvar;
   Thread::MutexBasicLockable mutex;
+  Thread::CondVar condvar;
   TimerPtr timer = scheduler_->createTimer(
       [&condvar, &mutex, &done]() {
         Thread::LockGuard lock(mutex);
@@ -220,8 +220,8 @@ TEST_F(SimulatedTimeSystemTest, DuplicateTimer) {
       base_scheduler_.run(Dispatcher::RunType::Block);
     }
   });
-  Thread::CondVar condvar;
   Thread::MutexBasicLockable mutex;
+  Thread::CondVar condvar;
   TimerPtr timer = scheduler_->createTimer(
       [&condvar, &mutex, &done]() {
         Thread::LockGuard lock(mutex);

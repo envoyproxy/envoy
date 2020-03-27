@@ -230,8 +230,13 @@ void SimulatedTimeSystemHelper::sleep(const Duration& duration) {
   MonotonicTime monotonic_time =
       monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
   setMonotonicTimeLockHeld(monotonic_time);
+  waitForNoPendingLockHeld();
+}
+
+void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
   mutex_.Await(absl::Condition(
-      +[](uint32_t* pending_alarms) -> bool { return *pending_alarms == 0; }, &pending_alarms_));
+      +[](const uint32_t* pending_alarms) -> bool { return *pending_alarms == 0; },
+      &pending_alarms_));
 }
 
 void SimulatedTimeSystemHelper::advanceTime(const Duration& duration) {
@@ -243,26 +248,22 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
     Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
     const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
   only_one_thread_.checkOneThread();
-  const Duration real_time_poll_delay(
-      std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(5)), duration));
+  //const Duration real_time_poll_delay(
+  //    std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(1)), duration));
   const MonotonicTime end_time = monotonicTime() + duration;
 
-  while (true) {
-    // First check to see if the condition is already satisfied without advancing sim time.
-    if (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::NoTimeout) {
-      return Thread::CondVar::WaitStatus::NoTimeout;
-    }
 
-    absl::MutexLock lock(&mutex_);
-
-    // Wait for the libevent poll in another thread to catch up prior to advancing time.
-    if (hasPendingLockHeld()) {
-      continue;
-    }
+  // First check to see if the condition is already satisfied without advancing sim time.
+  //while (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::Timeout) {
+  while (!condvar.poll()) {
+    mutex.unlock();
+    mutex_.Lock();
 
     // If we reached our end_time, break the loop and return timeout.
     if (monotonic_time_ >= end_time) {
-      break;
+      mutex_.Unlock();
+      mutex.lock();
+      return Thread::CondVar::WaitStatus::Timeout;
     }
 
     if (alarms_.empty()) {
@@ -274,8 +275,13 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
       MonotonicTime next_wakeup = alarmTimeLockHeld(alarm);
       setMonotonicTimeLockHeld(std::min(next_wakeup, end_time));
     }
+
+    // Wait for the libevent poll in another thread to catch up prior to advancing time.
+    waitForNoPendingLockHeld();
+    mutex_.Unlock();
+    mutex.lock();
   }
-  return Thread::CondVar::WaitStatus::Timeout;
+  return Thread::CondVar::WaitStatus::NoTimeout;
 }
 
 MonotonicTime SimulatedTimeSystemHelper::alarmTimeLockHeld(Alarm* alarm) NO_THREAD_SAFETY_ANALYSIS {
