@@ -47,7 +47,7 @@ $outDirClean = "/$env:TOOLS_BIN_DIR".replace(':', '').replace('\', '/')
 $env:PATH = "$env:TOOLS_BIN_DIR\msys64\usr\bin;$env:TOOLS_BIN_DIR\msys64\mingw64\bin;$env:Path"
 bash.exe -c "pacman-key --init 2>&1"
 bash.exe -c "pacman-key --populate msys2 2>&1"
-pacman.exe -Syyuu --noconfirm
-pacman.exe -Syuu --noconfirm
-pacman.exe -S --noconfirm --needed diffutils patch unzip zip
-pacman.exe -Scc --noconfirm
+pacman.exe -Syyuu --noconfirm 2>&1
+pacman.exe -Syuu --noconfirm 2>&1
+pacman.exe -S --noconfirm --needed compression diffutils patch 2>&1
+pacman.exe -Scc --noconfirm 2>&1
