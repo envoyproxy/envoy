@@ -23,9 +23,9 @@ namespace HttpFilters {
 namespace AdaptiveConcurrency {
 namespace {
 
-using ConcurrencyController::RequestForwardingAction;
+using Controller::RequestForwardingAction;
 
-class MockConcurrencyController : public ConcurrencyController::ConcurrencyController {
+class MockConcurrencyController : public Controller::ConcurrencyController {
 public:
   MOCK_METHOD(RequestForwardingAction, forwardingDecision, ());
   MOCK_METHOD(void, cancelLatencySample, ());

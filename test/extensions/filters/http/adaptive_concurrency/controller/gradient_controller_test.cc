@@ -28,7 +28,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AdaptiveConcurrency {
-namespace ConcurrencyController {
+namespace Controller {
 namespace {
 
 GradientControllerConfig makeConfig(const std::string& yaml_config,
@@ -624,7 +624,7 @@ min_rtt_calc_params:
 }
 
 } // namespace
-} // namespace ConcurrencyController
+} // namespace Controller
 } // namespace AdaptiveConcurrency
 } // namespace HttpFilters
 } // namespace Extensions
