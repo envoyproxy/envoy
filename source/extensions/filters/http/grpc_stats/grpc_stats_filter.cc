@@ -98,12 +98,32 @@ struct Config {
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
         PER_METHOD_STAT_SPECIFIER_NOT_SET:
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::kStatsForAllMethods:
-      stats_for_all_methods_ =
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, stats_for_all_methods,
-                                          context.runtime().snapshot().deprecatedFeatureEnabled(
-                                              "envoy.deprecated_features.grpc_stats_filter_enable_"
-                                              "stats_for_all_methods_by_default",
-                                              true));
+      if (proto_config.has_stats_for_all_methods()) {
+        stats_for_all_methods_ = proto_config.stats_for_all_methods().value();
+      } else {
+        // Default for when "grpc_stats_filter_enable_stats_for_all_methods_by_default" isn't
+        // set.
+        //
+        // This will flip to false after one release.
+        const bool runtime_feature_default = true;
+
+        const char* runtime_key = "envoy.deprecated_features.grpc_stats_filter_enable_"
+                                  "stats_for_all_methods_by_default";
+
+        stats_for_all_methods_ = context.runtime().snapshot().deprecatedFeatureEnabled(
+            runtime_key, runtime_feature_default);
+
+        if (stats_for_all_methods_) {
+          ENVOY_LOG_MISC(warn,
+                         "Using deprecated default value for "
+                         "'envoy.extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_"
+                         "methods'. The default for this field will become false in a future "
+                         "release. To retain this behavior, set this field to true in your "
+                         "configuration. A short-term workaround of setting runtime configuration "
+                         "{} to true can be used if the configuration cannot be changed.",
+                         runtime_key);
+        }
+      }
       break;
 
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::

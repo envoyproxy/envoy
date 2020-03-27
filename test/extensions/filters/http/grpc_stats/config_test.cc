@@ -8,6 +8,7 @@
 #include "test/common/buffer/utility.h"
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -227,7 +228,11 @@ TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSetting) {
       deprecatedFeatureEnabled(
           "envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default", _))
       .WillOnce(Invoke([](absl::string_view, bool default_value) { return default_value; }));
-  initialize();
+  EXPECT_LOG_CONTAINS("warn",
+                      "Using deprecated default value for "
+                      "'envoy.extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_"
+                      "methods'",
+                      initialize());
 
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
                                                  {":path", "/BadCompanions/GetBadCompanions"}};
@@ -256,7 +261,11 @@ TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSettingRuntimeOverrid
       deprecatedFeatureEnabled(
           "envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default", _))
       .WillOnce(Return(true));
-  initialize();
+  EXPECT_LOG_CONTAINS("warn",
+                      "Using deprecated default value for "
+                      "'envoy.extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_"
+                      "methods'",
+                      initialize());
 
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
                                                  {":path", "/BadCompanions/GetBadCompanions"}};
