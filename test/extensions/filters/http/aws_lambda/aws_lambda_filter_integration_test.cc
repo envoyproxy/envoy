@@ -77,7 +77,16 @@ public:
       auto encoder_decoder = codec_client_->startRequest(request_headers);
       request_encoder_ = &encoder_decoder.first;
       response = std::move(encoder_decoder.second);
-      Buffer::OwnedImpl buffer(request_body);
+      // chunk the data to simulate a real request
+      const size_t chunk_size = 5;
+      size_t i = 0;
+      for (; i < request_body.length() / chunk_size; i++) {
+        Buffer::OwnedImpl buffer(request_body.substr(i * chunk_size, chunk_size));
+        codec_client_->sendData(*request_encoder_, buffer, false);
+      }
+      // send the rest flagged as end_stream
+      Buffer::OwnedImpl buffer(
+          request_body.substr(i * chunk_size, request_body.length() % chunk_size));
       codec_client_->sendData(*request_encoder_, buffer, true);
     }
 
