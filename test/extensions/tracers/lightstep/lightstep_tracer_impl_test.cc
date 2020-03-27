@@ -33,11 +33,13 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::DoAll;
 using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::WithArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -71,6 +73,7 @@ public:
     opts->access_token = "sample_token";
     opts->component_name = "component";
 
+    cm_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
 
@@ -258,26 +261,119 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
 }
 
 TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
+  Upstream::ClusterUpdateCallbacks* cluster_update_callbacks;
+  EXPECT_CALL(cm_, addThreadLocalClusterUpdateCallbacks_(_))
+      .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks), Return(nullptr)));
+
   setupValidDriver(1);
 
-  // Simulate removal of a cluster.
-  EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(nullptr));
-  // Verify that no report will be sent.
-  EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
-
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
-      .WillOnce(Return(5000U));
+      .WillRepeatedly(Return(5000U));
 
-  // Trigger flush of a span.
-  driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
-                  {Tracing::Reason::Sampling, true})
-      ->finishSpan();
-  driver_->flush();
+  // Verify the effect of onClusterAddOrUpdate()/onClusterRemoval() on reporting logic,
+  // keeping in mind that they will be called both for relevant and irrelevant clusters.
 
-  EXPECT_EQ(0U, stats_.counter("tracing.lightstep.spans_sent").value());
-  EXPECT_EQ(1U, stats_.counter("tracing.lightstep.reports_skipped_no_cluster").value());
+  {
+    // Simulate removal of the relevant cluster.
+    cluster_update_callbacks->onClusterRemoval("fake_cluster");
+
+    // Verify that no report will be sent.
+    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+
+    // Trigger flush of a span.
+    driver_
+        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                    {Tracing::Reason::Sampling, true})
+        ->finishSpan();
+    driver_->flush();
+
+    // Verify observability.
+    EXPECT_EQ(1U, stats_.counter("tracing.lightstep.reports_skipped_no_cluster").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.lightstep.spans_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.lightstep.spans_dropped").value());
+  }
+
+  {
+    // Simulate addition of an irrelevant cluster.
+    NiceMock<Upstream::MockThreadLocalCluster> unrelated_cluster;
+    unrelated_cluster.cluster_.info_->name_ = "unrelated_cluster";
+    cluster_update_callbacks->onClusterAddOrUpdate(unrelated_cluster);
+
+    // Verify that no report will be sent.
+    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+
+    // Trigger flush of a span.
+    driver_
+        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                    {Tracing::Reason::Sampling, true})
+        ->finishSpan();
+    driver_->flush();
+
+    // Verify observability.
+    EXPECT_EQ(2U, stats_.counter("tracing.lightstep.reports_skipped_no_cluster").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.lightstep.spans_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.lightstep.spans_dropped").value());
+  }
+
+  {
+    // Simulate addition of the relevant cluster.
+    cluster_update_callbacks->onClusterAddOrUpdate(cm_.thread_local_cluster_);
+
+    // Verify that report will be sent.
+    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
+        .WillOnce(ReturnRef(cm_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    Http::AsyncClient::Callbacks* callback{};
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
+
+    // Trigger flush of a span.
+    driver_
+        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                    {Tracing::Reason::Sampling, true})
+        ->finishSpan();
+    driver_->flush();
+
+    // Complete in-flight request.
+    callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+
+    // Verify observability.
+    EXPECT_EQ(2U, stats_.counter("tracing.lightstep.reports_skipped_no_cluster").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.lightstep.spans_sent").value());
+    EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_dropped").value());
+  }
+
+  {
+    // Simulate removal of an irrelevant cluster.
+    cluster_update_callbacks->onClusterRemoval("unrelated_cluster");
+
+    // Verify that report will be sent.
+    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
+        .WillOnce(ReturnRef(cm_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    Http::AsyncClient::Callbacks* callback{};
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
+
+    // Trigger flush of a span.
+    driver_
+        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                    {Tracing::Reason::Sampling, true})
+        ->finishSpan();
+    driver_->flush();
+
+    // Complete in-flight request.
+    Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+    callback->onSuccess(request, std::move(msg));
+
+    // Verify observability.
+    EXPECT_EQ(2U, stats_.counter("tracing.lightstep.reports_skipped_no_cluster").value());
+    EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
+    EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_dropped").value());
+  }
 }
 
 TEST_F(LightStepDriverTest, FlushOneFailure) {
