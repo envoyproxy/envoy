@@ -49,7 +49,7 @@ Status::Status(StatusCode code, Http::Code http_code, absl::string_view msg)
 Status::~Status() { Unref(); }
 
 const std::string* Status::EmptyString() {
-  static std::string* empty_string = new std::string;
+  static auto* empty_string = new std::string;
   return empty_string;
 }
 

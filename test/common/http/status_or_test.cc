@@ -18,7 +18,7 @@ TEST(StatusOr, Status) {
 
 TEST(StatusOr, CopyStatus) {
   StatusOr<int> status_or = Status(StatusCode::CodecProtocolError, "foobar");
-  StatusOr<int> status_or_copy(status_or);
+  StatusOr<int> status_or_copy(status_or); // NOLINT - unit test
   EXPECT_FALSE(status_or_copy.Ok());
   EXPECT_FALSE(status_or_copy.Status().Ok());
   EXPECT_EQ(StatusCode::CodecProtocolError, status_or_copy.Status().Code());
@@ -40,7 +40,7 @@ TEST(StatusOr, MoveStatus) {
   StatusOr<int> status_or_copy(std::move(status_or));
 
   // status_or should retain the error status
-  EXPECT_FALSE(status_or.Ok());
+  EXPECT_FALSE(status_or.Ok()); // NOLINT - unit test
   EXPECT_FALSE(status_or.Status().Ok());
   EXPECT_EQ(StatusCode::CodecProtocolError, status_or.Status().Code());
   EXPECT_EQ("foobar", status_or.Status().Message());
@@ -95,7 +95,7 @@ TEST(StatusOr, MoveOnlyValue) {
 
   std::unique_ptr<int> value(std::move(another_status_or).Value());
   EXPECT_EQ(55, *value);
-  EXPECT_EQ(nullptr, another_status_or.Value());
+  EXPECT_EQ(nullptr, another_status_or.Value()); // NOLINT - unit test
   EXPECT_TRUE(another_status_or.Ok());
 }
 
@@ -117,7 +117,7 @@ TEST(StatusOr, CopyConversion) {
 TEST(StatusOr, MoveConversion) {
   struct A {
     A(int m) : m_(m) {}
-    virtual ~A() {}
+    virtual ~A() = default;
     int m_{};
   };
   struct B : public A {
@@ -128,7 +128,7 @@ TEST(StatusOr, MoveConversion) {
   StatusOr<std::unique_ptr<B>> b(std::make_unique<B>(121));
   StatusOr<std::unique_ptr<A>> a(std::move(b));
   EXPECT_EQ(131, a.Value()->m_);
-  EXPECT_EQ(nullptr, b.Value());
+  EXPECT_EQ(nullptr, b.Value()); // NOLINT - unit test
 }
 
 } // namespace Http

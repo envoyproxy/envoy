@@ -84,10 +84,10 @@ public:
    * BUT copy the status, such that the moved out of StatusOr remains valid when it carries Status.
    * It is a bit inefficient for error cases, but still allows T to be a move only type
    */
-  StatusOr(StatusOr&& other)
+  StatusOr(StatusOr&& other) noexcept
       : status_or_value_(other.Ok() ? StatusOrValue(std::move(other).Value())
                                     : StatusOrValue(other.Status())) {}
-  StatusOr& operator=(StatusOr&& other) {
+  StatusOr& operator=(StatusOr&& other) noexcept {
     status_or_value_ =
         other.Ok() ? StatusOrValue(std::move(other).Value()) : StatusOrValue(other.Status());
     return *this;

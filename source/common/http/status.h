@@ -15,7 +15,6 @@ namespace Http {
 /**
  * Status codes for representing classes of codec errors.
  */
-
 enum class StatusCode : int {
   Ok = 0,
   CodecProtocolError = 1,
@@ -36,11 +35,10 @@ enum class StatusCode : int {
  * Constructing an error status is likely as heavy as throwing an exception due to a heap
  * allocation.
  */
-
 class ABSL_MUST_USE_RESULT Status final {
 public:
   // Creates an OK status with no message.
-  Status() {}
+  Status() = default;
 
   /**
    * Create a status with the specified code and
@@ -61,7 +59,7 @@ public:
 
   // The moved-from state is the Ok.
   Status(Status&& other) noexcept : rep_(other.rep_) { other.rep_ = nullptr; }
-  Status& operator=(Status&&);
+  Status& operator=(Status&&) noexcept;
 
   ~Status();
 
@@ -118,15 +116,16 @@ private:
   };
 
   void Ref() {
-    if (rep_)
+    if (rep_) {
       rep_->ref_.fetch_add(1, std::memory_order_relaxed);
+    }
   }
   void Unref();
 
   StatusRep* rep_{nullptr};
 };
 
-inline Status& Status::operator=(const Status& other) {
+inline Status& Status::operator=(const Status& other) { // NOLINT self assignment
   if (other.rep_ != rep_) {
     Unref();
     rep_ = other.rep_;
@@ -135,7 +134,7 @@ inline Status& Status::operator=(const Status& other) {
   return *this;
 }
 
-inline Status& Status::operator=(Status&& other) {
+inline Status& Status::operator=(Status&& other) noexcept {
   Unref();
   rep_ = other.rep_;
   Ref();

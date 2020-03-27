@@ -54,7 +54,7 @@ TEST(Status, ErrorHttpCodeAndMessage) {
 TEST(Status, MoveOkIntoOk) {
   Status status;
   Status another_status(std::move(status));
-  EXPECT_TRUE(status.Ok());
+  EXPECT_TRUE(status.Ok()); // NOLINT - unit test
   EXPECT_TRUE(another_status.Ok());
 }
 
@@ -63,13 +63,13 @@ TEST(Status, MoveOkIntoError) {
   Status another_status;
   status = std::move(another_status);
   EXPECT_TRUE(status.Ok());
-  EXPECT_TRUE(another_status.Ok());
+  EXPECT_TRUE(another_status.Ok()); // NOLINT - unit test
 }
 
 TEST(Status, MoveErrorIntoOk) {
   Status status(StatusCode::BufferFloodError, Http::Code::BadRequest, "foobar");
   Status another_status(std::move(status));
-  EXPECT_TRUE(status.Ok());
+  EXPECT_TRUE(status.Ok()); // NOLINT - unit test
   EXPECT_FALSE(another_status.Ok());
   EXPECT_EQ(StatusCode::BufferFloodError, another_status.Code());
   EXPECT_TRUE(another_status.HttpCode().has_value());
@@ -79,7 +79,7 @@ TEST(Status, MoveErrorIntoOk) {
 
 TEST(Status, CopyOkIntoOk) {
   Status status;
-  Status another_status(status);
+  Status another_status(status); // NOLINT - unit test
   EXPECT_TRUE(status.Ok());
   EXPECT_TRUE(another_status.Ok());
 }
@@ -94,7 +94,7 @@ TEST(Status, CopyOkIntoError) {
 
 TEST(Status, CopyErrorIntoOk) {
   Status status(StatusCode::BufferFloodError, Http::Code::BadRequest, "foobar");
-  Status another_status(status);
+  Status another_status(status); // NOLINT - unit test
   EXPECT_FALSE(status.Ok());
   EXPECT_EQ(StatusCode::BufferFloodError, status.Code());
   EXPECT_TRUE(status.HttpCode().has_value());
