@@ -12,7 +12,7 @@ jobs:
   steps:
     - powershell: |
         .\ci\windows_ci_setup.ps1
-        Write-Host "##vso[task.prependpath]$env:TOOLS_BIN_DIR\msys64\bin;$env:TOOLS_BIN_DIR\msys64\usr\bin"
+        Write-Host "##vso[task.prependpath]$env:TOOLS_BIN_DIR\bin;$env:TOOLS_BIN_DIR\usr\bin"
         Write-Host "##vso[task.prependpath]$env:VC_TOOLS_BIN_X64;$env:VC_CMAKE_PATH\CMake\bin;$env:VC_CMAKE_PATH\Ninja"
         Write-Host "##vso[task.prependpath]$env:TOOLS_BIN_DIR"
       displayName: "Install dependencies"

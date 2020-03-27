@@ -42,9 +42,9 @@ Checksum $env:TEMP\msys2.tar.xz 168e156fa9f00d90a8445676c023c63be6e82f71487f4e26
 $tarpath="$env:ProgramFiles\Git\usr\bin\tar.exe"
 $msys2TarPathClean = "/$env:TEMP/msys2.tar.xz".replace(':', '').replace('\', '/')
 $outDirClean = "/$env:TOOLS_BIN_DIR".replace(':', '').replace('\', '/')
-&"$tarpath" -Jxf $msys2TarPathClean -C $outDirClean
+&"$tarpath" -Jxf $msys2TarPathClean -C $outDirClean --strip-components=1
 # Add utils to the path for msys2 setup
-$env:PATH = "$env:TOOLS_BIN_DIR\msys64\usr\bin;$env:TOOLS_BIN_DIR\msys64\mingw64\bin;$env:Path"
+$env:PATH = "$env:TOOLS_BIN_DIR\usr\bin;$env:TOOLS_BIN_DIR\mingw64\bin;$env:Path"
 bash.exe -c "pacman-key --init 2>&1"
 bash.exe -c "pacman-key --populate msys2 2>&1"
 bash.exe -c "pacman.exe -Syyuu --noconfirm 2>&1"
