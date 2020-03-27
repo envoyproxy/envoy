@@ -244,7 +244,7 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
     const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
   only_one_thread_.checkOneThread();
   const Duration real_time_poll_delay(
-      std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(50)), duration));
+      std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(5)), duration));
   const MonotonicTime end_time = monotonicTime() + duration;
 
   while (true) {
@@ -253,26 +253,26 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
       return Thread::CondVar::WaitStatus::NoTimeout;
     }
 
+    absl::MutexLock lock(&mutex_);
+
     // Wait for the libevent poll in another thread to catch up prior to advancing time.
-    if (hasPending()) {
+    if (hasPendingLockHeld()) {
       continue;
     }
 
-    mutex_.Lock();
-    if (monotonic_time_ < end_time) {
-      if (alarms_.empty()) {
-        // If no alarms are pending, sleep till the end time.
-        setMonotonicTimeAndUnlock(end_time);
-      } else {
-        // If there's another alarm pending, sleep forward to it.
-        Alarm* alarm = (*alarms_.begin());
-        MonotonicTime next_wakeup = alarmTimeLockHeld(alarm);
-        setMonotonicTimeAndUnlock(std::min(next_wakeup, end_time));
-      }
-    } else {
-      // If we reached our end_time, break the loop and return timeout.
-      mutex_.Unlock();
+    // If we reached our end_time, break the loop and return timeout.
+    if (monotonic_time_ >= end_time) {
       break;
+    }
+
+    if (alarms_.empty()) {
+      // If no alarms are pending, sleep till the end time.
+      setMonotonicTimeLockHeld(end_time);
+    } else {
+      // If there's another alarm pending, sleep forward to it.
+      Alarm* alarm = (*alarms_.begin());
+      MonotonicTime next_wakeup = alarmTimeLockHeld(alarm);
+      setMonotonicTimeLockHeld(std::min(next_wakeup, end_time));
     }
   }
   return Thread::CondVar::WaitStatus::Timeout;
@@ -341,21 +341,20 @@ void SimulatedTimeSystemHelper::setMonotonicTimeLockHeld(const MonotonicTime& mo
   }
 }
 
-void SimulatedTimeSystemHelper::setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) {
+/*void SimulatedTimeSystemHelper::setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) {
   setMonotonicTimeLockHeld(monotonic_time);
   mutex_.Unlock();
-}
+  }*/
 
 void SimulatedTimeSystemHelper::setSystemTime(const SystemTime& system_time) {
-  mutex_.Lock();
+  absl::MutexLock lock(&mutex_);
   if (system_time > system_time_) {
     MonotonicTime monotonic_time =
         monotonic_time_ +
         std::chrono::duration_cast<MonotonicTime::duration>(system_time - system_time_);
-    setMonotonicTimeAndUnlock(monotonic_time);
+    setMonotonicTimeLockHeld(monotonic_time);
   } else {
     system_time_ = system_time;
-    mutex_.Unlock();
   }
 }
 

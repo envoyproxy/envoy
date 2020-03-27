@@ -45,8 +45,8 @@ public:
    * @param monotonic_time The desired new current time.
    */
   void setMonotonicTime(const MonotonicTime& monotonic_time) {
-    mutex_.Lock();
-    setMonotonicTimeAndUnlock(monotonic_time);
+    absl::MutexLock lock(&mutex_);
+    setMonotonicTimeLockHeld(monotonic_time);
   }
 
   /**
@@ -77,7 +77,7 @@ private:
    *
    * @param monotonic_time The desired new current time.
    */
-  void setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) UNLOCK_FUNCTION(mutex_);
+  //void setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) UNLOCK_FUNCTION(mutex_);
   void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
@@ -100,8 +100,8 @@ private:
     absl::MutexLock lock(&mutex_);
     --pending_alarms_;
   }
-  bool hasPending() const {
-    absl::MutexLock lock(&mutex_);
+  bool hasPendingLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+    //absl::MutexLock lock(&mutex_);
     return pending_alarms_ > 0;
   }
 

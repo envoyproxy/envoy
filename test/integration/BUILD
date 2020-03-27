@@ -165,6 +165,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/server:utility_lib",
         "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],

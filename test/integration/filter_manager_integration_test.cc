@@ -9,6 +9,7 @@
 #include "test/integration/utility.h"
 #include "test/server/utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -133,6 +134,7 @@ private:
  */
 class InjectDataToFilterChainIntegrationTest
     : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, std::string>>,
+      public Event::TestUsingSimulatedTime,
       public BaseIntegrationTest,
       public TestWithAuxiliaryFilter {
 public:
