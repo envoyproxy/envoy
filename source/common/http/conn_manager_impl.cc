@@ -548,6 +548,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                connection_manager.config_.scopedRouteConfigProvider() == nullptr)),
          "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
          "ConnectionManagerImpl.");
+
+  stream_info_.setRequestIDExtension(connection_manager.config_.requestIDExtension());
+
   if (connection_manager_.config_.isRoutable() &&
       connection_manager.config_.routeConfigProvider() != nullptr) {
     route_config_update_requester_ =
@@ -895,8 +898,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // Modify the downstream remote address depending on configuration and headers.
     stream_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
         *request_headers_, connection_manager_.read_callbacks_->connection(),
-        connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
-        connection_manager_.local_info_));
+        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_));
   }
   ASSERT(stream_info_.downstreamRemoteAddress() != nullptr);
 
@@ -1521,7 +1523,9 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
-  ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(), EMPTY_STRING);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
+                                                  connection_manager_.config_.requestIDExtension(),
+                                                  EMPTY_STRING);
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(headers);
@@ -1604,6 +1608,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
     headers.setReferenceServer(connection_manager_.config_.serverName());
   }
   ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
+                                                  connection_manager_.config_.requestIDExtension(),
                                                   connection_manager_.config_.via());
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the

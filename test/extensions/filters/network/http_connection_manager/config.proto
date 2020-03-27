@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package test.http_connection_manager;
+
+message CustomRequestIDExtension {
+  string test_field = 1;
+}
+
+message UnknownRequestIDExtension {
+}

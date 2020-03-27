@@ -161,10 +161,12 @@ envoy_cc_fuzz_test(
     corpus = "conn_manager_impl_corpus",
     deps = [
         ":conn_manager_impl_fuzz_proto_cc_proto",
+        "//include/envoy/http:request_id_extension_interface",
         "//source/common/common:empty_string",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/common/http:date_provider_lib",
+        "//source/common/http:request_id_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:symbol_table_creator_lib",
@@ -191,6 +193,7 @@ envoy_cc_test(
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/access_log:access_log_lib",
@@ -203,6 +206,7 @@ envoy_cc_test(
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:request_id_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",
@@ -233,13 +237,14 @@ envoy_cc_test(
     name = "conn_manager_utility_test",
     srcs = ["conn_manager_utility_test.cc"],
     deps = [
+        "//include/envoy/http:request_id_extension_interface",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:request_id_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/common/runtime:uuid_util_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
@@ -366,5 +371,16 @@ envoy_cc_test(
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:path_utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "request_id_extension_uuid_impl_test",
+    srcs = ["request_id_extension_uuid_impl_test.cc"],
+    deps = [
+        "//source/common/http:request_id_extension_lib",
+        "//source/common/runtime:runtime_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

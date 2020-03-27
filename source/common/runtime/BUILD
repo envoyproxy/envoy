@@ -61,13 +61,3 @@ envoy_cc_library(
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
-
-envoy_cc_library(
-    name = "uuid_util_lib",
-    srcs = ["uuid_util.cc"],
-    hdrs = ["uuid_util.h"],
-    deps = [
-        ":runtime_lib",
-        "//source/common/common:utility_lib",
-    ],
-)

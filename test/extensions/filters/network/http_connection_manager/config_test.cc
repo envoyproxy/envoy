@@ -1,13 +1,17 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+#include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/date_provider_impl.h"
+#include "common/http/request_id_extension_uuid_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
 
+#include "test/extensions/filters/network/http_connection_manager/config.pb.h"
+#include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -1370,6 +1374,111 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtens
       nullptr,
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
           deprecated_name));
+}
+
+namespace {
+
+class TestRequestIDExtension : public Http::RequestIDExtension {
+public:
+  TestRequestIDExtension(const test::http_connection_manager::CustomRequestIDExtension& config)
+      : config_(config) {}
+
+  void set(Http::RequestHeaderMap&, bool) override {}
+  void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
+  bool modBy(const Http::RequestHeaderMap&, uint64_t&, uint64_t) override { return false; }
+  Http::TraceStatus getTraceStatus(const Http::RequestHeaderMap&) override {
+    return Http::TraceStatus::Sampled;
+  }
+  void setTraceStatus(Http::RequestHeaderMap&, Http::TraceStatus) override {}
+
+  std::string testField() { return config_.test_field(); }
+
+private:
+  test::http_connection_manager::CustomRequestIDExtension config_;
+};
+
+class TestRequestIDExtensionFactory : public Server::Configuration::RequestIDExtensionFactory {
+public:
+  std::string name() const override {
+    return "test.http_connection_manager.CustomRequestIDExtension";
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::http_connection_manager::CustomRequestIDExtension>();
+  }
+
+  Http::RequestIDExtensionSharedPtr
+  createExtensionInstance(const Protobuf::Message& config,
+                          Server::Configuration::FactoryContext& context) override {
+    const auto& custom_config = MessageUtil::downcastAndValidate<
+        const test::http_connection_manager::CustomRequestIDExtension&>(
+        config, context.messageValidationVisitor());
+    return std::make_shared<TestRequestIDExtension>(custom_config);
+  }
+};
+
+} // namespace
+
+TEST_F(HttpConnectionManagerConfigTest, CustomRequestIDExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  request_id_extension:
+    typed_config:
+      "@type": type.googleapis.com/test.http_connection_manager.CustomRequestIDExtension
+      test_field: example
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+  Registry::RegisterFactory<TestRequestIDExtensionFactory,
+                            Server::Configuration::RequestIDExtensionFactory>
+      registered;
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  auto request_id_extension =
+      dynamic_cast<TestRequestIDExtension*>(config.requestIDExtension().get());
+  ASSERT_NE(nullptr, request_id_extension);
+  EXPECT_EQ("example", request_id_extension->testField());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnknownRequestIDExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  request_id_extension:
+    typed_config:
+      "@type": type.googleapis.com/test.http_connection_manager.UnknownRequestIDExtension
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      EnvoyException, "Didn't find a registered implementation for type");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  request_id_extension: {}
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  auto request_id_extension =
+      dynamic_cast<Http::UUIDRequestIDExtension*>(config.requestIDExtension().get());
+  ASSERT_NE(nullptr, request_id_extension);
 }
 
 class FilterChainTest : public HttpConnectionManagerConfigTest {

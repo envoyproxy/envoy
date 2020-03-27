@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -11,11 +12,17 @@ load(
 
 envoy_package()
 
+envoy_proto_library(
+    name = "config",
+    srcs = ["config.proto"],
+)
+
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.network.http_connection_manager",
     deps = [
+        ":config_cc_proto",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
         "//source/extensions/access_loggers/file:config",

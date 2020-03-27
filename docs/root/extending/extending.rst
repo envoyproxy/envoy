@@ -18,6 +18,7 @@ types including:
 * :ref:`Retry implementations <arch_overview_http_routing_retry>`
 * :ref:`Stat sinks <arch_overview_statistics>`
 * :ref:`Tracers <arch_overview_tracing>`
+* :ref:`Request ID <arch_overview_tracing>`
 * Transport sockets
 * BoringSSL private key methods
 

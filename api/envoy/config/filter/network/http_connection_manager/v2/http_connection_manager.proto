@@ -32,7 +32,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 36]
+// [#next-free-field: 37]
 message HttpConnectionManager {
   enum CodecType {
     // For every new connection, the connection manager will determine which
@@ -493,6 +493,18 @@ message HttpConnectionManager {
   // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
   bool merge_slashes = 33;
+
+  // The configuration of the request ID extension. This includes operations such as
+  // generation, validation, and associated tracing operations.
+  //
+  // If not set, Envoy uses the default UUID-based behavior:
+  //
+  // 1. Request ID is propagated using *x-request-id* header.
+  //
+  // 2. Request ID is a universally unique identifier (UUID).
+  //
+  // 3. Tracing decision (sampled, forced, etc) is set in 14th byte of the UUID.
+  RequestIDExtension request_id_extension = 36;
 }
 
 message Rds {
@@ -641,4 +653,9 @@ message HttpFilter {
 
     google.protobuf.Any typed_config = 4;
   }
+}
+
+message RequestIDExtension {
+  // Request ID extension specific configuration.
+  google.protobuf.Any typed_config = 1;
 }
