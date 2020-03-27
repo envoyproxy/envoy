@@ -232,11 +232,11 @@ void GrpcWebFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
   if (!cluster_) {
     return;
   }
-  request_names_ = context_.resolveServiceAndMethod(headers.Path());
+  request_stat_names_ = context_.resolveDynamicServiceAndMethod(headers.Path());
 }
 
 void GrpcWebFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Context::Protocol::GrpcWeb, *request_names_,
+  context_.chargeStat(*cluster_, Grpc::Context::Protocol::GrpcWeb, *request_stat_names_,
                       headers.GrpcStatus());
 }
 
