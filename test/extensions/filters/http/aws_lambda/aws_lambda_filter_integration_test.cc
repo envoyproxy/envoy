@@ -3,6 +3,7 @@
 #include "source/extensions/filters/http/aws_lambda/request_response.pb.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -18,7 +19,13 @@ public:
   AwsLambdaFilterIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
-  void SetUp() override { setUpstreamProtocol(FakeHttpConnection::Type::HTTP1); }
+  void SetUp() override {
+    // set these environment variables to quickly sign credentials instead of attempting to query
+    // instance metadata and timing-out
+    TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "aws-user", 1 /*overwrite*/);
+    TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1 /*overwrite*/);
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+  }
 
   void TearDown() override {
     test_server_.reset();
