@@ -128,6 +128,7 @@ def envoy_cc_library(
         hdrs = hdrs,
         copts = envoy_copts(repository) + copts,
         visibility = visibility,
+        tags = ["nocompdb"],
         deps = [":" + name],
         strip_include_prefix = strip_include_prefix,
     )
