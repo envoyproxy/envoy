@@ -281,10 +281,15 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
           version, config) {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
+  return makeClientConnectionWithOptions(port, nullptr);
+}
+
+Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOptions(
+    uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
 
   connection->enableHalfClose(enable_half_close_);
   return connection;
@@ -522,6 +527,24 @@ IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
   return IntegrationTestServer::create(bootstrap_path, version_, on_server_ready_function,
                                        on_server_init_function, deterministic_, time_system, *api_,
                                        defer_listener_finalization_);
+}
+
+void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
+  listener_access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
+}
+
+std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename) {
+  // Wait a max of 1s for logs to flush to disk.
+  for (int i = 0; i < 1000; ++i) {
+    std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
+    if (contents.length() > 0) {
+      return contents;
+    }
+    absl::SleepFor(absl::Milliseconds(1));
+  }
+  RELEASE_ASSERT(0, "Timed out waiting for access log");
+  return "";
 }
 
 void BaseIntegrationTest::createXdsUpstream() {

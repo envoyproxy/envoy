@@ -3,10 +3,12 @@ syntax = "proto3";
 package envoy.v2;
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.v2";
 option java_outer_classname = "OneofProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message OneofExample {
   string foo = 1 [(udpa.annotations.field_migrate).oneof_promotion = "baz_specifier"];

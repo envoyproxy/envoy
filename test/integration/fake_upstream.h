@@ -69,6 +69,9 @@ public:
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::RequestTrailerMapPtr& trailers() { return trailers_; }
   bool receivedData() { return received_data_; }
+  Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
+    return encoder_.http1StreamEncoderOptions();
+  }
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -680,11 +683,15 @@ private:
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
+    const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+      return empty_access_logs_;
+    }
 
     FakeUpstream& parent_;
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     const Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
+    const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   };
 
   void threadRoutine();
