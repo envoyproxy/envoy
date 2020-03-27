@@ -7,8 +7,8 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/gradient_controller.h"
+#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
+#include "extensions/filters/http/adaptive_concurrency/controller/gradient_controller.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/runtime/mocks.h"
