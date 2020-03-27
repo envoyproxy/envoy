@@ -1249,6 +1249,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceRegexPatternCheck) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
+// This test verifies that when a hostname is set in the endpoint's HealthCheckConfig, it is used in
+// the health check request.
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHost) {
   const std::string host = "www.envoyproxy.io";
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
@@ -1259,7 +1261,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHos
       envoy::config::core::v3::UNKNOWN);
   const std::string path = "/healthcheck";
   setupServiceValidationHC();
-  // requires non-empty `service_name` in config.
+  // Requires non-empty `service_name` in config.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
@@ -1288,6 +1290,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHos
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
+// This test verifies that when a hostname is set in the endpoint's HealthCheckConfig and in the
+// cluster level configuration, the one in the endpoint takes priority.
 TEST_F(HttpHealthCheckerImplTest,
        SuccessServiceCheckWithCustomHostValueOnTheHostThatOverridesConfigValue) {
   const std::string host = "www.envoyproxy.io";
@@ -1391,7 +1395,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   const std::string value_downstream_local_address_without_port = "127.0.0.1";
 
   setupServiceValidationWithAdditionalHeaders();
-  // requires non-empty `service_name` in config.
+  // Requires non-empty `service_name` in config.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
@@ -1452,7 +1456,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
 
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithoutUserAgent) {
   setupServiceValidationWithoutUserAgent();
-  // requires non-empty `service_name` in config.
+  // Requires non-empty `service_name` in config.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
