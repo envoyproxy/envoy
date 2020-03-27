@@ -60,11 +60,7 @@ void LightStepLogger::operator()(lightstep::LogLevel level,
 const size_t LightStepDriver::DefaultMinFlushSpans = 200U;
 
 LightStepDriver::LightStepTransporter::LightStepTransporter(LightStepDriver& driver)
-    : driver_(driver), cluster_update_callbacks_handle_(
-                           driver_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
-  Upstream::ThreadLocalCluster* cluster = driver_.clusterManager().get(driver_.cluster());
-  collector_cluster_ = cluster ? cluster->info() : nullptr;
-}
+    : driver_(driver), collector_cluster_(driver_.clusterManager(), driver_.cluster()) {}
 
 LightStepDriver::LightStepTransporter::~LightStepTransporter() {
   if (active_request_ != nullptr) {
@@ -86,23 +82,6 @@ void LightStepDriver::LightStepTransporter::onFailure(
   reset();
 }
 
-void LightStepDriver::LightStepTransporter::onClusterAddOrUpdate(
-    Upstream::ThreadLocalCluster& cluster) {
-  if (cluster.info()->name() != driver_.cluster()) {
-    return;
-  }
-  ENVOY_LOG(debug, "attaching to cluster '{}'", cluster.info()->name());
-  collector_cluster_ = cluster.info();
-}
-
-void LightStepDriver::LightStepTransporter::onClusterRemoval(const std::string& cluster) {
-  if (cluster != driver_.cluster()) {
-    return;
-  }
-  ENVOY_LOG(debug, "detaching from cluster '{}'", cluster);
-  collector_cluster_.reset();
-}
-
 void LightStepDriver::LightStepTransporter::OnSpanBufferFull() noexcept {
   if (active_report_ != nullptr) {
     return;
@@ -116,25 +95,24 @@ void LightStepDriver::LightStepTransporter::Send(std::unique_ptr<lightstep::Buff
     callback.OnFailure(*report);
     return;
   }
-  active_report_ = std::move(report);
-  active_callback_ = &callback;
 
   const uint64_t timeout =
       driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
   Http::RequestMessagePtr message = Grpc::Common::prepareHeaders(
       driver_.cluster(), lightstep::CollectorServiceFullName(), lightstep::CollectorMethodName(),
       absl::optional<std::chrono::milliseconds>(timeout));
-  message->body() = serializeGrpcMessage(*active_report_);
+  message->body() = serializeGrpcMessage(*report);
 
-  if (collector_cluster_) {
-    active_cluster_ = collector_cluster_;
+  if (collector_cluster_.exists()) {
+    active_report_ = std::move(report);
+    active_callback_ = &callback;
+    active_cluster_ = collector_cluster_.info();
     active_request_ = driver_.clusterManager()
-                          .httpAsyncClientForCluster(collector_cluster_->name())
+                          .httpAsyncClientForCluster(collector_cluster_.info()->name())
                           .send(std::move(message), *this,
                                 Http::AsyncClient::RequestOptions().setTimeout(
                                     std::chrono::milliseconds(timeout)));
   } else {
-    reset();
     ENVOY_LOG(debug, "collector cluster '{}' does not exist", driver_.cluster());
     driver_.tracerStats().reports_skipped_no_cluster_.inc();
   }

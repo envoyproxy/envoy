@@ -17,6 +17,7 @@
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 #include "common/stats/symbol_table_impl.h"
+#include "common/upstream/cluster_update_tracker.h"
 
 #include "extensions/tracers/common/ot/opentracing_driver_impl.h"
 
@@ -78,8 +79,7 @@ public:
 private:
   class LightStepTransporter : Logger::Loggable<Logger::Id::tracing>,
                                public lightstep::AsyncTransporter,
-                               public Http::AsyncClient::Callbacks,
-                               public Upstream::ClusterUpdateCallbacks {
+                               public Http::AsyncClient::Callbacks {
   public:
     explicit LightStepTransporter(LightStepDriver& driver);
 
@@ -96,18 +96,13 @@ private:
     void onFailure(const Http::AsyncClient::Request&,
                    Http::AsyncClient::FailureReason failure_reason) override;
 
-    // Upstream::ClusterUpdateCallbacks
-    void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
-    void onClusterRemoval(const std::string& cluster_name) override;
-
   private:
     std::unique_ptr<lightstep::BufferChain> active_report_;
     Callback* active_callback_ = nullptr;
     Upstream::ClusterInfoConstSharedPtr active_cluster_;
     Http::AsyncClient::Request* active_request_ = nullptr;
     LightStepDriver& driver_;
-    const Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_handle_;
-    Upstream::ClusterInfoConstSharedPtr collector_cluster_;
+    Upstream::ClusterUpdateTracker collector_cluster_;
 
     void reset();
   };

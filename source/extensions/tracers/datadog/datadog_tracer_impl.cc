@@ -61,11 +61,7 @@ opentracing::Tracer& Driver::tracer() { return *tls_->getTyped<TlsTracer>().trac
 TraceReporter::TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver,
                              Event::Dispatcher& dispatcher)
     : driver_(driver), encoder_(encoder),
-      cluster_update_callbacks_handle_(
-          driver_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
-  Upstream::ThreadLocalCluster* cluster = driver_.clusterManager().get(driver_.cluster());
-  collector_cluster_ = cluster ? cluster->info() : nullptr;
-
+      collector_cluster_(driver_.clusterManager(), driver_.cluster()) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     for (auto& h : encoder_->headers()) {
       lower_case_headers_.emplace(h.first, Http::LowerCaseString{h.first});
@@ -105,10 +101,10 @@ void TraceReporter::flushTraces() {
     ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload size {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 
-    if (collector_cluster_) {
+    if (collector_cluster_.exists()) {
       Http::AsyncClient::Request* request =
           driver_.clusterManager()
-              .httpAsyncClientForCluster(collector_cluster_->name())
+              .httpAsyncClientForCluster(collector_cluster_.info()->name())
               .send(
                   std::move(message), *this,
                   Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000U)));
@@ -144,22 +140,6 @@ void TraceReporter::onSuccess(const Http::AsyncClient::Request& request,
     driver_.tracerStats().reports_sent_.inc();
     encoder_->handleResponse(http_response->body()->toString());
   }
-}
-
-void TraceReporter::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
-  if (cluster.info()->name() != driver_.cluster()) {
-    return;
-  }
-  ENVOY_LOG(debug, "attaching to cluster '{}'", cluster.info()->name());
-  collector_cluster_ = cluster.info();
-}
-
-void TraceReporter::onClusterRemoval(const std::string& cluster) {
-  if (cluster != driver_.cluster()) {
-    return;
-  }
-  ENVOY_LOG(debug, "detaching from cluster '{}'", cluster);
-  collector_cluster_.reset();
 }
 
 } // namespace Datadog
