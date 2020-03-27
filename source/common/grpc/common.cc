@@ -297,5 +297,21 @@ bool Common::parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message
   return proto.ParseFromZeroCopyStream(&stream);
 }
 
+absl::optional<Common::RequestNames>
+Common::resolveServiceAndMethod(const Http::HeaderEntry* path) {
+  absl::optional<RequestNames> request_names;
+  if (path == nullptr) {
+    return request_names;
+  }
+  absl::string_view str = path->value().getStringView();
+  str = str.substr(0, str.find('?'));
+  const auto parts = StringUtil::splitToken(str, "/");
+  if (parts.size() != 2) {
+    return request_names;
+  }
+  request_names = RequestNames{parts[0], parts[1]};
+  return request_names;
+}
+
 } // namespace Grpc
 } // namespace Envoy
