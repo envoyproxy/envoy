@@ -10,7 +10,7 @@ namespace DnsFilter {
 DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     Server::Configuration::ListenerFactoryContext& context,
     const envoy::config::filter::udp::dns_filter::v2alpha::DnsFilterConfig& config)
-    : root_scope(context.scope()), stats_(generateStats(config.stat_prefix(), root_scope)) {
+    : root_scope_(context.scope()), stats_(generateStats(config.stat_prefix(), root_scope)) {
 
   using envoy::config::filter::udp::dns_filter::v2alpha::DnsFilterConfig;
 
@@ -25,7 +25,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     // TODO (abaptiste): Check that the domain configured here appears
     // in the known domains list
     virtual_domains_.reserve(entries);
-    for (const auto virtual_domain : cfg.virtual_domains()) {
+    for (const auto& virtual_domain : cfg.virtual_domains()) {
       DnsAddressList addresses{};
 
       if (virtual_domain.endpoint().has_address_list()) {

@@ -12,11 +12,8 @@
 #include "gtest/gtest.h"
 
 using testing::AtLeast;
-using testing::ByMove;
 using testing::InSequence;
-using testing::Return;
 using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -34,7 +31,7 @@ public:
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
   }
 
-  ~DnsFilterTest() { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
+  ~DnsFilterTest() override { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
 
   void setup(const std::string& yaml) {
     envoy::config::filter::udp::dns_filter::v2alpha::DnsFilterConfig config;

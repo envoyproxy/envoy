@@ -50,7 +50,7 @@ private:
     return {ALL_DNS_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
 
-  Stats::Scope& root_scope;
+  Stats::Scope& root_scope_;
   mutable DnsFilterStats stats_;
   mutable DnsVirtualDomainConfig virtual_domains_;
 };
