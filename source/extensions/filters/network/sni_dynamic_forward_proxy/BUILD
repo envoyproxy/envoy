@@ -10,7 +10,7 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "proxy_filter",
+    name = "proxy_filter_lib",
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
     deps = [
@@ -29,8 +29,9 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "unknown",
+    status = "alpha",
     deps = [
-        ":proxy_filter",
+        ":proxy_filter_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",

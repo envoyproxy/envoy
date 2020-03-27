@@ -7,6 +7,7 @@
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/http_integration.h"
+#include "test/integration/ssl_utility.h"
 
 namespace Envoy {
 namespace {
@@ -94,29 +95,13 @@ typed_config:
 
   void createUpstreams() override {
     if (upstream_tls_) {
-      fake_upstreams_.emplace_back(new FakeUpstream(
-          createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
+                                                             factory_context_),
+                           0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
     } else {
       HttpIntegrationTest::createUpstreams();
     }
-  }
-
-  // TODO(mattklein123): This logic is duplicated in various places. Cleanup in a follow up.
-  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
-    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-    auto* common_tls_context = tls_context.mutable_common_tls_context();
-    auto* tls_cert = common_tls_context->add_tls_certificates();
-    tls_cert->mutable_certificate_chain()->set_filename(TestEnvironment::runfilesPath(
-        fmt::format("test/config/integration/certs/{}cert.pem", upstream_cert_name_)));
-    tls_cert->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(
-        fmt::format("test/config/integration/certs/{}key.pem", upstream_cert_name_)));
-
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-        tls_context, factory_context_);
-
-    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 
   bool upstream_tls_{};

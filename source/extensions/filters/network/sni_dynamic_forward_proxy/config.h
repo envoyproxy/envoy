@@ -21,6 +21,8 @@ using FilterConfig =
 class SniDynamicForwardProxyNetworkFilterConfigFactory : public Common::FactoryBase<FilterConfig> {
 public:
   SniDynamicForwardProxyNetworkFilterConfigFactory();
+
+private:
   Network::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const FilterConfig& proto_config,
                                     Server::Configuration::FactoryContext& context) override;
