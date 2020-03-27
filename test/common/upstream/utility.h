@@ -66,6 +66,15 @@ inline envoy::config::cluster::v3::Cluster defaultStaticCluster(const std::strin
   return parseClusterFromV2Json(defaultStaticClusterJson(name));
 }
 
+inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+                                  const std::string& url, uint32_t weight = 1) {
+  return HostSharedPtr{
+      new HostImpl(cluster, hostname, Network::Utility::resolveUrl(url), nullptr, weight,
+                   envoy::config::core::v3::Locality(),
+                   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+                   envoy::config::core::v3::UNKNOWN)};
+}
+
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
                                   uint32_t weight = 1) {
   return HostSharedPtr{

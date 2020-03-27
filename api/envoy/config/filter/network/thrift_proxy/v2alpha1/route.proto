@@ -8,6 +8,7 @@ import "envoy/api/v2/route/route_components.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.network.thrift_proxy.v2alpha1";
@@ -15,6 +16,7 @@ option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.thrift_proxy.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Thrift Proxy Route Configuration]
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
