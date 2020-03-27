@@ -339,11 +339,9 @@ public:
 // level, whereas enableHRTimer should be precise at the microsecond level.
 // For good measure, also check that '0'/immediate does what it says on the tin.
 TEST_F(TimerImplTimingTest, TheoreticalTimerTiming) {
-  ENVOY_LOG_MISC(error, "pid={}", getpid());
   Event::SimulatedTimeSystem time_system;
   Api::ApiPtr api = Api::createApiForTest(time_system);
   DispatcherPtr dispatcher(api->allocateDispatcher());
-
   Event::TimerPtr timer = dispatcher->createTimer([&dispatcher] { dispatcher->exit(); });
 
   const uint64_t timings[] = {0, 10, 50, 1234};

@@ -17,8 +17,8 @@ public:
 
   /**
    * Advances time forward by the specified duration, running any timers
-   * along the way that have been scheduled to fire, blocking until they
-   * are run.
+   * scheduled to fire, and blocking until the timer callbacks are complete.
+   * See also advanceTime(), which does not block.
    *
    * @param duration The amount of time to sleep.
    */
@@ -28,8 +28,9 @@ public:
   }
 
   /**
-   * Advances time forward by the specified duration. Timers may be triggered
-   * on their threads, but this method does not block until they are run.
+   * Advances time forward by the specified duration. Timers may be triggered on
+   * their threads, but unlike sleep(), this method does not block waiting for
+   * them.
    *
    * @param duration The amount of time to sleep.
    */
