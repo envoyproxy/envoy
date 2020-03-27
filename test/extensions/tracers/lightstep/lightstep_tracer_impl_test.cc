@@ -494,6 +494,44 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
   }
 }
 
+TEST_F(LightStepDriverTest, MultiplePropagationModes) {
+  const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    propagation_modes:
+    - ENVOY
+    - LIGHTSTEP
+    - B3
+    - TRACE_CONTEXT
+    )EOF";
+  envoy::config::trace::v3::LightstepConfig lightstep_config;
+  TestUtility::loadFromYaml(yaml_string, lightstep_config);
+
+  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", _))
+      .Times(AtLeast(1))
+      .WillRepeatedly(Return(1000));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
+                                             LightStepDriver::DefaultMinFlushSpans))
+      .Times(AtLeast(1))
+      .WillRepeatedly(Return(1));
+
+  setup(lightstep_config, true);
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
+  span->injectContext(request_headers_);
+  EXPECT_TRUE(request_headers_.has("x-ot-span-context"));
+  EXPECT_TRUE(request_headers_.has("ot-tracer-traceid"));
+  EXPECT_TRUE(request_headers_.has("x-b3-traceid"));
+  EXPECT_TRUE(request_headers_.has("traceparent"));
+}
+
 TEST_F(LightStepDriverTest, SpawnChild) {
   setupValidDriver();
 
