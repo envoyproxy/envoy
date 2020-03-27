@@ -35,9 +35,7 @@ ExtensionConfigBase::ExtensionConfigBase(
   case envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kTapdsConfig: {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  default: {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  default: { NOT_REACHED_GCOVR_EXCL_LINE; }
   }
 }
 

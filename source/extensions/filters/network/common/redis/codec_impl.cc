@@ -316,8 +316,8 @@ RespValue::CompositeArray::CompositeArrayConstIterator::operator++() {
   return *this;
 }
 
-bool RespValue::CompositeArray::CompositeArrayConstIterator::operator!=(
-    const CompositeArrayConstIterator& rhs) const {
+bool RespValue::CompositeArray::CompositeArrayConstIterator::
+operator!=(const CompositeArrayConstIterator& rhs) const {
   return command_ != (rhs.command_) || &array_ != &(rhs.array_) || index_ != rhs.index_ ||
          first_ != rhs.first_;
 }
@@ -381,9 +381,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         pending_value_stack_.front().value_->type(RespType::Integer);
         break;
       }
-      default: {
-        throw ProtocolError("invalid value type");
-      }
+      default: { throw ProtocolError("invalid value type"); }
       }
 
       remaining--;

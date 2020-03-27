@@ -417,14 +417,13 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
     tls_rejected_stats = &entry.rejected_stats_;
   }
 
-  return safeMakeStat<Counter>(
-      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->counters_,
-      central_cache_->rejected_stats_,
-      [](Allocator& allocator, StatName name, StatName tag_extracted_name,
-         const StatNameTagVector& tags) -> CounterSharedPtr {
-        return allocator.makeCounter(name, tag_extracted_name, tags);
-      },
-      tls_cache, tls_rejected_stats, parent_.null_counter_);
+  return safeMakeStat<Counter>(final_stat_name, joiner.tagExtractedName(), stat_name_tags,
+                               central_cache_->counters_, central_cache_->rejected_stats_,
+                               [](Allocator& allocator, StatName name, StatName tag_extracted_name,
+                                  const StatNameTagVector& tags) -> CounterSharedPtr {
+                                 return allocator.makeCounter(name, tag_extracted_name, tags);
+                               },
+                               tls_cache, tls_rejected_stats, parent_.null_counter_);
 }
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& histogram,

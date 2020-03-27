@@ -44,8 +44,8 @@ public:
   // separated by a single space: no fancy quoting or escaping.
   std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
     std::vector<std::string> words = TestUtility::split(args, ' ');
-    return std::make_unique<OptionsImpl>(
-        std::move(words), [](bool) { return "1"; }, spdlog::level::warn);
+    return std::make_unique<OptionsImpl>(std::move(words), [](bool) { return "1"; },
+                                         spdlog::level::warn);
   }
 };
 

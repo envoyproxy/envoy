@@ -9,7 +9,6 @@ namespace Retry {
 namespace Host {
 
 REGISTER_FACTORY(OmitCanaryHostsRetryPredicateFactory, Upstream::RetryHostPredicateFactory);
-
 }
 } // namespace Retry
 } // namespace Extensions

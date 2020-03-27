@@ -223,8 +223,8 @@ std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest()
 }
 
 Server::Options& TestEnvironment::getOptions() {
-  static OptionsImpl* options = new OptionsImpl(
-      argc_, argv_, [](bool) { return "1"; }, spdlog::level::err);
+  static OptionsImpl* options =
+      new OptionsImpl(argc_, argv_, [](bool) { return "1"; }, spdlog::level::err);
   return *options;
 }
 

@@ -87,8 +87,7 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
   if (insert_) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting body", *encoder_callbacks_);
     // TODO(toddmgreer): Wait for the cache if necessary.
-    insert_->insertBody(
-        data, [](bool) {}, end_stream);
+    insert_->insertBody(data, [](bool) {}, end_stream);
   }
   return Http::FilterDataStatus::Continue;
 }

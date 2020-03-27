@@ -280,12 +280,12 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
    */
   hints.ai_flags = ARES_AI_NOSORT;
 
-  ares_getaddrinfo(
-      channel_, dns_name_.c_str(), /* service */ nullptr, &hints,
-      [](void* arg, int status, int timeouts, ares_addrinfo* addrinfo) {
-        static_cast<PendingResolution*>(arg)->onAresGetAddrInfoCallback(status, timeouts, addrinfo);
-      },
-      this);
+  ares_getaddrinfo(channel_, dns_name_.c_str(), /* service */ nullptr, &hints,
+                   [](void* arg, int status, int timeouts, ares_addrinfo* addrinfo) {
+                     static_cast<PendingResolution*>(arg)->onAresGetAddrInfoCallback(
+                         status, timeouts, addrinfo);
+                   },
+                   this);
 }
 
 } // namespace Network
