@@ -260,17 +260,22 @@ TEST_F(HazelcastDividedCacheTest, CleanUpCachedResponseOnMissingBody) {
 }
 
 TEST_F(HazelcastDividedCacheTest, NotCreateBodyOnHeaderOnlyResponse) {
-  const std::string RequestPath("/header/only/response");
-  LookupContextPtr name_lookup_context = lookup(RequestPath);
-  uint64_t variant_hash_key =
-    static_cast<HazelcastLookupContextBase&>(*name_lookup_context).variantHashKey();
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-  insert(move(name_lookup_context), getResponseHeaders(), "");
-  name_lookup_context = lookup(RequestPath);
-  EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
-  auto header = testHeaderMap().get(mapKey(variant_hash_key));
-  EXPECT_NE(nullptr, header);
-  EXPECT_EQ(0, header->bodySize());
+  auto headerOnlyTest = [this](std::string path, bool empty_body) {
+    LookupContextPtr name_lookup_context = lookup(path);
+    EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+    insert(move(name_lookup_context), getResponseHeaders(), empty_body ? "" : nullptr);
+    name_lookup_context = lookup(path);
+    EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
+    EXPECT_EQ(0, lookup_result_.content_length_);
+  };
+
+  // This will pass end_stream = true during header insertion.
+  headerOnlyTest("/header/only/response", false);
+
+  // This will pass end_stream = false during header insertion,
+  // then empty body for body insertion.
+  headerOnlyTest("/empty/body/response", true);
+
   EXPECT_EQ(0, testBodyMap().size());
   clearMaps();
 }

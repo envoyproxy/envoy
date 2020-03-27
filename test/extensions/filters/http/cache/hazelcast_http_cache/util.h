@@ -11,7 +11,7 @@ class HazelcastTestUtil {
 public:
 
   static constexpr int TEST_PARTITION_SIZE = 10;
-  static constexpr int TEST_MAX_BODY_SIZE = TEST_PARTITION_SIZE * 10;
+  static constexpr int TEST_MAX_BODY_SIZE = TEST_PARTITION_SIZE * 20;
 
   static const std::string& abortedBodyResponse()
   {
@@ -23,8 +23,9 @@ public:
     HazelcastHttpCacheConfig hc;
     hc.set_group_name("dev");
     hc.set_group_password("dev-pass");
-    hc.set_ip("127.0.0.1");
-    hc.set_port(5701);
+    HazelcastHttpCacheConfig::MemberAddress* memberAddress = hc.add_addresses();
+    memberAddress->set_ip("127.0.0.1");
+    memberAddress->set_port(5701);
     hc.set_body_partition_size(TEST_PARTITION_SIZE);
     hc.set_app_prefix("test");
     hc.set_unified(unified);
@@ -67,7 +68,8 @@ protected:
   void insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& response_headers,
               const absl::string_view response_body) {
     InsertContextPtr inserter = hz_cache_->makeInsertContext(move(lookup));
-    inserter->insertHeaders(response_headers, false);
+    inserter->insertHeaders(response_headers, response_body == nullptr);
+    if (response_body == nullptr) return;
     inserter->insertBody(Buffer::OwnedImpl(response_body), nullptr, true);
   }
 

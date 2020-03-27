@@ -73,8 +73,20 @@ public:
     return signed_key;
   }
 
+  /**
+   * Creates string keys for body partition entries.
+   *
+   * @param key     Unsigned hash key for the header.
+   * @param order   Order of the body among other partitions starting from 0.
+   * @return        Body partition key for header and order pair.
+   *
+   * @note          Appending '#' or any other marker between the key and order
+   *                string is required. Otherwise, for instance, the 11th order
+   *                body for key 1 and the 1st order body for key 11 will have
+   *                the same map key "111".
+   */
   inline std::string orderedMapKey(const uint64_t& key, const uint64_t& order) {
-    return std::to_string(mapKey(key)) + std::to_string(order);
+    return std::to_string(key).append("#").append(std::to_string(order));
   }
 
   ~HazelcastHttpCache() {

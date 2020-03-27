@@ -189,20 +189,20 @@ void HazelcastHttpCache::updateDividedHeaders(LookupContextPtr&& lookup_context,
 };
 
 std::string HazelcastHttpCache::constructMapName(const std::string& postfix) {
-  return std::string(cache_config_.app_prefix())
-    .append(":")
-    .append(std::to_string(body_partition_size_))
-    .append(":")
-    .append(postfix);
+  std::string name(cache_config_.app_prefix());
+  if (!unified_) {
+    name.append(":").append(std::to_string(body_partition_size_));
+  }
+  return name.append("-").append(postfix);
 }
 
 HazelcastHttpCache::HazelcastHttpCache(HazelcastHttpCacheConfig config)
     : cache_config_(config), unified_(config.unified()),
     body_partition_size_(ConfigUtil::validPartitionSize(config.body_partition_size())),
-    max_body_size_(ConfigUtil::validMaxBodySize(config.max_body_size())) {
+    max_body_size_(ConfigUtil::validMaxBodySize(config.max_body_size(), config.unified())) {
   body_map_name_ = constructMapName("body");
-  header_map_name_ = constructMapName("header");
-  response_map_name_ = constructMapName("response");
+  header_map_name_ = constructMapName("div-cache");
+  response_map_name_ = constructMapName("uni-cache");
 };
 
 class HazelcastHttpCacheFactory : public HttpCacheFactory {

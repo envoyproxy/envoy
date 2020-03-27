@@ -140,6 +140,15 @@ TEST_F(HazelcastUnifiedCacheTest, DoNotOverrideExistingResponse) {
   clearMaps();
 }
 
+TEST_F(HazelcastUnifiedCacheTest, HeaderOnlyResponse) {
+  InsertContextPtr inserter = hz_cache_->makeInsertContext(lookup("/header/only"));
+  inserter->insertHeaders(getResponseHeaders(), true);
+  LookupContextPtr name_lookup_context = lookup("/header/only");
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
+  EXPECT_EQ(0, lookup_result_.content_length_);
+  clearMaps();
+}
+
 TEST_F(HazelcastUnifiedCacheTest, MissLookupOnDifferentKey) {
 
   const std::string RequestPath("/miss/on/different/key");

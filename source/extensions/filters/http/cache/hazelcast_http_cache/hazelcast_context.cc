@@ -321,7 +321,7 @@ void DividedInsertContext::flushBuffer() {
     ENVOY_LOG(warn, "Number of body partitions for a response has been reached {} (or more).",
         ConfigUtil::partitionWarnLimit());
     ENVOY_LOG(info, "Having so many partitions might cause performance drop "
-                    "as well as extra memory usage. Consider increasing body"
+                    "as well as extra memory usage. Consider increasing body "
                     "partition size.");
   }
 }

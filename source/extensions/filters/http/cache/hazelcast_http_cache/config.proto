@@ -7,22 +7,28 @@ package envoy.source.extensions.filters.http.cache;
 // [#extension: envoy.extensions.http.cache]
 
 // Hazelcast Http Cache configuration
-// TODO: Mention defaults.
 message HazelcastHttpCacheConfig {
+
+    // Address for Hazelcast cluster member.
+    message MemberAddress {
+        string ip = 1;
+        int32 port = 2;
+    }
+
     // Group name of Hazelcast cluster to be connected.
     string group_name = 1;
     // Group password of Hazelcast cluster to be connected.
     string group_password = 2;
 
-    // IP address of Hazelcast member to be connected.
-    string ip = 3;
-    // Port of Hazelcast member to be connected.
-    int32 port = 4;
+    // Only one member address is enough to connect to the cluster but
+    // providing more than one is recommended.
+    // By default, 127.0.0.1:5701 will be tried.
+    repeated MemberAddress addresses = 3;
 
     // Application specific name for the cache. Different deployments should
     // use the same prefix if they want to share the same cache and connect
-    // to the same Hazelcast cluster.
-    string app_prefix = 5;
+    // to the same Hazelcast cluster. Empty string by default.
+    string app_prefix = 4;
 
     // In unified mode, cached responses will be stored as a single entry.
     // On a range HTTP request, regardless of the request range, all the
@@ -34,13 +40,16 @@ message HazelcastHttpCacheConfig {
     // map partitioned with body_partition_size. On a range request, only
     // required body partitions are called from the distributed map. This
     // option causes extra memory usage per partition on the cache.
-    bool unified = 6;
+    // False by default.
+    bool unified = 5;
 
     // Body partition size for divided cache. Ignored in unified mode.
-    int64 body_partition_size = 7;
+    // At most 64 KB allowed. 2 KB by default.
+    uint64 body_partition_size = 6;
 
     // Maximum allowed body size per response. If insertion for a larger
     // value than the limit is attempted, the first max_body_size bytes
     // of the response will be cached and the remaining will be ignored.
-    int64 max_body_size = 8;
+    // At most 64 KB for UNIFIED mode, 2 MB for DIVIDED mode.
+    uint64 max_body_size = 7;
 }
