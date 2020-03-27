@@ -1466,8 +1466,8 @@ TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestKeepR
 // new request id
 TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestGenerateNewRequestId) {
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
-  TestRequestHeaderMapImpl headers; 
-  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1); 
+  TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
   EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
