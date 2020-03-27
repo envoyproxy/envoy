@@ -9,3 +9,5 @@ Envoy has the following builtin UDP listener filters.
   :maxdepth: 2
 
   udp_proxy
+  dns_filter
+
