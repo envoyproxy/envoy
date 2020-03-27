@@ -339,7 +339,7 @@ min_rtt_calc_params:
       // prevent the concurrency limit from decreasing.
       controller->recordLatencySample(std::chrono::milliseconds(6));
     }
-    time_system_.sleep(std::chrono::milliseconds(101));
+    time_system_.advanceTime(std::chrono::milliseconds(101));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_GT(controller->concurrencyLimit(), last_concurrency);
   }
@@ -372,7 +372,7 @@ min_rtt_calc_params:
 
   // Ensure that the concurrency window increases on its own due to the headroom calculation with
   // the max gradient.
-  time_system_.sleep(std::chrono::milliseconds(101));
+  time_system_.advanceTime(std::chrono::milliseconds(101));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_GE(controller->concurrencyLimit(), 7);
   EXPECT_LE(controller->concurrencyLimit() / 7.0, 2.0);
@@ -385,7 +385,7 @@ min_rtt_calc_params:
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(4));
     }
-    time_system_.sleep(std::chrono::milliseconds(101));
+    time_system_.advanceTime(std::chrono::milliseconds(101));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     // Verify the minimum gradient.
     EXPECT_LE(last_concurrency, controller->concurrencyLimit());
@@ -399,7 +399,7 @@ min_rtt_calc_params:
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(6));
     }
-    time_system_.sleep(std::chrono::milliseconds(101));
+    time_system_.advanceTime(std::chrono::milliseconds(101));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_LT(controller->concurrencyLimit(), last_concurrency);
     EXPECT_GE(controller->concurrencyLimit(), 7);
@@ -433,7 +433,7 @@ min_rtt_calc_params:
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(4));
     }
-    time_system_.sleep(std::chrono::milliseconds(101));
+    time_system_.advanceTime(std::chrono::milliseconds(101));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     // Verify the value is growing.
     EXPECT_GT(controller->concurrencyLimit(), last_concurrency);
@@ -442,7 +442,7 @@ min_rtt_calc_params:
   const auto limit_val = controller->concurrencyLimit();
 
   // Wait until the minRTT recalculation is triggered again and verify the limit drops.
-  time_system_.sleep(std::chrono::seconds(31));
+  time_system_.advanceTime(std::chrono::seconds(31));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(controller->concurrencyLimit(), 3);
 
@@ -484,19 +484,19 @@ min_rtt_calc_params:
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(4));
     }
-    time_system_.sleep(std::chrono::milliseconds(101));
+    time_system_.advanceTime(std::chrono::milliseconds(101));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     // Verify the value is growing.
     EXPECT_GT(controller->concurrencyLimit(), last_concurrency);
   }
 
   // Wait until the minRTT recalculation is triggered again and verify the limit drops.
-  time_system_.sleep(std::chrono::seconds(31));
+  time_system_.advanceTime(std::chrono::seconds(31));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // Verify sample recalculation doesn't occur during the minRTT window.
-  time_system_.sleep(std::chrono::milliseconds(101));
+  time_system_.advanceTime(std::chrono::milliseconds(101));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(controller->concurrencyLimit(), 3);
 }
@@ -528,7 +528,7 @@ min_rtt_calc_params:
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(4));
     }
-    time_system_.sleep(std::chrono::milliseconds(101));
+    time_system_.advanceTime(std::chrono::milliseconds(101));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     // Verify the value is growing.
     EXPECT_GT(controller->concurrencyLimit(), last_concurrency);
@@ -537,7 +537,7 @@ min_rtt_calc_params:
   // Now we make sure that the limit value doesn't change in the absence of samples.
   for (int sample_iters = 0; sample_iters < 5; ++sample_iters) {
     const auto old_limit = controller->concurrencyLimit();
-    time_system_.sleep(std::chrono::milliseconds(101));
+    time_system_.advanceTime(std::chrono::milliseconds(101));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_EQ(old_limit, controller->concurrencyLimit());
   }

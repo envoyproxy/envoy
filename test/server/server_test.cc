@@ -488,7 +488,7 @@ protected:
       server_->flushStats();
     } else {
       // Default flush interval is 5 seconds.
-      simTime().sleep(std::chrono::seconds(6));
+      simTime().advanceTime(std::chrono::seconds(6));
     }
     server_->dispatcher().run(Event::Dispatcher::RunType::Block);
   }

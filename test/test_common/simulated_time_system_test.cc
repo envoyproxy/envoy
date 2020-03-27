@@ -35,7 +35,7 @@ protected:
   }
 
   void sleepMsAndLoop(int64_t delay_ms) {
-    time_system_.sleep(std::chrono::milliseconds(delay_ms));
+    time_system_.advanceTime(std::chrono::milliseconds(delay_ms));
     base_scheduler_.run(Dispatcher::RunType::NonBlock);
   }
 

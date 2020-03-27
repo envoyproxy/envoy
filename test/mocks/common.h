@@ -54,6 +54,7 @@ public:
     return real_time_.createScheduler(base_scheduler);
   }
   void sleep(const Duration& duration) override { real_time_.sleep(duration); }
+  void advanceTime(const Duration& duration) override { real_time_.advanceTime(duration); }
   Thread::CondVar::WaitStatus
   waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
           const Duration& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
