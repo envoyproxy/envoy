@@ -277,9 +277,13 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
       .WillRepeatedly(Return(5000U));
 
+  // Verify the effect of onClusterAddOrUpdate()/onClusterRemoval() on reporting logic,
+  // keeping in mind that they will be called both for relevant and irrelevant clusters.
+
   {
     // Simulate removal of the relevant cluster.
     cluster_update_callbacks->onClusterRemoval("fake_cluster");
+
     // Verify that no report will be sent.
     EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
     EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
@@ -290,8 +294,12 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
 
+    // Verify observability.
     EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());
     EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
   }
 
   {
@@ -299,6 +307,7 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     NiceMock<Upstream::MockThreadLocalCluster> unrelated_cluster;
     unrelated_cluster.cluster_.info_->name_ = "unrelated_cluster";
     cluster_update_callbacks->onClusterAddOrUpdate(unrelated_cluster);
+
     // Verify that no report will be sent.
     EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
     EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
@@ -309,8 +318,12 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
 
+    // Verify observability.
     EXPECT_EQ(2U, stats_.counter("tracing.zipkin.spans_sent").value());
     EXPECT_EQ(2U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
   }
 
   {
@@ -321,7 +334,7 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillOnce(ReturnRef(cm_.async_client_));
     Http::MockAsyncClientRequest request(&cm_.async_client_);
-    Http::AsyncClient::Callbacks* callback;
+    Http::AsyncClient::Callbacks* callback{};
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
 
@@ -331,10 +344,15 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
 
+    // Complete in-flight request.
     callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
 
+    // Verify observability.
     EXPECT_EQ(3U, stats_.counter("tracing.zipkin.spans_sent").value());
     EXPECT_EQ(2U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
+    EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_failed").value());
   }
 
   {
@@ -345,7 +363,7 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillOnce(ReturnRef(cm_.async_client_));
     Http::MockAsyncClientRequest request(&cm_.async_client_);
-    Http::AsyncClient::Callbacks* callback;
+    Http::AsyncClient::Callbacks* callback{};
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
 
@@ -355,10 +373,17 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
 
-    callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+    // Complete in-flight request.
+    Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "202"}}}));
+    callback->onSuccess(request, std::move(msg));
 
+    // Verify observability.
     EXPECT_EQ(4U, stats_.counter("tracing.zipkin.spans_sent").value());
     EXPECT_EQ(2U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
+    EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
+    EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_failed").value());
   }
 }
 

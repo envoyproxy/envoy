@@ -235,7 +235,7 @@ void ReporterImpl::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
   if (cluster.info()->name() != driver_.cluster()) {
     return;
   }
-  ENVOY_LOG(debug, "attaching to cluster {}", cluster.info()->name());
+  ENVOY_LOG(debug, "attaching to cluster '{}'", cluster.info()->name());
   collector_cluster_ = cluster.info();
 }
 
@@ -243,7 +243,7 @@ void ReporterImpl::onClusterRemoval(const std::string& cluster) {
   if (cluster != driver_.cluster()) {
     return;
   }
-  ENVOY_LOG(debug, "detaching from cluster {}", cluster);
+  ENVOY_LOG(debug, "detaching from cluster '{}'", cluster);
   collector_cluster_.reset();
 }
 
