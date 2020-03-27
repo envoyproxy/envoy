@@ -354,6 +354,7 @@ alignof
 alloc
 alloca
 allocator
+allowlist
 alls
 alphanumerics
 amongst
@@ -733,6 +734,7 @@ mixin
 mkdir
 mmap
 mmsg
+mmsghdr
 mongo
 moveable
 msec
@@ -754,6 +756,7 @@ namespaces
 namespacing
 nan
 natively
+ndk
 netblock
 netblocks
 netfilter
