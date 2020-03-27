@@ -26,10 +26,25 @@ function Checksum
 mkdir "$env:TOOLS_BIN_DIR"
 $wc = New-Object System.Net.WebClient
 $wc.DownloadFile("https://github.com/bazelbuild/bazelisk/releases/download/v1.0/bazelisk-windows-amd64.exe", "$env:TOOLS_BIN_DIR\bazel.exe")
-$wc.DownloadFile("https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-win.zip", "$env:TOOLS_BIN_DIR\ninja-win.zip")
+# See https://sourceforge.net/projects/msys2/files/Base/x86_64/ for msys2 download source
+$wc.DownloadFile("http://repo.msys2.org/distrib/x86_64/msys2-base-x86_64-20190524.tar.xz", "$env:TEMP\msys2.tar.xz")
+# VSBuildTools/VS2019 already provides ninja 1.8.2
+# $wc.DownloadFile("https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-win.zip", "$env:TOOLS_BIN_DIR\ninja-win.zip")
 
 # Check the SHA256 file hash of each downloaded file.
 Checksum $env:TOOLS_BIN_DIR\bazel.exe 96395ee9e3fb9f4499fcaffa8a94dd72b0748f495f366bc4be44dbf09d6827fc SHA256
-Checksum $env:TOOLS_BIN_DIR\ninja-win.zip 2d70010633ddaacc3af4ffbd21e22fae90d158674a09e132e06424ba3ab036e9 SHA256
+Checksum $env:TOOLS_BIN_DIR\msys2.tar.xz 168e156fa9f00d90a8445676c023c63be6e82f71487f4e2688ab5cb13b345383 SHA256
+# Checksum $env:TOOLS_BIN_DIR\ninja-win.zip 2d70010633ddaacc3af4ffbd21e22fae90d158674a09e132e06424ba3ab036e9 SHA256
 
-Unzip "$env:TOOLS_BIN_DIR\ninja-win.zip" "$env:TOOLS_BIN_DIR"
+# Unzip "$env:TOOLS_BIN_DIR\ninja-win.zip" "$env:TOOLS_BIN_DIR"
+
+# Unpack and install msys2 and required packages
+$tarpath="$env:ProgramFiles\Git\usr\bin\tar.exe"
+&"$tarpath" -xJf "$env:TEMP\msys2.tar.xz" -C "$env:TOOLS_BIN_DIR"
+$env:PATH = "$env:TOOLS_BIN_DIR\mingw64\bin;$env:TOOLS_BIN_DIR\usr\bin;$env:Path"
+bash.exe -c "pacman-key --init 2>&1"
+bash.exe -c "pacman-key --populate msys2 2>&1"
+pacman.exe -Syyuu --noconfirm
+pacman.exe -Syuu --noconfirm
+pacman.exe -S --noconfirm --needed diffutils patch unzip zip
+pacman.exe -Scc --noconfirm

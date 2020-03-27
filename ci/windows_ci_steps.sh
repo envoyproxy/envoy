@@ -25,7 +25,7 @@ drive="$(readlink -f $TMPDIR | cut -d '/' -f2)"
 # Set up PATH to ensure executables from installed software and system to not conflict with those
 # from MSVC (e.g. link.exe from mingw64 or find.exe from C:\windows\system32 do not conflict with
 # desired executables with those same names).
-export PATH=$(echo :$PATH: | sed "s#::#:#g;s#:/usr/bin:#:#g;s#:/mingw64/bin:#:#ig;s#:/c/windows/system32:#:#ig;s/$/\/usr\/bin:\/mingw64\/bin:\/c\/windows\/system32/;s/^://")
+# export PATH=$(echo :$PATH: | sed "s#::#:#g;s#:/usr/bin:#:#g;s#:/mingw64/bin:#:#ig;s#:/c/windows/system32:#:#ig;s/$/\/usr\/bin:\/mingw64\/bin:\/c\/windows\/system32/;s/^://")
 
 BAZEL_STARTUP_OPTIONS="--noworkspace_rc --bazelrc=windows/.bazelrc --output_base=c:/_eb"
 BAZEL_BUILD_OPTIONS="-c opt --config=msvc-cl --show_task_finish --verbose_failures \
