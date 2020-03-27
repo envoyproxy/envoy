@@ -655,7 +655,7 @@ def _com_googlesource_googleurl():
     )
     native.bind(
         name = "googleurl",
-        actual = "@com_googlesource_googleurl//:url_lib",
+        actual = "@com_googlesource_googleurl//url:url",
     )
 
 def _org_llvm_releases_compiler_rt():
