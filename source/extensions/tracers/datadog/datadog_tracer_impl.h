@@ -97,6 +97,7 @@ private:
  * tracing.datadog.flush_interval_ms, and defaults to 2000ms.
  */
 class TraceReporter : public Http::AsyncClient::Callbacks,
+                      public Upstream::ClusterUpdateCallbacks,
                       protected Logger::Loggable<Logger::Id::tracing> {
 public:
   /**
@@ -111,6 +112,10 @@ public:
   // Http::AsyncClient::Callbacks.
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
+
+  // Upstream::ClusterUpdateCallbacks
+  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
+  void onClusterRemoval(const std::string& cluster_name) override;
 
 private:
   /**
@@ -129,6 +134,9 @@ private:
   TraceEncoderSharedPtr encoder_;
 
   std::map<std::string, Http::LowerCaseString> lower_case_headers_;
+
+  const Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_handle_;
+  Upstream::ClusterInfoConstSharedPtr collector_cluster_;
 
   // Track active HTTP requests to be able to cancel them on destruction.
   Http::AsyncClientRequestTracker active_requests_;
