@@ -219,11 +219,8 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     auto rid_extension = config.requestIDExtension();
     // Unconditionally set a request ID if we are allowed to override it from
     // the edge. Otherwise just ensure it is set.
-    if (!config.preserveExternalRequestId() && edge_request) {
-      rid_extension->set(request_headers);
-    } else {
-      rid_extension->ensure(request_headers);
-    }
+    const bool force_set = !config.preserveExternalRequestId() && edge_request;
+    rid_extension->set(request_headers, force_set);
   }
 
   mutateXfccRequestHeader(request_headers, connection, config);

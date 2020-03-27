@@ -13,17 +13,15 @@
 namespace Envoy {
 namespace Http {
 
-void UUIDRequestIDExtension::set(RequestHeaderMap& request_headers) {
+void UUIDRequestIDExtension::set(RequestHeaderMap& request_headers, bool force) {
+  if (!force && request_headers.RequestId()) {
+    return;
+  }
+
   // TODO(PiotrSikora) PERF: Write UUID directly to the header map.
   std::string uuid = random_.uuid();
   ASSERT(!uuid.empty());
   request_headers.setRequestId(uuid);
-}
-
-void UUIDRequestIDExtension::ensure(RequestHeaderMap& request_headers) {
-  if (!request_headers.RequestId()) {
-    set(request_headers);
-  }
 }
 
 void UUIDRequestIDExtension::setInResponse(ResponseHeaderMap& response_headers,

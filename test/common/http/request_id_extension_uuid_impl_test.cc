@@ -19,11 +19,11 @@ TEST(UUIDRequestIDExtensionTest, SetRequestID) {
   TestRequestHeaderMapImpl request_headers;
 
   EXPECT_CALL(random, uuid()).Times(1).WillOnce(Return("first-request-id"));
-  uuid_utils.set(request_headers);
+  uuid_utils.set(request_headers, true);
   EXPECT_EQ("first-request-id", request_headers.get_(Headers::get().RequestId));
 
   EXPECT_CALL(random, uuid()).Times(1).WillOnce(Return("second-request-id"));
-  uuid_utils.set(request_headers);
+  uuid_utils.set(request_headers, true);
   EXPECT_EQ("second-request-id", request_headers.get_(Headers::get().RequestId));
 }
 
@@ -33,11 +33,11 @@ TEST(UUIDRequestIDExtensionTest, EnsureRequestID) {
   TestRequestHeaderMapImpl request_headers;
 
   EXPECT_CALL(random, uuid()).Times(1).WillOnce(Return("first-request-id"));
-  uuid_utils.ensure(request_headers);
+  uuid_utils.set(request_headers, false);
   EXPECT_EQ("first-request-id", request_headers.get_(Headers::get().RequestId));
 
   EXPECT_CALL(random, uuid()).Times(0);
-  uuid_utils.ensure(request_headers);
+  uuid_utils.set(request_headers, false);
   EXPECT_EQ("first-request-id", request_headers.get_(Headers::get().RequestId));
 }
 

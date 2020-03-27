@@ -1383,8 +1383,7 @@ public:
   TestRequestIDExtension(const test::http_connection_manager::CustomRequestIDExtension& config)
       : config_(config) {}
 
-  void set(Http::RequestHeaderMap&) override {}
-  void ensure(Http::RequestHeaderMap&) override {}
+  void set(Http::RequestHeaderMap&, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
   bool modBy(const Http::RequestHeaderMap&, uint64_t&, uint64_t) override { return false; }
   Http::TraceStatus getTraceStatus(const Http::RequestHeaderMap&) override {

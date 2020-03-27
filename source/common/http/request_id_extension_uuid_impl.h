@@ -7,12 +7,13 @@
 namespace Envoy {
 namespace Http {
 
+// UUIDRequestIDExtension is the default implementation if no other extension is explicitly
+// configured.
 class UUIDRequestIDExtension : public RequestIDExtension {
 public:
   explicit UUIDRequestIDExtension(Envoy::Runtime::RandomGenerator& random) : random_(random) {}
 
-  void set(RequestHeaderMap& request_headers);
-  void ensure(RequestHeaderMap& request_headers);
+  void set(RequestHeaderMap& request_headers, bool force);
   void setInResponse(ResponseHeaderMap& response_headers, const RequestHeaderMap& request_headers);
   bool modBy(const RequestHeaderMap& request_headers, uint64_t& out, uint64_t mod);
   TraceStatus getTraceStatus(const RequestHeaderMap& request_headers);

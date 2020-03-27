@@ -22,15 +22,9 @@ public:
    * Directly set a request ID into the provided request headers. Override any previous request ID
    * if any.
    * @param request_headers supplies the incoming request headers for setting a request ID.
+   * @param force specifies if a new request ID should be forcefully set if one is already present.
    */
-  virtual void set(Http::RequestHeaderMap& request_headers) PURE;
-
-  /**
-   * Ensure that a request is configured with a request id. Do not override an ID if request has one
-   * already.
-   * @param request_headers supplies the incoming request headers for setting a request ID.
-   */
-  virtual void ensure(Http::RequestHeaderMap& request_headers) PURE;
+  virtual void set(Http::RequestHeaderMap& request_headers, bool force) PURE;
 
   /**
    * Preserve request ID in response headers if any is set in the request headers.
