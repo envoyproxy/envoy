@@ -21,7 +21,7 @@ df -h
 # which respects the value of the TMPDIR environment variable
 drive="$(readlink -f $TMPDIR | cut -d '/' -f2)"
 if [ ! -e "/$drive/$drive" ]; then
-  /c/windows/system32/cmd.exe "/c mklink /d $drive:\\$drive $drive:\\"
+  /c/windows/system32/cmd.exe /c "mklink /d $drive:\\$drive $drive:\\"
 fi
 
 # Set up PATH to ensure executables from installed software and system to not conflict with those

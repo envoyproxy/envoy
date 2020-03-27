@@ -24,6 +24,7 @@ jobs:
     - bash: ci/windows_ci_steps.sh
       displayName: "Run Windows CI"
       env:
-        TMPDIR: $(Agent.TempDirectory)
         BAZEL_VC: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\VC"
         BAZEL_SH: $(Pipeline.Workspace)/bin/bin/bash.exe
+        MSYS2_ARG_CONV_EXCL: "*"
+        TMPDIR: $(Agent.TempDirectory)
