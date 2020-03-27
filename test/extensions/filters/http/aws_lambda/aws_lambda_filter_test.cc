@@ -36,7 +36,7 @@ class AwsLambdaFilterTest : public ::testing::Test {
 public:
   void setupFilter(const FilterSettings& settings) {
     signer_ = std::make_shared<NiceMock<MockSigner>>();
-    filter_ = std::make_unique<Filter>(settings, signer_);
+    filter_ = std::make_unique<Filter>(settings, stats_, signer_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     const std::string metadata_yaml = "egress_gateway: true";
@@ -52,6 +52,8 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   envoy::config::core::v3::Metadata metadata_;
+  Stats::IsolatedStoreImpl stats_store_;
+  FilterStats stats_ = generateStats("test", stats_store_);
 };
 
 /**
@@ -77,32 +79,6 @@ TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
   Http::TestResponseHeaderMapImpl response_headers;
   const auto encode_result = filter_->encodeHeaders(response_headers, true /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, encode_result);
-}
-
-/**
- * If the filter is configured with an invalid ARN, then we stop.
- */
-TEST_F(AwsLambdaFilterTest, ConfigurationWithInvalidARN) {
-  setupFilter({"BadARN", InvocationMode::Synchronous, true /*passthrough*/});
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply);
-  Http::TestRequestHeaderMapImpl headers;
-  const auto result = filter_->decodeHeaders(headers, true /*end_stream*/);
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, result);
-}
-
-/**
- * If there's a per-route configuration with an invalid ARN, then we stop.
- */
-TEST_F(AwsLambdaFilterTest, PerRouteConfigWithInvalidARN) {
-  setupFilter({Arn, InvocationMode::Synchronous, true /*passthrough*/});
-  FilterSettings route_settings{"BadARN", InvocationMode::Synchronous, true /*passthrough*/};
-  ON_CALL(decoder_callbacks_.route_->route_entry_,
-          perFilterConfig(HttpFilterNames::get().AwsLambda))
-      .WillByDefault(Return(&route_settings));
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply);
-  Http::TestRequestHeaderMapImpl headers;
-  const auto result = filter_->decodeHeaders(headers, true /*end_stream*/);
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, result);
 }
 
 /**
@@ -566,6 +542,8 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeBase64EncodedBody) {
   result = filter_->encodeData(encoded_buf, true /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
   EXPECT_STREQ("Beans", encoded_buf.toString().c_str());
+
+  EXPECT_EQ(0ul, filter_->stats().server_error_.value());
 }
 
 /**
@@ -599,6 +577,8 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeInvalidJson) {
 
   ASSERT_NE(nullptr, headers.Status());
   EXPECT_EQ("500", headers.Status()->value().getStringView());
+
+  EXPECT_EQ(1ul, filter_->stats().server_error_.value());
 }
 
 } // namespace

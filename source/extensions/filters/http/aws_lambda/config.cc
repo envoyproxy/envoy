@@ -2,6 +2,8 @@
 
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
 #include "envoy/registry/registry.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/common/fmt.h"
 
@@ -21,7 +23,7 @@ std::string extractRegionFromArn(absl::string_view arn) {
   if (parsed_arn.has_value()) {
     return parsed_arn->region();
   }
-  throw EnvoyException(fmt::format("Invalid ARN: {}", arn));
+  throw EnvoyException(fmt::format("aws_lambda_filter: Invalid ARN: {}", arn));
 }
 
 InvocationMode
@@ -38,11 +40,12 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
+
 } // namespace
 
 Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
@@ -55,8 +58,9 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
   FilterSettings filter_settings{proto_config.arn(), getInvocationMode(proto_config),
                                  proto_config.payload_passthrough()};
 
-  return [signer, filter_settings](Http::FilterChainFactoryCallbacks& cb) {
-    auto filter = std::make_shared<Filter>(filter_settings, signer);
+  FilterStats stats = generateStats(stat_prefix, context.scope());
+  return [stats, signer, filter_settings](Http::FilterChainFactoryCallbacks& cb) {
+    auto filter = std::make_shared<Filter>(filter_settings, stats, signer);
     cb.addStreamFilter(filter);
   };
 }
@@ -65,10 +69,15 @@ Router::RouteSpecificFilterConfigConstSharedPtr
 AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig& proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  if (!parseArn(proto_config.invoke_config().arn())) {
+    throw EnvoyException(
+        fmt::format("aws_lambda_filter: Invalid ARN: {}", proto_config.invoke_config().arn()));
+  }
   return std::make_shared<const FilterSettings>(FilterSettings{
       proto_config.invoke_config().arn(), getInvocationMode(proto_config.invoke_config()),
       proto_config.invoke_config().payload_passthrough()});
 }
+
 /*
  * Static registration for the AWS Lambda filter. @see RegisterFactory.
  */

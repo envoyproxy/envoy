@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/http/filter.h"
+#include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -54,6 +55,24 @@ private:
 absl::optional<Arn> parseArn(absl::string_view arn);
 
 /**
+ * All stats for the AWS Lambda filter. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_AWS_LAMBDA_FILTER_STATS(COUNTER, HISTOGRAM)  \
+  COUNTER(server_error)                                  \
+  HISTOGRAM(upstream_rq_payload_size, Bytes)
+// clang-format on
+
+/**
+ * Wrapper struct filter stats. @see stats_macros.h
+ */
+struct FilterStats {
+  ALL_AWS_LAMBDA_FILTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+};
+
+FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+
+/**
  * Lambda invocation mode.
  * Synchronous mode is analogous to a blocking call; Lambda responds when it's completed processing.
  * In the Asynchronous mode, Lambda responds immediately acknowledging it received the request.
@@ -78,7 +97,7 @@ private:
 class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 
 public:
-  Filter(const FilterSettings& config,
+  Filter(const FilterSettings& config, const FilterStats& stats,
          const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer);
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
@@ -93,6 +112,7 @@ public:
    * @return error message if settings are invalid. Otherwise, empty string.
    */
   std::string resolveSettings();
+  FilterStats& stats() { return stats_; }
 
   /**
    * Used for unit testing only
@@ -106,8 +126,9 @@ private:
                       Buffer::Instance& out) const;
   // Convert the JSON response to a standard HTTP response.
   void dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::Instance& body,
-                         Buffer::Instance& out) const;
+                         Buffer::Instance& out);
   const FilterSettings settings_;
+  FilterStats stats_;
   Http::RequestHeaderMap* request_headers_ = nullptr;
   Http::ResponseHeaderMap* response_headers_ = nullptr;
   std::shared_ptr<Extensions::Common::Aws::Signer> sigv4_signer_;
