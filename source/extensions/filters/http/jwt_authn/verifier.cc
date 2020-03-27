@@ -119,13 +119,14 @@ public:
     auto& ctximpl = static_cast<ContextImpl&>(*context);
     auto auth = auth_factory_.create(getAudienceChecker(), provider_name_, false, false);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
-    auth->verify(ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
-                 [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
-                   ctximpl.addPayload(name, payload);
-                 },
-                 [this, context](const Status& status) {
-                   onComplete(status, static_cast<ContextImpl&>(*context));
-                 });
+    auth->verify(
+        ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
+        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
+          ctximpl.addPayload(name, payload);
+        },
+        [this, context](const Status& status) {
+          onComplete(status, static_cast<ContextImpl&>(*context));
+        });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
     } else {
@@ -169,13 +170,14 @@ public:
     auto& ctximpl = static_cast<ContextImpl&>(*context);
     auto auth = auth_factory_.create(nullptr, absl::nullopt, true, true);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
-    auth->verify(ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
-                 [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
-                   ctximpl.addPayload(name, payload);
-                 },
-                 [this, context](const Status& status) {
-                   onComplete(status, static_cast<ContextImpl&>(*context));
-                 });
+    auth->verify(
+        ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
+        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
+          ctximpl.addPayload(name, payload);
+        },
+        [this, context](const Status& status) {
+          onComplete(status, static_cast<ContextImpl&>(*context));
+        });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
     } else {
@@ -203,13 +205,14 @@ public:
     auto auth = auth_factory_.create(nullptr, absl::nullopt, false /* allow failed */,
                                      true /* allow missing */);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
-    auth->verify(ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
-                 [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
-                   ctximpl.addPayload(name, payload);
-                 },
-                 [this, context](const Status& status) {
-                   onComplete(status, static_cast<ContextImpl&>(*context));
-                 });
+    auth->verify(
+        ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
+        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
+          ctximpl.addPayload(name, payload);
+        },
+        [this, context](const Status& status) {
+          onComplete(status, static_cast<ContextImpl&>(*context));
+        });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
     } else {

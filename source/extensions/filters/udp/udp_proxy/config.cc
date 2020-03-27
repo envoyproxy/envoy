@@ -8,6 +8,7 @@ namespace UdpProxy {
 static Registry::RegisterFactory<UdpProxyFilterConfigFactory,
                                  Server::Configuration::NamedUdpListenerFilterConfigFactory>
     register_;
+
 }
 } // namespace UdpFilters
 } // namespace Extensions

@@ -40,8 +40,9 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
                                              quic::QuicSpdyClientSession* client_session,
                                              quic::StreamType type)
     : quic::QuicSpdyClientStream(pending, client_session, type),
-      EnvoyQuicStream(16 * 1024, [this]() { runLowWatermarkCallbacks(); },
-                      [this]() { runHighWatermarkCallbacks(); }) {}
+      EnvoyQuicStream(
+          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
+          [this]() { runHighWatermarkCallbacks(); }) {}
 
 void EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);

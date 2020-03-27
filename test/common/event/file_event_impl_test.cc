@@ -164,18 +164,18 @@ TEST_F(FileEventImplTest, SetEnabled) {
 #else
   const FileTriggerType trigger = FileTriggerType::Edge;
 #endif
-  Event::FileEventPtr file_event =
-      dispatcher_->createFileEvent(fds_[0],
-                                   [&](uint32_t events) -> void {
-                                     if (events & FileReadyType::Read) {
-                                       read_event.ready();
-                                     }
+  Event::FileEventPtr file_event = dispatcher_->createFileEvent(
+      fds_[0],
+      [&](uint32_t events) -> void {
+        if (events & FileReadyType::Read) {
+          read_event.ready();
+        }
 
-                                     if (events & FileReadyType::Write) {
-                                       write_event.ready();
-                                     }
-                                   },
-                                   trigger, FileReadyType::Read | FileReadyType::Write);
+        if (events & FileReadyType::Write) {
+          write_event.ready();
+        }
+      },
+      trigger, FileReadyType::Read | FileReadyType::Write);
 
   file_event->setEnabled(FileReadyType::Read);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);

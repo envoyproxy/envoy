@@ -9,9 +9,9 @@ class EnvoyQuicSimulatedWatermarkBufferTest : public ::testing::Test,
                                               protected Logger::Loggable<Logger::Id::testing> {
 public:
   EnvoyQuicSimulatedWatermarkBufferTest()
-      : simulated_watermark_buffer_(low_watermark_, high_watermark_,
-                                    [this]() { onBelowLowWatermark(); },
-                                    [this]() { onAboveHighWatermark(); }, ENVOY_LOGGER()) {}
+      : simulated_watermark_buffer_(
+            low_watermark_, high_watermark_, [this]() { onBelowLowWatermark(); },
+            [this]() { onAboveHighWatermark(); }, ENVOY_LOGGER()) {}
 
   void onAboveHighWatermark() { ++above_high_watermark_; }
 
@@ -66,8 +66,9 @@ TEST_F(EnvoyQuicSimulatedWatermarkBufferTest, GoAboveHighWatermarkAndComeDown) {
 }
 
 TEST_F(EnvoyQuicSimulatedWatermarkBufferTest, NoWatermarkSpecified) {
-  EnvoyQuicSimulatedWatermarkBuffer buffer(0, 0, [this]() { onBelowLowWatermark(); },
-                                           [this]() { onAboveHighWatermark(); }, ENVOY_LOGGER());
+  EnvoyQuicSimulatedWatermarkBuffer buffer(
+      0, 0, [this]() { onBelowLowWatermark(); }, [this]() { onAboveHighWatermark(); },
+      ENVOY_LOGGER());
   buffer.checkHighWatermark(10);
   EXPECT_EQ(0U, above_high_watermark_);
 
