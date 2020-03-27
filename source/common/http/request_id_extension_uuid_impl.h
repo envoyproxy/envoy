@@ -13,11 +13,12 @@ class UUIDRequestIDExtension : public RequestIDExtension {
 public:
   explicit UUIDRequestIDExtension(Envoy::Runtime::RandomGenerator& random) : random_(random) {}
 
-  void set(RequestHeaderMap& request_headers, bool force);
-  void setInResponse(ResponseHeaderMap& response_headers, const RequestHeaderMap& request_headers);
-  bool modBy(const RequestHeaderMap& request_headers, uint64_t& out, uint64_t mod);
-  TraceStatus getTraceStatus(const RequestHeaderMap& request_headers);
-  void setTraceStatus(RequestHeaderMap& request_headers, TraceStatus status);
+  void set(RequestHeaderMap& request_headers, bool force) override;
+  void setInResponse(ResponseHeaderMap& response_headers,
+                     const RequestHeaderMap& request_headers) override;
+  bool modBy(const RequestHeaderMap& request_headers, uint64_t& out, uint64_t mod) override;
+  TraceStatus getTraceStatus(const RequestHeaderMap& request_headers) override;
+  void setTraceStatus(RequestHeaderMap& request_headers, TraceStatus status) override;
 
 private:
   // Reference to the random generator used to generate new request IDs
