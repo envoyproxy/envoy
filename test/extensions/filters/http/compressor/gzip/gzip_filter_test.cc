@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/common/hex.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
 
@@ -6,8 +8,6 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
-
-using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -20,8 +20,8 @@ protected:
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     envoy::extensions::filters::http::compressor::gzip::v3::Gzip gzip;
     CompressorFactoryPtr gzip_factory = std::make_unique<Gzip::GzipCompressorFactory>(gzip);
-    config_.reset(
-        new CompressorFilterConfig(compressor, "test.", stats_, runtime_, std::move(gzip_factory)));
+    config_ = std::make_shared<CompressorFilterConfig>(compressor, "test.", stats_, runtime_,
+                                                       std::move(gzip_factory));
     filter_ = std::make_unique<Common::Compressors::CompressorFilter>(config_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);

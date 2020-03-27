@@ -1,6 +1,9 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
+#include "envoy/server/filter_config.h"
+
+#include "extensions/filters/http/compressor/compressor_factory.h"
 
 namespace Envoy {
 namespace Extensions {
