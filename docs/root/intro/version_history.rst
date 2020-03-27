@@ -19,6 +19,7 @@ Version history
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
 * grpc-json: added support for building HTTP request into
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
+* grpc-stats: add options to limit which messages stats are created for.
 * config: added stat :ref:`update_time <config_cluster_manager_cds>`.
 * datasource: added retry policy for remote async data source.
 * dns: the STRICT_DNS cluster now only resolves to 0 hosts if DNS resolution successfully returns 0 hosts.

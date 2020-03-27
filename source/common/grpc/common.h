@@ -153,6 +153,20 @@ public:
    */
   static bool parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto);
 
+  struct RequestNames {
+    absl::string_view service_;
+    absl::string_view method_;
+  };
+
+  /**
+   * Resolve the gRPC service and method from the HTTP2 :path header.
+   * @param path supplies the :path header.
+   * @return if both gRPC serve and method have been resolved successfully returns
+   *   a populated RequestNames, otherwise returns an empty optional.
+   * @note The return value is only valid as long as `path` is still valid and unmodified.
+   */
+  static absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path);
+
 private:
   static void checkForHeaderOnlyError(Http::ResponseMessage& http_response);
 };

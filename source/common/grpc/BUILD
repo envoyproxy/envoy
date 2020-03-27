@@ -107,6 +107,7 @@ envoy_cc_library(
     hdrs = ["context_impl.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":common_lib",
         ":stat_names_lib",
         "//include/envoy/grpc:context_interface",
         "//include/envoy/http:header_map_interface",

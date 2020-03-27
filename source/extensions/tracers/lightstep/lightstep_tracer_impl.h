@@ -137,7 +137,7 @@ private:
   const PropagationMode propagation_mode_;
   Grpc::Context& grpc_context_;
   Stats::StatNamePool pool_;
-  const Grpc::Context::RequestNames request_names_;
+  const Grpc::Context::RequestStatNames request_stat_names_;
 };
 } // namespace Lightstep
 } // namespace Tracers
