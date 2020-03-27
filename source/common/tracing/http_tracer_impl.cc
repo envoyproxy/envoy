@@ -69,12 +69,8 @@ Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
     return {Reason::HealthCheck, false};
   }
 
-  Http::RequestIDExtensionSharedPtr rid_extension = stream_info.getRequestIDExtension();
-  if (rid_extension == nullptr) {
-    return {Reason::NotTraceableRequestId, false};
-  }
-
-  Http::TraceStatus trace_status = rid_extension->getTraceStatus(request_headers);
+  Http::TraceStatus trace_status =
+      stream_info.getRequestIDExtension()->getTraceStatus(request_headers);
 
   switch (trace_status) {
   case Http::TraceStatus::Client:
