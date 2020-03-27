@@ -10,11 +10,11 @@
 
 namespace Envoy {
 
-class GzipIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class CompressorIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                             public Event::SimulatedTimeSystem,
                             public HttpIntegrationTest {
 public:
-  GzipIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  CompressorIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void SetUp() override { decompressor_.init(window_bits); }
   void TearDown() override { cleanupUpstreamAndDownstream(); }
@@ -108,14 +108,14 @@ public:
   Decompressor::ZlibDecompressorImpl decompressor_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, GzipIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, CompressorIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 /**
  * Exercises gzip compression with default configuration.
  */
-TEST_P(GzipIntegrationTest, AcceptanceDefaultConfigTest) {
+TEST_P(CompressorIntegrationTest, AcceptanceDefaultConfigTest) {
   initializeFilter(default_config);
   doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                          {":path", "/test/long/url"},
@@ -130,7 +130,7 @@ TEST_P(GzipIntegrationTest, AcceptanceDefaultConfigTest) {
 /**
  * Exercises gzip compression with deprecated full configuration.
  */
-TEST_P(GzipIntegrationTest, AcceptanceDeprecatedFullConfigTest) {
+TEST_P(CompressorIntegrationTest, AcceptanceDeprecatedFullConfigTest) {
   initializeFilter(deprecated_full_config);
   doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                          {":path", "/test/long/url"},
@@ -145,7 +145,7 @@ TEST_P(GzipIntegrationTest, AcceptanceDeprecatedFullConfigTest) {
 /**
  * Exercises gzip compression with full configuration.
  */
-TEST_P(GzipIntegrationTest, AcceptanceFullConfigTest) {
+TEST_P(CompressorIntegrationTest, AcceptanceFullConfigTest) {
   initializeFilter(full_config);
   doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                          {":path", "/test/long/url"},
@@ -160,7 +160,7 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigTest) {
 /**
  * Exercises filter when client request contains 'identity' type.
  */
-TEST_P(GzipIntegrationTest, IdentityAcceptEncoding) {
+TEST_P(CompressorIntegrationTest, IdentityAcceptEncoding) {
   initializeFilter(default_config);
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
@@ -175,7 +175,7 @@ TEST_P(GzipIntegrationTest, IdentityAcceptEncoding) {
 /**
  * Exercises filter when client request contains unsupported 'accept-encoding' type.
  */
-TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
+TEST_P(CompressorIntegrationTest, NotSupportedAcceptEncoding) {
   initializeFilter(default_config);
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
@@ -190,7 +190,7 @@ TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
 /**
  * Exercises filter when upstream response is already encoded.
  */
-TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
+TEST_P(CompressorIntegrationTest, UpstreamResponseAlreadyEncoded) {
   initializeFilter(default_config);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
@@ -216,7 +216,7 @@ TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
 /**
  * Exercises filter when upstream responds with content length below the default threshold.
  */
-TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
+TEST_P(CompressorIntegrationTest, NotEnoughContentLength) {
   initializeFilter(default_config);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
@@ -240,7 +240,7 @@ TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
 /**
  * Exercises filter when response from upstream service is empty.
  */
-TEST_P(GzipIntegrationTest, EmptyResponse) {
+TEST_P(CompressorIntegrationTest, EmptyResponse) {
   initializeFilter(default_config);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
@@ -263,7 +263,7 @@ TEST_P(GzipIntegrationTest, EmptyResponse) {
 /**
  * Exercises filter when upstream responds with restricted content-type value.
  */
-TEST_P(GzipIntegrationTest, SkipOnContentType) {
+TEST_P(CompressorIntegrationTest, SkipOnContentType) {
   initializeFilter(full_config);
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
@@ -278,7 +278,7 @@ TEST_P(GzipIntegrationTest, SkipOnContentType) {
 /**
  * Exercises filter when upstream responds with restricted cache-control value.
  */
-TEST_P(GzipIntegrationTest, SkipOnCacheControl) {
+TEST_P(CompressorIntegrationTest, SkipOnCacheControl) {
   initializeFilter(full_config);
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
@@ -294,7 +294,7 @@ TEST_P(GzipIntegrationTest, SkipOnCacheControl) {
 /**
  * Exercises gzip compression when upstream returns a chunked response.
  */
-TEST_P(GzipIntegrationTest, AcceptanceFullConfigChunkedResponse) {
+TEST_P(CompressorIntegrationTest, AcceptanceFullConfigChunkedResponse) {
   initializeFilter(full_config);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
@@ -318,7 +318,7 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigChunkedResponse) {
 /**
  * Verify Vary header values are preserved.
  */
-TEST_P(GzipIntegrationTest, AcceptanceFullConfigVeryHeader) {
+TEST_P(CompressorIntegrationTest, AcceptanceFullConfigVeryHeader) {
   initializeFilter(default_config);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
