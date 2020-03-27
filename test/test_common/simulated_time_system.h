@@ -112,8 +112,6 @@ private:
   uint64_t index_ GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   uint32_t pending_alarms_ GUARDED_BY(mutex_);
-  absl::flat_hash_map<Thread::ThreadId, uint32_t> thread_pending_map_;
-  // uint32_t pending_alarms_on_other_threads_ GUARDED_BY(mutex_);
   Thread::OnlyOneThread only_one_thread_;
 };
 
