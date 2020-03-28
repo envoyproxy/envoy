@@ -10,11 +10,11 @@ namespace PostgreSQLProxy {
 
 class DecoderCallbacksMock : public DecoderCallbacks {
 public:
-  MOCK_METHOD(void, incFrontend, (), (override));
   MOCK_METHOD(void, incBackend, (), (override));
-  MOCK_METHOD(void, incUnknown, (), (override));
+  MOCK_METHOD(void, incFrontend, (), (override));
   MOCK_METHOD(void, incErrors, (), (override));
-  MOCK_METHOD(void, incSessions, (), (override));
+  MOCK_METHOD(void, incSessionsEncrypted, (), (override));
+  MOCK_METHOD(void, incSessionsUnencrypted, (), (override));
   MOCK_METHOD(void, incStatements, (), (override));
   MOCK_METHOD(void, incStatementsDelete, (), (override));
   MOCK_METHOD(void, incStatementsInsert, (), (override));
@@ -24,8 +24,8 @@ public:
   MOCK_METHOD(void, incTransactions, (), (override));
   MOCK_METHOD(void, incTransactionsCommit, (), (override));
   MOCK_METHOD(void, incTransactionsRollback, (), (override));
+  MOCK_METHOD(void, incUnknown, (), (override));
   MOCK_METHOD(void, incWarnings, (), (override));
-  MOCK_METHOD(void, incEncryptedSessions, (), (override));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -364,7 +364,7 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, AuthenticationMsg) {
   // Create authentication message which does not
   // mean that authentication was OK. The number of
   // sessions must not be increased.
-  EXPECT_CALL(callbacks_, incSessions()).Times(0);
+  EXPECT_CALL(callbacks_, incSessionsUnencrypted()).Times(0);
   payload_ = "blah blah";
   data_.add("R");
   length_ = htonl(4 + payload_.length());
@@ -375,7 +375,7 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, AuthenticationMsg) {
 
   // Create the correct payload which means that
   // authentication completed successfully.
-  EXPECT_CALL(callbacks_, incSessions());
+  EXPECT_CALL(callbacks_, incSessionsUnencrypted());
   data_.add("R");
   length_ = htonl(8);
   data_.add(&length_, sizeof(length_));
@@ -448,7 +448,7 @@ TEST_P(PostgreSQLProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   ASSERT_FALSE(decoder_->encrypted());
 
   // Create SSLRequest
-  EXPECT_CALL(callbacks_, incEncryptedSessions());
+  EXPECT_CALL(callbacks_, incSessionsEncrypted());
   length_ = htonl(8);
   data_.add(&length_, sizeof(length_));
   // 1234 in the most significant 16 bits, and some code in the least significant 16 bits

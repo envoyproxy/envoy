@@ -20,23 +20,26 @@ class DecoderCallbacks {
 public:
   virtual ~DecoderCallbacks() = default;
 
-  virtual void incFrontend() PURE;
   virtual void incBackend() PURE;
-  virtual void incUnknown() PURE;
-
   virtual void incErrors() PURE;
-  virtual void incSessions() PURE;
+  virtual void incFrontend() PURE;
+
+  virtual void incSessionsEncrypted() PURE;
+  virtual void incSessionsUnencrypted() PURE;
+
   virtual void incStatements() PURE;
   virtual void incStatementsDelete() PURE;
   virtual void incStatementsInsert() PURE;
   virtual void incStatementsOther() PURE;
   virtual void incStatementsSelect() PURE;
   virtual void incStatementsUpdate() PURE;
+
   virtual void incTransactions() PURE;
   virtual void incTransactionsCommit() PURE;
   virtual void incTransactionsRollback() PURE;
+
+  virtual void incUnknown() PURE;
   virtual void incWarnings() PURE;
-  virtual void incEncryptedSessions() PURE;
 };
 
 // PostgreSQL message decoder.
@@ -77,13 +80,13 @@ protected:
   void decodeBackendNoticeResponse();
   void decodeFrontendTerminate();
 
-  void incFrontend() { callbacks_->incFrontend(); }
   void incBackend() { callbacks_->incBackend(); }
-  void incUnknown() { callbacks_->incUnknown(); }
+  void incFrontend() { callbacks_->incFrontend(); }
+  void incSessionsEncrypted() { callbacks_->incSessionsEncrypted(); }
+  void incSessionsUnencrypted() { callbacks_->incSessionsUnencrypted(); }
   void incStatements() { callbacks_->incStatements(); }
   void incStatementsOther() { callbacks_->incStatementsOther(); }
-  void incSessions() { callbacks_->incSessions(); }
-  void incEncryptedSessions() { callbacks_->incEncryptedSessions(); }
+  void incUnknown() { callbacks_->incUnknown(); }
 
   DecoderCallbacks* callbacks_;
   PostgreSQLSession session_;

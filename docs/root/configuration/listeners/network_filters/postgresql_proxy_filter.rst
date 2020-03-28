@@ -48,9 +48,12 @@ Every configured PostgreSQL proxy filter has statistics rooted at postgresql.<st
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  frontend_msgs, Counter, Number of frontend messages detected by the filter
   backend_msgs, Counter, Number of backend messages detected by the filter
-  sessions, Counter, Number of messages indicating successful login 
+  errors, Counter, Number of times the server replied with error
+  frontend_msgs, Counter, Number of frontend messages detected by the filter
+  sessions, Counter, Number of successful logins
+  sessions_encrypted, Counter, Number of times the proxy detected encrypted sessions
+  sessions_unencrypted, Counter, Number of messages indicating unencrypted successful login
   statements, Counter, Number of SQL statements
   statements_delete, Counter, Number of DELETE statements
   statements_insert, Counter, Number of INSERT statements
@@ -60,7 +63,5 @@ Every configured PostgreSQL proxy filter has statistics rooted at postgresql.<st
   transactions, Counter, Number of SQL transactions
   transactions_commit, Counter, Number of COMMIT transactions
   transactions_rollback, Counter, Number of ROLLBACK transactions
-  errors, Counter, Number of times the server replied with error
   warnings, Counter, Number of time the server replied with warning
-  unknown, Counter, Number of times the proxy successfully decoded a message but did not know what to do with it.
-  encrypted_sessions, Counter, Number of times the proxy detected encrypted sessions.
+  unknown, Counter, Number of times the proxy successfully decoded a message but did not know what to do with it

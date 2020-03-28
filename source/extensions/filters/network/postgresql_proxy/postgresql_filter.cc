@@ -52,17 +52,21 @@ DecoderPtr PostgreSQLFilter::createDecoder(DecoderCallbacks* callbacks) {
   return std::make_unique<DecoderImpl>(callbacks);
 }
 
+void PostgreSQLFilter::incBackend() { config_->stats_.backend_msgs_.inc(); }
 void PostgreSQLFilter::incErrors() { config_->stats_.errors_.inc(); }
+void PostgreSQLFilter::incFrontend() { config_->stats_.frontend_msgs_.inc(); }
 
-void PostgreSQLFilter::incSessions() { config_->stats_.sessions_.inc(); }
+void PostgreSQLFilter::incSessionsEncrypted() {
+  config_->stats_.sessions_.inc();
+  config_->stats_.sessions_encrypted_.inc();
+}
+
+void PostgreSQLFilter::incSessionsUnencrypted() {
+  config_->stats_.sessions_.inc();
+  config_->stats_.sessions_unencrypted_.inc();
+}
 
 void PostgreSQLFilter::incStatements() { config_->stats_.statements_.inc(); }
-
-void PostgreSQLFilter::incFrontend() { config_->stats_.frontend_msgs_.inc(); }
-void PostgreSQLFilter::incBackend() { config_->stats_.backend_msgs_.inc(); }
-
-void PostgreSQLFilter::incUnknown() { config_->stats_.unknown_.inc(); }
-void PostgreSQLFilter::incEncryptedSessions() { config_->stats_.encrypted_sessions_.inc(); }
 
 void PostgreSQLFilter::incStatementsDelete() {
   config_->stats_.statements_delete_.inc();
@@ -107,6 +111,7 @@ void PostgreSQLFilter::incTransactionsRollback() {
   }
 }
 
+void PostgreSQLFilter::incUnknown() { config_->stats_.unknown_.inc(); }
 void PostgreSQLFilter::incWarnings() { config_->stats_.warnings_.inc(); }
 
 void PostgreSQLFilter::doDecode(Buffer::Instance& data, bool frontend) {
