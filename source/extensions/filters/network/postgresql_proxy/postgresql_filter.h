@@ -19,11 +19,12 @@ namespace PostgreSQLProxy {
  * All PostgreSQL proxy stats. @see stats_macros.h
  */
 #define ALL_POSTGRESQL_PROXY_STATS(COUNTER)                                                        \
-  COUNTER(frontend_msgs)                                                                           \
   COUNTER(backend_msgs)                                                                            \
-  COUNTER(unknown)                                                                                 \
-  COUNTER(sessions)                                                                                \
   COUNTER(errors)                                                                                  \
+  COUNTER(frontend_msgs)                                                                           \
+  COUNTER(sessions)                                                                                \
+  COUNTER(sessions_encrypted)                                                                      \
+  COUNTER(sessions_unencrypted)                                                                    \
   COUNTER(statements)                                                                              \
   COUNTER(statements_insert)                                                                       \
   COUNTER(statements_delete)                                                                       \
@@ -33,8 +34,8 @@ namespace PostgreSQLProxy {
   COUNTER(transactions)                                                                            \
   COUNTER(transactions_commit)                                                                     \
   COUNTER(transactions_rollback)                                                                   \
-  COUNTER(warnings)                                                                                \
-  COUNTER(encrypted_sessions)
+  COUNTER(unknown)                                                                                 \
+  COUNTER(warnings)
 
 /**
  * Struct definition for all PostgreSQL proxy stats. @see stats_macros.h
@@ -78,11 +79,11 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
 
   // PostgreSQLProxy::DecoderCallback
-  void incFrontend() override;
   void incBackend() override;
-  void incUnknown() override;
   void incErrors() override;
-  void incSessions() override;
+  void incFrontend() override;
+  void incSessionsEncrypted() override;
+  void incSessionsUnencrypted() override;
   void incStatements() override;
   void incStatementsDelete() override;
   void incStatementsInsert() override;
@@ -92,8 +93,8 @@ public:
   void incTransactions() override;
   void incTransactionsCommit() override;
   void incTransactionsRollback() override;
+  void incUnknown() override;
   void incWarnings() override;
-  void incEncryptedSessions() override;
 
   void doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);

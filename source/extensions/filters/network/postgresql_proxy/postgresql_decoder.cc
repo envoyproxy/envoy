@@ -142,7 +142,7 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
       ENVOY_LOG(trace, "postgresql_proxy: detected encrypted traffic.");
       encrypted_ = true;
       startup_ = false;
-      incEncryptedSessions();
+      incSessionsEncrypted();
       data.drain(data.length());
       return false;
     } else {
@@ -244,7 +244,7 @@ void DecoderImpl::decodeAuthentication() {
   // check if auth message indicates successful authentication
   // Length must be 8 and payload must be 0
   if ((8 == message_len_) && (0 == *(reinterpret_cast<const uint32_t*>(message_.data())))) {
-    callbacks_->incSessions();
+    incSessionsUnencrypted();
   }
 }
 
