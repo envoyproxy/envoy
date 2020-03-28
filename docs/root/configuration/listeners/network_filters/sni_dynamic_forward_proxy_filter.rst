@@ -7,9 +7,9 @@ SNI dynamic forward proxy
 
   SNI dynamic forward proxy support should be considered alpha and not production ready.
 
-Through the combination of :ref:`TLS Inspector <config_listener_filters_tls_inspector>` listener filter,
-this netwrok filter and the
-:ref:`custom cluster <envoy_api_msg_config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig>`,
+Through the combination of :ref:`TLS inspector <config_listener_filters_tls_inspector>` listener filter,
+this network filter and the
+:ref:`dynamic forward proxy cluster <envoy_api_msg_config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig>`,
 Envoy supports SNI based dynamic forward proxy. The implementation works just like the
 :ref:`HTTP dynamic forward proxy <arch_overview_http_dynamic_forward_proxy>`, but using the value in
 SNI as target host instead.
