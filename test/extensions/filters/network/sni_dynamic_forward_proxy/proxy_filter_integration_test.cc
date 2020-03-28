@@ -20,6 +20,7 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(),
                             ConfigHelper::TCP_PROXY_CONFIG) {}
 
+  // TODO(lizan): move this to a utility.
   static std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
     switch (version) {
     case Network::Address::IpVersion::v4:
