@@ -16,7 +16,8 @@ ProxyFilterConfig::ProxyFilterConfig(
     const FilterConfig& proto_config,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
     Upstream::ClusterManager& cluster_manager)
-    : port_(proto_config.port_value()), dns_cache_manager_(cache_manager_factory.get()),
+    : port_(static_cast<uint16_t>(proto_config.port_value())),
+      dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
       cluster_manager_(cluster_manager) {}
 
