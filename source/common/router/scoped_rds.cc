@@ -15,6 +15,7 @@
 #include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
+#include "common/config/resources.h"
 #include "common/config/version_converter.h"
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
@@ -241,7 +242,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     // In the case if factory_context_.init_manager() is uninitialized, RDS is already paused
     // either by Server init or LDS init.
     if (factory_context_.clusterManager().adsMux()) {
-      factory_context_.clusterManager().adsMux()->pause(getResourceName());
+      factory_context_.clusterManager().adsMux()->pause(
+          Envoy::Config::TypeUrl::get().RouteConfiguration);
     }
     resume_rds = std::make_unique<Cleanup>([this, &noop_init_manager, version_info] {
       // For new RDS subscriptions created after listener warming up, we don't wait for them to
@@ -255,7 +257,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       // Note in the case of partial acceptance, accepted RDS subscriptions should be started
       // despite of any error.
       if (factory_context_.clusterManager().adsMux()) {
-        factory_context_.clusterManager().adsMux()->resume(getResourceName());
+        factory_context_.clusterManager().adsMux()->resume(
+            Envoy::Config::TypeUrl::get().RouteConfiguration);
       }
     });
   }

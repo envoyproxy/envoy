@@ -22,6 +22,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/new_grpc_mux_impl.h"
+#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/grpc/async_client_manager_impl.h"
@@ -142,31 +143,16 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
-      const auto target_type_urls =
-          Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      if (cm_.adsMux() == nullptr) {
+      if (cm_.adsMux() == nullptr ||
+          cm_.adsMux()->paused(Config::TypeUrl::get().ClusterLoadAssignment)) {
         initializeSecondaryClusters();
-        return;
       } else {
-        bool cluster_load_assignment_paused = false;
-        for (const auto& type_url : target_type_urls) {
-          cluster_load_assignment_paused =
-              cluster_load_assignment_paused || cm_.adsMux()->paused(type_url);
-        }
-        if (!cluster_load_assignment_paused) {
-          for (const auto& type_url : target_type_urls) {
-            cm_.adsMux()->pause(type_url);
-          }
-          Cleanup eds_resume([this, target_type_urls] {
-            for (const auto& type_url : target_type_urls) {
-              cm_.adsMux()->resume(type_url);
-            }
-          });
-        }
+        cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
+        Cleanup eds_resume(
+            [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
         initializeSecondaryClusters();
       }
     }
@@ -759,16 +745,10 @@ void ClusterManagerImpl::updateClusterCounts() {
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   if (ads_mux_) {
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
-    const auto target_type_urls =
-        Config::getAllVersionTypeUrls<envoy::config::cluster::v3::Cluster>();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      for (const auto& type_url : target_type_urls) {
-        ads_mux_->pause(type_url);
-      }
+      ads_mux_->pause(Config::TypeUrl::get().Cluster);
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
-      for (const auto& type_url : target_type_urls) {
-        ads_mux_->resume(type_url);
-      }
+      ads_mux_->resume(Config::TypeUrl::get().Cluster);
     }
   }
   cm_stats_.active_clusters_.set(active_clusters_.size());

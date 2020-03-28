@@ -14,6 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/config/api_version.h"
+#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -43,16 +44,9 @@ void LdsApiImpl::onConfigUpdate(
     const std::string& system_version_info) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
-    const auto target_type_urls =
-        Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
-    for (const auto& type_url : target_type_urls) {
-      cm_.adsMux()->pause(type_url);
-    }
-    maybe_eds_resume = std::make_unique<Cleanup>([this, target_type_urls] {
-      for (const auto& type_url : target_type_urls) {
-        cm_.adsMux()->resume(type_url);
-      }
-    });
+    cm_.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
+    maybe_eds_resume = std::make_unique<Cleanup>(
+        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration); });
   }
 
   bool any_applied = false;
