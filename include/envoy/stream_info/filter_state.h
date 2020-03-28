@@ -10,6 +10,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace StreamInfo {
@@ -56,6 +57,13 @@ public:
      * logging. nullptr if the filter state cannot be serialized or serialization is not supported.
      */
     virtual ProtobufTypes::MessagePtr serializeAsProto() const { return nullptr; }
+
+    /**
+     * @return absl::optional<std::string> a optional string to the serialization of the filter
+     * state. No value if the filter state cannot be serialized or serialization is not supported.
+     * This method can be used to get a unstructured serialization result.
+     */
+    virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
   };
 
   virtual ~FilterState() = default;
