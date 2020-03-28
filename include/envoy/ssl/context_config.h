@@ -131,9 +131,9 @@ public:
   virtual absl::optional<std::chrono::seconds> sessionTimeout() const PURE;
 
   /**
-   * @return True if TLS session tickets are disabled, false otherwise.
+   * @return True if stateless TLS session resumption is disabled, false otherwise.
    */
-  virtual bool disableSessionTickets() const PURE;
+  virtual bool disableStatelessSessionResumption() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;

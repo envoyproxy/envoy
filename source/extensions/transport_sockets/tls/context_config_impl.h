@@ -147,7 +147,9 @@ public:
   }
 
   void setSecretUpdateCallback(std::function<void()> callback) override;
-  bool disableSessionTickets() const override { return disable_session_tickets_; }
+  bool disableStatelessSessionResumption() const override {
+    return disable_stateless_session_resumption_;
+  }
 
 private:
   static const unsigned DEFAULT_MIN_VERSION;
@@ -166,7 +168,7 @@ private:
   ServerContextConfig::SessionTicketKey getSessionTicketKey(const std::string& key_data);
 
   absl::optional<std::chrono::seconds> session_timeout_;
-  const bool disable_session_tickets_;
+  const bool disable_stateless_session_resumption_;
 };
 
 } // namespace Tls

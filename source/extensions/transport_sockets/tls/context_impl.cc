@@ -1010,7 +1010,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
           this);
     }
 
-    if (config.disableSessionTickets()) {
+    if (config.disableStatelessSessionResumption()) {
       SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_NO_TICKET);
     } else if (!session_ticket_keys_.empty()) {
       SSL_CTX_set_tlsext_ticket_key_cb(

@@ -2635,9 +2635,10 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, client_stats_store.counter("ssl.session_reused").value());
 }
 
-void testSupportForSessionTickets(const std::string& server_ctx_yaml,
-                                  const std::string& client_ctx_yaml, bool expect_support,
-                                  const Network::Address::IpVersion ip_version) {
+void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml,
+                                              const std::string& client_ctx_yaml,
+                                              bool expect_support,
+                                              const Network::Address::IpVersion ip_version) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(*time_system);
 
@@ -2995,7 +2996,7 @@ TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertDifferentSAN) {
                               GetParam());
 }
 
-TEST_P(SslSocketTest, SessionTicketsDisabled) {
+TEST_P(SslSocketTest, StatelessSessionResumptionDisabled) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -3003,17 +3004,17 @@ TEST_P(SslSocketTest, SessionTicketsDisabled) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key:
         filename: "{{ test_tmpdir }}/unittestkey.pem"
-  disable_session_tickets: true
+  disable_stateless_session_resumption: true
 )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
     common_tls_context:
   )EOF";
 
-  testSupportForSessionTickets(server_ctx_yaml, client_ctx_yaml, false, GetParam());
+  testSupportForStatelessSessionResumption(server_ctx_yaml, client_ctx_yaml, false, GetParam());
 }
 
-TEST_P(SslSocketTest, SessionTicketsEnabledExplicitly) {
+TEST_P(SslSocketTest, SatelessSessionResumptionEnabledExplicitly) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -3021,17 +3022,17 @@ TEST_P(SslSocketTest, SessionTicketsEnabledExplicitly) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key:
         filename: "{{ test_tmpdir }}/unittestkey.pem"
-  disable_session_tickets: false
+  disable_stateless_session_resumption: false
 )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
     common_tls_context:
   )EOF";
 
-  testSupportForSessionTickets(server_ctx_yaml, client_ctx_yaml, true, GetParam());
+  testSupportForStatelessSessionResumption(server_ctx_yaml, client_ctx_yaml, true, GetParam());
 }
 
-TEST_P(SslSocketTest, SessionTicketsEnabledByDefault) {
+TEST_P(SslSocketTest, StatelessSessionResumptionEnabledByDefault) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -3045,7 +3046,7 @@ TEST_P(SslSocketTest, SessionTicketsEnabledByDefault) {
     common_tls_context:
   )EOF";
 
-  testSupportForSessionTickets(server_ctx_yaml, client_ctx_yaml, true, GetParam());
+  testSupportForStatelessSessionResumption(server_ctx_yaml, client_ctx_yaml, true, GetParam());
 }
 
 // Test that if two listeners use the same cert and session ticket key, but

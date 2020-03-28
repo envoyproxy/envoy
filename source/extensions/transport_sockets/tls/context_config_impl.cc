@@ -138,7 +138,7 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
     }
   }
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
-      SessionTicketKeysTypeCase::kDisableSessionTickets:
+      SessionTicketKeysTypeCase::kDisableStatelessSessionResumption:
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
       SessionTicketKeysTypeCase::SESSION_TICKET_KEYS_TYPE_NOT_SET:
     return nullptr;
@@ -148,12 +148,12 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
   }
 }
 
-bool getSessionTicketsDisabled(
+bool getStatelessSessionResumptionDisabled(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config) {
   if (config.session_ticket_keys_type_case() ==
       envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
-          SessionTicketKeysTypeCase::kDisableSessionTickets) {
-    return config.disable_session_tickets();
+          SessionTicketKeysTypeCase::kDisableStatelessSessionResumption) {
+    return config.disable_stateless_session_resumption();
   } else {
     return false;
   }
@@ -387,7 +387,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
-      disable_session_tickets_(getSessionTicketsDisabled(config)) {
+      disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)) {
 
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.
