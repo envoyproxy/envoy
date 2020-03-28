@@ -890,7 +890,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stat
                      max_response_headers_count, formatter(settings), settings.enable_trailers_) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
-  if ((pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) ||
+  if ((pending_response_.has_value() && pending_response_.value().encoder_->headRequest()) ||
       parser_.status_code == 204 || parser_.status_code == 304 ||
       (parser_.status_code >= 200 && parser_.content_length == 0)) {
     return true;
@@ -910,7 +910,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
 
   ASSERT(!pending_response_.has_value());
   pending_response_.emplace(*this, header_key_formatter_.get(), &response_decoder);
-  return pending_response_.value().encoder_;
+  return *pending_response_.value().encoder_;
 }
 
 int ClientConnectionImpl::onHeadersComplete() {
@@ -976,6 +976,8 @@ void ClientConnectionImpl::onMessageComplete() {
       }
     }
 
+    ENVOY_CONN_LOG(trace, "before decode headers, decoder: {}", connection_,
+                   reinterpret_cast<uint64_t>(response.decoder_));
     if (deferred_end_stream_headers_) {
       response.decoder_->decodeHeaders(
           std::move(absl::get<ResponseHeaderMapPtr>(headers_or_trailers_)), true);
@@ -987,6 +989,8 @@ void ClientConnectionImpl::onMessageComplete() {
       Buffer::OwnedImpl buffer;
       response.decoder_->decodeData(buffer, true);
     }
+    ENVOY_CONN_LOG(trace, "after decode headers, decoder: {}", connection_,
+                   reinterpret_cast<uint64_t>(response.decoder_));
 
     // Reset to ensure no information from one requests persists to the next.
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
@@ -996,20 +1000,20 @@ void ClientConnectionImpl::onMessageComplete() {
 void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   // Only raise reset if we did not already dispatch a complete response.
   if (pending_response_.has_value()) {
-    pending_response_.value().encoder_.runResetCallbacks(reason);
+    pending_response_.value().encoder_->runResetCallbacks(reason);
     pending_response_.reset();
   }
 }
 
 void ClientConnectionImpl::sendProtocolError(absl::string_view details) {
   if (pending_response_.has_value()) {
-    pending_response_.value().encoder_.setDetails(details);
+    pending_response_.value().encoder_->setDetails(details);
   }
 }
 
 void ClientConnectionImpl::onAboveHighWatermark() {
   // This should never happen without an active stream/request.
-  pending_response_.value().encoder_.runHighWatermarkCallbacks();
+  pending_response_.value().encoder_->runHighWatermarkCallbacks();
 }
 
 void ClientConnectionImpl::onBelowLowWatermark() {
@@ -1017,7 +1021,7 @@ void ClientConnectionImpl::onBelowLowWatermark() {
   // such as sending multiple responses to the same request, causing us to close the connection, but
   // in doing so go below low watermark.
   if (pending_response_.has_value()) {
-    pending_response_.value().encoder_.runLowWatermarkCallbacks();
+    pending_response_.value().encoder_->runLowWatermarkCallbacks();
   }
 }
 

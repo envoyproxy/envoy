@@ -434,9 +434,10 @@ private:
   struct PendingResponse {
     PendingResponse(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
                     ResponseDecoder* decoder)
-        : encoder_(connection, header_key_formatter), decoder_(decoder) {}
+        : encoder_(std::make_unique<RequestEncoderImpl>(connection, header_key_formatter)),
+          decoder_(decoder) {}
 
-    RequestEncoderImpl encoder_;
+    std::unique_ptr<RequestEncoderImpl> encoder_;
     ResponseDecoder* decoder_;
   };
 
