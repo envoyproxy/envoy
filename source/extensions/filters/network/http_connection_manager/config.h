@@ -11,6 +11,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/tracing/http_tracer_manager.h"
 
@@ -98,6 +99,7 @@ public:
                                 Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
+  Http::RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
@@ -116,6 +118,9 @@ public:
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+    return max_stream_duration_;
+  }
   Router::RouteConfigProvider* routeConfigProvider() override {
     return route_config_provider_.get();
   }
@@ -169,6 +174,7 @@ private:
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           filter_config);
 
+  Http::RequestIDExtensionSharedPtr request_id_extension_;
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
@@ -186,7 +192,7 @@ private:
   Router::RouteConfigProviderManager& route_config_provider_manager_;
   Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
   CodecType codec_type_;
-  const Http::Http2Settings http2_settings_;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const Http::Http1Settings http1_settings_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
@@ -198,6 +204,7 @@ private:
   const uint32_t max_request_headers_count_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  absl::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_;
   std::chrono::milliseconds request_timeout_;
   Router::RouteConfigProviderSharedPtr route_config_provider_;

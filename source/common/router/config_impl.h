@@ -157,7 +157,7 @@ class VirtualHostImpl : public VirtualHost {
 public:
   VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                   const ConfigImpl& global_route_config,
-                  Server::Configuration::ServerFactoryContext& factory_context,
+                  Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
                   ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
   RouteConstSharedPtr getRouteFromEntries(const Http::RequestHeaderMap& headers,
@@ -187,32 +187,38 @@ public:
 private:
   enum class SslRequirements { None, ExternalOnly, All };
 
-  struct VirtualClusterEntry : public VirtualCluster {
-    VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
-                        Stats::StatNamePool& pool);
-
-    // Router::VirtualCluster
-    Stats::StatName statName() const override { return stat_name_; }
-
-    const Stats::StatName stat_name_;
-    std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
-  };
-
-  class CatchAllVirtualCluster : public VirtualCluster {
+  struct VirtualClusterBase : public VirtualCluster {
   public:
-    explicit CatchAllVirtualCluster(Stats::StatNamePool& pool) : stat_name_(pool.add("other")) {}
+    VirtualClusterBase(Stats::StatName stat_name, Stats::ScopePtr&& scope)
+        : stat_name_(stat_name), scope_(std::move(scope)), stats_(generateStats(*scope_)) {}
 
     // Router::VirtualCluster
     Stats::StatName statName() const override { return stat_name_; }
+    VirtualClusterStats& stats() const override { return stats_; }
 
   private:
     const Stats::StatName stat_name_;
+    Stats::ScopePtr scope_;
+    mutable VirtualClusterStats stats_;
+  };
+
+  struct VirtualClusterEntry : public VirtualClusterBase {
+    VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
+                        Stats::StatNamePool& pool, Stats::Scope& scope);
+
+    std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
+  };
+
+  struct CatchAllVirtualCluster : public VirtualClusterBase {
+    explicit CatchAllVirtualCluster(Stats::StatNamePool& pool, Stats::Scope& scope)
+        : VirtualClusterBase(pool.add("other"), scope.createScope("other")) {}
   };
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
   Stats::StatNamePool stat_name_pool_;
   const Stats::StatName stat_name_;
+  Stats::ScopePtr vcluster_scope_;
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;
@@ -842,6 +848,7 @@ private:
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
 
+  Stats::ScopePtr vhost_scope_;
   std::unordered_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
   //

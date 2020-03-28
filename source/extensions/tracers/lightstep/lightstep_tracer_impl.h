@@ -88,8 +88,9 @@ private:
               Callback& callback) noexcept override;
 
     // Http::AsyncClient::Callbacks
-    void onSuccess(Http::ResponseMessagePtr&& response) override;
-    void onFailure(Http::AsyncClient::FailureReason failure_reason) override;
+    void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
+    void onFailure(const Http::AsyncClient::Request&,
+                   Http::AsyncClient::FailureReason failure_reason) override;
 
   private:
     std::unique_ptr<lightstep::BufferChain> active_report_;
@@ -136,7 +137,7 @@ private:
   const PropagationMode propagation_mode_;
   Grpc::Context& grpc_context_;
   Stats::StatNamePool pool_;
-  const Grpc::Context::RequestNames request_names_;
+  const Grpc::Context::RequestStatNames request_stat_names_;
 };
 } // namespace Lightstep
 } // namespace Tracers

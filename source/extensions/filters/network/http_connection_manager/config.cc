@@ -23,8 +23,11 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/router/rds_impl.h"
+#include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_config_impl.h"
 #include "common/tracing/http_tracer_manager_impl.h"
@@ -174,7 +177,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
-      http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
+      http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
@@ -185,6 +188,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       max_connection_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
+      max_stream_duration_(
+          PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
@@ -220,6 +225,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
     idle_timeout_ = absl::nullopt;
+  }
+
+  // If we are provided a different request_id_extension implementation to use try and create a new
+  // instance of it, otherwise use default one.
+  if (config.request_id_extension().has_typed_config()) {
+    request_id_extension_ =
+        Http::RequestIDExtensionFactory::fromProto(config.request_id_extension(), context_);
+  } else {
+    request_id_extension_ = Http::RequestIDExtensionFactory::defaultInstance(context_.random());
   }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
@@ -462,7 +476,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         maxRequestHeadersCount());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
-        connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
+        connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount());
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
@@ -475,7 +489,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
             .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,
+        connection, data, callbacks, context_.scope(), http1_settings_, http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount());
   }
 

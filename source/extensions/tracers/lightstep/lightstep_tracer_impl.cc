@@ -36,6 +36,34 @@ static Buffer::InstancePtr serializeGrpcMessage(const lightstep::BufferChain& bu
   return body;
 }
 
+static std::vector<lightstep::PropagationMode>
+MakePropagationModes(const envoy::config::trace::v3::LightstepConfig& lightstep_config) {
+  if (lightstep_config.propagation_modes().empty()) {
+    return {lightstep::PropagationMode::envoy};
+  }
+  std::vector<lightstep::PropagationMode> result;
+  result.reserve(lightstep_config.propagation_modes().size());
+  for (auto propagation_mode : lightstep_config.propagation_modes()) {
+    switch (propagation_mode) {
+    case envoy::config::trace::v3::LightstepConfig::ENVOY:
+      result.push_back(lightstep::PropagationMode::envoy);
+      break;
+    case envoy::config::trace::v3::LightstepConfig::LIGHTSTEP:
+      result.push_back(lightstep::PropagationMode::lightstep);
+      break;
+    case envoy::config::trace::v3::LightstepConfig::B3:
+      result.push_back(lightstep::PropagationMode::b3);
+      break;
+    case envoy::config::trace::v3::LightstepConfig::TRACE_CONTEXT:
+      result.push_back(lightstep::PropagationMode::trace_context);
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+  return result;
+}
+
 void LightStepLogger::operator()(lightstep::LogLevel level,
                                  opentracing::string_view message) const {
   const fmt::string_view fmt_message{message.data(), message.size()};
@@ -68,15 +96,16 @@ LightStepDriver::LightStepTransporter::~LightStepTransporter() {
   }
 }
 
-void LightStepDriver::LightStepTransporter::onSuccess(Http::ResponseMessagePtr&& /*response*/) {
-  driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_names_, true);
+void LightStepDriver::LightStepTransporter::onSuccess(const Http::AsyncClient::Request&,
+                                                      Http::ResponseMessagePtr&& /*response*/) {
+  driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_stat_names_, true);
   active_callback_->OnSuccess(*active_report_);
   reset();
 }
 
 void LightStepDriver::LightStepTransporter::onFailure(
-    Http::AsyncClient::FailureReason /*failure_reason*/) {
-  driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_names_, false);
+    const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason /*failure_reason*/) {
+  driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_stat_names_, false);
   active_callback_->OnFailure(*active_report_);
   reset();
 }
@@ -158,8 +187,9 @@ LightStepDriver::LightStepDriver(const envoy::config::trace::v3::LightstepConfig
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(scope, "tracing.lightstep."))},
       tls_{tls.allocateSlot()}, runtime_{runtime}, options_{std::move(options)},
       propagation_mode_{propagation_mode}, grpc_context_(grpc_context),
-      pool_(scope.symbolTable()), request_names_{pool_.add(lightstep::CollectorServiceFullName()),
-                                                 pool_.add(lightstep::CollectorMethodName())} {
+      pool_(scope.symbolTable()), request_stat_names_{
+                                      pool_.add(lightstep::CollectorServiceFullName()),
+                                      pool_.add(lightstep::CollectorMethodName())} {
 
   Config::Utility::checkCluster(TracerNames::get().Lightstep, lightstep_config.collector_cluster(),
                                 cm_);
@@ -170,12 +200,15 @@ LightStepDriver::LightStepDriver(const envoy::config::trace::v3::LightstepConfig
         fmt::format("{} collector cluster must support http2 for gRPC calls", cluster_->name()));
   }
 
-  tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+  auto propagation_modes = MakePropagationModes(lightstep_config);
+
+  tls_->set([this, &propagation_modes](
+                Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     lightstep::LightStepTracerOptions tls_options;
     tls_options.access_token = options_->access_token;
     tls_options.component_name = options_->component_name;
     tls_options.use_thread = false;
-    tls_options.use_single_key_propagation = true;
+    tls_options.propagation_modes = propagation_modes;
     tls_options.logger_sink = LightStepLogger{};
 
     tls_options.max_buffered_spans = std::function<size_t()>{[this] {

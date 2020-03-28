@@ -87,6 +87,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
                           parent_.connection().localAddress()->asString());
   }
+
   parent_.connection().dispatcher().post([this, headers_copy, end_stream]() -> void {
     encoder_.encodeHeaders(*headers_copy, end_stream);
   });
@@ -107,7 +108,7 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
 }
 
 void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
-  std::shared_ptr<Buffer::Instance> data_copy(new Buffer::OwnedImpl(data));
+  std::shared_ptr<Buffer::Instance> data_copy = std::make_shared<Buffer::OwnedImpl>(data);
   parent_.connection().dispatcher().post(
       [this, data_copy, end_stream]() -> void { encoder_.encodeData(*data_copy, end_stream); });
 }
@@ -234,11 +235,13 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
         shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
         max_request_headers_count);
   } else {
-    auto settings = Http::Http2Settings();
-    settings.allow_connect_ = true;
-    settings.allow_metadata_ = true;
+    envoy::config::core::v3::Http2ProtocolOptions http2_options =
+        ::Envoy::Http2::Utility::initializeAndValidateOptions(
+            envoy::config::core::v3::Http2ProtocolOptions());
+    http2_options.set_allow_connect(true);
+    http2_options.set_allow_metadata(true);
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, store, settings, max_request_headers_kb,
+        shared_connection_.connection(), *this, store, http2_options, max_request_headers_kb,
         max_request_headers_count);
     ASSERT(type == Type::HTTP2);
   }

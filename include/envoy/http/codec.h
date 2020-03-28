@@ -27,6 +27,23 @@ const char MaxResponseHeadersCountOverrideKey[] =
 class Stream;
 
 /**
+ * Stream encoder options specific to HTTP/1.
+ */
+class Http1StreamEncoderOptions {
+public:
+  virtual ~Http1StreamEncoderOptions() = default;
+
+  /**
+   * Force disable chunk encoding, even if there is no known content length. This effectively forces
+   * HTTP/1.0 behavior in which the connection will need to be closed to indicate end of stream.
+   */
+  virtual void disableChunkEncoding() PURE;
+};
+
+using Http1StreamEncoderOptionsOptRef =
+    absl::optional<std::reference_wrapper<Http1StreamEncoderOptions>>;
+
+/**
  * Encodes an HTTP stream. This interface contains methods common to both the request and response
  * path.
  * TODO(mattklein123): Consider removing the StreamEncoder interface entirely and just duplicating
@@ -53,6 +70,12 @@ public:
    * @param metadata_map_vector is the vector of metadata maps to encode.
    */
   virtual void encodeMetadata(const MetadataMapVector& metadata_map_vector) PURE;
+
+  /**
+   * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
+   * absl::nullopt.
+   */
+  virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 };
 
 /**
@@ -324,78 +347,6 @@ struct Http1Settings {
 
   // How header keys should be formatted when serializing HTTP/1.1 headers.
   HeaderKeyFormat header_key_format_{HeaderKeyFormat::Default};
-};
-
-/**
- * HTTP/2 codec settings
- */
-struct Http2Settings {
-  // TODO(jwfang): support other HTTP/2 settings
-  uint32_t hpack_table_size_{DEFAULT_HPACK_TABLE_SIZE};
-  uint32_t max_concurrent_streams_{DEFAULT_MAX_CONCURRENT_STREAMS};
-  uint32_t initial_stream_window_size_{DEFAULT_INITIAL_STREAM_WINDOW_SIZE};
-  uint32_t initial_connection_window_size_{DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE};
-  bool allow_connect_{DEFAULT_ALLOW_CONNECT};
-  bool allow_metadata_{DEFAULT_ALLOW_METADATA};
-  bool stream_error_on_invalid_http_messaging_{DEFAULT_STREAM_ERROR_ON_INVALID_HTTP_MESSAGING};
-  uint32_t max_outbound_frames_{DEFAULT_MAX_OUTBOUND_FRAMES};
-  uint32_t max_outbound_control_frames_{DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES};
-  uint32_t max_consecutive_inbound_frames_with_empty_payload_{
-      DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD};
-  uint32_t max_inbound_priority_frames_per_stream_{DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM};
-  uint32_t max_inbound_window_update_frames_per_data_frame_sent_{
-      DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT};
-
-  // disable HPACK compression
-  static const uint32_t MIN_HPACK_TABLE_SIZE = 0;
-  // initial value from HTTP/2 spec, same as NGHTTP2_DEFAULT_HEADER_TABLE_SIZE from nghttp2
-  static const uint32_t DEFAULT_HPACK_TABLE_SIZE = (1 << 12);
-  // no maximum from HTTP/2 spec, use unsigned 32-bit maximum
-  static const uint32_t MAX_HPACK_TABLE_SIZE = std::numeric_limits<uint32_t>::max();
-
-  // TODO(jwfang): make this 0, the HTTP/2 spec minimum
-  static const uint32_t MIN_MAX_CONCURRENT_STREAMS = 1;
-  // defaults to maximum, same as nghttp2
-  static const uint32_t DEFAULT_MAX_CONCURRENT_STREAMS = (1U << 31) - 1;
-  // no maximum from HTTP/2 spec, total streams is unsigned 32-bit maximum,
-  // one-side (client/server) is half that, and we need to exclude stream 0.
-  // same as NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS from nghttp2
-  static const uint32_t MAX_MAX_CONCURRENT_STREAMS = (1U << 31) - 1;
-
-  // initial value from HTTP/2 spec, same as NGHTTP2_INITIAL_WINDOW_SIZE from nghttp2
-  // NOTE: we only support increasing window size now, so this is also the minimum
-  // TODO(jwfang): make this 0 to support decrease window size
-  static const uint32_t MIN_INITIAL_STREAM_WINDOW_SIZE = (1 << 16) - 1;
-  // initial value from HTTP/2 spec is 65535, but we want more (256MiB)
-  static const uint32_t DEFAULT_INITIAL_STREAM_WINDOW_SIZE = 256 * 1024 * 1024;
-  // maximum from HTTP/2 spec, same as NGHTTP2_MAX_WINDOW_SIZE from nghttp2
-  static const uint32_t MAX_INITIAL_STREAM_WINDOW_SIZE = (1U << 31) - 1;
-
-  // CONNECTION_WINDOW_SIZE is similar to STREAM_WINDOW_SIZE, but for connection-level window
-  // TODO(jwfang): make this 0 to support decrease window size
-  static const uint32_t MIN_INITIAL_CONNECTION_WINDOW_SIZE = (1 << 16) - 1;
-  // nghttp2's default connection-level window equals to its stream-level,
-  // our default connection-level window also equals to our stream-level
-  static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 256 * 1024 * 1024;
-  static const uint32_t MAX_INITIAL_CONNECTION_WINDOW_SIZE = (1U << 31) - 1;
-  // By default both nghttp2 and Envoy do not allow CONNECT over H2.
-  static const bool DEFAULT_ALLOW_CONNECT = false;
-  // By default Envoy does not allow METADATA support.
-  static const bool DEFAULT_ALLOW_METADATA = false;
-  // By default Envoy does not allow invalid headers.
-  static const bool DEFAULT_STREAM_ERROR_ON_INVALID_HTTP_MESSAGING = false;
-
-  // Default limit on the number of outbound frames of all types.
-  static const uint32_t DEFAULT_MAX_OUTBOUND_FRAMES = 10000;
-  // Default limit on the number of outbound frames of types PING, SETTINGS and RST_STREAM.
-  static const uint32_t DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES = 1000;
-  // Default limit on the number of consecutive inbound frames with an empty payload
-  // and no end stream flag.
-  static const uint32_t DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD = 1;
-  // Default limit on the number of inbound frames of type PRIORITY (per stream).
-  static const uint32_t DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM = 100;
-  // Default limit on the number of inbound frames of type WINDOW_UPDATE (per DATA frame sent).
-  static const uint32_t DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT = 10;
 };
 
 /**

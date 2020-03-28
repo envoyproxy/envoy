@@ -188,20 +188,28 @@ void ReporterImpl::flushSpans() {
 
     const uint64_t timeout =
         driver_.runtime().snapshot().getInteger("tracing.zipkin.request_timeout", 5000U);
-    driver_.clusterManager()
-        .httpAsyncClientForCluster(driver_.cluster()->name())
-        .send(std::move(message), *this,
-              Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
+    Http::AsyncClient::Request* request = driver_.clusterManager()
+                                              .httpAsyncClientForCluster(driver_.cluster()->name())
+                                              .send(std::move(message), *this,
+                                                    Http::AsyncClient::RequestOptions().setTimeout(
+                                                        std::chrono::milliseconds(timeout)));
+    if (request) {
+      active_requests_.add(*request);
+    }
 
     span_buffer_->clear();
   }
 }
 
-void ReporterImpl::onFailure(Http::AsyncClient::FailureReason) {
+void ReporterImpl::onFailure(const Http::AsyncClient::Request& request,
+                             Http::AsyncClient::FailureReason) {
+  active_requests_.remove(request);
   driver_.tracerStats().reports_failed_.inc();
 }
 
-void ReporterImpl::onSuccess(Http::ResponseMessagePtr&& http_response) {
+void ReporterImpl::onSuccess(const Http::AsyncClient::Request& request,
+                             Http::ResponseMessagePtr&& http_response) {
+  active_requests_.remove(request);
   if (Http::Utility::getResponseStatus(http_response->headers()) !=
       enumToInt(Http::Code::Accepted)) {
     driver_.tracerStats().reports_dropped_.inc();

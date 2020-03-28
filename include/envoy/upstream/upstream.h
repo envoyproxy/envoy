@@ -575,6 +575,7 @@ public:
   COUNTER(upstream_rq_pending_total)                                                               \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
   COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_rx_reset)                                                                    \
@@ -720,10 +721,11 @@ public:
   virtual const Http::Http1Settings& http1Settings() const PURE;
 
   /**
-   * @return const Http::Http2Settings& for HTTP/2 connections created on behalf of this cluster.
-   *         @see Http::Http2Settings.
+   * @return const envoy::config::core::v3::Http2ProtocolOptions& for HTTP/2 connections
+   * created on behalf of this cluster.
+   *         @see envoy::config::core::v3::Http2ProtocolOptions.
    */
-  virtual const Http::Http2Settings& http2Settings() const PURE;
+  virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
 
   /**
    * @param name std::string containing the well-known name of the extension for which protocol

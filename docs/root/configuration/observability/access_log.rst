@@ -256,7 +256,7 @@ The following command operators are supported:
     * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
     * **UF**: Upstream connection failure in addition to 503 response code.
     * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
-    * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
+    * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
     * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_api_field_route.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.max_connect_attempts>` was reached.
   HTTP only
     * **DC**: Downstream connection termination.
@@ -350,6 +350,9 @@ The following command operators are supported:
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
     Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+
+%DOWNSTREAM_LOCAL_PORT%
+    Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
 
 %REQ(X?Y):Z%
   HTTP

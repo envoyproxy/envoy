@@ -19,6 +19,7 @@
 #include "common/http/context_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/symbol_table_creator.h"
@@ -71,6 +72,7 @@ public:
     ON_CALL(scoped_route_config_provider_, lastUpdated())
         .WillByDefault(Return(time_system_.systemTime()));
     access_logs_.emplace_back(std::make_shared<NiceMock<AccessLog::MockInstance>>());
+    request_id_extension_ = RequestIDExtensionFactory::defaultInstance(random_);
   }
 
   void newStream() {
@@ -87,6 +89,8 @@ public:
   }
 
   // Http::ConnectionManagerConfig
+
+  RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
                                   ServerConnectionCallbacks&) override {
@@ -103,6 +107,9 @@ public:
   bool isRoutable() const override { return true; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
+  }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+    return max_stream_duration_;
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -149,6 +156,8 @@ public:
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
+  RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   MockServerConnection* codec_{};
   MockStreamDecoderFilter* decoder_filter_{};
@@ -170,6 +179,7 @@ public:
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  absl::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
