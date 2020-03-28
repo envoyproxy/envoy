@@ -88,7 +88,7 @@ void LightStepLogger::operator()(lightstep::LogLevel level,
 const size_t LightStepDriver::DefaultMinFlushSpans = 200U;
 
 LightStepDriver::LightStepTransporter::LightStepTransporter(LightStepDriver& driver)
-    : driver_(driver) {}
+    : driver_(driver), collector_cluster_(driver_.clusterManager(), driver_.cluster()) {}
 
 LightStepDriver::LightStepTransporter::~LightStepTransporter() {
   if (active_request_ != nullptr) {
@@ -98,14 +98,14 @@ LightStepDriver::LightStepTransporter::~LightStepTransporter() {
 
 void LightStepDriver::LightStepTransporter::onSuccess(const Http::AsyncClient::Request&,
                                                       Http::ResponseMessagePtr&& /*response*/) {
-  driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_stat_names_, true);
+  driver_.grpc_context_.chargeStat(*active_cluster_, driver_.request_stat_names_, true);
   active_callback_->OnSuccess(*active_report_);
   reset();
 }
 
 void LightStepDriver::LightStepTransporter::onFailure(
     const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason /*failure_reason*/) {
-  driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_stat_names_, false);
+  driver_.grpc_context_.chargeStat(*active_cluster_, driver_.request_stat_names_, false);
   active_callback_->OnFailure(*active_report_);
   reset();
 }
@@ -123,24 +123,31 @@ void LightStepDriver::LightStepTransporter::Send(std::unique_ptr<lightstep::Buff
     callback.OnFailure(*report);
     return;
   }
-  active_report_ = std::move(report);
-  active_callback_ = &callback;
 
   const uint64_t timeout =
       driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
   Http::RequestMessagePtr message = Grpc::Common::prepareHeaders(
-      driver_.cluster()->name(), lightstep::CollectorServiceFullName(),
-      lightstep::CollectorMethodName(), absl::optional<std::chrono::milliseconds>(timeout));
-  message->body() = serializeGrpcMessage(*active_report_);
+      driver_.cluster(), lightstep::CollectorServiceFullName(), lightstep::CollectorMethodName(),
+      absl::optional<std::chrono::milliseconds>(timeout));
+  message->body() = serializeGrpcMessage(*report);
 
-  active_request_ =
-      driver_.clusterManager()
-          .httpAsyncClientForCluster(driver_.cluster()->name())
-          .send(std::move(message), *this,
-                Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
+  if (collector_cluster_.exists()) {
+    active_report_ = std::move(report);
+    active_callback_ = &callback;
+    active_cluster_ = collector_cluster_.info();
+    active_request_ = driver_.clusterManager()
+                          .httpAsyncClientForCluster(collector_cluster_.info()->name())
+                          .send(std::move(message), *this,
+                                Http::AsyncClient::RequestOptions().setTimeout(
+                                    std::chrono::milliseconds(timeout)));
+  } else {
+    ENVOY_LOG(debug, "collector cluster '{}' does not exist", driver_.cluster());
+    driver_.tracerStats().reports_skipped_no_cluster_.inc();
+  }
 }
 
 void LightStepDriver::LightStepTransporter::reset() {
+  active_cluster_ = nullptr;
   active_request_ = nullptr;
   active_callback_ = nullptr;
   active_report_ = nullptr;
@@ -192,12 +199,12 @@ LightStepDriver::LightStepDriver(const envoy::config::trace::v3::LightstepConfig
                                       pool_.add(lightstep::CollectorMethodName())} {
 
   Config::Utility::checkCluster(TracerNames::get().Lightstep, lightstep_config.collector_cluster(),
-                                cm_);
-  cluster_ = cm_.get(lightstep_config.collector_cluster())->info();
+                                cm_, /* allow_added_via_api */ true);
+  cluster_ = lightstep_config.collector_cluster();
 
-  if (!(cluster_->features() & Upstream::ClusterInfo::Features::HTTP2)) {
+  if (!(cm_.get(cluster_)->info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
     throw EnvoyException(
-        fmt::format("{} collector cluster must support http2 for gRPC calls", cluster_->name()));
+        fmt::format("{} collector cluster must support http2 for gRPC calls", cluster_));
   }
 
   auto propagation_modes = MakePropagationModes(lightstep_config);
