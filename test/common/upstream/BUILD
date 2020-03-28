@@ -43,6 +43,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cluster_update_tracker_test",
+    srcs = ["cluster_update_tracker_test.cc"],
+    deps = [
+        "//source/common/upstream:cluster_update_tracker_lib",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "conn_pool_map_impl_test",
     srcs = ["conn_pool_map_impl_test.cc"],
     deps = [

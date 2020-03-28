@@ -29,9 +29,9 @@ Driver::Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
                                 POOL_COUNTER_PREFIX(scope, "tracing.datadog."))},
       tls_(tls.allocateSlot()), runtime_(runtime) {
 
-  Config::Utility::checkCluster(TracerNames::get().Datadog, datadog_config.collector_cluster(),
-                                cm_);
-  cluster_ = cm_.get(datadog_config.collector_cluster())->info();
+  Config::Utility::checkCluster(TracerNames::get().Datadog, datadog_config.collector_cluster(), cm_,
+                                /* allow_added_via_api */ true);
+  cluster_ = datadog_config.collector_cluster();
 
   // Default tracer options.
   tracer_options_.operation_name_override = "envoy.proxy";
@@ -60,7 +60,8 @@ opentracing::Tracer& Driver::tracer() { return *tls_->getTyped<TlsTracer>().trac
 
 TraceReporter::TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver,
                              Event::Dispatcher& dispatcher)
-    : driver_(driver), encoder_(encoder) {
+    : driver_(driver), encoder_(encoder),
+      collector_cluster_(driver_.clusterManager(), driver_.cluster()) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     for (auto& h : encoder_->headers()) {
       lower_case_headers_.emplace(h.first, Http::LowerCaseString{h.first});
@@ -89,7 +90,7 @@ void TraceReporter::flushTraces() {
     Http::RequestMessagePtr message(new Http::RequestMessageImpl());
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     message->headers().setReferencePath(encoder_->path());
-    message->headers().setReferenceHost(driver_.cluster()->name());
+    message->headers().setReferenceHost(driver_.cluster());
     for (auto& h : encoder_->headers()) {
       message->headers().setReferenceKey(lower_case_headers_.at(h.first), h.second);
     }
@@ -100,13 +101,19 @@ void TraceReporter::flushTraces() {
     ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload size {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 
-    Http::AsyncClient::Request* request =
-        driver_.clusterManager()
-            .httpAsyncClientForCluster(driver_.cluster()->name())
-            .send(std::move(message), *this,
+    if (collector_cluster_.exists()) {
+      Http::AsyncClient::Request* request =
+          driver_.clusterManager()
+              .httpAsyncClientForCluster(collector_cluster_.info()->name())
+              .send(
+                  std::move(message), *this,
                   Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000U)));
-    if (request) {
-      active_requests_.add(*request);
+      if (request) {
+        active_requests_.add(*request);
+      }
+    } else {
+      ENVOY_LOG(debug, "collector cluster '{}' does not exist", driver_.cluster());
+      driver_.tracerStats().reports_skipped_no_cluster_.inc();
     }
 
     encoder_->clearTraces();
