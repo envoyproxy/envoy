@@ -29,6 +29,7 @@ MockInstance::MockInstance() {
   ON_CALL(*this, newConnection(_)).WillByDefault(Invoke([&](Callbacks& cb) -> Cancellable* {
     return newConnectionImpl(cb);
   }));
+  ON_CALL(*this, host()).WillByDefault(Return(host_));
 }
 MockInstance::~MockInstance() = default;
 
