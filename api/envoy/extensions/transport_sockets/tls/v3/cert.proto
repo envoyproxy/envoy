@@ -452,7 +452,7 @@ message DownstreamTlsContext {
     // Config for fetching TLS session ticket keys via SDS API.
     SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
 
-    // Config for controlling stateless TLS session resumption: setting this to true will cause the TLS 
+    // Config for controlling stateless TLS session resumption: setting this to true will cause the TLS
     // server to not issue TLS session tickets for the purposes of stateless TLS session resumption.
     bool disable_stateless_session_resumption = 7;
   }
