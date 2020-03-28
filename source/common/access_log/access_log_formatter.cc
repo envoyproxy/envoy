@@ -314,8 +314,6 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
         }
         formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(args)});
       } else if (absl::StartsWith(token, "GRPC_STATUS")) {
-        std::string main_header, alternative_header;
-
         formatters.emplace_back(FormatterProviderPtr{
             new GrpcStatusFormatter("grpc-status", "", absl::optional<size_t>())});
       } else {

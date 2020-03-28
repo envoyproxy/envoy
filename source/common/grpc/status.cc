@@ -124,9 +124,8 @@ std::string Utility::grpcStatusToString(Status::GrpcStatus grpc_status) {
   case Status::WellKnownGrpcStatus::Unauthenticated:
     return "Unauthenticated";
   case Status::WellKnownGrpcStatus::InvalidCode:
-    return "InvalidCode";
   default:
-    return EMPTY_STRING;
+    return "InvalidCode";
   }
 }
 
