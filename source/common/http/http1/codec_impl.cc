@@ -976,8 +976,6 @@ void ClientConnectionImpl::onMessageComplete() {
       }
     }
 
-    ENVOY_CONN_LOG(trace, "before decode headers, decoder: {}", connection_,
-                   reinterpret_cast<uint64_t>(response.decoder_));
     if (deferred_end_stream_headers_) {
       response.decoder_->decodeHeaders(
           std::move(absl::get<ResponseHeaderMapPtr>(headers_or_trailers_)), true);
@@ -989,8 +987,6 @@ void ClientConnectionImpl::onMessageComplete() {
       Buffer::OwnedImpl buffer;
       response.decoder_->decodeData(buffer, true);
     }
-    ENVOY_CONN_LOG(trace, "after decode headers, decoder: {}", connection_,
-                   reinterpret_cast<uint64_t>(response.decoder_));
 
     // Reset to ensure no information from one requests persists to the next.
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
