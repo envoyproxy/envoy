@@ -189,6 +189,32 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
   }
 }
 
+TEST_F(LightStepDriverTest, DeferredTlsInitialization) {
+  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
+
+  const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    )EOF";
+  envoy::config::trace::v3::LightstepConfig lightstep_config;
+  TestUtility::loadFromYaml(yaml_string, lightstep_config);
+
+  std::unique_ptr<lightstep::LightStepTracerOptions> opts(new lightstep::LightStepTracerOptions());
+  opts->access_token = "sample_token";
+  opts->component_name = "component";
+
+  ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
+      .WillByDefault(ReturnRef(cm_.async_client_));
+
+  auto propagation_mode = Common::Ot::OpenTracingDriver::PropagationMode::TracerNative;
+
+  tls_.defer_data = true;
+  driver_ = std::make_unique<LightStepDriver>(lightstep_config, cm_, stats_, tls_, runtime_,
+                                              std::move(opts), propagation_mode, grpc_context_);
+  tls_.call();
+}
+
 TEST_F(LightStepDriverTest, AllowCollectorClusterToBeAddedViaApi) {
   EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
   ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
