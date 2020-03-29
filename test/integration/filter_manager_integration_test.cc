@@ -133,6 +133,7 @@ private:
  */
 class InjectDataToFilterChainIntegrationTest
     : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, std::string>>,
+      public Event::TestUsingSimulatedTime,
       public BaseIntegrationTest,
       public TestWithAuxiliaryFilter {
 public:
@@ -177,11 +178,11 @@ protected:
 class InjectDataWithEchoFilterIntegrationTest : public InjectDataToFilterChainIntegrationTest {
 public:
   static std::string echo_config() {
-    return ConfigHelper::BASE_CONFIG + R"EOF(
+    return absl::StrCat(ConfigHelper::BASE_CONFIG, R"EOF(
     filter_chains:
       filters:
       - name: envoy.filters.network.echo
-      )EOF";
+      )EOF");
   }
 
   InjectDataWithEchoFilterIntegrationTest()
@@ -230,7 +231,7 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, FilterChainMismatch) {
 class InjectDataWithTcpProxyFilterIntegrationTest : public InjectDataToFilterChainIntegrationTest {
 public:
   InjectDataWithTcpProxyFilterIntegrationTest()
-      : InjectDataToFilterChainIntegrationTest(ConfigHelper::TCP_PROXY_CONFIG) {}
+      : InjectDataToFilterChainIntegrationTest(ConfigHelper::TCP_PROXY_CONFIG()) {}
 };
 
 INSTANTIATE_TEST_SUITE_P(

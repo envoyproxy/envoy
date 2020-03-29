@@ -30,7 +30,7 @@
 
 namespace Envoy {
 
-const std::string ConfigHelper::BASE_CONFIG = R"EOF(
+const char ConfigHelper::BASE_CONFIG[] = R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -69,7 +69,7 @@ static_resources:
         port_value: 0
 )EOF";
 
-const std::string ConfigHelper::BASE_UDP_LISTENER_CONFIG = R"EOF(
+const char ConfigHelper::BASE_UDP_LISTENER_CONFIG[] = R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -97,7 +97,8 @@ static_resources:
         protocol: udp
 )EOF";
 
-const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
+std::string ConfigHelper::TCP_PROXY_CONFIG() {
+  return absl::StrCat(BASE_CONFIG, R"EOF(
     filter_chains:
       filters:
         name: tcp
@@ -105,9 +106,11 @@ const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
           "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
-)EOF";
+)EOF");
+}
 
-const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
+std::string ConfigHelper::HTTP_PROXY_CONFIG() {
+  return absl::StrCat(BASE_CONFIG, R"EOF(
     filter_chains:
       filters:
         name: http
@@ -134,12 +137,14 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
                   prefix: "/"
               domains: "*"
             name: route_config_0
-)EOF";
+)EOF");
+}
 
 // TODO(danzh): For better compatibility with HTTP integration test framework,
 // it's better to combine with HTTP_PROXY_CONFIG, and use config modifiers to
 // specify quic specific things.
-const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFIG + R"EOF(
+std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG() {
+  return absl::StrCat(BASE_UDP_LISTENER_CONFIG, R"EOF(
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
@@ -170,34 +175,31 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
             name: route_config_0
     udp_listener_config:
       udp_listener_name: "quiche_quic_listener"
-)EOF";
+)EOF");
+}
 
-const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
-    R"EOF(
+const char ConfigHelper::DEFAULT_BUFFER_FILTER[] = R"EOF(
 name: buffer
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 5242880
 )EOF";
 
-const std::string ConfigHelper::SMALL_BUFFER_FILTER =
-    R"EOF(
+const char ConfigHelper::SMALL_BUFFER_FILTER[] = R"EOF(
 name: buffer
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 1024
 )EOF";
 
-const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
-    R"EOF(
+const char ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER[] = R"EOF(
 name: health_check
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
 )EOF";
 
-const std::string ConfigHelper::DEFAULT_SQUASH_FILTER =
-    R"EOF(
+const char ConfigHelper::DEFAULT_SQUASH_FILTER[] = R"EOF(
 name: squash
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.squash.v2.Squash
