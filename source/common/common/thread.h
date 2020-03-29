@@ -53,12 +53,10 @@ public:
     condvar_.SignalAll();
   }
 
-  bool signaled() {
-    return signaled_;
-  }
+  bool signaled() { return signaled_; }
 
   void clearSignaled() {
-    //assert(signaled_ > 0);
+    // assert(signaled_ > 0);
     signaled_ = false;
   }
 
@@ -70,9 +68,9 @@ public:
    * with thread annotation.
    */
   void wait(MutexBasicLockable& mutex) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    //if (!signaled_) {
+    // if (!signaled_) {
     condvar_.Wait(&mutex.mutex_);
-      // }
+    // }
     clearSignaled();
   }
 
@@ -80,9 +78,9 @@ public:
    * @return WaitStatus whether the condition timed out or not.
    */
   template <class Rep, class Period>
-  WaitStatus waitFor(
-      MutexBasicLockable& mutex,
-      std::chrono::duration<Rep, Period> duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+  WaitStatus
+  waitFor(MutexBasicLockable& mutex,
+          std::chrono::duration<Rep, Period> duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     /*
     if (!signaled_) {
       // Note we ignore the return value from absl condvar here as it's spurious

@@ -248,6 +248,10 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
     Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
     const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
   only_one_thread_.checkOneThread();
+
+  // This real-time polling delay should not be necessary. But without it,
+  // /test/extensions/filters/http/cache:cache_filter_integration_test fails
+  // about 40% of the time.
 #define ADD_POLL_DELAY 1
 #if ADD_POLL_DELAY
   const Duration real_time_poll_delay(
@@ -291,10 +295,8 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
   return Thread::CondVar::WaitStatus::Timeout;
 #else
 
-
-
   // First check to see if the condition is already satisfied without advancing sim time.
-  //while (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::Timeout) {
+  // while (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::Timeout) {
 
 #if 1
   mutex.unlock();
@@ -340,7 +342,7 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
     }
 
     // Wait for the libevent poll in another thread to catch up prior to advancing time.
-    //if (hasPending()) {
+    // if (hasPending()) {
     //  continue;
     // }
 

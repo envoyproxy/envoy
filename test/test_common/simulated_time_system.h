@@ -29,8 +29,8 @@ public:
   void sleep(const Duration& duration) override;
   void advanceTime(const Duration& duration) override;
   Thread::CondVar::WaitStatus
-      waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-              const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // TimeSource
   SystemTime systemTime() override;
@@ -77,7 +77,7 @@ private:
    *
    * @param monotonic_time The desired new current time.
    */
-  //void setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) UNLOCK_FUNCTION(mutex_);
+  // void setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) UNLOCK_FUNCTION(mutex_);
   void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
