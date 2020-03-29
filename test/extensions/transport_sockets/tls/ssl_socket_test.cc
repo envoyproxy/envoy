@@ -2742,11 +2742,13 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
 
+  StreamInfo::StreamInfoImpl stream_info(time_system);
   Network::ConnectionPtr server_connection;
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
+            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
+            stream_info);
 
         const SslSocketInfo* ssl_socket =
             dynamic_cast<const SslSocketInfo*>(server_connection->ssl().get());
