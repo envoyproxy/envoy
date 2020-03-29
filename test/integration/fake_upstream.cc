@@ -48,7 +48,10 @@ void FakeStream::decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_str
   Thread::LockGuard lock(lock_);
   headers_ = std::move(headers);
   setEndStream(end_stream);
-  decoder_event_.notifyOne();
+  decode_headers_event_.notifyOne();
+  if (end_stream) {
+    decode_end_stream_event_.notifyOne();
+  }
 }
 
 void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -56,14 +59,18 @@ void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
   Thread::LockGuard lock(lock_);
   body_.add(data);
   setEndStream(end_stream);
-  decoder_event_.notifyOne();
+  decode_data_event_.notifyOne();
+  if (end_stream) {
+    decode_end_stream_event_.notifyOne();
+  }
 }
 
 void FakeStream::decodeTrailers(Http::RequestTrailerMapPtr&& trailers) {
   Thread::LockGuard lock(lock_);
   setEndStream(true);
   trailers_ = std::move(trailers);
-  decoder_event_.notifyOne();
+  decode_trailers_event_.notifyOne();
+  decode_end_stream_event_.notifyOne();
 }
 
 void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
@@ -138,7 +145,7 @@ void FakeStream::readDisable(bool disable) {
 void FakeStream::onResetStream(Http::StreamResetReason, absl::string_view) {
   Thread::LockGuard lock(lock_);
   saw_reset_ = true;
-  decoder_event_.notifyOne();
+  decode_reset_event_.notifyOne();
 }
 
 AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
@@ -148,7 +155,7 @@ AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for headers.";
     }
-    time_system_.waitFor(lock_, decoder_event_, 5ms);
+    time_system_.waitFor(lock_, decode_headers_event_, 5ms);
   }
   return AssertionSuccess();
 }
@@ -161,7 +168,7 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, ui
     if (time_system_.monotonicTime() >= start_time + timeout) {
       return AssertionFailure() << "Timed out waiting for data.";
     }
-    time_system_.waitFor(lock_, decoder_event_, 5ms);
+    time_system_.waitFor(lock_, decode_data_event_, 5ms);
     if (bodyLength() < body_length) {
       // Run the client dispatcher since we may need to process window updates, etc.
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
@@ -190,7 +197,7 @@ AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatche
     if (time_system_.monotonicTime() >= start_time + timeout) {
       return AssertionFailure() << "Timed out waiting for end of stream.";
     }
-    time_system_.waitFor(lock_, decoder_event_, 5ms);
+    time_system_.waitFor(lock_, decode_end_stream_event_, 5ms);
     if (!end_stream_) {
       // Run the client dispatcher since we may need to process window updates, etc.
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
@@ -207,7 +214,7 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
       return AssertionFailure() << "Timed out waiting for reset.";
     }
     // Safe since CondVar::waitFor won't throw.
-    time_system_.waitFor(lock_, decoder_event_, 5ms);
+    time_system_.waitFor(lock_, decode_reset_event_, 5ms);
   }
   return AssertionSuccess();
 }
@@ -333,6 +340,9 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
                                                      milliseconds timeout) {
   auto end_time = time_system_.monotonicTime() + timeout;
   Thread::LockGuard lock(lock_);
+  if (!ignore_spurious_events) {
+    connection_event_.clearSignaled();
+  }
   while (new_streams_.empty()) {
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for new stream.";

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <functional>
 #include <memory>
 
@@ -36,12 +37,6 @@ public:
     NoTimeout, // Success or Spurious
   };
 
-  enum class State {
-    Unsignaled,
-    SignalOne,
-    SignalAll
-  };
-
   /**
    * Note that it is not necessary to be holding an associated mutex to call
    * notifyOne or notifyAll. See the discussion in
@@ -49,28 +44,22 @@ public:
    * for more details.
    */
   void notifyOne() noexcept {
-    state_ = State::SignalOne;
+    signaled_ = true;
     condvar_.Signal();
   }
 
   void notifyAll() noexcept {
-    state_ = State::SignalAll;
+    signaled_ = true;
     condvar_.SignalAll();
   }
 
-  bool poll() {
-    bool ret = true;
-    switch (state_) {
-      case State::Unsignaled:
-        ret = false;
-        break;
-      case State::SignalOne:
-        state_ = State::Unsignaled;
-        break;
-      default:
-        break;
-    }
-    return ret;
+  bool signaled() {
+    return signaled_;
+  }
+
+  void clearSignaled() {
+    //assert(signaled_ > 0);
+    signaled_ = false;
   }
 
   /**
@@ -81,19 +70,10 @@ public:
    * with thread annotation.
    */
   void wait(MutexBasicLockable& mutex) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    switch (state_) {
-      case State::Unsignaled:
-        condvar_.Wait(&mutex.mutex_);
-        if (state_ == State::SignalOne) {
-          state_ = State::Unsignaled;
-        }
-        break;
-      case State::SignalOne:
-        state_ = State::Unsignaled;
-        break;
-      default:
-        break;
-    }
+    //if (!signaled_) {
+    condvar_.Wait(&mutex.mutex_);
+      // }
+    clearSignaled();
   }
 
   /**
@@ -103,23 +83,23 @@ public:
   WaitStatus waitFor(
       MutexBasicLockable& mutex,
       std::chrono::duration<Rep, Period> duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    switch (state_) {
-      case State::Unsignaled: {
-        bool timeout = condvar_.WaitWithTimeout(&mutex.mutex_, absl::FromChrono(duration));
-        if (timeout) {
-          return WaitStatus::Timeout;
-        }
-        if (state_ == State::SignalOne) {
-          state_ = State::Unsignaled;
-        }
-        break;
-      }
-      case State::SignalOne:
-        state_ = State::Unsignaled;
-        break;
-      default:
-        break;
+    /*
+    if (!signaled_) {
+      // Note we ignore the return value from absl condvar here as it's spurious
+      // anyway.
+      condvar_.WaitWithTimeout(&mutex.mutex_, absl::FromChrono(duration));
     }
+    if (signaled_) {
+      signaled_ = false;
+      return WaitStatus::NoTimeout;
+    }
+    return WaitStatus::Timeout;
+    */
+    bool timeout = condvar_.WaitWithTimeout(&mutex.mutex_, absl::FromChrono(duration));
+    if (timeout) {
+      return WaitStatus::Timeout;
+    }
+    clearSignaled();
     return WaitStatus::NoTimeout;
   }
 
@@ -128,7 +108,7 @@ private:
   // https://gist.github.com/jmarantz/d22b836cee3ca203cc368553eda81ce5
   // does not currently work well with thread-annotation.
   absl::CondVar condvar_;
-  State state_ = State::Unsignaled;
+  std::atomic<bool> signaled_{false};
 };
 
 } // namespace Thread
