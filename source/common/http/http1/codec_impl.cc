@@ -909,7 +909,9 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   ASSERT(connection_.readEnabled());
 
   ASSERT(!pending_response_.has_value());
+  ASSERT(pending_response_done_);
   pending_response_.emplace(*this, header_key_formatter_.get(), &response_decoder);
+  pending_response_done_ = false;
   return pending_response_.value().encoder_;
 }
 
@@ -962,8 +964,10 @@ void ClientConnectionImpl::onMessageComplete() {
   }
   if (pending_response_.has_value()) {
     // After calling decodeData() with end stream set to true, we should no longer be able to reset.
-    PendingResponse response = std::move(pending_response_.value());
-    pending_response_.reset();
+    PendingResponse& response = pending_response_.value();
+    // Encoder is used as part of decode* calls later in this function so pending_response_ can not
+    // be reset just yet. Preserve the state in pending_response_done_ instead.
+    pending_response_done_ = true;
 
     // Streams are responsible for unwinding any outstanding readDisable(true)
     // calls done on the underlying connection as they are destroyed. As this is
@@ -989,14 +993,16 @@ void ClientConnectionImpl::onMessageComplete() {
     }
 
     // Reset to ensure no information from one requests persists to the next.
+    pending_response_.reset();
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
   }
 }
 
 void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   // Only raise reset if we did not already dispatch a complete response.
-  if (pending_response_.has_value()) {
+  if (pending_response_.has_value() && !pending_response_done_) {
     pending_response_.value().encoder_.runResetCallbacks(reason);
+    pending_response_done_ = true;
     pending_response_.reset();
   }
 }
