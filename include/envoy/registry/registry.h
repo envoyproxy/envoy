@@ -15,6 +15,8 @@
 #include "common/config/api_type_oracle.h"
 #include "common/protobuf/utility.h"
 
+#include "extensions/common/utility.h"
+
 #include "absl/base/attributes.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
@@ -308,7 +310,9 @@ public:
       return nullptr;
     }
 
-    checkDeprecated(name);
+    if (!checkDeprecated(name)) {
+      return nullptr;
+    }
     return it->second;
   }
 
@@ -329,12 +333,15 @@ public:
     return (it == deprecatedFactoryNames().end()) ? name : it->second;
   }
 
-  static void checkDeprecated(absl::string_view name) {
+  static bool checkDeprecated(absl::string_view name) {
     auto it = deprecatedFactoryNames().find(name);
-    const bool status = it != deprecatedFactoryNames().end();
-    if (status) {
-      ENVOY_LOG(warn, "{} is deprecated, use {} instead.", it->first, it->second);
+    const bool deprecated = it != deprecatedFactoryNames().end();
+    if (deprecated) {
+      return Extensions::Common::Utility::ExtensionNameUtil::allowDeprecatedExtensionName(
+          "", it->first, it->second);
     }
+
+    return true;
   }
 
   /**

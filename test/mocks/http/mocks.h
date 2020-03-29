@@ -174,7 +174,7 @@ public:
   MOCK_METHOD(void, continueDecoding, ());
   MOCK_METHOD(void, addDecodedData, (Buffer::Instance & data, bool streaming));
   MOCK_METHOD(void, injectDecodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(HeaderMap&, addDecodedTrailers, ());
+  MOCK_METHOD(RequestTrailerMap&, addDecodedTrailers, ());
   MOCK_METHOD(MetadataMapVector&, addDecodedMetadata, ());
   MOCK_METHOD(const Buffer::Instance*, decodingBuffer, ());
   MOCK_METHOD(void, modifyDecodingBuffer, (std::function<void(Buffer::Instance&)>));
@@ -228,11 +228,12 @@ public:
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
   MOCK_METHOD(void, injectEncodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(HeaderMap&, addEncodedTrailers, ());
+  MOCK_METHOD(ResponseTrailerMap&, addEncodedTrailers, ());
   MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr &&));
   MOCK_METHOD(void, continueEncoding, ());
   MOCK_METHOD(const Buffer::Instance*, encodingBuffer, ());
   MOCK_METHOD(void, modifyEncodingBuffer, (std::function<void(Buffer::Instance&)>));
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 
   Buffer::InstancePtr buffer_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
@@ -334,11 +335,15 @@ public:
   MockAsyncClientCallbacks();
   ~MockAsyncClientCallbacks() override;
 
-  void onSuccess(ResponseMessagePtr&& response) override { onSuccess_(response.get()); }
+  void onSuccess(const Http::AsyncClient::Request& request,
+                 ResponseMessagePtr&& response) override {
+    onSuccess_(request, response.get());
+  }
 
   // Http::AsyncClient::Callbacks
-  MOCK_METHOD(void, onSuccess_, (ResponseMessage * response));
-  MOCK_METHOD(void, onFailure, (Http::AsyncClient::FailureReason reason));
+  MOCK_METHOD(void, onSuccess_, (const Http::AsyncClient::Request&, ResponseMessage*));
+  MOCK_METHOD(void, onFailure,
+              (const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason));
 };
 
 class MockAsyncClientStreamCallbacks : public AsyncClient::StreamCallbacks {

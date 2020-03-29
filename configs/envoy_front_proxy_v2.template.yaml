@@ -45,18 +45,18 @@
         route_config:
           {{ router_file_content(router_file='envoy_router_v2.template.yaml')|indent(10) }}
         http_filters:
-        - name: envoy.health_check
+        - name: envoy.filters.http.health_check
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
             pass_through_mode: false
             headers:
               - name: ":path"
                 exact_match: "/healthcheck"
-        - name: envoy.buffer
+        - name: envoy.filters.http.buffer
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
             max_request_bytes: 5242880
-        - name: envoy.rate_limit
+        - name: envoy.filters.http.ratelimit
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit
             domain: envoy_front
@@ -65,7 +65,7 @@
               grpc_service:
                 envoy_grpc:
                   cluster_name: ratelimit
-        - name: envoy.router
+        - name: envoy.filters.http.router
           typed_config: {}
         add_user_agent: true
         tracing:

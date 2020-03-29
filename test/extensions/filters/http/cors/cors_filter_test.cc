@@ -702,6 +702,16 @@ TEST_F(CorsFilterTest, OptionsRequestNotMatchingOriginByRegex) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
 }
 
+// Test that the deprecated extension name still functions.
+TEST(CorsFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.cors";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
+}
+
 } // namespace Cors
 } // namespace HttpFilters
 } // namespace Extensions

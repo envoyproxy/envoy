@@ -304,7 +304,7 @@ public:
    *
    * @return a reference to the newly created trailers map.
    */
-  virtual HeaderMap& addDecodedTrailers() PURE;
+  virtual RequestTrailerMap& addDecodedTrailers() PURE;
 
   /**
    * Create a locally generated response using the provided response_code and body_text parameters.
@@ -642,7 +642,7 @@ public:
    *
    * @return a reference to the newly created trailers map.
    */
-  virtual HeaderMap& addEncodedTrailers() PURE;
+  virtual ResponseTrailerMap& addEncodedTrailers() PURE;
 
   /**
    * Adds new metadata to be encoded.
@@ -676,6 +676,12 @@ public:
    * @return the buffer limit the filter should apply.
    */
   virtual uint32_t encoderBufferLimit() PURE;
+
+  /**
+   * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
+   * absl::nullopt.
+   */
+  virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 };
 
 /**

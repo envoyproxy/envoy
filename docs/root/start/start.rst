@@ -82,7 +82,7 @@ The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/l
                   - match: { prefix: "/" }
                     route: { host_rewrite: www.google.com, cluster: service_google }
               http_filters:
-              - name: envoy.router
+              - name: envoy.filters.http.router
 
 The specification of the :ref:`clusters <envoy_api_file_envoy/api/v2/cds.proto>`.
 
@@ -167,6 +167,7 @@ features. The following sandboxes are available:
     sandboxes/grpc_bridge
     sandboxes/jaeger_native_tracing
     sandboxes/jaeger_tracing
+    sandboxes/load_reporting_service
     sandboxes/lua
     sandboxes/mysql
     sandboxes/redis

@@ -74,7 +74,8 @@ public:
    * @param headers is the HTTP request headers.
    * @return list of extracted Jwt location info.
    */
-  virtual std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const PURE;
+  virtual std::vector<JwtLocationConstPtr>
+  extract(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
    * Remove headers that configured to send JWT payloads.

@@ -137,6 +137,12 @@ public:
    * @return whether a time_point contains a valid, not default constructed time.
    */
   static bool timePointValid(MonotonicTime time_point);
+
+  /**
+   * @param time_source time keeping source.
+   * @return uint64_t the number of milliseconds since the epoch.
+   */
+  static uint64_t nowToMilliseconds(TimeSource& time_source);
 };
 
 /**
@@ -299,11 +305,14 @@ public:
    * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
    * @param keep_empty_string result contains empty strings if the string starts or ends with
    * 'split', or if instances of 'split' are adjacent; default = false.
+   * @param trim_whitespace remove leading and trailing whitespaces from each of the split
+   * string views; default = false.
    * @return vector containing views of the split strings
    */
   static std::vector<absl::string_view> splitToken(absl::string_view source,
                                                    absl::string_view delimiters,
-                                                   bool keep_empty_string = false);
+                                                   bool keep_empty_string = false,
+                                                   bool trim_whitespace = false);
 
   /**
    * Remove tokens from a delimiter-separated string view. The tokens are trimmed before

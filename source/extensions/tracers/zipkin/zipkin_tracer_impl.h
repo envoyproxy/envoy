@@ -7,6 +7,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/http/async_client_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
@@ -66,7 +67,7 @@ public:
 
   void log(SystemTime timestamp, const std::string& event) override;
 
-  void injectContext(Http::HeaderMap& request_headers) override;
+  void injectContext(Http::RequestHeaderMap& request_headers) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
                               SystemTime start_time) override;
 
@@ -94,7 +95,7 @@ public:
    * Also, it associates the given random-number generator to the Zipkin::Tracer object it creates.
    */
   Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
-         Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+         Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
          const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator,
          TimeSource& time_source);
@@ -109,7 +110,7 @@ public:
    * Thus, this implementation of the virtual function startSpan() ignores the operation name
    * ("ingress" or "egress") passed by the caller.
    */
-  Tracing::SpanPtr startSpan(const Tracing::Config&, Http::HeaderMap& request_headers,
+  Tracing::SpanPtr startSpan(const Tracing::Config&, Http::RequestHeaderMap& request_headers,
                              const std::string&, SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
 
@@ -194,8 +195,8 @@ public:
 
   // Http::AsyncClient::Callbacks.
   // The callbacks below record Zipkin-span-related stats.
-  void onSuccess(Http::ResponseMessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason) override;
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
 
   /**
    * Creates a heap-allocated ZipkinReporter.
@@ -226,6 +227,8 @@ private:
   Event::TimerPtr flush_timer_;
   const CollectorInfo collector_;
   SpanBufferPtr span_buffer_;
+  // Track active HTTP requests to be able to cancel them on destruction.
+  Http::AsyncClientRequestTracker active_requests_;
 };
 } // namespace Zipkin
 } // namespace Tracers

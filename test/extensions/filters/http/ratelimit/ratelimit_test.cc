@@ -267,8 +267,8 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
 
   request_callbacks_->complete(
       Filters::Common::RateLimit::LimitStatus::OK,
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl(*rl_headers)},
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl(*request_headers_to_add)});
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl(*rl_headers)},
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl(*request_headers_to_add)});
   Http::TestHeaderMapImpl expected_headers(*rl_headers);
   Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
@@ -415,7 +415,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  Http::HeaderMapPtr h{new Http::TestHeaderMapImpl()};
+  Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl()};
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "429"},
       {"x-envoy-ratelimited", Http::Headers::get().EnvoyRateLimitedValues.True}};
@@ -468,8 +468,8 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
   Http::HeaderMapPtr request_headers_to_add{
       new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
 
-  Http::HeaderMapPtr h{new Http::TestHeaderMapImpl(*rl_headers)};
-  Http::HeaderMapPtr uh{new Http::TestHeaderMapImpl(*request_headers_to_add)};
+  Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl(*rl_headers)};
+  Http::RequestHeaderMapPtr uh{new Http::TestRequestHeaderMapImpl(*request_headers_to_add)};
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h),
                                std::move(uh));
 
@@ -498,7 +498,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enforcing", 100))
       .WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  Http::HeaderMapPtr h{new Http::TestHeaderMapImpl()};
+  Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl()};
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h),
                                nullptr);
 

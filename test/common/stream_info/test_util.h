@@ -4,6 +4,8 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
+#include "common/http/request_id_extension_impl.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
@@ -18,6 +20,7 @@ public:
     // Use 1999-01-01 00:00:00 +0
     time_t fake_time = 915148800;
     start_time_ = std::chrono::system_clock::from_time_t(fake_time);
+    request_id_extension_ = Http::RequestIDExtensionFactory::defaultInstance(random_);
 
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;
@@ -201,12 +204,30 @@ public:
     return upstream_transport_failure_reason_;
   }
 
-  void setRequestHeaders(const Http::HeaderMap& headers) override { request_headers_ = &headers; }
+  void setRequestHeaders(const Http::RequestHeaderMap& headers) override {
+    request_headers_ = &headers;
+  }
 
-  const Http::HeaderMap* getRequestHeaders() const override { return request_headers_; }
+  const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
+
+  void setRequestIDExtension(Http::RequestIDExtensionSharedPtr request_id_extension) override {
+    request_id_extension_ = request_id_extension;
+  }
+  Http::RequestIDExtensionSharedPtr getRequestIDExtension() const override {
+    return request_id_extension_;
+  }
 
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
+  void setUpstreamClusterInfo(
+      const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) override {
+    upstream_cluster_info_ = upstream_cluster_info;
+  }
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const override {
+    return upstream_cluster_info_;
+  }
+
+  Runtime::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
@@ -241,8 +262,10 @@ public:
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
   std::string upstream_transport_failure_reason_;
-  const Http::HeaderMap* request_headers_{};
+  const Http::RequestHeaderMap* request_headers_{};
   Envoy::Event::SimulatedTimeSystem test_time_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_{};
+  Http::RequestIDExtensionSharedPtr request_id_extension_;
 };
 
 } // namespace Envoy

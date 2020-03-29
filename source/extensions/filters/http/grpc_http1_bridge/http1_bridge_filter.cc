@@ -18,8 +18,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_names_,
+void Http1BridgeFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
+  context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_stat_names_,
                       headers.GrpcStatus());
 }
 
@@ -96,12 +96,12 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrail
   return Http::FilterTrailersStatus::Continue;
 }
 
-void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
+void Http1BridgeFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
   cluster_ = decoder_callbacks_->clusterInfo();
   if (!cluster_) {
     return;
   }
-  request_names_ = context_.resolveServiceAndMethod(headers.Path());
+  request_stat_names_ = context_.resolveDynamicServiceAndMethod(headers.Path());
 }
 
 } // namespace GrpcHttp1Bridge

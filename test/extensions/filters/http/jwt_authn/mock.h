@@ -53,7 +53,8 @@ public:
 
 class MockExtractor : public Extractor {
 public:
-  MOCK_METHOD(std::vector<JwtLocationConstPtr>, extract, (const Http::HeaderMap& headers), (const));
+  MOCK_METHOD(std::vector<JwtLocationConstPtr>, extract, (const Http::RequestHeaderMap& headers),
+              (const));
   MOCK_METHOD(void, sanitizePayloadHeaders, (Http::HeaderMap & headers), (const));
 };
 
@@ -70,7 +71,7 @@ public:
                   new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                       new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
               response_message->body() = std::make_unique<Buffer::OwnedImpl>(response_body_);
-              cb.onSuccess(std::move(response_message));
+              cb.onSuccess(request_, std::move(response_message));
               called_count_++;
               return &request_;
             }));

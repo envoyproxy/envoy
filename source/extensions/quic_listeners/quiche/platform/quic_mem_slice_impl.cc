@@ -25,21 +25,19 @@ QuicMemSliceImpl::QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length)
 QuicMemSliceImpl::QuicMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length) {
   ASSERT(firstSliceLength(buffer) == length);
   single_slice_buffer_.move(buffer, length);
-  ASSERT(single_slice_buffer_.getRawSlices(nullptr, 0) == 1);
+  ASSERT(single_slice_buffer_.getRawSlices().size() == 1);
 }
 
 const char* QuicMemSliceImpl::data() const {
-  Envoy::Buffer::RawSlice out;
-  uint64_t num_slices = single_slice_buffer_.getRawSlices(&out, 1);
-  ASSERT(num_slices <= 1);
-  return static_cast<const char*>(out.mem_);
+  Envoy::Buffer::RawSliceVector slices = single_slice_buffer_.getRawSlices(/*max_slices=*/1);
+  ASSERT(slices.size() <= 1);
+  return !slices.empty() ? static_cast<const char*>(slices[0].mem_) : nullptr;
 }
 
 size_t QuicMemSliceImpl::firstSliceLength(Envoy::Buffer::Instance& buffer) {
-  Envoy::Buffer::RawSlice slice;
-  uint64_t total_num = buffer.getRawSlices(&slice, 1);
-  ASSERT(total_num != 0);
-  return slice.len_;
+  Envoy::Buffer::RawSliceVector slices = buffer.getRawSlices(/*max_slices=*/1);
+  ASSERT(slices.size() == 1);
+  return slices[0].len_;
 }
 
 } // namespace quic

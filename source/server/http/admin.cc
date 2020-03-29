@@ -34,7 +34,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
@@ -55,6 +54,8 @@
 #include "common/router/config_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/upstream/host_utility.h"
+
+#include "server/http/utils.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 
@@ -135,22 +136,6 @@ const char AdminHtmlEnd[] = R"(
 const std::regex PromRegex("[^a-zA-Z0-9_]");
 
 const uint64_t RecentLookupsCapacity = 100;
-
-void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map) {
-  header_map.setStatus(std::to_string(enumToInt(code)));
-  const auto& headers = Http::Headers::get();
-  if (header_map.ContentType() == nullptr) {
-    // Default to text-plain if unset.
-    header_map.setReferenceContentType(headers.ContentTypeValues.TextUtf8);
-  }
-  // Default to 'no-cache' if unset, but not 'no-store' which may break the back button.
-  if (header_map.CacheControl() == nullptr) {
-    header_map.setReferenceCacheControl(headers.CacheControlValues.NoCacheMaxAge0);
-  }
-
-  // Under no circumstance should browsers sniff content-type.
-  header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
-}
 
 // Helper method to get filter parameter, or report an error for an invalid regex.
 bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
@@ -315,59 +300,6 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
 }
 
 } // namespace
-
-AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
-
-Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
-                                                     bool end_stream) {
-  request_headers_ = &headers;
-  if (end_stream) {
-    onComplete();
-  }
-
-  return Http::FilterHeadersStatus::StopIteration;
-}
-
-Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  // Currently we generically buffer all admin request data in case a handler wants to use it.
-  // If we ever support streaming admin requests we may need to revisit this. Note, we must use
-  // addDecodedData() here since we might need to perform onComplete() processing if end_stream is
-  // true.
-  callbacks_->addDecodedData(data, false);
-
-  if (end_stream) {
-    onComplete();
-  }
-
-  return Http::FilterDataStatus::StopIterationNoBuffer;
-}
-
-Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::RequestTrailerMap&) {
-  onComplete();
-  return Http::FilterTrailersStatus::StopIteration;
-}
-
-void AdminFilter::onDestroy() {
-  for (const auto& callback : on_destroy_callbacks_) {
-    callback();
-  }
-}
-
-void AdminFilter::addOnDestroyCallback(std::function<void()> cb) {
-  on_destroy_callbacks_.push_back(std::move(cb));
-}
-
-Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() const {
-  ASSERT(callbacks_ != nullptr);
-  return *callbacks_;
-}
-
-const Buffer::Instance* AdminFilter::getRequestBody() const { return callbacks_->decodingBuffer(); }
-
-const Http::HeaderMap& AdminFilter::getRequestHeaders() const {
-  ASSERT(request_headers_ != nullptr);
-  return *request_headers_;
-}
 
 bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
   if (params.size() != 1) {
@@ -610,7 +542,8 @@ void AdminImpl::writeListenersAsText(Buffer::Instance& response) {
   }
 }
 
-Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerClusters(absl::string_view url,
+                                      Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   const auto format_value = formatParam(query_params);
@@ -683,7 +616,8 @@ AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
       std::make_pair(Http::Code::NotFound, fmt::format("{} not found in config dump", resource))};
 }
 
-Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerConfigDump(absl::string_view url,
+                                        Http::ResponseHeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) const {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   const auto resource = resourceParam(query_params);
@@ -708,7 +642,8 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& 
 }
 
 // TODO(ambuc) Export this as a server (?) stat for monitoring.
-Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerContention(absl::string_view,
+                                        Http::ResponseHeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) {
 
   if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
@@ -726,7 +661,7 @@ Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& resp
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&,
+Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::ResponseHeaderMap&,
                                          Buffer::Instance& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
@@ -750,7 +685,7 @@ Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::HeaderMap&,
+Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::ResponseHeaderMap&,
                                           Buffer::Instance& response, AdminStream&) {
   if (!Profiler::Heap::profilerEnabled()) {
     response.add("The current build does not support heap profiler");
@@ -797,27 +732,27 @@ Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::HeaderMap
   return res;
 }
 
-Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::ResponseHeaderMap&,
                                              Buffer::Instance& response, AdminStream&) {
   server_.failHealthcheck(true);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHealthcheckOk(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerHealthcheckOk(absl::string_view, Http::ResponseHeaderMap&,
                                            Buffer::Instance& response, AdminStream&) {
   server_.failHealthcheck(false);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHotRestartVersion(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerHotRestartVersion(absl::string_view, Http::ResponseHeaderMap&,
                                                Buffer::Instance& response, AdminStream&) {
   response.add(server_.hotRestart().version());
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
+Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::ResponseHeaderMap&,
                                      Buffer::Instance& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
@@ -844,7 +779,7 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
 }
 
 // TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
-Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerMemory(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   envoy::admin::v3::Memory memory;
@@ -853,11 +788,12 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response
   memory.set_total_thread_cache(Memory::Stats::totalThreadCacheBytes());
   memory.set_pageheap_unmapped(Memory::Stats::totalPageHeapUnmapped());
   memory.set_pageheap_free(Memory::Stats::totalPageHeapFree());
+  memory.set_total_physical_bytes(Memory::Stats::totalPhysicalBytes());
   response.add(MessageUtil::getJsonStringFromMessage(memory, true, true)); // pretty-print
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::HeaderMap&,
+Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::ResponseHeaderMap&,
                                             Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   ListenerManager::StopListenersType stop_listeners_type =
@@ -868,7 +804,7 @@ Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::HeaderM
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::ResponseHeaderMap&,
                                            Buffer::Instance& response, AdminStream&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
@@ -878,7 +814,7 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerStatsRecentLookups(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerStatsRecentLookups(absl::string_view, Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response, AdminStream&) {
   Stats::SymbolTable& symbol_table = server_.stats().symbolTable();
   std::string table;
@@ -895,28 +831,28 @@ Http::Code AdminImpl::handlerStatsRecentLookups(absl::string_view, Http::HeaderM
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerStatsRecentLookupsClear(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerStatsRecentLookupsClear(absl::string_view, Http::ResponseHeaderMap&,
                                                      Buffer::Instance& response, AdminStream&) {
   server_.stats().symbolTable().clearRecentLookups();
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerStatsRecentLookupsDisable(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerStatsRecentLookupsDisable(absl::string_view, Http::ResponseHeaderMap&,
                                                        Buffer::Instance& response, AdminStream&) {
   server_.stats().symbolTable().setRecentLookupCapacity(0);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerStatsRecentLookupsEnable(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerStatsRecentLookupsEnable(absl::string_view, Http::ResponseHeaderMap&,
                                                       Buffer::Instance& response, AdminStream&) {
   server_.stats().symbolTable().setRecentLookupCapacity(RecentLookupsCapacity);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
+Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::ResponseHeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   const std::time_t current_time =
       std::chrono::system_clock::to_time_t(server_.timeSource().systemTime());
@@ -942,8 +878,8 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerReady(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
-                                   AdminStream&) {
+Http::Code AdminImpl::handlerReady(absl::string_view, Http::ResponseHeaderMap&,
+                                   Buffer::Instance& response, AdminStream&) {
   const envoy::admin::v3::ServerInfo::State state =
       Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
 
@@ -953,7 +889,7 @@ Http::Code AdminImpl::handlerReady(absl::string_view, Http::HeaderMap&, Buffer::
   return code;
 }
 
-Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerStats(absl::string_view url, Http::ResponseHeaderMap& response_headers,
                                    Buffer::Instance& response, AdminStream& admin_stream) {
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
@@ -1010,8 +946,9 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   return rc;
 }
 
-Http::Code AdminImpl::handlerPrometheusStats(absl::string_view path_and_query, Http::HeaderMap&,
-                                             Buffer::Instance& response, AdminStream&) {
+Http::Code AdminImpl::handlerPrometheusStats(absl::string_view path_and_query,
+                                             Http::ResponseHeaderMap&, Buffer::Instance& response,
+                                             AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
   absl::optional<std::regex> regex;
@@ -1196,14 +1133,15 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   return MessageUtil::getJsonStringFromMessage(document, pretty_print, true);
 }
 
-Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::ResponseHeaderMap&,
                                           Buffer::Instance& response, AdminStream&) {
   server_.shutdown();
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerListenerInfo(absl::string_view url, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerListenerInfo(absl::string_view url,
+                                          Http::ResponseHeaderMap& response_headers,
                                           Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   const auto format_value = formatParam(query_params);
@@ -1217,7 +1155,7 @@ Http::Code AdminImpl::handlerListenerInfo(absl::string_view url, Http::HeaderMap
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerCerts(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                    Buffer::Instance& response, AdminStream&) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
@@ -1238,7 +1176,8 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerRuntime(absl::string_view url,
+                                     Http::ResponseHeaderMap& response_headers,
                                      Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
@@ -1308,7 +1247,7 @@ bool AdminImpl::isFormUrlEncoded(const Http::HeaderEntry* content_type) const {
          Http::Headers::get().ContentTypeValues.FormUrlEncoded;
 }
 
-Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,
+Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::ResponseHeaderMap&,
                                            Buffer::Instance& response, AdminStream& admin_stream) {
   Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   if (params.empty()) {
@@ -1337,24 +1276,14 @@ Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMa
   return Http::Code::OK;
 }
 
-ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
-
-void AdminFilter::onComplete() {
-  absl::string_view path = request_headers_->Path()->value().getStringView();
-  ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
-
-  Buffer::OwnedImpl response;
-  Http::ResponseHeaderMapPtr header_map{new Http::ResponseHeaderMapImpl};
-  RELEASE_ASSERT(request_headers_, "");
-  Http::Code code = parent_.runCallback(path, *header_map, response, *this);
-  populateFallbackResponseHeaders(code, *header_map);
-  callbacks_->encodeHeaders(std::move(header_map),
-                            end_stream_on_complete_ && response.length() == 0);
-
-  if (response.length() > 0) {
-    callbacks_->encodeData(response, end_stream_on_complete_);
-  }
+Http::Code AdminImpl::handlerReopenLogs(absl::string_view, Http::ResponseHeaderMap&,
+                                        Buffer::Instance& response, AdminStream&) {
+  server_.accessLogManager().reopen();
+  response.add("OK\n");
+  return Http::Code::OK;
 }
+
+ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
@@ -1384,7 +1313,9 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
 }
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
-    : server_(server), profile_path_(profile_path),
+    : server_(server),
+      request_id_extension_(Http::RequestIDExtensionFactory::defaultInstance(server_.random())),
+      profile_path_(profile_path),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
@@ -1442,6 +1373,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
+          {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false,
+           true},
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
@@ -1450,7 +1383,9 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
                                                  const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
-      connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings(),
+      connection, data, callbacks, server_.stats(), Http::Http1Settings(),
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions()),
       maxRequestHeadersKb(), maxRequestHeadersCount());
 }
 
@@ -1465,12 +1400,13 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
 }
 
 void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{new AdminFilter(*this)});
+  callbacks.addStreamFilter(std::make_shared<AdminFilter>(createCallbackFunction()));
 }
 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
-                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                  AdminStream& admin_stream) {
+                                  Http::ResponseHeaderMap& response_headers,
+                                  Buffer::Instance& response, AdminStream& admin_stream) {
+
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
 
@@ -1521,8 +1457,8 @@ std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
   return sorted_handlers;
 }
 
-Http::Code AdminImpl::handlerHelp(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
-                                  AdminStream&) {
+Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
+                                  Buffer::Instance& response, AdminStream&) {
   response.add("admin commands are:\n");
 
   // Prefix order is used during searching, but for printing do them in alpha order.
@@ -1532,7 +1468,7 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::HeaderMap&, Buffer::I
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
 
@@ -1618,15 +1554,16 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 }
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
-                              Http::HeaderMap& response_headers, std::string& body) {
-  AdminFilter filter(*this);
+                              Http::ResponseHeaderMap& response_headers, std::string& body) {
+  AdminFilter filter(createCallbackFunction());
+
   Http::RequestHeaderMapImpl request_headers;
   request_headers.setMethod(method);
   filter.decodeHeaders(request_headers, false);
   Buffer::OwnedImpl response;
 
   Http::Code code = runCallback(path_and_query, response_headers, response, filter);
-  populateFallbackResponseHeaders(code, response_headers);
+  Utility::populateFallbackResponseHeaders(code, response_headers);
   body = response.toString();
   return code;
 }
@@ -1641,20 +1578,6 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
     handler->addListener(*listener_);
   }
-}
-
-envoy::admin::v3::ServerInfo::State Utility::serverState(Init::Manager::State state,
-                                                         bool health_check_failed) {
-  switch (state) {
-  case Init::Manager::State::Uninitialized:
-    return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
-  case Init::Manager::State::Initializing:
-    return envoy::admin::v3::ServerInfo::INITIALIZING;
-  case Init::Manager::State::Initialized:
-    return health_check_failed ? envoy::admin::v3::ServerInfo::DRAINING
-                               : envoy::admin::v3::ServerInfo::LIVE;
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Server

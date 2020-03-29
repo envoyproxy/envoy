@@ -264,6 +264,54 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeout) {
   EXPECT_EQ("504", response->headers().Status()->value().getStringView());
 }
 
+// Sends a request with a per try timeout specified but no global timeout.
+// Ensures that two requests are attempted and a timeout is returned
+// downstream.
+TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"},
+                                     {"x-envoy-upstream-rq-timeout-ms", "0"},
+                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}});
+  auto response = std::move(encoder_decoder.second);
+  request_encoder_ = &encoder_decoder.first;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  codec_client_->sendData(*request_encoder_, 0, true);
+
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Trigger per try timeout.
+  timeSystem().sleep(std::chrono::milliseconds(5));
+
+  // Wait for a second request to be sent upstream
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Encode 200 response headers for the first (timed out) request.
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  response->waitForHeaders();
+  codec_client_->close();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
 // With hedge_on_per_try_timeout enabled via config, sends a request with a
 // global timeout and per try timeout specified, sleeps for longer than the per
 // try but slightly less than the global timeout. We then have the first

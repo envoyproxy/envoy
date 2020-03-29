@@ -11,13 +11,14 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "ListenerComponentsProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Listener components]
 // Listener :ref:`configuration overview <config_listeners>`
@@ -139,7 +140,7 @@ message FilterChainMatch {
   // Suggested values include:
   //
   // * ``raw_buffer`` - default, used when no transport protocol is detected,
-  // * ``tls`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
+  // * ``tls`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
   //   when TLS protocol is detected.
   string transport_protocol = 9;
 
@@ -149,9 +150,9 @@ message FilterChainMatch {
   //
   // Suggested values include:
   //
-  // * ``http/1.1`` - set by :ref:`envoy.listener.tls_inspector
+  // * ``http/1.1`` - set by :ref:`envoy.filters.listener.tls_inspector
   //   <config_listener_filters_tls_inspector>`,
-  // * ``h2`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
+  // * ``h2`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
   //
   // .. attention::
   //

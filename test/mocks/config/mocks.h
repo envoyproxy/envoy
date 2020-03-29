@@ -5,6 +5,7 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/config_provider_impl.h"
@@ -106,17 +107,27 @@ public:
 
   MOCK_METHOD(ConfigProviderPtr, createXdsConfigProvider,
               (const Protobuf::Message& config_source_proto,
-               Server::Configuration::FactoryContext& factory_context,
-               const std::string& stat_prefix,
+               Server::Configuration::ServerFactoryContext& factory_context,
+               Init::Manager& init_manager, const std::string& stat_prefix,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
   MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
               (const Protobuf::Message& config_proto,
-               Server::Configuration::FactoryContext& factory_context,
+               Server::Configuration::ServerFactoryContext& factory_context,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
   MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
               (std::vector<std::unique_ptr<const Protobuf::Message>> && config_protos,
-               Server::Configuration::FactoryContext& factory_context,
+               Server::Configuration::ServerFactoryContext& factory_context,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
+};
+
+class MockTypedFactory : public TypedFactory {
+public:
+  ~MockTypedFactory() override;
+
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
+  MOCK_METHOD(std::string, configType, ());
+  MOCK_METHOD(std::string, name, (), (const));
+  MOCK_METHOD(std::string, category, (), (const));
 };
 
 } // namespace Config

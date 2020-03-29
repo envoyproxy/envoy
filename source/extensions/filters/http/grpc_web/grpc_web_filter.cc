@@ -38,7 +38,7 @@ const absl::flat_hash_set<std::string>& GrpcWebFilter::gRpcWebContentTypes() con
   return *types;
 }
 
-bool GrpcWebFilter::isGrpcWebRequest(const Http::HeaderMap& headers) {
+bool GrpcWebFilter::isGrpcWebRequest(const Http::RequestHeaderMap& headers) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr) {
     return gRpcWebContentTypes().count(content_type->value().getStringView()) > 0;
@@ -227,16 +227,16 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMa
   return Http::FilterTrailersStatus::Continue;
 }
 
-void GrpcWebFilter::setupStatTracking(const Http::HeaderMap& headers) {
+void GrpcWebFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
   cluster_ = decoder_callbacks_->clusterInfo();
   if (!cluster_) {
     return;
   }
-  request_names_ = context_.resolveServiceAndMethod(headers.Path());
+  request_stat_names_ = context_.resolveDynamicServiceAndMethod(headers.Path());
 }
 
-void GrpcWebFilter::chargeStat(const Http::HeaderMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Context::Protocol::GrpcWeb, *request_names_,
+void GrpcWebFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
+  context_.chargeStat(*cluster_, Grpc::Context::Protocol::GrpcWeb, *request_stat_names_,
                       headers.GrpcStatus());
 }
 

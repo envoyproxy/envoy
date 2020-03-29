@@ -33,6 +33,7 @@ message ValidationItem {
 // This includes the `pseudo-header <https://http2.github.io/http2-spec/#HttpRequest>`_ fields
 // defined in HTTP2.
 message ValidationInput {
+  reserved 8;
   // This pseudo-header field includes the authority portion of the target URI.
   // Clients that generate HTTP/2 requests directly SHOULD use the :authority pseudo-header field
   // instead of the Host header field.
@@ -62,10 +63,11 @@ message ValidationInput {
   // If not specified, or if internal is equal to false, x-envoy-internal is not set.
   bool internal = 7;
 
-  // Additional headers to be added as input for route determination.
+  // Additional request or response headers to be added as input for route determination.
   // The “:authority”, “:path”, “:method”, “x-forwarded-proto”, and “x-envoy-internal” fields are
   // specified by the other config options and should not be set here.
-  repeated envoy.config.core.v3.HeaderValue additional_headers = 8;
+  repeated envoy.config.core.v3.HeaderValue additional_request_headers = 10;
+  repeated envoy.config.core.v3.HeaderValue additional_response_headers = 11;
 
   // Runtime setting key to enable for the test case.
   // If a route depends on the runtime, the route will be enabled based on the random_value defined
@@ -78,6 +80,7 @@ message ValidationInput {
 // Use “” (empty string) to indicate that no return value is expected.
 // For example, to test that no cluster match is expected use {“cluster_name”: “”}.
 message ValidationAssert {
+  reserved 7, 8;
   // Match the cluster name.
   google.protobuf.StringValue cluster_name = 1;
 
@@ -96,11 +99,11 @@ message ValidationAssert {
   // Match the returned redirect path.
   google.protobuf.StringValue path_redirect = 6;
 
-  // Match the listed header fields.
-  // Examples header fields include the “:path”, “cookie”, and “date” fields.
+  // Match the listed request or response header fields.
+  // Example header fields include the “:path”, “cookie”, and “date” fields.
   // The header fields are checked after all other test cases.
   // Thus, the header fields checked will be those of the redirected or rewritten routes when
   // applicable.
-  repeated envoy.config.core.v3.HeaderValue header_fields = 7;
-  repeated envoy.config.core.v3.HeaderValue custom_header_fields = 8;
+  repeated envoy.config.core.v3.HeaderValue request_header_fields = 9;
+  repeated envoy.config.core.v3.HeaderValue response_header_fields = 10;
 }

@@ -7,8 +7,10 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/matchers.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -58,11 +60,40 @@ struct SuccessResponse {
   ResponsePtr response_;
 };
 
-std::vector<Matchers::LowerCaseStringMatcherPtr>
-createLowerCaseMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  std::vector<Matchers::LowerCaseStringMatcherPtr> matchers;
+envoy::type::matcher::v3::StringMatcher
+ignoreCaseStringMatcher(const envoy::type::matcher::v3::StringMatcher& matcher) {
+  const auto& match_pattern_case = matcher.match_pattern_case();
+  if (match_pattern_case == envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex ||
+      match_pattern_case ==
+          envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex) {
+    return matcher;
+  }
+
+  envoy::type::matcher::v3::StringMatcher ignore_case;
+  ignore_case.set_ignore_case(true);
+  switch (matcher.match_pattern_case()) {
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
+    ignore_case.set_exact(matcher.exact());
+    break;
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
+    ignore_case.set_prefix(matcher.prefix());
+    break;
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
+    ignore_case.set_suffix(matcher.suffix());
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+  return ignore_case;
+}
+
+std::vector<Matchers::StringMatcherPtr>
+createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                     const bool disable_lowercase_string_matcher) {
+  std::vector<Matchers::StringMatcherPtr> matchers;
   for (const auto& matcher : list.patterns()) {
-    matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(
+        disable_lowercase_string_matcher ? matcher : ignoreCaseStringMatcher(matcher)));
   }
   return matchers;
 }
@@ -70,7 +101,7 @@ createLowerCaseMatchers(const envoy::type::matcher::v3::ListStringMatcher& list)
 } // namespace
 
 // Matchers
-HeaderKeyMatcher::HeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcherPtr>&& list)
+HeaderKeyMatcher::HeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>&& list)
     : matchers_(std::move(list)) {}
 
 bool HeaderKeyMatcher::matches(absl::string_view key) const {
@@ -78,7 +109,7 @@ bool HeaderKeyMatcher::matches(absl::string_view key) const {
                      [&key](auto& matcher) { return matcher->match(key); });
 }
 
-NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcherPtr>&& list)
+NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>&& list)
     : matcher_(std::move(list)) {}
 
 bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
@@ -86,44 +117,53 @@ bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher
 // Config
 ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                            uint32_t timeout, absl::string_view path_prefix)
-    : request_header_matchers_(
-          toRequestMatchers(config.http_service().authorization_request().allowed_headers())),
-      client_header_matchers_(toClientMatchers(
-          config.http_service().authorization_response().allowed_client_headers())),
+    : enable_case_sensitive_string_matcher_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher")),
+      request_header_matchers_(
+          toRequestMatchers(config.http_service().authorization_request().allowed_headers(),
+                            enable_case_sensitive_string_matcher_)),
+      client_header_matchers_(
+          toClientMatchers(config.http_service().authorization_response().allowed_client_headers(),
+                           enable_case_sensitive_string_matcher_)),
       upstream_header_matchers_(toUpstreamMatchers(
-          config.http_service().authorization_response().allowed_upstream_headers())),
-      authorization_headers_to_add_(
-          toHeadersAdd(config.http_service().authorization_request().headers_to_add())),
+          config.http_service().authorization_response().allowed_upstream_headers(),
+          enable_case_sensitive_string_matcher_)),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix),
-      tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())) {}
+      tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
+      request_headers_parser_(Router::HeaderParser::configure(
+          config.http_service().authorization_request().headers_to_add(), false)) {}
 
 MatcherSharedPtr
-ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
+ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                                const bool disable_lowercase_string_matcher) {
   const std::vector<Http::LowerCaseString> keys{
       {Http::Headers::get().Authorization, Http::Headers::get().Method, Http::Headers::get().Path,
        Http::Headers::get().Host}};
 
-  std::vector<Matchers::LowerCaseStringMatcherPtr> matchers(createLowerCaseMatchers(list));
+  std::vector<Matchers::StringMatcherPtr> matchers(
+      createStringMatchers(list, disable_lowercase_string_matcher));
   for (const auto& key : keys) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
-    matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
 
 MatcherSharedPtr
-ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  std::vector<Matchers::LowerCaseStringMatcherPtr> matchers(createLowerCaseMatchers(list));
+ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                               const bool disable_lowercase_string_matcher) {
+  std::vector<Matchers::StringMatcherPtr> matchers(
+      createStringMatchers(list, disable_lowercase_string_matcher));
 
   // If list is empty, all authorization response headers, except Host, should be added to
   // the client response.
   if (matchers.empty()) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(Http::Headers::get().Host.get());
-    matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
 
     return std::make_shared<NotHeaderKeyMatcher>(std::move(matchers));
   }
@@ -137,25 +177,17 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
   for (const auto& key : keys) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
-    matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
 
 MatcherSharedPtr
-ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  return std::make_unique<HeaderKeyMatcher>(createLowerCaseMatchers(list));
-}
-
-Http::LowerCaseStrPairVector ClientConfig::toHeadersAdd(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers) {
-  Http::LowerCaseStrPairVector header_vec;
-  header_vec.reserve(headers.size());
-  for (const auto& header : headers) {
-    header_vec.emplace_back(Http::LowerCaseString(header.key()), header.value());
-  }
-  return header_vec;
+ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                                 const bool disable_lowercase_string_matcher) {
+  return std::make_unique<HeaderKeyMatcher>(
+      createStringMatchers(list, disable_lowercase_string_matcher));
 }
 
 RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
@@ -180,7 +212,8 @@ void RawHttpClientImpl::cancel() {
 // Client
 void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                               const envoy::service::auth::v3::CheckRequest& request,
-                              Tracing::Span& parent_span) {
+                              Tracing::Span& parent_span,
+                              const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   ASSERT(span_ == nullptr);
   callbacks_ = &callbacks;
@@ -213,9 +246,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     }
   }
 
-  for (const auto& header_to_add : config_->headersToAdd()) {
-    headers->setReference(header_to_add.first, header_to_add.second);
-  }
+  config_->requestHeaderParser().evaluateHeaders(*headers, stream_info);
 
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
@@ -244,14 +275,16 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   }
 }
 
-void RawHttpClientImpl::onSuccess(Http::ResponseMessagePtr&& message) {
+void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
+                                  Http::ResponseMessagePtr&& message) {
   callbacks_->onComplete(toResponse(std::move(message)));
   span_->finishSpan();
   callbacks_ = nullptr;
   span_ = nullptr;
 }
 
-void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
+void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
+                                  Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
   callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
   span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);

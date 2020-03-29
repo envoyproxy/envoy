@@ -20,9 +20,9 @@ public:
 
 private:
   // FactoryBase
-  Tracing::HttpTracerPtr
+  Tracing::HttpTracerSharedPtr
   createHttpTracerTyped(const envoy::config::trace::v3::LightstepConfig& proto_config,
-                        Server::Instance& server) override;
+                        Server::Configuration::TracerFactoryContext& context) override;
 };
 
 } // namespace Lightstep

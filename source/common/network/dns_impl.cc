@@ -89,7 +89,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     // callback_ target _should_ still be around. In that case, raise the callback_ so the target
     // can be done with this query and initiate a new one.
     if (!cancelled_) {
-      callback_({});
+      callback_(ResolutionStatus::Failure, {});
     }
     delete this;
     return;
@@ -112,7 +112,9 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   }
 
   std::list<DnsResponse> address_list;
+  ResolutionStatus resolution_status;
   if (status == ARES_SUCCESS) {
+    resolution_status = ResolutionStatus::Success;
     if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
       if (addrinfo->nodes->ai_family == AF_INET) {
         for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
@@ -146,6 +148,8 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
     ASSERT(addrinfo != nullptr);
     ares_freeaddrinfo(addrinfo);
+  } else {
+    resolution_status = ResolutionStatus::Failure;
   }
 
   if (timeouts > 0) {
@@ -155,7 +159,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   if (completed_) {
     if (!cancelled_) {
       try {
-        callback_(std::move(address_list));
+        callback_(resolution_status, std::move(address_list));
       } catch (const EnvoyException& e) {
         ENVOY_LOG(critical, "EnvoyException in c-ares callback");
         dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
@@ -176,7 +180,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   if (!completed_ && fallback_if_failed_) {
     fallback_if_failed_ = false;
     getAddrInfo(AF_INET);
-    // Note: Nothing can follow this call to getHostByName due to deletion of this
+    // Note: Nothing can follow this call to getAddrInfo due to deletion of this
     // object upon synchronous resolution.
     return;
   }
@@ -227,7 +231,7 @@ void DnsResolverImpl::onAresSocketStateChange(os_fd_t fd, int read, int write) {
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
-  // failed initial call to getHostByName followed by a synchronous IPv4
+  // failed initial call to getAddrInfo followed by a synchronous IPv4
   // resolution.
 
   // @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for why this is done.

@@ -20,9 +20,9 @@ public:
 
 private:
   // FactoryBase
-  Tracing::HttpTracerPtr
+  Tracing::HttpTracerSharedPtr
   createHttpTracerTyped(const envoy::config::trace::v3::DynamicOtConfig& configuration,
-                        Server::Instance& server) override;
+                        Server::Configuration::TracerFactoryContext& context) override;
 };
 
 } // namespace DynamicOt

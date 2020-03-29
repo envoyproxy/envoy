@@ -4,7 +4,7 @@ Original Source
 ===============
 
 * :ref:`Listener filter v2 API reference <envoy_api_msg_config.filter.listener.original_src.v2alpha1.OriginalSrc>`
-* This filter should be configured with the name *envoy.listener.original_src*.
+* This filter should be configured with the name *envoy.filters.listener.original_src*.
 
 The original source listener filter replicates the downstream remote address of the connection on
 the upstream side of Envoy. For example, if a downstream connection connects to Envoy with IP
@@ -71,8 +71,8 @@ marked with 123.
         address: 0.0.0.0
         port_value: 8888
     listener_filters:
-      - name: envoy.listener.proxy_protocol
-      - name: envoy.listener.original_src
+      - name: envoy.filters.listener.proxy_protocol
+      - name: envoy.filters.listener.original_src
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.listener.original_src.v2alpha1.OriginalSrc
           mark: 123

@@ -11,7 +11,9 @@
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
+#include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
+#include "common/init/watcher_impl.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -115,7 +117,7 @@ public:
   ConfigProviderInstanceType instanceType() const { return instance_type_; }
 
 protected:
-  ImmutableConfigProviderBase(Server::Configuration::FactoryContext& factory_context,
+  ImmutableConfigProviderBase(Server::Configuration::ServerFactoryContext& factory_context,
                               ConfigProviderManagerImplBase& config_provider_manager,
                               ConfigProviderInstanceType instance_type, ApiType api_type);
 
@@ -136,12 +138,6 @@ class MutableConfigProviderCommonBase;
  *
  * A subscription is intended to be co-owned by config providers with the same config source, it's
  * designed to be created/destructed on admin thread only.
- *
- * xDS config providers and subscriptions are split to avoid lifetime issues with arguments
- * required by the config providers. An example is the Server::Configuration::FactoryContext, which
- * is owned by listeners and therefore may be destroyed while an associated config provider is still
- * in use (see #3960). This split enables single ownership of the config providers, while enabling
- * shared ownership of the underlying subscription.
  *
  */
 class ConfigSubscriptionCommonBase : protected Logger::Loggable<Logger::Id::config> {
@@ -180,7 +176,7 @@ public:
    */
   void onConfigUpdate() {
     setLastUpdated();
-    init_target_.ready();
+    local_init_target_.ready();
   }
 
   /**
@@ -189,7 +185,7 @@ public:
    */
   void onConfigUpdateFailed() {
     setLastUpdated();
-    init_target_.ready();
+    local_init_target_.ready();
   }
 
 protected:
@@ -202,13 +198,22 @@ protected:
 
   ConfigSubscriptionCommonBase(const std::string& name, const uint64_t manager_identifier,
                                ConfigProviderManagerImplBase& config_provider_manager,
-                               Server::Configuration::FactoryContext& factory_context)
+                               Server::Configuration::ServerFactoryContext& factory_context)
       : name_(name), tls_(factory_context.threadLocal().allocateSlot()),
-        init_target_(absl::StrCat("ConfigSubscriptionCommonBase ", name_), [this]() { start(); }),
+        local_init_target_(
+            fmt::format("ConfigSubscriptionCommonBase local init target '{}'", name_),
+            [this]() { start(); }),
+        parent_init_target_(fmt::format("ConfigSubscriptionCommonBase init target '{}'", name_),
+                            [this]() { local_init_manager_.initialize(local_init_watcher_); }),
+        local_init_watcher_(fmt::format("ConfigSubscriptionCommonBase local watcher '{}'", name_),
+                            [this]() { parent_init_target_.ready(); }),
+        local_init_manager_(
+            fmt::format("ConfigSubscriptionCommonBase local init manager '{}'", name_)),
         manager_identifier_(manager_identifier), config_provider_manager_(config_provider_manager),
         time_source_(factory_context.timeSource()),
         last_updated_(factory_context.timeSource().systemTime()) {
     Envoy::Config::Utility::checkLocalInfo(name, factory_context.localInfo());
+    local_init_manager_.add(local_init_target_);
   }
 
   /**
@@ -220,7 +225,7 @@ protected:
   void applyConfigUpdate(const ConfigUpdateCb& update_fn);
 
   void setLastUpdated() { last_updated_ = time_source_.systemTime(); }
-
+  Init::Manager& localInitManager() { return local_init_manager_; }
   void setLastConfigInfo(absl::optional<LastConfigInfo>&& config_info) {
     config_info_ = std::move(config_info);
   }
@@ -232,7 +237,16 @@ protected:
   ThreadLocal::SlotPtr tls_;
 
 private:
-  Init::TargetImpl init_target_;
+  // Local init target which signals first RPC interaction with management server.
+  Init::TargetImpl local_init_target_;
+  // Target added to factory context's initManager.
+  Init::TargetImpl parent_init_target_;
+  // Watcher that marks parent_init_target_ ready when the local init manager is ready.
+  Init::WatcherImpl local_init_watcher_;
+  // Local manager that tracks the subscription initialization, it is also used for sub-resource
+  // initialization if the sub-resource is not initialized.
+  Init::ManagerImpl local_init_manager_;
+
   const uint64_t manager_identifier_;
   ConfigProviderManagerImplBase& config_provider_manager_;
   TimeSource& time_source_;
@@ -259,7 +273,7 @@ class ConfigSubscriptionInstance : public ConfigSubscriptionCommonBase {
 public:
   ConfigSubscriptionInstance(const std::string& name, const uint64_t manager_identifier,
                              ConfigProviderManagerImplBase& config_provider_manager,
-                             Server::Configuration::FactoryContext& factory_context)
+                             Server::Configuration::ServerFactoryContext& factory_context)
       : ConfigSubscriptionCommonBase(name, manager_identifier, config_provider_manager,
                                      factory_context) {}
 
@@ -419,7 +433,7 @@ protected:
       // around it. However, since this is not a performance critical path we err on the side
       // of simplicity.
       subscription = subscription_factory_fn(manager_identifier, *this);
-      init_manager.add(subscription->init_target_);
+      init_manager.add(subscription->parent_init_target_);
 
       bindSubscription(manager_identifier, subscription);
     } else {

@@ -206,13 +206,7 @@ private:
 };
 class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
-  ClusterMemoryTestRunner() : save_use_fakes_(Stats::SymbolTableCreator::useFakeSymbolTables()) {}
-  ~ClusterMemoryTestRunner() override {
-    Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(save_use_fakes_);
-  }
-
-private:
-  const bool save_use_fakes_;
+  Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
@@ -220,7 +214,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(true);
+  symbol_table_creator_test_peer_.setUseFakeSymbolTables(true);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
@@ -271,6 +265,10 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/01/09  9227     43637       44000   router: per-cluster histograms w/ timeout budget
   // 2020/01/12  9633     43797       44104   config: support recovery of original message when
   //                                          upgrading.
+  // 2020/02/13  10042    43797       44136   Metadata: Metadata are shared across different
+  //                                          clusters and hosts.
+  // 2020/03/16  9964     44085       44600   http2: support custom SETTINGS parameters.
+  // 2020/03/24  10501    44261       44600   upstream: upstream_rq_retry_limit_exceeded.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -284,12 +282,12 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 43797); // 104 bytes higher than a debug build.
-  EXPECT_MEMORY_LE(m_per_cluster, 44104);
+  EXPECT_MEMORY_EQ(m_per_cluster, 44261);
+  EXPECT_MEMORY_LE(m_per_cluster, 44600);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+  symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
@@ -325,6 +323,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2019/01/09  9227     35772       36500   router: per-cluster histograms w/ timeout budget
   // 2020/01/12  9633     35932       36500   config: support recovery of original message when
   //                                          upgrading.
+  // 2020/03/16  9964     36220       36800   http2: support custom SETTINGS parameters.
+  // 2020/03/24  10501    36300       36800   upstream: upstream_rq_retry_limit_exceeded.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -338,12 +338,12 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 35932); // 104 bytes higher than a debug build.
-  EXPECT_MEMORY_LE(m_per_cluster, 36500);
+  EXPECT_MEMORY_EQ(m_per_cluster, 36300);
+  EXPECT_MEMORY_LE(m_per_cluster, 36800);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+  symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
@@ -368,6 +368,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // 2019/11/12  8998     1299         1350   test: adjust memory limit for macOS
   // 2019/11/15  9040     1283         1350   build: update protobuf to 3.10.1
   // 2020/01/13  9663     1619         1655   api: deprecate hosts in Cluster.
+  // 2020/02/13  10042    1363         1655   Metadata object are shared across different clusters
+  //                                          and hosts.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -377,7 +379,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_host, 1619);
+  EXPECT_MEMORY_EQ(m_per_host, 1363);
   EXPECT_MEMORY_LE(m_per_host, 1655);
 }
 

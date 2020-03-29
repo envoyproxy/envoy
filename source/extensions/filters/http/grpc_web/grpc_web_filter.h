@@ -50,14 +50,14 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-  bool doStatTracking() const { return request_names_.has_value(); }
+  bool doStatTracking() const { return request_stat_names_.has_value(); }
 
 private:
   friend class GrpcWebFilterTest;
 
-  void chargeStat(const Http::HeaderMap& headers);
-  void setupStatTracking(const Http::HeaderMap& headers);
-  bool isGrpcWebRequest(const Http::HeaderMap& headers);
+  void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
+  void setupStatTracking(const Http::RequestHeaderMap& headers);
+  bool isGrpcWebRequest(const Http::RequestHeaderMap& headers);
 
   static const uint8_t GRPC_WEB_TRAILER;
   const absl::flat_hash_set<std::string>& gRpcWebContentTypes() const;
@@ -69,7 +69,7 @@ private:
   bool is_text_response_{};
   Buffer::OwnedImpl decoding_buffer_;
   Grpc::Decoder decoder_;
-  absl::optional<Grpc::Context::RequestNames> request_names_;
+  absl::optional<Grpc::Context::RequestStatNames> request_stat_names_;
   bool is_grpc_web_request_{};
   Grpc::Context& context_;
 };

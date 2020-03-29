@@ -24,10 +24,11 @@ namespace Router {
  */
 class RetryStateImpl : public RetryState {
 public:
-  static RetryStatePtr create(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
-                              const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
-                              Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                              Upstream::ResourcePriority priority);
+  static RetryStatePtr create(const RetryPolicy& route_policy,
+                              Http::RequestHeaderMap& request_headers,
+                              const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+                              Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                              Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority);
   ~RetryStateImpl() override;
 
   /**
@@ -50,11 +51,11 @@ public:
 
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
-  RetryStatus shouldRetryHeaders(const Http::HeaderMap& response_headers,
+  RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                  DoRetryCallback callback) override;
   // Returns true if the retry policy would retry the passed headers. Does not
   // take into account circuit breaking or remaining tries.
-  bool wouldRetryFromHeaders(const Http::HeaderMap& response_headers) override;
+  bool wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) override;
   RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
                                DoRetryCallback callback) override;
   RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) override;
@@ -85,10 +86,10 @@ public:
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
 
 private:
-  RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
-                 const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
-                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                 Upstream::ResourcePriority priority);
+  RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
+                 const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+                 Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                 Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority);
 
   void enableBackoffTimer();
   void resetRetry();
@@ -96,6 +97,7 @@ private:
   RetryStatus shouldRetry(bool would_retry, DoRetryCallback callback);
 
   const Upstream::ClusterInfo& cluster_;
+  const VirtualCluster* vcluster_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;

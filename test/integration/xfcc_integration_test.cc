@@ -737,6 +737,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"server.memory_allocated", "server.memory_allocated"},
       {"http.admin.downstream_cx_http2_active", "http.downstream_cx_http2_active"},
       {"server.memory_heap_size", "server.memory_heap_size"},
+      {"server.memory_physical_size", "server.memory_physical_size"},
       {"listener_manager.total_listeners_draining", "listener_manager.total_listeners_draining"},
       {"filesystem.write_total_buffered", "filesystem.write_total_buffered"},
       {"http.admin.downstream_cx_ssl_active", "http.downstream_cx_ssl_active"},
