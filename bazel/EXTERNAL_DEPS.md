@@ -70,6 +70,25 @@ The name of the dependency can be found in
 [the repository locations file.](https://github.com/envoyproxy/envoy/blob/master/bazel/repository_locations.bzl)
 The path of the local copy has to be absolute path.
 
+For repositories built by `envoy_cmake_external()` in `bazel/foreign_cc/BUILD`,
+it is necessary to populate the local copy with some additional Bazel machinery
+to support `--override_repository`:
+1. Place an empty `WORKSPACE` in the root.
+2. Place a `BUILD` file with `filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])`
+   in the root.
+
+# Debugging external dependencies
+
+For all external dependencies, overriding with a local copy as described in the
+previous section is a useful tool.
+
+Below we describe specific tips for obtaining additional debug for specific
+dependencies:
+
+* `libevent`: add `"EVENT__ENABLE_VERBOSE_DEBUG": "on",` to `cache_entries`
+  in the `event` target in `bazel/foreign_cc/BUILD` for verbose tracing of
+  libevent processing.
+
 # Distdir - prefetching dependencies
 
 Usually Bazel downloads all dependencies during build time. But there is a
