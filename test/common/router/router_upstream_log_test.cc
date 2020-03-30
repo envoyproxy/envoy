@@ -219,6 +219,8 @@ public:
     response_decoder->decodeHeaders(std::move(response_headers), true);
   }
 
+  Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
+
   std::vector<std::string> output_;
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -237,6 +239,7 @@ public:
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<TestFilter> router_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  Event::SimulatedTimeSystem time_system_;
 };
 
 TEST_F(RouterUpstreamLogTest, NoLogConfigured) {
@@ -295,6 +298,8 @@ typed_config:
   envoy::config::accesslog::v3::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
 
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
+
   init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
   run(200, {{"x-envoy-original-path", "/foo"}}, {}, {});
 
@@ -309,11 +314,10 @@ typed_config:
 
   const absl::Time timestamp = TestUtility::parseTime(matches[1].str(), "%Y-%m-%dT%H:%M:%S");
 
-  std::time_t log_time = absl::ToTimeT(timestamp);
-  std::time_t now = std::time(nullptr);
+  const std::time_t log_time = absl::ToTimeT(timestamp);
+  const auto expected = static_cast<std::time_t>(1234567891);
 
-  // Check that timestamp is close enough.
-  EXPECT_LE(std::abs(std::difftime(log_time, now)), 300);
+  EXPECT_EQ(log_time, expected);
 }
 
 } // namespace Router

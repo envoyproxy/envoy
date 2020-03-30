@@ -220,6 +220,9 @@ def runChecks():
                                 "Don't use mangled Protobuf names for enum constants")
   errors += checkUnfixableError("test_naming.cc",
                                 "Test names should be CamelCase, starting with a capital letter")
+  errors += checkUnfixableError("time_nullptr.cc",
+                                "Don't use time(nullptr); use TimeSource's systemTime() or " +
+                                "monotonicTime() instead")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",

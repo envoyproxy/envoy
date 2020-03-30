@@ -58,7 +58,10 @@ InstanceImpl::InstanceImpl(
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
       options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields()),
-      time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
+      time_source_(time_system), restarter_(restarter),
+      start_time_(std::chrono::duration_cast<std::chrono::seconds>(
+                      time_source_.systemTime().time_since_epoch())
+                      .count()),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
@@ -191,7 +194,10 @@ void InstanceImpl::updateServerStats() {
   // mergeParentStatsIfAny() does nothing and returns a struct of 0s if there is no parent.
   HotRestart::ServerStatsFromParent parent_stats = restarter_.mergeParentStatsIfAny(stats_store_);
 
-  server_stats_->uptime_.set(time(nullptr) - original_start_time_);
+  server_stats_->uptime_.set(
+      std::chrono::duration_cast<std::chrono::seconds>(time_source_.systemTime().time_since_epoch())
+          .count() -
+      original_start_time_);
   server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
                                        parent_stats.parent_memory_allocated_);
   server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
