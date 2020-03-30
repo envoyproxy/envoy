@@ -77,7 +77,12 @@ protected:
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 
-  void ConfigureMocks(int connection_count, bool runtime_enabled) {
+  void configureQuicRuntimeFlag(bool runtime_enabled) {
+    EXPECT_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true))
+        .WillRepeatedly(Return(runtime_enabled));
+  }
+
+  void ConfigureMocks(int connection_count) {
     EXPECT_CALL(listener_config_, filterChainManager())
         .Times(connection_count)
         .WillRepeatedly(ReturnRef(filter_chain_manager_));
@@ -94,9 +99,6 @@ protected:
         .Times(connection_count);
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
         .Times(connection_count);
-
-    EXPECT_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true))
-        .WillRepeatedly(Return(runtime_enabled));
 
     testing::Sequence seq;
     for (int i = 0; i < connection_count; ++i) {
@@ -255,7 +257,23 @@ TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
       ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
-  ConfigureMocks(/* connection_count = */ 1, /* runtime_enabled = */ true);
+  configureQuicRuntimeFlag(/* runtime_enabled = */ true);
+  ConfigureMocks(/* connection_count = */ 1);
+  SendFullCHLO(quic::test::TestConnectionId(1));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(buffered_packets->HasChlosBuffered());
+  EXPECT_FALSE(envoy_quic_dispatcher->session_map().empty());
+  ReadFromClientSockets();
+}
+
+/* Not configuring runtime key for `quic.enabled`
+and checking that quic processing is enabled by default. */
+TEST_P(ActiveQuicListenerTest, ReceiveFullChloQuicEnabledByDefault) {
+  EnvoyQuicDispatcher* const envoy_quic_dispatcher =
+      ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
+  quic::QuicBufferedPacketStore* const buffered_packets =
+      quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
+  ConfigureMocks(/* connection_count = */ 1);
   SendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
@@ -268,8 +286,8 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
       ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
-
-  ConfigureMocks(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2, /* runtime_enabled = */ true);
+  configureQuicRuntimeFlag(/* runtime_enabled = */ true);
+  ConfigureMocks(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2);
 
   // Generate one more CHLO than can be processed immediately.
   for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerLoop + 1; ++i) {
@@ -303,12 +321,11 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
 TEST_P(ActiveQuicListenerTest, QuicProcessingDisabled) {
   EnvoyQuicDispatcher* const envoy_quic_dispatcher =
       ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true)).WillRepeatedly(Return(false));
+  configureQuicRuntimeFlag(/* runtime_enabled = */ false);
   SendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // If listener was enabled, there should have been session created for active connection.
   EXPECT_TRUE(envoy_quic_dispatcher->session_map().empty());
-  ReadFromClientSockets();
 }
 
 } // namespace Quic
