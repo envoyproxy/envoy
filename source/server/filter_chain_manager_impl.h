@@ -77,7 +77,7 @@ public:
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
 
-  void startDraining() { is_draining_.store(true); }
+  void startDraining() override { is_draining_.store(true); }
 
 private:
   Configuration::FactoryContext& parent_context_;
@@ -96,15 +96,18 @@ public:
   const Network::TransportSocketFactory& transportSocketFactory() const override {
     return *transport_socket_factory_;
   }
-
   const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
     return filters_factory_;
   }
-
   void startDraining() override { factory_context_->startDraining(); }
-  std::unique_ptr<FilterChainFactoryContextImpl> factory_context_;
+  
+  void setFilterChainFactoryContext(Configuration::FilterChainFactoryContextPtr filter_chain_factory_context) {
+    ASSERT(factory_context_ == nullptr);
+    factory_context_ = std::move(filter_chain_factory_context);
+  }
 
 private:
+  Configuration::FilterChainFactoryContextPtr factory_context_;
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
 };

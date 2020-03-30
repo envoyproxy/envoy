@@ -851,10 +851,7 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
                                             *message, factory_context_, std::move(server_names)),
                                         listener_component_factory_.createNetworkFilterFactoryList(
                                             filter_chain.filters(), *filter_chain_factory_context));
-  // TODO(lambdai): remove this ugly downcast
-  filter_chain_res->factory_context_ = std::unique_ptr<FilterChainFactoryContextImpl>(
-      static_cast<FilterChainFactoryContextImpl*>(filter_chain_factory_context.release()));
-
+  filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
   return filter_chain_res;
 }
 

@@ -224,7 +224,15 @@ public:
  * The life time is no longer than the owning listener. It should be used to create
  * NetworkFilterChain.
  */
-class FilterChainFactoryContext : public virtual FactoryContext {};
+class FilterChainFactoryContext : public virtual FactoryContext {
+public:
+  /**
+   * Set the flag that all attached filter chains will be destroyed.
+   */
+  virtual void startDraining() PURE;
+};
+
+using FilterChainFactoryContextPtr = std::unique_ptr<FilterChainFactoryContext>;
 
 /**
  * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
