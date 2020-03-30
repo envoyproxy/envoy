@@ -1,4 +1,4 @@
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/gradient_controller.h"
+#include "extensions/filters/http/adaptive_concurrency/controller/gradient_controller.h"
 
 #include <atomic>
 #include <chrono>
@@ -12,7 +12,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
+#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "absl/synchronization/mutex.h"
 
@@ -20,7 +20,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AdaptiveConcurrency {
-namespace ConcurrencyController {
+namespace Controller {
 
 GradientControllerConfig::GradientControllerConfig(
     const envoy::extensions::filters::http::adaptive_concurrency::v3::GradientControllerConfig&
@@ -209,7 +209,7 @@ void GradientController::cancelLatencySample() {
   --num_rq_outstanding_;
 }
 
-} // namespace ConcurrencyController
+} // namespace Controller
 } // namespace AdaptiveConcurrency
 } // namespace HttpFilters
 } // namespace Extensions

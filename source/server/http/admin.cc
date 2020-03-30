@@ -1313,7 +1313,9 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
 }
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
-    : server_(server), profile_path_(profile_path),
+    : server_(server),
+      request_id_extension_(Http::RequestIDExtensionFactory::defaultInstance(server_.random())),
+      profile_path_(profile_path),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
