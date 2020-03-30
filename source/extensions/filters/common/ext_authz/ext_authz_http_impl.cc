@@ -4,15 +4,18 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
+#include "envoy/upstream/resource_manager.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/matchers.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
+#include "common/http/headers.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -98,6 +101,30 @@ createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
   return matchers;
 }
 
+ServerUri parseHttpServiceServerUri(const envoy::config::core::v3::HttpUri& http_uri) {
+  const auto& uri = http_uri.uri();
+
+  Http::Utility::Url server_uri;
+  if (!server_uri.initialize(uri)) {
+    throw EnvoyException(fmt::format("server URI '{}' is not a valid URI", uri));
+  }
+
+  ServerUri config_server_uri(server_uri.host_and_port(), server_uri.path_and_query_params(),
+                              server_uri.port());
+  return config_server_uri;
+}
+
+// Prepare the check message by setting the path (with appended path_prefix if required) and host.
+void prepareCheckMessage(Http::RequestMessagePtr& message, const absl::string_view path_prefix,
+                         const ServerUri& server_uri) {
+  if (path_prefix.empty()) {
+    message->headers().setPath(server_uri.path_and_query_params_);
+  } else {
+    message->headers().setPath(absl::StrCat(path_prefix, server_uri.path_and_query_params_));
+  }
+  message->headers().setHost(server_uri.host_and_port_);
+}
+
 } // namespace
 
 // Matchers
@@ -115,8 +142,9 @@ NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>
 bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
 
 // Config
-ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-                           uint32_t timeout, absl::string_view path_prefix)
+ClientConfig::ClientConfig(
+    const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config, uint32_t timeout,
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& dns_cache_manager_factory)
     : enable_case_sensitive_string_matcher_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher")),
       request_header_matchers_(
@@ -129,10 +157,17 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           config.http_service().authorization_response().allowed_upstream_headers(),
           enable_case_sensitive_string_matcher_)),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
-      path_prefix_(path_prefix),
+      path_prefix_(config.http_service().path_prefix()),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(Router::HeaderParser::configure(
-          config.http_service().authorization_request().headers_to_add(), false)) {}
+          config.http_service().authorization_request().headers_to_add(), false)),
+      dns_cache_manager_(dns_cache_manager_factory.get()),
+      // We setup dns_cache_ only when it is required, i.e. when the authorization cluster is a
+      // dynamic_forward_proxy cluster.
+      dns_cache_(config.http_service().has_dns_cache_config()
+                     ? dns_cache_manager_->getCache(config.http_service().dns_cache_config())
+                     : nullptr),
+      server_uri_(parseHttpServiceServerUri(config.http_service().server_uri())) {}
 
 MatcherSharedPtr
 ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -197,6 +232,10 @@ RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigS
 RawHttpClientImpl::~RawHttpClientImpl() {
   ASSERT(callbacks_ == nullptr);
   ASSERT(span_ == nullptr);
+  if (config_->dnsCache() != nullptr) {
+    cache_load_handle_.reset();
+    circuit_breaker_.reset();
+  }
 }
 
 void RawHttpClientImpl::cancel() {
@@ -219,7 +258,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   callbacks_ = &callbacks;
   span_ = parent_span.spawnChild(Tracing::EgressConfig::get(), config_->tracingName(),
                                  time_source_.systemTime());
-  span_->setTag(Tracing::Tags::get().UpstreamCluster, config_->cluster());
+  span_->setTag(Tracing::Tags::get().UpstreamCluster, config_->clusterName());
 
   Http::RequestHeaderMapPtr headers;
   const uint64_t request_length = request.attributes().request().http().body().size();
@@ -238,8 +277,18 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     }
 
     if (config_->requestHeaderMatchers()->matches(key.get())) {
-      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+      if (key == Http::Headers::get().Path) {
+        // If it is configured to forward the request path. For example, by using the following
+        // config:
+        //
+        // authorization_request:
+        //   allowed_headers:
+        //     patterns:
+        //     - exact: ":path"
+        //       ignore_case: true
+        //
+        // the request path will be preserved in x-envoy-original-path.
+        headers->setEnvoyOriginalPath(header.second);
       } else {
         headers->addCopy(key, header.second);
       }
@@ -247,31 +296,60 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   }
 
   config_->requestHeaderParser().evaluateHeaders(*headers, stream_info);
-
-  Http::RequestMessagePtr message =
-      std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
+  check_request_message_ = std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
   if (request_length > 0) {
-    message->body() =
+    check_request_message_->body() =
         std::make_unique<Buffer::OwnedImpl>(request.attributes().request().http().body());
   }
 
-  const std::string& cluster = config_->cluster();
+  auto* cluster = cm_.get(config_->clusterName());
 
   // It's possible that the cluster specified in the filter configuration no longer exists due to a
   // CDS removal.
-  if (cm_.get(cluster) == nullptr) {
-    // TODO(dio): Add stats and tracing related to this.
-    ENVOY_LOG(debug, "ext_authz cluster '{}' does not exist", cluster);
-    callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
-    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    span_->finishSpan();
-    callbacks_ = nullptr;
-    span_ = nullptr;
+  if (cluster == nullptr) {
+    handleMissingResource();
   } else {
-    span_->injectContext(message->headers());
-    request_ = cm_.httpAsyncClientForCluster(cluster).send(
-        std::move(message), *this,
-        Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));
+    ASSERT(check_request_message_ != nullptr);
+    prepareCheckMessage(check_request_message_, config_->pathPrefix(), config_->serverUri());
+
+    if (config_->dnsCache() == nullptr) {
+      // We don't have dns_cache here, hence we expect to user to configure the authorization
+      // cluster explicitly.
+      sendCheckRequest();
+    } else {
+      auto& resource =
+          cluster->info()->resourceManager(Upstream::ResourcePriority::Default).pendingRequests();
+      if (resource.canCreate()) {
+        circuit_breaker_ = std::make_unique<Upstream::ResourceAutoIncDec>(resource);
+        auto result = config_->dnsCache()->loadDnsCacheEntry(config_->serverUri().host_and_port_,
+                                                             config_->serverUri().port_, *this);
+        cache_load_handle_ = std::move(result.handle_);
+
+        switch (result.status_) {
+        case Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache: {
+          ASSERT(cache_load_handle_ == nullptr);
+          ENVOY_LOG(trace, "ext_authz DNS cache entry already loaded, sending check request");
+          sendCheckRequest();
+          break;
+        }
+        case Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading: {
+          ASSERT(cache_load_handle_ != nullptr);
+          ENVOY_LOG(debug, "ext_authz waiting to load DNS cache entry");
+          break;
+        }
+        case Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Overflow: {
+          ASSERT(cache_load_handle_ == nullptr);
+          ENVOY_LOG(debug, "ext_authz DNS cache overflow");
+          handleMissingResource();
+          break;
+        }
+        default:
+          NOT_REACHED_GCOVR_EXCL_LINE;
+        }
+      } else {
+        handleMissingResource();
+      }
+    }
   }
 }
 
@@ -281,6 +359,7 @@ void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
   span_->finishSpan();
   callbacks_ = nullptr;
   span_ = nullptr;
+  circuit_breaker_.reset();
 }
 
 void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
@@ -291,6 +370,7 @@ void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
   span_->finishSpan();
   callbacks_ = nullptr;
   span_ = nullptr;
+  circuit_breaker_.reset();
 }
 
 ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
@@ -328,6 +408,31 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                   message->bodyAsString(), static_cast<Http::Code>(status_code)}};
   span_->setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
   return std::move(denied.response_);
+}
+
+void RawHttpClientImpl::onLoadDnsCacheComplete() {
+  ASSERT(circuit_breaker_ != nullptr);
+  circuit_breaker_.reset();
+  ENVOY_LOG(debug, "ext_authz load DNS cache complete, sending check request to {}",
+            config_->clusterName());
+  sendCheckRequest();
+}
+
+void RawHttpClientImpl::handleMissingResource() {
+  // TODO(dio): Add stats and tracing related to this.
+  ENVOY_LOG(debug, "ext_authz resource for cluster '{}' is missing", config_->clusterName());
+  callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
+  span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  span_->finishSpan();
+  callbacks_ = nullptr;
+  span_ = nullptr;
+}
+
+void RawHttpClientImpl::sendCheckRequest() {
+  span_->injectContext(check_request_message_->headers());
+  request_ = cm_.httpAsyncClientForCluster(config_->clusterName())
+                 .send(std::move(check_request_message_), *this,
+                       Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));
 }
 
 } // namespace ExtAuthz

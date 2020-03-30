@@ -43,7 +43,7 @@ void validateCustomSettingsParameters(
   std::unordered_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals>
       custom_parameters;
   // User defined and named parameters with the same SETTINGS identifier can not both be set.
-  for (const auto it : options.custom_settings_parameters()) {
+  for (const auto& it : options.custom_settings_parameters()) {
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
     // Check for custom parameter inconsistencies.
     const auto result = custom_parameters.insert(
@@ -208,6 +208,28 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
   }
   host_and_port_ =
       absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
+
+  int port = 0;
+  bool converted_to_int = absl::SimpleAtoi(
+      absl::string_view(absolute_url.data() + u.field_data[UF_PORT].off, u.field_data[UF_PORT].len),
+      &port);
+
+  if (converted_to_int) {
+    // The converted integer should be in the valid range (http_parser_url has done the port value
+    // validation).
+    ASSERT(port <= static_cast<int>(UINT16_MAX) && port >= 0);
+    port_ = static_cast<uint16_t>(port);
+  } else {
+    // When it is failed to convert, i.e. when the port part is empty, we set the port_ value by
+    // default ports of known schemes.
+    if (scheme_ == "http") {
+      port_ = 80;
+    } else if (scheme_ == "https") {
+      port_ = 443;
+    } else {
+      port_ = 0;
+    }
+  }
 
   // RFC allows the absolute-uri to not end in /, but the absolute path form
   // must start with

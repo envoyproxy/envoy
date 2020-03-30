@@ -43,6 +43,7 @@ envoy_cc_test(
     srcs = ["ext_authz_http_impl_test.cc"],
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
+        "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
         "//test/mocks/stream_info:stream_info_mocks",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
@@ -56,6 +57,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
+        "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )

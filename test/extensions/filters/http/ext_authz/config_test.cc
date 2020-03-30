@@ -52,7 +52,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   std::string yaml = R"EOF(
   http_service:
     server_uri:
-      uri: "ext_authz:9000"
+      uri: "http://ext-authz.io:9000"
       cluster: "ext_authz"
       timeout: 0.25s
 
@@ -94,6 +94,10 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   EXPECT_CALL(context, runtime()).Times(1);
   EXPECT_CALL(context, scope()).Times(1);
   EXPECT_CALL(context, timeSource()).Times(1);
+  EXPECT_CALL(context, dispatcher()).Times(1);
+  EXPECT_CALL(context, singletonManager()).Times(1);
+  EXPECT_CALL(context, threadLocal()).Times(1);
+  EXPECT_CALL(context, random()).Times(1);
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   testing::StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));

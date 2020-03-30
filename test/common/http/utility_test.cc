@@ -1080,65 +1080,73 @@ TEST(Url, ParsingFails) {
 }
 
 void ValidateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
-                 absl::string_view expected_host_port, absl::string_view expected_path) {
+                 absl::string_view expected_host_port, absl::string_view expected_path,
+                 uint16_t expect_port) {
   Utility::Url url;
   ASSERT_TRUE(url.initialize(raw_url)) << "Failed to initialize " << raw_url;
   EXPECT_EQ(url.scheme(), expected_scheme);
   EXPECT_EQ(url.host_and_port(), expected_host_port);
   EXPECT_EQ(url.path_and_query_params(), expected_path);
+  EXPECT_EQ(url.port(), expect_port);
 }
 
 TEST(Url, ParsingTest) {
-  // Test url with no explicit path (with and without port)
-  ValidateUrl("http://www.host.com", "http", "www.host.com", "/");
-  ValidateUrl("http://www.host.com:80", "http", "www.host.com:80", "/");
+  // Test URL with no explicit path (with and without port).
+  ValidateUrl("http://www.host.com", "http", "www.host.com", "/", 80);
+  ValidateUrl("http://www.host.com:80", "http", "www.host.com:80", "/", 80);
 
-  // Test url with "/" path.
-  ValidateUrl("http://www.host.com:80/", "http", "www.host.com:80", "/");
-  ValidateUrl("http://www.host.com/", "http", "www.host.com", "/");
+  // Test URL with "/" path.
+  ValidateUrl("http://www.host.com:80/", "http", "www.host.com:80", "/", 80);
+  ValidateUrl("http://www.host.com/", "http", "www.host.com", "/", 80);
 
-  // Test url with "?".
-  ValidateUrl("http://www.host.com:80/?", "http", "www.host.com:80", "/?");
-  ValidateUrl("http://www.host.com/?", "http", "www.host.com", "/?");
+  // Test URL with "?".
+  ValidateUrl("http://www.host.com:80/?", "http", "www.host.com:80", "/?", 80);
+  ValidateUrl("http://www.host.com/?", "http", "www.host.com", "/?", 80);
 
-  // Test url with "?" but without slash.
-  ValidateUrl("http://www.host.com:80?", "http", "www.host.com:80", "?");
-  ValidateUrl("http://www.host.com?", "http", "www.host.com", "?");
+  // Test URL with "?" but without slash.
+  ValidateUrl("http://www.host.com:80?", "http", "www.host.com:80", "?", 80);
+  ValidateUrl("http://www.host.com?", "http", "www.host.com", "?", 80);
 
-  // Test url with multi-character path
-  ValidateUrl("http://www.host.com:80/path", "http", "www.host.com:80", "/path");
-  ValidateUrl("http://www.host.com/path", "http", "www.host.com", "/path");
+  // Test URL with multi-character path.
+  ValidateUrl("http://www.host.com:80/path", "http", "www.host.com:80", "/path", 80);
+  ValidateUrl("http://www.host.com/path", "http", "www.host.com", "/path", 80);
 
-  // Test url with multi-character path and ? at the end
-  ValidateUrl("http://www.host.com:80/path?", "http", "www.host.com:80", "/path?");
-  ValidateUrl("http://www.host.com/path?", "http", "www.host.com", "/path?");
+  // Test URL with multi-character path and ? at the end.
+  ValidateUrl("http://www.host.com:80/path?", "http", "www.host.com:80", "/path?", 80);
+  ValidateUrl("http://www.host.com/path?", "http", "www.host.com", "/path?", 80);
 
-  // Test https scheme
-  ValidateUrl("https://www.host.com", "https", "www.host.com", "/");
+  // Test https scheme. Since the port is not part of the URL, 443 is used as the port value.
+  ValidateUrl("https://www.host.com", "https", "www.host.com", "/", 443);
 
-  // Test url with query parameter
-  ValidateUrl("http://www.host.com:80/?query=param", "http", "www.host.com:80", "/?query=param");
-  ValidateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param");
+  // Test URL with query parameter.
+  ValidateUrl("http://www.host.com:80/?query=param", "http", "www.host.com:80", "/?query=param",
+              80);
+  ValidateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param", 80);
 
-  // Test url with query parameter but without slash
-  ValidateUrl("http://www.host.com:80?query=param", "http", "www.host.com:80", "?query=param");
-  ValidateUrl("http://www.host.com?query=param", "http", "www.host.com", "?query=param");
+  // Test URL with query parameter but without slash.
+  ValidateUrl("http://www.host.com:80?query=param", "http", "www.host.com:80", "?query=param", 80);
+  ValidateUrl("http://www.host.com?query=param", "http", "www.host.com", "?query=param", 80);
 
-  // Test url with multi-character path and query parameter
+  // Test URL with multi-character path and query parameter.
   ValidateUrl("http://www.host.com:80/path?query=param", "http", "www.host.com:80",
-              "/path?query=param");
-  ValidateUrl("http://www.host.com/path?query=param", "http", "www.host.com", "/path?query=param");
+              "/path?query=param", 80);
+  ValidateUrl("http://www.host.com/path?query=param", "http", "www.host.com", "/path?query=param",
+              80);
 
-  // Test url with multi-character path and more than one query parameter
+  // Test URL with multi-character path and more than one query parameter.
   ValidateUrl("http://www.host.com:80/path?query=param&query2=param2", "http", "www.host.com:80",
-              "/path?query=param&query2=param2");
+              "/path?query=param&query2=param2", 80);
   ValidateUrl("http://www.host.com/path?query=param&query2=param2", "http", "www.host.com",
-              "/path?query=param&query2=param2");
-  // Test url with multi-character path, more than one query parameter and fragment
+              "/path?query=param&query2=param2", 80);
+
+  // Test URL with multi-character path, more than one query parameter and fragment.
   ValidateUrl("http://www.host.com:80/path?query=param&query2=param2#fragment", "http",
-              "www.host.com:80", "/path?query=param&query2=param2#fragment");
+              "www.host.com:80", "/path?query=param&query2=param2#fragment", 80);
   ValidateUrl("http://www.host.com/path?query=param&query2=param2#fragment", "http", "www.host.com",
-              "/path?query=param&query2=param2#fragment");
+              "/path?query=param&query2=param2#fragment", 80);
+
+  // Test URL when the port is not 80 or 443.
+  ValidateUrl("http://www.host.com:3000/", "http", "www.host.com:3000", "/", 3000);
 }
 
 void validatePercentEncodingEncodeDecode(absl::string_view source,

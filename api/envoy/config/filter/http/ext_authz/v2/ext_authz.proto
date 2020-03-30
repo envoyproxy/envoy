@@ -5,6 +5,7 @@ package envoy.config.filter.http.ext_authz.v2;
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/grpc_service.proto";
 import "envoy/api/v2/core/http_uri.proto";
+import "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.proto";
 import "envoy/type/http_status.proto";
 import "envoy/type/matcher/string.proto";
 
@@ -143,7 +144,7 @@ message BufferSettings {
 // metadata as well as body may be added to the client's response. See :ref:`allowed_client_headers
 // <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_client_headers>`
 // for details.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message HttpService {
   reserved 3, 4, 5, 6;
 
@@ -158,6 +159,8 @@ message HttpService {
 
   // Settings used for controlling authorization response metadata.
   AuthorizationResponse authorization_response = 8;
+
+  common.dynamic_forward_proxy.v2alpha.DnsCacheConfig dns_cache_config = 9;
 }
 
 message AuthorizationRequest {

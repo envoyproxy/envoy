@@ -9,9 +9,12 @@
 
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
+#include "common/http/utility.h"
 #include "common/router/header_parser.h"
 #include "common/runtime/runtime_protos.h"
 
+#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
 namespace Envoy {
@@ -59,22 +62,35 @@ private:
 };
 
 /**
+ * ServerUri holds the information of a parsed HTTP service server URI.
+ */
+struct ServerUri {
+  ServerUri(absl::string_view host_and_port, absl::string_view path_and_query_params, uint16_t port)
+      : host_and_port_(host_and_port), path_and_query_params_(path_and_query_params), port_(port) {}
+
+  const std::string host_and_port_;
+  const std::string path_and_query_params_;
+  uint16_t port_;
+};
+
+/**
  * HTTP client configuration for the HTTP authorization (ext_authz) filter.
  */
 class ClientConfig {
 public:
-  ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-               uint32_t timeout, absl::string_view path_prefix);
+  ClientConfig(
+      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config, uint32_t timeout,
+      Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
 
   /**
    * Returns the name of the authorization cluster.
    */
-  const std::string& cluster() { return cluster_name_; }
+  const std::string& clusterName() const { return cluster_name_; }
 
   /**
    * Returns the authorization request path prefix.
    */
-  const std::string& pathPrefix() { return path_prefix_; }
+  const std::string& pathPrefix() const { return path_prefix_; }
 
   /**
    * Returns authorization request timeout.
@@ -107,12 +123,22 @@ public:
   /**
    * Returns the name used for tracing.
    */
-  const std::string& tracingName() { return tracing_name_; }
+  const std::string& tracingName() const { return tracing_name_; }
 
   /**
    * Returns the configured request header parser.
    */
   const Router::HeaderParser& requestHeaderParser() const { return *request_headers_parser_; }
+
+  /**
+   * Returns the the configured DNS cache.
+   */
+  Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() { return dns_cache_; }
+
+  /**
+   * Returns the parsed HTTP service server URI.
+   */
+  const ServerUri& serverUri() const { return server_uri_; };
 
 private:
   static MatcherSharedPtr
@@ -135,6 +161,9 @@ private:
   const std::string path_prefix_;
   const std::string tracing_name_;
   Router::HeaderParserPtr request_headers_parser_;
+  const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
+  const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
+  const ServerUri server_uri_;
 };
 
 using ClientConfigSharedPtr = std::shared_ptr<ClientConfig>;
@@ -146,9 +175,11 @@ using ClientConfigSharedPtr = std::shared_ptr<ClientConfig>;
  * dispatched to the downstream, and some headers to the upstream. The HTTP client also allows
  * setting a path prefix witch is not available for gRPC.
  */
-class RawHttpClientImpl : public Client,
-                          public Http::AsyncClient::Callbacks,
-                          Logger::Loggable<Logger::Id::config> {
+class RawHttpClientImpl
+    : public Client,
+      public Http::AsyncClient::Callbacks,
+      public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks,
+      Logger::Loggable<Logger::Id::config> {
 public:
   explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
                              TimeSource& time_source);
@@ -164,14 +195,23 @@ public:
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason reason) override;
 
+  // Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks
+  void onLoadDnsCacheComplete() override;
+
 private:
+  void handleMissingResource();
+  void sendCheckRequest();
+
   ResponsePtr toResponse(Http::ResponseMessagePtr message);
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
-  Http::AsyncClient::Request* request_{};
-  RequestCallbacks* callbacks_{};
+  Http::AsyncClient::Request* request_;
+  RequestCallbacks* callbacks_{nullptr};
   TimeSource& time_source_;
-  Tracing::SpanPtr span_;
+  Tracing::SpanPtr span_{nullptr};
+  Http::RequestMessagePtr check_request_message_;
+  Upstream::ResourceAutoIncDecPtr circuit_breaker_;
+  Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr cache_load_handle_;
 };
 
 } // namespace ExtAuthz

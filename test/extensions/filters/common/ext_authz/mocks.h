@@ -7,6 +7,8 @@
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
+#include "test/mocks/upstream/mocks.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -25,6 +27,8 @@ public:
   MOCK_METHOD(void, check,
               (RequestCallbacks & callbacks, const envoy::service::auth::v3::CheckRequest& request,
                Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info));
+
+  testing::NiceMock<Upstream::MockClusterManager> cm_;
 };
 
 class MockRequestCallbacks : public RequestCallbacks {
