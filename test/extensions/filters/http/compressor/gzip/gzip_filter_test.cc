@@ -14,7 +14,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Compressor {
 
-class GzipFilterTest : public testing::Test {
+class GzipCompressorFilterTest : public testing::Test {
 protected:
   void SetUp() override {
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
@@ -28,7 +28,7 @@ protected:
     decompressor_.init(31);
   }
 
-  // GzipFilterTest Helpers
+  // GzipCompressorFilterTest Helpers
   void verifyCompressedData(const uint32_t content_length) {
     // This makes sure we have a finished buffer before sending it to the client.
     expectValidFinishedBuffer(content_length);
@@ -131,7 +131,7 @@ protected:
 };
 
 // Acceptance Testing with default configuration.
-TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
+TEST_F(GzipCompressorFilterTest, AcceptanceGzipEncoding) {
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, false);
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
@@ -142,7 +142,7 @@ TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
   doResponseCompression({{":method", "get"}, {"content-length", "256"}}, false);
 }
 
-TEST_F(GzipFilterTest, AcceptanceGzipEncodingWithTrailers) {
+TEST_F(GzipCompressorFilterTest, AcceptanceGzipEncodingWithTrailers) {
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, false);
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
@@ -152,13 +152,13 @@ TEST_F(GzipFilterTest, AcceptanceGzipEncodingWithTrailers) {
 }
 
 // Verifies that compression is skipped when accept-encoding header is not allowed.
-TEST_F(GzipFilterTest, AcceptEncodingNoCompression) {
+TEST_F(GzipCompressorFilterTest, AcceptEncodingNoCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip;q=0, deflate"}}, true);
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
 // Verifies that compression is NOT skipped when accept-encoding header is allowed.
-TEST_F(GzipFilterTest, AcceptEncodingCompression) {
+TEST_F(GzipCompressorFilterTest, AcceptEncodingCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip, deflate"}}, true);
   doResponseCompression({{":method", "get"}, {"content-length", "256"}}, false);
 }
