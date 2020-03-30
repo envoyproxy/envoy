@@ -354,6 +354,7 @@ alignof
 alloc
 alloca
 allocator
+allowlist
 alls
 alphanumerics
 amongst
@@ -638,6 +639,7 @@ ified
 impl
 implementors
 impls
+indices
 inflater
 inflight
 -ing
