@@ -7,8 +7,6 @@
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
-#include "test/mocks/upstream/mocks.h"
-
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -37,8 +35,6 @@ public:
   ~MockRequestCallbacks() override;
 
   void onComplete(ResponsePtr&& response) override { onComplete_(response); }
-
-  MOCK_METHOD(void, onComplete_, (ResponsePtr & response));
 };
 
 } // namespace ExtAuthz

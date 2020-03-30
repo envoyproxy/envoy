@@ -57,7 +57,6 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
-        "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )

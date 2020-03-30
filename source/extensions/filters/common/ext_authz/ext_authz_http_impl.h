@@ -205,7 +205,7 @@ private:
   ResponsePtr toResponse(Http::ResponseMessagePtr message);
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
-  Http::AsyncClient::Request* request_;
+  Http::AsyncClient::Request* request_{nullptr};
   RequestCallbacks* callbacks_{nullptr};
   TimeSource& time_source_;
   Tracing::SpanPtr span_{nullptr};
