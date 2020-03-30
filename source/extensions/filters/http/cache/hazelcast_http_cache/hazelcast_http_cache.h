@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/common/logger.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "extensions/filters/http/cache/http_cache.h"
 #include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_cache_entry.h"
@@ -89,6 +90,10 @@ public:
     return std::to_string(key).append("#").append(std::to_string(order));
   }
 
+  uint64_t random() {
+    return rand_.random();
+  }
+
   ~HazelcastHttpCache() {
     shutdown();
   };
@@ -132,6 +137,7 @@ private:
   std::string header_map_name_;
   std::string response_map_name_;
 
+  Runtime::RandomGeneratorImpl rand_;
 };
 
 } // namespace HazelcastHttpCache

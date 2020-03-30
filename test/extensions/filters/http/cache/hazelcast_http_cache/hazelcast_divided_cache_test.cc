@@ -101,6 +101,27 @@ TEST_F(HazelcastDividedCacheTest, AbortDividedInsertionWhenMaxSizeReached) {
   clearMaps();
 }
 
+TEST_F(HazelcastDividedCacheTest, PreventOverridingCacheEntries) {
+  const std::string RequestPath("/prevent/override/cached/response");
+
+  LookupContextPtr name_lookup_context = lookup(RequestPath);
+  const std::string OriginalBody(HazelcastTestUtil::TEST_PARTITION_SIZE * 2, 'h');
+  insert(move(name_lookup_context), getResponseHeaders(), OriginalBody);
+
+  name_lookup_context = lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
+
+  // A possible call to insertion below is filter's fault, not an expected behavior.
+  const std::string OverriddenBody(HazelcastTestUtil::TEST_PARTITION_SIZE * 3, 'z');
+  insert(move(name_lookup_context), getResponseHeaders(), OverriddenBody);
+
+  name_lookup_context = lookup(RequestPath);
+  EXPECT_TRUE(expectLookupSuccessWithBody(name_lookup_context.get(), OriginalBody));
+  EXPECT_EQ(2, testBodyMap().size());
+  EXPECT_EQ(1, testHeaderMap().size());
+  clearMaps();
+}
+
 TEST_F(HazelcastDividedCacheTest, AbortInsertionIfKeyIsLocked) {
   const std::string RequestPath("/only/one/must/insert");
 

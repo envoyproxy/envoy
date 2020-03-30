@@ -31,6 +31,11 @@ void HazelcastHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
     Http::ResponseHeaderMapPtr&& response_headers) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   // TODO(enozcan): Enable when implemented on the filter side.
+  //  Depending on the filter's implementation, the cached entry's
+  //  variant_key_ must be updated as well.
+  //  Also, if vary headers change then the hash key of the response
+  //  will change and updating only header map will not be enough in
+  //  this case.
   ASSERT(lookup_context);
   ASSERT(response_headers);
   if (unified_) {

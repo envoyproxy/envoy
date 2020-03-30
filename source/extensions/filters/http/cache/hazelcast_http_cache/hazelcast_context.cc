@@ -141,18 +141,19 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     return;
   }
   if (header_entry) {
+    abort_insertion_ = true; // overriding an exiting entry is not allowed.
     ENVOY_LOG(debug, "Found divided response for key {}u, version {}, body size = {}",
         variant_hash_key_, header_entry->version(), header_entry->bodySize());
     if (!MessageDifferencer::Equals(header_entry->variantKey(), variantKey())) {
       // The same logic with UnifiedLookupContext#getHeaders applies.
       ENVOY_LOG(debug, "Keys mismatched for hash {}u. "
                        "Aborting lookup & insertion", variant_hash_key_);
-      abort_insertion_ = true;
       cb(LookupResult{});
       return;
     }
     this->total_body_size_ = header_entry->bodySize();
     this->version_ = header_entry->version();
+    this->found_header_ = true;
     cb(lookup_request_.makeLookupResult(std::move(header_entry->headerMap()), total_body_size_));
   } else {
     ENVOY_LOG(debug, "Didn't find divided response for key {}u", variant_hash_key_);
@@ -188,7 +189,7 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
 //
 void DividedLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) {
   ASSERT(range.end() <= total_body_size_);
-  ASSERT(!abort_insertion_);
+  ASSERT(found_header_, "Header lookup is missed.");
 
   // Lookup for only one body partition which includes the range.begin().
   uint64_t body_index = range.begin() / body_partition_size_;
@@ -345,6 +346,19 @@ void DividedInsertContext::flushHeader() {
     // issue can be tracked at: https://github.com/hazelcast/hazelcast-cpp-client/issues/579
     // TODO(enozcan): Use tryLock with leaseTime when released for Hazelcast cpp client.
   }
+}
+
+int32_t DividedInsertContext::createVersion() {
+  // We do not need a strong uniformity or randomness here. Even
+  // the versions of two different header entries with distinct
+  // hash keys are the same, this will not cause a problem at all.
+  // We only need a stamp for bodies which inserted for this context.
+  // Since this version is stored in cache entries, 32 bit random
+  // derived from the 64 bit is preferred here.
+  // Range: from (int32.MIN + 1) to (int32.MAX - 1), inclusive.
+  uint64_t rand64 = hz_cache_.random();
+  uint64_t max = std::numeric_limits<int32_t>::max();
+  return (rand64 % (max * 2)) - max;
 }
 
 } // HazelcastHttpCache

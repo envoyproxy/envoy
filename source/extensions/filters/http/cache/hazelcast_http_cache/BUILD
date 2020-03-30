@@ -26,6 +26,7 @@ envoy_cc_extension(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/runtime:runtime_lib",
         "//include/envoy/registry",
         "//source/extensions/filters/http/cache:http_cache_lib",
     ],

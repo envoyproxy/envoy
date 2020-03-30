@@ -57,11 +57,6 @@ private:
    *
    * @param raw_key     Key created by the filter.
    */
-  // TODO(enozcan): Ensure uniqueness of hash key for the same same response.
-  //  Different hash keys will be created if the order of values differ for the same
-  //  vary header key. Hence the response will not be affected but the same response
-  //  will be cached with different keys. (might be reordering/sorting here).
-  //  Prevent str copies as possible.
   void createVariantKey(Key& raw_key) {
     ASSERT(raw_key.custom_fields_size() == 0);
     ASSERT(raw_key.custom_ints_size() == 0); // Key must be pure.
@@ -74,12 +69,38 @@ private:
       header_strings.push_back(std::make_pair(std::string(header.key().getStringView()),
           std::string(header.value().getStringView())));
     }
+
+    // Different order of headers causes different hash keys even if their both key and value
+    // are the same. That is, the following two header lists will cause different hashes for
+    // the same response and hence they are sorted before insertion.
+    //
+    // { {"User-Agent", "desktop"}, {"Accept-Encoding","gzip"} }
+    // { {"Accept-Encoding","gzip"}, {"User-Agent", "desktop"} }
+
     std::sort(header_strings.begin(), header_strings.end(), [](auto& left, auto& right) -> bool {
-      return left.first == right.first ? left.second < right.second : left.first < right.first;
+      // Per https://tools.ietf.org/html/rfc2616#section-4.2 if two different header entries
+      // have the same field-name, then their order should not change. For distinct field-named
+      // headers the order is not significant but sorted alphabetically here to get the same hash
+      // for the same headers.
+      return left.first == right.first ? false : left.first < right.first;
     });
+
     for (auto& header : header_strings) {
-      raw_key.add_custom_fields(header.first + ":" + header.second);
+      raw_key.add_custom_fields(std::move(header.first));
+      raw_key.add_custom_fields(std::move(header.second));
     }
+    // stableHashKey now creates variant hash for the key since its custom_fields are like:
+    // [ "Accept-Encoding", "gzip", "User-Agent", "desktop"]
+
+    // TODO(enozcan): Ensure the generation of the same key for the same response independent
+    //  from the header orders.
+    //
+    //  Different hash keys will be created if the order of values differ for the same
+    //  vary header key. The response will not be affected but the same response will
+    //  be cached with different keys. i.e. two different hashes exist for the followings
+    //  where the only allowed vary header is "accept-language":
+    //  - {accept-language: en-US,tr;q=0.8}
+    //  - {accept-language: tr;q=0.8,en-US}
   }
 
 };
@@ -159,6 +180,8 @@ private:
 
   /** Max body size per body entry defined via config. */
   const uint64_t body_partition_size_;
+
+  bool found_header_ = false;
 };
 
 /**
@@ -176,18 +199,13 @@ private:
   void flushBuffer();
   void flushHeader();
 
-  /** Creates a common version for a header and its body entries.
-   * This version entity secures the relation between a header and
-   * its bodies hence they are stored in different distributed maps
-   * in DIVIDED mode. */
-  int32_t createVersion(){
-    // TODO: Use a secure or Envoy style random.
-    //  The <version> was designed to be the timestamp fetched from the Hazelcast
-    //  cluster during insertion (clusterTime). However, it's currently not
-    //  supported by the cpp client. Might be available in 4.0 release.
-    //  Related issue is: https://github.com/hazelcast/hazelcast-cpp-client/issues/581
-    return std::rand();
-  }
+  /**
+   * Creates a common version for a header and its body entries.
+   * This version denotes the relation between a header and its
+   * bodies such that they are inserted in the same insert context
+   * for the same lookup in DIVIDED mode.
+   */
+  int32_t createVersion();
 
   /** Counter for the order of next body entry to be inserted. */
   int body_order_ = 0;
