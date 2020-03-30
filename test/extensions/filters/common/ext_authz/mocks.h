@@ -25,8 +25,6 @@ public:
   MOCK_METHOD(void, check,
               (RequestCallbacks & callbacks, const envoy::service::auth::v3::CheckRequest& request,
                Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info));
-
-  testing::NiceMock<Upstream::MockClusterManager> cm_;
 };
 
 class MockRequestCallbacks : public RequestCallbacks {
@@ -35,6 +33,8 @@ public:
   ~MockRequestCallbacks() override;
 
   void onComplete(ResponsePtr&& response) override { onComplete_(response); }
+
+  MOCK_METHOD(void, onComplete_, (ResponsePtr & response));
 };
 
 } // namespace ExtAuthz
