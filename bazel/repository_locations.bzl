@@ -280,6 +280,11 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "75af53154402e1654cfd32d8aaeed5fab4dbb79d3cab8c9866019d5369c1889e",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz"],
     ),
+    com_googlesource_googleurl = dict(
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/googleurl_dbf5ad147f60afc125e99db7549402af49a5eae8.tar.gz
+        sha256 = "b40cd22cadba577b7281a76db66f6a66dd744edbad8cc2c861c2c976ef721e4d",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_dbf5ad147f60afc125e99db7549402af49a5eae8.tar.gz"],
+    ),
     com_google_cel_cpp = dict(
         sha256 = "326ec397b55e39f48bd5380ccded1af5b04653ee96e769cd4d694f9a3bacef50",
         strip_prefix = "cel-cpp-80e1cca533190d537a780ad007e8db64164c582e",
