@@ -558,8 +558,9 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use strftime; use absl::FormatTime instead")
   if "strptime" in line:
     reportError("Don't use strptime; use absl::FormatTime instead")
-  if "time(nullptr)" in line:
-    reportError("Don't use time(nullptr); use TimeSource's systemTime() or monotonicTime() instead")
+  errors += checkUnfixableError(
+      "time_nullptr.cc",
+      "Don't use time(nullptr); use TimeSource's systemTime() or monotonicTime() instead")
   if "std::atomic_" in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
