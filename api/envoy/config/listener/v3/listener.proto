@@ -4,6 +4,7 @@ package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/api_listener.proto";
 import "envoy/config/listener/v3/listener_components.proto";
 import "envoy/config/listener/v3/udp_listener_config.proto";
