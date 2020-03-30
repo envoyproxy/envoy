@@ -43,8 +43,6 @@ class ExtAuthzHttpClientTest
     : public testing::Test,
       public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
 public:
-  ExtAuthzHttpClientTest() {}
-
   void initialize(const std::string& yaml = EMPTY_STRING) {
     config_ = createConfig(yaml);
     client_ = std::make_unique<RawHttpClientImpl>(cm_, config_, time_source_);
