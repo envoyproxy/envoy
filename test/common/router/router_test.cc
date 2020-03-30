@@ -125,6 +125,12 @@ public:
     EXPECT_CALL(*per_try_timeout_, disableTimer());
   }
 
+  void expectMaxStreamDurationTimer() {
+    max_stream_duration_timer_ = new Event::MockTimer(&callbacks_.dispatcher_);
+    EXPECT_CALL(*max_stream_duration_timer_, enableTimer(_, _));
+    EXPECT_CALL(*max_stream_duration_timer_, disableTimer());
+  }
+
   AssertionResult verifyHostUpstreamStats(uint64_t success, uint64_t error) {
     if (success != cm_.conn_pool_.host_->stats_.rq_success_.value()) {
       return AssertionFailure() << fmt::format("rq_success {} does not match expected {}",
@@ -348,6 +354,7 @@ public:
   RouterTestFilter router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
+  Event::MockTimer* max_stream_duration_timer_{};
   Network::Address::InstanceConstSharedPtr host_address_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
   NiceMock<Http::MockRequestEncoder> original_encoder_;
@@ -3549,6 +3556,30 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   response_timeout_->invokeCallback();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+TEST_F(RouterTest, BasicMaxStreamDurationTest) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  ON_CALL(cm_.conn_pool_.host_->cluster_, maxStreamDuration())
+      .WillByDefault(Return(std::chrono::milliseconds(500)));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+  expectMaxStreamDurationTimer();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  max_stream_duration_timer_->invokeCallback();
+
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
 TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {

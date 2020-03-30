@@ -39,9 +39,9 @@ namespace Envoy {
 namespace Http {
 namespace {
 
-template <class ClusterInfoType> class CodecClientTestBase : public testing::Test {
+class CodecClientTest : public testing::Test {
 public:
-  CodecClientTestBase() {
+  CodecClientTest() {
     connection_ = new NiceMock<Network::MockClientConnection>();
 
     EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
@@ -52,9 +52,15 @@ public:
             Invoke([this](Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
 
     codec_ = new Http::MockClientConnection();
+
+    Network::ClientConnectionPtr connection{connection_};
+    EXPECT_CALL(dispatcher_, createTimer_(_));
+    client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(connection),
+                                                   codec_, nullptr, host_, dispatcher_);
+    ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   }
 
-  ~CodecClientTestBase() override { EXPECT_EQ(0U, client_->numActiveRequests()); }
+  ~CodecClientTest() override { EXPECT_EQ(0U, client_->numActiveRequests()); }
 
   Event::MockDispatcher dispatcher_;
   Network::MockClientConnection* connection_;
@@ -62,21 +68,11 @@ public:
   std::unique_ptr<CodecClientForTest> client_;
   Network::ConnectionCallbacks* connection_cb_;
   Network::ReadFilterSharedPtr filter_;
-  std::shared_ptr<ClusterInfoType> cluster_{new NiceMock<ClusterInfoType>()};
+  std::shared_ptr<Upstream::MockIdleTimeEnabledClusterInfo> cluster_{
+      new NiceMock<Upstream::MockIdleTimeEnabledClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_{
       Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
-};
-
-class CodecClientTest : public CodecClientTestBase<Upstream::MockIdleTimeEnabledClusterInfo> {
-public:
-  CodecClientTest() : CodecClientTestBase<Upstream::MockIdleTimeEnabledClusterInfo>() {
-    Network::ClientConnectionPtr connection{connection_};
-    EXPECT_CALL(dispatcher_, createTimer_(_));
-    client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(connection),
-                                                   codec_, nullptr, host_, dispatcher_);
-    ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
-  }
 };
 
 TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
@@ -284,36 +280,6 @@ TEST_F(CodecClientTest, SSLConnectionInfo) {
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
   EXPECT_NE(nullptr, stream_info_.downstreamSslConnection());
   EXPECT_EQ(session_id, stream_info_.downstreamSslConnection()->sessionId());
-}
-
-class CodecMaxStreamDurationTest
-    : public CodecClientTestBase<Upstream::MockMaxStreamDurationEnabledClusterInfo> {
-public:
-  CodecMaxStreamDurationTest()
-      : CodecClientTestBase<Upstream::MockMaxStreamDurationEnabledClusterInfo>() {
-    Network::ClientConnectionPtr connection{connection_};
-    client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(connection),
-                                                   codec_, nullptr, host_, dispatcher_);
-    ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
-  }
-};
-
-TEST_F(CodecMaxStreamDurationTest, Basic) {
-  ResponseDecoder* inner_decoder;
-  NiceMock<MockRequestEncoder> inner_encoder;
-  EXPECT_CALL(*codec_, newStream(_))
-      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
-        inner_decoder = &decoder;
-        return inner_encoder;
-      }));
-
-  Event::MockTimer* timer = new Event::MockTimer(&dispatcher_);
-  Http::MockResponseDecoder outer_decoder;
-  EXPECT_CALL(*timer, enableTimer(cluster_->maxStreamDuration().value(), _));
-  client_->newStream(outer_decoder);
-  EXPECT_CALL(*timer, disableTimer());
-  timer->invokeCallback();
-  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_max_duration_reached_.value());
 }
 
 // Test the codec getting input from a real TCP connection.

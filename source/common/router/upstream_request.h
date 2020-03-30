@@ -25,6 +25,7 @@
 namespace Envoy {
 namespace Router {
 
+class HttpUpstream;
 class Filter;
 class GenericUpstream;
 
@@ -72,6 +73,7 @@ public:
 
   void setRequestEncoder(Http::RequestEncoder& request_encoder);
   void clearRequestEncoder();
+  void onStreamMaxDurationReached();
 
   struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks {
     DownstreamWatermarkManager(UpstreamRequest& parent) : parent_(parent) {}
@@ -140,6 +142,8 @@ private:
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
   // and if so, if the per-try histogram should record a value.
   bool record_timeout_budget_ : 1;
+
+  Event::TimerPtr max_stream_duration_timer_;
 };
 
 // A generic API which covers common functionality between HTTP and TCP upstreams.

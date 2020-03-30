@@ -168,11 +168,5 @@ public:
   ~MockIdleTimeEnabledClusterInfo() override;
 };
 
-class MockMaxStreamDurationEnabledClusterInfo : public MockClusterInfo {
-public:
-  MockMaxStreamDurationEnabledClusterInfo();
-  ~MockMaxStreamDurationEnabledClusterInfo() override;
-};
-
 } // namespace Upstream
 } // namespace Envoy

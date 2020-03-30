@@ -360,6 +360,13 @@ void UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
   // If end_stream is set in headers, and there are metadata to send, delays end_stream. The case
   // only happens when decoding headers filters return ContinueAndEndStream.
   const bool delay_headers_end_stream = end_stream && !downstream_metadata_map_vector_.empty();
+
+  if (upstream_host_->cluster().maxStreamDuration().has_value()) {
+    max_stream_duration_timer_ = parent_.callbacks_->dispatcher().createTimer(
+        [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_->enableTimer(upstream_host_->cluster().maxStreamDuration().value());
+  }
+
   request_encoder.encodeHeaders(*parent_.downstream_headers_,
                                 end_stream && !delay_headers_end_stream);
   calling_encode_headers_ = false;
@@ -397,6 +404,14 @@ void UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
       upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
     }
   }
+}
+
+void UpstreamRequest::onStreamMaxDurationReached() {
+  ASSERT(upstream_host_);
+  upstream_host_->cluster().stats().upstream_rq_max_duration_reached_.inc();
+  max_stream_duration_timer_->disableTimer();
+  max_stream_duration_timer_.reset();
+  resetStream();
 }
 
 void UpstreamRequest::setRequestEncoder(Http::RequestEncoder& request_encoder) {
