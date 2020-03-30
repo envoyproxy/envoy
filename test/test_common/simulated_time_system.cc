@@ -255,7 +255,7 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
 #define ADD_POLL_DELAY 1
 #if ADD_POLL_DELAY
   const Duration real_time_poll_delay(
-      std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(50)), duration));
+      std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(1)), duration));
 #endif
   const MonotonicTime end_time = monotonicTime() + duration;
 

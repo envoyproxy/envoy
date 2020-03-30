@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cassert>
 #include <functional>
 #include <memory>
 
@@ -55,10 +54,7 @@ public:
 
   bool signaled() { return signaled_; }
 
-  void clearSignaled() {
-    // assert(signaled_ > 0);
-    signaled_ = false;
-  }
+  void clearSignaled() { signaled_ = false; }
 
   /**
    * wait() and waitFor do not throw, and never will, as they are based on
@@ -68,37 +64,19 @@ public:
    * with thread annotation.
    */
   void wait(MutexBasicLockable& mutex) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    // if (!signaled_) {
     condvar_.Wait(&mutex.mutex_);
-    // }
-    clearSignaled();
   }
 
   /**
    * @return WaitStatus whether the condition timed out or not.
    */
   template <class Rep, class Period>
-  WaitStatus
-  waitFor(MutexBasicLockable& mutex,
-          std::chrono::duration<Rep, Period> duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    /*
-    if (!signaled_) {
-      // Note we ignore the return value from absl condvar here as it's spurious
-      // anyway.
-      condvar_.WaitWithTimeout(&mutex.mutex_, absl::FromChrono(duration));
-    }
-    if (signaled_) {
-      signaled_ = false;
-      return WaitStatus::NoTimeout;
-    }
-    return WaitStatus::Timeout;
-    */
-    bool timeout = condvar_.WaitWithTimeout(&mutex.mutex_, absl::FromChrono(duration));
-    if (timeout) {
-      return WaitStatus::Timeout;
-    }
-    clearSignaled();
-    return WaitStatus::NoTimeout;
+  WaitStatus waitFor(
+      MutexBasicLockable& mutex,
+      std::chrono::duration<Rep, Period> duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+    return condvar_.WaitWithTimeout(&mutex.mutex_, absl::FromChrono(duration))
+               ? WaitStatus::Timeout
+               : WaitStatus::NoTimeout;
   }
 
 private:
