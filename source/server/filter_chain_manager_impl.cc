@@ -25,108 +25,109 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 
 } // namespace
 
-FilterChainFactoryContextImpl::FilterChainFactoryContextImpl(
+PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
     : parent_context_(parent_context), init_manager_(init_manager) {}
 
-bool FilterChainFactoryContextImpl::drainClose() const {
+bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
 }
 
-Network::DrainDecision& FilterChainFactoryContextImpl::drainDecision() { return *this; }
+Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { return *this; }
 
-Init::Manager& FilterChainFactoryContextImpl::initManager() { return init_manager_; }
+Init::Manager& PerFilterChainFactoryContextImpl::initManager() { return init_manager_; }
 
-ThreadLocal::SlotAllocator& FilterChainFactoryContextImpl::threadLocal() {
+ThreadLocal::SlotAllocator& PerFilterChainFactoryContextImpl::threadLocal() {
   return parent_context_.threadLocal();
 }
 
-const envoy::config::core::v3::Metadata& FilterChainFactoryContextImpl::listenerMetadata() const {
+const envoy::config::core::v3::Metadata&
+PerFilterChainFactoryContextImpl::listenerMetadata() const {
   return parent_context_.listenerMetadata();
 }
 
-envoy::config::core::v3::TrafficDirection FilterChainFactoryContextImpl::direction() const {
+envoy::config::core::v3::TrafficDirection PerFilterChainFactoryContextImpl::direction() const {
   return parent_context_.direction();
 }
 
-ProtobufMessage::ValidationContext& FilterChainFactoryContextImpl::messageValidationContext() {
+ProtobufMessage::ValidationContext& PerFilterChainFactoryContextImpl::messageValidationContext() {
   return parent_context_.messageValidationContext();
 }
-ProtobufMessage::ValidationVisitor& FilterChainFactoryContextImpl::messageValidationVisitor() {
+ProtobufMessage::ValidationVisitor& PerFilterChainFactoryContextImpl::messageValidationVisitor() {
   return parent_context_.messageValidationVisitor();
 }
 
-AccessLog::AccessLogManager& FilterChainFactoryContextImpl::accessLogManager() {
+AccessLog::AccessLogManager& PerFilterChainFactoryContextImpl::accessLogManager() {
   return parent_context_.accessLogManager();
 }
 
-Upstream::ClusterManager& FilterChainFactoryContextImpl::clusterManager() {
+Upstream::ClusterManager& PerFilterChainFactoryContextImpl::clusterManager() {
   return parent_context_.clusterManager();
 }
 
-Event::Dispatcher& FilterChainFactoryContextImpl::dispatcher() {
+Event::Dispatcher& PerFilterChainFactoryContextImpl::dispatcher() {
   return parent_context_.dispatcher();
 }
 
-Grpc::Context& FilterChainFactoryContextImpl::grpcContext() {
+Grpc::Context& PerFilterChainFactoryContextImpl::grpcContext() {
   return parent_context_.grpcContext();
 }
 
-bool FilterChainFactoryContextImpl::healthCheckFailed() {
+bool PerFilterChainFactoryContextImpl::healthCheckFailed() {
   return parent_context_.healthCheckFailed();
 }
 
-Http::Context& FilterChainFactoryContextImpl::httpContext() {
+Http::Context& PerFilterChainFactoryContextImpl::httpContext() {
   return parent_context_.httpContext();
 }
 
-const LocalInfo::LocalInfo& FilterChainFactoryContextImpl::localInfo() const {
+const LocalInfo::LocalInfo& PerFilterChainFactoryContextImpl::localInfo() const {
   return parent_context_.localInfo();
 }
 
-Envoy::Runtime::RandomGenerator& FilterChainFactoryContextImpl::random() {
+Envoy::Runtime::RandomGenerator& PerFilterChainFactoryContextImpl::random() {
   return parent_context_.random();
 }
 
-Envoy::Runtime::Loader& FilterChainFactoryContextImpl::runtime() {
+Envoy::Runtime::Loader& PerFilterChainFactoryContextImpl::runtime() {
   return parent_context_.runtime();
 }
 
-Stats::Scope& FilterChainFactoryContextImpl::scope() { return parent_context_.scope(); }
+Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return parent_context_.scope(); }
 
-Singleton::Manager& FilterChainFactoryContextImpl::singletonManager() {
+Singleton::Manager& PerFilterChainFactoryContextImpl::singletonManager() {
   return parent_context_.singletonManager();
 }
 
-OverloadManager& FilterChainFactoryContextImpl::overloadManager() {
+OverloadManager& PerFilterChainFactoryContextImpl::overloadManager() {
   return parent_context_.overloadManager();
 }
 
-Admin& FilterChainFactoryContextImpl::admin() { return parent_context_.admin(); }
+Admin& PerFilterChainFactoryContextImpl::admin() { return parent_context_.admin(); }
 
-TimeSource& FilterChainFactoryContextImpl::timeSource() { return api().timeSource(); }
+TimeSource& PerFilterChainFactoryContextImpl::timeSource() { return api().timeSource(); }
 
-Api::Api& FilterChainFactoryContextImpl::api() { return parent_context_.api(); }
+Api::Api& PerFilterChainFactoryContextImpl::api() { return parent_context_.api(); }
 
-ServerLifecycleNotifier& FilterChainFactoryContextImpl::lifecycleNotifier() {
+ServerLifecycleNotifier& PerFilterChainFactoryContextImpl::lifecycleNotifier() {
   return parent_context_.lifecycleNotifier();
 }
 
-ProcessContextOptRef FilterChainFactoryContextImpl::processContext() {
+ProcessContextOptRef PerFilterChainFactoryContextImpl::processContext() {
   return parent_context_.processContext();
 }
 
 Configuration::ServerFactoryContext&
-FilterChainFactoryContextImpl::getServerFactoryContext() const {
+PerFilterChainFactoryContextImpl::getServerFactoryContext() const {
   return parent_context_.getServerFactoryContext();
 }
 
 Configuration::TransportSocketFactoryContext&
-FilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
+PerFilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
   return parent_context_.getTransportSocketFactoryContext();
 }
 
-Stats::Scope& FilterChainFactoryContextImpl::listenerScope() {
+Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() {
   return parent_context_.listenerScope();
 }
 
@@ -609,7 +610,7 @@ FilterChainManagerImpl::createFilterChainFactoryContext(
     const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
   // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);
-  return std::make_unique<FilterChainFactoryContextImpl>(parent_context_, init_manager_);
+  return std::make_unique<PerFilterChainFactoryContextImpl>(parent_context_, init_manager_);
 }
 
 FactoryContextImpl::FactoryContextImpl(Server::Instance& server,

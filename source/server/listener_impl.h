@@ -77,8 +77,8 @@ private:
 //                     initializing all listeners after workers are started.
 
 /**
- * The immutable factory context could be used by listener filter factory contexts and network
- * filter factory contexts.
+ * The common functionality shared by PerListenerFilterFactoryContexts and
+ * PerFilterChainFactoryFactoryContexts.
  */
 class ListenerFactoryContextBaseImpl final : public Configuration::FactoryContext,
                                              public Network::DrainDecision {
@@ -132,19 +132,20 @@ private:
 };
 
 class ListenerImpl;
+
 // TODO(lambdai): Strip the interface since ListenerFactoryContext only need to support
 // ListenerFilterChain creation.
-class ListenerFactoryContextImpl : public Configuration::ListenerFactoryContext {
+class PerListenerFactoryContextImpl : public Configuration::ListenerFactoryContext {
 public:
-  ListenerFactoryContextImpl(Envoy::Server::Instance& server,
-                             ProtobufMessage::ValidationVisitor& validation_visitor,
-                             const envoy::config::listener::v3::Listener& config_message,
-                             const Network::ListenerConfig* listener_config,
-                             ListenerImpl& listener_impl, DrainManagerPtr drain_manager)
+  PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
+                                ProtobufMessage::ValidationVisitor& validation_visitor,
+                                const envoy::config::listener::v3::Listener& config_message,
+                                const Network::ListenerConfig* listener_config,
+                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager)
       : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
             server, validation_visitor, config_message, std::move(drain_manager))),
         listener_config_(listener_config), listener_impl_(listener_impl) {}
-  ListenerFactoryContextImpl(
+  PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
       const Network::ListenerConfig* listener_config, ListenerImpl& listener_impl)
       : listener_factory_context_base_(listener_factory_context_base),
@@ -340,7 +341,7 @@ private:
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   Network::ConnectionBalancerPtr connection_balancer_;
-  std::shared_ptr<ListenerFactoryContextImpl> listener_factory_context_;
+  std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
 
   // to access ListenerManagerImpl::factory_.

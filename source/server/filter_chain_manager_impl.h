@@ -35,15 +35,15 @@ public:
                    FilterChainFactoryContextCreator& context_creator) const PURE;
 };
 
-// FilterChainFactoryContextImpl is supposed to be used by network filter chain.
+// PerFilterChainFactoryContextImpl is supposed to be used by network filter chain.
 // Its lifetime must cover the created network filter chain.
 // Its lifetime should be covered by the owned listeners so as to support replacing the active
 // filter chains in the listener.
-class FilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
-                                      public Network::DrainDecision {
+class PerFilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
+                                         public Network::DrainDecision {
 public:
-  explicit FilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context,
-                                         Init::Manager& init_manager);
+  explicit PerFilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context,
+                                            Init::Manager& init_manager);
 
   // DrainDecision
   bool drainClose() const override;
@@ -100,8 +100,9 @@ public:
     return filters_factory_;
   }
   void startDraining() override { factory_context_->startDraining(); }
-  
-  void setFilterChainFactoryContext(Configuration::FilterChainFactoryContextPtr filter_chain_factory_context) {
+
+  void setFilterChainFactoryContext(
+      Configuration::FilterChainFactoryContextPtr filter_chain_factory_context) {
     ASSERT(factory_context_ == nullptr);
     factory_context_ = std::move(filter_chain_factory_context);
   }

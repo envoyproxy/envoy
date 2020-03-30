@@ -230,7 +230,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
-      listener_factory_context_(std::make_shared<ListenerFactoryContextImpl>(
+      listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, this, *this,
           parent.factory_.createDrainManager(config.drain_type()))),
       filter_chain_manager_(address_, listener_factory_context_->parent_factory_context(),
@@ -407,83 +407,84 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 }
 
-AccessLog::AccessLogManager& ListenerFactoryContextImpl::accessLogManager() {
+AccessLog::AccessLogManager& PerListenerFactoryContextImpl::accessLogManager() {
   return listener_factory_context_base_->accessLogManager();
 }
-Upstream::ClusterManager& ListenerFactoryContextImpl::clusterManager() {
+Upstream::ClusterManager& PerListenerFactoryContextImpl::clusterManager() {
   return listener_factory_context_base_->clusterManager();
 }
-Event::Dispatcher& ListenerFactoryContextImpl::dispatcher() {
+Event::Dispatcher& PerListenerFactoryContextImpl::dispatcher() {
   return listener_factory_context_base_->dispatcher();
 }
-Network::DrainDecision& ListenerFactoryContextImpl::drainDecision() {
+Network::DrainDecision& PerListenerFactoryContextImpl::drainDecision() {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
-Grpc::Context& ListenerFactoryContextImpl::grpcContext() {
+Grpc::Context& PerListenerFactoryContextImpl::grpcContext() {
   return listener_factory_context_base_->grpcContext();
 }
-bool ListenerFactoryContextImpl::healthCheckFailed() {
+bool PerListenerFactoryContextImpl::healthCheckFailed() {
   return listener_factory_context_base_->healthCheckFailed();
 }
-Http::Context& ListenerFactoryContextImpl::httpContext() {
+Http::Context& PerListenerFactoryContextImpl::httpContext() {
   return listener_factory_context_base_->httpContext();
 }
-const LocalInfo::LocalInfo& ListenerFactoryContextImpl::localInfo() const {
+const LocalInfo::LocalInfo& PerListenerFactoryContextImpl::localInfo() const {
   return listener_factory_context_base_->localInfo();
 }
-Envoy::Runtime::RandomGenerator& ListenerFactoryContextImpl::random() {
+Envoy::Runtime::RandomGenerator& PerListenerFactoryContextImpl::random() {
   return listener_factory_context_base_->random();
 }
-Envoy::Runtime::Loader& ListenerFactoryContextImpl::runtime() {
+Envoy::Runtime::Loader& PerListenerFactoryContextImpl::runtime() {
   return listener_factory_context_base_->runtime();
 }
-Stats::Scope& ListenerFactoryContextImpl::scope() {
+Stats::Scope& PerListenerFactoryContextImpl::scope() {
   return listener_factory_context_base_->scope();
 }
-Singleton::Manager& ListenerFactoryContextImpl::singletonManager() {
+Singleton::Manager& PerListenerFactoryContextImpl::singletonManager() {
   return listener_factory_context_base_->singletonManager();
 }
-OverloadManager& ListenerFactoryContextImpl::overloadManager() {
+OverloadManager& PerListenerFactoryContextImpl::overloadManager() {
   return listener_factory_context_base_->overloadManager();
 }
-ThreadLocal::Instance& ListenerFactoryContextImpl::threadLocal() {
+ThreadLocal::Instance& PerListenerFactoryContextImpl::threadLocal() {
   return listener_factory_context_base_->threadLocal();
 }
-Admin& ListenerFactoryContextImpl::admin() { return listener_factory_context_base_->admin(); }
-const envoy::config::core::v3::Metadata& ListenerFactoryContextImpl::listenerMetadata() const {
+Admin& PerListenerFactoryContextImpl::admin() { return listener_factory_context_base_->admin(); }
+const envoy::config::core::v3::Metadata& PerListenerFactoryContextImpl::listenerMetadata() const {
   return listener_factory_context_base_->listenerMetadata();
 };
-envoy::config::core::v3::TrafficDirection ListenerFactoryContextImpl::direction() const {
+envoy::config::core::v3::TrafficDirection PerListenerFactoryContextImpl::direction() const {
   return listener_factory_context_base_->direction();
 };
-TimeSource& ListenerFactoryContextImpl::timeSource() { return api().timeSource(); }
-const Network::ListenerConfig& ListenerFactoryContextImpl::listenerConfig() const {
+TimeSource& PerListenerFactoryContextImpl::timeSource() { return api().timeSource(); }
+const Network::ListenerConfig& PerListenerFactoryContextImpl::listenerConfig() const {
   return *listener_config_;
 }
-ProtobufMessage::ValidationContext& ListenerFactoryContextImpl::messageValidationContext() {
+ProtobufMessage::ValidationContext& PerListenerFactoryContextImpl::messageValidationContext() {
   return getServerFactoryContext().messageValidationContext();
 }
-ProtobufMessage::ValidationVisitor& ListenerFactoryContextImpl::messageValidationVisitor() {
+ProtobufMessage::ValidationVisitor& PerListenerFactoryContextImpl::messageValidationVisitor() {
   return listener_factory_context_base_->messageValidationVisitor();
 }
-Api::Api& ListenerFactoryContextImpl::api() { return listener_factory_context_base_->api(); }
-ServerLifecycleNotifier& ListenerFactoryContextImpl::lifecycleNotifier() {
+Api::Api& PerListenerFactoryContextImpl::api() { return listener_factory_context_base_->api(); }
+ServerLifecycleNotifier& PerListenerFactoryContextImpl::lifecycleNotifier() {
   return listener_factory_context_base_->lifecycleNotifier();
 }
-ProcessContextOptRef ListenerFactoryContextImpl::processContext() {
+ProcessContextOptRef PerListenerFactoryContextImpl::processContext() {
   return listener_factory_context_base_->processContext();
 }
-Configuration::ServerFactoryContext& ListenerFactoryContextImpl::getServerFactoryContext() const {
+Configuration::ServerFactoryContext&
+PerListenerFactoryContextImpl::getServerFactoryContext() const {
   return listener_factory_context_base_->getServerFactoryContext();
 }
 Configuration::TransportSocketFactoryContext&
-ListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
+PerListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
   return listener_factory_context_base_->getTransportSocketFactoryContext();
 }
-Stats::Scope& ListenerFactoryContextImpl::listenerScope() {
+Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();
 }
-Init::Manager& ListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
+Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 
 bool ListenerImpl::createNetworkFilterChain(
     Network::Connection& connection,
