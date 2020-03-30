@@ -1,7 +1,5 @@
 licenses(["notice"])  # Apache 2
 
-## Pluggable HTTP cache filter
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
@@ -9,6 +7,8 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+
+## Pluggable HTTP cache filter
 
 envoy_package()
 

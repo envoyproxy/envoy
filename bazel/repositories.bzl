@@ -73,6 +73,7 @@ def _python_deps():
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
+    _repository_impl("rules_cc")
     _repository_impl("grpc_httpjson_transcoding")
     native.bind(
         name = "path_matcher",

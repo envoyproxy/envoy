@@ -7,6 +7,7 @@ load(
     "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
+load("@rules_cc//cc:defs.bzl", "cc_binary")
 
 # Envoy C++ binary targets should be specified with this function.
 def envoy_cc_binary(
@@ -27,7 +28,7 @@ def envoy_cc_binary(
         linkopts = linkopts + _envoy_stamped_linkopts()
         deps = deps + _envoy_stamped_deps()
     deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + envoy_stdlib_deps()
-    native.cc_binary(
+    cc_binary(
         name = name,
         srcs = srcs,
         data = data,
