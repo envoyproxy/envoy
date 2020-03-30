@@ -21,6 +21,10 @@ namespace PostgreSQLProxy {
 #define ALL_POSTGRESQL_PROXY_STATS(COUNTER)                                                        \
   COUNTER(backend_msgs)                                                                            \
   COUNTER(errors)                                                                                  \
+  COUNTER(errors_error)                                                                            \
+  COUNTER(errors_fatal)                                                                            \
+  COUNTER(errors_panic)                                                                            \
+  COUNTER(errors_unknown)                                                                          \
   COUNTER(frontend_msgs)                                                                           \
   COUNTER(sessions)                                                                                \
   COUNTER(sessions_encrypted)                                                                      \
@@ -80,7 +84,10 @@ public:
 
   // PostgreSQLProxy::DecoderCallback
   void incBackend() override;
-  void incErrors() override;
+  void incErrorsError() override;
+  void incErrorsFatal() override;
+  void incErrorsPanic() override;
+  void incErrorsUnknown() override;
   void incFrontend() override;
   void incSessionsEncrypted() override;
   void incSessionsUnencrypted() override;

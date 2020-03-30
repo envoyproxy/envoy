@@ -12,7 +12,10 @@ class DecoderCallbacksMock : public DecoderCallbacks {
 public:
   MOCK_METHOD(void, incBackend, (), (override));
   MOCK_METHOD(void, incFrontend, (), (override));
-  MOCK_METHOD(void, incErrors, (), (override));
+  MOCK_METHOD(void, incErrorsError, (), (override));
+  MOCK_METHOD(void, incErrorsFatal, (), (override));
+  MOCK_METHOD(void, incErrorsPanic, (), (override));
+  MOCK_METHOD(void, incErrorsUnknown, (), (override));
   MOCK_METHOD(void, incSessionsEncrypted, (), (override));
   MOCK_METHOD(void, incSessionsUnencrypted, (), (override));
   MOCK_METHOD(void, incStatements, (), (override));
@@ -389,9 +392,11 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, AuthenticationMsg) {
 // indicates error.
 TEST_F(PostgreSQLProxyBackendDecoderTest, ErrorMsg) {
   // Check that even when message type is E,
-  // it must contain specific string to trigger
-  // statistics update.
-  EXPECT_CALL(callbacks_, incErrors()).Times(0);
+  // it must contain start with S character
+  EXPECT_CALL(callbacks_, incErrorsError()).Times(0);
+  EXPECT_CALL(callbacks_, incErrorsFatal()).Times(0);
+  EXPECT_CALL(callbacks_, incErrorsPanic()).Times(0);
+  EXPECT_CALL(callbacks_, incErrorsUnknown()).Times(1);
   payload_ = "blah blah";
   data_.add("E");
   length_ = htonl(4 + payload_.length());
@@ -400,10 +405,54 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, ErrorMsg) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  // Now for the correct message with specific
+  // Check for unknow localized message for version <= 9.5
+  EXPECT_CALL(callbacks_, incErrorsError()).Times(1);
+  EXPECT_CALL(callbacks_, incErrorsFatal()).Times(0);
+  EXPECT_CALL(callbacks_, incErrorsPanic()).Times(0);
+  EXPECT_CALL(callbacks_, incErrorsUnknown()).Times(0);
+  payload_ = "SERROC1234";
+  data_.add("E");
+  length_ = htonl(4 + payload_.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
+
+  // Now for the correct message with ERROR severity
   // string inside.
-  EXPECT_CALL(callbacks_, incErrors()).Times(1);
-  payload_ = "blah VERROR blah";
+  EXPECT_CALL(callbacks_, incErrorsError()).Times(1);
+  payload_ = "SERRORC1234";
+  data_.add("E");
+  length_ = htonl(4 + payload_.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
+
+  EXPECT_CALL(callbacks_, incErrorsError()).Times(1);
+  payload_ = "SERRORVERRORC1234";
+  data_.add("E");
+  length_ = htonl(4 + payload_.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
+
+  // Now for the correct message with FATAL severity
+  // string inside.
+  EXPECT_CALL(callbacks_, incErrorsFatal()).Times(1);
+  payload_ = "SFATALVFATALC22012";
+  data_.add("E");
+  length_ = htonl(4 + payload_.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
+
+  // Now for the correct message with PANIC severity
+  // string inside.
+  EXPECT_CALL(callbacks_, incErrorsPanic()).Times(1);
+  payload_ = "SPANICVPANICC22012";
   data_.add("E");
   length_ = htonl(4 + payload_.length());
   data_.add(&length_, sizeof(length_));
