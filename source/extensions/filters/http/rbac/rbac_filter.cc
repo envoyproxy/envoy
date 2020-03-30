@@ -56,7 +56,7 @@ Http::FilterHeadersStatus
 RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_LOG(
       debug,
-      "checking request: requestedServerName: {}, sourceIP: {}, peerIP: {}, remoteIP: {},"
+      "checking request: requestedServerName: {}, sourceIP: {}, directRemoteIP: {}, remoteIP: {},"
       "localAddress: {}, ssl: {}, headers: {}, dynamicMetadata: {}",
       callbacks_->connection()->requestedServerName(),
       callbacks_->connection()->remoteAddress()->asString(),

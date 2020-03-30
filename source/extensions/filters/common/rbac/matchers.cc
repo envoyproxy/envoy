@@ -46,11 +46,11 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
     return std::make_shared<const OrMatcher>(principal.or_ids());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAuthenticated:
     return std::make_shared<const AuthenticatedMatcher>(principal.authenticated());
-  case envoy::config::rbac::v3::Principal::IdentifierCase::kHiddenEnvoyDeprecatedSourceIp:
-    return std::make_shared<const IPMatcher>(principal.hidden_envoy_deprecated_source_ip(),
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kSourceIp:
+    return std::make_shared<const IPMatcher>(principal.source_ip(),
                                              IPMatcher::Type::ConnectionRemote);
-  case envoy::config::rbac::v3::Principal::IdentifierCase::kPeerIp:
-    return std::make_shared<const IPMatcher>(principal.peer_ip(),
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kDirectRemoteIp:
+    return std::make_shared<const IPMatcher>(principal.direct_remote_ip(),
                                              IPMatcher::Type::DownstreamDirectRemote);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kRemoteIp:
     return std::make_shared<const IPMatcher>(principal.remote_ip(),

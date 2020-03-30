@@ -68,7 +68,7 @@ TEST(AndMatcher, Principal_Set) {
   checkMatcher(RBAC::AndMatcher(set), true);
 
   principal = set.add_ids();
-  auto* cidr = principal->mutable_peer_ip();
+  auto* cidr = principal->mutable_direct_remote_ip();
   cidr->set_address_prefix("1.2.3.0");
   cidr->mutable_prefix_len()->set_value(24);
 
@@ -110,7 +110,7 @@ TEST(OrMatcher, Permission_Set) {
 TEST(OrMatcher, Principal_Set) {
   envoy::config::rbac::v3::Principal::Set set;
   envoy::config::rbac::v3::Principal* id = set.add_ids();
-  auto* cidr = id->mutable_peer_ip();
+  auto* cidr = id->mutable_direct_remote_ip();
   cidr->set_address_prefix("1.2.3.0");
   cidr->mutable_prefix_len()->set_value(24);
 

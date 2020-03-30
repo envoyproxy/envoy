@@ -204,17 +204,18 @@ message Principal {
     Authenticated authenticated = 4;
 
     // A CIDR block that describes the downstream IP.
+    // This address will honor proxy protocol, but will not honor XFF.
     api.v2.core.CidrRange source_ip = 5 [deprecated = true];
 
     // A CIDR block that describes the downstream remote/origin address.
     // Note: This is always the physical peer even if the
     // :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>` is inferred
     // from for example the x-forwarder-for header, proxy protocol, etc.
-    api.v2.core.CidrRange peer_ip = 10;
+    api.v2.core.CidrRange direct_remote_ip = 10;
 
     // A CIDR block that describes the downstream remote/origin address.
     // Note: This may not be the physical peer and could be different from the
-    // :ref:`peer_ip <envoy_api_field_config.rbac.v2.Principal.peer_ip>`.
+    // :ref:`direct_remote_ip <envoy_api_field_config.rbac.v2.Principal.direct_remote_ip>`.
     // E.g, if the remote ip is inferred from for example the x-forwarder-for header,
     // proxy protocol, etc.
     api.v2.core.CidrRange remote_ip = 11;

@@ -206,10 +206,6 @@ message Principal {
     type.matcher.v3.StringMatcher principal_name = 2;
   }
 
-  reserved 5;
-
-  reserved "source_ip";
-
   oneof identifier {
     option (validate.required) = true;
 
@@ -225,15 +221,19 @@ message Principal {
     // Authenticated attributes that identify the downstream.
     Authenticated authenticated = 4;
 
+    // A CIDR block that describes the downstream IP.
+    // This address will honor proxy protocol, but will not honor XFF.
+    core.v3.CidrRange source_ip = 5 [deprecated = true];
+
     // A CIDR block that describes the downstream remote/origin address.
     // Note: This is always the physical peer even if the
     // :ref:`remote_ip <envoy_api_field_config.rbac.v3.Principal.remote_ip>` is inferred
     // from for example the x-forwarder-for header, proxy protocol, etc.
-    core.v3.CidrRange peer_ip = 10;
+    core.v3.CidrRange direct_remote_ip = 10;
 
     // A CIDR block that describes the downstream remote/origin address.
     // Note: This may not be the physical peer and could be different from the
-    // :ref:`peer_ip <envoy_api_field_config.rbac.v3.Principal.peer_ip>`.
+    // :ref:`direct_remote_ip <envoy_api_field_config.rbac.v3.Principal.direct_remote_ip>`.
     // E.g, if the remote ip is inferred from for example the x-forwarder-for header,
     // proxy protocol, etc.
     core.v3.CidrRange remote_ip = 11;

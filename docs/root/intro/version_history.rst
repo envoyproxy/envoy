@@ -59,7 +59,7 @@ Version history
 * request_id_extension: add an ability to extend request ID handling at :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_id_extension>`.
 * rbac: added :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>` for matching downstream remote IP address.
 * rbac: deprecated :ref:`source_ip <envoy_api_field_config.rbac.v2.Principal.source_ip>` with
-  :ref:`peer_ip <envoy_api_field_config.rbac.v2.Principal.peer_ip>` and :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>`
+  :ref:`direct_remote_ip <envoy_api_field_config.rbac.v2.Principal.direct_remote_ip>` and :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>`
   for matching downstream peer and remote IP address.
 * retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
 * router: added additional stats for :ref:`virtual clusters <config_http_filters_router_vcluster_stats>`.
