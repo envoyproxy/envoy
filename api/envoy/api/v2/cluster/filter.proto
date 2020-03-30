@@ -5,6 +5,7 @@ package envoy.api.v2.cluster;
 import "google/protobuf/any.proto";
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.cluster";
@@ -13,6 +14,7 @@ option java_multiple_files = true;
 option csharp_namespace = "Envoy.Api.V2.ClusterNS";
 option ruby_package = "Envoy.Api.V2.ClusterNS";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Upstream filters]
 // Upstream filters apply to the connections to the upstream cluster hosts.

@@ -152,8 +152,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     }
   }
 
-  ENVOY_CONN_LOG(trace, "ssl read {} bytes into {} slices", callbacks_->connection(), bytes_read,
-                 read_buffer.getRawSlices(nullptr, 0));
+  ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);
 
   return {action, bytes_read, end_stream};
 }
@@ -501,6 +500,14 @@ const std::string& SslSocketInfo::tlsVersion() const {
   }
   cached_tls_version_ = SSL_get_version(ssl_.get());
   return cached_tls_version_;
+}
+
+absl::optional<std::string> SslSocketInfo::x509Extension(absl::string_view extension_name) const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return absl::nullopt;
+  }
+  return Utility::getX509ExtensionValue(*cert, extension_name);
 }
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }

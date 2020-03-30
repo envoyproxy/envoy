@@ -67,6 +67,10 @@ public:
     return remote_address_;
   }
 
+  const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return remote_address_;
+  }
+
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return local_address_;
   }
@@ -118,7 +122,7 @@ const char YamlHeader[] = R"EOF(
     - filter_chain_match:
         # empty
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -133,7 +137,7 @@ const char YamlSingleServer[] = R"EOF(
         server_names: "server1.example.com"
         transport_protocol: "tls"
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -148,7 +152,7 @@ const char YamlSingleDstPortTop[] = R"EOF(
         destination_port: )EOF";
 const char YamlSingleDstPortBottom[] = R"EOF(
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:

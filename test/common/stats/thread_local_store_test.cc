@@ -908,10 +908,7 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
 
 class StatsThreadLocalStoreTestNoFixture : public testing::Test {
 protected:
-  StatsThreadLocalStoreTestNoFixture()
-      : save_use_fakes_(SymbolTableCreator::useFakeSymbolTables()) {}
   ~StatsThreadLocalStoreTestNoFixture() override {
-    TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(save_use_fakes_);
     if (threading_enabled_) {
       store_->shutdownThreading();
       tls_.shutdownThread();
@@ -919,7 +916,7 @@ protected:
   }
 
   void init(bool use_fakes) {
-    TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(use_fakes);
+    symbol_table_creator_test_peer_.setUseFakeSymbolTables(use_fakes);
     symbol_table_ = SymbolTableCreator::makeSymbolTable();
     alloc_ = std::make_unique<AllocatorImpl>(*symbol_table_);
     store_ = std::make_unique<ThreadLocalStoreImpl>(*alloc_);
@@ -943,7 +940,7 @@ protected:
   std::unique_ptr<ThreadLocalStoreImpl> store_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  const bool save_use_fakes_;
+  TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
   bool threading_enabled_{false};
 };
 
@@ -1400,7 +1397,8 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
     main_dispatch_block();
 
     // Here we show that the counter cleanups have finished, because the use-count is 1.
-    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", StatNameTagVector{});
+    CounterSharedPtr counter =
+        alloc_.makeCounter(my_counter_scoped_name_, StatName(), StatNameTagVector{});
     EXPECT_EQ(1, counter->use_count()) << "index=" << i;
   }
 }
@@ -1424,7 +1422,8 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
     // running the test: NumScopes*NumThreads*NumIters == 70000, We use a timer
     // so we don't time out on asan/tsan tests, In opt builds this test takes
     // less than a second, and in fastbuild it takes less than 5.
-    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", StatNameTagVector{});
+    CounterSharedPtr counter =
+        alloc_.makeCounter(my_counter_scoped_name_, StatName(), StatNameTagVector{});
     uint32_t use_count = counter->use_count() - 1; // Subtract off this instance.
     EXPECT_EQ((i + 1) * NumScopes * NumThreads, use_count);
   }

@@ -69,6 +69,7 @@ ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
 void ActiveQuicListener::onListenerShutdown() {
   ENVOY_LOG(info, "Quic listener {} shutdown.", config_.name());
   quic_dispatcher_->Shutdown();
+  udp_listener_.reset();
 }
 
 void ActiveQuicListener::onData(Network::UdpRecvData& data) {
@@ -81,13 +82,11 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
       quic::QuicTime::Delta::FromMicroseconds(std::chrono::duration_cast<std::chrono::microseconds>(
                                                   data.receive_time_.time_since_epoch())
                                                   .count());
-  uint64_t num_slice = data.buffer_->getRawSlices(nullptr, 0);
-  ASSERT(num_slice == 1);
-  Buffer::RawSlice slice;
-  data.buffer_->getRawSlices(&slice, 1);
+  ASSERT(data.buffer_->getRawSlices().size() == 1);
+  Buffer::RawSliceVector slices = data.buffer_->getRawSlices(/*max_slices=*/1);
   // TODO(danzh): pass in TTL and UDP header.
-  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
-                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
+  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slices[0].mem_), slices[0].len_,
+                                  timestamp, /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
   quic_dispatcher_->ProcessPacket(self_address, peer_address, packet);
@@ -99,6 +98,16 @@ void ActiveQuicListener::onReadReady() {
 
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {
   quic_dispatcher_->OnCanWrite();
+}
+
+void ActiveQuicListener::pauseListening() { quic_dispatcher_->StopAcceptingNewConnections(); }
+
+void ActiveQuicListener::resumeListening() { quic_dispatcher_->StartAcceptingNewConnections(); }
+
+void ActiveQuicListener::shutdownListener() {
+  // Same as pauseListening() because all we want is to stop accepting new
+  // connections.
+  quic_dispatcher_->StopAcceptingNewConnections();
 }
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(

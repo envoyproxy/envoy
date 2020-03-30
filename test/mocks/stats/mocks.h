@@ -209,7 +209,7 @@ public:
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
   Unit unit_{Histogram::Unit::Unspecified};
-  Store* store_;
+  Store* store_{};
 
 private:
   RefcountHelper refcount_helper_;
@@ -237,7 +237,7 @@ public:
 
   bool used_;
   Unit unit_{Histogram::Unit::Unspecified};
-  Store* store_;
+  Store* store_{};
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
       std::make_shared<HistogramStatisticsImpl>();
 
@@ -294,16 +294,17 @@ public:
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
   MOCK_METHOD(HistogramOptConstRef, findHistogram, (StatName), (const));
 
-  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef) override {
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef) override {
     // We always just respond with the mocked counter, so the tags don't matter.
     return counter(symbol_table_->toString(name));
   }
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef,
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
                                    Gauge::ImportMode import_mode) override {
     // We always just respond with the mocked gauge, so the tags don't matter.
     return gauge(symbol_table_->toString(name), import_mode);
   }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef,
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
                                            Histogram::Unit unit) override {
     return histogram(symbol_table_->toString(name), unit);
   }

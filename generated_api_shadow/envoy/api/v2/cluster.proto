@@ -21,12 +21,14 @@ import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "ClusterProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Cluster configuration]
 
@@ -354,7 +356,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message CommonLbConfig {
     // Configuration for :ref:`zone aware routing
     // <arch_overview_load_balancing_zone_aware_routing>`.
@@ -382,6 +384,13 @@ message Cluster {
     // Configuration for :ref:`locality weighted load balancing
     // <arch_overview_load_balancing_locality_weighted_lb>`
     message LocalityWeightedLbConfig {
+    }
+
+    // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
+    message ConsistentHashingLbConfig {
+      // If set to `true`, the cluster will use hostname instead of the resolved
+      // address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
+      bool use_hostname_for_hashing = 1;
     }
 
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.
@@ -438,6 +447,9 @@ message Cluster {
     // If set to `true`, the cluster manager will drain all existing
     // connections to upstream hosts whenever hosts are added or removed from the cluster.
     bool close_connections_on_host_set_change = 6;
+
+    //Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
+    ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
   }
 
   message RefreshRate {

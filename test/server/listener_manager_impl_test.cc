@@ -17,6 +17,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/config/metadata.h"
+#include "common/init/manager_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/utility.h"
@@ -25,6 +26,7 @@
 #include "extensions/filters/listener/original_dst/original_dst.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "test/mocks/init/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
@@ -33,13 +35,15 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 
-using testing::AtLeast;
-using testing::InSequence;
-using testing::Throw;
-
 namespace Envoy {
 namespace Server {
 namespace {
+
+using testing::AtLeast;
+using testing::InSequence;
+using testing::Return;
+using testing::ReturnRef;
+using testing::Throw;
 
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
 protected:
@@ -149,7 +153,7 @@ address:
 filter_chains:
 - filters: []
   transport_socket:
-    name: envoy.transport_sockets.tls
+    name: tls
     typed_config:
       "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
       common_tls_context:
@@ -186,7 +190,7 @@ address:
 filter_chains:
 - filters: []
   transport_socket:
-    name: envoy.transport_sockets.tls
+    name: tls
     typed_config:
       "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
       common_tls_context:
@@ -373,10 +377,10 @@ filter_chains:
     config: {}
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
-                          EnvoyException,
-                          "Error: non-terminal filter non_terminal is the last "
-                          "filter in a network filter chain.");
+  EXPECT_THROW_WITH_REGEX(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
+      "Error: non-terminal filter named non_terminal of type non_terminal is the last "
+      "filter in a network filter chain.");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, NotTerminalLast) {
@@ -395,7 +399,8 @@ filter_chains:
 
   EXPECT_THROW_WITH_REGEX(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
-      "Error: envoy.filters.network.tcp_proxy must be the terminal network filter.");
+      "Error: terminal filter named envoy.filters.network.tcp_proxy of type "
+      "envoy.filters.network.tcp_proxy must be the last filter in a network filter chain.");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
@@ -671,6 +676,120 @@ filter_chains:
   checkStats(1, 0, 0, 0, 1, 0);
 
   EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// Tests that when listener tears down, server's initManager is notified.
+TEST_F(ListenerManagerImplTest, ListenerTeardownNotifiesServerInitManager) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
+
+  InSequence s;
+
+  auto* lds_api = new MockLdsApi();
+  EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
+  envoy::config::core::v3::ConfigSource lds_config;
+  manager_->createLdsApi(lds_config);
+
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
+  checkConfigDump(R"EOF(
+static_listeners:
+)EOF");
+
+  const std::string listener_foo_yaml = R"EOF(
+name: "foo"
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1234
+filter_chains: {}
+  )EOF";
+
+  Init::ManagerImpl server_init_mgr("server-init-manager");
+  Init::ExpectableWatcherImpl server_init_watcher("server-init-watcher");
+  { // Add and remove a listener before starting workers.
+    ListenerHandle* listener_foo = expectListenerCreate(true, true);
+    EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+    EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml),
+                                              "version1", true));
+    checkStats(1, 0, 0, 0, 1, 0);
+
+    EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version1"));
+    checkConfigDump(R"EOF(
+version_info: version1
+static_listeners:
+dynamic_listeners:
+  - name: foo
+    warming_state:
+      version_info: version1
+      listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+      last_updated:
+        seconds: 1001001001
+        nanos: 1000000
+)EOF");
+    EXPECT_CALL(listener_foo->target_, initialize()).Times(1);
+    server_init_mgr.initialize(server_init_watcher);
+    // Since listener_foo->target_ is not ready, the listener's listener_init_target will not be
+    // ready until the destruction happens.
+    server_init_watcher.expectReady().Times(1);
+    EXPECT_CALL(*listener_foo, onDestroy());
+    EXPECT_TRUE(manager_->removeListener("foo"));
+  }
+  // Listener foo's listener_init_target_ is the only target added to server_init_mgr.
+  EXPECT_EQ(server_init_mgr.state(), Init::Manager::State::Initialized);
+
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
+  checkConfigDump(R"EOF(
+static_listeners:
+)EOF");
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Now add new version listener foo after workers start, note it's fine that server_init_mgr is
+  // initialized, as no target will be added to it.
+  time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
+  EXPECT_CALL(server_, initManager()).Times(0); // No target added to server init manager.
+  server_init_watcher.expectReady().Times(0);
+  {
+    ListenerHandle* listener_foo2 = expectListenerCreate(true, true);
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+    // Version 2 listener will be initialized by listener manager directly.
+    EXPECT_CALL(listener_foo2->target_, initialize()).Times(1);
+    EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml),
+                                              "version2", true));
+    // Version2 is in warming list as listener_foo2->target_ is not ready yet.
+    checkStats(/*added=*/2, 0, /*removed=*/1, /*warming=*/1, 0, 0);
+    EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version2"));
+    checkConfigDump(R"EOF(
+  version_info: version2
+  static_listeners:
+  dynamic_listeners:
+    - name: foo
+      warming_state:
+        version_info: version2
+        listener:
+          "@type": type.googleapis.com/envoy.api.v2.Listener
+          name: foo
+          address:
+            socket_address:
+              address: 127.0.0.1
+              port_value: 1234
+          filter_chains: {}
+        last_updated:
+          seconds: 2002002002
+          nanos: 2000000
+  )EOF");
+    // Delete foo-listener again.
+    EXPECT_CALL(*listener_foo2, onDestroy());
+    EXPECT_TRUE(manager_->removeListener("foo"));
+  }
 }
 
 TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
@@ -1725,7 +1844,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
     - filter_chain_match:
         destination_port: 8080
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -1771,7 +1890,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
     - filter_chain_match:
         prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -1817,7 +1936,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
     - filter_chain_match:
         server_names: "server1.example.com"
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -1864,7 +1983,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
     - filter_chain_match:
         transport_protocol: "tls"
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -1907,7 +2026,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
         application_protocols: "http/1.1"
         source_type: ANY
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -1950,7 +2069,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
     - filter_chain_match:
         source_type: LOCAL
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2007,7 +2126,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
           - address_prefix: 10.0.0.1
             prefix_len: 24
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2063,7 +2182,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Ma
           - address_prefix: 2001:0db8:85a3:0000:0000:0000:0000:0000
             prefix_len: 64
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2102,7 +2221,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
         source_ports:
           - 100
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2145,7 +2264,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
     - filter_chain_match:
         source_type: LOCAL
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2156,7 +2275,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
         application_protocols: "http/1.1"
         source_type: EXTERNAL
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2166,7 +2285,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
     - filter_chain_match:
         source_type: ANY
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2228,7 +2347,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     - filter_chain_match:
         # empty
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2238,7 +2357,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     - filter_chain_match:
         destination_port: 8080
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2248,7 +2367,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     - filter_chain_match:
         destination_port: 8081
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2314,7 +2433,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     - filter_chain_match:
         # empty
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2324,7 +2443,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     - filter_chain_match:
         prefix_ranges: { address_prefix: 192.168.0.1, prefix_len: 32 }
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2334,7 +2453,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     - filter_chain_match:
         prefix_ranges: { address_prefix: 192.168.0.0, prefix_len: 16 }
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2400,7 +2519,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
     - filter_chain_match:
         # empty
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2413,7 +2532,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
     - filter_chain_match:
         server_names: "server1.example.com"
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2426,7 +2545,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
     - filter_chain_match:
         server_names: "*.com"
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2501,7 +2620,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
     - filter_chain_match:
         transport_protocol: "tls"
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2546,7 +2665,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
     - filter_chain_match:
         application_protocols: ["dummy", "h2"]
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2594,7 +2713,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
         transport_protocol: "tls"
         application_protocols: ["dummy", "h2"]
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2649,7 +2768,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
     - filter_chain_match:
         server_names: "example.com"
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2662,7 +2781,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
     - filter_chain_match:
         server_names: "www.example.com"
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2693,7 +2812,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
     - filter_chain_match:
         server_names: "example.com"
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2706,7 +2825,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
     - filter_chain_match:
         server_names: "www.example.com"
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2850,6 +2969,38 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 }
 
+// Test the tls inspector is not injected twice when the deprecated name is used.
+TEST_F(ListenerManagerImplWithRealFiltersTest,
+       DEPRECATED_FEATURE_TEST(TlsFilterChainWithDeprecatedTlsInspectorName)) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.listener.tls_inspector"
+      config: {}
+    filter_chains:
+    - filter_chain_match:
+        transport_protocol: "tls"
+    - filter_chain_match:
+        # empty
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // Make sure there is exactly 1 listener filter (and assume it's TLS Inspector). 2 filters
+  // would imply incorrect injection of a second filter.
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr&) -> void {}));
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, SniFilterChainWithoutTlsInspector) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -2942,7 +3093,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2970,7 +3121,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateChainInlinePrivateK
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -2993,7 +3144,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateIncomplete) {
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -3016,7 +3167,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidCertificateC
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -3040,7 +3191,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidIntermediate
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -3062,7 +3213,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidPrivateKey) 
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -3082,7 +3233,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidTrustedCA) {
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -3107,8 +3258,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
     filter_chains:
     - filter_chain_match:
       filters:
-      - name: envoy.filters.network.http_connection_manager
-        config:
+      - name: http
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: metadata_test
           route_config:
             virtual_hosts:
@@ -3497,7 +3649,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -3524,7 +3676,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CRLInline) {
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -3550,7 +3702,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, InvalidCRLInline) {
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -3573,7 +3725,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CRLWithNoCA) {
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -3595,7 +3747,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifySanWithNoCA) {
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -3621,7 +3773,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithNoCA) {
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -3645,7 +3797,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:

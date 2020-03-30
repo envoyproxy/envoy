@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/network/filter.h"
@@ -12,6 +13,7 @@
 
 #include "common/common/logger.h"
 #include "common/init/manager_impl.h"
+#include "common/init/target_impl.h"
 
 #include "server/filter_chain_manager_impl.h"
 
@@ -95,8 +97,7 @@ public:
    */
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash,
-               ProtobufMessage::ValidationVisitor& validation_visitor, uint32_t concurrency);
+               bool workers_started, uint64_t hash, uint32_t concurrency);
   ~ListenerImpl() override;
 
   /**
@@ -150,6 +151,9 @@ public:
     return udp_listener_factory_.get();
   }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    return access_logs_;
+  }
 
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
@@ -158,7 +162,6 @@ public:
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
-  Tracing::HttpTracer& httpTracer() override;
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
@@ -173,6 +176,7 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   const Network::ListenerConfig& listenerConfig() const override;
+  ProtobufMessage::ValidationContext& messageValidationContext() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
@@ -225,15 +229,18 @@ private:
   const uint64_t hash_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
+  // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
+  // listener initialization is complete.
+  Init::WatcherImpl local_init_watcher_;
+  // A target is added to Server's InitManager if workers_started_ is false.
+  Init::TargetImpl listener_init_target_;
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   Init::ManagerImpl dynamic_init_manager_;
 
-  // This init watcher, if available, notifies the "parent" listener manager when listener
-  // initialization is complete. It may be reset to cancel interest.
-  std::unique_ptr<Init::WatcherImpl> init_watcher_;
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
+  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};
   const envoy::config::listener::v3::Listener config_;

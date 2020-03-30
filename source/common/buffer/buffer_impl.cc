@@ -10,8 +10,15 @@
 
 namespace Envoy {
 namespace Buffer {
+namespace {
+// This size has been determined to be optimal from running the
+// //test/integration:http_benchmark benchmark tests.
+// TODO(yanavlasov): This may not be optimal for all hardware configurations or traffic patterns and
+// may need to be configurable in the future.
+constexpr uint64_t CopyThreshold = 512;
+} // namespace
 
-void OwnedImpl::add(const void* data, uint64_t size) {
+void OwnedImpl::addImpl(const void* data, uint64_t size) {
   const char* src = static_cast<const char*>(data);
   bool new_slice_needed = slices_.empty();
   while (size != 0) {
@@ -26,6 +33,8 @@ void OwnedImpl::add(const void* data, uint64_t size) {
   }
 }
 
+void OwnedImpl::add(const void* data, uint64_t size) { addImpl(data, size); }
+
 void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
   length_ += fragment.size();
   slices_.emplace_back(std::make_unique<UnownedSlice>(fragment));
@@ -35,10 +44,7 @@ void OwnedImpl::add(absl::string_view data) { add(data.data(), data.size()); }
 
 void OwnedImpl::add(const Instance& data) {
   ASSERT(&data != this);
-  uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  absl::FixedArray<RawSlice> slices(num_slices);
-  data.getRawSlices(slices.begin(), num_slices);
-  for (const RawSlice& slice : slices) {
+  for (const RawSlice& slice : data.getRawSlices()) {
     add(slice.mem_, slice.len_);
   }
 }
@@ -103,6 +109,11 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
     }
   }
 
+  // In case an extra slice was reserved, remove empty slices from the end of the buffer.
+  while (!slices_.empty() && slices_.back()->dataSize() == 0) {
+    slices_.pop_back();
+  }
+
   ASSERT(num_slices_committed > 0);
 }
 
@@ -155,23 +166,32 @@ void OwnedImpl::drain(uint64_t size) {
   }
 }
 
-uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
-  uint64_t num_slices = 0;
+RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) const {
+  uint64_t max_out = slices_.size();
+  if (max_slices.has_value()) {
+    max_out = std::min(max_out, max_slices.value());
+  }
+
+  RawSliceVector raw_slices;
+  raw_slices.reserve(max_out);
   for (const auto& slice : slices_) {
+    if (raw_slices.size() >= max_out) {
+      break;
+    }
+
     if (slice->dataSize() == 0) {
       continue;
     }
-    if (num_slices < out_size) {
-      out[num_slices].mem_ = slice->data();
-      out[num_slices].len_ = slice->dataSize();
-    }
-    // Per the definition of getRawSlices in include/envoy/buffer/buffer.h, we need to return
-    // the total number of slices needed to access all the data in the buffer, which can be
-    // larger than out_size. So we keep iterating and counting non-empty slices here, even
-    // if all the caller-supplied slices have been filled.
-    num_slices++;
+
+    // Temporary cast to fix 32-bit Envoy mobile builds, where sizeof(uint64_t) != sizeof(size_t).
+    // dataSize represents the size of a buffer so size_t should always be large enough to hold its
+    // size regardless of architecture. Buffer slices should in practice be relatively small, but
+    // there is currently no max size validation.
+    // TODO(antoniovicente) Set realistic limits on the max size of BufferSlice and consider use of
+    // size_t instead of uint64_t in the Slice interface.
+    raw_slices.emplace_back(RawSlice{slice->data(), static_cast<size_t>(slice->dataSize())});
   }
-  return num_slices;
+  return raw_slices;
 }
 
 uint64_t OwnedImpl::length() const {
@@ -223,6 +243,26 @@ void* OwnedImpl::linearize(uint32_t size) {
   return slices_.front()->data();
 }
 
+void OwnedImpl::coalesceOrAddSlice(SlicePtr&& other_slice) {
+  const uint64_t slice_size = other_slice->dataSize();
+  // The `other_slice` content can be coalesced into the existing slice IFF:
+  // 1. The `other_slice` can be coalesced. Objects of type UnownedSlice can not be coalesced. See
+  //    comment in the UnownedSlice class definition;
+  // 2. There are existing slices;
+  // 3. The `other_slice` content length is under the CopyThreshold;
+  // 4. There is enough unused space in the existing slice to accommodate the `other_slice` content.
+  if (other_slice->canCoalesce() && !slices_.empty() && slice_size < CopyThreshold &&
+      slices_.back()->reservableSize() >= slice_size) {
+    // Copy content of the `other_slice`. The `move` methods which call this method effectively
+    // drain the source buffer.
+    addImpl(other_slice->data(), slice_size);
+  } else {
+    // Take ownership of the slice.
+    slices_.emplace_back(std::move(other_slice));
+    length_ += slice_size;
+  }
+}
+
 void OwnedImpl::move(Instance& rhs) {
   ASSERT(&rhs != this);
   // We do the static cast here because in practice we only have one buffer implementation right
@@ -231,10 +271,9 @@ void OwnedImpl::move(Instance& rhs) {
   OwnedImpl& other = static_cast<OwnedImpl&>(rhs);
   while (!other.slices_.empty()) {
     const uint64_t slice_size = other.slices_.front()->dataSize();
-    slices_.emplace_back(std::move(other.slices_.front()));
-    other.slices_.pop_front();
-    length_ += slice_size;
+    coalesceOrAddSlice(std::move(other.slices_.front()));
     other.length_ -= slice_size;
+    other.slices_.pop_front();
   }
   other.postProcess();
 }
@@ -255,9 +294,8 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
       other.slices_.front()->drain(copy_size);
       other.length_ -= copy_size;
     } else {
-      slices_.emplace_back(std::move(other.slices_.front()));
+      coalesceOrAddSlice(std::move(other.slices_.front()));
       other.slices_.pop_front();
-      length_ += slice_size;
       other.length_ -= slice_size;
     }
     length -= copy_size;
@@ -438,9 +476,8 @@ bool OwnedImpl::startsWith(absl::string_view data) const {
 
 Api::IoCallUint64Result OwnedImpl::write(Network::IoHandle& io_handle) {
   constexpr uint64_t MaxSlices = 16;
-  RawSlice slices[MaxSlices];
-  const uint64_t num_slices = std::min(getRawSlices(slices, MaxSlices), MaxSlices);
-  Api::IoCallUint64Result result = io_handle.writev(slices, num_slices);
+  RawSliceVector slices = getRawSlices(MaxSlices);
+  Api::IoCallUint64Result result = io_handle.writev(slices.begin(), slices.size());
   if (result.ok() && result.rc_ > 0) {
     drain(static_cast<uint64_t>(result.rc_));
   }
@@ -456,16 +493,9 @@ OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
 OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, size); }
 
 std::string OwnedImpl::toString() const {
-  uint64_t num_slices = getRawSlices(nullptr, 0);
-  absl::FixedArray<RawSlice> slices(num_slices);
-  getRawSlices(slices.begin(), num_slices);
-  size_t len = 0;
-  for (const RawSlice& slice : slices) {
-    len += slice.len_;
-  }
   std::string output;
-  output.reserve(len);
-  for (const RawSlice& slice : slices) {
+  output.reserve(length());
+  for (const RawSlice& slice : getRawSlices()) {
     output.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 
@@ -481,6 +511,14 @@ void OwnedImpl::appendSliceForTest(const void* data, uint64_t size) {
 
 void OwnedImpl::appendSliceForTest(absl::string_view data) {
   appendSliceForTest(data.data(), data.size());
+}
+
+std::vector<OwnedSlice::SliceRepresentation> OwnedImpl::describeSlicesForTest() const {
+  std::vector<OwnedSlice::SliceRepresentation> slices;
+  for (const auto& slice : slices_) {
+    slices.push_back(slice->describeSliceForTest());
+  }
+  return slices;
 }
 
 } // namespace Buffer

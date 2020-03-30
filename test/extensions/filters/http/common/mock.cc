@@ -21,7 +21,7 @@ MockUpstream::MockUpstream(Upstream::MockClusterManager& mock_cm, const std::str
             } else {
               response_message->body().reset(nullptr);
             }
-            cb.onSuccess(std::move(response_message));
+            cb.onSuccess(request_, std::move(response_message));
             return &request_;
           }));
 }
@@ -33,7 +33,7 @@ MockUpstream::MockUpstream(Upstream::MockClusterManager& mock_cm,
       .WillByDefault(testing::Invoke(
           [this, reason](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            cb.onFailure(reason);
+            cb.onFailure(request_, reason);
             return &request_;
           }));
 }

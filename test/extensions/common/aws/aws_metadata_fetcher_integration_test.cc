@@ -20,12 +20,12 @@ public:
     return fmt::format(ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
-        name: envoy.filters.network.http_connection_manager
+        name: http
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: metadata_test
           http_filters:
-            - name: envoy.filters.http.fault
+            - name: fault
               typed_config:
                 "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
                 delay:
