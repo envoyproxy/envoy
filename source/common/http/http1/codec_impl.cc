@@ -893,6 +893,7 @@ bool ClientConnectionImpl::cannotHaveBody() {
   if ((pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) ||
       parser_.status_code == 204 || parser_.status_code == 304 ||
       (parser_.status_code >= 200 && parser_.content_length == 0)) {
+    ASSERT(!pending_response_done_);
     return true;
   } else {
     return false;
@@ -922,6 +923,7 @@ int ClientConnectionImpl::onHeadersComplete() {
   if (!pending_response_.has_value() && !resetStreamCalled()) {
     throw PrematureResponseException(static_cast<Http::Code>(parser_.status_code));
   } else if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
     ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
     headers->setStatus(parser_.status_code);
@@ -950,6 +952,7 @@ int ClientConnectionImpl::onHeadersComplete() {
 void ClientConnectionImpl::onBody(const char* data, size_t length) {
   ASSERT(!deferred_end_stream_headers_);
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     Buffer::OwnedImpl buffer;
     buffer.add(data, length);
     pending_response_.value().decoder_->decodeData(buffer, false);
@@ -963,6 +966,7 @@ void ClientConnectionImpl::onMessageComplete() {
     return;
   }
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     // After calling decodeData() with end stream set to true, we should no longer be able to reset.
     PendingResponse& response = pending_response_.value();
     // Encoder is used as part of decode* calls later in this function so pending_response_ can not
@@ -1009,6 +1013,7 @@ void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
 
 void ClientConnectionImpl::sendProtocolError(absl::string_view details) {
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     pending_response_.value().encoder_.setDetails(details);
   }
 }
@@ -1023,6 +1028,7 @@ void ClientConnectionImpl::onBelowLowWatermark() {
   // such as sending multiple responses to the same request, causing us to close the connection, but
   // in doing so go below low watermark.
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     pending_response_.value().encoder_.runLowWatermarkCallbacks();
   }
 }
