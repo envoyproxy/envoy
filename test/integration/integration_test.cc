@@ -49,9 +49,11 @@ void setAllowHttp10WithDefaultHost(
 
 } // namespace
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, IntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(HTTP1_DOWNSTREAM)),
+    TestUtility::ipDownstreamTestParamsToString);
 
 // Make sure we have correctly specified per-worker performance stats.
 TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
@@ -64,7 +66,7 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 
   // Per-worker listener stats.
   auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
-    if (GetParam() == Network::Address::IpVersion::v4) {
+    if (std::get<0>(GetParam()) == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
       test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
@@ -832,7 +834,7 @@ TEST_P(IntegrationTest, TestHeadWithExplicitTE) {
 
 TEST_P(IntegrationTest, TestBind) {
   std::string address_string;
-  if (GetParam() == Network::Address::IpVersion::v4) {
+  if (std::get<0>(GetParam()) == Network::Address::IpVersion::v4) {
     address_string = TestUtility::getIpv4Loopback();
   } else {
     address_string = "::1";
@@ -1124,14 +1126,16 @@ TEST_P(IntegrationTest, TrailersDroppedDownstream) {
   testTrailers(10, 10, false, false);
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, UpstreamEndpointIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(HTTP1_DOWNSTREAM)),
+    TestUtility::ipDownstreamTestParamsToString);
 
 TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
   initialize();
   EXPECT_STREQ(fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
-               Network::Test::getLoopbackAddressString(GetParam()).c_str());
+               Network::Test::getLoopbackAddressString(std::get<0>(GetParam())).c_str());
 }
 
 // Send continuous pipelined requests while not reading responses, to check

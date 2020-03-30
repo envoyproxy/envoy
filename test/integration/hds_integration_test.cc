@@ -26,14 +26,16 @@ namespace Envoy {
 namespace {
 
 // TODO(jmarantz): switch this to simulated-time after debugging flakes.
-class HdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                           public HttpIntegrationTest {
+class HdsIntegrationTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion,
+                                               FakeHttpConnection::Type, Http::CodecClient::Type>>,
+      public HttpIntegrationTest {
 public:
-  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  HdsIntegrationTest() : HttpIntegrationTest(std::get<2>(GetParam()), std::get<0>(GetParam())) {}
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+        new FakeUpstream(0, std::get<1>(GetParam()), version_, timeSystem()));
     hds_upstream_ = fake_upstreams_.back().get();
     hds_upstream_->set_allow_unexpected_disconnects(true);
     HttpIntegrationTest::createUpstreams();
@@ -232,9 +234,13 @@ public:
   envoy::service::health::v3::HealthCheckSpecifier server_health_check_specifier_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, HdsIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, HdsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(FakeHttpConnection::Type::HTTP2,
+                                     FakeHttpConnection::Type::LEGACY_HTTP2),
+                     testing::ValuesIn(HTTP1_DOWNSTREAM)),
+    HttpIntegrationTest::ipUpstreamDownstreamParamsToString);
 
 // Tests Envoy HTTP health checking a single healthy endpoint and reporting that it is
 // indeed healthy to the server.

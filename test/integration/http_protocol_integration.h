@@ -37,11 +37,11 @@ public:
   //
   // Upstream and downstream protocols may be changed via the input vectors.
   // Address combinations are propagated from TestEnvironment::getIpVersionsForTest()
-  static std::vector<HttpProtocolTestParams>
-  getProtocolTestParams(const std::vector<Http::CodecClient::Type>& downstream_protocols =
-                            {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
-                        const std::vector<FakeHttpConnection::Type>& upstream_protocols = {
-                            FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2});
+  static std::vector<HttpProtocolTestParams> getProtocolTestParams(
+      const std::vector<Http::CodecClient::Type>& downstream_protocols = HTTP1_HTTP2_DOWNSTREAM,
+      const std::vector<FakeHttpConnection::Type>& upstream_protocols = {
+          FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2,
+          FakeHttpConnection::Type::LEGACY_HTTP1, FakeHttpConnection::Type::LEGACY_HTTP2});
 
   // Allows pretty printed test names of the form
   // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream

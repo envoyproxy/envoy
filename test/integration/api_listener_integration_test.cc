@@ -13,10 +13,12 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace {
 
-class ApiListenerIntegrationTest : public BaseIntegrationTest,
-                                   public testing::TestWithParam<Network::Address::IpVersion> {
+class ApiListenerIntegrationTest
+    : public BaseIntegrationTest,
+      public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, FakeHttpConnection::Type>> {
 public:
-  ApiListenerIntegrationTest() : BaseIntegrationTest(GetParam(), bootstrap_config()) {
+  ApiListenerIntegrationTest() : BaseIntegrationTest(std::get<0>(GetParam()), bootstrap_config()) {
     use_lds_ = false;
     autonomous_upstream_ = true;
   }
@@ -30,6 +32,7 @@ public:
       bootstrap.mutable_static_resources()->add_listeners()->MergeFrom(
           Server::parseListenerFromV2Yaml(api_listener_config()));
     });
+    setUpstreamProtocol(std::get<1>(GetParam()));
   }
 
   void TearDown() override {
@@ -78,9 +81,12 @@ api_listener:
 
 ACTION_P(Notify, notification) { notification->Notify(); }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, ApiListenerIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, ApiListenerIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn({FakeHttpConnection::Type::HTTP1,
+                                        FakeHttpConnection::Type::LEGACY_HTTP1})),
+    BaseIntegrationTest::ipUpstreamTestParamsToString);
 
 TEST_P(ApiListenerIntegrationTest, Basic) {
   BaseIntegrationTest::initialize();

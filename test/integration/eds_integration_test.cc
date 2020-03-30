@@ -16,14 +16,26 @@
 namespace Envoy {
 namespace {
 
+envoy::type::v3::CodecClientType upstreamClientFlip(envoy::type::v3::CodecClientType type,
+                                                    bool use_new) {
+  if (type == envoy::type::v3::HTTP1) {
+    return use_new ? envoy::type::v3::HTTP1 : envoy::type::v3::LEGACY_HTTP1;
+  } else {
+    ASSERT(type == envoy::type::v3::HTTP2);
+    return use_new ? envoy::type::v3::HTTP2 : envoy::type::v3::LEGACY_HTTP2;
+  }
+}
+
 // Integration test for EDS features. EDS is consumed via filesystem
 // subscription.
-class EdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                           public HttpIntegrationTest {
+class EdsIntegrationTest
+    : public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, bool, Http::CodecClient::Type>>,
+      public HttpIntegrationTest {
 public:
   EdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
-        codec_client_type_(envoy::type::v3::HTTP1) {}
+      : HttpIntegrationTest(std::get<2>(GetParam()), std::get<0>(GetParam())),
+        codec_client_type_(upstreamClientFlip(envoy::type::v3::HTTP1, std::get<1>(GetParam()))) {}
 
   // We need to supply the endpoints via EDS to provide health status. Use a
   // filesystem delivery to simplify test mechanics.
@@ -95,6 +107,8 @@ public:
     setUpstreamCount(4);
     if (codec_client_type_ == envoy::type::v3::HTTP2) {
       setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    } else if (codec_client_type_ == envoy::type::v3::LEGACY_HTTP2) {
+      setUpstreamProtocol(FakeHttpConnection::Type::LEGACY_HTTP2);
     }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
@@ -132,19 +146,31 @@ public:
     test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   }
 
+  static std::string testingParamsToString(
+      const ::testing::TestParamInfo<
+          std::tuple<Network::Address::IpVersion, bool, Http::CodecClient::Type>>& params) {
+    return absl::StrCat(
+        (std::get<0>(params.param) == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+        std::get<1>(params.param) ? "Upstream_" : "LegacyUpstream_",
+        TestUtility::downstreamProtocolToString(std::get<2>(params.param)));
+  }
+
   envoy::type::v3::CodecClientType codec_client_type_{};
   EdsHelper eds_helper_;
   CdsHelper cds_helper_;
   envoy::config::cluster::v3::Cluster cluster_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, EdsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool(),
+                     testing::ValuesIn(HTTP1_DOWNSTREAM)),
+    EdsIntegrationTest::testingParamsToString);
 
 // Validates that endpoints can be added and then moved to other priorities without causing crashes.
 // Primarily as a regression test for https://github.com/envoyproxy/envoy/issues/8764
 TEST_P(EdsIntegrationTest, Http2UpdatePriorities) {
-  codec_client_type_ = envoy::type::v3::HTTP2;
+  codec_client_type_ = upstreamClientFlip(envoy::type::v3::HTTP2, std::get<1>(GetParam()));
   initializeTest(true);
 
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
@@ -162,7 +188,7 @@ TEST_P(EdsIntegrationTest, Http2UpdatePriorities) {
 // Verifies that a new cluster can we warmed when using HTTP/2 health checking. Regression test
 // of the issue detailed in issue #6951.
 TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
-  codec_client_type_ = envoy::type::v3::HTTP2;
+  codec_client_type_ = upstreamClientFlip(envoy::type::v3::HTTP2, std::get<1>(GetParam()));
   initializeTest(true);
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   setEndpoints(1, 0, 0, false);

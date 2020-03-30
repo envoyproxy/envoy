@@ -20,6 +20,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/thread.h"
 #include "common/config/version_converter.h"
+#include "common/http/codec_client.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
@@ -436,6 +437,35 @@ public:
   static std::string
   ipTestParamsToString(const ::testing::TestParamInfo<Network::Address::IpVersion>& params) {
     return params.param == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
+  }
+
+  static std::string downstreamProtocolToString(Http::CodecClient::Type type) {
+    std::string downstream_protocol;
+    switch (type) {
+    case Http::CodecClient::Type::HTTP2:
+      downstream_protocol = "Http2Downstream";
+      break;
+    case Http::CodecClient::Type::HTTP1:
+      downstream_protocol = "HttpDownstream";
+      break;
+    case Http::CodecClient::Type::LEGACY_HTTP1:
+      downstream_protocol = "HttpLegacyDownstream";
+      break;
+    case Http::CodecClient::Type::LEGACY_HTTP2:
+      downstream_protocol = "Http2LegacyDownstream";
+      break;
+    case Http::CodecClient::Type::HTTP3:
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
+    return downstream_protocol;
+  }
+
+  static std::string ipDownstreamTestParamsToString(
+      const ::testing::TestParamInfo<
+          std::tuple<Network::Address::IpVersion, Http::CodecClient::Type>>& params) {
+    return absl::StrCat(ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
+                            std::get<0>(params.param), params.index)),
+                        "_", downstreamProtocolToString(std::get<1>(params.param)));
   }
 
   /**

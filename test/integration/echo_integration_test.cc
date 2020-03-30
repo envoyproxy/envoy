@@ -7,10 +7,11 @@ namespace Envoy {
 
 std::string echo_config;
 
-class EchoIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class EchoIntegrationTest : public testing::TestWithParam<
+                                std::tuple<Network::Address::IpVersion, FakeHttpConnection::Type>>,
                             public BaseIntegrationTest {
 public:
-  EchoIntegrationTest() : BaseIntegrationTest(GetParam(), echo_config) {}
+  EchoIntegrationTest() : BaseIntegrationTest(std::get<0>(GetParam()), echo_config) {}
 
   // Called once by the gtest framework before any EchoIntegrationTests are run.
   static void SetUpTestSuite() {
@@ -31,7 +32,10 @@ public:
   /**
    * Initializer for an individual test.
    */
-  void SetUp() override { BaseIntegrationTest::initialize(); }
+  void SetUp() override {
+    BaseIntegrationTest::initialize();
+    setUpstreamProtocol(std::get<1>(GetParam()));
+  }
 
   /**
    *  Destructor for an individual test.
@@ -42,9 +46,12 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, EchoIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, EchoIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(FakeHttpConnection::Type::HTTP1,
+                                     FakeHttpConnection::Type::LEGACY_HTTP1)),
+    BaseIntegrationTest::ipUpstreamTestParamsToString);
 
 TEST_P(EchoIntegrationTest, Hello) {
   Buffer::OwnedImpl buffer("hello");
@@ -72,7 +79,7 @@ filter_chains:
 - filters:
   - name: envoy.filters.network.echo
   )EOF",
-                                                       GetParam());
+                                                       std::get<0>(GetParam()));
 
   // Add the listener.
   ConditionalInitializer listener_added_by_worker;

@@ -13,6 +13,14 @@
 
 namespace Envoy {
 
+const std::vector<Http::CodecClient::Type> HTTP1_DOWNSTREAM = {
+    Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::LEGACY_HTTP1};
+const std::vector<Http::CodecClient::Type> HTTP2_DOWNSTREAM = {
+    Http::CodecClient::Type::HTTP2, Http::CodecClient::Type::LEGACY_HTTP2};
+const std::vector<Http::CodecClient::Type> HTTP1_HTTP2_DOWNSTREAM = {
+    Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::LEGACY_HTTP1,
+    Http::CodecClient::Type::HTTP2, Http::CodecClient::Type::LEGACY_HTTP2};
+
 /**
  * HTTP codec client used during integration testing.
  */
@@ -99,6 +107,17 @@ public:
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   ~HttpIntegrationTest() override;
+
+  static std::string ipUpstreamDownstreamParamsToString(
+      const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion,
+                                                FakeHttpConnection::Type, Http::CodecClient::Type>>&
+          params) {
+    return absl::StrCat(
+        TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
+            std::get<0>(params.param), params.index)),
+        "_", FakeHttpConnection::upstreamProtocolToString(std::get<1>(params.param)), "_",
+        TestUtility::downstreamProtocolToString(std::get<2>(params.param)));
+  }
 
 protected:
   void useAccessLog(absl::string_view format = "");
@@ -222,6 +241,14 @@ protected:
   void testAdminDrain(Http::CodecClient::Type admin_request_type);
 
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
+  bool downstreamProtocolIsHttp1() const {
+    return downstream_protocol_ == Http::CodecClient::Type::HTTP1 ||
+           downstream_protocol_ == Http::CodecClient::Type::LEGACY_HTTP1;
+  }
+  bool downstreamProtocolIsHttp2() const {
+    return downstream_protocol_ == Http::CodecClient::Type::HTTP2 ||
+           downstream_protocol_ == Http::CodecClient::Type::LEGACY_HTTP2;
+  }
   // Prefix listener stat with IP:port, including IP version dependent loopback address.
   std::string listenerStatPrefix(const std::string& stat_name);
 

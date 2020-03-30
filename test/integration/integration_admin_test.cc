@@ -264,16 +264,14 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   // TODO(#8324): "http1.metadata_not_supported_error" should not still be in
   // the 'recent lookups' output after reset_counters.
-  switch (GetParam().downstream_protocol) {
-  case Http::CodecClient::Type::HTTP1:
+  if (downstreamProtocolIsHttp1()) {
     EXPECT_EQ("   Count Lookup\n"
               "       1 http1.metadata_not_supported_error\n"
               "       1 http1.response_flood\n"
               "\n"
               "total: 2\n",
               response->body());
-    break;
-  case Http::CodecClient::Type::HTTP2:
+  } else if (downstreamProtocolIsHttp2()) {
     EXPECT_EQ("   Count Lookup\n"
               "       1 http2.header_overflow\n"
               "       1 http2.headers_cb_no_stream\n"
@@ -290,9 +288,6 @@ TEST_P(IntegrationAdminTest, Admin) {
               "\n"
               "total: 12\n",
               response->body());
-    break;
-  case Http::CodecClient::Type::HTTP3:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/certs", response));

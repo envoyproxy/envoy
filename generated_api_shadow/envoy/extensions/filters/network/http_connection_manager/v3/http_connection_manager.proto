@@ -55,6 +55,14 @@ message HttpConnectionManager {
     // caution to prevent accidental execution of QUIC code. I.e. `!= HTTP2` is no longer sufficient
     // to distinguish HTTP1 and HTTP2 traffic.
     HTTP3 = 3;
+
+    // The connection manager will assume that the client is speaking HTTP/1.1. Exceptions are used.
+    LEGACY_HTTP1 = 4;
+
+    // The connection manager will assume that the client is speaking HTTP/2
+    // (Envoy does not require HTTP/2 to take place over TLS or to use ALPN.
+    // Prior knowledge is allowed). Exceptions are used.
+    LEGACY_HTTP2 = 5;
   }
 
   enum ServerHeaderTransformation {

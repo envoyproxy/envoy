@@ -10,14 +10,17 @@
 
 namespace Envoy {
 
-class HeaderCasingIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                    public HttpIntegrationTest {
+class HeaderCasingIntegrationTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion,
+                                               FakeHttpConnection::Type, Http::CodecClient::Type>>,
+      public HttpIntegrationTest {
 public:
-  HeaderCasingIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  HeaderCasingIntegrationTest()
+      : HttpIntegrationTest(std::get<2>(GetParam()), std::get<0>(GetParam())) {}
 
   void SetUp() override {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setDownstreamProtocol(std::get<2>(GetParam()));
+    setUpstreamProtocol(std::get<1>(GetParam()));
   }
 
   void initialize() override {
@@ -41,9 +44,13 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, HeaderCasingIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, HeaderCasingIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(FakeHttpConnection::Type::HTTP1,
+                                     FakeHttpConnection::Type::LEGACY_HTTP1),
+                     testing::ValuesIn(HTTP1_DOWNSTREAM)),
+    HttpIntegrationTest::ipUpstreamDownstreamParamsToString);
 
 TEST_P(HeaderCasingIntegrationTest, VerifyCasedHeaders) {
   initialize();

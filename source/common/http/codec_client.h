@@ -51,7 +51,7 @@ public:
   /**
    * Type of HTTP codec to use.
    */
-  enum class Type { HTTP1, HTTP2, HTTP3 };
+  enum class Type { HTTP1, HTTP2, HTTP3, LEGACY_HTTP1, LEGACY_HTTP2 };
 
   ~CodecClient() override;
 
@@ -117,6 +117,8 @@ public:
   bool remoteClosed() const { return remote_closed_; }
 
   Type type() const { return type_; }
+
+  static bool isHttp1(Type type) { return (type == Type::HTTP1 || type == Type::LEGACY_HTTP1); }
 
   const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
 

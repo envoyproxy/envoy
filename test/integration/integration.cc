@@ -370,7 +370,7 @@ void BaseIntegrationTest::createEnvoy() {
 
 void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
   upstream_protocol_ = protocol;
-  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
+  if (!FakeHttpConnection::typeIsHttp1(upstream_protocol_)) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
@@ -378,7 +378,9 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
           cluster->mutable_http2_protocol_options();
         });
   } else {
-    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1, "");
+    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1 ||
+                       protocol == FakeHttpConnection::Type::LEGACY_HTTP1,
+                   "");
   }
 }
 

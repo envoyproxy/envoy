@@ -11,12 +11,13 @@ namespace {
 
 using Params =
     std::tuple<Network::Address::IpVersion, bool, envoy::config::core::v3::ApiConfigSource::ApiType,
-               envoy::config::core::v3::ApiVersion, envoy::config::core::v3::ApiVersion>;
+               envoy::config::core::v3::ApiVersion, envoy::config::core::v3::ApiVersion,
+               FakeHttpConnection::Type, Http::CodecClient::Type>;
 
 class ApiVersionIntegrationTest : public testing::TestWithParam<Params>,
                                   public HttpIntegrationTest {
 public:
-  ApiVersionIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion()) {
+  ApiVersionIntegrationTest() : HttpIntegrationTest(std::get<6>(GetParam()), ipVersion()) {
     use_lds_ = false;
     create_xds_upstream_ = true;
     tls_xds_upstream_ = false;
@@ -35,12 +36,14 @@ public:
   }
 
   static std::string paramsToString(const testing::TestParamInfo<Params>& p) {
-    return fmt::format("{}_{}_{}_Resource_{}_Transport_{}",
+    return fmt::format("{}_{}_{}_Resource_{}_Transport_{}_{}_{}",
                        std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
                        std::get<1>(p.param) ? "ADS" : "SingletonXds",
                        envoy::config::core::v3::ApiConfigSource::ApiType_Name(std::get<2>(p.param)),
                        envoy::config::core::v3::ApiVersion_Name(std::get<3>(p.param)),
-                       envoy::config::core::v3::ApiVersion_Name(std::get<4>(p.param)));
+                       envoy::config::core::v3::ApiVersion_Name(std::get<4>(p.param)),
+                       FakeHttpConnection::upstreamProtocolToString(std::get<5>(p.param)),
+                       TestUtility::downstreamProtocolToString(std::get<6>(p.param)));
   }
 
   Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
@@ -67,7 +70,7 @@ public:
         grpc_service->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
       }
     });
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(std::get<5>(GetParam()));
     HttpIntegrationTest::initialize();
     if (xds_stream_ == nullptr) {
       createXdsConnection();
@@ -240,7 +243,10 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::Values(envoy::config::core::v3::ApiVersion::V2,
                                      envoy::config::core::v3::ApiVersion::V3),
                      testing::Values(envoy::config::core::v3::ApiVersion::V2,
-                                     envoy::config::core::v3::ApiVersion::V3)),
+                                     envoy::config::core::v3::ApiVersion::V3),
+                     testing::Values(FakeHttpConnection::Type::HTTP2,
+                                     FakeHttpConnection::Type::LEGACY_HTTP2),
+                     testing::ValuesIn(HTTP2_DOWNSTREAM)),
     ApiVersionIntegrationTest::paramsToString);
 
 INSTANTIATE_TEST_SUITE_P(
@@ -251,7 +257,10 @@ INSTANTIATE_TEST_SUITE_P(
                                      envoy::config::core::v3::ApiConfigSource::GRPC,
                                      envoy::config::core::v3::ApiConfigSource::DELTA_GRPC),
                      testing::Values(envoy::config::core::v3::ApiVersion::AUTO),
-                     testing::Values(envoy::config::core::v3::ApiVersion::AUTO)),
+                     testing::Values(envoy::config::core::v3::ApiVersion::AUTO),
+                     testing::Values(FakeHttpConnection::Type::HTTP2,
+                                     FakeHttpConnection::Type::LEGACY_HTTP2),
+                     testing::ValuesIn(HTTP2_DOWNSTREAM)),
     ApiVersionIntegrationTest::paramsToString);
 
 INSTANTIATE_TEST_SUITE_P(
@@ -262,7 +271,10 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::Values(envoy::config::core::v3::ApiVersion::V2,
                                      envoy::config::core::v3::ApiVersion::V3),
                      testing::Values(envoy::config::core::v3::ApiVersion::V2,
-                                     envoy::config::core::v3::ApiVersion::V3)),
+                                     envoy::config::core::v3::ApiVersion::V3),
+                     testing::Values(FakeHttpConnection::Type::HTTP2,
+                                     FakeHttpConnection::Type::LEGACY_HTTP2),
+                     testing::ValuesIn(HTTP2_DOWNSTREAM)),
     ApiVersionIntegrationTest::paramsToString);
 
 TEST_P(ApiVersionIntegrationTest, Lds) {
