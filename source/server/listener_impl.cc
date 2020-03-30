@@ -160,7 +160,8 @@ ThreadLocal::Instance& ListenerFactoryContextBaseImpl::threadLocal() {
   return server_.threadLocal();
 }
 Admin& ListenerFactoryContextBaseImpl::admin() { return server_.admin(); }
-// TODO(lambdai): consider moving away from factory context
+// TODO(lambdai): Consider moving away from factory context since listener filter and network filter
+// have independent factory context.
 const envoy::config::core::v3::Metadata& ListenerFactoryContextBaseImpl::listenerMetadata() const {
   return metadata_;
 };

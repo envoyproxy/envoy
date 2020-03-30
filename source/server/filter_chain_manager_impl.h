@@ -297,7 +297,7 @@ private:
 
   // Reference to the previous generation of filter chain manager to share the filter chains.
   // Caution: the pointer is valid only during warm up.
-  // TODO(lambdai): safer usage
+  // TODO(lambdai): Add state and getter method to explain when the point is valid.
   const FilterChainManagerImpl* origin_{};
 
   // For FilterChainFactoryContextCreator
