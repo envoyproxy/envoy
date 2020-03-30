@@ -104,7 +104,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
         Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
             proto_config);
 
-    Config::Utility::validateTerminalFilters(filters[i].name(), "network",
+    Config::Utility::validateTerminalFilters(filters[i].name(), factory.name(), "network",
                                              factory.isTerminalFilter(), i == filters.size() - 1);
 
     auto message = Config::Utility::translateToFactoryConfig(
@@ -184,10 +184,6 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   // For each listener config we share a single socket among all threaded listeners.
   // First we try to get the socket from our parent if applicable.
   if (address->type() == Network::Address::Type::Pipe) {
-// No such thing as AF_UNIX on Windows
-#ifdef WIN32
-    throw EnvoyException("network type pipe not supported on Windows");
-#else
     if (socket_type != Network::Address::SocketType::Stream) {
       // This could be implemented in the future, since Unix domain sockets
       // support SOCK_DGRAM, but there would need to be a way to specify it in
@@ -203,7 +199,6 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
       return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
     return std::make_shared<Network::UdsListenSocket>(address);
-#endif
   }
 
   const std::string scheme = (socket_type == Network::Address::SocketType::Stream)

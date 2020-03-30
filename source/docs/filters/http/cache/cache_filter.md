@@ -18,14 +18,14 @@ envoy.source.extensions.filters.http.cache.SimpleHttpCacheConfig will select a
 proof-of-concept implementation included in the Envoy source. More
 implementations can be provided by implementing
 Envoy::Extensions::HttpFilters::Cache::HttpCache. To write a cache storage
-implementation, see ![Writing Cache Filter
+implementation, see [Writing Cache Filter
 Implementations](cache_filter_plugins.md).
 
 TODO(toddmgreer) Describe other fields as they get implemented.
 The remaining configuration fields control caching behavior and limits. By
 default, this filter will cache almost all responses that are considered
-cacheable by ![RFC7234](https://httpwg.org/specs/rfc7234.html), with handling
-of conditional (![RFC7232](https://httpwg.org/specs/rfc7232.html)), and *range*
+cacheable by [RFC7234](https://httpwg.org/specs/rfc7234.html), with handling
+of conditional ([RFC7232](https://httpwg.org/specs/rfc7232.html)), and *range*
 [RFC7233](https://httpwg.org/specs/rfc7233.html) requests. Those RFC define
 which request methods and response codes are cacheable, subject to the
 cache-related headers they also define: *cache-control*, *range*, *if-match*,

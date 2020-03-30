@@ -8,6 +8,7 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
+#include "common/access_log/access_log_impl.h"
 #include "common/common/assert.h"
 #include "common/config/utility.h"
 #include "common/network/connection_balancer_impl.h"
@@ -215,6 +216,12 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     }
   }
 
+  for (const auto& access_log : config.access_log()) {
+    AccessLog::InstanceSharedPtr current_access_log =
+        AccessLog::AccessLogFactory::fromProto(access_log, *this);
+    access_logs_.push_back(current_access_log);
+  }
+
   if (config.filter_chains().empty() && (socket_type == Network::Address::SocketType::Stream ||
                                          !udp_listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
@@ -335,7 +342,6 @@ Event::Dispatcher& ListenerImpl::dispatcher() { return parent_.server_.dispatche
 Network::DrainDecision& ListenerImpl::drainDecision() { return *this; }
 Grpc::Context& ListenerImpl::grpcContext() { return parent_.server_.grpcContext(); }
 bool ListenerImpl::healthCheckFailed() { return parent_.server_.healthCheckFailed(); }
-Tracing::HttpTracer& ListenerImpl::httpTracer() { return httpContext().tracer(); }
 Http::Context& ListenerImpl::httpContext() { return parent_.server_.httpContext(); }
 
 const LocalInfo::LocalInfo& ListenerImpl::localInfo() const { return parent_.server_.localInfo(); }

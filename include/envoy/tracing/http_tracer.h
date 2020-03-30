@@ -190,7 +190,7 @@ public:
                             const Tracing::Decision tracing_decision) PURE;
 };
 
-using HttpTracerPtr = std::unique_ptr<HttpTracer>;
+using HttpTracerSharedPtr = std::shared_ptr<HttpTracer>;
 
 } // namespace Tracing
 } // namespace Envoy

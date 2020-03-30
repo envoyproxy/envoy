@@ -18,7 +18,6 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/uuid_util.h"
 #include "common/stream_info/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -70,21 +69,17 @@ Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
     return {Reason::HealthCheck, false};
   }
 
-  if (!request_headers.RequestId()) {
-    return {Reason::NotTraceableRequestId, false};
-  }
-
-  UuidTraceStatus trace_status =
-      UuidUtils::isTraceableUuid(request_headers.RequestId()->value().getStringView());
+  Http::TraceStatus trace_status =
+      stream_info.getRequestIDExtension()->getTraceStatus(request_headers);
 
   switch (trace_status) {
-  case UuidTraceStatus::Client:
+  case Http::TraceStatus::Client:
     return {Reason::ClientForced, true};
-  case UuidTraceStatus::Forced:
+  case Http::TraceStatus::Forced:
     return {Reason::ServiceForced, true};
-  case UuidTraceStatus::Sampled:
+  case Http::TraceStatus::Sampled:
     return {Reason::Sampling, true};
-  case UuidTraceStatus::NoTrace:
+  case Http::TraceStatus::NoTrace:
     return {Reason::NotTraceableRequestId, false};
   }
 

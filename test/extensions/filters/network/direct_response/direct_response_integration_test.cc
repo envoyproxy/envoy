@@ -16,14 +16,18 @@ public:
       - name: direct_response
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config
-          response: aGVsbG8sIHdvcmxkIQo=
+          response:
+            inline_string: "hello, world!\n"
       )EOF";
   }
 
   /**
    * Initializer for an individual test.
    */
-  void SetUp() override { BaseIntegrationTest::initialize(); }
+  void SetUp() override {
+    useListenerAccessLog("%RESPONSE_CODE_DETAILS%");
+    BaseIntegrationTest::initialize();
+  }
 
   /**
    *  Destructor for an individual test.
@@ -51,6 +55,8 @@ TEST_P(DirectResponseIntegrationTest, Hello) {
 
   connection.run();
   EXPECT_EQ("hello, world!\n", response);
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::HasSubstr(StreamInfo::ResponseCodeDetails::get().DirectResponse));
 }
 
 } // namespace Envoy

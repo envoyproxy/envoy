@@ -197,7 +197,10 @@ public:
   void setUpstreamAddress(uint32_t upstream_index,
                           envoy::config::endpoint::v3::LbEndpoint& endpoint) const;
 
-  virtual Network::ClientConnectionPtr makeClientConnection(uint32_t port);
+  Network::ClientConnectionPtr makeClientConnection(uint32_t port);
+  virtual Network::ClientConnectionPtr
+  makeClientConnectionWithOptions(uint32_t port,
+                                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
@@ -216,6 +219,13 @@ public:
   Api::ApiPtr api_;
   Api::ApiPtr api_for_server_stat_store_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
+
+  // Enable the listener access log
+  void useListenerAccessLog(absl::string_view format = "");
+  // Waits for the first access log entry.
+  std::string waitForAccessLog(const std::string& filename);
+
+  std::string listener_access_log_name_;
 
   // Functions for testing reloadable config (xDS)
   void createXdsUpstream();

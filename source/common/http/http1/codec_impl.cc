@@ -65,9 +65,9 @@ const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
-    : connection_(connection), chunk_encoding_(true), processing_100_continue_(false),
-      is_response_to_head_request_(false), is_content_length_allowed_(true),
-      header_key_formatter_(header_key_formatter) {
+    : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
+      processing_100_continue_(false), is_response_to_head_request_(false),
+      is_content_length_allowed_(true), header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -138,14 +138,14 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
   // response. Upper layers generally should strip transfer-encoding since it only applies to
   // HTTP/1.1. The codec will infer it based on the type of response.
   // for streaming (e.g. SSE stream sent to hystrix dashboard), we do not want
-  // chunk transfer encoding but we don't have a content-length so we pass "envoy only"
-  // header to avoid adding chunks
+  // chunk transfer encoding but we don't have a content-length so disable_chunk_encoding_ is
+  // consulted before enabling chunk encoding.
   //
   // Note that for HEAD requests Envoy does best-effort guessing when there is no
   // content-length. If a client makes a HEAD request for an upstream resource
   // with no bytes but the upstream response doesn't include "Content-length: 0",
   // Envoy will incorrectly assume a subsequent response to GET will be chunk encoded.
-  if (saw_content_length || headers.NoChunks()) {
+  if (saw_content_length || disable_chunk_encoding_) {
     chunk_encoding_ = false;
   } else {
     if (processing_100_continue_) {
@@ -267,9 +267,11 @@ void ServerConnectionImpl::doFloodProtectionChecks() const {
   if (!flood_protection_) {
     return;
   }
-  // Before sending another response, make sure it won't exceed flood protection thresholds.
+  // Before processing another request, make sure that we are below the response flood protection
+  // threshold.
   if (outbound_responses_ >= max_outbound_responses_) {
-    ENVOY_CONN_LOG(trace, "error sending response: Too many pending responses queued", connection_);
+    ENVOY_CONN_LOG(trace, "error accepting request: too many pending responses queued",
+                   connection_);
     stats_.response_flood_.inc();
     throw FrameFloodException("Too many responses queued.");
   }
@@ -311,9 +313,6 @@ static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
 void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
-  // Do flood checks before attempting to write any responses.
-  flood_checks_();
-
   started_response_ = true;
 
   // The contract is that client codecs must ensure that :status is present.
@@ -411,6 +410,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_header_sanitization")),
       enable_trailers_(enable_trailers),
+      reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                      [&]() -> void { this->onAboveHighWatermark(); }),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
@@ -451,10 +452,7 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
   }
 
   ssize_t total_parsed = 0;
-  uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-  data.getRawSlices(slices.begin(), num_slices);
-  for (const Buffer::RawSlice& slice : slices) {
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     total_parsed += slice.len_;
     onBody(static_cast<const char*>(slice.mem_), slice.len_);
   }
@@ -475,10 +473,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
-    uint64_t num_slices = data.getRawSlices(nullptr, 0);
-    absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-    data.getRawSlices(slices.begin(), num_slices);
-    for (const Buffer::RawSlice& slice : slices) {
+    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
       total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
     }
   } else {
@@ -543,12 +538,6 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
       throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
     }
-  } else if (header_value.find('\0') != absl::string_view::npos) {
-    // http-parser should filter for this
-    // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
-    // have an invariant that they must not contain embedded zero characters
-    // (NUL, ASCII 0x0).
-    throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
   }
 
   header_parsing_state_ = HeaderParsingState::Value;
@@ -605,11 +594,9 @@ int ConnectionImpl::onHeadersCompleteBase() {
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
   if (request_or_response_headers.TransferEncoding()) {
-    absl::string_view encoding =
+    const absl::string_view encoding =
         request_or_response_headers.TransferEncoding()->value().getStringView();
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
-        !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Identity) &&
+    if (reject_unsupported_transfer_encodings_ &&
         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
@@ -803,9 +790,14 @@ int ServerConnectionImpl::onHeadersComplete() {
 void ServerConnectionImpl::onMessageBegin() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_.has_value());
-    active_request_.emplace(*this, header_key_formatter_.get(), flood_checks_);
+    active_request_.emplace(*this, header_key_formatter_.get());
     auto& active_request = active_request_.value();
     active_request.request_decoder_ = &callbacks_.newStream(active_request.response_encoder_);
+
+    // Check for pipelined request flood as we prepare to accept a new request.
+    // Parse errors that happen prior to onMessageBegin result in stream termination, it is not
+    // possible to overflow output buffers with early parse errors.
+    doFloodProtectionChecks();
   }
 }
 

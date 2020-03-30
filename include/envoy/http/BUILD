@@ -60,7 +60,7 @@ envoy_cc_library(
     hdrs = ["context.h"],
     deps = [
         ":codes_interface",
-        "//include/envoy/tracing:http_tracer_interface",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -125,4 +125,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "metadata_interface",
     hdrs = ["metadata_interface.h"],
+)
+
+envoy_cc_library(
+    name = "request_id_extension_interface",
+    hdrs = ["request_id_extension.h"],
+    deps = [
+        ":header_map_interface",
+    ],
 )
