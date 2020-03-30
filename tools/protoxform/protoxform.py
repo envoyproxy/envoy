@@ -602,16 +602,16 @@ def ParameterCallback(parameter):
 
 def Main():
   plugin.Plugin([
-      plugin.DirectOutputDescriptor('.v2.proto',
+      plugin.DirectOutputDescriptor('.active.proto',
                                     functools.partial(ProtoFormatVisitor, status_pb2.ACTIVE)),
       plugin.OutputDescriptor(
-          '.v3.proto', functools.partial(ProtoFormatVisitor,
-                                         status_pb2.NEXT_MAJOR_VERSION_CANDIDATE),
-          functools.partial(migrate.V3MigrationXform, False)),
-      plugin.OutputDescriptor(
-          '.v3.envoy_internal.proto',
+          '.next_major_version_candidate.proto',
           functools.partial(ProtoFormatVisitor, status_pb2.NEXT_MAJOR_VERSION_CANDIDATE),
-          functools.partial(migrate.V3MigrationXform, True))
+          functools.partial(migrate.VersionUpgradeXform, 2, False)),
+      plugin.OutputDescriptor(
+          '.next_major_version_candidate.envoy_internal.proto',
+          functools.partial(ProtoFormatVisitor, status_pb2.NEXT_MAJOR_VERSION_CANDIDATE),
+          functools.partial(migrate.VersionUpgradeXform, 2, True))
   ], ParameterCallback)
 
 

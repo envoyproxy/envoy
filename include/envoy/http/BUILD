@@ -126,3 +126,11 @@ envoy_cc_library(
     name = "metadata_interface",
     hdrs = ["metadata_interface.h"],
 )
+
+envoy_cc_library(
+    name = "request_id_extension_interface",
+    hdrs = ["request_id_extension.h"],
+    deps = [
+        ":header_map_interface",
+    ],
+)

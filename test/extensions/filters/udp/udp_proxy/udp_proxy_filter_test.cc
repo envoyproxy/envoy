@@ -66,6 +66,7 @@ public:
                               int send_sys_errno = 0) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
 
+      EXPECT_CALL(*io_handle_, supportsMmsg());
       // Return the datagram.
       EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
           .WillOnce(
@@ -77,11 +78,10 @@ public:
                 } else {
                   ASSERT(data.size() <= slices[0].len_);
                   memcpy(slices[0].mem_, data.data(), data.size());
-                  output.peer_address_ = upstream_address_;
+                  output.msg_[0].peer_address_ = upstream_address_;
                   return makeNoError(data.size());
                 }
               }));
-
       if (recv_sys_errno == 0) {
         // Send the datagram downstream.
         EXPECT_CALL(parent_.callbacks_.udp_listener_, send(_))
@@ -97,6 +97,7 @@ public:
               }
             }));
         // Return an EAGAIN result.
+        EXPECT_CALL(*io_handle_, supportsMmsg());
         EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
             .WillOnce(Return(ByMove(Api::IoCallUint64Result(
                 0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
