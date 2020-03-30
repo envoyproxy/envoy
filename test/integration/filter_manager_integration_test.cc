@@ -133,7 +133,6 @@ private:
  */
 class InjectDataToFilterChainIntegrationTest
     : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, std::string>>,
-      public Event::TestUsingSimulatedTime,
       public BaseIntegrationTest,
       public TestWithAuxiliaryFilter {
 public:
