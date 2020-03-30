@@ -103,6 +103,11 @@ void DecoderImpl::initialize() {
     callbacks_->incStatementsDelete();
     callbacks_->incTransactionsCommit();
   };
+
+  // Setup hash map for handling backend ErrorResponse and NoticeResponse.
+  BE_errors_and_notices_["ERROR"] = [this](DecoderImpl*) -> void { callbacks_->incErrorsError(); };
+  BE_errors_and_notices_["FATAL"] = [this](DecoderImpl*) -> void { callbacks_->incErrorsFatal(); };
+  BE_errors_and_notices_["PANIC"] = [this](DecoderImpl*) -> void { callbacks_->incErrorsPanic(); };
 }
 
 bool DecoderImpl::parseMessage(Buffer::Instance& data) {
@@ -251,8 +256,34 @@ void DecoderImpl::decodeAuthentication() {
 // Method parses E (Error) message and looks for string
 // indicating that error happened.
 void DecoderImpl::decodeBackendErrorResponse() {
-  if (getMessage().find("VERROR") != std::string::npos) {
-    callbacks_->incErrors();
+
+  // Error/Notice message should start with character "S"
+  if (message_[0] != 'S') {
+    callbacks_->incErrorsUnknown();
+    return;
+  }
+
+  std::string severity;
+  std::size_t pos_severity = message_.find("V"); // Severity field without localization
+  std::size_t pos_sqlstate = message_.find("C"); // SQLSTATE code field
+
+  // If not found field "V" (unlocalized severity) then
+  // get the localied field starting at the beginning of
+  // the message.
+  // It's necessary since the Unlocalized Error and Notice
+  // responses was introduced on PostgreSQL 9.6
+  if (pos_severity == std::string::npos) {
+    pos_severity = 0;
+  }
+  severity = message_.substr(pos_severity + 1, pos_sqlstate - pos_severity - 1);
+
+  ENVOY_LOG(debug, "(Backend) pos_severity ({}) pos_sqlstate ({}) severity ({}) message ({})", pos_severity, pos_sqlstate, severity, message_);
+
+  auto it = BE_errors_and_notices_.find(severity);
+  if (it != BE_errors_and_notices_.end()) {
+    (*it).second(this);
+  } else {
+    callbacks_->incErrorsUnknown();
   }
 }
 

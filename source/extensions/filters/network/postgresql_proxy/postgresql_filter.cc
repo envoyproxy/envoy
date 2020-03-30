@@ -53,7 +53,27 @@ DecoderPtr PostgreSQLFilter::createDecoder(DecoderCallbacks* callbacks) {
 }
 
 void PostgreSQLFilter::incBackend() { config_->stats_.backend_msgs_.inc(); }
-void PostgreSQLFilter::incErrors() { config_->stats_.errors_.inc(); }
+
+void PostgreSQLFilter::incErrorsError() {
+  config_->stats_.errors_.inc();
+  config_->stats_.errors_error_.inc();
+}
+
+void PostgreSQLFilter::incErrorsFatal() {
+  config_->stats_.errors_.inc();
+  config_->stats_.errors_fatal_.inc();
+}
+
+void PostgreSQLFilter::incErrorsPanic() {
+  config_->stats_.errors_.inc();
+  config_->stats_.errors_panic_.inc();
+}
+
+void PostgreSQLFilter::incErrorsUnknown() {
+  config_->stats_.errors_.inc();
+  config_->stats_.errors_unknown_.inc();
+}
+
 void PostgreSQLFilter::incFrontend() { config_->stats_.frontend_msgs_.inc(); }
 
 void PostgreSQLFilter::incSessionsEncrypted() {

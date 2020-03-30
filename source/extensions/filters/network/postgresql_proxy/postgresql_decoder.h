@@ -21,7 +21,12 @@ public:
   virtual ~DecoderCallbacks() = default;
 
   virtual void incBackend() PURE;
-  virtual void incErrors() PURE;
+
+  virtual void incErrorsError() PURE;
+  virtual void incErrorsFatal() PURE;
+  virtual void incErrorsPanic() PURE;
+  virtual void incErrorsUnknown() PURE;
+
   virtual void incFrontend() PURE;
 
   virtual void incSessionsEncrypted() PURE;
@@ -102,6 +107,7 @@ protected:
   // Message action defines the Decoder's method which will be invoked
   // when a specific message has been decoded.
   using MsgAction = std::function<void(DecoderImpl*)>;
+
   // Message has two fields:
   // field 0 - string with message description
   // field 1 - vector of Decoder's methods which are invoked when the message
@@ -116,7 +122,7 @@ protected:
   // field 2 - data used for processing messages not found in hash map
   std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> FE_messages_;
   std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> BE_messages_;
-  //
+
   // Handler for startup postgresql message.
   // Startup message message which does not start with 1 byte TYPE.
   // It starts with message length and must be therefore handled
@@ -125,6 +131,9 @@ protected:
 
   // hash map for dispatching backend transaction messages
   absl::flat_hash_map<std::string, MsgAction> BE_statements_;
+
+  // hash map for dispatching backend errors and notice messages
+  absl::flat_hash_map<std::string, MsgAction> BE_errors_and_notices_;
 };
 
 } // namespace PostgreSQLProxy
