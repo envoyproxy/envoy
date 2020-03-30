@@ -19,7 +19,7 @@ namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
 void Http1BridgeFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_names_,
+  context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_stat_names_,
                       headers.GrpcStatus());
 }
 
@@ -101,7 +101,7 @@ void Http1BridgeFilter::setupStatTracking(const Http::RequestHeaderMap& headers)
   if (!cluster_) {
     return;
   }
-  request_names_ = context_.resolveServiceAndMethod(headers.Path());
+  request_stat_names_ = context_.resolveDynamicServiceAndMethod(headers.Path());
 }
 
 } // namespace GrpcHttp1Bridge

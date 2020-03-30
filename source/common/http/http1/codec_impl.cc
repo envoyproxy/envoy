@@ -267,9 +267,11 @@ void ServerConnectionImpl::doFloodProtectionChecks() const {
   if (!flood_protection_) {
     return;
   }
-  // Before sending another response, make sure it won't exceed flood protection thresholds.
+  // Before processing another request, make sure that we are below the response flood protection
+  // threshold.
   if (outbound_responses_ >= max_outbound_responses_) {
-    ENVOY_CONN_LOG(trace, "error sending response: Too many pending responses queued", connection_);
+    ENVOY_CONN_LOG(trace, "error accepting request: too many pending responses queued",
+                   connection_);
     stats_.response_flood_.inc();
     throw FrameFloodException("Too many responses queued.");
   }
@@ -311,9 +313,6 @@ static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
 void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
-  // Do flood checks before attempting to write any responses.
-  flood_checks_();
-
   started_response_ = true;
 
   // The contract is that client codecs must ensure that :status is present.
@@ -411,6 +410,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_header_sanitization")),
       enable_trailers_(enable_trailers),
+      reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                      [&]() -> void { this->onAboveHighWatermark(); }),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
@@ -595,8 +596,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding =
         request_or_response_headers.TransferEncoding()->value().getStringView();
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
+    if (reject_unsupported_transfer_encodings_ &&
         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
@@ -790,9 +790,14 @@ int ServerConnectionImpl::onHeadersComplete() {
 void ServerConnectionImpl::onMessageBegin() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_.has_value());
-    active_request_.emplace(*this, header_key_formatter_.get(), flood_checks_);
+    active_request_.emplace(*this, header_key_formatter_.get());
     auto& active_request = active_request_.value();
     active_request.request_decoder_ = &callbacks_.newStream(active_request.response_encoder_);
+
+    // Check for pipelined request flood as we prepare to accept a new request.
+    // Parse errors that happen prior to onMessageBegin result in stream termination, it is not
+    // possible to overflow output buffers with early parse errors.
+    doFloodProtectionChecks();
   }
 }
 

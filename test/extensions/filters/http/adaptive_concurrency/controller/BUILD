@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
-        "//source/extensions/filters/http/adaptive_concurrency/concurrency_controller:concurrency_controller_lib",
+        "//source/extensions/filters/http/adaptive_concurrency/controller:controller_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:simulated_time_system_lib",
