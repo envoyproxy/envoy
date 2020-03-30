@@ -8,7 +8,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
+#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/strings/numbers.h"
@@ -19,7 +19,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AdaptiveConcurrency {
-namespace ConcurrencyController {
+namespace Controller {
 
 /**
  * All stats for the gradient controller.
@@ -276,7 +276,7 @@ private:
 };
 using GradientControllerSharedPtr = std::shared_ptr<GradientController>;
 
-} // namespace ConcurrencyController
+} // namespace Controller
 } // namespace AdaptiveConcurrency
 } // namespace HttpFilters
 } // namespace Extensions
