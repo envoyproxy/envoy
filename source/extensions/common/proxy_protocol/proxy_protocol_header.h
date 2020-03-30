@@ -38,16 +38,16 @@ constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_INET6 = 36;
 constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_UNIX = 216;
 
 // Generates the v1 PROXY protocol header and adds it to the specified buffer
-void generate_v1_header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
-                        uint32_t dst_port, Network::Address::IpVersion ip_version,
-                        Buffer::Instance& out);
+void generateV1Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
+                      uint32_t dst_port, Network::Address::IpVersion ip_version,
+                      Buffer::Instance& out);
 // Generates the v2 PROXY protocol header and adds it to the specified buffer
 // TCP is assumed as the transport protocol
-void generate_v2_header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
-                        uint32_t dst_port, Network::Address::IpVersion ip_version,
-                        Buffer::Instance& out);
+void generateV2Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
+                      uint32_t dst_port, Network::Address::IpVersion ip_version,
+                      Buffer::Instance& out);
 // Generates the v2 PROXY protocol local command header and adds it to the specified buffer
-void generate_v2_local_header(Buffer::Instance& out);
+void generateV2LocalHeader(Buffer::Instance& out);
 
 } // namespace ProxyProtocol
 } // namespace Common

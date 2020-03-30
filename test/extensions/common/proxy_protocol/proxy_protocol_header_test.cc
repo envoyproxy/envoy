@@ -25,7 +25,7 @@ TEST(ProxyProtocolHeaderTest, GeneratesV1IPv4Header) {
   const auto version = Network::Address::IpVersion::v4;
   Buffer::OwnedImpl buff{};
 
-  generate_v1_header(src_addr, dst_addr, src_port, dst_port, version, buff);
+  generateV1Header(src_addr, dst_addr, src_port, dst_port, version, buff);
 
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
@@ -40,7 +40,7 @@ TEST(ProxyProtocolHeaderTest, GeneratesV1IPv6Header) {
   const auto version = Network::Address::IpVersion::v6;
   Buffer::OwnedImpl buff{};
 
-  generate_v1_header(src_addr, dst_addr, src_port, dst_port, version, buff);
+  generateV1Header(src_addr, dst_addr, src_port, dst_port, version, buff);
 
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
@@ -57,7 +57,7 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4Header) {
   const auto version = Network::Address::IpVersion::v4;
   Buffer::OwnedImpl buff{};
 
-  generate_v2_header(src_addr, dst_addr, src_port, dst_port, version, buff);
+  generateV2Header(src_addr, dst_addr, src_port, dst_port, version, buff);
 
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
@@ -76,7 +76,7 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2IPv6Header) {
   const auto version = Network::Address::IpVersion::v6;
   Buffer::OwnedImpl buff{};
 
-  generate_v2_header(src_addr, dst_addr, src_port, dst_port, version, buff);
+  generateV2Header(src_addr, dst_addr, src_port, dst_port, version, buff);
 
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
@@ -87,7 +87,7 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2LocalHeader) {
   const Buffer::OwnedImpl expectedBuff(v2_protocol, sizeof(v2_protocol));
   Buffer::OwnedImpl buff{};
 
-  generate_v2_local_header(buff);
+  generateV2LocalHeader(buff);
 
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }

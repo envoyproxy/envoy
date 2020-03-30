@@ -12,9 +12,9 @@ namespace Extensions {
 namespace Common {
 namespace ProxyProtocol {
 
-void generate_v1_header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
-                        uint32_t dst_port, Network::Address::IpVersion ip_version,
-                        Buffer::Instance& out) {
+void generateV1Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
+                      uint32_t dst_port, Network::Address::IpVersion ip_version,
+                      Buffer::Instance& out) {
   std::ostringstream stream;
   stream << PROXY_PROTO_V1_SIGNATURE;
 
@@ -35,9 +35,9 @@ void generate_v1_header(const std::string& src_addr, const std::string& dst_addr
   out.add(stream.str());
 }
 
-void generate_v2_header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
-                        uint32_t dst_port, Network::Address::IpVersion ip_version,
-                        Buffer::Instance& out) {
+void generateV2Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
+                      uint32_t dst_port, Network::Address::IpVersion ip_version,
+                      Buffer::Instance& out) {
   out.add(PROXY_PROTO_V2_SIGNATURE, PROXY_PROTO_V2_SIGNATURE_LEN);
 
   const uint8_t version_and_command = PROXY_PROTO_V2_VERSION << 4 | PROXY_PROTO_V2_ONBEHALF_OF;
@@ -95,7 +95,7 @@ void generate_v2_header(const std::string& src_addr, const std::string& dst_addr
   out.add(ports, 4);
 }
 
-void generate_v2_local_header(Buffer::Instance& out) {
+void generateV2LocalHeader(Buffer::Instance& out) {
   out.add(PROXY_PROTO_V2_SIGNATURE, PROXY_PROTO_V2_SIGNATURE_LEN);
   const uint8_t addr_fam_protocol_and_length[4]{PROXY_PROTO_V2_VERSION << 4, 0, 0, 0};
   out.add(addr_fam_protocol_and_length, 4);
