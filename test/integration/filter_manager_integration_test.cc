@@ -204,6 +204,26 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, UsageOfInjectDataMethodsShouldBe
   tcp_client->close();
 }
 
+TEST_P(InjectDataWithEchoFilterIntegrationTest, FilterChainMismatch) {
+  useListenerAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_filter_chains(0)
+        ->mutable_filter_chain_match()
+        ->set_transport_protocol("tls");
+  });
+  initialize();
+
+  auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->write("hello");
+  tcp_client->close();
+
+  std::string access_log =
+      absl::StrCat("NR ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr(access_log));
+}
+
 /**
  * Integration test with an auxiliary filter in front of "envoy.filters.network.tcp_proxy".
  */

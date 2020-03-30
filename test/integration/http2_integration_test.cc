@@ -1622,6 +1622,10 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   auto response = readFrame();
   // Make sure we've got RST_STREAM from the server
   EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
+
+  // Disable reading to make sure that the RST_STREAM frames stack up on the server.
+  tcp_client_->readDisable(true);
+
   uint64_t total_bytes_sent = 0;
   while (total_bytes_sent < TransmitThreshold && tcp_client_->connected()) {
     request = Http::Http2::Http2Frame::makeMalformedRequest(++i);

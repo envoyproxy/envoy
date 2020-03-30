@@ -65,6 +65,9 @@ public:
   MOCK_METHOD(SysCallSizeResult, readv, (os_fd_t, const iovec*, int));
   MOCK_METHOD(SysCallSizeResult, recv, (os_fd_t socket, void* buffer, size_t length, int flags));
   MOCK_METHOD(SysCallSizeResult, recvmsg, (os_fd_t socket, msghdr* msg, int flags));
+  MOCK_METHOD(SysCallIntResult, recvmmsg,
+              (os_fd_t socket, struct mmsghdr* msgvec, unsigned int vlen, int flags,
+               struct timespec* timeout));
   MOCK_METHOD(SysCallIntResult, ftruncate, (int fd, off_t length));
   MOCK_METHOD(SysCallPtrResult, mmap,
               (void* addr, size_t length, int prot, int flags, int fd, off_t offset));
@@ -84,6 +87,7 @@ public:
   MOCK_METHOD(SysCallIntResult, socketpair, (int domain, int type, int protocol, os_fd_t sv[2]));
   MOCK_METHOD(SysCallIntResult, listen, (os_fd_t sockfd, int backlog));
   MOCK_METHOD(SysCallSizeResult, write, (os_fd_t sockfd, const void* buffer, size_t length));
+  MOCK_METHOD(bool, supportsMmsg, (), (const));
 
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<os_fd_t, int, int>;

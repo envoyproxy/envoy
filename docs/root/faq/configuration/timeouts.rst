@@ -41,7 +41,7 @@ context request/stream is interchangeable.
 * The HTTP connection manager :ref:`request_timeout
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_timeout>`
   is the amount of time the connection manager will allow for the *entire request stream* to be
-  received by the client.
+  received from the client.
 
   .. attention::
 
