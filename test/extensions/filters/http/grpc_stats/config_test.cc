@@ -144,11 +144,11 @@ TEST_F(GrpcStatsFilterConfigTest, StatsAllowlistMatch) {
 
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.BadCompanions.GetBadCompanions.success")
+                     .counterFromString("grpc.BadCompanions.GetBadCompanions.success")
                      .value());
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc.BadCompanions.GetBadCompanions.total")
                      .value());
 }
 
@@ -164,14 +164,17 @@ TEST_F(GrpcStatsFilterConfigTest, StatsAllowlistMismatchMethod) {
 
   EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.BadCompanions.GetGoodCompanions.success")
+                     .counterFromString("grpc.BadCompanions.GetGoodCompanions.success")
                      .value());
   EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.BadCompanions.GetGoodCompanions.total")
+                     .counterFromString("grpc.BadCompanions.GetGoodCompanions.total")
                      .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.success").value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
+  EXPECT_EQ(
+      1UL,
+      decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.success").value());
+  EXPECT_EQ(1UL,
+            decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.total").value());
 }
 
 // Test that an allowlist service mismatch results in going to the generic stat.
@@ -186,14 +189,17 @@ TEST_F(GrpcStatsFilterConfigTest, StatsAllowlistMismatchService) {
 
   EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.GoodCompanions.GetBadCompanions.success")
+                     .counterFromString("grpc.GoodCompanions.GetBadCompanions.success")
                      .value());
   EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.GoodCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc.GoodCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.success").value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
+  EXPECT_EQ(
+      1UL,
+      decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.success").value());
+  EXPECT_EQ(1UL,
+            decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.total").value());
 }
 
 // Test that any method results in going to the generic stat, when stats_for_all_methods == false.
@@ -208,14 +214,17 @@ TEST_F(GrpcStatsFilterConfigTest, DisableStatsForAllMethods) {
 
   EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.BadCompanions.GetBadCompanions.success")
+                     .counterFromString("grpc.BadCompanions.GetBadCompanions.success")
                      .value());
   EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.success").value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
+  EXPECT_EQ(
+      1UL,
+      decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.success").value());
+  EXPECT_EQ(1UL,
+            decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.total").value());
 }
 
 // Test that any method results in a specific stat, when stats_for_all_methods isn't set
@@ -241,14 +250,17 @@ TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSetting) {
 
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.BadCompanions.GetBadCompanions.success")
+                     .counterFromString("grpc.BadCompanions.GetBadCompanions.success")
                      .value());
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.success").value());
-  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
+  EXPECT_EQ(
+      0UL,
+      decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.success").value());
+  EXPECT_EQ(0UL,
+            decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.total").value());
 }
 
 // Test that any method results in a specific stat, when stats_for_all_methods isn't set
@@ -274,14 +286,17 @@ TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSettingRuntimeOverrid
 
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.BadCompanions.GetBadCompanions.success")
+                     .counterFromString("grpc.BadCompanions.GetBadCompanions.success")
                      .value());
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.success").value());
-  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
+  EXPECT_EQ(
+      0UL,
+      decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.success").value());
+  EXPECT_EQ(0UL,
+            decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.total").value());
 }
 
 // Test that the runtime override for the deprecated previous default behavior works.
@@ -300,14 +315,17 @@ TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSettingRuntimeOverrid
 
   EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.BadCompanions.GetBadCompanions.success")
+                     .counterFromString("grpc.BadCompanions.GetBadCompanions.success")
                      .value());
   EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.success").value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
+  EXPECT_EQ(
+      1UL,
+      decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.success").value());
+  EXPECT_EQ(1UL,
+            decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.total").value());
 }
 
 TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
