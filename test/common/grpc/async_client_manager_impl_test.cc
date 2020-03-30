@@ -54,7 +54,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
   EXPECT_CALL(cm_, clusters());
   EXPECT_THROW_WITH_MESSAGE(
       async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "Unknown gRPC client cluster 'foo'");
+      "AsyncClientFactory: unknown cluster 'foo'");
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
@@ -69,7 +69,8 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
   EXPECT_THROW_WITH_MESSAGE(
       async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "gRPC client cluster 'foo' is not static");
+      "AsyncClientFactory: invalid cluster 'foo': currently only static (non-CDS) clusters are "
+      "supported");
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {

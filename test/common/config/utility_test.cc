@@ -514,6 +514,38 @@ TEST(UtilityTest, EmptyToEmptyConfig) {
   EXPECT_THAT(out, ProtoEq(envoy::extensions::filters::http::cors::v3::Cors()));
 }
 
+// Validates CheckCluster functionality.
+TEST(UtilityTest, CheckCluster) {
+  Upstream::MockClusterManager cm;
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+
+  // Validate that proper error is thrown, when cluster is not available.
+  EXPECT_CALL(cm, clusters()).WillOnce(Return(cluster_map));
+  EXPECT_THROW_WITH_MESSAGE(Utility::checkCluster("prefix", "foo", cm, false), EnvoyException,
+                            "prefix: unknown cluster 'foo'");
+
+  // Validate that proper error is thrown, when dynamic cluster is passed when it is not expected.
+  Upstream::MockClusterMockPrioritySet api_cluster;
+  cluster_map.emplace("foo", api_cluster);
+  EXPECT_CALL(cm, clusters()).Times(2).WillRepeatedly(Return(cluster_map));
+  EXPECT_CALL(api_cluster, info());
+  EXPECT_CALL(*api_cluster.info_, addedViaApi()).WillOnce(Return(true));
+  EXPECT_THROW_WITH_MESSAGE(Utility::checkCluster("prefix", "foo", cm, false), EnvoyException,
+                            "prefix: invalid cluster 'foo': currently only "
+                            "static (non-CDS) clusters are supported");
+  EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, true));
+
+  // Validate that bootstrap cluster does not throw any exceptions.
+  cluster_map.clear();
+  Upstream::MockClusterMockPrioritySet bootstrap_cluster;
+  cluster_map.emplace("foo", bootstrap_cluster);
+  EXPECT_CALL(cm, clusters()).Times(2).WillRepeatedly(Return(cluster_map));
+  EXPECT_CALL(bootstrap_cluster, info());
+  EXPECT_CALL(*bootstrap_cluster.info_, addedViaApi()).WillOnce(Return(false));
+  EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, true));
+  EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, false));
+}
+
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTypes) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
