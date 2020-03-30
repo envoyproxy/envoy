@@ -62,9 +62,9 @@ envoy_cc_library(
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
+        "//include/envoy/event:deferred_task",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
-        "//include/envoy/event:deferred_task",
         "//include/envoy/network:connection_handler_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",

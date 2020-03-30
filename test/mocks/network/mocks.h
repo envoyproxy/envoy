@@ -170,7 +170,7 @@ public:
   MOCK_METHOD(void, addAcceptFilter_, (Network::ListenerFilterPtr&));
 };
 
-class MockFilterChain : public FilterChain {
+class MockFilterChain : public DrainableFilterChain {
 public:
   MockFilterChain();
   ~MockFilterChain() override;

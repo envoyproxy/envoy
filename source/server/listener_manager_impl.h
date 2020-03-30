@@ -206,10 +206,8 @@ private:
     uint64_t workers_pending_removal_;
   };
 
-void addListenerToWorker(Worker& worker,
-                                              absl::optional<uint64_t> overridden_listener,
-                                              ListenerImpl& listener,
-                                              ListenerCompletionCallback completion_callback) ;
+  void addListenerToWorker(Worker& worker, absl::optional<uint64_t> overridden_listener,
+                           ListenerImpl& listener, ListenerCompletionCallback completion_callback);
 
   ProtobufTypes::MessagePtr dumpListenerConfigs();
   static ListenerManagerStats generateStats(Stats::Scope& scope);
@@ -241,9 +239,9 @@ void addListenerToWorker(Worker& worker,
   void drainListener(ListenerImplPtr&& listener);
 
   /**
-   * Mark filter chains which owned by listener for draining. Expecting the decendent of the
+   * Mark filter chains which owned by listener for draining. Expecting the descendant of the
    * listener took over the listener socket but these filter chains are not attached by that
-   * decendent.
+   * descendant.
    * @param listener supplies the listener to drain.
    */
   void drainFilterChains(ListenerImplPtr&& listener, ListenerImpl& new_listener);

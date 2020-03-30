@@ -433,7 +433,7 @@ ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(
 void ConnectionHandlerImpl::ActiveTcpListener::removeFilterChains(
     const std::list<const Network::FilterChain*>& draining_filter_chains) {
   // need to recover the original deleting state
-  // TODO(lambdai): determine if removFilterChains could be invoked when is_deleting
+  // TODO(lambdai): determine if removeFilterChains could be invoked when is_deleting
   // TODO(lambdai): RAII
   // alternatively, erase the iterator of connections prior to the connection removal
   bool was_deleting = is_deleting_;

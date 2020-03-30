@@ -656,13 +656,12 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
       });
 }
 
-
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   // The warmed listener should be added first so that the worker will accept new connections
   // when it stops listening on the old listener.
   for (const auto& worker : workers_) {
-    addListenerToWorker(*worker, /* overrided listener */ absl::nullopt, listener,
-                        /* callback */ nullptr);
+    addListenerToWorker(*worker, /*overridden_listener=*/absl::nullopt, listener,
+                        /*callback=*/nullptr);
   }
 
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
@@ -683,13 +682,12 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   updateWarmingActiveGauges();
 }
 
-void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
-                                            ListenerImpl& ) {
+void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener, ListenerImpl&) {
 
   // First add the listener to the draining list.
   std::list<DrainingFilterChains>::iterator draining_group = draining_filter_groups_.emplace(
       draining_filter_groups_.begin(), std::move(listener), workers_.size());
-  // TODO(lambdai): fill it in next PR.    
+  // TODO(lambdai): fill it in next PR.
   // draining_group->draining_listener_->diffFilterChain(
   //     new_listener, [&draining_group](FilterChainImpl& filter_chain) mutable {
   //       filter_chain.startDraining();
@@ -700,7 +698,8 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
   // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
   // restart. Same below inside the lambda.
   // TODO(lambdai): Currently the number of DrainFilterChains objects are tracked:
-  // len(filter_chains). What we really need is accumulate(filter_chains, fc: len(fc))
+  // len(filter_chains). What we really need is accumulate(filter_chains, filter_chains:
+  // len(filter_chains))
   stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
 
   draining_group->draining_listener_->debugLog(
@@ -723,7 +722,7 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
   // draining at whatever the server configured drain times are.
   // TODO(lambdai): only partial functionality is adopted. Consider split functionality?
   // 1. Filter chain doesn't query the listener's drain close decision
-  // 2. the completion callback is used to execute the resouce clean up.
+  // 2. the completion callback is used to execute the resource clean up.
   draining_group->startDrainSequence(
       server_.options().drainTime(), server_.dispatcher(), [this, draining_group]() -> void {
         draining_group->draining_listener_->debugLog(
@@ -815,7 +814,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
     ENVOY_LOG(debug, "starting worker {}", i);
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
-addListenerToWorker(*worker, absl::nullopt, *listener, [this, listeners_pending_init]() {
+      addListenerToWorker(*worker, absl::nullopt, *listener, [this, listeners_pending_init]() {
         if (--(*listeners_pending_init) == 0) {
           stats_.workers_started_.set(1);
         }

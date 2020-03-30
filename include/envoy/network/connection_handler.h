@@ -55,7 +55,7 @@ public:
   /**
    * Remove the filter chains and the connections in the listener. All connections owned
    * by the filter chains will be closed. Once all the connections are destroyed(connections
-   * could be defered deleted!), invoke the completion.
+   * could be deferred deleted!), invoke the completion.
    * @param draining_filter_chains supplies the listener and the the filter chains.
    */
   virtual void removeFilterChains(const DrainingFilterChains& draining_filter_chains,

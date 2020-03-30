@@ -222,7 +222,6 @@ public:
   // ListenerFactoryContext may be shared by generations of listeners
   std::shared_ptr<Configuration::ListenerFactoryContext> getListenerFactoryContext();
 
-
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
    */

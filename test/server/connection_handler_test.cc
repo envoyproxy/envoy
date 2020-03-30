@@ -877,7 +877,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {
   EXPECT_CALL(mock_draining_filter_chains, getDrainingFilterChains)
       .WillOnce(ReturnRef(filter_chains));
 
-  // The completition callback is scheduled
+  // The completion callback is scheduled
   handler_->removeFilterChains(mock_draining_filter_chains,
                                []() { ENVOY_LOG(debug, "removed filter chains"); });
   // Trigger the deletion if any.
