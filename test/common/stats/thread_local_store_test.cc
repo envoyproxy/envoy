@@ -1121,11 +1121,11 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
   EXPECT_EQ(2, validateMerge());
 
   const std::string h1_expected_summary =
-      "P0: 1.0, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
+      "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
       "P99: 1.099, P99.5: 1.0995, P99.9: 1.0999, P100: 1.1";
   const std::string h2_expected_summary =
-      "P0: 0.0, P25: 25.0, P50: 50.0, P75: 75.0, P90: 90.0, P95: 95.0, P99: 99.0, "
-      "P99.5: 99.5, P99.9: 99.9, P100: 100.0";
+      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, "
+      "P99.5: 99.5, P99.9: 99.9, P100: 100";
 
   const std::string h1_expected_buckets =
       "B0.5: 0, B1: 0, B5: 1, B10: 1, B25: 1, B50: 1, B100: 1, B250: 1, "
@@ -1165,9 +1165,8 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
   }
   EXPECT_EQ(1, validateMerge());
 
-  const std::string expected_summary =
-      "P0: 0.0, P25: 25.0, P50: 50.0, P75: 75.0, P90: 90.0, P95: 95.0, P99: "
-      "99.0, P99.5: 99.5, P99.9: 99.9, P100: 100.0";
+  const std::string expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: "
+                                       "99, P99.5: 99.5, P99.9: 99.9, P100: 100";
   const std::string expected_bucket_summary =
       "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
       "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "

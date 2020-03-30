@@ -44,7 +44,7 @@ std::string HistogramStatisticsImpl::quantileSummary() const {
   summary.reserve(supported_quantiles.size());
   for (size_t i = 0; i < supported_quantiles.size(); ++i) {
     summary.push_back(
-        fmt::format("P{:g}: {}", 100 * supported_quantiles[i], computed_quantiles_[i]));
+        fmt::format("P{:g}: {:g}", 100 * supported_quantiles[i], computed_quantiles_[i]));
   }
   return absl::StrJoin(summary, ", ");
 }
