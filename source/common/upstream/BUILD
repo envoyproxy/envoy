@@ -76,6 +76,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cluster_update_tracker_lib",
+    srcs = ["cluster_update_tracker.cc"],
+    hdrs = ["cluster_update_tracker.h"],
+    deps = [
+        "//include/envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_pool_map",
     hdrs = ["conn_pool_map.h"],
     deps = [
@@ -331,6 +340,9 @@ envoy_cc_library(
     name = "ring_hash_lb_lib",
     srcs = ["ring_hash_lb.cc"],
     hdrs = ["ring_hash_lb.h"],
+    external_deps = [
+        "abseil_inlined_vector",
+    ],
     deps = [
         ":thread_aware_lb_lib",
         "//source/common/common:minimal_logger_lib",

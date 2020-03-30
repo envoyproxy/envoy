@@ -225,9 +225,12 @@ class TestVirtualCluster : public VirtualCluster {
 public:
   // Router::VirtualCluster
   Stats::StatName statName() const override { return stat_name_.statName(); }
+  VirtualClusterStats& stats() const override { return stats_; }
 
   Stats::TestSymbolTable symbol_table_;
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
+  Stats::IsolatedStoreImpl stats_store_;
+  mutable VirtualClusterStats stats_{generateStats(stats_store_)};
 };
 
 class MockVirtualHost : public VirtualHost {

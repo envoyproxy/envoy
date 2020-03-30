@@ -32,6 +32,7 @@
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
+#include "common/router/router.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -41,9 +42,9 @@
 namespace Envoy {
 namespace Router {
 
-UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
-    : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
-      stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
+UpstreamRequest::UpstreamRequest(Filter& parent, std::unique_ptr<GenericConnPool>&& conn_pool)
+    : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
+      stream_info_(parent_.callbacks_->dispatcher().timeSource()),
       start_time_(parent_.callbacks_->dispatcher().timeSource().monotonicTime()),
       calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
@@ -61,6 +62,9 @@ UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance&
   }
 
   stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
+  if (conn_pool_->protocol().has_value()) {
+    stream_info_.protocol(conn_pool_->protocol().value());
+  }
 }
 
 UpstreamRequest::~UpstreamRequest() {
@@ -162,13 +166,7 @@ void UpstreamRequest::encodeHeaders(bool end_stream) {
   ASSERT(!encode_complete_);
   encode_complete_ = end_stream;
 
-  // It's possible for a reset to happen inline within the newStream() call. In this case, we
-  // might get deleted inline as well. Only write the returned handle out if it is not nullptr to
-  // deal with this case.
-  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(*this, *this);
-  if (handle) {
-    conn_pool_stream_handle_ = handle;
-  }
+  conn_pool_->newStream(this);
 }
 
 void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -257,11 +255,9 @@ void UpstreamRequest::resetStream() {
     span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
   }
 
-  if (conn_pool_stream_handle_) {
-    ENVOY_STREAM_LOG(debug, "cancelling pool request", *parent_.callbacks_);
+  if (conn_pool_->cancelAnyPendingRequest()) {
+    ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.callbacks_);
     ASSERT(!upstream_);
-    conn_pool_stream_handle_->cancel();
-    conn_pool_stream_handle_ = nullptr;
   }
 
   if (upstream_) {
@@ -313,20 +309,28 @@ void UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureReason reas
   onResetStream(reset_reason, transport_failure_reason);
 }
 
-void UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
-                                  Upstream::HostDescriptionConstSharedPtr host,
-                                  const StreamInfo::StreamInfo& info) {
+void UpstreamRequest::onPoolReady(
+    std::unique_ptr<GenericUpstream>&& upstream, Upstream::HostDescriptionConstSharedPtr host,
+    const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+    const StreamInfo::StreamInfo& info) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
+  upstream_ = std::move(upstream);
+
+  if (parent_.request_vcluster_) {
+    // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
+    // callback. Hence, the upstream request increases the virtual cluster's upstream_rq_total_ stat
+    // here.
+    parent_.request_vcluster_->stats().upstream_rq_total_.inc();
+  }
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
   onUpstreamHostSelected(host);
 
-  stream_info_.setUpstreamLocalAddress(request_encoder.getStream().connectionLocalAddress());
-  parent_.callbacks_->streamInfo().setUpstreamLocalAddress(
-      request_encoder.getStream().connectionLocalAddress());
+  stream_info_.setUpstreamLocalAddress(upstream_local_address);
+  parent_.callbacks_->streamInfo().setUpstreamLocalAddress(upstream_local_address);
 
   stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
   parent_.callbacks_->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
@@ -337,8 +341,11 @@ void UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
     create_per_try_timeout_on_request_complete_ = true;
   }
 
-  conn_pool_stream_handle_ = nullptr;
-  setRequestEncoder(request_encoder);
+  // Make sure the connection manager will inform the downstream watermark manager when the
+  // downstream buffers are overrun. This may result in immediate watermark callbacks referencing
+  // the encoder.
+  parent_.callbacks_->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
+
   calling_encode_headers_ = true;
   if (parent_.route_entry_->autoHostRewrite() && !host->hostname().empty()) {
     parent_.downstream_headers_->setHost(host->hostname());
@@ -354,8 +361,7 @@ void UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
   // If end_stream is set in headers, and there are metadata to send, delays end_stream. The case
   // only happens when decoding headers filters return ContinueAndEndStream.
   const bool delay_headers_end_stream = end_stream && !downstream_metadata_map_vector_.empty();
-  request_encoder.encodeHeaders(*parent_.downstream_headers_,
-                                end_stream && !delay_headers_end_stream);
+  upstream_->encodeHeaders(*parent_.downstream_headers_, end_stream && !delay_headers_end_stream);
   calling_encode_headers_ = false;
 
   // It is possible to get reset in the middle of an encodeHeaders() call. This happens for
@@ -370,35 +376,27 @@ void UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
     if (!downstream_metadata_map_vector_.empty()) {
       ENVOY_STREAM_LOG(debug, "Send metadata onPoolReady. {}", *parent_.callbacks_,
                        downstream_metadata_map_vector_);
-      request_encoder.encodeMetadata(downstream_metadata_map_vector_);
+      upstream_->encodeMetadata(downstream_metadata_map_vector_);
       downstream_metadata_map_vector_.clear();
       if (delay_headers_end_stream) {
         Buffer::OwnedImpl empty_data("");
-        request_encoder.encodeData(empty_data, true);
+        upstream_->encodeData(empty_data, true);
       }
     }
 
     if (buffered_request_body_) {
       stream_info_.addBytesSent(buffered_request_body_->length());
-      request_encoder.encodeData(*buffered_request_body_, encode_complete_ && !encode_trailers_);
+      upstream_->encodeData(*buffered_request_body_, encode_complete_ && !encode_trailers_);
     }
 
     if (encode_trailers_) {
-      request_encoder.encodeTrailers(*parent_.downstream_trailers_);
+      upstream_->encodeTrailers(*parent_.downstream_trailers_);
     }
 
     if (encode_complete_) {
       upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
     }
   }
-}
-
-void UpstreamRequest::setRequestEncoder(Http::RequestEncoder& request_encoder) {
-  upstream_.reset(new HttpUpstream(*this, &request_encoder));
-  // Now that there is an encoder, have the connection manager inform the manager when the
-  // downstream buffers are overrun. This may result in immediate watermark callbacks referencing
-  // the encoder.
-  parent_.callbacks_->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
 }
 
 void UpstreamRequest::clearRequestEncoder() {
@@ -464,6 +462,42 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
   ASSERT(parent_.upstream_requests_.size() == 1 || parent_.downstream_end_stream_);
   parent_.cluster_->stats().upstream_flow_control_drained_total_.inc();
   parent_.callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+}
+
+void HttpConnPool::newStream(UpstreamRequest* request) {
+  request_ = request;
+  // It's possible for a reset to happen inline within the newStream() call. In this case, we
+  // might get deleted inline as well. Only write the returned handle out if it is not nullptr to
+  // deal with this case.
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(*request, *this);
+  if (handle) {
+    conn_pool_stream_handle_ = handle;
+  }
+}
+
+bool HttpConnPool::cancelAnyPendingRequest() {
+  if (conn_pool_stream_handle_) {
+    conn_pool_stream_handle_->cancel();
+    conn_pool_stream_handle_ = nullptr;
+    return true;
+  }
+  return false;
+}
+absl::optional<Http::Protocol> HttpConnPool::protocol() const { return conn_pool_.protocol(); }
+
+void HttpConnPool::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+                                 absl::string_view transport_failure_reason,
+                                 Upstream::HostDescriptionConstSharedPtr host) {
+  request_->onPoolFailure(reason, transport_failure_reason, host);
+}
+
+void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
+                               Upstream::HostDescriptionConstSharedPtr host,
+                               const StreamInfo::StreamInfo& info) {
+  conn_pool_stream_handle_ = nullptr;
+  auto upstream = std::make_unique<HttpUpstream>(*request_, &request_encoder);
+  request_->onPoolReady(std::move(upstream), host,
+                        request_encoder.getStream().connectionLocalAddress(), info);
 }
 
 } // namespace Router

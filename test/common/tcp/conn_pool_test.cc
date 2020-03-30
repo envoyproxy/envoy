@@ -69,11 +69,9 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
  */
 class ConnPoolImplForTest : public ConnPoolImpl {
 public:
-  ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
-                      Upstream::ClusterInfoConstSharedPtr cluster,
+  ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
-      : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
-                     Upstream::ResourcePriority::Default, nullptr, nullptr),
+      : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, nullptr, nullptr),
         mock_dispatcher_(dispatcher), mock_upstream_ready_timer_(upstream_ready_timer) {}
 
   ~ConnPoolImplForTest() override {
@@ -153,7 +151,8 @@ class TcpConnPoolImplTest : public testing::Test {
 public:
   TcpConnPoolImplTest()
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
-        conn_pool_(dispatcher_, cluster_, upstream_ready_timer_) {}
+        host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")),
+        conn_pool_(dispatcher_, host_, upstream_ready_timer_) {}
 
   ~TcpConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
@@ -162,6 +161,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Event::MockTimer>* upstream_ready_timer_;
+  Upstream::HostSharedPtr host_;
   ConnPoolImplForTest conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
@@ -263,6 +263,8 @@ struct ActiveTestConn {
   ConnPoolCallbacks callbacks_;
   bool completed_{};
 };
+
+TEST_F(TcpConnPoolImplTest, HostAccessor) { EXPECT_EQ(conn_pool_.host(), host_); }
 
 /**
  * Verify that connections are drained when requested.

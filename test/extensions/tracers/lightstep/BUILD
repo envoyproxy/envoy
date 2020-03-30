@@ -23,7 +23,6 @@ envoy_extension_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/common/runtime:uuid_util_lib",
         "//source/common/stats:fake_symbol_table_lib",
         "//source/extensions/tracers/lightstep:lightstep_tracer_lib",
         "//test/mocks/http:http_mocks",

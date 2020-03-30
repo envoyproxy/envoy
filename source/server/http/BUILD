@@ -13,9 +13,12 @@ envoy_cc_library(
     srcs = ["admin.cc"],
     hdrs = ["admin.h"],
     deps = [
+        ":admin_filter_lib",
         ":config_tracker_lib",
+        ":utils_lib",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -33,7 +36,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
-        "//source/common/common:enum_to_int",
         "//source/common/common:macros",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:mutex_tracer_lib",
@@ -46,6 +48,7 @@ envoy_cc_library(
         "//source/common/http:default_server_string_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:request_id_extension_lib",
         "//source/common/http:utility_lib",
         "//source/common/memory:stats_lib",
         "//source/common/memory:utils_lib",
@@ -65,6 +68,36 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "admin_filter_lib",
+    srcs = ["admin_filter.cc"],
+    hdrs = ["admin_filter.h"],
+    deps = [
+        ":utils_lib",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/server:admin_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "utils_lib",
+    srcs = ["utils.cc"],
+    hdrs = ["utils.h"],
+    deps = [
+        "//include/envoy/init:manager_interface",
+        "//source/common/common:enum_to_int",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )
 
