@@ -67,7 +67,8 @@ public:
 
   const std::string deprecated_full_config{R"EOF(
       name: envoy.filters.http.compressor
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.http.compressor.v2.Compressor
         disable_on_etag_header: true
         content_length: 100
         content_type:
@@ -75,7 +76,8 @@ public:
           - application/json
         compressor_library:
           name: envoy.filters.http.compressor.gzip
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.http.compressor.gzip.v2.Gzip
             memory_level: 3
             window_bits: 10
             compression_level: best
