@@ -10,7 +10,7 @@ public:
   DirectResponseIntegrationTest() : BaseIntegrationTest(GetParam(), directResponseConfig()) {}
 
   static std::string directResponseConfig() {
-    return absl::StrCat(ConfigHelper::BASE_CONFIG, R"EOF(
+    return absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
       - name: direct_response

@@ -178,7 +178,7 @@ protected:
 class InjectDataWithEchoFilterIntegrationTest : public InjectDataToFilterChainIntegrationTest {
 public:
   static std::string echo_config() {
-    return absl::StrCat(ConfigHelper::BASE_CONFIG, R"EOF(
+    return absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
       - name: envoy.filters.network.echo
@@ -231,7 +231,7 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, FilterChainMismatch) {
 class InjectDataWithTcpProxyFilterIntegrationTest : public InjectDataToFilterChainIntegrationTest {
 public:
   InjectDataWithTcpProxyFilterIntegrationTest()
-      : InjectDataToFilterChainIntegrationTest(ConfigHelper::TCP_PROXY_CONFIG()) {}
+      : InjectDataToFilterChainIntegrationTest(ConfigHelper::tcpProxyConfig()) {}
 };
 
 INSTANTIATE_TEST_SUITE_P(

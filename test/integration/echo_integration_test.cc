@@ -14,7 +14,7 @@ public:
 
   // Called once by the gtest framework before any EchoIntegrationTests are run.
   static void SetUpTestSuite() {
-    echo_config = absl::StrCat(ConfigHelper::BASE_CONFIG, R"EOF(
+    echo_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
         name: ratelimit

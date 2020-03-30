@@ -23,7 +23,7 @@ class ThriftConnManagerIntegrationTest
       public BaseThriftIntegrationTest {
 public:
   static void SetUpTestSuite() {
-    thrift_config_ = absl::StrCat(ConfigHelper::BASE_CONFIG, R"EOF(
+    thrift_config_ = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
         - name: thrift

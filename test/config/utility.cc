@@ -30,7 +30,8 @@
 
 namespace Envoy {
 
-const char ConfigHelper::BASE_CONFIG[] = R"EOF(
+std::string ConfigHelper::baseConfig() {
+  return R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -68,8 +69,10 @@ static_resources:
         address: 127.0.0.1
         port_value: 0
 )EOF";
+}
 
-const char ConfigHelper::BASE_UDP_LISTENER_CONFIG[] = R"EOF(
+std::string ConfigHelper::baseUdpListenerConfig() {
+  return R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -96,9 +99,10 @@ static_resources:
         port_value: 0
         protocol: udp
 )EOF";
+}
 
-std::string ConfigHelper::TCP_PROXY_CONFIG() {
-  return absl::StrCat(BASE_CONFIG, R"EOF(
+std::string ConfigHelper::tcpProxyConfig() {
+  return absl::StrCat(baseConfig(), R"EOF(
     filter_chains:
       filters:
         name: tcp
@@ -109,8 +113,8 @@ std::string ConfigHelper::TCP_PROXY_CONFIG() {
 )EOF");
 }
 
-std::string ConfigHelper::HTTP_PROXY_CONFIG() {
-  return absl::StrCat(BASE_CONFIG, R"EOF(
+std::string ConfigHelper::httpProxyConfig() {
+  return absl::StrCat(baseConfig(), R"EOF(
     filter_chains:
       filters:
         name: http
@@ -143,8 +147,8 @@ std::string ConfigHelper::HTTP_PROXY_CONFIG() {
 // TODO(danzh): For better compatibility with HTTP integration test framework,
 // it's better to combine with HTTP_PROXY_CONFIG, and use config modifiers to
 // specify quic specific things.
-std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG() {
-  return absl::StrCat(BASE_UDP_LISTENER_CONFIG, R"EOF(
+std::string ConfigHelper::quicHttpProxyConfig() {
+  return absl::StrCat(baseUdpListenerConfig(), R"EOF(
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
@@ -178,28 +182,35 @@ std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG() {
 )EOF");
 }
 
-const char ConfigHelper::DEFAULT_BUFFER_FILTER[] = R"EOF(
+std::string ConfigHelper::defaultBufferFilter() {
+  return R"EOF(
 name: buffer
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 5242880
 )EOF";
+}
 
-const char ConfigHelper::SMALL_BUFFER_FILTER[] = R"EOF(
+std::string ConfigHelper::smallBufferFilter() {
+  return R"EOF(
 name: buffer
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 1024
 )EOF";
+}
 
-const char ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER[] = R"EOF(
+std::string ConfigHelper::defaultHealthCheckFilter() {
+  return R"EOF(
 name: health_check
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
 )EOF";
+}
 
-const char ConfigHelper::DEFAULT_SQUASH_FILTER[] = R"EOF(
+std::string ConfigHelper::defaultSquashFilter() {
+  return R"EOF(
 name: squash
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.squash.v2.Squash
@@ -219,6 +230,7 @@ typed_config:
     seconds: 1
     nanos: 0
 )EOF";
+}
 
 // TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
 //               work restores it here.

@@ -113,7 +113,7 @@ public:
 
   // Called once by the gtest framework before any tests are run.
   static void SetUpTestSuite() {
-    tcp_conn_pool_config = absl::StrCat(ConfigHelper::BASE_CONFIG, R"EOF(
+    tcp_conn_pool_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       - filters:
         - name: envoy.test.router

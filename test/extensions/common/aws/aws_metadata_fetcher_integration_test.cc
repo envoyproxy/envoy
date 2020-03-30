@@ -17,7 +17,7 @@ public:
       : BaseIntegrationTest(Network::Address::IpVersion::v4, renderConfig(status_code, delay_s)) {}
 
   static std::string renderConfig(int status_code, int delay_s) {
-    return absl::StrCat(ConfigHelper::BASE_CONFIG, fmt::format(R"EOF(
+    return absl::StrCat(ConfigHelper::baseConfig(), fmt::format(R"EOF(
     filter_chains:
       filters:
         name: http

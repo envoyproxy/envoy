@@ -12,7 +12,7 @@ public:
   UdpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), configToUse()) {}
 
   static std::string configToUse() {
-    return absl::StrCat(ConfigHelper::BASE_UDP_LISTENER_CONFIG, R"EOF(
+    return absl::StrCat(ConfigHelper::base_UdpListener_Config(), R"EOF(
     listener_filters:
       name: udp_proxy
       typed_config:
