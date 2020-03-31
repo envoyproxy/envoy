@@ -22,7 +22,8 @@ def generateCompilationDatabase(args):
   # binaries so just always strip and use dynamic link to minimize download size.
   bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", "")) + [
       "-c", "fastbuild", "--build_tag_filters=-nocompdb",
-      "--experimental_remote_download_outputs=all", "--strip=always"
+      "--experimental_remote_download_outputs=all", "--strip=always",
+      "--define=ENVOY_CONFIG_COMPILATION_DATABASE=1",
   ]
   if args.run_bazel_build:
     runBazelBuildForCompilationDatabase(bazel_options, args.bazel_targets)
