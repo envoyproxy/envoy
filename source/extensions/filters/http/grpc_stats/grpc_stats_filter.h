@@ -26,14 +26,14 @@ struct GrpcStatsObject : public StreamInfo::FilterState::Object {
   }
 };
 
-class GrpcStatsFilterConfig
+class GrpcStatsFilterConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::grpc_stats::v3::FilterConfig> {
 public:
-  GrpcStatsFilterConfig() : FactoryBase(HttpFilterNames::get().GrpcStats) {}
+  GrpcStatsFilterConfigFactory() : FactoryBase(HttpFilterNames::get().GrpcStats) {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& config,
+      const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
       const std::string&, Server::Configuration::FactoryContext&) override;
 };
 
