@@ -14,6 +14,7 @@ set -e
 
 if [[ "$2" == "--test" ]]
 then
+  echo "protoxform_test..."
   ./tools/protoxform/protoxform_test.sh
 fi
 
