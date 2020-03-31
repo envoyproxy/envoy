@@ -9,7 +9,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
+
 class TcpProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
 public:
@@ -42,5 +42,4 @@ public:
   FakeRawConnectionPtr fake_upstream_connection_;
 };
 
-} // namespace
 } // namespace Envoy

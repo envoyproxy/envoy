@@ -31,8 +31,6 @@ void TcpProxyIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
 }
 
-namespace {
-
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -808,5 +806,4 @@ TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
 }
 
-} // namespace
 } // namespace Envoy
