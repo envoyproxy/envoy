@@ -13,10 +13,10 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "concurrency_controller_lib",
+    name = "controller_lib",
     srcs = ["gradient_controller.cc"],
     hdrs = [
-        "concurrency_controller.h",
+        "controller.h",
         "gradient_controller.h",
     ],
     external_deps = [
