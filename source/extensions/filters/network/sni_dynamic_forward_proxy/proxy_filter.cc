@@ -34,6 +34,8 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
     return Network::FilterStatus::Continue;
   }
 
+  // TODO(lizan): implement circuit breaker in SNI dynamic forward proxy
+
   uint16_t default_port = config_->port();
 
   auto result = config_->cache().loadDnsCacheEntry(sni, default_port, *this);
