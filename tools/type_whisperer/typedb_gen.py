@@ -153,8 +153,7 @@ if __name__ == '__main__':
   type_map.update([
       UpgradedTypeWithDescription(type_name, type_desc)
       for type_name, type_desc in type_map.items()
-      if type_desc.qualified_package in next_versions_pkgs and
-      (type_desc.active or type_desc.deprecated_type)
+      if type_desc.qualified_package in next_versions_pkgs
   ])
 
   # Generate the type database proto. To provide some stability across runs, in
@@ -167,8 +166,7 @@ if __name__ == '__main__':
     type_desc = type_db.types[t]
     type_desc.qualified_package = type_map[t].qualified_package
     type_desc.proto_path = type_map[t].proto_path
-    if type_desc.qualified_package in next_versions_pkgs and (not type_map[t].map_entry or
-                                                              type_map[t].active):
+    if type_desc.qualified_package in next_versions_pkgs:
       type_desc.next_version_type_name = UpgradedType(t, type_map[t])
       assert (type_desc.next_version_type_name != t)
       next_proto_info[type_map[t].proto_path] = (
