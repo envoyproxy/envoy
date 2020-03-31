@@ -51,6 +51,10 @@ jobs:
       # Wait for the app to start and get some requests/responses.
       - name: 'Sleep'
         run: sleep 120
+      # Print out the log in case the liveliness check fails.
+      # This allows the author to decide if the failure is a flake or a real problem.
+      - name: 'Cat log'
+        run: 'cat /tmp/envoy.log'
       # Check for the sentinel value that shows the app is alive and well.
       - name: 'Check liveliness'
         run: 'cat /tmp/envoy.log | grep "Response status (1): 200"'
@@ -79,6 +83,10 @@ jobs:
       # Wait for the app to start and get some requests/responses.
       - name: 'Sleep'
         run: sleep 120
+      # Print out the log in case the liveliness check fails.
+      # This allows the author to decide if the failure is a flake or a real problem.
+      - name: 'Cat log'
+        run: 'cat /tmp/envoy.log'
       # Check for the sentinel value that shows the app is alive and well.
       - name: 'Check liveliness'
         run: 'cat /tmp/envoy.log | grep "Response status (1): 200"'
