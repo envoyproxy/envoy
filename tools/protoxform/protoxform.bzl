@@ -7,7 +7,7 @@ def _protoxform_impl(target, ctx):
         "proto",
         "protoxform",
         [
-            ".active.proto",
+            ".active_or_frozen.proto",
             ".next_major_version_candidate.proto",
             ".next_major_version_candidate.envoy_internal.proto",
         ],

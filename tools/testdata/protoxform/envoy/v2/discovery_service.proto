@@ -8,6 +8,9 @@ import "google/api/annotations.proto";
 
 import "envoy/annotations/resource.proto";
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 service SomeDiscoveryService {
   option (envoy.annotations.resource).type = "envoy.v2.SomeResource";

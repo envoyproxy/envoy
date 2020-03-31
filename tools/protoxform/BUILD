@@ -1,6 +1,27 @@
 licenses(["notice"])  # Apache 2
 
 py_binary(
+    name = "merge_active_shadow",
+    srcs = ["merge_active_shadow.py"],
+    deps = [
+        "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
+        "@com_google_googleapis//google/api:annotations_py_proto",
+        "@com_google_protobuf//:protobuf_python",
+        "@envoy_api_canonical//envoy/annotations:pkg_py_proto",
+    ],
+)
+
+py_test(
+    name = "merge_active_shadow_test",
+    srcs = ["merge_active_shadow_test.py"],
+    deps = [
+        ":merge_active_shadow",
+        "@com_google_protobuf//:protobuf_python",
+    ],
+)
+
+py_binary(
     name = "protoxform",
     srcs = [
         "migrate.py",
