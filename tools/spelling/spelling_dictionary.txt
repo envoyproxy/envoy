@@ -223,6 +223,7 @@ PREBIND
 PRNG
 PROT
 Postgre
+Postgres
 Prereq
 QUIC
 QoS

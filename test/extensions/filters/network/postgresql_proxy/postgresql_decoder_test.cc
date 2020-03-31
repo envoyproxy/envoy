@@ -12,23 +12,15 @@ class DecoderCallbacksMock : public DecoderCallbacks {
 public:
   MOCK_METHOD(void, incBackend, (), (override));
   MOCK_METHOD(void, incFrontend, (), (override));
-  MOCK_METHOD(void, incErrorsError, (), (override));
-  MOCK_METHOD(void, incErrorsFatal, (), (override));
-  MOCK_METHOD(void, incErrorsPanic, (), (override));
-  MOCK_METHOD(void, incErrorsUnknown, (), (override));
   MOCK_METHOD(void, incSessionsEncrypted, (), (override));
   MOCK_METHOD(void, incSessionsUnencrypted, (), (override));
-  MOCK_METHOD(void, incStatements, (), (override));
-  MOCK_METHOD(void, incStatementsDelete, (), (override));
-  MOCK_METHOD(void, incStatementsInsert, (), (override));
-  MOCK_METHOD(void, incStatementsOther, (), (override));
-  MOCK_METHOD(void, incStatementsSelect, (), (override));
-  MOCK_METHOD(void, incStatementsUpdate, (), (override));
+  MOCK_METHOD(void, incStatement, (StatementType), (override));
   MOCK_METHOD(void, incTransactions, (), (override));
   MOCK_METHOD(void, incTransactionsCommit, (), (override));
   MOCK_METHOD(void, incTransactionsRollback, (), (override));
   MOCK_METHOD(void, incUnknown, (), (override));
   MOCK_METHOD(void, incNotice, (NoticeType), (override));
+  MOCK_METHOD(void, incError, (ErrorType), (override));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -67,8 +59,7 @@ class PostgreSQLProxyBackendDecoderTest : public PostgreSQLProxyDecoderTestBase,
 
 class PostgreSQLProxyErrorTest
     : public PostgreSQLProxyDecoderTestBase,
-      public ::testing::TestWithParam<
-          std::tuple<std::string, uint32_t, uint32_t, uint32_t, uint32_t>> {};
+      public ::testing::TestWithParam<std::tuple<std::string, DecoderCallbacks::ErrorType>> {};
 
 class PostgreSQLProxyNoticeTest
     : public PostgreSQLProxyDecoderTestBase,
@@ -267,7 +258,7 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, ParseStatement) {
 
   // Partial message should be ignored
   EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
-  EXPECT_CALL(callbacks_, incStatementsOther());
+  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Other));
   payload_ = "ROLL";
   data_.add("C");
   length_ = htonl(4 + payload_.length());
@@ -278,7 +269,7 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, ParseStatement) {
 
   // Keyword without a space  should be ignored
   EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
-  EXPECT_CALL(callbacks_, incStatementsOther());
+  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Other));
   payload_ = "ROLLBACK123";
   data_.add("C");
   length_ = htonl(4 + payload_.length());
@@ -292,8 +283,7 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, ParseStatement) {
 // trigger proper stats updates.
 TEST_F(PostgreSQLProxyDecoderTest, Backend) {
   // C message
-  EXPECT_CALL(callbacks_, incStatements());
-  EXPECT_CALL(callbacks_, incStatementsOther());
+  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Other));
   payload_ = "BEGIN 123";
   data_.add("C");
   length_ = htonl(4 + payload_.length());
@@ -303,8 +293,7 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
   data_.drain(data_.length());
   ASSERT_TRUE(decoder_->getSession().inTransaction());
 
-  EXPECT_CALL(callbacks_, incStatements());
-  EXPECT_CALL(callbacks_, incStatementsOther());
+  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Other));
   payload_ = "START TR";
   data_.add("C");
   length_ = htonl(4 + payload_.length());
@@ -313,7 +302,7 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements());
+  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Noop));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload_ = "COMMIT";
   data_.add("C");
@@ -323,7 +312,7 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements());
+  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Noop));
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   payload_ = "ROLLBACK";
   data_.add("C");
@@ -333,8 +322,7 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements());
-  EXPECT_CALL(callbacks_, incStatementsInsert());
+  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Insert));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload_ = "INSERT 1";
   data_.add("C");
@@ -344,8 +332,7 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements());
-  EXPECT_CALL(callbacks_, incStatementsUpdate());
+  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Update));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload_ = "UPDATE 1i23";
   data_.add("C");
@@ -355,8 +342,7 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements());
-  EXPECT_CALL(callbacks_, incStatementsDelete());
+  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Delete));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload_ = "DELETE 88";
   data_.add("C");
@@ -400,10 +386,7 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, AuthenticationMsg) {
 // Test check parsing of E message. The message
 // indicates error.
 TEST_P(PostgreSQLProxyErrorTest, ParseErrorMsgs) {
-  EXPECT_CALL(callbacks_, incErrorsError()).Times(std::get<1>(GetParam()));
-  EXPECT_CALL(callbacks_, incErrorsFatal()).Times(std::get<2>(GetParam()));
-  EXPECT_CALL(callbacks_, incErrorsPanic()).Times(std::get<3>(GetParam()));
-  EXPECT_CALL(callbacks_, incErrorsUnknown()).Times(std::get<4>(GetParam()));
+  EXPECT_CALL(callbacks_, incError(std::get<1>(GetParam())));
   payload_ = std::get<0>(GetParam());
   data_.add("E");
   length_ = htonl(4 + payload_.length());
@@ -415,14 +398,22 @@ TEST_P(PostgreSQLProxyErrorTest, ParseErrorMsgs) {
 INSTANTIATE_TEST_SUITE_P(
     PostgreSQLProxyErrorTestSuite, PostgreSQLProxyErrorTest,
     ::testing::Values(
-        std::make_tuple("blah blah", 0, 0, 0, 1), std::make_tuple("SBLAHC1234", 0, 0, 0, 1),
-        std::make_tuple("SERRORC1234", 1, 0, 0, 0),
-        std::make_tuple("SERRORVERRORC1234", 1, 0, 0, 0),
-        std::make_tuple("SFATALVFATALC22012", 0, 1, 0, 0),
-        std::make_tuple("SPANICVPANICC22012", 0, 0, 1, 0),
+        std::make_tuple("blah blah", DecoderCallbacks::ErrorType::Unknown),
+        std::make_tuple("SERRORC1234", DecoderCallbacks::ErrorType::Error),
+        std::make_tuple("SERRORVERRORC1234", DecoderCallbacks::ErrorType::Error),
+        std::make_tuple("SFATALVFATALC22012", DecoderCallbacks::ErrorType::Fatal),
+        std::make_tuple("SPANICVPANICC22012", DecoderCallbacks::ErrorType::Panic),
+        // This is the real German message in Postgres > 9.6. It contains keyword
+        // in English with V prefix.
         std::make_tuple("SPANIKVPANICC42501Mkonnte Datei »pg_wal/000000010000000100000096« nicht "
                         "öffnen: Permission deniedFxlog.cL3229RXLogFileInit",
-                        0, 0, 1, 0)));
+                        DecoderCallbacks::ErrorType::Panic),
+        // This is German message indicating error. The comment field contains word PANIC.
+        // Since we do not decode other languages, it should go into Other bucket.
+        // This situation can only happen in Postgres < 9.6. Starting with version 9.6
+        // messages must have severity in English with prefix V.
+        std::make_tuple("SFEHLERCP0001MMy PANIC ugly messageFpl_exec.cL3216Rexec_stmt_raise",
+                        DecoderCallbacks::ErrorType::Unknown)));
 
 // Test parsing N message. It indicate notice
 // and carries additional information about the
@@ -441,11 +432,11 @@ INSTANTIATE_TEST_SUITE_P(
     PostgreSQLProxyNoticeTestSuite, PostgreSQLProxyNoticeTest,
     ::testing::Values(std::make_tuple("blah blah", DecoderCallbacks::NoticeType::Unknown),
                       std::make_tuple("SblalalaC2345", DecoderCallbacks::NoticeType::Unknown),
-                      std::make_tuple("SblahWARNING23345", DecoderCallbacks::NoticeType::Warning),
-                      std::make_tuple("SblahblahNOTICEbbal4", DecoderCallbacks::NoticeType::Notice),
-                      std::make_tuple("SINFO", DecoderCallbacks::NoticeType::Info),
+                      std::make_tuple("SblahVWARNING23345", DecoderCallbacks::NoticeType::Warning),
+                      std::make_tuple("SNOTICEERRORbbal4", DecoderCallbacks::NoticeType::Notice),
+                      std::make_tuple("SINFOVblabla", DecoderCallbacks::NoticeType::Info),
                       std::make_tuple("SDEBUGDEBUG", DecoderCallbacks::NoticeType::Debug),
-                      std::make_tuple("SLLLLOGGGG", DecoderCallbacks::NoticeType::Log)));
+                      std::make_tuple("SLOGGGGINFO", DecoderCallbacks::NoticeType::Log)));
 
 // Test checks if the decoder can detect initial message which indicates
 // that protocol uses encryption

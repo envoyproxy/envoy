@@ -90,24 +90,16 @@ public:
 
   // PostgreSQLProxy::DecoderCallback
   void incBackend() override;
-  void incErrorsError() override;
-  void incErrorsFatal() override;
-  void incErrorsPanic() override;
-  void incErrorsUnknown() override;
   void incFrontend() override;
   void incSessionsEncrypted() override;
   void incSessionsUnencrypted() override;
-  void incStatements() override;
-  void incStatementsDelete() override;
-  void incStatementsInsert() override;
-  void incStatementsOther() override;
-  void incStatementsSelect() override;
-  void incStatementsUpdate() override;
+  void incStatement(StatementType) override;
   void incTransactions() override;
   void incTransactionsCommit() override;
   void incTransactionsRollback() override;
   void incUnknown() override;
   void incNotice(NoticeType) override;
+  void incError(ErrorType) override;
 
   void doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);
