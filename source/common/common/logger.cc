@@ -53,7 +53,7 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
 
   // This memory buffer must exist in the scope of the entire function,
   // otherwise the string_view will refer to memory that is already free.
-  fmt::memory_buffer formatted;
+  spdlog::memory_buf_t formatted;
   if (formatter_) {
     formatter_->format(msg, formatted);
     msg_view = absl::string_view(formatted.data(), formatted.size());

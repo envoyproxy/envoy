@@ -108,7 +108,7 @@ parseUpstreamMetadataField(absl::string_view params_str) {
 
     switch (value->kind_case()) {
     case ProtobufWkt::Value::kNumberValue:
-      return fmt::format("{}", value->number_value());
+      return fmt::format("{:g}", value->number_value());
 
     case ProtobufWkt::Value::kStringValue:
       return value->string_value();
