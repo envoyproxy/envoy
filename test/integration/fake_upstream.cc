@@ -12,7 +12,9 @@
 #include "common/common/fmt.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http2/codec_impl_legacy.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
@@ -231,18 +233,30 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
     Http::Http1Settings http1_settings;
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
-    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
-        shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
-        max_request_headers_count);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+      codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
+          shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
+          max_request_headers_count);
+    } else {
+      codec_ = std::make_unique<Http::Legacy::Http1::ServerConnectionImpl>(
+          shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
+          max_request_headers_count);
+    }
   } else {
     envoy::config::core::v3::Http2ProtocolOptions http2_options =
         ::Envoy::Http2::Utility::initializeAndValidateOptions(
             envoy::config::core::v3::Http2ProtocolOptions());
     http2_options.set_allow_connect(true);
     http2_options.set_allow_metadata(true);
-    codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, store, http2_options, max_request_headers_kb,
-        max_request_headers_count);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+      codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
+          shared_connection_.connection(), *this, store, http2_options, max_request_headers_kb,
+          max_request_headers_count);
+    } else {
+      codec_ = std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
+          shared_connection_.connection(), *this, store, http2_options, max_request_headers_kb,
+          max_request_headers_count);
+    }
     ASSERT(type == Type::HTTP2);
   }
 

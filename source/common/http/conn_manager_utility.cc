@@ -11,7 +11,9 @@
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
@@ -46,13 +48,25 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
-    return std::make_unique<Http2::ServerConnectionImpl>(connection, callbacks, scope,
-                                                         http2_options, max_request_headers_kb,
-                                                         max_request_headers_count);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+      return std::make_unique<Http2::ServerConnectionImpl>(connection, callbacks, scope,
+                                                           http2_options, max_request_headers_kb,
+                                                           max_request_headers_count);
+    } else {
+      return std::make_unique<Legacy::Http2::ServerConnectionImpl>(
+          connection, callbacks, scope, http2_options, max_request_headers_kb,
+          max_request_headers_count);
+    }
   } else {
-    return std::make_unique<Http1::ServerConnectionImpl>(connection, scope, callbacks,
-                                                         http1_settings, max_request_headers_kb,
-                                                         max_request_headers_count);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+      return std::make_unique<Http1::ServerConnectionImpl>(connection, scope, callbacks,
+                                                           http1_settings, max_request_headers_kb,
+                                                           max_request_headers_count);
+    } else {
+      return std::make_unique<Legacy::Http1::ServerConnectionImpl>(
+          connection, scope, callbacks, http1_settings, max_request_headers_kb,
+          max_request_headers_count);
+    }
   }
 }
 
