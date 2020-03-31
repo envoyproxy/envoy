@@ -36,9 +36,9 @@ namespace {
  * what the PROXY protocol util functions generate
  */
 class ProxyProtocolRegressionTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                          public Network::ListenerConfig,
-                          public Network::FilterChainManager,
-                          protected Logger::Loggable<Logger::Id::main> {
+                                    public Network::ListenerConfig,
+                                    public Network::FilterChainManager,
+                                    protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolRegressionTest()
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
@@ -64,9 +64,7 @@ public:
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
-  std::chrono::milliseconds listenerFiltersTimeout() const override {
-    return {};
-  }
+  std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
   bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
@@ -103,7 +101,7 @@ public:
         }));
     conn_->connect();
     if (read) {
-      read_filter_= std::make_shared<NiceMock<Network::MockReadFilter>>();
+      read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
       EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
           .WillOnce(Invoke([&](Network::Connection& connection,
                                const std::vector<Network::FilterFactoryCb>&) -> bool {
