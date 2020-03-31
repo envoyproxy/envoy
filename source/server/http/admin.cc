@@ -353,19 +353,19 @@ void AdminImpl::addOutlierInfo(const std::string& cluster_name,
                                Buffer::Instance& response) {
   if (outlier_detector) {
     response.add(fmt::format(
-        "{}::outlier::success_rate_average::{}\n", cluster_name,
+        "{}::outlier::success_rate_average::{:g}\n", cluster_name,
         outlier_detector->successRateAverage(
             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
     response.add(fmt::format(
-        "{}::outlier::success_rate_ejection_threshold::{}\n", cluster_name,
+        "{}::outlier::success_rate_ejection_threshold::{:g}\n", cluster_name,
         outlier_detector->successRateEjectionThreshold(
             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
     response.add(fmt::format(
-        "{}::outlier::local_origin_success_rate_average::{}\n", cluster_name,
+        "{}::outlier::local_origin_success_rate_average::{:g}\n", cluster_name,
         outlier_detector->successRateAverage(
             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
     response.add(fmt::format(
-        "{}::outlier::local_origin_success_rate_ejection_threshold::{}\n", cluster_name,
+        "{}::outlier::local_origin_success_rate_ejection_threshold::{:g}\n", cluster_name,
         outlier_detector->successRateEjectionThreshold(
             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
   }
