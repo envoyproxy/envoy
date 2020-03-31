@@ -35,12 +35,12 @@ namespace {
  * Regression tests for testing that the PROXY protocol listener filter can correctly read
  * what the PROXY protocol util functions generate
  */
-class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class ProxyProtocolRegressionTest : public testing::TestWithParam<Network::Address::IpVersion>,
                           public Network::ListenerConfig,
                           public Network::FilterChainManager,
                           protected Logger::Loggable<Logger::Id::main> {
 public:
-  ProxyProtocolTest()
+  ProxyProtocolRegressionTest()
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
@@ -65,7 +65,7 @@ public:
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override {
-    return std::chrono::milliseconds();
+    return {};
   }
   bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
@@ -103,7 +103,7 @@ public:
         }));
     conn_->connect();
     if (read) {
-      read_filter_.reset(new NiceMock<Network::MockReadFilter>());
+      read_filter_= std::make_shared<NiceMock<Network::MockReadFilter>>();
       EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
           .WillOnce(Invoke([&](Network::Connection& connection,
                                const std::vector<Network::FilterFactoryCb>&) -> bool {
@@ -170,11 +170,11 @@ public:
 };
 
 // Parameterize the listener socket address version.
-INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolRegressionTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ProxyProtocolTest, V1Basic) {
+TEST_P(ProxyProtocolRegressionTest, V1Basic) {
   std::string source_addr;
   Buffer::OwnedImpl buff{};
   if (GetParam() == Network::Address::IpVersion::v4) {
@@ -196,7 +196,7 @@ TEST_P(ProxyProtocolTest, V1Basic) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, V2Basic) {
+TEST_P(ProxyProtocolRegressionTest, V2Basic) {
   std::string source_addr;
   Buffer::OwnedImpl buff{};
   if (GetParam() == Network::Address::IpVersion::v4) {
@@ -218,7 +218,7 @@ TEST_P(ProxyProtocolTest, V2Basic) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, V2LocalConnection) {
+TEST_P(ProxyProtocolRegressionTest, V2LocalConnection) {
   Buffer::OwnedImpl buff{};
   generateV2LocalHeader(buff);
   connect();
