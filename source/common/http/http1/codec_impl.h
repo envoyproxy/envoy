@@ -476,6 +476,7 @@ private:
   }
 
   absl::optional<PendingResponse> pending_response_;
+  bool pending_response_done_{true};
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
   // TODO(mattklein123): This should be a member of PendingResponse but this change needs dedicated
