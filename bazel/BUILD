@@ -128,6 +128,11 @@ config_setting(
 )
 
 config_setting(
+    name = "compdb_build",
+    values = {"define": "ENVOY_CONFIG_COMPILATION_DATABASE=1"},
+)
+
+config_setting(
     name = "clang_build",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "clang",
