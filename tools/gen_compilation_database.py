@@ -18,11 +18,11 @@ def runBazelBuildForCompilationDatabase(bazel_options, bazel_targets):
 
 # This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.sh
 def generateCompilationDatabase(args):
-  # We need to download all remote outputs for generated source code, we don't care about built
-  # binaries so just always strip and use dynamic link to minimize download size.
+  # We need to download all remote outputs for generated source code. This option lives here to override those
+  # specified in bazelrc.
   bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", "")) + [
-      "-c", "fastbuild", "--build_tag_filters=-nocompdb",
-      "--experimental_remote_download_outputs=all", "--strip=always"
+      "--config=compdb",
+      "--remote_download_outputs=all",
   ]
   if args.run_bazel_build:
     runBazelBuildForCompilationDatabase(bazel_options, args.bazel_targets)
