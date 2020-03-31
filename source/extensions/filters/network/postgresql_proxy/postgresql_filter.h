@@ -39,7 +39,13 @@ namespace PostgreSQLProxy {
   COUNTER(transactions_commit)                                                                     \
   COUNTER(transactions_rollback)                                                                   \
   COUNTER(unknown)                                                                                 \
-  COUNTER(warnings)
+  COUNTER(notices)                                                                                 \
+  COUNTER(notices_warning)                                                                         \
+  COUNTER(notices_notice)                                                                          \
+  COUNTER(notices_debug)                                                                           \
+  COUNTER(notices_info)                                                                            \
+  COUNTER(notices_log)                                                                             \
+  COUNTER(notices_unknown)
 
 /**
  * Struct definition for all PostgreSQL proxy stats. @see stats_macros.h
@@ -101,7 +107,7 @@ public:
   void incTransactionsCommit() override;
   void incTransactionsRollback() override;
   void incUnknown() override;
-  void incWarnings() override;
+  void incNotice(NoticeType) override;
 
   void doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);

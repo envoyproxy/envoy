@@ -105,9 +105,25 @@ void DecoderImpl::initialize() {
   };
 
   // Setup hash map for handling backend ErrorResponse and NoticeResponse.
-  BE_errors_and_notices_["ERROR"] = [this](DecoderImpl*) -> void { callbacks_->incErrorsError(); };
-  BE_errors_and_notices_["FATAL"] = [this](DecoderImpl*) -> void { callbacks_->incErrorsFatal(); };
-  BE_errors_and_notices_["PANIC"] = [this](DecoderImpl*) -> void { callbacks_->incErrorsPanic(); };
+  BE_errors_["ERROR"] = [this](DecoderImpl*) -> void { callbacks_->incErrorsError(); };
+  BE_errors_["FATAL"] = [this](DecoderImpl*) -> void { callbacks_->incErrorsFatal(); };
+  BE_errors_["PANIC"] = [this](DecoderImpl*) -> void { callbacks_->incErrorsPanic(); };
+
+  BE_notices_["WARNING"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::Warning);
+  };
+  BE_notices_["NOTICE"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::Notice);
+  };
+  BE_notices_["DEBUG"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::Debug);
+  };
+  BE_notices_["INFO"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::Info);
+  };
+  BE_notices_["LOG"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::Log);
+  };
 }
 
 bool DecoderImpl::parseMessage(Buffer::Instance& data) {
@@ -263,35 +279,37 @@ void DecoderImpl::decodeBackendErrorResponse() {
     return;
   }
 
-  std::string severity;
-  std::size_t pos_severity = message_.find("V"); // Severity field without localization
-  std::size_t pos_sqlstate = message_.find("C"); // SQLSTATE code field
-
-  // If not found field "V" (unlocalized severity) then
-  // get the localied field starting at the beginning of
-  // the message.
-  // It's necessary since the Unlocalized Error and Notice
-  // responses was introduced on PostgreSQL 9.6
-  if (pos_severity == std::string::npos) {
-    pos_severity = 0;
+  bool found = false;
+  for (const auto it : BE_errors_) {
+    if (message_.find(it.first) != std::string::npos) {
+      found = true;
+      it.second(this);
+    }
   }
-  severity = message_.substr(pos_severity + 1, pos_sqlstate - pos_severity - 1);
 
-  ENVOY_LOG(debug, "(Backend) pos_severity ({}) pos_sqlstate ({}) severity ({}) message ({})", pos_severity, pos_sqlstate, severity, message_);
-
-  auto it = BE_errors_and_notices_.find(severity);
-  if (it != BE_errors_and_notices_.end()) {
-    (*it).second(this);
-  } else {
+  if (!found) {
     callbacks_->incErrorsUnknown();
   }
 }
 
 // Method parses N (Notice) message and looks for string
-// indicating warning.
+// indicating its meaning. It can be warning, notice, info, debug or log.
 void DecoderImpl::decodeBackendNoticeResponse() {
-  if (getMessage().find("VWARNING") != std::string::npos) {
-    callbacks_->incWarnings();
+  if (message_[0] != 'S') {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Unknown);
+    return;
+  }
+
+  bool found = false;
+  for (const auto it : BE_notices_) {
+    if (message_.find(it.first) != std::string::npos) {
+      found = true;
+      it.second(this);
+    }
+  }
+
+  if (!found) {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Unknown);
   }
 }
 

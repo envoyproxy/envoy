@@ -18,6 +18,8 @@ namespace PostgreSQLProxy {
 // General callbacks for dispatching decoded PostgreSQL messages to a sink.
 class DecoderCallbacks {
 public:
+  enum NoticeType { Warning, Notice, Debug, Info, Log, Unknown };
+
   virtual ~DecoderCallbacks() = default;
 
   virtual void incBackend() PURE;
@@ -44,7 +46,7 @@ public:
   virtual void incTransactionsRollback() PURE;
 
   virtual void incUnknown() PURE;
-  virtual void incWarnings() PURE;
+  virtual void incNotice(NoticeType) PURE;
 };
 
 // PostgreSQL message decoder.
@@ -133,7 +135,8 @@ protected:
   absl::flat_hash_map<std::string, MsgAction> BE_statements_;
 
   // hash map for dispatching backend errors and notice messages
-  absl::flat_hash_map<std::string, MsgAction> BE_errors_and_notices_;
+  absl::flat_hash_map<std::string, MsgAction> BE_errors_;
+  absl::flat_hash_map<std::string, MsgAction> BE_notices_;
 };
 
 } // namespace PostgreSQLProxy
