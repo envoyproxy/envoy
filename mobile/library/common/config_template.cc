@@ -70,6 +70,18 @@ static_resources:
         keepalive_interval: 10
         keepalive_probes: 1
         keepalive_time: 5
+    circuit_breakers: &circuit_breakers_settings
+      thresholds:
+        - priority: DEFAULT
+          # n.b: with mobile clients there are scenarios where all concurrent requests might be
+          # retries (e.g., when the phone goes offline). Therefore, Envoy Mobile allows all concurrent
+          # requests to be retries by setting the concurrent retry budget to 100%.
+          # This configuration uses the default for max concurrent requests (1024) because there is
+          # no reasonable scenario where a mobile client should have even close to that many concurrent
+          # requests.
+          retry_budget:
+            budget_percent:
+              value: 100
   - name: base_wlan
     connect_timeout: {{ connect_timeout_seconds }}s
     lb_policy: CLUSTER_PROVIDED
@@ -80,6 +92,7 @@ static_resources:
         dns_cache_config: *dns_cache_config
     transport_socket: *base_transport_socket
     upstream_connection_options: *upstream_opts
+    circuit_breakers: *circuit_breakers_settings
   - name: base_wwan
     connect_timeout: {{ connect_timeout_seconds }}s
     lb_policy: CLUSTER_PROVIDED
@@ -90,6 +103,7 @@ static_resources:
         dns_cache_config: *dns_cache_config
     transport_socket: *base_transport_socket
     upstream_connection_options: *upstream_opts
+    circuit_breakers: *circuit_breakers_settings
   - name: base_h2
     http2_protocol_options: {}
     connect_timeout: {{ connect_timeout_seconds }}s
@@ -101,6 +115,7 @@ static_resources:
         dns_cache_config: *dns_cache_config
     transport_socket: *base_transport_socket
     upstream_connection_options: *upstream_opts
+    circuit_breakers: *circuit_breakers_settings
   - name: base_wlan_h2
     http2_protocol_options: {}
     connect_timeout: {{ connect_timeout_seconds }}s
@@ -112,6 +127,7 @@ static_resources:
         dns_cache_config: *dns_cache_config
     transport_socket: *base_transport_socket
     upstream_connection_options: *upstream_opts
+    circuit_breakers: *circuit_breakers_settings
   - name: base_wwan_h2
     http2_protocol_options: {}
     connect_timeout: {{ connect_timeout_seconds }}s
@@ -123,6 +139,7 @@ static_resources:
         dns_cache_config: *dns_cache_config
     transport_socket: *base_transport_socket
     upstream_connection_options: *upstream_opts
+    circuit_breakers: *circuit_breakers_settings
   - name: stats
     connect_timeout: {{ connect_timeout_seconds }}s
     dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
