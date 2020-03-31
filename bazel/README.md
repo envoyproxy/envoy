@@ -591,11 +591,19 @@ Sometimes it's useful to see real system paths in bazel error message output (vs
 
 Run `tools/gen_compilation_database.py` to generate
 a [JSON Compilation Database](https://clang.llvm.org/docs/JSONCompilationDatabase.html). This could be used
-with any tools (e.g. clang-tidy) compatible with the format.
+with any tools (e.g. clang-tidy) compatible with the format. It is recommended to run this script
+with `TEST_TMPDIR` set, so the Bazel artifacts doesn't get cleaned up in next `bazel build` or `bazel test`.
 
 The compilation database could also be used to setup editors with cross reference, code completion.
 For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
-[cquery](https://github.com/cquery-project/cquery) with supported editors.
+[clangd](https://clangd.llvm.org/) with supported editors.
+
+For example, use following command to prepare a compilation database:
+
+```
+TEST_TMPDIR=/tmp tools/gen_compilation_database.py --run_bazel_build
+```
+
 
 # Running clang-format without docker
 

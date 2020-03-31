@@ -4,7 +4,7 @@
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
 
 #include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
+#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -23,9 +23,9 @@ namespace HttpFilters {
 namespace AdaptiveConcurrency {
 namespace {
 
-using ConcurrencyController::RequestForwardingAction;
+using Controller::RequestForwardingAction;
 
-class MockConcurrencyController : public ConcurrencyController::ConcurrencyController {
+class MockConcurrencyController : public Controller::ConcurrencyController {
 public:
   MOCK_METHOD(RequestForwardingAction, forwardingDecision, ());
   MOCK_METHOD(void, cancelLatencySample, ());

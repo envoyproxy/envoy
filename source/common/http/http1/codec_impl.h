@@ -224,6 +224,7 @@ protected:
   const bool strict_header_validation_ : 1;
   const bool connection_header_sanitization_ : 1;
   const bool enable_trailers_ : 1;
+  const bool reject_unsupported_transfer_encodings_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -475,6 +476,7 @@ private:
   }
 
   absl::optional<PendingResponse> pending_response_;
+  bool pending_response_done_{true};
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
   // TODO(mattklein123): This should be a member of PendingResponse but this change needs dedicated
