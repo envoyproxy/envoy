@@ -113,24 +113,13 @@ void DecoderImpl::initialize() {
   };
 
   // Setup hash map for handling backend ErrorResponse messages.
-  // Versions prior to 9.6 have keywords starting with S and
-  // Postgres versions 9.6 and higher use keywords starting with V.
-  std::get<0>(BE_errors_)["SERROR"] = [this](DecoderImpl*) -> void {
+  std::get<0>(BE_errors_)["ERROR"] = [this](DecoderImpl*) -> void {
     callbacks_->incError(DecoderCallbacks::ErrorType::Error);
   };
-  std::get<0>(BE_errors_)["VERROR"] = [this](DecoderImpl*) -> void {
-    callbacks_->incError(DecoderCallbacks::ErrorType::Error);
-  };
-  std::get<0>(BE_errors_)["SFATAL"] = [this](DecoderImpl*) -> void {
+  std::get<0>(BE_errors_)["FATAL"] = [this](DecoderImpl*) -> void {
     callbacks_->incError(DecoderCallbacks::ErrorType::Fatal);
   };
-  std::get<0>(BE_errors_)["VFATAL"] = [this](DecoderImpl*) -> void {
-    callbacks_->incError(DecoderCallbacks::ErrorType::Fatal);
-  };
-  std::get<0>(BE_errors_)["SPANIC"] = [this](DecoderImpl*) -> void {
-    callbacks_->incError(DecoderCallbacks::ErrorType::Panic);
-  };
-  std::get<0>(BE_errors_)["VPANIC"] = [this](DecoderImpl*) -> void {
+  std::get<0>(BE_errors_)["PANIC"] = [this](DecoderImpl*) -> void {
     callbacks_->incError(DecoderCallbacks::ErrorType::Panic);
   };
   // Setup handler which is called when decoder cannot decode the message and treats it as Unknown
@@ -140,36 +129,19 @@ void DecoderImpl::initialize() {
   };
 
   // Setup hash map for handling backend NoticeResponse messages.
-  // Versions prior to 9.6 have keywords starting with S and
-  // Postgres versions 9.6 and higher use keywords starting with V.
-  std::get<0>(BE_notices_)["SWARNING"] = [this](DecoderImpl*) -> void {
+  std::get<0>(BE_notices_)["WARNING"] = [this](DecoderImpl*) -> void {
     callbacks_->incNotice(DecoderCallbacks::NoticeType::Warning);
   };
-  std::get<0>(BE_notices_)["VWARNING"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Warning);
-  };
-  std::get<0>(BE_notices_)["SNOTICE"] = [this](DecoderImpl*) -> void {
+  std::get<0>(BE_notices_)["NOTICE"] = [this](DecoderImpl*) -> void {
     callbacks_->incNotice(DecoderCallbacks::NoticeType::Notice);
   };
-  std::get<0>(BE_notices_)["VNOTICE"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Notice);
-  };
-  std::get<0>(BE_notices_)["SDEBUG"] = [this](DecoderImpl*) -> void {
+  std::get<0>(BE_notices_)["DEBUG"] = [this](DecoderImpl*) -> void {
     callbacks_->incNotice(DecoderCallbacks::NoticeType::Debug);
   };
-  std::get<0>(BE_notices_)["VDEBUG"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Debug);
-  };
-  std::get<0>(BE_notices_)["SINFO"] = [this](DecoderImpl*) -> void {
+  std::get<0>(BE_notices_)["INFO"] = [this](DecoderImpl*) -> void {
     callbacks_->incNotice(DecoderCallbacks::NoticeType::Info);
   };
-  std::get<0>(BE_notices_)["VINFO"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Info);
-  };
-  std::get<0>(BE_notices_)["SLOG"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Log);
-  };
-  std::get<0>(BE_notices_)["VLOG"] = [this](DecoderImpl*) -> void {
+  std::get<0>(BE_notices_)["LOG"] = [this](DecoderImpl*) -> void {
     callbacks_->incNotice(DecoderCallbacks::NoticeType::Log);
   };
   // Setup handler which is called when decoder cannot decode the message and treats it as Unknown
@@ -332,7 +304,11 @@ void DecoderImpl::decodeErrorNotice(
   }
 
   for (const auto it : std::get<0>(types)) {
-    if (message_.find(it.first) != std::string::npos) {
+    // Try to find a keyword with S prefix or V prefix.
+    // Postgres versions prior to 9.6 use only S prefix while
+    // versions higher than 9.6 use S and V prefixes.
+    if ((message_.find("S" + it.first) != std::string::npos) ||
+        (message_.find("V" + it.first) != std::string::npos)) {
       it.second(this);
       return;
     }
