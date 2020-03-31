@@ -354,6 +354,7 @@ alignof
 alloc
 alloca
 allocator
+allowlist
 alls
 alphanumerics
 amongst
@@ -638,6 +639,7 @@ ified
 impl
 implementors
 impls
+indices
 inflater
 inflight
 -ing
@@ -733,6 +735,7 @@ mixin
 mkdir
 mmap
 mmsg
+mmsghdr
 mongo
 moveable
 msec
@@ -754,6 +757,7 @@ namespaces
 namespacing
 nan
 natively
+ndk
 netblock
 netblocks
 netfilter
