@@ -155,12 +155,8 @@ TEST_F(MaglevLoadBalancerTest, BasicWithRetryHostPredicate) {
   // maglev: i=5 host=127.0.0.1:90
   // maglev: i=6 host=127.0.0.1:93
   LoadBalancerPtr lb = lb_->factory()->create();
-  const std::vector<HostConstSharedPtr> expected_hosts{
-      host_set_.hosts_[2], host_set_.hosts_[4], host_set_.hosts_[0], host_set_.hosts_[1],
-      host_set_.hosts_[5], host_set_.hosts_[0], host_set_.hosts_[3],
-  };
-
   {
+    // Confirm that i=3 is selected by the hash.
     TestLoadBalancerContext context(10);
     EXPECT_EQ(host_set_.hosts_[1], lb->chooseHost(&context));
   }
@@ -172,7 +168,7 @@ TEST_F(MaglevLoadBalancerTest, BasicWithRetryHostPredicate) {
   {
     // Second attempt chooses a different host in the ring.
     TestLoadBalancerContext context(
-        10, 2, [&](const Host& host) { return &host == expected_hosts[3].get(); });
+        10, 2, [&](const Host& host) { return &host == host_set_.hosts_[1].get(); });
     EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(&context));
   }
   {
