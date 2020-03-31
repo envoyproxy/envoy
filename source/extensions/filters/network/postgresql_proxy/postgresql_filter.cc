@@ -131,8 +131,31 @@ void PostgreSQLFilter::incTransactionsRollback() {
   }
 }
 
+void PostgreSQLFilter::incNotice(NoticeType type) {
+  config_->stats_.notices_.inc();
+  switch (type) {
+  case Warning:
+    config_->stats_.notices_warning_.inc();
+    break;
+  case Notice:
+    config_->stats_.notices_notice_.inc();
+    break;
+  case Debug:
+    config_->stats_.notices_debug_.inc();
+    break;
+  case Info:
+    config_->stats_.notices_debug_.inc();
+    break;
+  case Log:
+    config_->stats_.notices_log_.inc();
+    break;
+  case Unknown:
+    config_->stats_.notices_unknown_.inc();
+    break;
+  }
+}
+
 void PostgreSQLFilter::incUnknown() { config_->stats_.unknown_.inc(); }
-void PostgreSQLFilter::incWarnings() { config_->stats_.warnings_.inc(); }
 
 void PostgreSQLFilter::doDecode(Buffer::Instance& data, bool frontend) {
   // Keep processing data until buffer is empty or decoder says

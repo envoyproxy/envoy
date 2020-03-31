@@ -28,7 +28,7 @@ public:
   MOCK_METHOD(void, incTransactionsCommit, (), (override));
   MOCK_METHOD(void, incTransactionsRollback, (), (override));
   MOCK_METHOD(void, incUnknown, (), (override));
-  MOCK_METHOD(void, incWarnings, (), (override));
+  MOCK_METHOD(void, incNotice, (NoticeType), (override));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -64,6 +64,15 @@ class PostgreSQLProxyFrontendEncrDecoderTest : public PostgreSQLProxyDecoderTest
 // Class is used for parameterized tests for backend messages.
 class PostgreSQLProxyBackendDecoderTest : public PostgreSQLProxyDecoderTestBase,
                                           public ::testing::TestWithParam<std::string> {};
+
+class PostgreSQLProxyErrorTest
+    : public PostgreSQLProxyDecoderTestBase,
+      public ::testing::TestWithParam<
+          std::tuple<std::string, uint32_t, uint32_t, uint32_t, uint32_t>> {};
+
+class PostgreSQLProxyNoticeTest
+    : public PostgreSQLProxyDecoderTestBase,
+      public ::testing::TestWithParam<std::tuple<std::string, DecoderCallbacks::NoticeType>> {};
 
 // Test processing the startup message from a client.
 // For historical reasons, the first message does not include
@@ -390,102 +399,53 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, AuthenticationMsg) {
 
 // Test check parsing of E message. The message
 // indicates error.
-TEST_F(PostgreSQLProxyBackendDecoderTest, ErrorMsg) {
-  // Check that even when message type is E,
-  // it must contain start with S character
-  EXPECT_CALL(callbacks_, incErrorsError()).Times(0);
-  EXPECT_CALL(callbacks_, incErrorsFatal()).Times(0);
-  EXPECT_CALL(callbacks_, incErrorsPanic()).Times(0);
-  EXPECT_CALL(callbacks_, incErrorsUnknown()).Times(1);
-  payload_ = "blah blah";
+TEST_P(PostgreSQLProxyErrorTest, ParseErrorMsgs) {
+  EXPECT_CALL(callbacks_, incErrorsError()).Times(std::get<1>(GetParam()));
+  EXPECT_CALL(callbacks_, incErrorsFatal()).Times(std::get<2>(GetParam()));
+  EXPECT_CALL(callbacks_, incErrorsPanic()).Times(std::get<3>(GetParam()));
+  EXPECT_CALL(callbacks_, incErrorsUnknown()).Times(std::get<4>(GetParam()));
+  payload_ = std::get<0>(GetParam());
   data_.add("E");
   length_ = htonl(4 + payload_.length());
   data_.add(&length_, sizeof(length_));
   data_.add(payload_);
   decoder_->onData(data_, false);
-  data_.drain(data_.length());
-
-  // Check for unknow localized message for version <= 9.5
-  EXPECT_CALL(callbacks_, incErrorsError()).Times(1);
-  EXPECT_CALL(callbacks_, incErrorsFatal()).Times(0);
-  EXPECT_CALL(callbacks_, incErrorsPanic()).Times(0);
-  EXPECT_CALL(callbacks_, incErrorsUnknown()).Times(0);
-  payload_ = "SERROC1234";
-  data_.add("E");
-  length_ = htonl(4 + payload_.length());
-  data_.add(&length_, sizeof(length_));
-  data_.add(payload_);
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
-
-  // Now for the correct message with ERROR severity
-  // string inside.
-  EXPECT_CALL(callbacks_, incErrorsError()).Times(1);
-  payload_ = "SERRORC1234";
-  data_.add("E");
-  length_ = htonl(4 + payload_.length());
-  data_.add(&length_, sizeof(length_));
-  data_.add(payload_);
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
-
-  EXPECT_CALL(callbacks_, incErrorsError()).Times(1);
-  payload_ = "SERRORVERRORC1234";
-  data_.add("E");
-  length_ = htonl(4 + payload_.length());
-  data_.add(&length_, sizeof(length_));
-  data_.add(payload_);
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
-
-  // Now for the correct message with FATAL severity
-  // string inside.
-  EXPECT_CALL(callbacks_, incErrorsFatal()).Times(1);
-  payload_ = "SFATALVFATALC22012";
-  data_.add("E");
-  length_ = htonl(4 + payload_.length());
-  data_.add(&length_, sizeof(length_));
-  data_.add(payload_);
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
-
-  // Now for the correct message with PANIC severity
-  // string inside.
-  EXPECT_CALL(callbacks_, incErrorsPanic()).Times(1);
-  payload_ = "SPANICVPANICC22012";
-  data_.add("E");
-  length_ = htonl(4 + payload_.length());
-  data_.add(&length_, sizeof(length_));
-  data_.add(payload_);
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
 }
 
-// Test N type of message: Notification.
-// The decoder should react only when the message contains
-// warning content.
-TEST_F(PostgreSQLProxyBackendDecoderTest, NotificationMsg) {
-  // Nothing should happen if the message does not contain
-  // specific warning  string
-  EXPECT_CALL(callbacks_, incWarnings()).Times(0);
-  payload_ = "blah blah";
+INSTANTIATE_TEST_SUITE_P(
+    PostgreSQLProxyErrorTestSuite, PostgreSQLProxyErrorTest,
+    ::testing::Values(
+        std::make_tuple("blah blah", 0, 0, 0, 1), std::make_tuple("SBLAHC1234", 0, 0, 0, 1),
+        std::make_tuple("SERRORC1234", 1, 0, 0, 0),
+        std::make_tuple("SERRORVERRORC1234", 1, 0, 0, 0),
+        std::make_tuple("SFATALVFATALC22012", 0, 1, 0, 0),
+        std::make_tuple("SPANICVPANICC22012", 0, 0, 1, 0),
+        std::make_tuple("SPANIKVPANICC42501Mkonnte Datei »pg_wal/000000010000000100000096« nicht "
+                        "öffnen: Permission deniedFxlog.cL3229RXLogFileInit",
+                        0, 0, 1, 0)));
+
+// Test parsing N message. It indicate notice
+// and carries additional information about the
+// purpose of the message.
+TEST_P(PostgreSQLProxyNoticeTest, ParseNoticeMsgs) {
+  EXPECT_CALL(callbacks_, incNotice(std::get<1>(GetParam())));
+  payload_ = std::get<0>(GetParam());
   data_.add("N");
   length_ = htonl(4 + payload_.length());
   data_.add(&length_, sizeof(length_));
   data_.add(payload_);
   decoder_->onData(data_, false);
-  data_.drain(data_.length());
-
-  // Warnings stats should be updated now.
-  EXPECT_CALL(callbacks_, incWarnings());
-  payload_ = "blah VWARNING blah";
-  data_.add("N");
-  length_ = htonl(4 + payload_.length());
-  data_.add(&length_, sizeof(length_));
-  data_.add(payload_);
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    PostgreSQLProxyNoticeTestSuite, PostgreSQLProxyNoticeTest,
+    ::testing::Values(std::make_tuple("blah blah", DecoderCallbacks::NoticeType::Unknown),
+                      std::make_tuple("SblalalaC2345", DecoderCallbacks::NoticeType::Unknown),
+                      std::make_tuple("SblahWARNING23345", DecoderCallbacks::NoticeType::Warning),
+                      std::make_tuple("SblahblahNOTICEbbal4", DecoderCallbacks::NoticeType::Notice),
+                      std::make_tuple("SINFO", DecoderCallbacks::NoticeType::Info),
+                      std::make_tuple("SDEBUGDEBUG", DecoderCallbacks::NoticeType::Debug),
+                      std::make_tuple("SLLLLOGGGG", DecoderCallbacks::NoticeType::Log)));
 
 // Test checks if the decoder can detect initial message which indicates
 // that protocol uses encryption
