@@ -416,9 +416,11 @@ std::string StringUtil::escape(const std::string& source) {
   return ret;
 }
 
-std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) {
-  static const std::string DefaultDateFormat = "%Y-%m-%dT%H:%M:%E3SZ";
+const std::string& getDefaultDateFormat() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "%Y-%m-%dT%H:%M:%E3SZ");
+}
 
+std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) {
   struct CachedTime {
     std::chrono::seconds epoch_time_seconds;
     std::string formatted_time;
@@ -432,8 +434,8 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) 
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
 
   if (cached_time.formatted_time.empty() || cached_time.epoch_time_seconds != epoch_time_seconds) {
-    cached_time.formatted_time =
-        absl::FormatTime(DefaultDateFormat, absl::FromChrono(system_time), absl::UTCTimeZone());
+    cached_time.formatted_time = absl::FormatTime(
+        getDefaultDateFormat(), absl::FromChrono(system_time), absl::UTCTimeZone());
     cached_time.epoch_time_seconds = epoch_time_seconds;
   } else {
     // Overwrite the digits in the ".000Z" at the end of the string with the
