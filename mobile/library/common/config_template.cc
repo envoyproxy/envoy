@@ -157,6 +157,9 @@ stats_config:
             regex: 'cluster\.[\w]+?\.upstream_rq_[1|2|3|4|5]xx'
         - safe_regex:
             google_re2: {}
+            regex: 'cluster\.[\w]+?\.upstream_rq_active'
+        - safe_regex:
+            google_re2: {}
             regex: 'cluster\.[\w]+?\.upstream_rq_retry'
         - safe_regex:
             google_re2: {}
