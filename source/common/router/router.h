@@ -247,7 +247,7 @@ class UpstreamRequest;
 using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
 
 // The interface the UpstreamRequest has to interact with the router filter.
-// Split out primarily for mockable unit tests.
+// Split out primarily for unit test mocks.
 class RouterFilterInterface {
 public:
   virtual ~RouterFilterInterface() = default;
