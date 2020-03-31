@@ -198,4 +198,5 @@ static void BM_PriorityAndLocalityWeighted(benchmark::State& state) {
     speed_test.PriorityAndLocalityWeightedHelper(state.range(0));
   }
 }
-BENCHMARK(BM_PriorityAndLocalityWeighted)->Arg(2)->Arg(20)->Arg(200)->Arg(2000)->Arg(20000);
+BENCHMARK(BM_PriorityAndLocalityWeighted)->Arg(2000)->Arg(4000)->Arg(6000)->Arg(8000)->Arg(10000)->
+    Arg(12000)->Arg(14000)->Arg(16000)->Arg(18000)->Arg(20000);
