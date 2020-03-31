@@ -251,9 +251,9 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["dataplane"],
     ),
     com_github_pallets_jinja = dict(
-        sha256 = "db49236731373e4f3118af880eb91bb0aa6978bc0cf8b35760f6a026f1a9ffc4",
-        strip_prefix = "jinja-2.10.3",
-        urls = ["https://github.com/pallets/jinja/archive/2.10.3.tar.gz"],
+        sha256 = "35ccc930685e37c4762258917e822b5db29b60431afb6d6e00e22b4f5287165a",
+        strip_prefix = "jinja-2.11.1",
+        urls = ["https://github.com/pallets/jinja/archive/2.11.1.tar.gz"],
         use_category = ["build"],
     ),
     com_github_pallets_markupsafe = dict(
