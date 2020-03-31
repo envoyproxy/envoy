@@ -7,11 +7,14 @@
 #include "common/decompressor/zlib_decompressor_impl.h"
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/http/gzip/config.h"
 #include "extensions/filters/http/gzip/gzip_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "absl/container/fixed_array.h"
@@ -415,6 +418,39 @@ TEST(GzipFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName
       nullptr,
       Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
           deprecated_name));
+}
+
+// Test that the deprecated extension triggers an exception.
+TEST(GzipFilterFactoryTest, DEPRECATED_FEATURE_TEST(TestCheckDeprecatedExtensionThrows)) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  GzipFilterFactory factory;
+  envoy::extensions::filters::http::gzip::v3::Gzip config;
+
+  EXPECT_CALL(
+      context.runtime_loader_.snapshot_,
+      deprecatedFeatureEnabled("envoy.deprecated_features.allow_deprecated_gzip_http_filter", _))
+      .WillRepeatedly(Return(false));
+
+  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(config, "stats.", context),
+                          EnvoyException,
+                          "Using deprecated extension 'envoy.extensions.filters.http.gzip'.*");
+}
+
+// Test that the deprecated extension gives a deprecation warning.
+TEST(GzipFilterFactoryTest, DEPRECATED_FEATURE_TEST(TestCheckDeprecatedExtensionWarns)) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  GzipFilterFactory factory;
+  envoy::extensions::filters::http::gzip::v3::Gzip config;
+
+  EXPECT_CALL(
+      context.runtime_loader_.snapshot_,
+      deprecatedFeatureEnabled("envoy.deprecated_features.allow_deprecated_gzip_http_filter", _))
+      .WillRepeatedly(Return(true));
+
+  EXPECT_NO_THROW(factory.createFilterFactoryFromProto(config, "stats.", context));
+
+  EXPECT_LOG_CONTAINS("warn", "Using deprecated extension 'envoy.extensions.filters.http.gzip'.",
+                      factory.createFilterFactoryFromProto(config, "stats.", context));
 }
 
 } // namespace Gzip
