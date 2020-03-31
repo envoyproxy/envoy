@@ -32,8 +32,7 @@ declare -r PROTO_TARGETS=$(bazel query "labels(srcs, labels(deps, @envoy_api_can
 BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all"
 
 bazel build ${BAZEL_BUILD_OPTIONS} --//tools/api_proto_plugin:default_type_db_target=@envoy_api_canonical//versioning:active_protos \
-  @envoy_api_canonical//versioning:active_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto \
-  --action_env=CPROFILE_ENABLED=1 --host_force_python=PY3
+  @envoy_api_canonical//versioning:active_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto
 
 TOOLS=$(dirname $(dirname $(realpath $0)))
 # to satisfy dependency on api_proto_plugin
