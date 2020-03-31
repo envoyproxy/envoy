@@ -162,23 +162,23 @@ TEST_F(MaglevLoadBalancerTest, BasicWithRetryHostPredicate) {
 
   {
     TestLoadBalancerContext context(10);
-    EXPECT_EQ(expected_hosts[3], lb->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[1], lb->chooseHost(&context));
   }
   {
     // First attempt succeeds even when retry count is > 0.
     TestLoadBalancerContext context(10, 2, [](const Host&) { return false; });
-    EXPECT_EQ(expected_hosts[3], lb->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[1], lb->chooseHost(&context));
   }
   {
     // Second attempt chooses a different host in the ring.
     TestLoadBalancerContext context(
         10, 2, [&](const Host& host) { return &host == expected_hosts[3].get(); });
-    EXPECT_EQ(expected_hosts[5], lb->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(&context));
   }
   {
     // Exhausted retries return the last checked host.
     TestLoadBalancerContext context(10, 2, [](const Host&) { return true; });
-    EXPECT_EQ(expected_hosts[4], lb->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb->chooseHost(&context));
   }
 }
 

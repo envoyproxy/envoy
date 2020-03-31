@@ -87,6 +87,8 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h, uint32_t a
   }
 
   // If a retry host predicate is being applied, behave as if this host was not in the ring.
+  // Note that this does not guarantee a different host: e.g., attempt == ring_.size() or
+  // when the offset causes us to select the same host at another location in the ring.
   if (attempt > 0) {
     midp = (midp + attempt) % ring_.size();
   }
