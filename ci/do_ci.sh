@@ -316,7 +316,7 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   echo "check_format..."
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
-  ./tools/proto_format/proto_format.sh check
+  ./tools/proto_format/proto_format.sh check --test
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."

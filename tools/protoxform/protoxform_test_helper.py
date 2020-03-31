@@ -107,10 +107,10 @@ if __name__ == "__main__":
   logging.basicConfig(format='%(message)s')
   for target in sys.argv[1:]:
     path, filename = PathAndFilename(target)
-    messages += Run(path, filename, 'v2')
-    messages += Run(path, filename, 'v3')
-    messages += Run(path, filename, 'v3')
-    messages += Run(path, filename, 'v3.envoy_internal')
+    messages += Run(path, filename, 'active')
+    messages += Run(path, filename, 'next_major_version_candidate')
+    messages += Run(path, filename, 'next_major_version_candidate')
+    messages += Run(path, filename, 'next_major_version_candidate.envoy_internal')
 
   if len(messages) == 0:
     logging.warning("PASS")
