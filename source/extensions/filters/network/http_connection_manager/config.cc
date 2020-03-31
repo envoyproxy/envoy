@@ -20,7 +20,9 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
@@ -458,14 +460,28 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          const Buffer::Instance& data,
                                          Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
-  case CodecType::HTTP1:
-    return std::make_unique<Http::Http1::ServerConnectionImpl>(
-        connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb(),
-        maxRequestHeadersCount());
-  case CodecType::HTTP2:
-    return std::make_unique<Http::Http2::ServerConnectionImpl>(
-        connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount());
+  case CodecType::HTTP1: {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+      return std::make_unique<Http::Http1::ServerConnectionImpl>(
+          connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb(),
+          maxRequestHeadersCount());
+    } else {
+      return std::make_unique<Http::Legacy::Http1::ServerConnectionImpl>(
+          connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb(),
+          maxRequestHeadersCount());
+    }
+  }
+  case CodecType::HTTP2: {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+      return std::make_unique<Http::Http2::ServerConnectionImpl>(
+          connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
+          maxRequestHeadersCount());
+    } else {
+      return std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
+          connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
+          maxRequestHeadersCount());
+    }
+  }
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
     // TODO(danzh) Add support to get the factory name from config, possibly

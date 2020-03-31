@@ -190,6 +190,9 @@ public:
   void addClusterFilterMetadata(absl::string_view metadata_yaml,
                                 absl::string_view cluster_name = "cluster_0");
 
+  // Set legacy codecs to use for upstream and downstream codecs.
+  void setLegacyCodecs();
+
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(

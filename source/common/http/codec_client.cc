@@ -9,7 +9,9 @@
 #include "common/config/utility.h"
 #include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
@@ -148,15 +150,27 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case Type::HTTP1: {
-    codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        *connection_, host->cluster().statsScope(), *this, host->cluster().http1Settings(),
-        host->cluster().maxResponseHeadersCount());
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+      codec_ = std::make_unique<Http1::ClientConnectionImpl>(
+          *connection_, host->cluster().statsScope(), *this, host->cluster().http1Settings(),
+          host->cluster().maxResponseHeadersCount());
+    } else {
+      codec_ = std::make_unique<Legacy::Http1::ClientConnectionImpl>(
+          *connection_, host->cluster().statsScope(), *this, host->cluster().http1Settings(),
+          host->cluster().maxResponseHeadersCount());
+    }
     break;
   }
   case Type::HTTP2: {
-    codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-        *connection_, *this, host->cluster().statsScope(), host->cluster().http2Options(),
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+      codec_ = std::make_unique<Http2::ClientConnectionImpl>(
+          *connection_, *this, host->cluster().statsScope(), host->cluster().http2Options(),
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
+    } else {
+      codec_ = std::make_unique<Http2::ClientConnectionImpl>(
+          *connection_, *this, host->cluster().statsScope(), host->cluster().http2Options(),
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
+    }
     break;
   }
   case Type::HTTP3: {
@@ -164,6 +178,7 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
         Config::Utility::getAndCheckFactoryByName<Http::QuicHttpClientConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
             .createQuicClientConnection(*connection_, *this));
+    break;
   }
   }
 }
