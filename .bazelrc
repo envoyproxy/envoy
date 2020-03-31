@@ -13,7 +13,7 @@ startup --host_jvm_args=-Xmx2g
 build --workspace_status_command=bazel/get_workspace_status
 build --experimental_local_memory_estimate
 build --experimental_strict_action_env=true
-build --host_force_python=PY2
+build --host_force_python=PY3
 build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build --action_env=BAZEL_LINKOPTS=-lm
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
@@ -197,6 +197,13 @@ build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:plain-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
+
+# Compile database generation config
+# We don't care about built binaries so always strip and use fastbuild.
+build:compdb -c fastbuild
+build:compdb --strip=always
+build:compdb --build_tag_filters=-nocompdb
+build:compdb --define=ENVOY_CONFIG_COMPILATION_DATABASE=1
 
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc
