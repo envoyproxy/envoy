@@ -18,35 +18,28 @@ namespace PostgreSQLProxy {
 // General callbacks for dispatching decoded PostgreSQL messages to a sink.
 class DecoderCallbacks {
 public:
-  enum NoticeType { Warning, Notice, Debug, Info, Log, Unknown };
-
   virtual ~DecoderCallbacks() = default;
 
   virtual void incBackend() PURE;
-
-  virtual void incErrorsError() PURE;
-  virtual void incErrorsFatal() PURE;
-  virtual void incErrorsPanic() PURE;
-  virtual void incErrorsUnknown() PURE;
-
   virtual void incFrontend() PURE;
 
   virtual void incSessionsEncrypted() PURE;
   virtual void incSessionsUnencrypted() PURE;
 
-  virtual void incStatements() PURE;
-  virtual void incStatementsDelete() PURE;
-  virtual void incStatementsInsert() PURE;
-  virtual void incStatementsOther() PURE;
-  virtual void incStatementsSelect() PURE;
-  virtual void incStatementsUpdate() PURE;
+  enum class StatementType { Insert, Delete, Select, Update, Other, Noop };
+  virtual void incStatement(StatementType) PURE;
 
   virtual void incTransactions() PURE;
   virtual void incTransactionsCommit() PURE;
   virtual void incTransactionsRollback() PURE;
 
   virtual void incUnknown() PURE;
+
+  enum class NoticeType { Warning, Notice, Debug, Info, Log, Unknown };
   virtual void incNotice(NoticeType) PURE;
+
+  enum class ErrorType { Error, Fatal, Panic, Unknown };
+  virtual void incError(ErrorType) PURE;
 };
 
 // PostgreSQL message decoder.
@@ -91,8 +84,6 @@ protected:
   void incFrontend() { callbacks_->incFrontend(); }
   void incSessionsEncrypted() { callbacks_->incSessionsEncrypted(); }
   void incSessionsUnencrypted() { callbacks_->incSessionsUnencrypted(); }
-  void incStatements() { callbacks_->incStatements(); }
-  void incStatementsOther() { callbacks_->incStatementsOther(); }
   void incUnknown() { callbacks_->incUnknown(); }
 
   DecoderCallbacks* callbacks_;
@@ -135,8 +126,9 @@ protected:
   absl::flat_hash_map<std::string, MsgAction> BE_statements_;
 
   // hash map for dispatching backend errors and notice messages
-  absl::flat_hash_map<std::string, MsgAction> BE_errors_;
-  absl::flat_hash_map<std::string, MsgAction> BE_notices_;
+  std::tuple<absl::flat_hash_map<std::string, MsgAction>, MsgAction> BE_errors_;
+  std::tuple<absl::flat_hash_map<std::string, MsgAction>, MsgAction> BE_notices_;
+  void decodeErrorNotice(std::tuple<absl::flat_hash_map<std::string, MsgAction>, MsgAction>& types);
 };
 
 } // namespace PostgreSQLProxy

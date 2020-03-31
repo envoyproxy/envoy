@@ -72,57 +72,110 @@ void DecoderImpl::initialize() {
 
   // Setup hash map for handling backend statements.
   BE_statements_["BEGIN"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatementsOther();
+    callbacks_->incStatement(DecoderCallbacks::StatementType::Other);
+    callbacks_->incTransactions();
     session_.setInTransaction(true);
   };
   BE_statements_["ROLLBACK"] = [this](DecoderImpl*) -> void {
+    callbacks_->incStatement(DecoderCallbacks::StatementType::Noop);
     callbacks_->incTransactionsRollback();
     session_.setInTransaction(false);
   };
   BE_statements_["START"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatementsOther();
+    callbacks_->incStatement(DecoderCallbacks::StatementType::Other);
+    callbacks_->incTransactions();
     session_.setInTransaction(true);
   };
   BE_statements_["COMMIT"] = [this](DecoderImpl*) -> void {
+    callbacks_->incStatement(DecoderCallbacks::StatementType::Noop);
     session_.setInTransaction(false);
     callbacks_->incTransactionsCommit();
   };
   BE_statements_["SELECT"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatementsSelect();
+    callbacks_->incStatement(DecoderCallbacks::StatementType::Select);
+    callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
   };
   BE_statements_["INSERT"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatementsInsert();
+    callbacks_->incStatement(DecoderCallbacks::StatementType::Insert);
+    callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
   };
   BE_statements_["UPDATE"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatementsUpdate();
+    callbacks_->incStatement(DecoderCallbacks::StatementType::Update);
+    callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
   };
   BE_statements_["DELETE"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatementsDelete();
+    callbacks_->incStatement(DecoderCallbacks::StatementType::Delete);
+    callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
   };
 
-  // Setup hash map for handling backend ErrorResponse and NoticeResponse.
-  BE_errors_["ERROR"] = [this](DecoderImpl*) -> void { callbacks_->incErrorsError(); };
-  BE_errors_["FATAL"] = [this](DecoderImpl*) -> void { callbacks_->incErrorsFatal(); };
-  BE_errors_["PANIC"] = [this](DecoderImpl*) -> void { callbacks_->incErrorsPanic(); };
+  // Setup hash map for handling backend ErrorResponse messages.
+  // Versions prior to 9.6 have keywords starting with S and
+  // Postgres versions 9.6 and higher use keywords starting with V.
+  std::get<0>(BE_errors_)["SERROR"] = [this](DecoderImpl*) -> void {
+    callbacks_->incError(DecoderCallbacks::ErrorType::Error);
+  };
+  std::get<0>(BE_errors_)["VERROR"] = [this](DecoderImpl*) -> void {
+    callbacks_->incError(DecoderCallbacks::ErrorType::Error);
+  };
+  std::get<0>(BE_errors_)["SFATAL"] = [this](DecoderImpl*) -> void {
+    callbacks_->incError(DecoderCallbacks::ErrorType::Fatal);
+  };
+  std::get<0>(BE_errors_)["VFATAL"] = [this](DecoderImpl*) -> void {
+    callbacks_->incError(DecoderCallbacks::ErrorType::Fatal);
+  };
+  std::get<0>(BE_errors_)["SPANIC"] = [this](DecoderImpl*) -> void {
+    callbacks_->incError(DecoderCallbacks::ErrorType::Panic);
+  };
+  std::get<0>(BE_errors_)["VPANIC"] = [this](DecoderImpl*) -> void {
+    callbacks_->incError(DecoderCallbacks::ErrorType::Panic);
+  };
+  // Setup handler which is called when decoder cannot decode the message and treats it as Unknown
+  // Error message.
+  std::get<1>(BE_errors_) = [this](DecoderImpl*) -> void {
+    callbacks_->incError(DecoderCallbacks::ErrorType::Unknown);
+  };
 
-  BE_notices_["WARNING"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::Warning);
+  // Setup hash map for handling backend NoticeResponse messages.
+  // Versions prior to 9.6 have keywords starting with S and
+  // Postgres versions 9.6 and higher use keywords starting with V.
+  std::get<0>(BE_notices_)["SWARNING"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Warning);
   };
-  BE_notices_["NOTICE"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::Notice);
+  std::get<0>(BE_notices_)["VWARNING"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Warning);
   };
-  BE_notices_["DEBUG"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::Debug);
+  std::get<0>(BE_notices_)["SNOTICE"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Notice);
   };
-  BE_notices_["INFO"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::Info);
+  std::get<0>(BE_notices_)["VNOTICE"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Notice);
   };
-  BE_notices_["LOG"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::Log);
+  std::get<0>(BE_notices_)["SDEBUG"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Debug);
+  };
+  std::get<0>(BE_notices_)["VDEBUG"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Debug);
+  };
+  std::get<0>(BE_notices_)["SINFO"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Info);
+  };
+  std::get<0>(BE_notices_)["VINFO"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Info);
+  };
+  std::get<0>(BE_notices_)["SLOG"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Log);
+  };
+  std::get<0>(BE_notices_)["VLOG"] = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Log);
+  };
+  // Setup handler which is called when decoder cannot decode the message and treats it as Unknown
+  // Notice message.
+  std::get<1>(BE_notices_) = [this](DecoderImpl*) -> void {
+    callbacks_->incNotice(DecoderCallbacks::NoticeType::Unknown);
   };
 }
 
@@ -233,8 +286,6 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 // decoded. It extracts the keyword from message's payload
 // and updates stats associated with that keyword.
 void DecoderImpl::decodeBackendStatements() {
-  callbacks_->incStatements();
-
   // The message_ contains the statement. Find space character
   // and the statement is the first word. If space cannot be found
   // take the whole message
@@ -244,7 +295,8 @@ void DecoderImpl::decodeBackendStatements() {
   if (it != BE_statements_.end()) {
     (*it).second(this);
   } else {
-    callbacks_->incStatementsOther();
+    callbacks_->incStatement(DecoderCallbacks::StatementType::Other);
+    callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
   }
 }
@@ -269,49 +321,34 @@ void DecoderImpl::decodeAuthentication() {
   }
 }
 
-// Method parses E (Error) message and looks for string
-// indicating that error happened.
-void DecoderImpl::decodeBackendErrorResponse() {
-
+// Method is used to parse Error and Notice messages. Their syntax is the same, but they
+// use different keywords inside the message and statistics fields are different.
+void DecoderImpl::decodeErrorNotice(
+    std::tuple<absl::flat_hash_map<std::string, MsgAction>, MsgAction>& types) {
   // Error/Notice message should start with character "S"
   if (message_[0] != 'S') {
-    callbacks_->incErrorsUnknown();
+    std::get<1>(types)(this);
     return;
   }
 
-  bool found = false;
-  for (const auto it : BE_errors_) {
+  for (const auto it : std::get<0>(types)) {
     if (message_.find(it.first) != std::string::npos) {
-      found = true;
       it.second(this);
+      return;
     }
   }
 
-  if (!found) {
-    callbacks_->incErrorsUnknown();
-  }
+  // keyword was not found in the message. Count is as Unknown.
+  std::get<1>(types)(this);
 }
+
+// Method parses E (Error) message and looks for string
+// indicating that error happened.
+void DecoderImpl::decodeBackendErrorResponse() { decodeErrorNotice(BE_errors_); }
 
 // Method parses N (Notice) message and looks for string
 // indicating its meaning. It can be warning, notice, info, debug or log.
-void DecoderImpl::decodeBackendNoticeResponse() {
-  if (message_[0] != 'S') {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Unknown);
-    return;
-  }
-
-  bool found = false;
-  for (const auto it : BE_notices_) {
-    if (message_.find(it.first) != std::string::npos) {
-      found = true;
-      it.second(this);
-    }
-  }
-
-  if (!found) {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Unknown);
-  }
-}
+void DecoderImpl::decodeBackendNoticeResponse() { decodeErrorNotice(BE_notices_); }
 
 } // namespace PostgreSQLProxy
 } // namespace NetworkFilters

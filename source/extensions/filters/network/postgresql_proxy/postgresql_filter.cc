@@ -54,26 +54,6 @@ DecoderPtr PostgreSQLFilter::createDecoder(DecoderCallbacks* callbacks) {
 
 void PostgreSQLFilter::incBackend() { config_->stats_.backend_msgs_.inc(); }
 
-void PostgreSQLFilter::incErrorsError() {
-  config_->stats_.errors_.inc();
-  config_->stats_.errors_error_.inc();
-}
-
-void PostgreSQLFilter::incErrorsFatal() {
-  config_->stats_.errors_.inc();
-  config_->stats_.errors_fatal_.inc();
-}
-
-void PostgreSQLFilter::incErrorsPanic() {
-  config_->stats_.errors_.inc();
-  config_->stats_.errors_panic_.inc();
-}
-
-void PostgreSQLFilter::incErrorsUnknown() {
-  config_->stats_.errors_.inc();
-  config_->stats_.errors_unknown_.inc();
-}
-
 void PostgreSQLFilter::incFrontend() { config_->stats_.frontend_msgs_.inc(); }
 
 void PostgreSQLFilter::incSessionsEncrypted() {
@@ -84,33 +64,6 @@ void PostgreSQLFilter::incSessionsEncrypted() {
 void PostgreSQLFilter::incSessionsUnencrypted() {
   config_->stats_.sessions_.inc();
   config_->stats_.sessions_unencrypted_.inc();
-}
-
-void PostgreSQLFilter::incStatements() { config_->stats_.statements_.inc(); }
-
-void PostgreSQLFilter::incStatementsDelete() {
-  config_->stats_.statements_delete_.inc();
-  incTransactions();
-}
-
-void PostgreSQLFilter::incStatementsInsert() {
-  config_->stats_.statements_insert_.inc();
-  incTransactions();
-}
-
-void PostgreSQLFilter::incStatementsOther() {
-  config_->stats_.statements_other_.inc();
-  incTransactions();
-}
-
-void PostgreSQLFilter::incStatementsSelect() {
-  config_->stats_.statements_select_.inc();
-  incTransactions();
-}
-
-void PostgreSQLFilter::incStatementsUpdate() {
-  config_->stats_.statements_update_.inc();
-  incTransactions();
 }
 
 void PostgreSQLFilter::incTransactions() {
@@ -134,23 +87,65 @@ void PostgreSQLFilter::incTransactionsRollback() {
 void PostgreSQLFilter::incNotice(NoticeType type) {
   config_->stats_.notices_.inc();
   switch (type) {
-  case Warning:
+  case DecoderCallbacks::NoticeType::Warning:
     config_->stats_.notices_warning_.inc();
     break;
-  case Notice:
+  case DecoderCallbacks::NoticeType::Notice:
     config_->stats_.notices_notice_.inc();
     break;
-  case Debug:
+  case DecoderCallbacks::NoticeType::Debug:
     config_->stats_.notices_debug_.inc();
     break;
-  case Info:
+  case DecoderCallbacks::NoticeType::Info:
     config_->stats_.notices_debug_.inc();
     break;
-  case Log:
+  case DecoderCallbacks::NoticeType::Log:
     config_->stats_.notices_log_.inc();
     break;
-  case Unknown:
+  case DecoderCallbacks::NoticeType::Unknown:
     config_->stats_.notices_unknown_.inc();
+    break;
+  }
+}
+
+void PostgreSQLFilter::incError(ErrorType type) {
+  config_->stats_.errors_.inc();
+  switch (type) {
+  case DecoderCallbacks::ErrorType::Error:
+    config_->stats_.errors_error_.inc();
+    break;
+  case DecoderCallbacks::ErrorType::Fatal:
+    config_->stats_.errors_fatal_.inc();
+    break;
+  case DecoderCallbacks::ErrorType::Panic:
+    config_->stats_.errors_panic_.inc();
+    break;
+  case DecoderCallbacks::ErrorType::Unknown:
+    config_->stats_.errors_unknown_.inc();
+    break;
+  }
+}
+
+void PostgreSQLFilter::incStatement(StatementType type) {
+  config_->stats_.statements_.inc();
+
+  switch (type) {
+  case DecoderCallbacks::StatementType::Insert:
+    config_->stats_.statements_insert_.inc();
+    break;
+  case DecoderCallbacks::StatementType::Delete:
+    config_->stats_.statements_delete_.inc();
+    break;
+  case DecoderCallbacks::StatementType::Select:
+    config_->stats_.statements_select_.inc();
+    break;
+  case DecoderCallbacks::StatementType::Update:
+    config_->stats_.statements_update_.inc();
+    break;
+  case DecoderCallbacks::StatementType::Other:
+    config_->stats_.statements_other_.inc();
+    break;
+  case DecoderCallbacks::StatementType::Noop:
     break;
   }
 }
