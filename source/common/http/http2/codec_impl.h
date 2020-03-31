@@ -168,6 +168,7 @@ protected:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     Stream& getStream() override { return *this; }
     void encodeMetadata(const MetadataMapVector& metadata_map_vector) override;
+    Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
 
     // Http::Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }

@@ -4,13 +4,14 @@ package envoy.extensions.filters.network.ext_authz.v3;
 
 import "envoy/config/core/v3/grpc_service.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.ext_authz.v3";
 option java_outer_classname = "ExtAuthzProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Network External Authorization ]
 // The network layer external authorization service configuration
