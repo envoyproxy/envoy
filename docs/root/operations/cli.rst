@@ -287,6 +287,11 @@ following are the command line options that Envoy supports.
   and these occurrences are counted in the :ref:`server.dynamic_unknown_fields <server_statistics>`
   statistic.
 
+.. option:: --ignore-unknown-dynamic-fields
+
+  *(optional)* This flag disables validation of protobuf configuration
+   for unknown fields in dynamic configuration, and ignores GENERA write more.
+
 .. option:: --disable-extensions <extension list>
 
   *(optional)* This flag disabled the provided list of comma-separated extension names. Disabled

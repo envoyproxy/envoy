@@ -228,6 +228,17 @@ TEST_F(EdsTest, ValidateFail) {
   EXPECT_FALSE(initialized_);
 }
 
+// Validate that onConfigUpdate() can ignore unknown fields.
+TEST_F(EdsTest, ValidateIgnored) {
+  validation_visitor_.setSkipValidation(true);
+  initialize();
+  envoy::config::endpoint::v3::ClusterLoadAssignment resource;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  resources.Add()->PackFrom(resource);
+  // initialization fails but we don't throw, unlike ValidateFail above
+  EXPECT_FALSE(initialized_);
+}
+
 // Validate that onConfigUpdate() with unexpected cluster names rejects config.
 TEST_F(EdsTest, OnConfigUpdateWrongName) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
@@ -252,7 +263,7 @@ TEST_F(EdsTest, OnConfigUpdateEmpty) {
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   eds_callbacks_->onConfigUpdate(resources, removed_resources, "");
   EXPECT_EQ(2UL, stats_.counter("cluster.name.update_empty").value());
-  EXPECT_TRUE(initialized_);
+  // EXPECT_TRUE(initialized_);
 }
 
 // Validate that onConfigUpdate() with unexpected cluster vector size rejects config.

@@ -10,10 +10,13 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
-class NullValidationVisitorImpl : public ValidationVisitor {
+class NullValidationVisitorImpl : public NullValidationVisitor {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view) override {}
+
+  // Envoy::ProtobufMessage::ValidationVisitor
+  bool skipValidation() override { return true; }
 };
 
 ValidationVisitor& getNullValidationVisitor();
@@ -62,11 +65,14 @@ private:
 
 class ProdValidationContextImpl : public ValidationContextImpl {
 public:
-  ProdValidationContextImpl(bool allow_unknown_static_fields, bool allow_unknown_dynamic_fields)
+  ProdValidationContextImpl(bool allow_unknown_static_fields, bool allow_unknown_dynamic_fields,
+                            bool ignore_unknown_dynamic_fields)
       : ValidationContextImpl(allow_unknown_static_fields ? static_warning_validation_visitor_
                                                           : getStrictValidationVisitor(),
                               allow_unknown_dynamic_fields
-                                  ? dynamic_warning_validation_visitor_
+                                  ? (ignore_unknown_dynamic_fields
+                                         ? ProtobufMessage::getNullValidationVisitor()
+                                         : dynamic_warning_validation_visitor_)
                                   : ProtobufMessage::getStrictValidationVisitor()) {}
 
   ProtobufMessage::WarningValidationVisitorImpl& static_warning_validation_visitor() {

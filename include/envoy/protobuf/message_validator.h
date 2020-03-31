@@ -33,7 +33,15 @@ public:
    * @param description human readable description of the field
    */
   virtual void onUnknownField(absl::string_view description) PURE;
+
+  /**
+   * If true, skip this validation visitor in the interest of speed when
+   * possible.
+   **/
+  virtual bool skipValidation() { return false; }
 };
+
+class NullValidationVisitor : public ValidationVisitor {};
 
 class ValidationContext {
 public:
