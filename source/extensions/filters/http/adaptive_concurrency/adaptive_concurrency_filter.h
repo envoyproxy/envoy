@@ -14,7 +14,7 @@
 #include "common/common/cleanup.h"
 #include "common/runtime/runtime_protos.h"
 
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
+#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -44,8 +44,7 @@ private:
 
 using AdaptiveConcurrencyFilterConfigSharedPtr =
     std::shared_ptr<const AdaptiveConcurrencyFilterConfig>;
-using ConcurrencyControllerSharedPtr =
-    std::shared_ptr<ConcurrencyController::ConcurrencyController>;
+using ConcurrencyControllerSharedPtr = std::shared_ptr<Controller::ConcurrencyController>;
 
 /**
  * A filter that samples request latencies and dynamically adjusts the request
