@@ -591,5 +591,6 @@ if __name__ == '__main__':
   proto_desc_path = sys.argv[1]
   file_proto = descriptor_pb2.FileDescriptorProto()
   text_format.Merge(pathlib.Path(proto_desc_path).read_text(), file_proto)
-  utils.LoadTypeDb(sys.argv[2])
-  sys.stdout.write(traverse.TraverseFile(file_proto, ProtoFormatVisitor()).decode())
+  dst_path = pathlib.Path(sys.argv[2])
+  utils.LoadTypeDb(sys.argv[3])
+  dst_path.write_bytes(traverse.TraverseFile(file_proto, ProtoFormatVisitor()))

@@ -89,6 +89,21 @@ def GetDestinationPath(src):
       matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
 
 
+def GetAbsDestinationPath(dst_root, src):
+  """Obtain absolute path from a proto file path combined with destination root.
+
+  Creates the parent directory if necessary.
+
+  Args:
+    dst_root: destination root path.
+    src: source path.
+  """
+  rel_dst_path = GetDestinationPath(src)
+  dst = dst_root.joinpath(rel_dst_path)
+  dst.parent.mkdir(0o755, parents=True, exist_ok=True)
+  return dst
+
+
 def ProtoPrint(src, dst):
   """Pretty-print FileDescriptorProto to a destination file.
 
@@ -97,27 +112,21 @@ def ProtoPrint(src, dst):
     dst: destination path for formatted proto.
   """
   print('ProtoPrint %s' % dst)
-  contents = subprocess.check_output([
+  subprocess.check_output([
       'bazel-bin/tools/protoxform/protoprint', src,
+      str(dst),
       './bazel-bin/tools/protoxform/protoprint.runfiles/envoy/tools/type_whisperer/api_type_db.pb_text'
   ])
-  dst.write_bytes(contents)
 
 
-def SyncProtoFile(cmd, dst_root, src):
+def SyncProtoFile(src_dst_pair):
   """Diff or in-place update a single proto file from protoxform.py Bazel cache artifacts."
 
   Args:
-    cmd: 'check' or 'fix'.
-    src: source path.
+    src_dst_pair: source/destination path tuple.
   """
-  # Skip empty files, this indicates this file isn't modified in this version.
-  if os.stat(src).st_size == 0:
-    return []
-  rel_dst_path = GetDestinationPath(src)
-  dst = dst_root.joinpath(rel_dst_path)
-  dst.parent.mkdir(0o755, True, True)
-  ProtoPrint(src, dst)
+  rel_dst_path = GetDestinationPath(src_dst_pair[0])
+  ProtoPrint(*src_dst_pair)
   return ['//%s:pkg' % str(rel_dst_path.parent)]
 
 
@@ -276,8 +285,11 @@ def Sync(api_root, mode, labels, shadow):
           utils.BazelBinPathForOutputArtifact(
               label, '.next_major_version_candidate.envoy_internal.proto'
               if shadow else '.next_major_version_candidate.proto'))
+    src_dst_paths = [
+        (path, GetAbsDestinationPath(dst_dir, path)) for path in paths if os.stat(path).st_size > 0
+    ]
     with mp.Pool() as p:
-      pkg_deps = p.map(functools.partial(SyncProtoFile, mode, dst_dir), paths)
+      pkg_deps = p.map(SyncProtoFile, src_dst_paths)
     SyncBuildFiles(mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")

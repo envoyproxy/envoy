@@ -55,11 +55,10 @@ def ProtoPrint(src, dst):
     dst: destination path for formatted proto.
   """
   print('ProtoPrint %s' % dst)
-  contents = subprocess.check_output([
-      'bazel-bin/tools/protoxform/protoprint', src,
+  subprocess.check_call([
+      'bazel-bin/tools/protoxform/protoprint', src, dst,
       './bazel-bin/tools/protoxform/protoprint.runfiles/envoy/tools/type_whisperer/api_type_db.pb_text'
   ])
-  pathlib.Path(dst).write_bytes(contents)
 
 
 def ResultProtoFile(path, tmp, filename, version):
