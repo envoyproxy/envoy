@@ -21,4 +21,5 @@ genrule(
     name = "empty_cc",
     outs = ["empty.cc"],
     cmd = "touch \"$(@D)/empty.cc\"",
+    visibility = ["//visibility:public"],
 )
