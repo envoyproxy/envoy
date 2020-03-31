@@ -8,6 +8,7 @@
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
 #include "common/common/empty_string.h"
+#include "common/common/perf_annotation.h"
 #include "common/singleton/const_singleton.h"
 
 #include "absl/strings/match.h"
@@ -219,7 +220,10 @@ HeaderMapImpl::StaticLookupTable<ResponseTrailerMapImpl>::StaticLookupTable(){
 
 uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data,
                                        absl::string_view delimiter) {
+  PERF_OPERATION(perf);
+
   if (data.empty()) {
+    PERF_RECORD(perf, "hm-appendToHeader-empty", header.getStringView());
     return 0;
   }
   uint64_t byte_size = 0;
@@ -228,12 +232,15 @@ uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view d
     byte_size += delimiter.size();
   }
   header.append(data.data(), data.size());
+  PERF_RECORD(perf, "hm-appendToHeader-success", header.getStringView());
   return data.size() + byte_size;
 }
 
 void HeaderMapImpl::initFromInitList(
     HeaderMap& new_header_map,
     const std::initializer_list<std::pair<LowerCaseString, std::string>>& values) {
+  PERF_OPERATION(perf);
+
   for (auto& value : values) {
     HeaderString key_string;
     key_string.setCopy(value.first.get().c_str(), value.first.get().size());
@@ -241,6 +248,7 @@ void HeaderMapImpl::initFromInitList(
     value_string.setCopy(value.second.c_str(), value.second.size());
     new_header_map.addViaMove(std::move(key_string), std::move(value_string));
   }
+  PERF_RECORD(perf, "hm-initFromInitList", "");
 }
 
 void HeaderMapImpl::updateSize(uint64_t from_size, uint64_t to_size) {
@@ -257,6 +265,8 @@ void HeaderMapImpl::subtractSize(uint64_t size) {
 }
 
 void HeaderMapImpl::copyFrom(HeaderMap& lhs, const HeaderMap& header_map) {
+  PERF_OPERATION(perf);
+
   header_map.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         // TODO(mattklein123) PERF: Avoid copying here if not necessary.
@@ -270,6 +280,7 @@ void HeaderMapImpl::copyFrom(HeaderMap& lhs, const HeaderMap& header_map) {
         return HeaderMap::Iterate::Continue;
       },
       &lhs);
+  PERF_RECORD(perf, "hm-copyFrom", "");
 }
 
 namespace {
@@ -307,35 +318,49 @@ bool HeaderMapImpl::operator==(const HeaderMap& rhs) const {
 bool HeaderMapImpl::operator!=(const HeaderMap& rhs) const { return !operator==(rhs); }
 
 void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
+  PERF_OPERATION(perf);
   auto lookup = staticLookup(key.getStringView());
   if (lookup.has_value()) {
     key.clear();
     if (*lookup.value().entry_ == nullptr) {
       maybeCreateInline(lookup.value().entry_, *lookup.value().key_, std::move(value));
+      PERF_RECORD(perf, "hm-insertByKey-inline-new", lookup.value().key_->get());
     } else {
       const uint64_t added_size =
           appendToHeader((*lookup.value().entry_)->value(), value.getStringView());
       addSize(added_size);
       value.clear();
+      PERF_RECORD(perf, "hm-insertByKey-inline-append", lookup.value().key_->get());
     }
   } else {
     addSize(key.size() + value.size());
     std::list<HeaderEntryImpl>::iterator i = headers_.insert(std::move(key), std::move(value));
     i->entry_ = i;
+    PERF_RECORD(perf, "hm-insertByKey-noninline", i->key().getStringView());
   }
 }
 
 void HeaderMapImpl::addViaMove(HeaderString&& key, HeaderString&& value) {
   // If this is an inline header, we can't addViaMove, because we'll overwrite
   // the existing value.
+  PERF_OPERATION(perf);
   auto* entry = getExistingInline(key.getStringView());
   if (entry != nullptr) {
     const uint64_t added_size = appendToHeader(entry->value(), value.getStringView());
     addSize(added_size);
     key.clear();
     value.clear();
+    PERF_RECORD(perf, "hm-addViaMove-inline-append", entry->value().getStringView());
   } else {
+#ifdef ENVOY_PERF_ANNOTATION
+    HeaderString new_key;
+    new_key.setCopy(key.getStringView());
     insertByKey(std::move(key), std::move(value));
+    PERF_RECORD(perf, "hm-addViaMove-noninline", new_key.getStringView());
+    new_key.clear();
+#else
+    insertByKey(std::move(key), std::move(value));
+#endif
   }
 }
 
@@ -362,12 +387,14 @@ void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, absl::string_vie
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
+  PERF_OPERATION(perf);
   auto* entry = getExistingInline(key.get());
   if (entry != nullptr) {
     char buf[32];
     StringUtil::itoa(buf, sizeof(buf), value);
     const uint64_t added_size = appendToHeader(entry->value(), buf);
     addSize(added_size);
+    PERF_RECORD(perf, "hm-addCopy-inline-append", key.get());
     return;
   }
   HeaderString new_key;
@@ -377,13 +404,16 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
   insertByKey(std::move(new_key), std::move(new_value));
   ASSERT(new_key.empty());   // NOLINT(bugprone-use-after-move)
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
+  PERF_RECORD(perf, "hm-addCopy-noninline", key.get());
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value) {
+  PERF_OPERATION(perf);
   auto* entry = getExistingInline(key.get());
   if (entry != nullptr) {
     const uint64_t added_size = appendToHeader(entry->value(), value);
     addSize(added_size);
+    PERF_RECORD(perf, "hm-addCopy-inline-append", key.get());
     return;
   }
   HeaderString new_key;
@@ -393,16 +423,20 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value)
   insertByKey(std::move(new_key), std::move(new_value));
   ASSERT(new_key.empty());   // NOLINT(bugprone-use-after-move)
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
+  PERF_RECORD(perf, "hm-addCopy-noninline", key.get());
 }
 
 void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view value) {
   // TODO(#9221): converge on and document a policy for coalescing multiple headers.
+  PERF_OPERATION(perf);
   auto* entry = getExisting(key);
   if (entry) {
     const uint64_t added_size = appendToHeader(entry->value(), value);
     addSize(added_size);
+    PERF_RECORD(perf, "hm-appendCopy-update", key.get());
   } else {
     addCopy(key, value);
+    PERF_RECORD(perf, "hm-appendCopy-new", key.get());
   }
 }
 
@@ -505,16 +539,20 @@ HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
 }
 
 void HeaderMapImpl::clear() {
+  PERF_OPERATION(perf);
   clearInline();
   headers_.clear();
   cached_byte_size_ = 0;
+  PERF_RECORD(perf, "hm-clear", "");
 }
 
 size_t HeaderMapImpl::remove(const LowerCaseString& key) {
+  PERF_OPERATION(perf);
   const size_t old_size = headers_.size();
   auto lookup = staticLookup(key.get());
   if (lookup.has_value()) {
     removeInline(lookup.value().entry_);
+    PERF_RECORD(perf, "hm-remove-inline", key.get());
   } else {
     for (auto i = headers_.begin(); i != headers_.end();) {
       if (i->key() == key.get().c_str()) {
@@ -524,11 +562,13 @@ size_t HeaderMapImpl::remove(const LowerCaseString& key) {
         ++i;
       }
     }
+    PERF_RECORD(perf, "hm-remove-non-inline", key.get());
   }
   return old_size - headers_.size();
 }
 
 size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
+  PERF_OPERATION(perf);
   const size_t old_size = headers_.size();
   headers_.remove_if([&prefix, this](const HeaderEntryImpl& entry) {
     bool to_remove = absl::StartsWith(entry.key().getStringView(), prefix.get());
@@ -549,6 +589,7 @@ size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
     }
     return to_remove;
   });
+  PERF_RECORD(perf, "hm-removeprefix", prefix.get());
   return old_size - headers_.size();
 }
 

@@ -694,7 +694,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
       logs_handler_(server), profiling_handler_(profile_path), runtime_handler_(server),
-      listeners_handler_(server),
+      listeners_handler_(server), perf_stats_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -743,6 +743,12 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable), false, true},
           {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true},
+#ifdef ENVOY_PERF_ANNOTATION
+          {"/perf_stats", "Show header-map performance information",
+           MAKE_ADMIN_HANDLER(perf_stats_handler_.handlerHeaderMapPerfStats), false, false},
+          {"/perf_stats/clear", "clear header-map performance information",
+           MAKE_ADMIN_HANDLER(perf_stats_handler_.handlerHeaderMapPerfClear), false, true},
+#endif
           {"/listeners", "print listener info",
            MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo), false, false},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime),
@@ -753,7 +759,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true},
       },
       date_provider_(server.dispatcher().timeSource()),
-      admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
+      admin_filter_chain_(std::make_shared<AdminFilterChain>()) {
+}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,

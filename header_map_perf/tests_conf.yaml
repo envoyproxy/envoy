@@ -1,0 +1,11 @@
+logs_dir: "/tmp/header_map_perf_logs"
+default_envoy_settings:
+  exe: "../bazel-bin/source/exe/envoy-static"
+  cores: 1
+  params: "--concurrency 1 --config-path ./nighthawk_config_test1.yaml"
+tests:
+  - name: "client1_4conn_1000rps"
+    exec: "../../nighthawk//bazel-bin/nighthawk_client --rps 1000 --connections 4 --concurrency auto --prefetch-connections -v info http://127.0.0.1:10000/"
+  - name: "client1_8conn_10000rps"
+    exec: "../../nighthawk//bazel-bin/nighthawk_client --rps 18000 --connections 8 --concurrency auto --prefetch-connections -v info http://127.0.0.1:10000/"
+

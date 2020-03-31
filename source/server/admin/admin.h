@@ -42,6 +42,7 @@
 #include "server/admin/config_tracker_impl.h"
 #include "server/admin/listeners_handler.h"
 #include "server/admin/logs_handler.h"
+#include "server/admin/perf_stats_handler.h"
 #include "server/admin/profiling_handler.h"
 #include "server/admin/runtime_handler.h"
 #include "server/admin/stats_handler.h"
@@ -421,6 +422,7 @@ private:
   Server::ProfilingHandler profiling_handler_;
   Server::RuntimeHandler runtime_handler_;
   Server::ListenersHandler listeners_handler_;
+  Server::PerfStatsHandler perf_stats_handler_;
   std::list<UrlHandler> handlers_;
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   const uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};

@@ -17,6 +17,7 @@ envoy_cc_library(
         ":config_tracker_lib",
         ":listeners_handler_lib",
         ":logs_handler_lib",
+        ":perf_stats_handler_lib",
         ":profiling_handler_lib",
         ":runtime_handler_lib",
         ":stats_handler_lib",
@@ -188,6 +189,21 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/profiler:profiler_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "perf_stats_handler_lib",
+    srcs = ["perf_stats_handler.cc"],
+    hdrs = ["perf_stats_handler.h"],
+    deps = [
+        ":handler_ctx_lib",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/server:instance_interface",
+        "//source/common/common:perf_annotation_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
     ],
 )
 

@@ -110,6 +110,7 @@ bool MainCommonBase::run() {
   switch (options_.mode()) {
   case Server::Mode::Serve:
     server_->run();
+    PERF_DUMP();
     return true;
   case Server::Mode::Validate: {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
