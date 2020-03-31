@@ -52,8 +52,10 @@ void setAllowHttp10WithDefaultHost(
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, IntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(FakeHttpConnection::Type::HTTP1,
+                                     FakeHttpConnection::Type::LEGACY_HTTP1),
                      testing::ValuesIn(HTTP1_DOWNSTREAM)),
-    TestUtility::ipDownstreamTestParamsToString);
+    HttpIntegrationTest::ipUpstreamDownstreamParamsToString);
 
 // Make sure we have correctly specified per-worker performance stats.
 TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
@@ -1129,8 +1131,10 @@ TEST_P(IntegrationTest, TrailersDroppedDownstream) {
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, UpstreamEndpointIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(FakeHttpConnection::Type::HTTP1,
+                                     FakeHttpConnection::Type::LEGACY_HTTP1),
                      testing::ValuesIn(HTTP1_DOWNSTREAM)),
-    TestUtility::ipDownstreamTestParamsToString);
+    HttpIntegrationTest::ipUpstreamDownstreamParamsToString);
 
 TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
   initialize();

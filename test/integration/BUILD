@@ -289,6 +289,32 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http2_flood_integration_test",
+    srcs = [
+        "http2_flood_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/filters/http/dynamo:config",
+        "//source/extensions/filters/http/health_check:config",
+        "//test/common/http/http2:http2_frame",
+        "//test/integration/filters:metadata_stop_all_filter_config_lib",
+        "//test/integration/filters:request_metadata_filter_config_lib",
+        "//test/integration/filters:response_metadata_filter_config_lib",
+        "//test/integration/filters:stop_iteration_and_continue",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "http_subset_lb_integration_test",
     srcs = [
         "http_subset_lb_integration_test.cc",

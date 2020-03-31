@@ -55,7 +55,7 @@ TEST_P(HeaderPrefixIntegrationTest, FailedCustomHeaderPrefix) {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, HeaderPrefixIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
-                             {FakeHttpConnection::Type::HTTP1})),
+                             HTTP1_HTTP2_DOWNSTREAM, {FakeHttpConnection::Type::HTTP1,
+                                                      FakeHttpConnection::Type::LEGACY_HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 } // namespace Envoy

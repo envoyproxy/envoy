@@ -11,8 +11,10 @@
 
 namespace Envoy {
 
+// This class tests over legacy and new versions of HTTP1 for both upstream and downstream.
 class HttpSubsetLbIntegrationTest
-    : public testing::TestWithParam<envoy::config::cluster::v3::Cluster::LbPolicy>,
+    : public testing::TestWithParam<std::tuple<envoy::config::cluster::v3::Cluster::LbPolicy,
+                                               FakeHttpConnection::Type, Http::CodecClient::Type>>,
       public HttpIntegrationTest {
 public:
   // Returns all load balancer types except ORIGINAL_DST_LB and CLUSTER_PROVIDED.
@@ -43,17 +45,23 @@ public:
 
   // Converts an LbPolicy to strings suitable for test names.
   static std::string subsetLbTestParamsToString(
-      const testing::TestParamInfo<envoy::config::cluster::v3::Cluster::LbPolicy>& p) {
-    const std::string& policy_name = envoy::config::cluster::v3::Cluster::LbPolicy_Name(p.param);
-    return absl::StrReplaceAll(policy_name, {{"_", ""}});
+      const testing::TestParamInfo<std::tuple<envoy::config::cluster::v3::Cluster::LbPolicy,
+                                              FakeHttpConnection::Type, Http::CodecClient::Type>>&
+          p) {
+    const std::string& policy_name =
+        envoy::config::cluster::v3::Cluster::LbPolicy_Name(std::get<0>(p.param));
+    return absl::StrCat(absl::StrReplaceAll(policy_name, {{"_", ""}}), "_",
+                        FakeHttpConnection::upstreamProtocolToString(std::get<1>(p.param)),
+                        TestUtility::downstreamProtocolToString(std::get<2>(p.param)));
   }
 
   HttpSubsetLbIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
+      : HttpIntegrationTest(std::get<2>(GetParam()),
                             TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::HTTP_PROXY_CONFIG),
-        num_hosts_{4}, is_hash_lb_(GetParam() == envoy::config::cluster::v3::Cluster::RING_HASH ||
-                                   GetParam() == envoy::config::cluster::v3::Cluster::MAGLEV) {
+        num_hosts_{4},
+        is_hash_lb_(std::get<0>(GetParam()) == envoy::config::cluster::v3::Cluster::RING_HASH ||
+                    std::get<0>(GetParam()) == envoy::config::cluster::v3::Cluster::MAGLEV) {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
 
@@ -61,7 +69,7 @@ public:
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters(0);
 
-      cluster->set_lb_policy(GetParam());
+      cluster->set_lb_policy(std::get<0>(GetParam()));
 
       // Create subsets based on type value of the "type" metadata.
       cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
@@ -137,8 +145,8 @@ public:
   };
 
   void SetUp() override {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setDownstreamProtocol(std::get<2>(GetParam()));
+    setUpstreamProtocol(std::get<1>(GetParam()));
   }
 
   // Runs a subset lb test with the given request headers, expecting the x-host-type header to
@@ -179,10 +187,12 @@ public:
 
     if (is_hash_lb_) {
       EXPECT_EQ(hosts.size(), 1) << "Expected a single unique host to be selected for "
-                                 << envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam());
+                                 << envoy::config::cluster::v3::Cluster::LbPolicy_Name(
+                                        std::get<0>(GetParam()));
     } else {
       EXPECT_GT(hosts.size(), 1) << "Expected multiple hosts to be selected for "
-                                 << envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam());
+                                 << envoy::config::cluster::v3::Cluster::LbPolicy_Name(
+                                        std::get<0>(GetParam()));
     }
   }
 
@@ -203,9 +213,13 @@ public:
       {":authority", "host"}, {"x-type", "b"},    {"x-hash", "hash-b"}};
 };
 
-INSTANTIATE_TEST_SUITE_P(SubsetCompatibleLoadBalancers, HttpSubsetLbIntegrationTest,
-                         testing::ValuesIn(HttpSubsetLbIntegrationTest::getSubsetLbTestParams()),
-                         HttpSubsetLbIntegrationTest::subsetLbTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    SubsetCompatibleLoadBalancers, HttpSubsetLbIntegrationTest,
+    testing::Combine(testing::ValuesIn(HttpSubsetLbIntegrationTest::getSubsetLbTestParams()),
+                     testing::Values(FakeHttpConnection::Type::HTTP1,
+                                     FakeHttpConnection::Type::LEGACY_HTTP1),
+                     testing::ValuesIn(HTTP1_DOWNSTREAM)),
+    HttpSubsetLbIntegrationTest::subsetLbTestParamsToString);
 
 // Tests each subset-compatible load balancer policy with 4 hosts divided into 2 subsets.
 TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancer) {

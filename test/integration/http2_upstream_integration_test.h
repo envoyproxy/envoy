@@ -5,15 +5,17 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class Http2UpstreamIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                     public HttpIntegrationTest {
+class Http2UpstreamIntegrationTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion,
+                                               FakeHttpConnection::Type, Http::CodecClient::Type>>,
+      public HttpIntegrationTest {
 public:
   Http2UpstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+      : HttpIntegrationTest(std::get<2>(GetParam()), std::get<0>(GetParam())) {}
 
   void SetUp() override {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setDownstreamProtocol(std::get<2>(GetParam()));
+    setUpstreamProtocol(std::get<1>(GetParam()));
   }
 
   void initialize() override { HttpIntegrationTest::initialize(); }
