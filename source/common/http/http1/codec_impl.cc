@@ -893,6 +893,7 @@ bool ClientConnectionImpl::cannotHaveBody() {
   if ((pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) ||
       parser_.status_code == 204 || parser_.status_code == 304 ||
       (parser_.status_code >= 200 && parser_.content_length == 0)) {
+    ASSERT(!pending_response_done_);
     return true;
   } else {
     return false;
@@ -909,7 +910,9 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   ASSERT(connection_.readEnabled());
 
   ASSERT(!pending_response_.has_value());
+  ASSERT(pending_response_done_);
   pending_response_.emplace(*this, header_key_formatter_.get(), &response_decoder);
+  pending_response_done_ = false;
   return pending_response_.value().encoder_;
 }
 
@@ -920,6 +923,7 @@ int ClientConnectionImpl::onHeadersComplete() {
   if (!pending_response_.has_value() && !resetStreamCalled()) {
     throw PrematureResponseException(static_cast<Http::Code>(parser_.status_code));
   } else if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
     ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
     headers->setStatus(parser_.status_code);
@@ -948,6 +952,7 @@ int ClientConnectionImpl::onHeadersComplete() {
 void ClientConnectionImpl::onBody(const char* data, size_t length) {
   ASSERT(!deferred_end_stream_headers_);
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     Buffer::OwnedImpl buffer;
     buffer.add(data, length);
     pending_response_.value().decoder_->decodeData(buffer, false);
@@ -961,9 +966,12 @@ void ClientConnectionImpl::onMessageComplete() {
     return;
   }
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     // After calling decodeData() with end stream set to true, we should no longer be able to reset.
-    PendingResponse response = std::move(pending_response_.value());
-    pending_response_.reset();
+    PendingResponse& response = pending_response_.value();
+    // Encoder is used as part of decode* calls later in this function so pending_response_ can not
+    // be reset just yet. Preserve the state in pending_response_done_ instead.
+    pending_response_done_ = true;
 
     // Streams are responsible for unwinding any outstanding readDisable(true)
     // calls done on the underlying connection as they are destroyed. As this is
@@ -989,20 +997,23 @@ void ClientConnectionImpl::onMessageComplete() {
     }
 
     // Reset to ensure no information from one requests persists to the next.
+    pending_response_.reset();
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
   }
 }
 
 void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   // Only raise reset if we did not already dispatch a complete response.
-  if (pending_response_.has_value()) {
+  if (pending_response_.has_value() && !pending_response_done_) {
     pending_response_.value().encoder_.runResetCallbacks(reason);
+    pending_response_done_ = true;
     pending_response_.reset();
   }
 }
 
 void ClientConnectionImpl::sendProtocolError(absl::string_view details) {
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     pending_response_.value().encoder_.setDetails(details);
   }
 }
@@ -1017,6 +1028,7 @@ void ClientConnectionImpl::onBelowLowWatermark() {
   // such as sending multiple responses to the same request, causing us to close the connection, but
   // in doing so go below low watermark.
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     pending_response_.value().encoder_.runLowWatermarkCallbacks();
   }
 }
