@@ -291,7 +291,7 @@ public:
         "{}_{}_{}",
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
-        (Http::CodecClient::isHttp1(std::get<1>(params.param)) ? "Http" : "Http2"),
+        (std::get<1>(params.param) == Http::CodecClient::Type::HTTP2 ? "Http2" : "Http"),
         std::regex_replace(std::get<2>(params.param), invalid_param_name_regex(), "_"));
   }
 

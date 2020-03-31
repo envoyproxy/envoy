@@ -6,25 +6,22 @@
 
 // A test class for testing HTTP/1.1 upstream and downstreams
 namespace Envoy {
-class IntegrationTest : public testing::TestWithParam<
-                            std::tuple<Network::Address::IpVersion, Http::CodecClient::Type>>,
+class IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                         public HttpIntegrationTest {
 public:
-  IntegrationTest() : HttpIntegrationTest(std::get<1>(GetParam()), std::get<0>(GetParam())) {}
+  IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 };
 
-class UpstreamEndpointIntegrationTest
-    : public testing::TestWithParam<
-          std::tuple<Network::Address::IpVersion, Http::CodecClient::Type>>,
-      public HttpIntegrationTest {
+class UpstreamEndpointIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                        public HttpIntegrationTest {
 public:
   UpstreamEndpointIntegrationTest()
       : HttpIntegrationTest(
-            std::get<1>(GetParam()),
+            Http::CodecClient::Type::HTTP1,
             [](int) {
               return Network::Utility::parseInternetAddress(
-                  Network::Test::getLoopbackAddressString(std::get<0>(GetParam())), 0);
+                  Network::Test::getLoopbackAddressString(GetParam()), 0);
             },
-            std::get<0>(GetParam())) {}
+            GetParam()) {}
 };
 } // namespace Envoy

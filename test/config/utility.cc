@@ -603,9 +603,7 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
         hcm_config;
     loadHttpConnectionManager(hcm_config);
     if (hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
-                                       v3::HttpConnectionManager::HTTP2 ||
-        hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
-                                       v3::HttpConnectionManager::LEGACY_HTTP2) {
+                                       v3::HttpConnectionManager::HTTP2) {
       const uint32_t size = std::max(downstream_buffer_limit,
                                      Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
       auto* options = hcm_config.mutable_http2_protocol_options();
@@ -885,9 +883,7 @@ void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max
         hcm_config;
     loadHttpConnectionManager(hcm_config);
     if (hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
-                                       v3::HttpConnectionManager::HTTP2 ||
-        hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
-                                       v3::HttpConnectionManager::LEGACY_HTTP2) {
+                                       v3::HttpConnectionManager::HTTP2) {
       auto* options = hcm_config.mutable_http2_protocol_options();
       options->mutable_max_outbound_frames()->set_value(max_all_frames);
       options->mutable_max_outbound_control_frames()->set_value(max_control_frames);

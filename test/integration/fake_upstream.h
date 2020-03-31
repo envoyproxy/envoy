@@ -418,7 +418,7 @@ protected:
  */
 class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeConnectionBase {
 public:
-  enum class Type { HTTP1, HTTP2, LEGACY_HTTP1, LEGACY_HTTP2 };
+  enum class Type { HTTP1, HTTP2 };
 
   FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
                      Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
@@ -437,29 +437,6 @@ public:
   // Http::ServerConnectionCallbacks
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
   void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-
-  static bool typeIsHttp1(FakeHttpConnection::Type type) {
-    return type == Type::HTTP1 || type == Type::LEGACY_HTTP1;
-  }
-
-  static std::string upstreamProtocolToString(FakeHttpConnection::Type type) {
-    std::string upstream_protocol;
-    switch (type) {
-    case FakeHttpConnection::Type::HTTP1:
-      upstream_protocol = "HttpUpstream";
-      break;
-    case FakeHttpConnection::Type::LEGACY_HTTP1:
-      upstream_protocol = "HttpLegacyUpstream";
-      break;
-    case FakeHttpConnection::Type::HTTP2:
-      upstream_protocol = "Http2Upstream";
-      break;
-    case FakeHttpConnection::Type::LEGACY_HTTP2:
-      upstream_protocol = "Http2LegacyUpstream";
-      break;
-    }
-    return upstream_protocol;
-  }
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {

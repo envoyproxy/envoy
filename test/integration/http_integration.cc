@@ -52,12 +52,6 @@ typeToCodecType(Http::CodecClient::Type type) {
   case Http::CodecClient::Type::HTTP3:
     return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         HTTP3;
-  case Http::CodecClient::Type::LEGACY_HTTP1:
-    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-        LEGACY_HTTP1;
-  case Http::CodecClient::Type::LEGACY_HTTP2:
-    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-        LEGACY_HTTP2;
   default:
     RELEASE_ASSERT(0, "");
   }
@@ -275,7 +269,7 @@ ConfigHelper::HttpModifierFunction HttpIntegrationTest::setEnableDownstreamTrail
 ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrailersHttp1() {
   return [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
-    if (FakeHttpConnection::typeIsHttp1(fake_upstreams_[0]->httpType())) {
+    if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
       auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
       cluster->mutable_http_protocol_options()->set_enable_trailers(true);
     }
@@ -529,7 +523,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   response->waitForEndStream();
 
-  if (downstreamProtocolIsHttp1()) {
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
   } else {
     codec_client_->close();
@@ -556,7 +550,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  if (downstreamProtocolIsHttp1()) {
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
   } else {
     response->waitForReset();
@@ -584,7 +578,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   codec_client_->close();
 
-  if (FakeHttpConnection::typeIsHttp1(upstreamProtocol())) {
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -603,7 +597,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
 #if defined(__APPLE__) || defined(WIN32)
   // Skip this test on OS/X + Windows: we can't detect the early close, and we
   // won't clean up the upstream connection until it times out. See #4294.
-  if (downstreamProtocolIsHttp1()) {
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     return;
   }
 #endif
@@ -617,7 +611,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
   response->waitForBodyData(512);
   codec_client_->close();
 
-  if (FakeHttpConnection::typeIsHttp1(upstreamProtocol())) {
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -645,7 +639,7 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   upstream_request_->encodeData(512, true);
   response->waitForEndStream();
 
-  if (FakeHttpConnection::typeIsHttp1(upstreamProtocol())) {
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -653,7 +647,7 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
-  if (downstreamProtocolIsHttp1()) {
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
   } else {
     codec_client_->close();
@@ -681,7 +675,7 @@ void HttpIntegrationTest::testRetry() {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
-  if (FakeHttpConnection::typeIsHttp1(fake_upstreams_[0]->httpType())) {
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
@@ -726,7 +720,7 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
                .c_str()),
       1);
 
-  if (FakeHttpConnection::typeIsHttp1(fake_upstreams_[0]->httpType())) {
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
@@ -770,7 +764,7 @@ void HttpIntegrationTest::testGrpcRetry() {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "1"}}, false);
-  if (FakeHttpConnection::typeIsHttp1(fake_upstreams_[0]->httpType())) {
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
@@ -780,8 +774,8 @@ void HttpIntegrationTest::testGrpcRetry() {
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512,
-                                FakeHttpConnection::typeIsHttp1(fake_upstreams_[0]->httpType()));
-  if (!FakeHttpConnection::typeIsHttp1(fake_upstreams_[0]->httpType())) {
+                                fake_upstreams_[0]->httpType() != FakeHttpConnection::Type::HTTP2);
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
     upstream_request_->encodeTrailers(response_trailers);
   }
 
@@ -792,7 +786,7 @@ void HttpIntegrationTest::testGrpcRetry() {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
-  if (!FakeHttpConnection::typeIsHttp1(fake_upstreams_[0]->httpType())) {
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
     EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
   }
 }
@@ -992,7 +986,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
     auto encoder_decoder = codec_client_->startRequest(big_headers);
     auto response = std::move(encoder_decoder.second);
 
-    if (downstreamProtocolIsHttp1()) {
+    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
       codec_client_->waitForDisconnect();
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().Status()->value().getStringView());
@@ -1031,7 +1025,7 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   if (size >= max_size) {
-    if (downstreamProtocolIsHttp1()) {
+    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
       codec_client_->waitForDisconnect();
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().Status()->value().getStringView());
@@ -1108,7 +1102,7 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   response->waitForBodyData(512);
   codec_client_->sendReset(*request_encoder_);
 
-  if (FakeHttpConnection::typeIsHttp1(upstreamProtocol())) {
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());

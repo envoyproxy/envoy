@@ -46,28 +46,23 @@ private:
 
 // Pretty-printing of parameterized test names.
 std::string dynamicValidationTestParamsToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool,
-                                              FakeHttpConnection::Type, Http::CodecClient::Type>>&
-        params) {
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
   return fmt::format(
-      "{}_{}_{}_{}",
+      "{}_{}",
       TestUtility::ipTestParamsToString(
           ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
-      std::get<1>(params.param) ? "with_reject_unknown_fields" : "without_reject_unknown_fields",
-      FakeHttpConnection::upstreamProtocolToString(std::get<2>(params.param)),
-      TestUtility::downstreamProtocolToString(std::get<3>(params.param)));
+      std::get<1>(params.param) ? "with_reject_unknown_fields" : "without_reject_unknown_fields");
 }
 
 // Validate unknown field handling in dynamic configuration.
 class DynamicValidationIntegrationTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool,
-                                               FakeHttpConnection::Type, Http::CodecClient::Type>>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public HttpIntegrationTest {
 public:
   DynamicValidationIntegrationTest()
-      : HttpIntegrationTest(std::get<3>(GetParam()), std::get<0>(GetParam())),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, std::get<0>(GetParam())),
         reject_unknown_dynamic_fields_(std::get<1>(GetParam())) {
-    setUpstreamProtocol(std::get<2>(GetParam()));
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   }
 
   void createEnvoy() override {
@@ -88,10 +83,7 @@ private:
 
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, DynamicValidationIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool(),
-                     testing::Values(FakeHttpConnection::Type::HTTP2,
-                                     FakeHttpConnection::Type::LEGACY_HTTP2),
-                     testing::ValuesIn(HTTP2_DOWNSTREAM)),
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
     dynamicValidationTestParamsToString);
 
 // Protocol options in CDS with unknown fields are rejected if and only if strict.

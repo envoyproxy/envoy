@@ -157,7 +157,7 @@ public:
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
 private:
-  enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO, LEGACY_HTTP1, LEGACY_HTTP2 };
+  enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
   void
   processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                     proto_config,

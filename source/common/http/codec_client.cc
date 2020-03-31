@@ -9,9 +9,7 @@
 #include "common/config/utility.h"
 #include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"
-#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
@@ -81,7 +79,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   }
 
   // HTTP/1 can signal end of response by disconnecting. We need to handle that case.
-  if (isHttp1(type_) && event == Network::ConnectionEvent::RemoteClose &&
+  if (type_ == Type::HTTP1 && event == Network::ConnectionEvent::RemoteClose &&
       !active_requests_.empty()) {
     Buffer::OwnedImpl empty;
     onData(empty);
@@ -166,18 +164,6 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
         Config::Utility::getAndCheckFactoryByName<Http::QuicHttpClientConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
             .createQuicClientConnection(*connection_, *this));
-    break;
-  }
-  case Type::LEGACY_HTTP1: {
-    codec_ = std::make_unique<Legacy::Http1::ClientConnectionImpl>(
-        *connection_, host->cluster().statsScope(), *this, host->cluster().http1Settings(),
-        host->cluster().maxResponseHeadersCount());
-    break;
-  }
-  case Type::LEGACY_HTTP2: {
-    codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-        *connection_, *this, host->cluster().statsScope(), host->cluster().http2Options(),
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
   }
   }
 }

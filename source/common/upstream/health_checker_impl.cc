@@ -173,10 +173,6 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecClient::Type codec_client_ty
     return Http::Protocol::Http2;
   case Http::CodecClient::Type::HTTP3:
     return Http::Protocol::Http3;
-  case Http::CodecClient::Type::LEGACY_HTTP1:
-    return Http::Protocol::Http11;
-  case Http::CodecClient::Type::LEGACY_HTTP2:
-    return Http::Protocol::Http2;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -366,10 +362,6 @@ HttpHealthCheckerImpl::codecClientType(const envoy::type::v3::CodecClientType& t
     return Http::CodecClient::Type::HTTP2;
   case envoy::type::v3::HTTP1:
     return Http::CodecClient::Type::HTTP1;
-  case envoy::type::v3::LEGACY_HTTP2:
-    return Http::CodecClient::Type::LEGACY_HTTP2;
-  case envoy::type::v3::LEGACY_HTTP1:
-    return Http::CodecClient::Type::LEGACY_HTTP1;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

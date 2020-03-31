@@ -77,13 +77,11 @@ public:
 REGISTER_FACTORY(PoliteFilterConfigFactory,
                  Server::Configuration::NamedUpstreamNetworkFilterConfigFactory);
 
-class ClusterFilterIntegrationTest
-    : public testing::TestWithParam<
-          std::tuple<Network::Address::IpVersion, FakeHttpConnection::Type>>,
-      public BaseIntegrationTest {
+class ClusterFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                     public BaseIntegrationTest {
 public:
   ClusterFilterIntegrationTest()
-      : BaseIntegrationTest(std::get<0>(GetParam()), ConfigHelper::TCP_PROXY_CONFIG) {}
+      : BaseIntegrationTest(GetParam(), ConfigHelper::TCP_PROXY_CONFIG) {}
 
   void initialize() override {
     enable_half_close_ = true;
@@ -95,17 +93,13 @@ public:
       config.set_value("surely ");
       filter->mutable_typed_config()->PackFrom(config);
     });
-    setUpstreamProtocol(std::get<1>(GetParam()));
     BaseIntegrationTest::initialize();
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, ClusterFilterIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(FakeHttpConnection::Type::HTTP1,
-                                     FakeHttpConnection::Type::LEGACY_HTTP1)),
-    BaseIntegrationTest::ipUpstreamTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterFilterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ClusterFilterIntegrationTest, TestClusterFilter) {
   initialize();

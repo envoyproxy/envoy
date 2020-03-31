@@ -20,9 +20,12 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
 
 std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
     const ::testing::TestParamInfo<HttpProtocolTestParams>& params) {
-  return absl::StrCat((params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
-                      TestUtility::downstreamProtocolToString(params.param.downstream_protocol),
-                      FakeHttpConnection::upstreamProtocolToString(params.param.upstream_protocol));
+  return absl::StrCat(
+      (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+      (params.param.downstream_protocol == Http::CodecClient::Type::HTTP2 ? "Http2Downstream_"
+                                                                          : "HttpDownstream_"),
+      (params.param.upstream_protocol == FakeHttpConnection::Type::HTTP2 ? "Http2Upstream"
+                                                                         : "HttpUpstream"));
 }
 
 } // namespace Envoy

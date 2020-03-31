@@ -20,9 +20,7 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
-#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
@@ -393,14 +391,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       HTTP3:
     codec_type_ = CodecType::HTTP3;
     break;
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      LEGACY_HTTP1:
-    codec_type_ = CodecType::LEGACY_HTTP1;
-    break;
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      LEGACY_HTTP2:
-    codec_type_ = CodecType::LEGACY_HTTP2;
-    break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -474,14 +464,6 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         maxRequestHeadersCount());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
-        connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount());
-  case CodecType::LEGACY_HTTP1:
-    return std::make_unique<Http::Legacy::Http1::ServerConnectionImpl>(
-        connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb(),
-        maxRequestHeadersCount());
-  case CodecType::LEGACY_HTTP2:
-    return std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
         connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount());
   case CodecType::HTTP3:

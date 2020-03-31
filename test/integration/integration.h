@@ -335,15 +335,6 @@ public:
     return response;
   }
 
-  static std::string ipUpstreamTestParamsToString(
-      const ::testing::TestParamInfo<
-          std::tuple<Network::Address::IpVersion, FakeHttpConnection::Type>>& params) {
-    return absl::StrCat(
-        TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
-            std::get<0>(params.param), params.index)),
-        "_", FakeHttpConnection::upstreamProtocolToString(std::get<1>(params.param)));
-  }
-
 private:
   Event::GlobalTimeSystem time_system_;
 

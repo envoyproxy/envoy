@@ -15,13 +15,11 @@ namespace {
 const int UpstreamIndex = 0;
 
 // Integration test for cluster extension using CustomStaticCluster.
-class CustomClusterIntegrationTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion,
-                                               FakeHttpConnection::Type, Http::CodecClient::Type>>,
-      public HttpIntegrationTest {
+class CustomClusterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                     public HttpIntegrationTest {
 public:
   CustomClusterIntegrationTest()
-      : HttpIntegrationTest(std::get<2>(GetParam()), std::get<0>(GetParam()), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 
   void initialize() override {
     setUpstreamCount(1);
@@ -44,7 +42,6 @@ public:
 
       cluster_0->mutable_cluster_type()->CopyFrom(cluster_type);
     });
-    setUpstreamProtocol(std::get<1>(GetParam()));
     HttpIntegrationTest::initialize();
     test_server_->waitForGaugeGe("cluster_manager.active_clusters", 1);
   }
@@ -53,13 +50,8 @@ public:
   bool cluster_provided_lb_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, CustomClusterIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(FakeHttpConnection::Type::HTTP1,
-                                     FakeHttpConnection::Type::LEGACY_HTTP1),
-                     testing::ValuesIn(HTTP1_DOWNSTREAM)),
-    HttpIntegrationTest::ipUpstreamDownstreamParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, CustomClusterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(CustomClusterIntegrationTest, TestRouterHeaderOnly) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
