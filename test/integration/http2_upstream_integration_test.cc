@@ -15,13 +15,9 @@
 
 namespace Envoy {
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, Http2UpstreamIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(FakeHttpConnection::Type::HTTP2,
-                                     FakeHttpConnection::Type::LEGACY_HTTP2),
-                     testing::ValuesIn(HTTP2_DOWNSTREAM)),
-    HttpIntegrationTest::ipUpstreamDownstreamParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2UpstreamIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);

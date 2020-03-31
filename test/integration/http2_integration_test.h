@@ -3,24 +3,20 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "test/common/http/http2/http2_frame.h"
 #include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
 
-// This test class tests both versions of HTTP/2 downstream protocols with both versions of the
-// default HTTP/1 upstream.
-namespace Envoy {
-class Http2IntegrationTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion,
-                                               FakeHttpConnection::Type, Http::CodecClient::Type>>,
-      public HttpIntegrationTest {
-public:
-  Http2IntegrationTest() : HttpIntegrationTest(std::get<2>(GetParam()), std::get<0>(GetParam())) {}
+using Envoy::Http::Http2::Http2Frame;
 
-  void SetUp() override {
-    setDownstreamProtocol(std::get<2>(GetParam()));
-    setUpstreamProtocol(std::get<1>(GetParam()));
-  }
+namespace Envoy {
+class Http2IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                             public HttpIntegrationTest {
+public:
+  Http2IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+
+  void SetUp() override { setDownstreamProtocol(Http::CodecClient::Type::HTTP2); }
 
   void simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes);
 
@@ -60,8 +56,8 @@ public:
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
-    setDownstreamProtocol(std::get<2>(GetParam()));
-    setUpstreamProtocol(std::get<1>(GetParam()));
+    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   }
 
   void testRequestMetadataWithStopAllFilter();
@@ -71,4 +67,21 @@ public:
   void runHeaderOnlyTest(bool send_request_body, size_t body_size);
 };
 
+class Http2FloodMitigationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                 public HttpIntegrationTest {
+public:
+  Http2FloodMitigationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+
+protected:
+  void startHttp2Session();
+  void floodServer(const Http2Frame& frame, const std::string& flood_stat);
+  void floodServer(absl::string_view host, absl::string_view path,
+                   Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat);
+  Http2Frame readFrame();
+  void sendFame(const Http2Frame& frame);
+  void setNetworkConnectionBufferSize();
+  void beginSession();
+
+  IntegrationTcpClientPtr tcp_client_;
+};
 } // namespace Envoy

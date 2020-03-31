@@ -14,13 +14,9 @@
 
 namespace Envoy {
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, ProxyProtoIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(FakeHttpConnection::Type::HTTP1,
-                                     FakeHttpConnection::Type::LEGACY_HTTP1),
-                     testing::ValuesIn(HTTP1_DOWNSTREAM)),
-    HttpIntegrationTest::ipUpstreamDownstreamParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ProxyProtoIntegrationTest, V1RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -119,7 +115,7 @@ TEST_P(ProxyProtoIntegrationTest, AccessLog) {
   const std::vector<absl::string_view> tokens = StringUtil::splitToken(log_line, " ");
 
   ASSERT_EQ(2, tokens.size());
-  EXPECT_EQ(tokens[0], Network::Test::getLoopbackAddressString(std::get<0>(GetParam())));
+  EXPECT_EQ(tokens[0], Network::Test::getLoopbackAddressString(GetParam()));
   EXPECT_EQ(tokens[1], "1.2.3.4:12345");
 }
 
@@ -140,12 +136,11 @@ TEST_P(ProxyProtoIntegrationTest, DEPRECATED_FEATURE_TEST(OriginalDst)) {
     // Create proxy protocol line that has the fake upstream address as the destination address.
     // This address will become the "restored" address for the server connection and will
     // be used as the destination address by the original destination cluster.
-    std::string proxyLine =
-        fmt::format("PROXY {} {} 65535 {}\r\n",
-                    std::get<0>(GetParam()) == Network::Address::IpVersion::v4 ? "TCP4 1.2.3.4"
-                                                                               : "TCP6 1:2:3::4",
-                    Network::Test::getLoopbackAddressString(std::get<0>(GetParam())),
-                    fake_upstreams_[0]->localAddress()->ip()->port());
+    std::string proxyLine = fmt::format(
+        "PROXY {} {} 65535 {}\r\n",
+        GetParam() == Network::Address::IpVersion::v4 ? "TCP4 1.2.3.4" : "TCP6 1:2:3::4",
+        Network::Test::getLoopbackAddressString(GetParam()),
+        fake_upstreams_[0]->localAddress()->ip()->port());
 
     Buffer::OwnedImpl buf(proxyLine);
     conn->write(buf, false);
@@ -171,12 +166,11 @@ TEST_P(ProxyProtoIntegrationTest, ClusterProvided) {
     // Create proxy protocol line that has the fake upstream address as the destination address.
     // This address will become the "restored" address for the server connection and will
     // be used as the destination address by the original destination cluster.
-    std::string proxyLine =
-        fmt::format("PROXY {} {} 65535 {}\r\n",
-                    std::get<0>(GetParam()) == Network::Address::IpVersion::v4 ? "TCP4 1.2.3.4"
-                                                                               : "TCP6 1:2:3::4",
-                    Network::Test::getLoopbackAddressString(std::get<0>(GetParam())),
-                    fake_upstreams_[0]->localAddress()->ip()->port());
+    std::string proxyLine = fmt::format(
+        "PROXY {} {} 65535 {}\r\n",
+        GetParam() == Network::Address::IpVersion::v4 ? "TCP4 1.2.3.4" : "TCP6 1:2:3::4",
+        Network::Test::getLoopbackAddressString(GetParam()),
+        fake_upstreams_[0]->localAddress()->ip()->port());
 
     Buffer::OwnedImpl buf(proxyLine);
     conn->write(buf, false);

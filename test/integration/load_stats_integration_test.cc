@@ -18,13 +18,10 @@
 namespace Envoy {
 namespace {
 
-class LoadStatsIntegrationTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion,
-                                               FakeHttpConnection::Type, Http::CodecClient::Type>>,
-      public HttpIntegrationTest {
+class LoadStatsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                 public HttpIntegrationTest {
 public:
-  LoadStatsIntegrationTest()
-      : HttpIntegrationTest(std::get<2>(GetParam()), std::get<0>(GetParam())) {
+  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
     // We rely on some fairly specific load balancing picks in this test, so
     // determinize the schedule.
     setDeterministic();
@@ -137,8 +134,6 @@ public:
         cluster_0->mutable_common_lb_config()->mutable_locality_weighted_lb_config();
       }
     });
-    // HttpIntegrationTest uses HTTP1 upstream by default.
-    setUpstreamProtocol(std::get<1>(GetParam()));
     HttpIntegrationTest::initialize();
     load_report_upstream_ = fake_upstreams_[0].get();
     for (uint32_t i = 0; i < upstream_endpoints_; ++i) {
@@ -366,13 +361,9 @@ public:
   const uint32_t load_report_interval_ms_ = 500;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, LoadStatsIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(FakeHttpConnection::Type::HTTP1,
-                                     FakeHttpConnection::Type::LEGACY_HTTP1),
-                     testing::ValuesIn(HTTP1_DOWNSTREAM)),
-    HttpIntegrationTest::ipUpstreamDownstreamParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, LoadStatsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Validate the load reports for successful requests as cluster membership
 // changes.

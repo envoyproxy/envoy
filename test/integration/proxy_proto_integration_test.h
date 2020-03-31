@@ -11,20 +11,16 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class ProxyProtoIntegrationTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion,
-                                               FakeHttpConnection::Type, Http::CodecClient::Type>>,
-      public HttpIntegrationTest {
+class ProxyProtoIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                  public HttpIntegrationTest {
 public:
-  ProxyProtoIntegrationTest()
-      : HttpIntegrationTest(std::get<2>(GetParam()), std::get<0>(GetParam())) {
+  ProxyProtoIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
           auto* filter_chain = listener->mutable_filter_chains(0);
           filter_chain->mutable_use_proxy_proto()->set_value(true);
         });
-    setUpstreamProtocol(std::get<1>(GetParam()));
   }
 };
 } // namespace Envoy

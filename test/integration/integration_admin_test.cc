@@ -29,8 +29,8 @@ namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationAdminTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             HTTP1_HTTP2_DOWNSTREAM, {FakeHttpConnection::Type::HTTP1,
-                                                      FakeHttpConnection::Type::LEGACY_HTTP1})),
+                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
+                             {FakeHttpConnection::Type::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(IntegrationAdminTest, HealthCheck) {
@@ -458,14 +458,10 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
   EXPECT_EQ("200", request("admin", "POST", "/cpuprofiler?enable=n", response));
 }
 
-class IntegrationAdminIpv4Ipv6Test
-    : public testing::Test,
-      public HttpIntegrationTest,
-      public testing::WithParamInterface<
-          std::tuple<FakeHttpConnection::Type, Http::CodecClient::Type>> {
+class IntegrationAdminIpv4Ipv6Test : public testing::Test, public HttpIntegrationTest {
 public:
   IntegrationAdminIpv4Ipv6Test()
-      : HttpIntegrationTest(std::get<1>(GetParam()), Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(
@@ -475,27 +471,13 @@ public:
           socket_address->set_ipv4_compat(true);
           socket_address->set_address("::");
         });
-    setUpstreamProtocol(std::get<0>(GetParam()));
     HttpIntegrationTest::initialize();
-  }
-
-  static std::string upstreamDownstreamParamsToString(
-      const ::testing::TestParamInfo<std::tuple<FakeHttpConnection::Type, Http::CodecClient::Type>>&
-          params) {
-    return absl::StrCat(FakeHttpConnection::upstreamProtocolToString(std::get<0>(params.param)),
-                        "_", TestUtility::downstreamProtocolToString(std::get<1>(params.param)));
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationAdminIpv4Ipv6Test,
-                         testing::Combine(testing::Values(FakeHttpConnection::Type::HTTP1,
-                                                          FakeHttpConnection::Type::LEGACY_HTTP1),
-                                          testing::ValuesIn(HTTP1_DOWNSTREAM)),
-                         IntegrationAdminIpv4Ipv6Test::upstreamDownstreamParamsToString);
-
 // Verify an IPv4 client can connect to the admin interface listening on :: when
 // IPv4 compat mode is enabled.
-TEST_P(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
+TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
   if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4) &&
       TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
     initialize();
@@ -517,18 +499,15 @@ TEST_P(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 class StatsMatcherIntegrationTest
     : public testing::Test,
       public HttpIntegrationTest,
-      public testing::WithParamInterface<std::tuple<
-          Network::Address::IpVersion, FakeHttpConnection::Type, Http::CodecClient::Type>> {
+      public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
-  StatsMatcherIntegrationTest()
-      : HttpIntegrationTest(std::get<2>(GetParam()), std::get<0>(GetParam())) {}
+  StatsMatcherIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(
         [this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           *bootstrap.mutable_stats_config()->mutable_stats_matcher() = stats_matcher_;
         });
-    setUpstreamProtocol(std::get<1>(GetParam()));
     HttpIntegrationTest::initialize();
   }
   void makeRequest() {
@@ -541,13 +520,9 @@ public:
   BufferingStreamDecoderPtr response_;
   envoy::config::metrics::v3::StatsMatcher stats_matcher_;
 };
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, StatsMatcherIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(FakeHttpConnection::Type::HTTP1,
-                                     FakeHttpConnection::Type::LEGACY_HTTP1),
-                     testing::ValuesIn(HTTP1_DOWNSTREAM)),
-    HttpIntegrationTest::ipUpstreamDownstreamParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, StatsMatcherIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Verify that StatsMatcher prevents the printing of uninstantiated stats.
 TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {

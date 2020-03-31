@@ -22,15 +22,12 @@ namespace Envoy {
 namespace {
 
 std::string ipSuppressEnvoyHeadersTestParamsToString(
-    const ::testing::TestParamInfo<
-        std::tuple<Network::Address::IpVersion, bool, bool, Http::CodecClient::Type>>& params) {
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
   return fmt::format(
-      "{}_{}_{}_{}",
+      "{}_{}",
       TestUtility::ipTestParamsToString(
           ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
-      std::get<1>(params.param) ? "with_x_envoy_from_router" : "without_x_envoy_from_router",
-      std::get<2>(params.param) ? "NEW_UPSTREAM" : "LEGACY_UPSTREAM",
-      TestUtility::downstreamProtocolToString(std::get<3>(params.param)));
+      std::get<1>(params.param) ? "with_x_envoy_from_router" : "without_x_envoy_from_router");
 }
 
 void disableHeaderValueOptionAppend(
@@ -40,10 +37,10 @@ void disableHeaderValueOptionAppend(
   }
 }
 
-const char http_connection_mgr_config[] = R"EOF(
+const std::string http_connection_mgr_config = R"EOF(
 http_filters:
   - name: envoy.filters.http.router
-codec_type: {}
+codec_type: HTTP1
 use_remote_address: false
 xff_num_trusted_hops: 1
 stat_prefix: header_test
@@ -52,8 +49,8 @@ route_config:
     - name: no-headers
       domains: ["no-headers.com"]
       routes:
-        - match: {{ prefix: "/" }}
-          route: {{ cluster: "cluster_0" }}
+        - match: { prefix: "/" }
+          route: { cluster: "cluster_0" }
     - name: vhost-headers
       domains: ["vhost-headers.com"]
       request_headers_to_add:
@@ -67,9 +64,9 @@ route_config:
             value: "vhost"
       response_headers_to_remove: ["x-vhost-response-remove"]
       routes:
-        - match: {{ prefix: "/vhost-only" }}
-          route: {{ cluster: "cluster_0" }}
-        - match: {{ prefix: "/vhost-and-route" }}
+        - match: { prefix: "/vhost-only" }
+          route: { cluster: "cluster_0" }
+        - match: { prefix: "/vhost-and-route" }
           request_headers_to_add:
             - header:
                 key: "x-route-request"
@@ -82,7 +79,7 @@ route_config:
           response_headers_to_remove: ["x-route-response-remove"]
           route:
             cluster: cluster_0
-        - match: {{ prefix: "/vhost-route-and-weighted-clusters" }}
+        - match: { prefix: "/vhost-route-and-weighted-clusters" }
           request_headers_to_add:
             - header:
                 key: "x-route-request"
@@ -111,7 +108,7 @@ route_config:
     - name: route-headers
       domains: ["route-headers.com"]
       routes:
-        - match: {{ prefix: "/route-only" }}
+        - match: { prefix: "/route-only" }
           request_headers_to_add:
             - header:
                 key: "x-route-request"
@@ -127,7 +124,7 @@ route_config:
     - name: xff-headers
       domains: ["xff-headers.com"]
       routes:
-        - match: {{ prefix: "/test" }}
+        - match: { prefix: "/test" }
           route:
             cluster: cluster_0
           request_headers_to_add:
@@ -144,7 +141,7 @@ route_config:
             key: "authorization"
             value: "token1"
       routes:
-        - match: {{ prefix: "/test" }}
+        - match: { prefix: "/test" }
           route:
             cluster: cluster_0
           request_headers_to_add:
@@ -157,14 +154,14 @@ route_config:
     - name: path-sanitization
       domains: ["path-sanitization.com"]
       routes:
-        - match: {{ prefix: "/private" }}
+        - match: { prefix: "/private" }
           route:
             cluster: cluster_0
           request_headers_to_add:
             - header:
                 key: "x-site"
                 value: "private"
-        - match: {{ prefix: "/public" }}
+        - match: { prefix: "/public" }
           route:
             cluster: cluster_0
           request_headers_to_add:
@@ -176,11 +173,11 @@ route_config:
 } // namespace
 
 class HeaderIntegrationTest
-    : public testing::TestWithParam<
-          std::tuple<Network::Address::IpVersion, bool, bool, Http::CodecClient::Type>>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public HttpIntegrationTest {
 public:
-  HeaderIntegrationTest() : HttpIntegrationTest(std::get<3>(GetParam()), std::get<0>(GetParam())) {}
+  HeaderIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())) {}
 
   bool routerSuppressEnvoyHeaders() const { return std::get<1>(GetParam()); }
 
@@ -284,12 +281,7 @@ public:
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           // Overwrite default config with our own.
-          TestUtility::loadFromYaml(
-              fmt::format(http_connection_mgr_config,
-                          std::get<3>(GetParam()) == Http::CodecClient::Type::HTTP1
-                              ? "HTTP1"
-                              : "LEGACY_HTTP1"),
-              hcm);
+          TestUtility::loadFromYaml(http_connection_mgr_config, hcm);
           envoy::extensions::filters::http::router::v3::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
           hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
@@ -372,11 +364,8 @@ public:
     HttpIntegrationTest::createUpstreams();
 
     if (use_eds_) {
-      fake_upstreams_.emplace_back(new FakeUpstream(0,
-                                                    std::get<2>(GetParam())
-                                                        ? FakeHttpConnection::Type::HTTP2
-                                                        : FakeHttpConnection::Type::LEGACY_HTTP2,
-                                                    version_, timeSystem()));
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
     }
   }
 
@@ -425,8 +414,7 @@ public:
         RELEASE_ASSERT(result, result.message());
       };
     }
-    setUpstreamProtocol(std::get<2>(GetParam()) ? FakeHttpConnection::Type::HTTP1
-                                                : FakeHttpConnection::Type::LEGACY_HTTP1);
+
     HttpIntegrationTest::initialize();
   }
 
@@ -464,12 +452,9 @@ protected:
   FakeStreamPtr eds_stream_;
 };
 
-// Tests over IP Versions, with/without suppress envoy headers, with new/legacy upstream codecs, and
-// downstream HTTP/1s.
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool(),
-                     testing::Bool(), testing::ValuesIn(HTTP1_DOWNSTREAM)),
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
     ipSuppressEnvoyHeadersTestParamsToString);
 
 // Validate that downstream request headers are passed upstream and upstream response headers are
