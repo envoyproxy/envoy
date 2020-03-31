@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "envoy/network/io_handle.h"
 
 #include "common/network/io_socket_error_impl.h"
@@ -45,11 +47,22 @@ public:
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
                                   uint32_t self_port, RecvMsgOutput& output) override {
     if (closed_) {
+      ASSERT(false, "recvmmsg is called after close.");
       return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
                                                         Network::IoSocketError::deleteIoError));
     }
     return io_handle_.recvmsg(slices, num_slice, self_port, output);
   }
+  Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   RecvMsgOutput& output) override {
+    if (closed_) {
+      ASSERT(false, "recvmmsg is called after close.");
+      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
+                                                        Network::IoSocketError::deleteIoError));
+    }
+    return io_handle_.recvmmsg(slices, self_port, output);
+  }
+  bool supportsMmsg() const override { return io_handle_.supportsMmsg(); }
 
 private:
   Network::IoHandle& io_handle_;

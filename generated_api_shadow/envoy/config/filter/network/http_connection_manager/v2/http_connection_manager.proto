@@ -18,6 +18,7 @@ import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.network.http_connection_manager.v2";
@@ -25,12 +26,13 @@ option java_outer_classname = "HttpConnectionManagerProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.http_connection_manager.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 36]
+// [#next-free-field: 37]
 message HttpConnectionManager {
   enum CodecType {
     // For every new connection, the connection manager will determine which
@@ -334,7 +336,7 @@ message HttpConnectionManager {
   // timeout, although per-route idle timeout overrides will continue to apply.
   google.protobuf.Duration stream_idle_timeout = 24;
 
-  // A timeout for idle requests managed by the connection manager.
+  // The amount of time that Envoy will wait for the entire request to be received.
   // The timer is activated when the request is initiated, and is disarmed when the last byte of the
   // request is sent upstream (i.e. all decoding filters have processed the request), OR when the
   // response is initiated. If not specified or set to 0, this timeout is disabled.
@@ -491,6 +493,18 @@ message HttpConnectionManager {
   // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
   bool merge_slashes = 33;
+
+  // The configuration of the request ID extension. This includes operations such as
+  // generation, validation, and associated tracing operations.
+  //
+  // If not set, Envoy uses the default UUID-based behavior:
+  //
+  // 1. Request ID is propagated using *x-request-id* header.
+  //
+  // 2. Request ID is a universally unique identifier (UUID).
+  //
+  // 3. Tracing decision (sampled, forced, etc) is set in 14th byte of the UUID.
+  RequestIDExtension request_id_extension = 36;
 }
 
 message Rds {
@@ -639,4 +653,9 @@ message HttpFilter {
 
     google.protobuf.Any typed_config = 4;
   }
+}
+
+message RequestIDExtension {
+  // Request ID extension specific configuration.
+  google.protobuf.Any typed_config = 1;
 }

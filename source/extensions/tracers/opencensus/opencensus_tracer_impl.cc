@@ -241,6 +241,17 @@ void Span::setSampled(bool sampled) { span_.AddAnnotation("setSampled", {{"sampl
 Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
                const LocalInfo::LocalInfo& localinfo, Api::Api& api)
     : oc_config_(oc_config), local_info_(localinfo) {
+  // To give user a chance to correct initially invalid configuration and try to apply it once again
+  // without a need to restart Envoy, validation checks must be done prior to any side effects.
+  if (oc_config.stackdriver_exporter_enabled() && oc_config.has_stackdriver_grpc_service() &&
+      !oc_config.stackdriver_grpc_service().has_google_grpc()) {
+    throw EnvoyException("Opencensus stackdriver tracer only support GoogleGrpc.");
+  }
+  if (oc_config.ocagent_exporter_enabled() && oc_config.has_ocagent_grpc_service() &&
+      !oc_config.ocagent_grpc_service().has_google_grpc()) {
+    throw EnvoyException("Opencensus ocagent tracer only supports GoogleGrpc.");
+  }
+  // Process-wide side effects.
   if (oc_config.has_trace_config()) {
     applyTraceConfig(oc_config.trace_config());
   }
@@ -254,10 +265,8 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       auto channel =
           grpc::CreateChannel(oc_config.stackdriver_address(), grpc::InsecureChannelCredentials());
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
-    } else if (oc_config.has_stackdriver_grpc_service()) {
-      if (!oc_config.stackdriver_grpc_service().has_google_grpc()) {
-        throw EnvoyException("Opencensus stackdriver tracer only support GoogleGrpc.");
-      }
+    } else if (oc_config.has_stackdriver_grpc_service() &&
+               oc_config.stackdriver_grpc_service().has_google_grpc()) {
       envoy::config::core::v3::GrpcService stackdriver_service =
           oc_config.stackdriver_grpc_service();
       if (stackdriver_service.google_grpc().target_uri().empty()) {
@@ -279,10 +288,8 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
     ::opencensus::exporters::trace::OcAgentOptions opts;
     if (!oc_config.ocagent_address().empty()) {
       opts.address = oc_config.ocagent_address();
-    } else if (oc_config.has_ocagent_grpc_service()) {
-      if (!oc_config.ocagent_grpc_service().has_google_grpc()) {
-        throw EnvoyException("Opencensus ocagent tracer only supports GoogleGrpc.");
-      }
+    } else if (oc_config.has_ocagent_grpc_service() &&
+               oc_config.ocagent_grpc_service().has_google_grpc()) {
       envoy::config::core::v3::GrpcService ocagent_service = oc_config.ocagent_grpc_service();
       auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(ocagent_service, api);
       opts.trace_service_stub =

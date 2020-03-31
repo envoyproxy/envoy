@@ -7,8 +7,10 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/http/async_client_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
+#include "common/upstream/cluster_update_tracker.h"
 
 #include "extensions/tracers/zipkin/span_buffer.h"
 #include "extensions/tracers/zipkin/tracer.h"
@@ -22,6 +24,7 @@ namespace Zipkin {
 #define ZIPKIN_TRACER_STATS(COUNTER)                                                               \
   COUNTER(spans_sent)                                                                              \
   COUNTER(timer_flushed)                                                                           \
+  COUNTER(reports_skipped_no_cluster)                                                              \
   COUNTER(reports_sent)                                                                            \
   COUNTER(reports_dropped)                                                                         \
   COUNTER(reports_failed)
@@ -115,7 +118,7 @@ public:
 
   // Getters to return the ZipkinDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
-  Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
+  const std::string& cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   ZipkinTracerStats& tracerStats() { return tracer_stats_; }
 
@@ -131,7 +134,7 @@ private:
   };
 
   Upstream::ClusterManager& cm_;
-  Upstream::ClusterInfoConstSharedPtr cluster_;
+  std::string cluster_;
   ZipkinTracerStats tracer_stats_;
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;
@@ -170,7 +173,9 @@ struct CollectorInfo {
  *
  * The default values for the runtime parameters are 5 spans and 5000ms.
  */
-class ReporterImpl : public Reporter, Http::AsyncClient::Callbacks {
+class ReporterImpl : Logger::Loggable<Logger::Id::tracing>,
+                     public Reporter,
+                     public Http::AsyncClient::Callbacks {
 public:
   /**
    * Constructor.
@@ -194,8 +199,8 @@ public:
 
   // Http::AsyncClient::Callbacks.
   // The callbacks below record Zipkin-span-related stats.
-  void onSuccess(Http::ResponseMessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason) override;
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
 
   /**
    * Creates a heap-allocated ZipkinReporter.
@@ -226,6 +231,9 @@ private:
   Event::TimerPtr flush_timer_;
   const CollectorInfo collector_;
   SpanBufferPtr span_buffer_;
+  Upstream::ClusterUpdateTracker collector_cluster_;
+  // Track active HTTP requests to be able to cancel them on destruction.
+  Http::AsyncClientRequestTracker active_requests_;
 };
 } // namespace Zipkin
 } // namespace Tracers

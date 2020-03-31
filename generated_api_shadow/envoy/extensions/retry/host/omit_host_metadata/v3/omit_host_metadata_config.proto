@@ -4,11 +4,13 @@ package envoy.extensions.retry.host.omit_host_metadata.v3;
 
 import "envoy/config/core/v3/base.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.retry.host.omit_host_metadata.v3";
 option java_outer_classname = "OmitHostMetadataConfigProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Omit host metadata retry predicate]
 

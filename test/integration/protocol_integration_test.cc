@@ -104,6 +104,8 @@ TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
 // Change the default route to be restrictive, and send a request to an alternate route.
 TEST_P(ProtocolIntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
+TEST_P(ProtocolIntegrationTest, RouterVirtualClusters) { testRouterVirtualClusters(); }
+
 // Change the default route to be restrictive, and send a POST to an alternate route.
 TEST_P(DownstreamProtocolIntegrationTest, RouterNotFoundBodyNoBuffer) {
   testRouterNotFoundWithBody();
@@ -1496,6 +1498,25 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
+  config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
+  response->waitForReset();
+  EXPECT_FALSE(response->complete());
 }
 
 // Make sure that invalid authority headers get blocked at or before the HCM.

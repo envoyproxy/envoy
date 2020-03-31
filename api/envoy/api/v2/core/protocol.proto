@@ -6,12 +6,14 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "ProtocolProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Protocol options]
 
@@ -59,6 +61,12 @@ message HttpProtocolOptions {
   // maximum number of request headers allowed is 100. Requests that exceed this limit will receive
   // a 431 response for HTTP/1.x and cause a stream reset for HTTP/2.
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
+
+  // Total duration to keep alive an HTTP request/response stream. If the time limit is reached the stream will be
+  // reset independent of any other timeouts. If not specified, this value is not set.
+  // The current implementation implements this timeout on downstream connections only.
+  // [#comment:TODO(shikugawa): add this functionality to upstream.]
+  google.protobuf.Duration max_stream_duration = 4;
 }
 
 // [#next-free-field: 6]

@@ -391,6 +391,27 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   }
 }
 
+void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
+                                            absl::string_view cluster_name) {
+  RELEASE_ASSERT(!finalized_, "");
+  ProtobufWkt::Struct cluster_metadata;
+  TestUtility::loadFromYaml(std::string(metadata_yaml), cluster_metadata);
+
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  for (int i = 0; i < static_resources->clusters_size(); ++i) {
+    auto* cluster = static_resources->mutable_clusters(i);
+    if (cluster->name() != cluster_name) {
+      continue;
+    }
+    for (const auto& kvp : cluster_metadata.fields()) {
+      ASSERT_TRUE(kvp.second.kind_case() == ProtobufWkt::Value::KindCase::kStructValue);
+      cluster->mutable_metadata()->mutable_filter_metadata()->insert(
+          {kvp.first, kvp.second.struct_value()});
+    }
+    break;
+  }
+}
+
 void ConfigHelper::applyConfigModifiers() {
   for (const auto& config_modifier : config_modifiers_) {
     config_modifier(bootstrap_);
@@ -612,6 +633,16 @@ void ConfigHelper::setDownstreamMaxConnectionDuration(std::chrono::milliseconds 
       });
 }
 
+void ConfigHelper::setDownstreamMaxStreamDuration(std::chrono::milliseconds timeout) {
+  addConfigModifier(
+      [timeout](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_max_stream_duration()->MergeFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
+      });
+}
+
 void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   RELEASE_ASSERT(!finalized_, "");
 
@@ -699,6 +730,24 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   access_log_config.set_path(filename);
   hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
   storeHttpConnectionManager(hcm_config);
+  return true;
+}
+
+bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::string_view format) {
+  RELEASE_ASSERT(!finalized_, "");
+  if (bootstrap_.mutable_static_resources()->listeners_size() == 0) {
+    return false;
+  }
+  envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+  if (!format.empty()) {
+    access_log_config.set_format(std::string(format));
+  }
+  access_log_config.set_path(filename);
+  bootstrap_.mutable_static_resources()
+      ->mutable_listeners(0)
+      ->add_access_log()
+      ->mutable_typed_config()
+      ->PackFrom(access_log_config);
   return true;
 }
 
