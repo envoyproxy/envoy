@@ -13,7 +13,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.wasm.v3";
 option java_outer_classname = "WasmProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Wasm service]
 
@@ -62,15 +62,15 @@ message PluginConfig {
   // filters/services with a blank group_name with the same *vm_id* will share Context(s).
   string group_name = 2;
 
+  google.protobuf.Any configuration = 5;
+  // In the future add referential VM configurations.
+
   // Configuration for finding or starting VM.
   oneof vm_config {
+    // Filter/service configuration used to configure or reconfigure a plugin
+    // (proxy_on_configuration).
     VmConfig inline_vm_config = 3;
-    // In the future add referential VM configurations.
   }
-
-  // Filter/service configuration used to configure or reconfigure a plugin
-  // (proxy_on_configuration).
-  google.protobuf.Any configuration = 5;
 }
 
 // WasmService is configured as a built-in *envoy.wasm_service* :ref:`ServiceConfig

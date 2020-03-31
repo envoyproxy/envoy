@@ -11,7 +11,7 @@ import "udpa/annotations/versioning.proto";
 option java_package = "io.envoyproxy.envoy.admin.v3";
 option java_outer_classname = "ServerInfoProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Server State]
 
@@ -137,13 +137,6 @@ message CommandLineOptions {
   // See :option:`--mode` for details.
   Mode mode = 19;
 
-  // max_stats and max_obj_name_len are now unused and have no effect.
-  uint64 hidden_envoy_deprecated_max_stats = 20
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
-
-  uint64 hidden_envoy_deprecated_max_obj_name_len = 21
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
-
   // See :option:`--disable-hot-restart` for details.
   bool disable_hot_restart = 22;
 
@@ -158,4 +151,10 @@ message CommandLineOptions {
 
   // See :option:`--disable-extensions` for details.
   repeated string disabled_extensions = 28;
+
+  uint64 hidden_envoy_deprecated_max_stats = 20
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+
+  uint64 hidden_envoy_deprecated_max_obj_name_len = 21
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }

@@ -12,7 +12,7 @@ option java_package = "io.envoyproxy.envoy.config.accesslog.v2";
 option java_outer_classname = "FileProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.access_loggers.file.v3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: File access log]
 // [#extension: envoy.access_loggers.file]

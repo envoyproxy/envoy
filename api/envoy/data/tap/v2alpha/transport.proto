@@ -12,7 +12,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.data.tap.v2alpha";
 option java_outer_classname = "TransportProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Transport tap data]
 // Trace format for the tap transport socket extension. This dumps plain text read/write

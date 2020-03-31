@@ -9,7 +9,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.on_demand.v3";
 option java_outer_classname = "OnDemandProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: OnDemand]
 // IP tagging :ref:`configuration overview <config_http_filters_on_demand>`.

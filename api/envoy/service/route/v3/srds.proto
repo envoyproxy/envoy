@@ -14,7 +14,7 @@ option java_package = "io.envoyproxy.envoy.service.route.v3";
 option java_outer_classname = "SrdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: SRDS]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`

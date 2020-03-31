@@ -13,7 +13,7 @@ option java_package = "io.envoyproxy.envoy.extensions.filter.udp.dns_filter.v3al
 option java_outer_classname = "DnsFilterProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).work_in_progress = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: DNS Filter]
 // DNS Filter :ref:`configuration overview <config_udp_listener_filters_dns_filter>`.

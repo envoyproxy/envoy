@@ -12,7 +12,7 @@ option java_package = "io.envoyproxy.envoy.service.accesslog.v2";
 option java_outer_classname = "AlsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: gRPC Access Log Service (ALS)]
 
