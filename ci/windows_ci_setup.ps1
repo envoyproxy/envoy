@@ -25,11 +25,11 @@ function Checksum
 
 mkdir "$env:TOOLS_BIN_DIR"
 $wc = New-Object System.Net.WebClient
-$wc.DownloadFile("https://github.com/bazelbuild/bazelisk/releases/download/v1.0/bazelisk-windows-amd64.exe", "$env:TOOLS_BIN_DIR\bazel.exe")
-$wc.DownloadFile("https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-win.zip", "$env:TOOLS_BIN_DIR\ninja-win.zip")
+$wc.DownloadFile("https://github.com/bazelbuild/bazelisk/releases/download/v1.3.0/bazelisk-windows-amd64.exe", "$env:TOOLS_BIN_DIR\bazel.exe")
+$wc.DownloadFile("https://github.com/ninja-build/ninja/releases/download/v1.10.0/ninja-win.zip", "$env:TOOLS_BIN_DIR\ninja-win.zip")
 
 # Check the SHA256 file hash of each downloaded file.
-Checksum $env:TOOLS_BIN_DIR\bazel.exe 96395ee9e3fb9f4499fcaffa8a94dd72b0748f495f366bc4be44dbf09d6827fc SHA256
-Checksum $env:TOOLS_BIN_DIR\ninja-win.zip 2d70010633ddaacc3af4ffbd21e22fae90d158674a09e132e06424ba3ab036e9 SHA256
+Checksum $env:TOOLS_BIN_DIR\bazel.exe 31fa9fcf250fe64aa3c5c83b69d76e1e9571b316a58bb5c714084495623e38b0 SHA256
+Checksum $env:TOOLS_BIN_DIR\ninja-win.zip 919fd158c16bf135e8a850bb4046ec1ce28a7439ee08b977cd0b7f6b3463d178 SHA256
 
 Unzip "$env:TOOLS_BIN_DIR\ninja-win.zip" "$env:TOOLS_BIN_DIR"

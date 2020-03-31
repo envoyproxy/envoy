@@ -1,19 +1,19 @@
 REPOSITORY_LOCATIONS = dict(
     bazel_compdb = dict(
-        sha256 = "87e376a685eacfb27bcc0d0cdf5ded1d0b99d868390ac50f452ba6ed781caffe",
-        strip_prefix = "bazel-compilation-database-0.4.2",
-        urls = ["https://github.com/grailbio/bazel-compilation-database/archive/0.4.2.tar.gz"],
+        sha256 = "9a1f88851a556104c67065c3dafa99ce47235635713d717f26a43637c8b4ab3d",
+        strip_prefix = "bazel-compilation-database-0.4.3",
+        urls = ["https://github.com/grailbio/bazel-compilation-database/archive/0.4.3.tar.gz"],
     ),
     bazel_gazelle = dict(
-        sha256 = "86c6d481b3f7aedc1d60c1c211c6f76da282ae197c3b3160f54bd3a8f847896f",
-        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.19.1/bazel-gazelle-v0.19.1.tar.gz"],
+        sha256 = "d8c45ee70ec39a57e7a05e5027c32b1576cc7f16d9dd37135b0eddde45cf1b10",
+        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.20.0/bazel-gazelle-v0.20.0.tar.gz"],
     ),
     bazel_toolchains = dict(
-        sha256 = "1342f84d4324987f63307eb6a5aac2dff6d27967860a129f5cd40f8f9b6fd7dd",
-        strip_prefix = "bazel-toolchains-2.2.0",
+        sha256 = "81e08efc3b26cdb14fe4188574d5797dbf8b348a79ecbe50e66f7992ab210fbe",
+        strip_prefix = "bazel-toolchains-2.2.2",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/2.2.0/bazel-toolchains-2.2.0.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/2.2.0.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/2.2.2/bazel-toolchains-2.2.2.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/2.2.2.tar.gz",
         ],
     ),
     build_bazel_rules_apple = dict(
@@ -95,9 +95,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gabime/spdlog/archive/v1.4.0.tar.gz"],
     ),
     com_github_google_libprotobuf_mutator = dict(
-        sha256 = "",
+        sha256 = "f6def6cdf63e29a367d46c0ad9e3e31eed89d031e22e0caac126f1e62d8b3fd0",
         strip_prefix = "libprotobuf-mutator-3521f47a2828da9ace403e4ecc4aece1a84feb36",
-        # 2020-02-04
+        # 2020-02-05
         urls = ["https://github.com/google/libprotobuf-mutator/archive/3521f47a2828da9ace403e4ecc4aece1a84feb36.tar.gz"],
     ),
     com_github_gperftools_gperftools = dict(
@@ -194,9 +194,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/nodejs/http-parser/archive/v2.9.3.tar.gz"],
     ),
     com_github_pallets_jinja = dict(
-        sha256 = "db49236731373e4f3118af880eb91bb0aa6978bc0cf8b35760f6a026f1a9ffc4",
-        strip_prefix = "jinja-2.10.3",
-        urls = ["https://github.com/pallets/jinja/archive/2.10.3.tar.gz"],
+        sha256 = "35ccc930685e37c4762258917e822b5db29b60431afb6d6e00e22b4f5287165a",
+        strip_prefix = "jinja-2.11.1",
+        urls = ["https://github.com/pallets/jinja/archive/2.11.1.tar.gz"],
     ),
     com_github_pallets_markupsafe = dict(
         sha256 = "222a10e3237d92a9cd45ed5ea882626bc72bc5e0264d3ed0f2c9129fa69fc167",
