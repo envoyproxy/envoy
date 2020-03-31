@@ -217,7 +217,8 @@ struct StreamInfoImpl : public StreamInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  const FilterStateSharedPtr& filterState() const override { return filter_state_; }
+  const FilterStateSharedPtr& filterState() override { return filter_state_; }
+  const FilterState& filterState() const override { return *filter_state_; }
 
   const FilterStateSharedPtr& upstreamFilterState() const override {
     return upstream_filter_state_;

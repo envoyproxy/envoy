@@ -421,7 +421,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
   if (downstreamConnection()) {
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        *downstreamConnection()->streamInfo().filterState());
+        downstreamConnection()->streamInfo().filterState());
   }
 
   if (!config_->tunnelingConfig()) {

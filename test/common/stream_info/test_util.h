@@ -179,9 +179,8 @@ public:
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  const Envoy::StreamInfo::FilterStateSharedPtr& filterState() const override {
-    return filter_state_;
-  }
+  const Envoy::StreamInfo::FilterStateSharedPtr& filterState() override { return filter_state_; }
+  const Envoy::StreamInfo::FilterState& filterState() const override { return *filter_state_; }
 
   const Envoy::StreamInfo::FilterStateSharedPtr& upstreamFilterState() const override {
     return upstream_filter_state_;

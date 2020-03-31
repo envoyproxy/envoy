@@ -600,6 +600,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "test_value");
   testFormatting(stream_info, "PER_REQUEST_STATE(testing2)", "");
@@ -617,6 +618,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVari
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "");
 }
@@ -871,6 +873,7 @@ TEST(HeaderParserTest, TestParseInternal) {
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   for (const auto& test_case : test_cases) {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
@@ -1041,6 +1044,7 @@ request_headers_to_remove: ["x-nope"]
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   req_header_parser->evaluateHeaders(header_map, stream_info);
 

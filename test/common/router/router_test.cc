@@ -4358,11 +4358,11 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
   bool filter_state_verified = false;
   router_.config().upstream_logs_.push_back(
       std::make_shared<TestAccessLog>([&](const auto& stream_info) {
-        filter_state_verified = stream_info.upstreamFilterState()->hasDataWithName("foo");
+        filter_state_verified = stream_info.upstreamFilterState()->hasDataWithName("upstream data");
       }));
 
   upstream_stream_info_.filterState()->setData(
-      "foo", std::make_unique<StreamInfo::UInt32AccessorImpl>(123),
+      "upstream data", std::make_unique<StreamInfo::UInt32AccessorImpl>(123),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
   expectResponseTimerCreate();
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))

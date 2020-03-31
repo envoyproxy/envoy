@@ -144,7 +144,7 @@ parsePerRequestStateField(absl::string_view param_str) {
 
   std::string param(modified_param_str);
   return [param](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
-    const Envoy::StreamInfo::FilterState& filter_state = *stream_info.filterState();
+    const Envoy::StreamInfo::FilterState& filter_state = stream_info.filterState();
 
     // No such value means don't output anything.
     if (!filter_state.hasDataWithName(param)) {
