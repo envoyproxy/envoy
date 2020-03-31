@@ -72,7 +72,8 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./source/common/access_log/access_log_formatter.cc",
                        "./source/extensions/filters/http/squash/squash_filter.h",
                        "./source/extensions/filters/http/squash/squash_filter.cc",
-                       "./source/server/http/admin.h", "./source/server/http/admin.cc",
+                       "./source/server/http/utils.h", "./source/server/http/utils.cc",
+                       "./source/server/http/stats_handler.h","./source/server/http/stats_handler.cc",
                        "./tools/clang_tools/api_booster/main.cc",
                        "./tools/clang_tools/api_booster/proto_cxx_utils.cc",
                        "./source/common/common/version.cc")
