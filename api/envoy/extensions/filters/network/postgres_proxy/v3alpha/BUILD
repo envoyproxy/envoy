@@ -6,7 +6,7 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     deps = [
-        "//envoy/config/filter/network/postgresql_proxy/v2alpha:pkg",
+        "//envoy/config/filter/network/postgres_proxy/v2alpha:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

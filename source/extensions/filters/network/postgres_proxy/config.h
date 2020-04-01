@@ -1,34 +1,34 @@
 #pragma once
 
-#include "envoy/extensions/filters/network/postgresql_proxy/v3alpha/postgresql_proxy.pb.h"
-#include "envoy/extensions/filters/network/postgresql_proxy/v3alpha/postgresql_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.h"
+#include "envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
-#include "extensions/filters/network/postgresql_proxy/postgresql_filter.h"
+#include "extensions/filters/network/postgres_proxy/postgres_filter.h"
 #include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace PostgreSQLProxy {
+namespace PostgresProxy {
 
 /**
- * Config registration for the PostgreSQL proxy filter.
+ * Config registration for the Postgres proxy filter.
  */
-class PostgreSQLConfigFactory
+class PostgresConfigFactory
     : public Common::FactoryBase<
-          envoy::extensions::filters::network::postgresql_proxy::v3alpha::PostgreSQLProxy> {
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy> {
 public:
-  PostgreSQLConfigFactory() : FactoryBase{NetworkFilterNames::get().PostgreSQL} {}
+  PostgresConfigFactory() : FactoryBase{NetworkFilterNames::get().Postgres} {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::network::postgresql_proxy::v3alpha::PostgreSQLProxy&
+      const envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy&
           proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 
-} // namespace PostgreSQLProxy
+} // namespace PostgresProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
