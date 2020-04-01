@@ -74,7 +74,8 @@ message HealthCheck {
   message HttpHealthCheck {
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
-    // with will be used.
+    // with will be used. The host header can be customized for a specific endpoint by setting the
+    // :ref:`hostname <envoy_api_field_endpoint.Endpoint.HealthCheckConfig.hostname>` field.
     string host = 1;
 
     // Specifies the HTTP path that will be requested during health checking. For example
@@ -161,7 +162,8 @@ message HealthCheck {
 
     // The value of the :authority header in the gRPC health check request. If
     // left empty (default value), the name of the cluster this health check is associated
-    // with will be used.
+    // with will be used. The authority header can be customized for a specific endpoint by setting
+    // the :ref:`hostname <envoy_api_field_endpoint.Endpoint.HealthCheckConfig.hostname>` field.
     string authority = 2;
   }
 

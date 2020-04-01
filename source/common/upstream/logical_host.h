@@ -88,6 +88,9 @@ public:
     return logical_host_->outlierDetector();
   }
   HostStats& stats() const override { return logical_host_->stats(); }
+  const std::string& hostnameForHealthChecks() const override {
+    return logical_host_->hostnameForHealthChecks();
+  }
   const std::string& hostname() const override { return logical_host_->hostname(); }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const envoy::config::core::v3::Locality& locality() const override {

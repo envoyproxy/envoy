@@ -244,7 +244,8 @@ HostDescriptionImpl::HostDescriptionImpl(
     const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority)
-    : cluster_(cluster), hostname_(hostname), address_(dest_address),
+    : cluster_(cluster), hostname_(hostname),
+      health_checks_hostname_(health_check_config.hostname()), address_(dest_address),
       canary_(Config::Metadata::metadataValue(metadata.get(),
                                               Config::MetadataFilters::get().ENVOY_LB,
                                               Config::MetadataEnvoyLbKeys::get().CANARY)

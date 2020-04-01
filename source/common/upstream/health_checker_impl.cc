@@ -25,6 +25,33 @@
 namespace Envoy {
 namespace Upstream {
 
+namespace {
+
+// Helper functions to get the correct hostname for an L7 health check.
+const std::string& getHostname(const HostSharedPtr& host, const std::string& config_hostname,
+                               const ClusterInfoConstSharedPtr& cluster) {
+  if (!host->hostnameForHealthChecks().empty()) {
+    return host->hostnameForHealthChecks();
+  }
+
+  if (!config_hostname.empty()) {
+    return config_hostname;
+  }
+
+  return cluster->name();
+}
+
+const std::string& getHostname(const HostSharedPtr& host,
+                               const absl::optional<std::string>& config_hostname,
+                               const ClusterInfoConstSharedPtr& cluster) {
+  if (config_hostname.has_value()) {
+    return getHostname(host, config_hostname.value(), cluster);
+  }
+  return getHostname(host, EMPTY_STRING, cluster);
+}
+
+} // namespace
+
 class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
 public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
@@ -181,8 +208,7 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecClient::Type codec_client_ty
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent),
-      hostname_(parent_.host_value_.empty() ? parent_.cluster_.info()->name()
-                                            : parent_.host_value_),
+      hostname_(getHostname(host, parent_.host_value_, parent_.cluster_.info())),
       protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)),
       local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
@@ -640,9 +666,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   request_encoder_ = &client_->newStream(*this);
   request_encoder_->getStream().addCallbacks(*this);
 
-  const std::string& authority = parent_.authority_value_.has_value()
-                                     ? parent_.authority_value_.value()
-                                     : parent_.cluster_.info()->name();
+  const std::string& authority =
+      getHostname(host_, parent_.authority_value_, parent_.cluster_.info());
   auto headers_message =
       Grpc::Common::prepareHeaders(authority, parent_.service_method_.service()->full_name(),
                                    parent_.service_method_.name(), absl::nullopt);
