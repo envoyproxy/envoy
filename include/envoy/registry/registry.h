@@ -393,13 +393,22 @@ private:
           prev_by_name->name(), prev_by_name->configType(), factory.name(), factory.configType());
     }
 
+    // Ignore empty config types and ignore test-registered factories that are using the Struct
+    // type.
+    // TODO(zuercher): convert static factory registrations in tests to use InjectFactory and
+    // remove the struct check.
+    bool valid_config_type =
+        !factory.configType().empty() && factory.configType() != "google.protobuf.Struct";
+
     Base* prev_by_type = nullptr;
-    if (!factory.configType().empty()) {
+    if (valid_config_type) {
       // If's possible the that no factory was replaced by-name, but that the replacement factory
       // is displacing a factory by type. Completely remove the factory by type.
       auto type_it = factoriesByType().find(factory.configType());
       if (type_it != factoriesByType().end()) {
         prev_by_type = type_it->second;
+        ASSERT(prev_by_type != nullptr);
+
         factoriesByType().erase(type_it);
 
         factories().erase(prev_by_type->name());
@@ -415,14 +424,14 @@ private:
     factories().emplace(factory.name(), replacement);
     RELEASE_ASSERT(getFactory(factory.name()) == replacement, "");
 
-    if (!factory.configType().empty()) {
+    if (valid_config_type) {
       factoriesByType().emplace(factory.configType(), replacement);
       RELEASE_ASSERT(getFactoryByType(factory.configType()) == replacement, "");
     }
 
-    return [replacement, prev_by_type, prev_by_name]() {
+    return [replacement, prev_by_name, prev_by_type, valid_config_type]() {
       factories().erase(replacement->name());
-      if (!replacement->configType().empty()) {
+      if (valid_config_type) {
         factoriesByType().erase(replacement->configType());
       }
 

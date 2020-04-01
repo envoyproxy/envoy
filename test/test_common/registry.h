@@ -30,7 +30,7 @@ public:
 
 private:
   Base& instance_;
-  Base* original_;
+  Base* original_{};
   std::function<void()> restore_factories_;
 };
 
