@@ -187,6 +187,7 @@ public:
   std::unique_ptr<MockFilterChainFactoryBuilder> dummy_builder_;
 };
 
+// NOLINTNEXTLINE(readability-redundant-member-init)
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
 (::benchmark::State& state) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
