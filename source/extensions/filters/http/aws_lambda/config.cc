@@ -29,8 +29,7 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
 
-  using envoy::extensions::filters::http::aws_lambda::v3::Config_InvocationMode_ASYNCHRONOUS;
-  using envoy::extensions::filters::http::aws_lambda::v3::Config_InvocationMode_SYNCHRONOUS;
+  using namespace envoy::extensions::filters::http::aws_lambda::v3;
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
