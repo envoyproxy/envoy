@@ -37,7 +37,7 @@ powershell -Command 'while ($true) { get-process java,cl,link | foreach { $out =
 
 # Test compilation of known MSVC-compatible test sources
 # bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //test/... --test_tag_filters=-skip_on_windows --build_tests_only
-bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //test/server/... --test_tag_filters=-skip_on_windows --build_tests_only
+bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //test/server:api_listener_test --test_tag_filters=-skip_on_windows --build_tests_only
 
 # Test invocations of known-working tests on Windows
 # bazel ${BAZEL_STARTUP_OPTIONS} test ${BAZEL_BUILD_OPTIONS} //test/... --test_tag_filters=-skip_on_windows,-fails_on_windows --build_tests_only --test_summary=terse --test_output=errors
