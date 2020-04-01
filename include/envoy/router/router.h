@@ -11,6 +11,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -478,6 +479,15 @@ public:
   virtual bool includeAttemptCountInResponse() const PURE;
 
   /**
+   * If present, this indicates that CONNECT requests to this host should be converted
+   * to TCP proxying, i.e. the payload of the HTTP body should be sent as raw
+   * TCP  upstream.
+   * @return configuration for TCP proxying, if present.
+   */
+  using ProxyingConfig = envoy::config::route::v3::VirtualHost::ProxyingConfig;
+  virtual const absl::optional<ProxyingConfig> proxyingConfig() const PURE;
+
+  /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
    *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
    *         as other limits may apply.
@@ -818,6 +828,15 @@ public:
    * @return bool whether x-envoy-attempt-count should be included on the downstream response.
    */
   virtual bool includeAttemptCountInResponse() const PURE;
+
+  /**
+   * If present, this indicates that CONNECT requests on this route should be converted
+   * to TCP proxying, i.e. the payload of the HTTP body should be sent as raw
+   * TCP  upstream.
+   * @return configuration for TCP proxying, if present.
+   */
+  using ProxyingConfig = envoy::config::route::v3::VirtualHost::ProxyingConfig;
+  virtual const absl::optional<ProxyingConfig> proxyingConfig() const PURE;
 
   using UpgradeMap = std::map<std::string, bool>;
   /**

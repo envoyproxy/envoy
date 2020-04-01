@@ -186,6 +186,7 @@ private:
     }
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
+    const absl::optional<ProxyingConfig> proxyingConfig() const override { return absl::nullopt; }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
@@ -271,6 +272,7 @@ private:
 
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
+    const absl::optional<ProxyingConfig> proxyingConfig() const override { return absl::nullopt; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     Router::InternalRedirectAction internalRedirectAction() const override {
       return Router::InternalRedirectAction::PassThrough;
