@@ -232,8 +232,7 @@ def _org_unicode_icuuc():
     _repository_impl(
         name = "org_unicode_icuuc",
         build_file = "@envoy//bazel/external:icuuc.BUILD",
-        patches = ["@envoy//bazel/external:icuuc.patch"],
-        patch_args = ["-p1"],
+        # TODO(dio): Consider patching udata when we need to embed some data.
     )
     native.bind(
         name = "icuuc",

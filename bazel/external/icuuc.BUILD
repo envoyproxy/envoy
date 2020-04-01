@@ -1,5 +1,3 @@
-# https://github.com/tensorflow/tensorflow/commit/1154432f88387c81be4ac2e3cb249b787ffafe21
-# https://github.com/tensorflow/tensorflow/blob/068641e7f858d92407343b2c3994d3bee3822093/third_party/icu/BUILD.bazel
 licenses(["notice"])  # Apache 2
 
 exports_files([
@@ -8,6 +6,7 @@ exports_files([
 ])
 
 icuuc_copts = [
+    "-DU_STATIC_IMPLEMENTATION",
     "-DU_COMMON_IMPLEMENTATION",
     "-DU_HAVE_STD_ATOMICS",  # TODO(gunan): Remove when TF is on ICU 64+.
 ] + select({
