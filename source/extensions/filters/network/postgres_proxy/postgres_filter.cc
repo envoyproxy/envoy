@@ -50,9 +50,9 @@ DecoderPtr PostgresFilter::createDecoder(DecoderCallbacks* callbacks) {
   return std::make_unique<DecoderImpl>(callbacks);
 }
 
-void PostgresFilter::incBackend() { config_->stats_.backend_msgs_.inc(); }
+void PostgresFilter::incBackend() { config_->stats_.messages_backend_.inc(); }
 
-void PostgresFilter::incFrontend() { config_->stats_.frontend_msgs_.inc(); }
+void PostgresFilter::incFrontend() { config_->stats_.messages_frontend_.inc(); }
 
 void PostgresFilter::incSessionsEncrypted() {
   config_->stats_.sessions_.inc();
@@ -107,19 +107,19 @@ void PostgresFilter::incNotice(NoticeType type) {
 }
 
 void PostgresFilter::incError(ErrorType type) {
-  config_->stats_.errors_.inc();
+  config_->stats_.messages_backend_error_.inc();
   switch (type) {
   case DecoderCallbacks::ErrorType::Error:
-    config_->stats_.errors_error_.inc();
+    config_->stats_.messages_backend_error_error_.inc();
     break;
   case DecoderCallbacks::ErrorType::Fatal:
-    config_->stats_.errors_fatal_.inc();
+    config_->stats_.messages_backend_error_fatal_.inc();
     break;
   case DecoderCallbacks::ErrorType::Panic:
-    config_->stats_.errors_panic_.inc();
+    config_->stats_.messages_backend_error_panic_.inc();
     break;
   case DecoderCallbacks::ErrorType::Unknown:
-    config_->stats_.errors_unknown_.inc();
+    config_->stats_.messages_backend_error_unknown_.inc();
     break;
   }
 }
@@ -148,7 +148,7 @@ void PostgresFilter::incStatement(StatementType type) {
   }
 }
 
-void PostgresFilter::incUnknown() { config_->stats_.unknown_.inc(); }
+void PostgresFilter::incUnknown() { config_->stats_.messages_unknown_.inc(); }
 
 void PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {
   // Keep processing data until buffer is empty or decoder says

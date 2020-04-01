@@ -19,13 +19,13 @@ namespace PostgresProxy {
  * All Postgres proxy stats. @see stats_macros.h
  */
 #define ALL_POSTGRES_PROXY_STATS(COUNTER)                                                          \
-  COUNTER(backend_msgs)                                                                            \
-  COUNTER(errors)                                                                                  \
-  COUNTER(errors_error)                                                                            \
-  COUNTER(errors_fatal)                                                                            \
-  COUNTER(errors_panic)                                                                            \
-  COUNTER(errors_unknown)                                                                          \
-  COUNTER(frontend_msgs)                                                                           \
+  COUNTER(messages_backend)                                                                        \
+  COUNTER(messages_backend_error)                                                                  \
+  COUNTER(messages_backend_error_error)                                                            \
+  COUNTER(messages_backend_error_fatal)                                                            \
+  COUNTER(messages_backend_error_panic)                                                            \
+  COUNTER(messages_backend_error_unknown)                                                          \
+  COUNTER(messages_frontend)                                                                       \
   COUNTER(sessions)                                                                                \
   COUNTER(sessions_encrypted)                                                                      \
   COUNTER(sessions_unencrypted)                                                                    \
@@ -38,14 +38,14 @@ namespace PostgresProxy {
   COUNTER(transactions)                                                                            \
   COUNTER(transactions_commit)                                                                     \
   COUNTER(transactions_rollback)                                                                   \
-  COUNTER(unknown)                                                                                 \
   COUNTER(notices)                                                                                 \
-  COUNTER(notices_warning)                                                                         \
   COUNTER(notices_notice)                                                                          \
+  COUNTER(notices_warning)                                                                         \
   COUNTER(notices_debug)                                                                           \
   COUNTER(notices_info)                                                                            \
   COUNTER(notices_log)                                                                             \
-  COUNTER(notices_unknown)
+  COUNTER(notices_unknown)                                                                         \
+  COUNTER(messages_unknown)
 
 /**
  * Struct definition for all Postgres proxy stats. @see stats_macros.h
