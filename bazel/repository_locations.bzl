@@ -330,4 +330,9 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "kafka-python-2.0.0",
         urls = ["https://github.com/dpkp/kafka-python/archive/2.0.0.tar.gz"],
     ),
+    org_unicode_icuuc = dict(
+        strip_prefix = "icu-release-64-2",
+        sha256 = "524960ac99d086cdb6988d2a92fc163436fd3c6ec0a84c475c6382fbf989be05",
+        urls = ["https://github.com/unicode-org/icu/archive/release-64-2.tar.gz"],
+    ),
 )

@@ -336,7 +336,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     external_deps = [
         "abseil_optional",
-        "http_parser",
+        "googleurl",
         "nghttp2",
     ],
     deps = [

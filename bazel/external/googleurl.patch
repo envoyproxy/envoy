@@ -1,0 +1,17 @@
+diff --git a/url/BUILD b/url/BUILD
+index 0126bdc..a11e973 100644
+--- a/url/BUILD
++++ b/url/BUILD
+@@ -43,11 +43,11 @@ cc_library(
+         "url_util.h",
+     ],
+     copts = build_config.default_copts,
+-    linkopts = ["-licuuc"],
+     visibility = ["//visibility:public"],
+     deps = [
+         "//base",
+         "//base/strings",
+         "//polyfills",
++        "@org_unicode_icuuc//:common"
+     ],
+ )

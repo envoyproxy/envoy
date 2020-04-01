@@ -18,6 +18,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
+#include "url/gurl.h"
 
 namespace Envoy {
 namespace Http2 {
@@ -102,14 +103,16 @@ namespace Utility {
 class Url {
 public:
   bool initialize(absl::string_view absolute_url);
-  absl::string_view scheme() { return scheme_; }
-  absl::string_view host_and_port() { return host_and_port_; }
-  absl::string_view path_and_query_params() { return path_and_query_params_; }
+  absl::string_view scheme() const { return scheme_; }
+  absl::string_view hostAndPort() const { return host_and_port_; }
+  absl::string_view pathAndQueryParams() const { return path_and_query_params_; }
+  uint64_t port() const { return port_; }
 
 private:
-  absl::string_view scheme_;
-  absl::string_view host_and_port_;
-  absl::string_view path_and_query_params_;
+  std::string scheme_;
+  std::string host_and_port_;
+  std::string path_and_query_params_;
+  uint16_t port_{0};
 };
 
 class PercentEncoding {

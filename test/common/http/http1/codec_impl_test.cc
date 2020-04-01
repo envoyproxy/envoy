@@ -414,6 +414,15 @@ TEST_F(Http1ServerConnectionImplTest, Http10Absolute) {
   expectHeadersTest(Protocol::Http10, true, buffer, expected_headers);
 }
 
+TEST_F(Http1ServerConnectionImplTest, Http10AbsoluteWithCustomPort) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com:8080"}, {":path", "/foobar"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com:8080/foobar HTTP/1.0\r\n\r\n");
+  expectHeadersTest(Protocol::Http10, true, buffer, expected_headers);
+}
+
 TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
   initialize();
 

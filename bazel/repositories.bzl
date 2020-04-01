@@ -145,6 +145,7 @@ def envoy_dependencies(skip_targets = []):
     _com_googlesource_quiche()
     _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
+    _org_unicode_icuuc()
     _io_opentracing_cpp()
     _net_zlib()
     _upb()
@@ -225,6 +226,18 @@ def _com_github_cyan4973_xxhash():
     native.bind(
         name = "xxhash",
         actual = "@com_github_cyan4973_xxhash//:xxhash",
+    )
+
+def _org_unicode_icuuc():
+    _repository_impl(
+        name = "org_unicode_icuuc",
+        build_file = "@envoy//bazel/external:icuuc.BUILD",
+        patches = ["@envoy//bazel/external:icuuc.patch"],
+        patch_args = ["-p1"],
+    )
+    native.bind(
+        name = "icuuc",
+        actual = "@org_unicode_icuuc//:common",
     )
 
 def _com_github_envoyproxy_sqlparser():
@@ -652,6 +665,8 @@ def _com_googlesource_quiche():
 def _com_googlesource_googleurl():
     _repository_impl(
         name = "com_googlesource_googleurl",
+        patches = ["@envoy//bazel/external:googleurl.patch"],
+        patch_args = ["-p1"],
     )
     native.bind(
         name = "googleurl",
