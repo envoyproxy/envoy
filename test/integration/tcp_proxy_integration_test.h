@@ -10,8 +10,7 @@
 
 namespace Envoy {
 namespace {
-class TcpProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                public BaseIntegrationTest {
+class TcpProxyIntegrationTest : TcpProxySslIntegrationTest {
 public:
   TcpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::TCP_PROXY_CONFIG) {
     enable_half_close_ = true;
