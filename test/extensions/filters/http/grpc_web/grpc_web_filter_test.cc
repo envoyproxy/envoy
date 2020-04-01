@@ -219,13 +219,14 @@ TEST_P(GrpcWebFilterTest, StatsNormalResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(1UL,
+            decoder_callbacks_.clusterInfo()
+                ->statsScope()
+                .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.success")
+                .value());
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.success")
-                     .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
 }
 
@@ -240,13 +241,14 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "1"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(1UL,
+            decoder_callbacks_.clusterInfo()
+                ->statsScope()
+                .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.failure")
+                .value());
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.failure")
-                     .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
 }
 

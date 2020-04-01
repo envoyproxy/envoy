@@ -43,6 +43,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cluster_update_tracker_test",
+    srcs = ["cluster_update_tracker_test.cc"],
+    deps = [
+        "//source/common/upstream:cluster_update_tracker_lib",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "conn_pool_map_impl_test",
     srcs = ["conn_pool_map_impl_test.cc"],
     deps = [
@@ -71,6 +80,7 @@ envoy_cc_test(
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -405,6 +415,7 @@ envoy_cc_test(
         "//source/common/upstream:strict_dns_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
@@ -456,6 +467,7 @@ envoy_cc_test_library(
         "//source/common/upstream:subset_lb_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/integration/clusters:custom_static_cluster",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",

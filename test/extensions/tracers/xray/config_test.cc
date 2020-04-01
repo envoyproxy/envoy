@@ -41,7 +41,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithTypedConfig) {
   XRayTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr xray_tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr xray_tracer = factory.createHttpTracer(*message, context);
   ASSERT_NE(nullptr, xray_tracer);
 }
 
@@ -76,7 +76,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
-  Tracing::HttpTracerPtr xray_tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr xray_tracer = factory.createHttpTracer(*message, context);
   ASSERT_NE(nullptr, xray_tracer);
 }
 

@@ -163,7 +163,9 @@ public:
                                        StatNameTagVectorOptConstRef tags) override {
     return default_scope_->counterFromStatNameWithTags(name, tags);
   }
-  Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
+  Counter& counterFromString(const std::string& name) override {
+    return default_scope_->counterFromString(name);
+  }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
@@ -172,15 +174,15 @@ public:
                                    Gauge::ImportMode import_mode) override {
     return default_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
   }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
-    return default_scope_->gauge(name, import_mode);
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
+    return default_scope_->gaugeFromString(name, import_mode);
   }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override {
     return default_scope_->histogramFromStatNameWithTags(name, tags, unit);
   }
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
-    return default_scope_->histogram(name, unit);
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
+    return default_scope_->histogramFromString(name, unit);
   }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
@@ -297,15 +299,15 @@ private:
     const SymbolTable& constSymbolTable() const override { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
-    Counter& counter(const std::string& name) override {
+    Counter& counterFromString(const std::string& name) override {
       StatNameManagedStorage storage(name, symbolTable());
       return counterFromStatName(storage.statName());
     }
-    Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+    Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
       StatNameManagedStorage storage(name, symbolTable());
       return gaugeFromStatName(storage.statName(), import_mode);
     }
-    Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
+    Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
       StatNameManagedStorage storage(name, symbolTable());
       return histogramFromStatName(storage.statName(), unit);
     }

@@ -15,7 +15,7 @@ namespace Envoy {
 class IntegrationAdminTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
-    config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
+    config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
     HttpIntegrationTest::initialize();
   }
 

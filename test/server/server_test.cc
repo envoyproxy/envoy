@@ -41,7 +41,7 @@ namespace {
 TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
-  Stats::IsolatedStoreImpl store;
+  Stats::TestUtil::TestStore store;
   Stats::Counter& c = store.counter("hello");
   c.inc();
   store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
@@ -254,7 +254,7 @@ protected:
 // Custom StatsSink that just increments a counter when flush is called.
 class CustomStatsSink : public Stats::Sink {
 public:
-  CustomStatsSink(Stats::Scope& scope) : stats_flushed_(scope.counter("stats.flushed")) {}
+  CustomStatsSink(Stats::Scope& scope) : stats_flushed_(scope.counterFromString("stats.flushed")) {}
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot&) override { stats_flushed_.inc(); }
@@ -321,9 +321,10 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
   // Validate that initialization_time histogram value has been set.
-  EXPECT_TRUE(
-      stats_store_.histogram("server.initialization_time_ms", Stats::Histogram::Unit::Milliseconds)
-          .used());
+  EXPECT_TRUE(stats_store_
+                  .histogramFromString("server.initialization_time_ms",
+                                       Stats::Histogram::Unit::Milliseconds)
+                  .used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }
 
@@ -512,8 +513,8 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(ServerStatsTest, FlushStats) {
   initialize("test/server/test_data/server/empty_bootstrap.yaml");
-  Stats::Gauge& recent_lookups =
-      stats_store_.gauge("server.stats_recent_lookups", Stats::Gauge::ImportMode::NeverImport);
+  Stats::Gauge& recent_lookups = stats_store_.gaugeFromString(
+      "server.stats_recent_lookups", Stats::Gauge::ImportMode::NeverImport);
   EXPECT_EQ(0, recent_lookups.value());
   flushStats();
   uint64_t strobed_recent_lookups = recent_lookups.value();

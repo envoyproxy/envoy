@@ -48,14 +48,17 @@ class QuicHttpIntegrationTest : public HttpIntegrationTest,
 public:
   QuicHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam(),
-                            ConfigHelper::QUIC_HTTP_PROXY_CONFIG),
+                            ConfigHelper::quicHttpProxyConfig()),
         supported_versions_(quic::CurrentSupportedVersions()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
         injected_resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
         file_updater_(injected_resource_filename_) {}
 
-  Network::ClientConnectionPtr makeClientConnection(uint32_t port) override {
+  Network::ClientConnectionPtr makeClientConnectionWithOptions(
+      uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
+    // Setting socket options is not supported.
+    ASSERT(!options);
     server_addr_ = Network::Utility::resolveUrl(
         fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
     Network::Address::InstanceConstSharedPtr local_addr =
