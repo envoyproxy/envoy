@@ -48,12 +48,17 @@ class ConnectionImpl;
 class StreamEncoderImpl : public virtual StreamEncoder,
                           public Stream,
                           Logger::Loggable<Logger::Id::http>,
-                          public StreamCallbackHelper {
+                          public StreamCallbackHelper,
+                          public Http1StreamEncoderOptions {
 public:
   // Http::StreamEncoder
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeMetadata(const MetadataMapVector&) override;
   Stream& getStream() override { return *this; }
+  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return *this; }
+
+  // Http::Http1StreamEncoderOptions
+  void disableChunkEncoding() override { disable_chunk_encoding_ = true; }
 
   // Http::Stream
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
@@ -77,6 +82,7 @@ protected:
   static const std::string LAST_CHUNK;
 
   ConnectionImpl& connection_;
+  bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
@@ -115,11 +121,8 @@ private:
  */
 class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
-  using FloodChecks = std::function<void()>;
-
-  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
-                      FloodChecks& flood_checks)
-      : StreamEncoderImpl(connection, header_key_formatter), flood_checks_(flood_checks) {}
+  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+      : StreamEncoderImpl(connection, header_key_formatter) {}
 
   bool startedResponse() { return started_response_; }
 
@@ -129,7 +132,6 @@ public:
   void encodeTrailers(const ResponseTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
-  FloodChecks& flood_checks_;
   bool started_response_{};
 };
 
@@ -227,6 +229,7 @@ protected:
   const bool strict_header_validation_ : 1;
   const bool connection_header_sanitization_ : 1;
   const bool enable_trailers_ : 1;
+  const bool reject_unsupported_transfer_encodings_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -352,7 +355,6 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  using FloodChecks = std::function<void()>;
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
@@ -366,9 +368,8 @@ private:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
-                  FloodChecks& flood_checks)
-        : response_encoder_(connection, header_key_formatter, flood_checks) {}
+    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+        : response_encoder_(connection, header_key_formatter) {}
 
     HeaderString request_url_;
     RequestDecoder* request_decoder_{};
@@ -424,7 +425,6 @@ private:
   void checkHeaderNameForUnderscores() override;
 
   ServerConnectionCallbacks& callbacks_;
-  std::function<void()> flood_checks_{[&]() { this->doFloodProtectionChecks(); }};
   absl::optional<ActiveRequest> active_request_;
   Http1Settings codec_settings_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
@@ -503,6 +503,7 @@ private:
   }
 
   absl::optional<PendingResponse> pending_response_;
+  bool pending_response_done_{true};
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
   // TODO(mattklein123): This should be a member of PendingResponse but this change needs dedicated

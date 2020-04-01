@@ -184,6 +184,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/dubbo_proxy:conn_manager_lib",
         "//source/extensions/filters/network/dubbo_proxy:dubbo_hessian2_serializer_impl_lib",
         "//source/extensions/filters/network/dubbo_proxy:dubbo_protocol_impl_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/server:server_mocks",
         "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
