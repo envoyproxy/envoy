@@ -1105,6 +1105,9 @@ envoy_cc_test(
     srcs = [
         "listener_filter_integration_test.cc",
     ],
+    data = [
+        "//test/config/integration/certs",
+    ],
     deps = [
         ":integration_lib",
         "//source/common/config:api_version_lib",
