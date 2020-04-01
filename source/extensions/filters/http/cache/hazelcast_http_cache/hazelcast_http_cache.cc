@@ -38,10 +38,18 @@ void HazelcastHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
   //  this case.
   ASSERT(lookup_context);
   ASSERT(response_headers);
-  if (unified_) {
-    updateUnifiedHeaders(std::move(lookup_context), std::move(response_headers));
-  } else {
-    updateDividedHeaders(std::move(lookup_context), std::move(response_headers));
+  try {
+    if (unified_) {
+      updateUnifiedHeaders(std::move(lookup_context), std::move(response_headers));
+    } else {
+      updateDividedHeaders(std::move(lookup_context), std::move(response_headers));
+    }
+  } catch (HazelcastClientOfflineException e) {
+    ENVOY_LOG(warn, "Hazelcast Connection is offline!");
+  } catch (OperationTimeoutException e) {
+    ENVOY_LOG(warn, "Updating headers has timed out.");
+  } catch (...) {
+    ENVOY_LOG(warn, "Updating headers has failed.");
   }
 }
 
@@ -83,7 +91,7 @@ HazelcastResponsePtr HazelcastHttpCache::getResponse(const uint64_t& key) {
 }
 
 void HazelcastHttpCache::connect() {
-  if (hazelcast_client_) {
+  if (hazelcast_client_ && hazelcast_client_->getLifecycleService().isRunning()) {
     ENVOY_LOG(warn, "Client is already connected. Cluster name: {}",
         hazelcast_client_->getClientConfig().getGroupConfig().getName());
     return;
@@ -108,12 +116,20 @@ void HazelcastHttpCache::connect() {
                   " from the map named {}.", unified_ ? response_map_name_ : header_map_name_);
 }
 
-void HazelcastHttpCache::shutdown() {
-  if (hazelcast_client_) {
+void HazelcastHttpCache::shutdown(bool destroy) {
+  if (!hazelcast_client_) {
+    ENVOY_LOG(warn, "Client is already offline.");
+    return;
+  }
+  if (hazelcast_client_->getLifecycleService().isRunning()) {
     ENVOY_LOG(info, "Shutting down Hazelcast connection...");
     hazelcast_client_->shutdown();
-    hazelcast_client_.release();
     ENVOY_LOG(info, "Cache is offline now.");
+  } else {
+    ENVOY_LOG(warn, "Cache is already offline.");
+  }
+  if (destroy) {
+    hazelcast_client_.reset();
   }
 }
 
@@ -141,8 +157,12 @@ void HazelcastHttpCache::onMissingBody(uint64_t key, int32_t version,  uint64_t 
   } catch (HazelcastClientOfflineException e) {
     // see DividedInsertContext#flushHeader() for left over locks on a connection failure.
     ENVOY_LOG(warn, "Hazelcast Connection is offline!");
+  } catch (OperationTimeoutException e) {
+    ENVOY_LOG(warn, "Clean up for missing body has timed out.");
+  } catch (...) {
+    ENVOY_LOG(warn, "Clean up for missing body has failed.");
   }
-};
+}
 
 void HazelcastHttpCache::onVersionMismatch(uint64_t key, int32_t version, uint64_t body_size) {
   onMissingBody(key, version, body_size);
@@ -163,6 +183,10 @@ void HazelcastHttpCache::unlock(const uint64_t& key) {
   }
 }
 
+HazelcastHttpCache::~HazelcastHttpCache() {
+  shutdown(true);
+}
+
 void HazelcastHttpCache::updateUnifiedHeaders(LookupContextPtr&& lookup_context,
     Http::ResponseHeaderMapPtr&& response_headers) {
   const uint64_t& key = static_cast<UnifiedLookupContext*>(lookup_context.get())->variantHashKey();
@@ -176,7 +200,7 @@ void HazelcastHttpCache::updateUnifiedHeaders(LookupContextPtr&& lookup_context,
   updated.header().headerMap(std::move(response_headers));
   // Update headers if no other update is performed in meantime.
   getResponseMap().replace(key, updated, *response);
-};
+}
 
 void HazelcastHttpCache::updateDividedHeaders(LookupContextPtr&& lookup_context,
     Http::ResponseHeaderMapPtr&& response_headers) {
@@ -191,7 +215,7 @@ void HazelcastHttpCache::updateDividedHeaders(LookupContextPtr&& lookup_context,
   updated.headerMap(std::move(response_headers));
   // Update headers if no other update is performed in meantime.
   getHeaderMap().replace(key, updated, *stale);
-};
+}
 
 std::string HazelcastHttpCache::constructMapName(const std::string& postfix) {
   std::string name(cache_config_.app_prefix());
@@ -208,7 +232,7 @@ HazelcastHttpCache::HazelcastHttpCache(HazelcastHttpCacheConfig config)
   body_map_name_ = constructMapName("body");
   header_map_name_ = constructMapName("div-cache");
   response_map_name_ = constructMapName("uni-cache");
-};
+}
 
 class HazelcastHttpCacheFactory : public HttpCacheFactory {
 public:

@@ -19,10 +19,14 @@ void UnifiedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
   try {
     response_ = hz_cache_.getResponse(variant_hash_key_);
   } catch (HazelcastClientOfflineException e){
-    ENVOY_LOG(warn, "Hazelcast cluster connection is lost! Aborting lookups and insertions"
-                    "until the connection is restored...");
-    abort_insertion_ = true;
-    cb(LookupResult{});
+    handleLookupFailure("Hazelcast cluster connection is lost! Aborting lookups and "
+                         "insertions until the connection is restored...", cb);
+    return;
+  } catch (OperationTimeoutException e) {
+    handleLookupFailure("Operation timed out during cache lookup.", cb);
+    return;
+  } catch (...) {
+    handleLookupFailure("Lookup to cache has failed.", cb);
     return;
   }
   if (response_) {
@@ -33,10 +37,8 @@ void UnifiedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
       // is performed here. If a different response is found with the same
       // hash (probably on hash collisions), the new response is denied to
       // be cached and the old one remains.
-      ENVOY_LOG(debug, "Keys mismatched for hash {}u. "
-                       "Aborting lookup & insertion", variant_hash_key_);
-      abort_insertion_ = true;
-      cb(LookupResult{});
+      handleLookupFailure("Mismatched keys found for unsigned hash: "
+                           + std::to_string(variant_hash_key_), cb, false);
       return;
     }
     cb(lookup_request_.makeLookupResult(std::move(response_->header().headerMap()),
@@ -121,7 +123,12 @@ void UnifiedInsertContext::flushEntry() {
   try {
     hz_cache_.putResponseIfAbsent(variant_hash_key_, entry);
   } catch (HazelcastClientOfflineException e) {
-    ENVOY_LOG(warn, "Hazelcast cluster connection is lost!");  }
+    ENVOY_LOG(warn, "Hazelcast cluster connection is lost! Failed to insert response.");
+  } catch (OperationTimeoutException e) {
+    ENVOY_LOG(warn, "Operation timed out during cache insertion.");
+  } catch (...) {
+    ENVOY_LOG(warn, "Response insertion to cache has failed.");
+  }
 }
 
 DividedLookupContext::DividedLookupContext(HazelcastHttpCache& cache, LookupRequest&& request)
@@ -134,10 +141,14 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
   try {
     header_entry = hz_cache_.getHeader(variant_hash_key_);
   } catch (HazelcastClientOfflineException e){
-    ENVOY_LOG(warn, "Hazelcast cluster connection is lost! Aborting lookups and insertions"
-                    "until the connection is restored...");
-    abort_insertion_ = true;
-    cb(LookupResult{});
+    handleLookupFailure("Hazelcast cluster connection is lost! Aborting lookups and "
+                         "insertions until the connection is restored.", cb);
+    return;
+  } catch (OperationTimeoutException e) {
+    handleLookupFailure("Operation timed out during cache lookup.", cb);
+    return;
+  } catch (...) {
+    handleLookupFailure("Lookup to cache has failed.", cb);
     return;
   }
   if (header_entry) {
@@ -145,10 +156,8 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     ENVOY_LOG(debug, "Found divided response for key {}u, version {}, body size = {}",
         variant_hash_key_, header_entry->version(), header_entry->bodySize());
     if (!MessageDifferencer::Equals(header_entry->variantKey(), variantKey())) {
-      // The same logic with UnifiedLookupContext#getHeaders applies.
-      ENVOY_LOG(debug, "Keys mismatched for hash {}u. "
-                       "Aborting lookup & insertion", variant_hash_key_);
-      cb(LookupResult{});
+      handleLookupFailure("Mismatched keys found for unsigned hash: "
+                           + std::to_string(variant_hash_key_), cb, false);
       return;
     }
     this->total_body_size_ = header_entry->bodySize();
@@ -166,9 +175,12 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     try {
       abort_insertion_ = !hz_cache_.tryLock(variant_hash_key_);
     } catch (HazelcastClientOfflineException e) {
-      ENVOY_LOG(warn, "Hazelcast cluster connection is lost! Aborting lookups and insertions"
-                      " until the connection is restored...");
-      abort_insertion_ = true;
+      handleLookupFailure("Hazelcast cluster connection is lost! Aborting lookups and insertions"
+                           " until the connection is restored...", cb);
+      return;
+    } catch (...) {
+      handleLookupFailure("Lock trial has failed.", cb);
+      return;
     }
     cb(LookupResult{});
   }
@@ -197,9 +209,14 @@ void DividedLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCal
   try {
     body = hz_cache_.getBody(variant_hash_key_, body_index);
   } catch (HazelcastClientOfflineException e) {
-    ENVOY_LOG(warn, "Hazelcast cluster connection is lost! Aborting lookups and insertions"
-                    " until the connection is restored...");
-    cb(nullptr);
+    handleBodyLookupFailure("Hazelcast cluster connection is lost! Aborting lookups and "
+                             "insertions until the connection is restored...", cb);
+    return;
+  } catch (OperationTimeoutException e) {
+    handleBodyLookupFailure("Operation timed out during cache lookup.", cb);
+    return;
+  } catch (...) {
+    handleBodyLookupFailure("Lookup to cache for body entry has failed.", cb);
     return;
   }
 
@@ -207,10 +224,10 @@ void DividedLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCal
     ENVOY_LOG(debug, "Found divided body with key {}u + \"{}\", version {}, size {}",
         variant_hash_key_, body_index, body->version(),body->length());
     if (body->version() != version_) {
-      ENVOY_LOG(debug, "Body version mismatched with header for key {}u at body: {}. "
-                       "Aborting lookup and performing cleanup.", variant_hash_key_, body_index);
       hz_cache_.onVersionMismatch(variant_hash_key_, version_, total_body_size_);
-      cb(nullptr);
+      handleBodyLookupFailure(fmt::format("Body version mismatched with header for "
+        "key {}u at body: {}. Aborting lookup and performing cleanup.", variant_hash_key_,
+        body_index), cb, false);
       return;
     }
     uint64_t offset = (range.begin() % body_partition_size_);
@@ -226,12 +243,22 @@ void DividedLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCal
     }
   } else {
     // Body partition is expected to reside in the cache but lookup is failed.
-    ENVOY_LOG(debug, "Found missing body for key {}u at body: {}. Cleaning up response"
-                     "with body size: {}", variant_hash_key_, body_index, total_body_size_);
     hz_cache_.onMissingBody(variant_hash_key_, version_, total_body_size_);
-    cb(nullptr);
+    handleBodyLookupFailure(fmt::format("Found missing body for key {}u at index: {}. Response "
+      "with body size {} has been cleaned up from the cache.",variant_hash_key_, body_index,
+      total_body_size_), cb, false);
   }
 };
+
+void DividedLookupContext::handleBodyLookupFailure(absl::string_view message,
+    const LookupBodyCallback& cb, bool warn_log){
+  if (warn_log) {
+    ENVOY_LOG(warn, "{}", message);
+  } else {
+    ENVOY_LOG(debug, "{}", message);
+  }
+  cb(nullptr);
+}
 
 DividedInsertContext::DividedInsertContext(LookupContext& lookup_context,
     HazelcastHttpCache& cache) : HazelcastInsertContextBase(lookup_context, cache),
@@ -276,7 +303,13 @@ void DividedInsertContext::insertBody(const Buffer::Instance& chunk,
       copyIntoLocalBuffer(copied_bytes, available_bytes, chunk);
       ASSERT(buffer_vector_.size() == body_partition_size_);
       remaining_bytes -= available_bytes;
-      flushBuffer();
+      if (!flushBuffer()) {
+        // Abort insertion if one of the body insertions fails.
+        if (ready_for_next_chunk) {
+          ready_for_next_chunk(false);
+        }
+        return;
+      }
     } else {
       // Copy all the bytes starting from chunk[copied_bytes] into buffer. Current
       // buffer can hold the remaining data.
@@ -288,8 +321,12 @@ void DividedInsertContext::insertBody(const Buffer::Instance& chunk,
   if (end_stream || trimmed) {
     // Header shouldn't be inserted before body insertions are completed.
     // Total body size in the header entry is computed via inserted body partitions.
-    flushBuffer();
-    flushHeader();
+    if (flushBuffer()) {
+      // Header insertion is performed only when all bodies are stored.
+      // Otherwise, insertion will be aborted and another insert context
+      // will store the response by overriding body entries flushed so far.
+      flushHeader();
+    }
   }
   if (ready_for_next_chunk) {
     ready_for_next_chunk(!trimmed);
@@ -304,10 +341,16 @@ void DividedInsertContext::copyIntoLocalBuffer(uint64_t& offset, uint64_t& size,
   offset += size;
 };
 
-void DividedInsertContext::flushBuffer() {
+/**
+ * Wraps the current body buffer with HazelcastBodyEntry and puts
+ * into the cache.
+ *
+ * @return True if insertion is completed.
+ */
+bool DividedInsertContext::flushBuffer() {
   ASSERT(!abort_insertion_);
   if (buffer_vector_.size() == 0) {
-    return;
+    return true;
   }
   total_body_size_ += buffer_vector_.size();
   HazelcastBodyEntry bodyEntry(hz_cache_.mapKey(variant_hash_key_),
@@ -317,6 +360,13 @@ void DividedInsertContext::flushBuffer() {
     hz_cache_.putBody(variant_hash_key_, body_order_++, bodyEntry);
   } catch (HazelcastClientOfflineException e) {
     ENVOY_LOG(warn, "Hazelcast cluster connection is lost!");
+    return false;
+  } catch (OperationTimeoutException e) {
+    ENVOY_LOG(warn, "Operation timed out during body insertion.");
+    return false;
+  } catch (...) {
+    ENVOY_LOG(warn, "Body insertion to cache has failed.");
+    return false;
   }
   if (body_order_ == ConfigUtil::partitionWarnLimit()) {
     ENVOY_LOG(warn, "Number of body partitions for a response has been reached {} (or more).",
@@ -325,6 +375,7 @@ void DividedInsertContext::flushBuffer() {
                     "as well as extra memory usage. Consider increasing body "
                     "partition size.");
   }
+  return true;
 }
 
 void DividedInsertContext::flushHeader() {
@@ -345,6 +396,8 @@ void DividedInsertContext::flushHeader() {
     // option can be used when available in a future release of cpp client. The related
     // issue can be tracked at: https://github.com/hazelcast/hazelcast-cpp-client/issues/579
     // TODO(enozcan): Use tryLock with leaseTime when released for Hazelcast cpp client.
+  } catch (...) {
+    ENVOY_LOG(warn, "Failed to complete response insertion.");
   }
 }
 

@@ -49,7 +49,7 @@ public:
 
   // Hazelcast cluster connection
   void connect();
-  void shutdown();
+  void shutdown(bool destroy);
 
   // Recoveries for malformed entries
   void onMissingBody(uint64_t key, int32_t version, uint64_t body_size);
@@ -94,9 +94,7 @@ public:
     return rand_.random();
   }
 
-  ~HazelcastHttpCache() {
-    shutdown();
-  };
+  ~HazelcastHttpCache();
 
 private:
   friend class HazelcastHttpCacheTestBase;

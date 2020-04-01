@@ -35,6 +35,17 @@ public:
 
 protected:
 
+  void handleLookupFailure(absl::string_view message, const LookupHeadersCallback& cb,
+      bool warn_log = true) {
+    if (warn_log) {
+      ENVOY_LOG(warn, "{}", message);
+    } else {
+      ENVOY_LOG(debug, "{}", message);
+    }
+    abort_insertion_ = true;
+    cb(LookupResult{});
+  }
+
   HazelcastHttpCache& hz_cache_;
   LookupRequest lookup_request_;
 
@@ -174,6 +185,9 @@ public:
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override;
 
 private:
+  void handleBodyLookupFailure(absl::string_view message, const LookupBodyCallback& cb,
+      bool warn_log = true);
+
   uint64_t total_body_size_;
 
   int32_t version_;
@@ -196,7 +210,7 @@ public:
 
 private:
   void copyIntoLocalBuffer(uint64_t& index, uint64_t& size, const Buffer::Instance& source);
-  void flushBuffer();
+  bool flushBuffer();
   void flushHeader();
 
   /**

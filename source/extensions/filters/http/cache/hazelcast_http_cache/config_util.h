@@ -27,13 +27,21 @@ public:
     envoy::source::extensions::filters::http::cache::HazelcastHttpCacheConfig& cache_config) {
     hazelcast::client::ClientConfig config;
     config.getGroupConfig().setName(cache_config.group_name());
-    config.getNetworkConfig().setConnectionAttemptPeriod(5000).setConnectionAttemptLimit(5);
+    config.getNetworkConfig().setConnectionTimeout(cache_config.connection_timeout()
+      == 0 ? DEFAULT_CONNECTION_TIMEOUT_MS : cache_config.connection_timeout());
+    config.getNetworkConfig().setConnectionAttemptLimit(cache_config.connection_attempt_limit()
+      == 0 ? DEFAULT_CONNECTION_ATTEMPT_LIMIT : cache_config.connection_attempt_limit());
+    config.getNetworkConfig().setConnectionAttemptPeriod(cache_config.connection_attempt_period()
+      == 0 ? DEFAULT_CONNECTION_ATTEMPT_PERIOD_MS : cache_config.connection_attempt_period());
     config.getConnectionStrategyConfig().setReconnectMode(
-        hazelcast::client::config::ClientConnectionStrategyConfig::ReconnectMode::ASYNC);
+      hazelcast::client::config::ClientConnectionStrategyConfig::ReconnectMode::ASYNC);
     for (auto &address : cache_config.addresses()) {
       config.getNetworkConfig().addAddress(hazelcast::client::Address(address.ip(),
-          address.port()));
+        address.port()));
     }
+    config.setProperty("hazelcast.client.invocation.timeout.seconds",
+      std::to_string(cache_config.invocation_timeout() == 0 ?
+      DEFAULT_INVOCATION_TIMEOUT_SEC : cache_config.invocation_timeout()));
     return config;
   }
 
@@ -48,13 +56,26 @@ private:
 
   // Sizes for each divided body entry.
   static constexpr uint64_t DEFAULT_PARTITION_SIZE = 2048;
+
   static constexpr uint64_t MAX_PARTITION_SIZE = DEFAULT_PARTITION_SIZE * 32;
 
-  // Size for total body size of a unified response
+  // Size for total body size of a unified response.
   static constexpr uint64_t MAX_UNIFIED_BODY_SIZE = MAX_PARTITION_SIZE;
 
-  // Size for total body size of a divided response (at most 32 partitions allowed)
+  // Size for total body size of a divided response (at most 32 partitions allowed).
   static constexpr uint64_t MAX_DIVIDED_BODY_SIZE = MAX_UNIFIED_BODY_SIZE * 32;
+
+  // Duration to try to reconnect a cluster if a member does not respond.
+  static constexpr uint32_t DEFAULT_CONNECTION_TIMEOUT_MS = 5000;
+
+  // Limit of connection attempts before go offline.
+  static constexpr uint32_t DEFAULT_CONNECTION_ATTEMPT_LIMIT = 10;
+
+  // Duration between connection retries.
+  static constexpr uint32_t DEFAULT_CONNECTION_ATTEMPT_PERIOD_MS = 5000;
+
+  // Duration for an invocation to be cancelled.
+  static constexpr uint32_t DEFAULT_INVOCATION_TIMEOUT_SEC = 8;
 };
 
 } // HazelcastHttpCache
