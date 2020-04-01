@@ -316,8 +316,8 @@ SslSocketInfo::SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx)
 }
 
 bool SslSocketInfo::peerCertificatePresented() const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  return cert != nullptr;
+  const STACK_OF(CRYPTO_BUFFER)* chain = SSL_get0_peer_certificates(ssl_.get());
+  return chain != nullptr && sk_CRYPTO_BUFFER_num(chain) > 0;
 }
 
 bool SslSocketInfo::peerCertificateValidated() const {
@@ -330,13 +330,11 @@ absl::Span<const std::string> SslSocketInfo::uriSanLocalCertificate() const {
     return cached_uri_san_local_certificate_;
   }
 
-  // The cert object is not owned.
-  X509* cert = SSL_get_certificate(ssl_.get());
-  if (!cert) {
+  if (!getX509Certificate()) {
     ASSERT(cached_uri_san_local_certificate_.empty());
     return cached_uri_san_local_certificate_;
   }
-  cached_uri_san_local_certificate_ = Utility::getSubjectAltNames(*cert, GEN_URI);
+  cached_uri_san_local_certificate_ = Utility::getSubjectAltNames(*getX509Certificate(), GEN_URI);
   return cached_uri_san_local_certificate_;
 }
 
@@ -345,12 +343,11 @@ absl::Span<const std::string> SslSocketInfo::dnsSansLocalCertificate() const {
     return cached_dns_san_local_certificate_;
   }
 
-  X509* cert = SSL_get_certificate(ssl_.get());
-  if (!cert) {
+  if (!getX509Certificate()) {
     ASSERT(cached_dns_san_local_certificate_.empty());
     return cached_dns_san_local_certificate_;
   }
-  cached_dns_san_local_certificate_ = Utility::getSubjectAltNames(*cert, GEN_DNS);
+  cached_dns_san_local_certificate_ = Utility::getSubjectAltNames(*getX509Certificate(), GEN_DNS);
   return cached_dns_san_local_certificate_;
 }
 
@@ -358,16 +355,15 @@ const std::string& SslSocketInfo::sha256PeerCertificateDigest() const {
   if (!cached_sha_256_peer_certificate_digest_.empty()) {
     return cached_sha_256_peer_certificate_digest_;
   }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
+  const STACK_OF(CRYPTO_BUFFER)* chain = SSL_get0_peer_certificates(ssl_.get());
+  if (!chain || sk_CRYPTO_BUFFER_num(chain) == 0) {
     ASSERT(cached_sha_256_peer_certificate_digest_.empty());
     return cached_sha_256_peer_certificate_digest_;
   }
+  CRYPTO_BUFFER* leaf = sk_CRYPTO_BUFFER_value(chain, 0);
 
   std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
-  unsigned int n;
-  X509_digest(cert.get(), EVP_sha256(), computed_hash.data(), &n);
-  RELEASE_ASSERT(n == computed_hash.size(), "");
+  SHA256(CRYPTO_BUFFER_data(leaf), CRYPTO_BUFFER_len(leaf), computed_hash.data());
   cached_sha_256_peer_certificate_digest_ = Hex::encode(computed_hash);
   return cached_sha_256_peer_certificate_digest_;
 }
@@ -376,15 +372,18 @@ const std::string& SslSocketInfo::urlEncodedPemEncodedPeerCertificate() const {
   if (!cached_url_encoded_pem_encoded_peer_certificate_.empty()) {
     return cached_url_encoded_pem_encoded_peer_certificate_;
   }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
+  const STACK_OF(CRYPTO_BUFFER)* chain = SSL_get0_peer_certificates(ssl_.get());
+  if (!chain || sk_CRYPTO_BUFFER_num(chain) == 0) {
     ASSERT(cached_url_encoded_pem_encoded_peer_certificate_.empty());
     return cached_url_encoded_pem_encoded_peer_certificate_;
   }
+  CRYPTO_BUFFER* leaf = sk_CRYPTO_BUFFER_value(chain, 0);
 
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
   RELEASE_ASSERT(buf != nullptr, "");
-  RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1, "");
+  RELEASE_ASSERT(PEM_write_bio(buf.get(), PEM_STRING_X509, /* header */ "",
+                               CRYPTO_BUFFER_data(leaf), CRYPTO_BUFFER_len(leaf)) != 0,
+                 "");
   const uint8_t* output;
   size_t length;
   RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
@@ -399,18 +398,19 @@ const std::string& SslSocketInfo::urlEncodedPemEncodedPeerCertificateChain() con
     return cached_url_encoded_pem_encoded_peer_cert_chain_;
   }
 
-  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl_.get());
-  if (cert_chain == nullptr) {
+  const STACK_OF(CRYPTO_BUFFER)* chain = SSL_get0_peer_certificates(ssl_.get());
+  if (!chain) {
     ASSERT(cached_url_encoded_pem_encoded_peer_cert_chain_.empty());
     return cached_url_encoded_pem_encoded_peer_cert_chain_;
   }
 
-  for (uint64_t i = 0; i < sk_X509_num(cert_chain); i++) {
-    X509* cert = sk_X509_value(cert_chain, i);
-
+  for (uint64_t i = 0; i < sk_CRYPTO_BUFFER_num(chain); i++) {
+    CRYPTO_BUFFER* cert = sk_CRYPTO_BUFFER_value(chain, i);
     bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
     RELEASE_ASSERT(buf != nullptr, "");
-    RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert) == 1, "");
+    RELEASE_ASSERT(PEM_write_bio(buf.get(), PEM_STRING_X509, /* header */ "",
+                                 CRYPTO_BUFFER_data(cert), CRYPTO_BUFFER_len(cert)) != 0,
+                   "");
     const uint8_t* output;
     size_t length;
     RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
@@ -429,12 +429,12 @@ absl::Span<const std::string> SslSocketInfo::uriSanPeerCertificate() const {
     return cached_uri_san_peer_certificate_;
   }
 
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
+  if (!getX509PeerCertificate()) {
     ASSERT(cached_uri_san_peer_certificate_.empty());
     return cached_uri_san_peer_certificate_;
   }
-  cached_uri_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_URI);
+  cached_uri_san_peer_certificate_ =
+      Utility::getSubjectAltNames(*getX509PeerCertificate(), GEN_URI);
   return cached_uri_san_peer_certificate_;
 }
 
@@ -443,12 +443,12 @@ absl::Span<const std::string> SslSocketInfo::dnsSansPeerCertificate() const {
     return cached_dns_san_peer_certificate_;
   }
 
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
+  if (!getX509PeerCertificate()) {
     ASSERT(cached_dns_san_peer_certificate_.empty());
     return cached_dns_san_peer_certificate_;
   }
-  cached_dns_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_DNS);
+  cached_dns_san_peer_certificate_ =
+      Utility::getSubjectAltNames(*getX509PeerCertificate(), GEN_DNS);
   return cached_dns_san_peer_certificate_;
 }
 
@@ -503,11 +503,35 @@ const std::string& SslSocketInfo::tlsVersion() const {
 }
 
 absl::optional<std::string> SslSocketInfo::x509Extension(absl::string_view extension_name) const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
+  if (!getX509PeerCertificate()) {
     return absl::nullopt;
   }
-  return Utility::getX509ExtensionValue(*cert, extension_name);
+  return Utility::getX509ExtensionValue(*getX509PeerCertificate(), extension_name);
+}
+
+X509* SslSocketInfo::getX509Certificate() const {
+  if (cached_certificate_) {
+    return cached_certificate_.get();
+  }
+  CRYPTO_BUFFER* leaf = ContextImpl::leafCertificate(ssl_.get());
+  if (leaf) {
+    auto* start = CRYPTO_BUFFER_data(leaf);
+    cached_certificate_.reset(d2i_X509(nullptr, &start, CRYPTO_BUFFER_len(leaf)));
+  }
+  return cached_certificate_.get();
+}
+
+X509* SslSocketInfo::getX509PeerCertificate() const {
+  if (cached_peer_certificate_) {
+    return cached_peer_certificate_.get();
+  }
+  const STACK_OF(CRYPTO_BUFFER)* chain = SSL_get0_peer_certificates(ssl_.get());
+  if (chain && sk_CRYPTO_BUFFER_num(chain) > 0) {
+    CRYPTO_BUFFER* leaf = sk_CRYPTO_BUFFER_value(chain, 0);
+    auto* start = CRYPTO_BUFFER_data(leaf);
+    cached_peer_certificate_.reset(d2i_X509(nullptr, &start, CRYPTO_BUFFER_len(leaf)));
+  }
+  return cached_peer_certificate_.get();
 }
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
@@ -516,12 +540,12 @@ const std::string& SslSocketInfo::serialNumberPeerCertificate() const {
   if (!cached_serial_number_peer_certificate_.empty()) {
     return cached_serial_number_peer_certificate_;
   }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
+  if (!getX509PeerCertificate()) {
     ASSERT(cached_serial_number_peer_certificate_.empty());
     return cached_serial_number_peer_certificate_;
   }
-  cached_serial_number_peer_certificate_ = Utility::getSerialNumberFromCertificate(*cert.get());
+  cached_serial_number_peer_certificate_ =
+      Utility::getSerialNumberFromCertificate(*getX509PeerCertificate());
   return cached_serial_number_peer_certificate_;
 }
 
@@ -529,12 +553,11 @@ const std::string& SslSocketInfo::issuerPeerCertificate() const {
   if (!cached_issuer_peer_certificate_.empty()) {
     return cached_issuer_peer_certificate_;
   }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
+  if (!getX509PeerCertificate()) {
     ASSERT(cached_issuer_peer_certificate_.empty());
     return cached_issuer_peer_certificate_;
   }
-  cached_issuer_peer_certificate_ = Utility::getIssuerFromCertificate(*cert);
+  cached_issuer_peer_certificate_ = Utility::getIssuerFromCertificate(*getX509PeerCertificate());
   return cached_issuer_peer_certificate_;
 }
 
@@ -542,12 +565,11 @@ const std::string& SslSocketInfo::subjectPeerCertificate() const {
   if (!cached_subject_peer_certificate_.empty()) {
     return cached_subject_peer_certificate_;
   }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
+  if (!getX509PeerCertificate()) {
     ASSERT(cached_subject_peer_certificate_.empty());
     return cached_subject_peer_certificate_;
   }
-  cached_subject_peer_certificate_ = Utility::getSubjectFromCertificate(*cert);
+  cached_subject_peer_certificate_ = Utility::getSubjectFromCertificate(*getX509PeerCertificate());
   return cached_subject_peer_certificate_;
 }
 
@@ -555,29 +577,26 @@ const std::string& SslSocketInfo::subjectLocalCertificate() const {
   if (!cached_subject_local_certificate_.empty()) {
     return cached_subject_local_certificate_;
   }
-  X509* cert = SSL_get_certificate(ssl_.get());
-  if (!cert) {
+  if (!getX509Certificate()) {
     ASSERT(cached_subject_local_certificate_.empty());
     return cached_subject_local_certificate_;
   }
-  cached_subject_local_certificate_ = Utility::getSubjectFromCertificate(*cert);
+  cached_subject_local_certificate_ = Utility::getSubjectFromCertificate(*getX509Certificate());
   return cached_subject_local_certificate_;
 }
 
 absl::optional<SystemTime> SslSocketInfo::validFromPeerCertificate() const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
+  if (!getX509PeerCertificate()) {
     return absl::nullopt;
   }
-  return Utility::getValidFrom(*cert);
+  return Utility::getValidFrom(*getX509PeerCertificate());
 }
 
 absl::optional<SystemTime> SslSocketInfo::expirationPeerCertificate() const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
+  if (!getX509PeerCertificate()) {
     return absl::nullopt;
   }
-  return Utility::getExpirationTime(*cert);
+  return Utility::getExpirationTime(*getX509PeerCertificate());
 }
 
 const std::string& SslSocketInfo::sessionId() const {

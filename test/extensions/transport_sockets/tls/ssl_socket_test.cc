@@ -2512,9 +2512,9 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   SSL_set_cert_cb(
       ssl_socket->rawSslForTest(),
       [](SSL* ssl, void*) -> int {
-        STACK_OF(X509_NAME)* list = SSL_get_client_CA_list(ssl);
+        const STACK_OF(CRYPTO_BUFFER)* list = SSL_get0_server_requested_CAs(ssl);
         EXPECT_NE(nullptr, list);
-        EXPECT_EQ(2U, sk_X509_NAME_num(list));
+        EXPECT_EQ(2U, sk_CRYPTO_BUFFER_num(list));
         return 1;
       },
       nullptr);

@@ -86,6 +86,13 @@ public:
    */
   static bool dnsNameMatch(const std::string& dns_name, const char* pattern);
 
+  /**
+   * Returns the leaf certificate used by the supplied connection.
+   * @param ssl a connected SSL connection
+   * @return the DER-encoded leaf certificate that was presented during the SSL handshake.
+   */
+  static CRYPTO_BUFFER* leafCertificate(SSL* ssl);
+
   SslStats& stats() { return stats_; }
 
   /**
@@ -114,8 +121,8 @@ protected:
   // A X509_STORE_CTX_verify_cb callback for ignoring cert expiration in X509_verify_cert().
   static int ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* store_ctx);
 
-  // A SSL_CTX_set_cert_verify_callback for custom cert validation.
-  static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
+  // A SSL_CTX_set_custom_verify_cb for custom cert validation.
+  static ssl_verify_result_t verifyCallback(SSL* ssl, uint8_t* out_alert);
 
   Envoy::Ssl::ClientValidationStatus
   verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,
@@ -158,7 +165,10 @@ protected:
     // safely substituted via SSL_set_SSL_CTX() during the
     // SSL_CTX_set_select_certificate_cb() callback following ClientHello.
     bssl::UniquePtr<SSL_CTX> ssl_ctx_;
-    bssl::UniquePtr<X509> cert_chain_;
+    // x509_store_ configures X509_verify_cert().
+    bssl::UniquePtr<X509_STORE> x509_store_;
+    // cert_ is the leaf certificate. (We don't retain the rest of the chain.)
+    bssl::UniquePtr<CRYPTO_BUFFER> cert_;
     std::string cert_chain_file_path_;
     bool is_ecdsa_{};
     Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};

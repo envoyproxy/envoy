@@ -82,6 +82,14 @@ public:
   bssl::UniquePtr<SSL> ssl_;
 
 private:
+  // getX509Certificate parses our leaf certificate, and caches and returns the result.
+  X509* getX509Certificate() const;
+  // getX509PeerCertificate parses the peer's leaf certificate (if any), and caches and returns the
+  // result.
+  X509* getX509PeerCertificate() const;
+
+  mutable bssl::UniquePtr<X509> cached_certificate_;
+  mutable bssl::UniquePtr<X509> cached_peer_certificate_;
   mutable std::vector<std::string> cached_uri_san_local_certificate_;
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_serial_number_peer_certificate_;
