@@ -1618,7 +1618,11 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponse) {
 
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                   {":path", "/"},
+                                   {":authority", "host"},
+                                   {"connection", "upgrade"},
+                                   {"upgrade", "websocket"}};
   request_encoder.encodeHeaders(headers, true);
 
   // Send upgrade headers
@@ -1649,7 +1653,11 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {
 
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                   {":path", "/"},
+                                   {":authority", "host"},
+                                   {"connection", "upgrade"},
+                                   {"upgrade", "websocket"}};
   request_encoder.encodeHeaders(headers, true);
 
   // Send upgrade headers
