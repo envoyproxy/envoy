@@ -74,7 +74,7 @@ def _install_locally(version, files):
 
 def _urlopen_retried(request, max_retries=20, attempt=1, delay_sec=1):
     """
-    Retries a request via recursion. Retries happen with a default delay of 1 second. We do not exponentially back off.
+    Retries a request via recursion. Retries happen after the provided delay. We do not exponentially back off.
     :param request: the request to be made
     :param max_retries: Number of retries to use, default is 20. The reason we are using such a high retry is because
     sonatype fails quite frequently
@@ -85,7 +85,7 @@ def _urlopen_retried(request, max_retries=20, attempt=1, delay_sec=1):
     try:
         return urlopen(request)
     except HTTPError as e:
-        if max_retries > 0 and e.code >= 500:
+        if max_retries > attempt and e.code >= 500:
             print(
                 "[{retry_attempt}/{max_retries} Retry attempt] Retrying request after {delay}s."
                 " Received error code {code}"
@@ -98,7 +98,7 @@ def _urlopen_retried(request, max_retries=20, attempt=1, delay_sec=1):
                 file=sys.stderr)
             time.sleep(delay_sec)
             return _urlopen_retried(request, max_retries, attempt + 1)
-        elif max_retries == 0:
+        elif max_retries <= attempt:
             print("Retry limit reached. Will not continue to retry. Received error code {}".format(e.code),
                   file=sys.stderr)
             raise e
