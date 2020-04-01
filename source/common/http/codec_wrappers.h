@@ -93,6 +93,10 @@ public:
 
   Stream& getStream() override { return inner_.getStream(); }
 
+  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
+    return inner_.http1StreamEncoderOptions();
+  }
+
 protected:
   RequestEncoderWrapper(RequestEncoder& inner) : inner_(inner) {}
 

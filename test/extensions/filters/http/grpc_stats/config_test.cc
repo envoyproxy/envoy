@@ -8,11 +8,13 @@
 #include "test/common/buffer/utility.h"
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -22,11 +24,9 @@ namespace {
 
 class GrpcStatsFilterConfigTest : public testing::Test {
 protected:
-  void initialize(bool emit_filter_state) {
-    envoy::extensions::filters::http::grpc_stats::v3::FilterConfig config{};
-    config.set_emit_filter_state(emit_filter_state);
-    GrpcStatsFilterConfig factory;
-    Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context_);
+  void initialize() {
+    GrpcStatsFilterConfigFactory factory;
+    Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config_, "stats", context_);
     Http::MockFilterChainFactoryCallbacks filter_callback;
 
     ON_CALL(filter_callback, addStreamFilter(_)).WillByDefault(testing::SaveArg<0>(&filter_));
@@ -37,6 +37,27 @@ protected:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
+  void addAllowlistEntry() {
+    auto* allowlist = config_.mutable_individual_method_stats_allowlist();
+    auto* services = allowlist->mutable_services();
+    auto* service = services->Add();
+    service->set_name("BadCompanions");
+    *service->mutable_method_names()->Add() = "GetBadCompanions";
+    *service->mutable_method_names()->Add() = "AnotherMethod";
+  }
+
+  void doRequestResponse(Http::TestRequestHeaderMapImpl& request_headers) {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+    Buffer::OwnedImpl data("hello");
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, false));
+    Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+  }
+
+  envoy::extensions::filters::http::grpc_stats::v3::FilterConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<Http::StreamFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -44,7 +65,8 @@ protected:
 };
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
-  initialize(false);
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  initialize();
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
@@ -71,19 +93,14 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
 }
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
-  initialize(false);
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  initialize();
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  doRequestResponse(request_headers);
 
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
-  Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, false));
-  Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.success")
@@ -96,17 +113,14 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
 }
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
-  initialize(false);
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  initialize();
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc+proto"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  doRequestResponse(request_headers);
 
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
-  Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.success")
@@ -118,8 +132,189 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
   EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
+// Test that an allowlist match results in method-named stats.
+TEST_F(GrpcStatsFilterConfigTest, StatsAllowlistMatch) {
+  addAllowlistEntry();
+  initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                                 {":path", "/BadCompanions/GetBadCompanions"}};
+
+  doRequestResponse(request_headers);
+
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.BadCompanions.GetBadCompanions.success")
+                     .value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.BadCompanions.GetBadCompanions.total")
+                     .value());
+}
+
+// Test that an allowlist method mismatch results in going to the generic stat.
+TEST_F(GrpcStatsFilterConfigTest, StatsAllowlistMismatchMethod) {
+  addAllowlistEntry();
+  initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                                 {":path", "/BadCompanions/GetGoodCompanions"}};
+
+  doRequestResponse(request_headers);
+
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.BadCompanions.GetGoodCompanions.success")
+                     .value());
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.BadCompanions.GetGoodCompanions.total")
+                     .value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.success").value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
+}
+
+// Test that an allowlist service mismatch results in going to the generic stat.
+TEST_F(GrpcStatsFilterConfigTest, StatsAllowlistMismatchService) {
+  addAllowlistEntry();
+  initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                                 {":path", "/GoodCompanions/GetBadCompanions"}};
+
+  doRequestResponse(request_headers);
+
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.GoodCompanions.GetBadCompanions.success")
+                     .value());
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.GoodCompanions.GetBadCompanions.total")
+                     .value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.success").value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
+}
+
+// Test that any method results in going to the generic stat, when stats_for_all_methods == false.
+TEST_F(GrpcStatsFilterConfigTest, DisableStatsForAllMethods) {
+  config_.mutable_stats_for_all_methods()->set_value(false);
+  initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                                 {":path", "/BadCompanions/GetBadCompanions"}};
+
+  doRequestResponse(request_headers);
+
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.BadCompanions.GetBadCompanions.success")
+                     .value());
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.BadCompanions.GetBadCompanions.total")
+                     .value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.success").value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
+}
+
+// Test that any method results in a specific stat, when stats_for_all_methods isn't set
+// at all.
+//
+// This is deprecated behavior and will be changed during the deprecation window.
+TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSetting) {
+  EXPECT_CALL(
+      context_.runtime_loader_.snapshot_,
+      deprecatedFeatureEnabled(
+          "envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default", _))
+      .WillOnce(Invoke([](absl::string_view, bool default_value) { return default_value; }));
+  EXPECT_LOG_CONTAINS("warn",
+                      "Using deprecated default value for "
+                      "'envoy.extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_"
+                      "methods'",
+                      initialize());
+
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                                 {":path", "/BadCompanions/GetBadCompanions"}};
+
+  doRequestResponse(request_headers);
+
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.BadCompanions.GetBadCompanions.success")
+                     .value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.BadCompanions.GetBadCompanions.total")
+                     .value());
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.success").value());
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
+}
+
+// Test that any method results in a specific stat, when stats_for_all_methods isn't set
+// at all.
+//
+// This is deprecated behavior and will be changed during the deprecation window.
+TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSettingRuntimeOverrideTrue) {
+  EXPECT_CALL(
+      context_.runtime_loader_.snapshot_,
+      deprecatedFeatureEnabled(
+          "envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default", _))
+      .WillOnce(Return(true));
+  EXPECT_LOG_CONTAINS("warn",
+                      "Using deprecated default value for "
+                      "'envoy.extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_"
+                      "methods'",
+                      initialize());
+
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                                 {":path", "/BadCompanions/GetBadCompanions"}};
+
+  doRequestResponse(request_headers);
+
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.BadCompanions.GetBadCompanions.success")
+                     .value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.BadCompanions.GetBadCompanions.total")
+                     .value());
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.success").value());
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
+}
+
+// Test that the runtime override for the deprecated previous default behavior works.
+TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSettingRuntimeOverrideFalse) {
+  EXPECT_CALL(
+      context_.runtime_loader_.snapshot_,
+      deprecatedFeatureEnabled(
+          "envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default", _))
+      .WillOnce(Return(false));
+  initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                                 {":path", "/BadCompanions/GetBadCompanions"}};
+
+  doRequestResponse(request_headers);
+
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.BadCompanions.GetBadCompanions.success")
+                     .value());
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counter("grpc.BadCompanions.GetBadCompanions.total")
+                     .value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.success").value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
+}
+
 TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
-  initialize(true);
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  config_.set_emit_filter_state(true);
+  initialize();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc+proto"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};

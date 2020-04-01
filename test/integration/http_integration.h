@@ -100,9 +100,6 @@ public:
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   ~HttpIntegrationTest() override;
 
-  // Waits for the first access log entry.
-  std::string waitForAccessLog(const std::string& filename);
-
 protected:
   void useAccessLog(absl::string_view format = "");
 
@@ -173,6 +170,7 @@ protected:
                                                     const std::string& authority = "host");
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
+  void testRouterVirtualClusters();
 
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
                                             bool big_header,

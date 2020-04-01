@@ -108,7 +108,7 @@ parseUpstreamMetadataField(absl::string_view params_str) {
 
     switch (value->kind_case()) {
     case ProtobufWkt::Value::kNumberValue:
-      return fmt::format("{}", value->number_value());
+      return fmt::format("{:g}", value->number_value());
 
     case ProtobufWkt::Value::kStringValue:
       return value->string_value();
@@ -240,6 +240,11 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
       return StreamInfo::Utility::formatDownstreamAddressNoPort(
+          *stream_info.downstreamLocalAddress());
+    };
+  } else if (field_name == "DOWNSTREAM_LOCAL_PORT") {
+    field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+      return StreamInfo::Utility::formatDownstreamAddressJustPort(
           *stream_info.downstreamLocalAddress());
     };
   } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
