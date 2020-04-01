@@ -32,11 +32,11 @@ bool isModifyMethod(const Http::RequestHeaderMap& headers) {
           method_type == method_values.Delete || method_type == method_values.Patch);
 }
 
-absl::string_view hostAndPort(const Http::HeaderEntry* header) {
+absl::string_view host_and_port(const Http::HeaderEntry* header) {
   Http::Utility::Url absolute_url;
   if (header != nullptr && !header->value().empty()) {
     if (absolute_url.initialize(header->value().getStringView())) {
-      return absolute_url.hostAndPort();
+      return absolute_url.host_and_port();
     }
     return header->value().getStringView();
   }
@@ -44,15 +44,15 @@ absl::string_view hostAndPort(const Http::HeaderEntry* header) {
 }
 
 absl::string_view sourceOriginValue(const Http::RequestHeaderMap& headers) {
-  const absl::string_view origin = hostAndPort(headers.Origin());
+  const absl::string_view origin = host_and_port(headers.Origin());
   if (origin != EMPTY_STRING) {
     return origin;
   }
-  return hostAndPort(headers.Referer());
+  return host_and_port(headers.Referer());
 }
 
 absl::string_view targetOriginValue(const Http::RequestHeaderMap& headers) {
-  return hostAndPort(headers.Host());
+  return host_and_port(headers.Host());
 }
 
 static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {

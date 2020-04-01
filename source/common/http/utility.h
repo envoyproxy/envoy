@@ -104,8 +104,8 @@ class Url {
 public:
   bool initialize(absl::string_view absolute_url);
   absl::string_view scheme() const { return scheme_; }
-  absl::string_view hostAndPort() const { return host_and_port_; }
-  absl::string_view pathAndQueryParams() const { return path_and_query_params_; }
+  absl::string_view host_and_port() const { return host_and_port_; }
+  absl::string_view path_and_query_params() const { return path_and_query_params_; }
   uint64_t port() const { return port_; }
 
 private:

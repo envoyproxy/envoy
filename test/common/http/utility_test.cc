@@ -1085,8 +1085,8 @@ void ValidateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
   Utility::Url url;
   ASSERT_TRUE(url.initialize(raw_url)) << "Failed to initialize " << raw_url;
   EXPECT_EQ(url.scheme(), expected_scheme);
-  EXPECT_EQ(url.hostAndPort(), expected_host_port);
-  EXPECT_EQ(url.pathAndQueryParams(), expected_path);
+  EXPECT_EQ(url.host_and_port(), expected_host_port);
+  EXPECT_EQ(url.path_and_query_params(), expected_path);
   EXPECT_EQ(url.port(), expected_port);
 }
 
