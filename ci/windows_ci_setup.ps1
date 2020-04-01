@@ -33,3 +33,8 @@ Checksum $env:TOOLS_BIN_DIR\bazel.exe 96395ee9e3fb9f4499fcaffa8a94dd72b0748f495f
 Checksum $env:TOOLS_BIN_DIR\ninja-win.zip 2d70010633ddaacc3af4ffbd21e22fae90d158674a09e132e06424ba3ab036e9 SHA256
 
 Unzip "$env:TOOLS_BIN_DIR\ninja-win.zip" "$env:TOOLS_BIN_DIR"
+
+echo "system info"
+systeminfo 2>&1
+Get-CimInstance win32_computersystem | fl *
+Get-CimInstance -Class Win32_PageFileUsage | fl *
