@@ -28,7 +28,7 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers) {
         // Skip headers that are likely to mutate, when crossing proxies
         const auto key = entry.key().getStringView();
         if (key == Http::Headers::get().ForwardedFor.get() ||
-            key == Http::Headers::get().ForwardedProto.get()) {
+            key == Http::Headers::get().ForwardedProto.get() || key == "x-amzn-trace-id") {
           return Http::HeaderMap::Iterate::Continue;
         }
 

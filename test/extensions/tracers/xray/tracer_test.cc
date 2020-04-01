@@ -107,7 +107,7 @@ TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
     daemon::Segment s;
     MessageUtil::loadFromJson(json, s, ProtobufMessage::getNullValidationVisitor());
     ASSERT_STREQ(expected_parent_id.c_str(), s.parent_id().c_str());
-    ASSERT_STREQ(expected_operation_name, s.name().c_str());
+    ASSERT_STREQ(expected_span_name, s.name().c_str());
     ASSERT_STREQ(xray_parent_span->traceId().c_str(), s.trace_id().c_str());
     ASSERT_STRNE(xray_parent_span->Id().c_str(), s.id().c_str());
   };
@@ -145,9 +145,9 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
   span->injectContext(request_headers);
   auto* header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
   ASSERT_NE(header, nullptr);
-  ASSERT_NE(header->value().getStringView().find("root="), absl::string_view::npos);
-  ASSERT_NE(header->value().getStringView().find("parent="), absl::string_view::npos);
-  ASSERT_NE(header->value().getStringView().find("sampled=1"), absl::string_view::npos);
+  ASSERT_NE(header->value().getStringView().find("Root="), absl::string_view::npos);
+  ASSERT_NE(header->value().getStringView().find("Parent="), absl::string_view::npos);
+  ASSERT_NE(header->value().getStringView().find("Sampled=1"), absl::string_view::npos);
 }
 
 TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
@@ -158,9 +158,9 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
   span->injectContext(request_headers);
   auto* header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
   ASSERT_NE(header, nullptr);
-  ASSERT_NE(header->value().getStringView().find("root="), absl::string_view::npos);
-  ASSERT_NE(header->value().getStringView().find("parent="), absl::string_view::npos);
-  ASSERT_NE(header->value().getStringView().find("sampled=0"), absl::string_view::npos);
+  ASSERT_NE(header->value().getStringView().find("Root="), absl::string_view::npos);
+  ASSERT_NE(header->value().getStringView().find("Parent="), absl::string_view::npos);
+  ASSERT_NE(header->value().getStringView().find("Sampled=0"), absl::string_view::npos);
 }
 
 TEST_F(XRayTracerTest, TraceIDFormatTest) {
