@@ -151,25 +151,25 @@ typed_config:
       request_handle:streamInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
       local dynamic_metadata_value = request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["foo"]
 
-      request_handle:headers():add("request_body_size", body_length)
-      request_handle:headers():add("request_metadata_foo", metadata["foo"])
-      request_handle:headers():add("request_metadata_baz", metadata["baz"])
+      request_handle:headers():add("request-body-size", body_length)
+      request_handle:headers():add("request-metadata-foo", metadata["foo"])
+      request_handle:headers():add("request-metadata-baz", metadata["baz"])
       if request_handle:connection():ssl() == nil then
-        request_handle:headers():add("request_secure", "false")
+        request_handle:headers():add("request-secure", "false")
       else
-        request_handle:headers():add("request_secure", "true")
+        request_handle:headers():add("request-secure", "true")
       end
-      request_handle:headers():add("request_protocol", request_handle:streamInfo():protocol())
-      request_handle:headers():add("request_dynamic_metadata_value", dynamic_metadata_value)
+      request_handle:headers():add("request-protocol", request_handle:streamInfo():protocol())
+      request_handle:headers():add("request-dynamic-metadata-value", dynamic_metadata_value)
     end
 
     function envoy_on_response(response_handle)
       local metadata = response_handle:metadata():get("foo.bar")
       local body_length = response_handle:body():length()
-      response_handle:headers():add("response_metadata_foo", metadata["foo"])
-      response_handle:headers():add("response_metadata_baz", metadata["baz"])
-      response_handle:headers():add("response_body_size", body_length)
-      response_handle:headers():add("request_protocol", response_handle:streamInfo():protocol())
+      response_handle:headers():add("response-metadata-foo", metadata["foo"])
+      response_handle:headers():add("response-metadata-baz", metadata["baz"])
+      response_handle:headers():add("response-body-size", body_length)
+      response_handle:headers():add("request-protocol", response_handle:streamInfo():protocol())
       response_handle:headers():remove("foo")
     end
 )EOF";
@@ -192,31 +192,31 @@ typed_config:
 
   waitForNextUpstreamRequest();
   EXPECT_EQ("10", upstream_request_->headers()
-                      .get(Http::LowerCaseString("request_body_size"))
+                      .get(Http::LowerCaseString("request-body-size"))
                       ->value()
                       .getStringView());
 
   EXPECT_EQ("bar", upstream_request_->headers()
-                       .get(Http::LowerCaseString("request_metadata_foo"))
+                       .get(Http::LowerCaseString("request-metadata-foo"))
                        ->value()
                        .getStringView());
 
   EXPECT_EQ("bat", upstream_request_->headers()
-                       .get(Http::LowerCaseString("request_metadata_baz"))
+                       .get(Http::LowerCaseString("request-metadata-baz"))
                        ->value()
                        .getStringView());
   EXPECT_EQ("false", upstream_request_->headers()
-                         .get(Http::LowerCaseString("request_secure"))
+                         .get(Http::LowerCaseString("request-secure"))
                          ->value()
                          .getStringView());
 
   EXPECT_EQ("HTTP/1.1", upstream_request_->headers()
-                            .get(Http::LowerCaseString("request_protocol"))
+                            .get(Http::LowerCaseString("request-protocol"))
                             ->value()
                             .getStringView());
 
   EXPECT_EQ("bar", upstream_request_->headers()
-                       .get(Http::LowerCaseString("request_dynamic_metadata_value"))
+                       .get(Http::LowerCaseString("request-dynamic-metadata-value"))
                        ->value()
                        .getStringView());
 
@@ -230,20 +230,20 @@ typed_config:
   response->waitForEndStream();
 
   EXPECT_EQ("7", response->headers()
-                     .get(Http::LowerCaseString("response_body_size"))
+                     .get(Http::LowerCaseString("response-body-size"))
                      ->value()
                      .getStringView());
   EXPECT_EQ("bar", response->headers()
-                       .get(Http::LowerCaseString("response_metadata_foo"))
+                       .get(Http::LowerCaseString("response-metadata-foo"))
                        ->value()
                        .getStringView());
   EXPECT_EQ("bat", response->headers()
-                       .get(Http::LowerCaseString("response_metadata_baz"))
+                       .get(Http::LowerCaseString("response-metadata-baz"))
                        ->value()
                        .getStringView());
   EXPECT_EQ(
       "HTTP/1.1",
-      response->headers().get(Http::LowerCaseString("request_protocol"))->value().getStringView());
+      response->headers().get(Http::LowerCaseString("request-protocol"))->value().getStringView());
   EXPECT_EQ(nullptr, response->headers().get(Http::LowerCaseString("foo")));
 
   cleanup();
@@ -268,8 +268,8 @@ typed_config:
       "hello world",
       5000)
 
-      request_handle:headers():add("upstream_foo", headers["foo"])
-      request_handle:headers():add("upstream_body_size", #body)
+      request_handle:headers():add("upstream-foo", headers["foo"])
+      request_handle:headers():add("upstream-body-size", #body)
     end
 )EOF";
 
@@ -293,11 +293,11 @@ typed_config:
 
   waitForNextUpstreamRequest();
   EXPECT_EQ("bar", upstream_request_->headers()
-                       .get(Http::LowerCaseString("upstream_foo"))
+                       .get(Http::LowerCaseString("upstream-foo"))
                        ->value()
                        .getStringView());
   EXPECT_EQ("4", upstream_request_->headers()
-                     .get(Http::LowerCaseString("upstream_body_size"))
+                     .get(Http::LowerCaseString("upstream-body-size"))
                      ->value()
                      .getStringView());
 
@@ -328,7 +328,7 @@ typed_config:
 
       request_handle:respond(
         {[":status"] = "403",
-         ["upstream_foo"] = headers["foo"]},
+         ["upstream-foo"] = headers["foo"]},
         "nope")
     end
 )EOF";
@@ -517,7 +517,7 @@ typed_config:
 
       if pubkey == nil then
         request_handle:logErr("log test")
-        request_handle:headers():add("signature_verification", "rejected")
+        request_handle:headers():add("signature-verification", "rejected")
         return
       end
 
@@ -528,10 +528,10 @@ typed_config:
       local ok, error = request_handle:verifySignature(hash, pubkey, rawsig, string.len(rawsig), data, string.len(data))
 
       if ok then
-        request_handle:headers():add("signature_verification", "approved")
+        request_handle:headers():add("signature-verification", "approved")
       else
         request_handle:logErr(error)
-        request_handle:headers():add("signature_verification", "rejected")
+        request_handle:headers():add("signature-verification", "rejected")
       end
 
       request_handle:headers():add("verification", "done")
@@ -558,7 +558,7 @@ typed_config:
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("approved", upstream_request_->headers()
-                            .get(Http::LowerCaseString("signature_verification"))
+                            .get(Http::LowerCaseString("signature-verification"))
                             ->value()
                             .getStringView());
 

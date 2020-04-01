@@ -23,7 +23,7 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& header_map, bool) override {
     const Http::HeaderEntry* entry_content =
-        header_map.get(Envoy::Http::LowerCaseString("content_size"));
+        header_map.get(Envoy::Http::LowerCaseString("content-size"));
     ASSERT(entry_content != nullptr);
     content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
 

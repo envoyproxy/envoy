@@ -16,9 +16,9 @@ void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeader
 
 } // namespace
 
-const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
-const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect_request_size_bytes";
-const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
+const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response-size-bytes";
+const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect-request-size-bytes";
+const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset-after-request";
 
 AutonomousStream::AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                                    AutonomousUpstream& upstream, bool allow_incomplete_streams)
@@ -66,7 +66,8 @@ AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shar
                                                    Stats::Store& store, Type type,
                                                    AutonomousUpstream& upstream)
     : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem(),
-                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT),
+                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+                         envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST),
       upstream_(upstream) {}
 
 Http::RequestDecoder& AutonomousHttpConnection::newStream(Http::ResponseEncoder& response_encoder,

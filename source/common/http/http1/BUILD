@@ -39,6 +39,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/http/http1:header_formatter_lib",
         "//source/common/runtime:runtime_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
