@@ -2,9 +2,10 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
-    "envoy_cc_test_binary",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -77,8 +78,8 @@ envoy_cc_test(
     srcs = ["access_log_manager_impl_test.cc"],
     deps = [
         "//source/common/access_log:access_log_manager_lib",
-        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
@@ -86,7 +87,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_binary(
+envoy_cc_benchmark_binary(
     name = "access_log_formatter_speed_test",
     srcs = ["access_log_formatter_speed_test.cc"],
     external_deps = [
@@ -101,4 +102,9 @@ envoy_cc_test_binary(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
     ],
+)
+
+envoy_benchmark_test(
+    name = "access_log_formatter_speed_test_benchmark_test",
+    benchmark_binary = "access_log_formatter_speed_test",
 )

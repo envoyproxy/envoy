@@ -123,6 +123,9 @@ public:
   // Set the max connection duration for downstream connections through the HttpConnectionManager.
   void setDownstreamMaxConnectionDuration(std::chrono::milliseconds max_connection_duration);
 
+  // Set the max stream duration for downstream connections through the HttpConnectionManager.
+  void setDownstreamMaxStreamDuration(std::chrono::milliseconds max_stream_duration);
+
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
@@ -148,6 +151,9 @@ public:
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // /dev/null.
   bool setAccessLog(const std::string& filename, absl::string_view format = "");
+
+  // Set the listener access log for the first listener to a given file.
+  bool setListenerAccessLog(const std::string& filename, absl::string_view format = "");
 
   // Renames the first listener to the name specified.
   void renameListener(const std::string& name);
@@ -179,6 +185,10 @@ public:
 
   // Add this key value pair to the static runtime.
   void addRuntimeOverride(const std::string& key, const std::string& value);
+
+  // Add filter_metadata to a cluster with the given name
+  void addClusterFilterMetadata(absl::string_view metadata_yaml,
+                                absl::string_view cluster_name = "cluster_0");
 
 private:
   // Load the first HCM struct from the first listener into a parsed proto.

@@ -63,7 +63,7 @@ public:
   }
 
   // HTTP async receive methods
-  void onSuccess(Http::ResponseMessagePtr&& response) override {
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override {
     ENVOY_LOG(trace, "{}", __func__);
     complete_ = true;
     const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
@@ -93,7 +93,8 @@ public:
     reset();
   }
 
-  void onFailure(Http::AsyncClient::FailureReason reason) override {
+  void onFailure(const Http::AsyncClient::Request&,
+                 Http::AsyncClient::FailureReason reason) override {
     ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}]: network error {}", __func__, uri_->uri(),
               enumToInt(reason));
     complete_ = true;

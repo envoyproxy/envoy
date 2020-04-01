@@ -6,6 +6,7 @@
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
@@ -246,11 +247,27 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
+  void setRequestIDExtension(Http::RequestIDExtensionSharedPtr utils) override {
+    request_id_extension_ = utils;
+  }
+  Http::RequestIDExtensionSharedPtr getRequestIDExtension() const override {
+    return request_id_extension_;
+  }
+
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
        << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
        << DUMP_MEMBER(health_check_request_) << DUMP_MEMBER(route_name_) << "\n";
+  }
+
+  void setUpstreamClusterInfo(
+      const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) override {
+    upstream_cluster_info_ = upstream_cluster_info;
+  }
+
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const override {
+    return upstream_cluster_info_;
   }
 
   TimeSource& time_source_;
@@ -285,8 +302,10 @@ private:
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
+  Http::RequestIDExtensionSharedPtr request_id_extension_;
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
 };
 
 } // namespace StreamInfo

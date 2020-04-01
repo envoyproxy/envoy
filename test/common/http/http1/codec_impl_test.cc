@@ -11,6 +11,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/runtime/runtime_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -89,7 +90,7 @@ public:
 protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
 };
 
 void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,
@@ -273,7 +274,9 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-TEST_F(Http1ServerConnectionImplTest, IdentityEncoding) {
+// We support the identity encoding, but because it does not end in chunked encoding we reject it
+// per RFC 7230 Section 3.3.3
+TEST_F(Http1ServerConnectionImplTest, IdentityEncodingNoChunked) {
   initialize();
 
   InSequence sequence;
@@ -281,15 +284,22 @@ TEST_F(Http1ServerConnectionImplTest, IdentityEncoding) {
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  TestHeaderMapImpl expected_headers{
-      {":path", "/"},
-      {":method", "GET"},
-      {"transfer-encoding", "identity"},
-  };
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: identity\r\n\r\n");
-  codec_->dispatch(buffer);
-  EXPECT_EQ(0U, buffer.length());
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: unsupported transfer encoding");
+}
+
+TEST_F(Http1ServerConnectionImplTest, UnsupportedEncoding) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: gzip\r\n\r\n");
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: unsupported transfer encoding");
 }
 
 TEST_F(Http1ServerConnectionImplTest, ChunkedBody) {
@@ -340,7 +350,6 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodyCase) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-// Currently http_parser does not support chained transfer encodings.
 TEST_F(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
   initialize();
 
@@ -659,7 +668,8 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
     response_encoder->encodeHeaders(headers, true);
   }
 
-  // Trying to shove a third response in the queue should trigger flood protection.
+  // Trying to accept a third request with two buffered responses in the queue should trigger flood
+  // protection.
   {
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
@@ -669,10 +679,7 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
         }));
 
     Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-    codec_->dispatch(buffer);
-
-    TestResponseHeaderMapImpl headers{{":status", "200"}};
-    EXPECT_THROW_WITH_MESSAGE(response_encoder->encodeHeaders(headers, true), FrameFloodException,
+    EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), FrameFloodException,
                               "Too many responses queued.");
     EXPECT_EQ(1, store_.counter("http1.response_flood").value());
   }
@@ -808,7 +815,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderEmbeddedNulRejection) {
   Buffer::OwnedImpl buffer(
       absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: bar", std::string(1, '\0'), "baz\r\n"));
   EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: header value contains NUL");
+                            "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
 // Mutate an HTTP GET with embedded NULs, this should always be rejected in some
@@ -1069,7 +1076,7 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
   ON_CALL(connection_, write(_, _)).WillByDefault(Invoke([&output](Buffer::Instance& data, bool) {
     // Verify that individual writes into the codec's output buffer were coalesced into a single
     // slice
-    ASSERT_EQ(1, data.getRawSlices(nullptr, 0));
+    ASSERT_EQ(1, data.getRawSlices().size());
     output.append(data.toString());
     data.drain(data.length());
   }));
@@ -1374,7 +1381,7 @@ public:
   std::unique_ptr<ClientConnectionImpl> codec_;
 
 protected:
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
 };
 

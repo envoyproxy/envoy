@@ -203,6 +203,11 @@ public:
    *                      should be done by resetting the connection.
    */
   virtual Cancellable* newConnection(Callbacks& callbacks) PURE;
+
+  /**
+   * @return the description of the host this connection pool is for.
+   */
+  virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;

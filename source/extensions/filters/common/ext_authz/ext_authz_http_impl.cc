@@ -128,11 +128,11 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
       upstream_header_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers(),
           enable_case_sensitive_string_matcher_)),
-      authorization_headers_to_add_(
-          toHeadersAdd(config.http_service().authorization_request().headers_to_add())),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix),
-      tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())) {}
+      tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
+      request_headers_parser_(Router::HeaderParser::configure(
+          config.http_service().authorization_request().headers_to_add(), false)) {}
 
 MatcherSharedPtr
 ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -190,16 +190,6 @@ ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatch
       createStringMatchers(list, disable_lowercase_string_matcher));
 }
 
-Http::LowerCaseStrPairVector ClientConfig::toHeadersAdd(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers) {
-  Http::LowerCaseStrPairVector header_vec;
-  header_vec.reserve(headers.size());
-  for (const auto& header : headers) {
-    header_vec.emplace_back(Http::LowerCaseString(header.key()), header.value());
-  }
-  return header_vec;
-}
-
 RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
                                      TimeSource& time_source)
     : cm_(cm), config_(config), time_source_(time_source) {}
@@ -222,7 +212,8 @@ void RawHttpClientImpl::cancel() {
 // Client
 void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                               const envoy::service::auth::v3::CheckRequest& request,
-                              Tracing::Span& parent_span) {
+                              Tracing::Span& parent_span,
+                              const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   ASSERT(span_ == nullptr);
   callbacks_ = &callbacks;
@@ -255,9 +246,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     }
   }
 
-  for (const auto& header_to_add : config_->headersToAdd()) {
-    headers->setReference(header_to_add.first, header_to_add.second);
-  }
+  config_->requestHeaderParser().evaluateHeaders(*headers, stream_info);
 
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
@@ -286,14 +275,16 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   }
 }
 
-void RawHttpClientImpl::onSuccess(Http::ResponseMessagePtr&& message) {
+void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
+                                  Http::ResponseMessagePtr&& message) {
   callbacks_->onComplete(toResponse(std::move(message)));
   span_->finishSpan();
   callbacks_ = nullptr;
   span_ = nullptr;
 }
 
-void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
+void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
+                                  Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
   callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
   span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);

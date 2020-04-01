@@ -34,6 +34,7 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = [
         ":runtime_features_lib",
+        "//include/envoy/config:discovery_service_base_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/init:manager_interface",
@@ -60,15 +61,5 @@ envoy_cc_library(
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "uuid_util_lib",
-    srcs = ["uuid_util.cc"],
-    hdrs = ["uuid_util.h"],
-    deps = [
-        ":runtime_lib",
-        "//source/common/common:utility_lib",
     ],
 )

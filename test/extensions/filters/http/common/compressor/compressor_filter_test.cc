@@ -159,7 +159,7 @@ protected:
   std::unique_ptr<CompressorFilter> filter_;
   Buffer::OwnedImpl data_;
   std::string expected_str_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
@@ -174,7 +174,9 @@ TEST_F(CompressorFilterTest, DecodeHeadersWithRuntimeDisabled) {
   }
 }
 )EOF");
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillOnce(Return(false));
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
+      .Times(2)
+      .WillRepeatedly(Return(false));
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, test"}}, false);
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
 }
@@ -343,7 +345,7 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   {
     // Compressor "test2" from an independent filter chain should not overshadow "test".
     // The independence is simulated with a new instance DecoderFilterCallbacks set for "test2".
-    Stats::IsolatedStoreImpl stats;
+    Stats::TestUtil::TestStore stats;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
@@ -365,7 +367,8 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   }
   {
     // check if the legacy "header_gzip" counter is incremented for gzip compression filter
-    Stats::IsolatedStoreImpl stats;
+    Stats::TestUtil::TestStore stats;
+    ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
@@ -383,7 +386,8 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   }
   {
     // check if identity stat is increased twice (the second time via the cached path).
-    Stats::IsolatedStoreImpl stats;
+    Stats::TestUtil::TestStore stats;
+    ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
@@ -401,7 +405,8 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   }
   {
     // check if not_valid stat is increased twice (the second time via the cached path).
-    Stats::IsolatedStoreImpl stats;
+    Stats::TestUtil::TestStore stats;
+    ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
@@ -419,7 +424,8 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   }
   {
     // Test that encoding decision is cached when used by multiple filters.
-    Stats::IsolatedStoreImpl stats;
+    Stats::TestUtil::TestStore stats;
+    ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
@@ -446,7 +452,8 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   }
   {
     // Test that first registered filter is used when handling wildcard.
-    Stats::IsolatedStoreImpl stats;
+    Stats::TestUtil::TestStore stats;
+    ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
