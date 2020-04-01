@@ -20,12 +20,12 @@ public:
   }
 
   ~InjectFactory() {
+    // Always remove the injected factory so that it's name is not registered.
+    Registry::FactoryRegistry<Base>::removeFactoryForTest(instance_.name(), instance_.configType());
+
     if (displaced_) {
-      auto injected = Registry::FactoryRegistry<Base>::replaceFactoryForTest(*displaced_);
-      EXPECT_EQ(injected, &instance_);
-    } else {
-      Registry::FactoryRegistry<Base>::removeFactoryForTest(instance_.name(),
-                                                            instance_.configType());
+      // Replace any displaced factory (which had the same name OR type as the injected factory).
+      Registry::FactoryRegistry<Base>::replaceFactoryForTest(*displaced_);
     }
   }
 

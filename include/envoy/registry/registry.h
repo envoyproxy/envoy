@@ -372,7 +372,7 @@ private:
   /**
    * Replaces a factory by name. This method should only be used for testing purposes.
    * @param factory is the factory to inject.
-   * @return Base* a pointer to the previously registered value.
+   * @return Base* a pointer to the previously registered factory (by name or type).
    */
   static Base* replaceFactoryForTest(Base& factory) {
     auto it = factories().find(factory.name());
@@ -388,8 +388,15 @@ private:
     auto config_type = factory.configType();
     Base* prev = getFactoryByType(config_type);
     if (prev != nullptr) {
-      factoriesByType().emplace(config_type, &factory);
+      ASSERT(displaced == nullptr || displaced == prev,
+             fmt::format("displaced two different factories: one by name ({}) and one by type ({})",
+                         factory.name(), config_type));
+      displaced = prev;
+      factoriesByType().erase(config_type);
     }
+
+    factoriesByType().emplace(config_type, &factory);
+    RELEASE_ASSERT(getFactoryByType(config_type) == &factory, "");
 
     return displaced;
   }
