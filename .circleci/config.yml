@@ -85,17 +85,17 @@ jobs:
        - store_artifacts:
            path: generated/docs
 
-workflows:
-  version: 2
-  all:
-    jobs:
-      - api
-      - go_control_plane_mirror
-      - filter_example_mirror
-      - coverage
-      - coverage_publish:
-          requires: [coverage]
-      - docs:
-          filters:
-            tags:
-              only: /^v.*/
+# workflows:
+#   version: 2
+#   all:
+#     jobs:
+#       - api
+#       - go_control_plane_mirror
+#       - filter_example_mirror
+#       - coverage
+#       - coverage_publish:
+#           requires: [coverage]
+#       - docs:
+#           filters:
+#             tags:
+#               only: /^v.*/
