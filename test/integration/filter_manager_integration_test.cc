@@ -433,7 +433,7 @@ protected:
  */
 class InjectDataWithEchoFilterIntegrationTest : public InjectDataToFilterChainIntegrationTest {
 public:
-  static std::string echo_config() {
+  static std::string echoConfig() {
     return absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
@@ -442,7 +442,7 @@ public:
   }
 
   InjectDataWithEchoFilterIntegrationTest()
-      : InjectDataToFilterChainIntegrationTest(echo_config()) {}
+      : InjectDataToFilterChainIntegrationTest(echoConfig()) {}
 };
 
 INSTANTIATE_TEST_SUITE_P(
