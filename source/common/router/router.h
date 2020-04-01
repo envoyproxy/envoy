@@ -419,6 +419,7 @@ public:
     return cookie_value;
   }
 
+  // RouterFilterInterface
   void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
                                     UpstreamRequest& upstream_request) override;
   void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
