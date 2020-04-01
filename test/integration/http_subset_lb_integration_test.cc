@@ -51,7 +51,7 @@ public:
   HttpSubsetLbIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
-                            ConfigHelper::HTTP_PROXY_CONFIG),
+                            ConfigHelper::httpProxyConfig()),
         num_hosts_{4}, is_hash_lb_(GetParam() == envoy::config::cluster::v3::Cluster::RING_HASH ||
                                    GetParam() == envoy::config::cluster::v3::Cluster::MAGLEV) {
     autonomous_upstream_ = true;

@@ -17,7 +17,8 @@ public:
       : BaseIntegrationTest(Network::Address::IpVersion::v4, renderConfig(status_code, delay_s)) {}
 
   static std::string renderConfig(int status_code, int delay_s) {
-    return fmt::format(ConfigHelper::BASE_CONFIG + R"EOF(
+    return absl::StrCat(ConfigHelper::baseConfig(),
+                        fmt::format(R"EOF(
     filter_chains:
       filters:
         name: http
@@ -66,7 +67,7 @@ public:
               domains: "*"
             name: route_config_0
       )EOF",
-                       delay_s, delay_s > 0 ? 0 : 1000, status_code, status_code);
+                                    delay_s, delay_s > 0 ? 0 : 1000, status_code, status_code));
   }
 
   void SetUp() override { BaseIntegrationTest::initialize(); }

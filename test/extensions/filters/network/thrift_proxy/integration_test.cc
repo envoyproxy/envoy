@@ -23,7 +23,7 @@ class ThriftConnManagerIntegrationTest
       public BaseThriftIntegrationTest {
 public:
   static void SetUpTestSuite() {
-    thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
+    thrift_config_ = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
         - name: thrift
@@ -64,7 +64,7 @@ public:
                     method_name: "poke"
                   route:
                     cluster: "cluster_3"
-      )EOF";
+      )EOF");
   }
 
   void initializeCall(DriverMode mode) {

@@ -28,7 +28,7 @@ public:
       : BaseIntegrationTest(GetParam(), rbac_config) {}
 
   static void SetUpTestSuite() {
-    rbac_config = ConfigHelper::BASE_CONFIG + R"EOF(
+    rbac_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
        -  name: rbac
@@ -44,7 +44,7 @@ public:
                     - not_id:
                         any: true
        -  name: envoy.filters.network.echo
-)EOF";
+)EOF");
   }
 
   void initializeFilter(const std::string& config) {

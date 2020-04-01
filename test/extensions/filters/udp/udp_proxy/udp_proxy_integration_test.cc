@@ -12,14 +12,14 @@ public:
   UdpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), configToUse()) {}
 
   static std::string configToUse() {
-    return ConfigHelper::BASE_UDP_LISTENER_CONFIG + R"EOF(
+    return absl::StrCat(ConfigHelper::baseUdpListenerConfig(), R"EOF(
     listener_filters:
       name: udp_proxy
       typed_config:
         '@type': type.googleapis.com/envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig
         stat_prefix: foo
         cluster: cluster_0
-      )EOF";
+      )EOF");
   }
 
   void setup(uint32_t upstream_count) {

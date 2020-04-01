@@ -48,7 +48,7 @@ class QuicHttpIntegrationTest : public HttpIntegrationTest,
 public:
   QuicHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam(),
-                            ConfigHelper::QUIC_HTTP_PROXY_CONFIG),
+                            ConfigHelper::quicHttpProxyConfig()),
         supported_versions_(quic::CurrentSupportedVersions()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),

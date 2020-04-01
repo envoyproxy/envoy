@@ -152,7 +152,6 @@ envoy_cc_test(
     name = "filter_manager_integration_test",
     srcs = [
         "filter_manager_integration_test.cc",
-        "filter_manager_integration_test.h",
     ],
     deps = [
         ":filter_manager_integration_proto_cc_proto",
