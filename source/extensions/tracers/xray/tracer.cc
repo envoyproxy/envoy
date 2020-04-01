@@ -89,17 +89,6 @@ void Span::finishSpan() {
     s.mutable_http()->mutable_response()->insert(KeyValue{item.first, item.second});
   }
 
-#ifndef NDEBUG
-  // invalid JSON messages will be discarded by the X-Ray daemon.
-  try {
-    MessageUtil::validate(s, ProtobufMessage::getStrictValidationVisitor());
-  } catch (Envoy::ProtoValidationException& ex) {
-    auto& logger = Logger::Registry::getLog(Logger::Id::tracing);
-    ENVOY_LOG_TO_LOGGER(logger, trace, "X-Ray Span Validation Error: {}", ex.what());
-    return;
-  }
-#endif
-
   const std::string json = MessageUtil::getJsonStringFromMessage(
       s, false /* pretty_print  */, false /* always_print_primitive_fields */);
 
