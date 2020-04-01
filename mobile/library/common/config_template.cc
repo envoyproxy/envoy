@@ -198,6 +198,11 @@ stats_config:
             regex: 'cluster\.[\w]+?\.upstream_rq_unknown'
         - safe_regex:
             google_re2: {}
+            regex: 'http.hcm.downstream_rq_[1|2|3|4|5]xx'
+        - exact: 'http.hcm.downstream_rq_total'
+        - exact: 'http.hcm.downstream_rq_completed'
+        - safe_regex:
+            google_re2: {}
             regex: 'vhost.api.vcluster\.[\w]+?\.upstream_rq_[1|2|3|4|5]xx'
         - safe_regex:
             google_re2: {}
