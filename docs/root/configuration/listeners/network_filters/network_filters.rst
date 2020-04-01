@@ -19,7 +19,7 @@ filters.
   local_rate_limit_filter
   mongo_proxy_filter
   mysql_proxy_filter
-  postgresql_proxy_filter
+  postgres_proxy_filter
   rate_limit_filter
   rbac_filter
   redis_proxy_filter

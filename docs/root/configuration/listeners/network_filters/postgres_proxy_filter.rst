@@ -1,48 +1,48 @@
-.. _config_network_filters_postgresql_proxy:
+.. _config_network_filters_postgres_proxy:
 
-PostgreSQL proxy
+Postgres proxy
 ================
 
-The PostgreSQL proxy filter decodes the wire protocol between PostgreSQL client
+The Postgres proxy filter decodes the wire protocol between Postgres client
 and server. The decoded info is currently used only to produce statistics.
 
-When the PostgreSQL filter detects that a session is encrypted, the messages
+When the Postgres filter detects that a session is encrypted, the messages
 are ignored and no decoding takes place.
 
 
 .. attention::
 
-   The `postgresql_proxy` filter is experimental and is currently under active development.
+   The `postgres_proxy` filter is experimental and is currently under active development.
    Capabilities will be expanded over time and the configuration structures are likely to change.
 
 Configuration
 -------------
 
-The PostgreSQL proxy filter should be chained with the TCP proxy as shown in the configuration
+The Postgres proxy filter should be chained with the TCP proxy as shown in the configuration
 example below:
 
 .. code-block:: yaml
 
     filter_chains:
     - filters:
-      - name: envoy.filters.network.postgresql_proxy
+      - name: envoy.filters.network.postgres_proxy
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.postgresql_proxy.v2alpha.PostgreSQLProxy
-          stat_prefix: postgresql
+          "@type": type.googleapis.com/envoy.config.filter.network.postgres_proxy.v2alpha.PostgresProxy
+          stat_prefix: postgres
       - name: envoy.tcp_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
           stat_prefix: tcp
-          cluster: postgresql_cluster
+          cluster: postgres_cluster
 
 * :ref:`v2 API reference <envoy_api_field_listener.Filter.name>`
 
-.. _config_network_filters_postgresql_proxy_stats:
+.. _config_network_filters_postgres_proxy_stats:
 
 Statistics
 ----------
 
-Every configured PostgreSQL proxy filter has statistics rooted at postgresql.<stat_prefix> with the following statistics:
+Every configured Postgres proxy filter has statistics rooted at postgres.<stat_prefix> with the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description

@@ -21,13 +21,13 @@ envoy_package()
 envoy_cc_library(
     name = "filter",
     srcs = [
-        "postgresql_decoder.cc",
-        "postgresql_filter.cc",
+        "postgres_decoder.cc",
+        "postgres_filter.cc",
     ],
     hdrs = [
-        "postgresql_decoder.h",
-        "postgresql_filter.h",
-        "postgresql_session.h",
+        "postgres_decoder.h",
+        "postgres_filter.h",
+        "postgres_session.h",
     ],
     repository = "@envoy",
     deps = [
@@ -50,6 +50,6 @@ envoy_cc_extension(
         ":filter",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/network/postgresql_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg_cc_proto",
     ],
 )

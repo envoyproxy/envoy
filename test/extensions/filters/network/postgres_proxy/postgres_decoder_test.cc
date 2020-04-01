@@ -1,12 +1,12 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "extensions/filters/network/postgresql_proxy/postgresql_decoder.h"
+#include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace PostgreSQLProxy {
+namespace PostgresProxy {
 
 class DecoderCallbacksMock : public DecoderCallbacks {
 public:
@@ -24,9 +24,9 @@ public:
 };
 
 // Define fixture class with decoder and mock callbacks.
-class PostgreSQLProxyDecoderTestBase {
+class PostgresProxyDecoderTestBase {
 public:
-  PostgreSQLProxyDecoderTestBase() {
+  PostgresProxyDecoderTestBase() {
     decoder_ = std::make_unique<DecoderImpl>(&callbacks_);
     decoder_->initialize();
     decoder_->setStartup(false);
@@ -43,26 +43,26 @@ protected:
   std::string payload_;
 };
 
-class PostgreSQLProxyDecoderTest : public PostgreSQLProxyDecoderTestBase, public ::testing::Test {};
+class PostgresProxyDecoderTest : public PostgresProxyDecoderTestBase, public ::testing::Test {};
 
 // Class is used for parameterized tests for frontend messages.
-class PostgreSQLProxyFrontendDecoderTest : public PostgreSQLProxyDecoderTestBase,
-                                           public ::testing::TestWithParam<std::string> {};
+class PostgresProxyFrontendDecoderTest : public PostgresProxyDecoderTestBase,
+                                         public ::testing::TestWithParam<std::string> {};
 
 // Class is used for parameterized tests for encrypted messages.
-class PostgreSQLProxyFrontendEncrDecoderTest : public PostgreSQLProxyDecoderTestBase,
-                                               public ::testing::TestWithParam<uint32_t> {};
+class PostgresProxyFrontendEncrDecoderTest : public PostgresProxyDecoderTestBase,
+                                             public ::testing::TestWithParam<uint32_t> {};
 
 // Class is used for parameterized tests for backend messages.
-class PostgreSQLProxyBackendDecoderTest : public PostgreSQLProxyDecoderTestBase,
-                                          public ::testing::TestWithParam<std::string> {};
+class PostgresProxyBackendDecoderTest : public PostgresProxyDecoderTestBase,
+                                        public ::testing::TestWithParam<std::string> {};
 
-class PostgreSQLProxyErrorTest
-    : public PostgreSQLProxyDecoderTestBase,
+class PostgresProxyErrorTest
+    : public PostgresProxyDecoderTestBase,
       public ::testing::TestWithParam<std::tuple<std::string, DecoderCallbacks::ErrorType>> {};
 
-class PostgreSQLProxyNoticeTest
-    : public PostgreSQLProxyDecoderTestBase,
+class PostgresProxyNoticeTest
+    : public PostgresProxyDecoderTestBase,
       public ::testing::TestWithParam<std::tuple<std::string, DecoderCallbacks::NoticeType>> {};
 
 // Test processing the startup message from a client.
@@ -71,7 +71,7 @@ class PostgreSQLProxyNoticeTest
 // message contains the protocol version. After processing the
 // startup message the server should start using message format
 // with command as 1st byte.
-TEST_F(PostgreSQLProxyDecoderTest, StartupMessage) {
+TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   decoder_->setStartup(true);
 
   // start with length
@@ -94,7 +94,7 @@ TEST_F(PostgreSQLProxyDecoderTest, StartupMessage) {
 // Test processing messages which map 1:1 with buffer.
 // The buffer contains just a single entire message and
 // nothing more.
-TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferSingleMessages) {
+TEST_F(PostgresProxyDecoderTest, ReadingBufferSingleMessages) {
 
   // Feed empty buffer - should not crash
   decoder_->onData(data_, true);
@@ -124,7 +124,7 @@ TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferSingleMessages) {
 // Test simulates situation when decoder is called with incomplete message.
 // The message should not be processed until the buffer is filled
 // with missing bytes.
-TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferLargeMessages) {
+TEST_F(PostgresProxyDecoderTest, ReadingBufferLargeMessages) {
   // fill the buffer with message of 100 bytes long
   // but the buffer contains only 98 bytes.
   // It should not be processed.
@@ -145,7 +145,7 @@ TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferLargeMessages) {
 // Test simulates situation when a buffer contains more than one
 // message. Call to the decoder should consume only one message
 // at a time and only when the buffer contains the entire message.
-TEST_F(PostgreSQLProxyDecoderTest, TwoMessagesInOneBuffer) {
+TEST_F(PostgresProxyDecoderTest, TwoMessagesInOneBuffer) {
   // create the first message of 50 bytes long (+1 for command)
   data_.add("P");
   length_ = htonl(50);
@@ -171,7 +171,7 @@ TEST_F(PostgreSQLProxyDecoderTest, TwoMessagesInOneBuffer) {
   ASSERT_THAT(data_.length(), 0);
 }
 
-TEST_F(PostgreSQLProxyDecoderTest, Unknown) {
+TEST_F(PostgresProxyDecoderTest, Unknown) {
   // Create invalid message. The first byte is invalid "="
   // Message must be at least 5 bytes to be parsed.
   EXPECT_CALL(callbacks_, incUnknown()).Times(1);
@@ -183,7 +183,7 @@ TEST_F(PostgreSQLProxyDecoderTest, Unknown) {
 }
 
 // Test if each frontend command calls incFrontend method
-TEST_P(PostgreSQLProxyFrontendDecoderTest, FrontendInc) {
+TEST_P(PostgresProxyFrontendDecoderTest, FrontendInc) {
   EXPECT_CALL(callbacks_, incFrontend()).Times(1);
   data_.add(GetParam());
   length_ = htonl(50);
@@ -193,12 +193,12 @@ TEST_P(PostgreSQLProxyFrontendDecoderTest, FrontendInc) {
 }
 
 // Run the above test for each frontend message
-INSTANTIATE_TEST_SUITE_P(FrontEndMessagesTests, PostgreSQLProxyFrontendDecoderTest,
+INSTANTIATE_TEST_SUITE_P(FrontEndMessagesTests, PostgresProxyFrontendDecoderTest,
                          ::testing::Values("B", "C", "d", "c", "f", "D", "E", "H", "F", "p", "P",
                                            "p", "Q", "S", "X"));
 
 // Test if X message triggers incRollback and sets proper state in transaction
-TEST_F(PostgreSQLProxyFrontendDecoderTest, TerminateMessage) {
+TEST_F(PostgresProxyFrontendDecoderTest, TerminateMessage) {
   // set decoder state NOT to be in_transaction
   decoder_->getSession().setInTransaction(false);
   EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
@@ -218,7 +218,7 @@ TEST_F(PostgreSQLProxyFrontendDecoderTest, TerminateMessage) {
 }
 
 // Test if each backend command calls incBackend method
-TEST_P(PostgreSQLProxyBackendDecoderTest, BackendInc) {
+TEST_P(PostgresProxyBackendDecoderTest, BackendInc) {
   EXPECT_CALL(callbacks_, incBackend()).Times(1);
   data_.add(GetParam());
   length_ = htonl(50);
@@ -228,13 +228,13 @@ TEST_P(PostgreSQLProxyBackendDecoderTest, BackendInc) {
 }
 
 // Run the above test for each backend message
-INSTANTIATE_TEST_SUITE_P(BackendMessagesTests, PostgreSQLProxyBackendDecoderTest,
+INSTANTIATE_TEST_SUITE_P(BackendMessagesTests, PostgresProxyBackendDecoderTest,
                          ::testing::Values("R", "K", "2", "3", "C", "d", "c", "G", "H", "D", "I",
                                            "E", "V", "v", "n", "N", "A", "t", "S", "1", "s", "Z",
                                            "T"));
 // Test parsing backend messages.
 // The parser should react only to the first word until the space.
-TEST_F(PostgreSQLProxyBackendDecoderTest, ParseStatement) {
+TEST_F(PostgresProxyBackendDecoderTest, ParseStatement) {
   // Payload contains a space after the keyword
   // Rollback counter should be bumped up
   EXPECT_CALL(callbacks_, incTransactionsRollback());
@@ -281,7 +281,7 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, ParseStatement) {
 
 // Test Backend messages and make sure that they
 // trigger proper stats updates.
-TEST_F(PostgreSQLProxyDecoderTest, Backend) {
+TEST_F(PostgresProxyDecoderTest, Backend) {
   // C message
   EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Other));
   payload_ = "BEGIN 123";
@@ -358,7 +358,7 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
 // multiple R messages. Only payload with length is 8 and
 // payload with uint32 number equal to 0 indicates
 // successful authentication.
-TEST_F(PostgreSQLProxyBackendDecoderTest, AuthenticationMsg) {
+TEST_F(PostgresProxyBackendDecoderTest, AuthenticationMsg) {
   // Create authentication message which does not
   // mean that authentication was OK. The number of
   // sessions must not be increased.
@@ -385,7 +385,7 @@ TEST_F(PostgreSQLProxyBackendDecoderTest, AuthenticationMsg) {
 
 // Test check parsing of E message. The message
 // indicates error.
-TEST_P(PostgreSQLProxyErrorTest, ParseErrorMsgs) {
+TEST_P(PostgresProxyErrorTest, ParseErrorMsgs) {
   EXPECT_CALL(callbacks_, incError(std::get<1>(GetParam())));
   payload_ = std::get<0>(GetParam());
   data_.add("E");
@@ -396,7 +396,7 @@ TEST_P(PostgreSQLProxyErrorTest, ParseErrorMsgs) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    PostgreSQLProxyErrorTestSuite, PostgreSQLProxyErrorTest,
+    PostgresProxyErrorTestSuite, PostgresProxyErrorTest,
     ::testing::Values(
         std::make_tuple("blah blah", DecoderCallbacks::ErrorType::Unknown),
         std::make_tuple("SERRORC1234", DecoderCallbacks::ErrorType::Error),
@@ -418,7 +418,7 @@ INSTANTIATE_TEST_SUITE_P(
 // Test parsing N message. It indicate notice
 // and carries additional information about the
 // purpose of the message.
-TEST_P(PostgreSQLProxyNoticeTest, ParseNoticeMsgs) {
+TEST_P(PostgresProxyNoticeTest, ParseNoticeMsgs) {
   EXPECT_CALL(callbacks_, incNotice(std::get<1>(GetParam())));
   payload_ = std::get<0>(GetParam());
   data_.add("N");
@@ -429,7 +429,7 @@ TEST_P(PostgreSQLProxyNoticeTest, ParseNoticeMsgs) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    PostgreSQLProxyNoticeTestSuite, PostgreSQLProxyNoticeTest,
+    PostgresProxyNoticeTestSuite, PostgresProxyNoticeTest,
     ::testing::Values(std::make_tuple("blah blah", DecoderCallbacks::NoticeType::Unknown),
                       std::make_tuple("SblalalaC2345", DecoderCallbacks::NoticeType::Unknown),
                       std::make_tuple("SblahVWARNING23345", DecoderCallbacks::NoticeType::Warning),
@@ -440,7 +440,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 // Test checks if the decoder can detect initial message which indicates
 // that protocol uses encryption
-TEST_P(PostgreSQLProxyFrontendEncrDecoderTest, EncyptedTraffic) {
+TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   // set decoder to wait for initial message
   decoder_->setStartup(true);
 
@@ -474,10 +474,10 @@ TEST_P(PostgreSQLProxyFrontendEncrDecoderTest, EncyptedTraffic) {
 // Run encryption tests.
 // 80877103 is SSL code
 // 80877104 is GSS code
-INSTANTIATE_TEST_SUITE_P(FrontendEncryptedMessagesTests, PostgreSQLProxyFrontendEncrDecoderTest,
+INSTANTIATE_TEST_SUITE_P(FrontendEncryptedMessagesTests, PostgresProxyFrontendEncrDecoderTest,
                          ::testing::Values(80877103, 80877104));
 
-} // namespace PostgreSQLProxy
+} // namespace PostgresProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

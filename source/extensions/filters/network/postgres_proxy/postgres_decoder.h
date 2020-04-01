@@ -6,16 +6,16 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
-#include "extensions/filters/network/postgresql_proxy/postgresql_session.h"
+#include "extensions/filters/network/postgres_proxy/postgres_session.h"
 
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace PostgreSQLProxy {
+namespace PostgresProxy {
 
-// General callbacks for dispatching decoded PostgreSQL messages to a sink.
+// General callbacks for dispatching decoded Postgres messages to a sink.
 class DecoderCallbacks {
 public:
   virtual ~DecoderCallbacks() = default;
@@ -42,13 +42,13 @@ public:
   virtual void incError(ErrorType) PURE;
 };
 
-// PostgreSQL message decoder.
+// Postgres message decoder.
 class Decoder {
 public:
   virtual ~Decoder() = default;
 
   virtual bool onData(Buffer::Instance& data, bool frontend) PURE;
-  virtual PostgreSQLSession& getSession() PURE;
+  virtual PostgresSession& getSession() PURE;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
@@ -58,7 +58,7 @@ public:
   DecoderImpl(DecoderCallbacks* callbacks) : callbacks_(callbacks) { initialize(); }
 
   bool onData(Buffer::Instance& data, bool frontend) override;
-  PostgreSQLSession& getSession() override { return session_; }
+  PostgresSession& getSession() override { return session_; }
 
   void setMessage(std::string message) { message_ = message; }
   std::string getMessage() { return message_; }
@@ -87,7 +87,7 @@ protected:
   void incUnknown() { callbacks_->incUnknown(); }
 
   DecoderCallbacks* callbacks_;
-  PostgreSQLSession session_;
+  PostgresSession session_;
 
   // the following fields store result of message parsing
   char command_;
@@ -116,7 +116,7 @@ protected:
   std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> FE_messages_;
   std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> BE_messages_;
 
-  // Handler for startup postgresql message.
+  // Handler for startup postgres message.
   // Startup message message which does not start with 1 byte TYPE.
   // It starts with message length and must be therefore handled
   // differently.
@@ -131,7 +131,7 @@ protected:
   void decodeErrorNotice(std::tuple<absl::flat_hash_map<std::string, MsgAction>, MsgAction>& types);
 };
 
-} // namespace PostgreSQLProxy
+} // namespace PostgresProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

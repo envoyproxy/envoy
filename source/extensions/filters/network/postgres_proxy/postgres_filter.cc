@@ -1,26 +1,26 @@
-#include "extensions/filters/network/postgresql_proxy/postgresql_filter.h"
+#include "extensions/filters/network/postgres_proxy/postgres_filter.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
-#include "extensions/filters/network/postgresql_proxy/postgresql_decoder.h"
+#include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace PostgreSQLProxy {
+namespace PostgresProxy {
 
-PostgreSQLFilterConfig::PostgreSQLFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
+PostgresFilterConfig::PostgresFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
     : stat_prefix_{stat_prefix}, scope_{scope}, stats_{generateStats(stat_prefix, scope)} {}
 
-PostgreSQLFilter::PostgreSQLFilter(PostgreSQLFilterConfigSharedPtr config) : config_{config} {
+PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
     decoder_ = createDecoder(this);
   }
 }
 
 // Network::ReadFilter
-Network::FilterStatus PostgreSQLFilter::onData(Buffer::Instance& data, bool) {
+Network::FilterStatus PostgresFilter::onData(Buffer::Instance& data, bool) {
   ENVOY_CONN_LOG(trace, "echo: got {} bytes", read_callbacks_->connection(), data.length());
 
   // Frontend Buffer
@@ -30,16 +30,14 @@ Network::FilterStatus PostgreSQLFilter::onData(Buffer::Instance& data, bool) {
   return Network::FilterStatus::Continue;
 }
 
-Network::FilterStatus PostgreSQLFilter::onNewConnection() {
-  return Network::FilterStatus::Continue;
-}
+Network::FilterStatus PostgresFilter::onNewConnection() { return Network::FilterStatus::Continue; }
 
-void PostgreSQLFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+void PostgresFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
 }
 
 // Network::WriteFilter
-Network::FilterStatus PostgreSQLFilter::onWrite(Buffer::Instance& data, bool) {
+Network::FilterStatus PostgresFilter::onWrite(Buffer::Instance& data, bool) {
 
   // Backend Buffer
   backend_buffer_.add(data);
@@ -48,43 +46,43 @@ Network::FilterStatus PostgreSQLFilter::onWrite(Buffer::Instance& data, bool) {
   return Network::FilterStatus::Continue;
 }
 
-DecoderPtr PostgreSQLFilter::createDecoder(DecoderCallbacks* callbacks) {
+DecoderPtr PostgresFilter::createDecoder(DecoderCallbacks* callbacks) {
   return std::make_unique<DecoderImpl>(callbacks);
 }
 
-void PostgreSQLFilter::incBackend() { config_->stats_.backend_msgs_.inc(); }
+void PostgresFilter::incBackend() { config_->stats_.backend_msgs_.inc(); }
 
-void PostgreSQLFilter::incFrontend() { config_->stats_.frontend_msgs_.inc(); }
+void PostgresFilter::incFrontend() { config_->stats_.frontend_msgs_.inc(); }
 
-void PostgreSQLFilter::incSessionsEncrypted() {
+void PostgresFilter::incSessionsEncrypted() {
   config_->stats_.sessions_.inc();
   config_->stats_.sessions_encrypted_.inc();
 }
 
-void PostgreSQLFilter::incSessionsUnencrypted() {
+void PostgresFilter::incSessionsUnencrypted() {
   config_->stats_.sessions_.inc();
   config_->stats_.sessions_unencrypted_.inc();
 }
 
-void PostgreSQLFilter::incTransactions() {
+void PostgresFilter::incTransactions() {
   if (!decoder_->getSession().inTransaction()) {
     config_->stats_.transactions_.inc();
   }
 }
 
-void PostgreSQLFilter::incTransactionsCommit() {
+void PostgresFilter::incTransactionsCommit() {
   if (!decoder_->getSession().inTransaction()) {
     config_->stats_.transactions_commit_.inc();
   }
 }
 
-void PostgreSQLFilter::incTransactionsRollback() {
+void PostgresFilter::incTransactionsRollback() {
   if (!decoder_->getSession().inTransaction()) {
     config_->stats_.transactions_rollback_.inc();
   }
 }
 
-void PostgreSQLFilter::incNotice(NoticeType type) {
+void PostgresFilter::incNotice(NoticeType type) {
   config_->stats_.notices_.inc();
   switch (type) {
   case DecoderCallbacks::NoticeType::Warning:
@@ -108,7 +106,7 @@ void PostgreSQLFilter::incNotice(NoticeType type) {
   }
 }
 
-void PostgreSQLFilter::incError(ErrorType type) {
+void PostgresFilter::incError(ErrorType type) {
   config_->stats_.errors_.inc();
   switch (type) {
   case DecoderCallbacks::ErrorType::Error:
@@ -126,7 +124,7 @@ void PostgreSQLFilter::incError(ErrorType type) {
   }
 }
 
-void PostgreSQLFilter::incStatement(StatementType type) {
+void PostgresFilter::incStatement(StatementType type) {
   config_->stats_.statements_.inc();
 
   switch (type) {
@@ -150,9 +148,9 @@ void PostgreSQLFilter::incStatement(StatementType type) {
   }
 }
 
-void PostgreSQLFilter::incUnknown() { config_->stats_.unknown_.inc(); }
+void PostgresFilter::incUnknown() { config_->stats_.unknown_.inc(); }
 
-void PostgreSQLFilter::doDecode(Buffer::Instance& data, bool frontend) {
+void PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {
   // Keep processing data until buffer is empty or decoder says
   // that it cannot process data in the buffer.
   while ((0 < data.length()) && (decoder_->onData(data, frontend))) {
@@ -160,7 +158,7 @@ void PostgreSQLFilter::doDecode(Buffer::Instance& data, bool frontend) {
   }
 }
 
-} // namespace PostgreSQLProxy
+} // namespace PostgresProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

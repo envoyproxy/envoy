@@ -12,22 +12,22 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace PostgreSQLProxy {
+namespace PostgresProxy {
 
-class PostgreSQLIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                  public BaseIntegrationTest {
+class PostgresIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                public BaseIntegrationTest {
 
   std::string postgres_config() {
     return fmt::format(
         TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "test/extensions/filters/network/postgresql_proxy/postgresql_test_config.yaml")),
+            "test/extensions/filters/network/postgres_proxy/postgres_test_config.yaml")),
         Network::Test::getLoopbackAddressString(GetParam()),
         Network::Test::getLoopbackAddressString(GetParam()),
         Network::Test::getAnyAddressString(GetParam()));
   }
 
 public:
-  PostgreSQLIntegrationTest() : BaseIntegrationTest(GetParam(), postgres_config()){};
+  PostgresIntegrationTest() : BaseIntegrationTest(GetParam(), postgres_config()){};
 
   void SetUp() override { BaseIntegrationTest::initialize(); }
 
@@ -36,12 +36,12 @@ public:
     fake_upstreams_.clear();
   }
 };
-INSTANTIATE_TEST_SUITE_P(IpVersions, PostgreSQLIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, PostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 // Test that the filter is properly chained and reacts to successful login
 // message.
-TEST_P(PostgreSQLIntegrationTest, Login) {
+TEST_P(PostgresIntegrationTest, Login) {
   std::string str;
   std::string recv;
 
@@ -79,10 +79,10 @@ TEST_P(PostgreSQLIntegrationTest, Login) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Make sure that the successful login bumped up the number of sessions.
-  test_server_->waitForCounterEq("postgresql.postgresql_stats.sessions", 1);
+  test_server_->waitForCounterEq("postgres.postgres_stats.sessions", 1);
 }
 
-} // namespace PostgreSQLProxy
+} // namespace PostgresProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

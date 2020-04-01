@@ -830,6 +830,7 @@ pos
 posix
 postfix
 postfixes
+postgres
 postgresql
 pre
 preallocate

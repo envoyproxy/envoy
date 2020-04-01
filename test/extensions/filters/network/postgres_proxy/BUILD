@@ -12,42 +12,42 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "postgresql_decoder_tests",
+    name = "postgres_decoder_tests",
     srcs = [
-        "postgresql_decoder_test.cc",
+        "postgres_decoder_test.cc",
     ],
-    extension_name = "envoy.filters.network.postgresql_proxy",
+    extension_name = "envoy.filters.network.postgres_proxy",
     deps = [
-        "//source/extensions/filters/network/postgresql_proxy:filter",
+        "//source/extensions/filters/network/postgres_proxy:filter",
         "//test/mocks/network:network_mocks",
     ],
 )
 
 envoy_extension_cc_test(
-    name = "postgresql_filter_tests",
+    name = "postgres_filter_tests",
     srcs = [
-        "postgresql_filter_test.cc",
+        "postgres_filter_test.cc",
     ],
-    extension_name = "envoy.filters.network.postgresql_proxy",
+    extension_name = "envoy.filters.network.postgres_proxy",
     deps = [
-        "//source/extensions/filters/network/postgresql_proxy:filter",
+        "//source/extensions/filters/network/postgres_proxy:filter",
         "//test/mocks/network:network_mocks",
     ],
 )
 
 envoy_extension_cc_test(
-    name = "postgresql_integration_test",
+    name = "postgres_integration_test",
     srcs = [
-        "postgresql_integration_test.cc",
+        "postgres_integration_test.cc",
     ],
     data = [
-        "postgresql_test_config.yaml",
+        "postgres_test_config.yaml",
     ],
-    extension_name = "envoy.filters.network.postgresql_proxy",
+    extension_name = "envoy.filters.network.postgres_proxy",
     deps = [
         "//source/common/tcp_proxy",
-        "//source/extensions/filters/network/postgresql_proxy:config",
-        "//source/extensions/filters/network/postgresql_proxy:filter",
+        "//source/extensions/filters/network/postgres_proxy:config",
+        "//source/extensions/filters/network/postgres_proxy:filter",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:integration_lib",
     ],

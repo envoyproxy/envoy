@@ -48,20 +48,20 @@ DELETE FROM test;
 COMMIT;
 
 /*
-postgresql.egress_postgresql.errors: 0
-postgresql.egress_postgresql.frontend_commands: 14
-postgresql.egress_postgresql.sessions: 1
-postgresql.egress_postgresql.statements: 14
-postgresql.egress_postgresql.statements_delete: 2
-postgresql.egress_postgresql.statements_insert: 2
-postgresql.egress_postgresql.statements_other: 6
-postgresql.egress_postgresql.statements_select: 2
-postgresql.egress_postgresql.statements_update: 2
-postgresql.egress_postgresql.transactions: 1
-postgresql.egress_postgresql.transactions_commit: 1
-postgresql.egress_postgresql.transactions_rollback: 0
-postgresql.egress_postgresql.unrecognized: 0
-postgresql.egress_postgresql.warnings: 0
+postgres.egress_postgres.errors: 0
+postgres.egress_postgres.frontend_commands: 14
+postgres.egress_postgres.sessions: 1
+postgres.egress_postgres.statements: 14
+postgres.egress_postgres.statements_delete: 2
+postgres.egress_postgres.statements_insert: 2
+postgres.egress_postgres.statements_other: 6
+postgres.egress_postgres.statements_select: 2
+postgres.egress_postgres.statements_update: 2
+postgres.egress_postgres.transactions: 1
+postgres.egress_postgres.transactions_commit: 1
+postgres.egress_postgres.transactions_rollback: 0
+postgres.egress_postgres.unrecognized: 0
+postgres.egress_postgres.warnings: 0
 */
 
 /* </EXPLICT_TRANSACTIONS> */

@@ -1,11 +1,11 @@
-#include "extensions/filters/network/postgresql_proxy/postgresql_decoder.h"
+#include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
 
 #include <vector>
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace PostgreSQLProxy {
+namespace PostgresProxy {
 
 void DecoderImpl::initialize() {
   // Special handler for first message of the transaction
@@ -152,7 +152,7 @@ void DecoderImpl::initialize() {
 }
 
 bool DecoderImpl::parseMessage(Buffer::Instance& data) {
-  ENVOY_LOG(trace, "postgresql_proxy: parsing message, len {}", data.length());
+  ENVOY_LOG(trace, "postgres_proxy: parsing message, len {}", data.length());
 
   // The minimum size of the message sufficient for parsing is 5 bytes.
   if (data.length() < 5) {
@@ -162,7 +162,7 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
 
   if (!startup_) {
     data.copyOut(0, 1, &command_);
-    ENVOY_LOG(trace, "postgresql_proxy: command is {}", command_);
+    ENVOY_LOG(trace, "postgres_proxy: command is {}", command_);
   }
 
   // The 1 byte message type and message length should be in the buffer
@@ -172,7 +172,7 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   data.copyOut(startup_ ? 0 : 1, 4, &length);
   length = ntohl(length);
   if (data.length() < (length + (startup_ ? 0 : 1))) {
-    ENVOY_LOG(trace, "postgresql_proxy: cannot parse message. Need {} bytes in buffer",
+    ENVOY_LOG(trace, "postgres_proxy: cannot parse message. Need {} bytes in buffer",
               length + (startup_ ? 0 : 1));
     // not enough data in the buffer
     return false;
@@ -185,14 +185,14 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
     // Startup message with 1234 in the most significant 16 bits
     // indicate request to encrypt.
     if (code >= 0x04d20000) {
-      ENVOY_LOG(trace, "postgresql_proxy: detected encrypted traffic.");
+      ENVOY_LOG(trace, "postgres_proxy: detected encrypted traffic.");
       encrypted_ = true;
       startup_ = false;
       incSessionsEncrypted();
       data.drain(data.length());
       return false;
     } else {
-      ENVOY_LOG(debug, "Detected version {}.{} of PostgreSQL", code >> 16, code & 0x0000FFFF);
+      ENVOY_LOG(debug, "Detected version {}.{} of Postgres", code >> 16, code & 0x0000FFFF);
     }
   }
 
@@ -205,19 +205,19 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   data.drain(bytesToRead);
   setMessage(message);
 
-  ENVOY_LOG(trace, "postgresql_proxy: msg parsed");
+  ENVOY_LOG(trace, "postgres_proxy: msg parsed");
   return true;
 }
 
 bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   // If encrypted, just drain the traffic
   if (encrypted_) {
-    ENVOY_LOG(trace, "postgresql_proxy: ignoring {} bytes of encrypted data", data.length());
+    ENVOY_LOG(trace, "postgres_proxy: ignoring {} bytes of encrypted data", data.length());
     data.drain(data.length());
     return true;
   }
 
-  ENVOY_LOG(trace, "postgresql_proxy: decoding {} bytes", data.length());
+  ENVOY_LOG(trace, "postgres_proxy: decoding {} bytes", data.length());
 
   if (!parseMessage(data)) {
     return false;
@@ -249,7 +249,7 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   ENVOY_LOG(debug, "({}) length = {}", std::get<0>(msg_processor), getMessageLength());
   ENVOY_LOG(debug, "({}) message = {}", std::get<0>(msg_processor), getMessage());
 
-  ENVOY_LOG(trace, "postgresql_proxy: {} bytes remaining in buffer", data.length());
+  ENVOY_LOG(trace, "postgres_proxy: {} bytes remaining in buffer", data.length());
 
   return true;
 }
@@ -326,7 +326,7 @@ void DecoderImpl::decodeBackendErrorResponse() { decodeErrorNotice(BE_errors_); 
 // indicating its meaning. It can be warning, notice, info, debug or log.
 void DecoderImpl::decodeBackendNoticeResponse() { decodeErrorNotice(BE_notices_); }
 
-} // namespace PostgreSQLProxy
+} // namespace PostgresProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

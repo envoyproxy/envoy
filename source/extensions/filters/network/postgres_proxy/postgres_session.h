@@ -6,10 +6,10 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace PostgreSQLProxy {
+namespace PostgresProxy {
 
-// Class stores data about the current state of a transaction between postgresql client and server.
-class PostgreSQLSession {
+// Class stores data about the current state of a transaction between postgres client and server.
+class PostgresSession {
 public:
   bool inTransaction() { return in_transaction_; };
   void setInTransaction(bool in_transaction) { in_transaction_ = in_transaction; };
@@ -18,7 +18,7 @@ private:
   bool in_transaction_{false};
 };
 
-} // namespace PostgreSQLProxy
+} // namespace PostgresProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

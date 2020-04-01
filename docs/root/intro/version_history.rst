@@ -48,6 +48,7 @@ Version history
 * mongo: the stat emitted for queries without a max time set in the :ref:`MongoDB filter<config_network_filters_mongo_proxy>` was modified to emit correctly for Mongo v3.2+.
 * network filters: network filter extensions use the "envoy.filters.network" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
+* network filters: added a :ref:`postgres proxy <config_network_filters_postgres_proxy>`.
 * network filters: added a :ref:`direct response filter <config_network_filters_direct_response>`.
 * network filters: added a :ref:`postgresql proxy <config_network_filters_postgresql_proxy>`.
 * rbac: added :ref:`url_path <envoy_api_field_config.rbac.v2.Permission.url_path>` for matching URL path without the query and fragment string.

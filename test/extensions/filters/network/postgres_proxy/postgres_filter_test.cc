@@ -3,14 +3,14 @@
 
 #include <tuple>
 
-#include "extensions/filters/network/postgresql_proxy/postgresql_filter.h"
+#include "extensions/filters/network/postgres_proxy/postgres_filter.h"
 
 #include "test/mocks/network/mocks.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace PostgreSQLProxy {
+namespace PostgresProxy {
 
 using ::testing::WithArg;
 using ::testing::WithArgs;
@@ -18,39 +18,39 @@ using ::testing::WithArgs;
 class DecoderTest : public Decoder {
 public:
   MOCK_METHOD(bool, onData, (Buffer::Instance&, bool), (override));
-  MOCK_METHOD(PostgreSQLSession&, getSession, (), (override));
+  MOCK_METHOD(PostgresSession&, getSession, (), (override));
 };
 
-class PostgreSQLFilterTest
+class PostgresFilterTest
     : public ::testing::TestWithParam<
-          std::tuple<std::function<void(PostgreSQLFilter*, Buffer::Instance&, bool)>,
-                     std::function<uint32_t(const PostgreSQLFilter*)>>> {
+          std::tuple<std::function<void(PostgresFilter*, Buffer::Instance&, bool)>,
+                     std::function<uint32_t(const PostgresFilter*)>>> {
 public:
-  PostgreSQLFilterTest() {
-    config_ = std::make_shared<PostgreSQLFilterConfig>(stat_prefix_, scope_);
-    filter_ = std::make_unique<PostgreSQLFilter>(config_);
+  PostgresFilterTest() {
+    config_ = std::make_shared<PostgresFilterConfig>(stat_prefix_, scope_);
+    filter_ = std::make_unique<PostgresFilter>(config_);
 
     filter_->setDecoder(std::make_unique<DecoderTest>());
   }
 
   Stats::IsolatedStoreImpl scope_;
   std::string stat_prefix_{"test."};
-  std::unique_ptr<PostgreSQLFilter> filter_;
-  PostgreSQLFilterConfigSharedPtr config_;
+  std::unique_ptr<PostgresFilter> filter_;
+  PostgresFilterConfigSharedPtr config_;
 
   // These variables are used internally in tests
   Buffer::OwnedImpl data_;
   char buf_[256];
 };
 
-TEST_F(PostgreSQLFilterTest, NewConnection) {
+TEST_F(PostgresFilterTest, NewConnection) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
 }
 
 // Test reading buffer until the buffer is exhausted
 // or decoder indicates that there is not enough data in a buffer
 // to process a message.
-TEST_P(PostgreSQLFilterTest, ReadData) {
+TEST_P(PostgresFilterTest, ReadData) {
   data_.add(buf_, 256);
 
   // Simulate reading entire buffer.
@@ -98,13 +98,13 @@ TEST_P(PostgreSQLFilterTest, ReadData) {
 // Parameterized test:
 // First value in the tuple is method taking buffer with received data.
 // Second value in the tuple is method returning how many bytes are left after processing.
-INSTANTIATE_TEST_SUITE_P(
-    ProcessDataTests, PostgreSQLFilterTest,
-    ::testing::Values(
-        std::make_tuple(&PostgreSQLFilter::onData, &PostgreSQLFilter::getFrontendBufLength),
-        std::make_tuple(&PostgreSQLFilter::onWrite, &PostgreSQLFilter::getBackendBufLength)));
+INSTANTIATE_TEST_SUITE_P(ProcessDataTests, PostgresFilterTest,
+                         ::testing::Values(std::make_tuple(&PostgresFilter::onData,
+                                                           &PostgresFilter::getFrontendBufLength),
+                                           std::make_tuple(&PostgresFilter::onWrite,
+                                                           &PostgresFilter::getBackendBufLength)));
 
-} // namespace PostgreSQLProxy
+} // namespace PostgresProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
