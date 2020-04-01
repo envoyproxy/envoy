@@ -16,22 +16,22 @@ template <class Base> class InjectFactory {
 public:
   InjectFactory(Base& instance) : instance_(instance) {
     EXPECT_STRNE(instance.category().c_str(), "");
-    displaced_ = Registry::FactoryRegistry<Base>::replaceFactoryForTest(instance_);
+
+    original_ = Registry::FactoryRegistry<Base>::getFactory(instance_.name());
+    restore_factories_ = Registry::FactoryRegistry<Base>::replaceFactoryForTest(instance_);
   }
 
   ~InjectFactory() {
-    // Always remove the injected factory so that it's name is not registered.
-    Registry::FactoryRegistry<Base>::removeFactoryForTest(instance_.name(), instance_.configType());
+    restore_factories_();
 
-    if (displaced_) {
-      // Replace any displaced factory (which had the same name OR type as the injected factory).
-      Registry::FactoryRegistry<Base>::replaceFactoryForTest(*displaced_);
-    }
+    auto* restored = Registry::FactoryRegistry<Base>::getFactory(instance_.name());
+    ASSERT(restored == original_);
   }
 
 private:
   Base& instance_;
-  Base* displaced_{};
+  Base* original_;
+  std::function<void()> restore_factories_;
 };
 
 } // namespace Registry

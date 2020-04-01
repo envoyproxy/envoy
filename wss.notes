@@ -1,0 +1,78 @@
+  timeout client 1m
+                -> hcm.common_http_protocol_options.idle_timeout 1m
+  timeout client-fin 5s
+                -> hcm.delayed_close_timed 5s
+  timeout connect 5s
+                -> cluster.connect_timeout 5s
+  timeout http-request 5s
+                -> hcm.request_timeout 5s
+  timeout server 1m
+                -> cluster.common_http_protocol_options.idle_timeout 1m
+  timeout server-fin 5s
+                n/a
+  timeout tunnel 5m
+                -> hcm.stream_idle_timeout 5m
+  retries 3
+                1. circuit breaker max_retries should be 20000
+                2. per-route: set retry policy on connect-failure with 3 tries
+                3. route_action.timeout = 30s
+
+slack-msgs.com
+        virtual_hosts.domains = ["lb.slack-msgs.com", *.lb.slack-msgs.com", "dev.slack-msgs.com", "*.dev.slack-msgs.com"]
+
+split flannel routes:
+
+              - match:
+                  prefix: "/"
+                  query_parameters:
+                  - name: flannel
+                    present_match: true
+                  - name: enterprise_id
+                    string_match:
+                      exact: E12KS1G65
+                route:
+                  weighted_clusters:
+                    total_weight: 2
+                    clusters:
+                    - name: flannel-canary
+                      weight: 1
+                    - name: flannel
+                      weight: 1
+                  upgrade_configs:
+                  - upgrade_type: websocket
+                request_headers_to_add: []
+              - match:
+                  prefix: "/"
+                  query_parameters:
+                  - name: flannel
+                    present_match: true
+                  - name: canary
+                    present_match: true
+                route:
+                  cluster: flannel-canary
+                  upgrade_configs:
+                  - upgrade_type: websocket
+                request_headers_to_add: []
+              - match:
+                  prefix: "/"
+                  query_parameters:
+                  - name: flannel
+                    present_match: true
+                route:
+                  cluster: flannel
+                  upgrade_configs:
+                  - upgrade_type: websocket
+                request_headers_to_add: []
+
+docs debug (start of docs):
+
+   - match:
+       safe_regex:
+          pattern: "/docs.*/debug"
+     direct_response:
+       status: 403
+       body:
+         inline_string: "access denied"
+
+what are we logging in haproxy that isn't in envoy logs that we care about?
+  - source ip? (relates to xff)
