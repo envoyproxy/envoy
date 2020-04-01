@@ -130,7 +130,6 @@ jobs:
       vmImage: "windows-latest"
     steps:
       - powershell: |
-          .\ci\windows_ci_setup.ps1
           systeminfo 2>&1
           Get-CimInstance win32_computersystem | fl *
           Get-CimInstance -Class Win32_PageFileUsage | fl *
