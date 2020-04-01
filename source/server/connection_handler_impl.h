@@ -241,7 +241,7 @@ private:
       GenericListenerFilter(const Network::ListenerFilterMatcherSharedPtr& matcher,
                             Network::ListenerFilterPtr listener_filter)
           : listener_filter_(std::move(listener_filter)), matcher_(std::move(matcher)) {}
-      Network::FilterStatus onAccept(ListenerFilterCallbacks& cb) {
+      Network::FilterStatus onAccept(ListenerFilterCallbacks& cb) override {
         if (isDisabled(cb)) {
           return Network::FilterStatus::Continue;
         }
