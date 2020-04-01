@@ -9,6 +9,8 @@
 
 #include "test/test_common/environment.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Fuzz {
 
@@ -50,7 +52,8 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
 } // namespace Fuzz
 } // namespace Envoy
 
-extern "C" int LLVMFuzzerInitialize(int* /*argc*/, char*** argv) {
+extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv) {
+  testing::InitGoogleMock(argc, *argv);
   Envoy::Fuzz::Runner::setupEnvironment(1, *argv, spdlog::level::critical);
   return 0;
 }
