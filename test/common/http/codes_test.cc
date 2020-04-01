@@ -46,8 +46,8 @@ public:
   }
 
   Stats::TestSymbolTable symbol_table_;
-  Stats::IsolatedStoreImpl global_store_;
-  Stats::IsolatedStoreImpl cluster_scope_;
+  Stats::TestUtil::TestStore global_store_;
+  Stats::TestUtil::TestStore cluster_scope_;
   Http::CodeStatsImpl code_stats_;
   Stats::StatNamePool pool_;
 };

@@ -90,8 +90,8 @@ TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
-  Stats::Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
@@ -236,8 +236,8 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
-  Stats::Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
 
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("h2", h2.name());
@@ -334,8 +334,8 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
-  Stats::Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
@@ -434,11 +434,11 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram(
+  Stats::Histogram& h1 = store_->histogramFromString(
       "h1_matches", Stats::Histogram::Unit::Unspecified); // Will match, be used, and print
-  Stats::Histogram& h2 = store_->histogram(
+  Stats::Histogram& h2 = store_->histogramFromString(
       "h2_matches", Stats::Histogram::Unit::Unspecified); // Will match but not be used
-  Stats::Histogram& h3 = store_->histogram(
+  Stats::Histogram& h3 = store_->histogramFromString(
       "h3_not", Stats::Histogram::Unit::Unspecified); // Will be used but not match
 
   EXPECT_EQ("h1_matches", h1.name());

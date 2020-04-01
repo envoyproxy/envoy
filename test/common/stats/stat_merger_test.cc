@@ -17,13 +17,13 @@ namespace {
 class StatMergerTest : public testing::Test {
 public:
   StatMergerTest()
-      : stat_merger_(store_), whywassixafraidofseven_(store_.gauge("whywassixafraidofseven",
-                                                                   Gauge::ImportMode::Accumulate)) {
+      : stat_merger_(store_), whywassixafraidofseven_(store_.gaugeFromString(
+                                  "whywassixafraidofseven", Gauge::ImportMode::Accumulate)) {
     whywassixafraidofseven_.set(678);
   }
 
   void mergeTest(const std::string& name, Gauge::ImportMode initial, Gauge::ImportMode merge) {
-    Gauge& g1 = store_.gauge(name, initial);
+    Gauge& g1 = store_.gaugeFromString(name, initial);
     EXPECT_EQ(initial, g1.importMode()) << name;
     g1.mergeImportMode(merge);
     EXPECT_EQ(merge, g1.importMode()) << name;
@@ -66,35 +66,35 @@ public:
 
 TEST_F(StatMergerTest, CounterMerge) {
   // Child's value of the counter might already be non-zero by the first merge.
-  store_.counter("draculaer").inc();
-  EXPECT_EQ(1, store_.counter("draculaer").latch());
+  store_.counterFromString("draculaer").inc();
+  EXPECT_EQ(1, store_.counterFromString("draculaer").latch());
 
   Protobuf::Map<std::string, uint64_t> counter_deltas;
   counter_deltas["draculaer"] = 1;
   stat_merger_.mergeStats(counter_deltas, empty_gauges_);
   // Initial combined value: 1+1.
-  EXPECT_EQ(2, store_.counter("draculaer").value());
-  EXPECT_EQ(1, store_.counter("draculaer").latch());
+  EXPECT_EQ(2, store_.counterFromString("draculaer").value());
+  EXPECT_EQ(1, store_.counterFromString("draculaer").latch());
 
   // The parent's counter increases by 1.
   counter_deltas["draculaer"] = 1;
   stat_merger_.mergeStats(counter_deltas, empty_gauges_);
-  EXPECT_EQ(3, store_.counter("draculaer").value());
-  EXPECT_EQ(1, store_.counter("draculaer").latch());
+  EXPECT_EQ(3, store_.counterFromString("draculaer").value());
+  EXPECT_EQ(1, store_.counterFromString("draculaer").latch());
 
   // Our own counter increases by 4, while the parent's stays constant. Total increase of 4.
-  store_.counter("draculaer").add(4);
+  store_.counterFromString("draculaer").add(4);
   counter_deltas["draculaer"] = 0;
   stat_merger_.mergeStats(counter_deltas, empty_gauges_);
-  EXPECT_EQ(7, store_.counter("draculaer").value());
-  EXPECT_EQ(4, store_.counter("draculaer").latch());
+  EXPECT_EQ(7, store_.counterFromString("draculaer").value());
+  EXPECT_EQ(4, store_.counterFromString("draculaer").latch());
 
   // Our counter and the parent's counter both increase by 2, total increase of 4.
-  store_.counter("draculaer").add(2);
+  store_.counterFromString("draculaer").add(2);
   counter_deltas["draculaer"] = 2;
   stat_merger_.mergeStats(counter_deltas, empty_gauges_);
-  EXPECT_EQ(11, store_.counter("draculaer").value());
-  EXPECT_EQ(4, store_.counter("draculaer").latch());
+  EXPECT_EQ(11, store_.counterFromString("draculaer").value());
+  EXPECT_EQ(4, store_.counterFromString("draculaer").latch());
 }
 
 TEST_F(StatMergerTest, BasicDefaultAccumulationImport) {
@@ -142,7 +142,7 @@ TEST_F(StatMergerTest, MultipleImportsWithAccumulationLogic) {
 // the child has that gauge undefined.
 TEST_F(StatMergerTest, ExclusionsNotImported) {
   Gauge& some_sort_of_version =
-      store_.gauge("some.sort.of.version", Gauge::ImportMode::NeverImport);
+      store_.gaugeFromString("some.sort.of.version", Gauge::ImportMode::NeverImport);
   some_sort_of_version.set(12345);
 
   Protobuf::Map<std::string, uint64_t> gauges;
@@ -153,7 +153,8 @@ TEST_F(StatMergerTest, ExclusionsNotImported) {
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
   EXPECT_EQ(12345, some_sort_of_version.value());
   EXPECT_FALSE(
-      store_.gauge("child.doesnt.have.this.version", Gauge::ImportMode::NeverImport).used());
+      store_.gaugeFromString("child.doesnt.have.this.version", Gauge::ImportMode::NeverImport)
+          .used());
 
   // Check the "undefined remains undefined" behavior for a bunch of other names.
   gauges["runtime.admin_overrides_active"] = 111;
@@ -177,7 +178,7 @@ TEST_F(StatMergerTest, ExclusionsNotImported) {
 
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
 #define EXPECT_GAUGE_NOT_USED(name)                                                                \
-  EXPECT_FALSE(store_.gauge(name, Gauge::ImportMode::NeverImport).used())
+  EXPECT_FALSE(store_.gaugeFromString(name, Gauge::ImportMode::NeverImport).used())
 
   EXPECT_GAUGE_NOT_USED("child.doesnt.have.this.version");
   EXPECT_GAUGE_NOT_USED("runtime.admin_overrides_active");
@@ -342,8 +343,8 @@ protected:
 };
 
 TEST_F(StatMergerThreadLocalTest, FilterOutUninitializedGauges) {
-  Gauge& g1 = store_.gauge("newgauge1", Gauge::ImportMode::Uninitialized);
-  Gauge& g2 = store_.gauge("newgauge2", Gauge::ImportMode::Accumulate);
+  Gauge& g1 = store_.gaugeFromString("newgauge1", Gauge::ImportMode::Uninitialized);
+  Gauge& g2 = store_.gaugeFromString("newgauge2", Gauge::ImportMode::Accumulate);
   std::vector<GaugeSharedPtr> gauges = store_.gauges();
   ASSERT_EQ(1, gauges.size());
   EXPECT_EQ(&g2, gauges[0].get());
@@ -369,11 +370,11 @@ TEST_F(StatMergerThreadLocalTest, NewStatFromParent) {
     gauges["newgauge1"] = 1;
     gauges["newgauge2"] = 2;
     stat_merger.mergeStats(counter_deltas, gauges);
-    EXPECT_EQ(0, store_.counter("newcounter0").value());
-    EXPECT_EQ(0, store_.counter("newcounter0").latch());
-    EXPECT_EQ(1, store_.counter("newcounter1").value());
-    EXPECT_EQ(1, store_.counter("newcounter1").latch());
-    EXPECT_EQ(1, store_.gauge("newgauge1", Gauge::ImportMode::Accumulate).value());
+    EXPECT_EQ(0, store_.counterFromString("newcounter0").value());
+    EXPECT_EQ(0, store_.counterFromString("newcounter0").latch());
+    EXPECT_EQ(1, store_.counterFromString("newcounter1").value());
+    EXPECT_EQ(1, store_.counterFromString("newcounter1").latch());
+    EXPECT_EQ(1, store_.gaugeFromString("newgauge1", Gauge::ImportMode::Accumulate).value());
   }
   // We accessed 0 and 1 above, but not 2. Now that StatMerger has been destroyed,
   // 2 should be gone.
@@ -388,7 +389,7 @@ TEST_F(StatMergerThreadLocalTest, NewStatFromParent) {
 // from the parent, that we retain the import-mode, accumulating the updated
 // value. https://github.com/envoyproxy/envoy/issues/7227
 TEST_F(StatMergerThreadLocalTest, RetainImportModeAfterMerge) {
-  Gauge& gauge = store_.gauge("mygauge", Gauge::ImportMode::Accumulate);
+  Gauge& gauge = store_.gaugeFromString("mygauge", Gauge::ImportMode::Accumulate);
   gauge.set(42);
   EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
   EXPECT_EQ(42, gauge.value());
@@ -407,7 +408,7 @@ TEST_F(StatMergerThreadLocalTest, RetainImportModeAfterMerge) {
 // from the parent, that we retain the import-mode, and don't accumulate the updated
 // value. https://github.com/envoyproxy/envoy/issues/7227
 TEST_F(StatMergerThreadLocalTest, RetainNeverImportModeAfterMerge) {
-  Gauge& gauge = store_.gauge("mygauge", Gauge::ImportMode::NeverImport);
+  Gauge& gauge = store_.gaugeFromString("mygauge", Gauge::ImportMode::NeverImport);
   gauge.set(42);
   EXPECT_EQ(Gauge::ImportMode::NeverImport, gauge.importMode());
   EXPECT_EQ(42, gauge.value());

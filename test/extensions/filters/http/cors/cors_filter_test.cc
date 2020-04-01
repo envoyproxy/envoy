@@ -64,7 +64,7 @@ public:
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
   CorsFilterConfigSharedPtr config_;
   CorsFilter filter_;
   Buffer::OwnedImpl data_;

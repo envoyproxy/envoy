@@ -264,7 +264,7 @@ private:
 void testUtil(const TestUtilOptions& options) {
   Event::SimulatedTimeSystem time_system;
 
-  Stats::IsolatedStoreImpl server_stats_store;
+  Stats::TestUtil::TestStore server_stats_store;
   Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
@@ -305,7 +305,7 @@ void testUtil(const TestUtilOptions& options) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(options.clientCtxYaml()),
                             client_tls_context);
 
-  Stats::IsolatedStoreImpl client_stats_store;
+  Stats::TestUtil::TestStore client_stats_store;
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
@@ -571,7 +571,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   const auto& filter_chain = options.listener().filter_chains(0);
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
-  Stats::IsolatedStoreImpl server_stats_store;
+  Stats::TestUtil::TestStore server_stats_store;
   Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
@@ -589,7 +589,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true);
 
-  Stats::IsolatedStoreImpl client_stats_store;
+  Stats::TestUtil::TestStore client_stats_store;
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
@@ -2340,7 +2340,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
-  Stats::IsolatedStoreImpl server_stats_store;
+  Stats::TestUtil::TestStore server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
@@ -2396,7 +2396,7 @@ TEST_P(SslSocketTest, HalfClose) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
-  Stats::IsolatedStoreImpl server_stats_store;
+  Stats::TestUtil::TestStore server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
@@ -2415,7 +2415,7 @@ TEST_P(SslSocketTest, HalfClose) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl client_stats_store;
+  Stats::TestUtil::TestStore client_stats_store;
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
@@ -2478,7 +2478,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
-  Stats::IsolatedStoreImpl server_stats_store;
+  Stats::TestUtil::TestStore server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
@@ -2500,7 +2500,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl client_stats_store;
+  Stats::TestUtil::TestStore client_stats_store;
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -2557,7 +2557,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(*time_system);
 
-  Stats::IsolatedStoreImpl server_stats_store;
+  Stats::TestUtil::TestStore server_stats_store;
   Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
@@ -2590,7 +2590,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
 
-  Stats::IsolatedStoreImpl client_stats_store;
+  Stats::TestUtil::TestStore client_stats_store;
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
@@ -3020,7 +3020,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
   auto server2_cfg = std::make_unique<ServerContextConfigImpl>(tls_context2, factory_context_);
   ContextManagerImpl manager(time_system_);
-  Stats::IsolatedStoreImpl server_stats_store;
+  Stats::TestUtil::TestStore server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
   ServerSslSocketFactory server2_ssl_socket_factory(std::move(server2_cfg), manager,
@@ -3047,7 +3047,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
 
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl client_stats_store;
+  Stats::TestUtil::TestStore client_stats_store;
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -3128,7 +3128,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
 
   ContextManagerImpl manager(time_system_);
 
-  Stats::IsolatedStoreImpl server_stats_store;
+  Stats::TestUtil::TestStore server_stats_store;
   Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system_);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
@@ -3155,7 +3155,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx_proto;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_ctx_proto);
 
-  Stats::IsolatedStoreImpl client_stats_store;
+  Stats::TestUtil::TestStore client_stats_store;
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system_);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
@@ -3399,7 +3399,7 @@ TEST_P(SslSocketTest, SslError) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
-  Stats::IsolatedStoreImpl server_stats_store;
+  Stats::TestUtil::TestStore server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
@@ -4072,7 +4072,7 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
 // Validate that if downstream secrets are not yet downloaded from SDS server, Envoy creates
 // NotReadySslSocket object to handle downstream connection.
 TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
-  Stats::IsolatedStoreImpl stats_store;
+  Stats::TestUtil::TestStore stats_store;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   NiceMock<Init::MockManager> init_manager;
@@ -4108,7 +4108,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
 // Validate that if upstream secrets are not yet downloaded from SDS server, Envoy creates
 // NotReadySslSocket object to handle upstream connection.
 TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
-  Stats::IsolatedStoreImpl stats_store;
+  Stats::TestUtil::TestStore stats_store;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   NiceMock<Init::MockManager> init_manager;
@@ -4297,8 +4297,8 @@ protected:
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
-  Stats::IsolatedStoreImpl server_stats_store_;
-  Stats::IsolatedStoreImpl client_stats_store_;
+  Stats::TestUtil::TestStore server_stats_store_;
+  Stats::TestUtil::TestStore client_stats_store_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;

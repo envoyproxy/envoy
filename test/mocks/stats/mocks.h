@@ -273,7 +273,7 @@ public:
   TestSymbolTable global_symbol_table_;
 };
 
-class MockStore : public SymbolTableProvider, public StoreImpl {
+class MockStore : public SymbolTableProvider, public TestUtil::TestStore {
 public:
   MockStore();
   ~MockStore() override;

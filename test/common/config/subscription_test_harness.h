@@ -105,7 +105,7 @@ public:
 
   virtual void doSubscriptionTearDown() {}
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   SubscriptionStats stats_;
 };
 

@@ -14,6 +14,7 @@ envoy_cc_test(
     srcs = ["message_validator_impl_test.cc"],
     deps = [
         "//source/common/protobuf:message_validator_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
@@ -25,7 +26,7 @@ envoy_cc_test(
     deps = [
         "//source/common/config:api_version_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/stats:isolated_store_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",

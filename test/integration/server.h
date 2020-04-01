@@ -102,15 +102,15 @@ public:
     return wrapped_scope_->nullGauge(str);
   }
 
-  Counter& counter(const std::string& name) override {
+  Counter& counterFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return counterFromStatName(storage.statName());
   }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName(), unit);
   }
@@ -150,9 +150,9 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatNameWithTags(name, tags);
   }
-  Counter& counter(const std::string& name) override {
+  Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
-    return store_.counter(name);
+    return store_.counterFromString(name);
   }
   ScopePtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
@@ -164,9 +164,9 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gaugeFromStatNameWithTags(name, tags, import_mode);
   }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return store_.gauge(name, import_mode);
+    return store_.gaugeFromString(name, import_mode);
   }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override {
@@ -174,9 +174,9 @@ public:
     return store_.histogramFromStatNameWithTags(name, tags, unit);
   }
   NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return store_.histogram(name, unit);
+    return store_.histogramFromString(name, unit);
   }
   CounterOptConstRef findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);

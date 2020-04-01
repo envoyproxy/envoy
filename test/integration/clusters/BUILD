@@ -13,6 +13,8 @@ envoy_cc_test_library(
     name = "custom_static_cluster",
     srcs = [
         "custom_static_cluster.cc",
+    ],
+    hdrs = [
         "custom_static_cluster.h",
     ],
     deps = [

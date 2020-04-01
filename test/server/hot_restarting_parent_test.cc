@@ -62,7 +62,7 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNotBindPort) {
 }
 
 TEST_F(HotRestartingParentTest, ExportStatsToChild) {
-  Stats::IsolatedStoreImpl store;
+  Stats::TestUtil::TestStore store;
   MockListenerManager listener_manager;
   EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
   EXPECT_CALL(listener_manager, numConnections()).WillRepeatedly(Return(0));
@@ -114,7 +114,7 @@ TEST_F(HotRestartingParentTest, ExportStatsToChild) {
 TEST_F(HotRestartingParentTest, RetainDynamicStats) {
   MockListenerManager listener_manager;
   Stats::SymbolTableImpl parent_symbol_table;
-  Stats::IsolatedStoreImpl parent_store(parent_symbol_table);
+  Stats::TestUtil::TestStore parent_store(parent_symbol_table);
 
   EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
   EXPECT_CALL(listener_manager, numConnections()).WillRepeatedly(Return(0));
@@ -132,7 +132,7 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
 
   {
     Stats::SymbolTableImpl child_symbol_table;
-    Stats::IsolatedStoreImpl child_store(child_symbol_table);
+    Stats::TestUtil::TestStore child_store(child_symbol_table);
     Stats::StatNameDynamicPool dynamic(child_store.symbolTable());
     Stats::Counter& c1 = child_store.counter("c1");
     Stats::Counter& c2 = child_store.counterFromStatName(dynamic.add("c2"));

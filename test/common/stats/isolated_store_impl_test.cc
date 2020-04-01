@@ -34,8 +34,8 @@ protected:
 
 TEST_F(StatsIsolatedStoreImplTest, All) {
   ScopePtr scope1 = store_->createScope("scope1.");
-  Counter& c1 = store_->counter("c1");
-  Counter& c2 = scope1->counter("c2");
+  Counter& c1 = store_->counterFromString("c1");
+  Counter& c2 = scope1->counterFromString("c2");
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
   EXPECT_EQ("c1", c1.tagExtractedName());
@@ -57,8 +57,8 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   c1.add(100);
   EXPECT_EQ(200, found_counter->get().value());
 
-  Gauge& g1 = store_->gauge("g1", Gauge::ImportMode::Accumulate);
-  Gauge& g2 = scope1->gauge("g2", Gauge::ImportMode::Accumulate);
+  Gauge& g1 = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  Gauge& g2 = scope1->gaugeFromString("g2", Gauge::ImportMode::Accumulate);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
   EXPECT_EQ("g1", g1.tagExtractedName());
@@ -83,10 +83,10 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   g1.set(0);
   EXPECT_EQ(0, found_gauge->get().value());
 
-  Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   EXPECT_TRUE(h1.used()); // hardcoded in impl to be true always.
   EXPECT_TRUE(h1.use_count() == 1);
-  Histogram& h2 = scope1->histogram("h2", Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 = scope1->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
   scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
@@ -111,11 +111,11 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(&h1, &found_histogram->get());
 
   ScopePtr scope2 = scope1->createScope("foo.");
-  EXPECT_EQ("scope1.foo.bar", scope2->counter("bar").name());
+  EXPECT_EQ("scope1.foo.bar", scope2->counterFromString("bar").name());
 
   // Validate that we sanitize away bad characters in the stats prefix.
   ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
-  EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
+  EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
   EXPECT_EQ(4UL, store_->counters().size());
   EXPECT_EQ(2UL, store_->gauges().size());
@@ -129,7 +129,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
 TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
   ScopePtr scope1 = store_->createScope("scope1");
   ScopePtr scope2 = scope1->createScope("scope2");
-  Counter& c1 = scope2->counter("c1");
+  Counter& c1 = scope2->counterFromString("c1");
   EXPECT_EQ("scope1.scope2.c1", c1.name());
 }
 
@@ -172,7 +172,7 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
 
   // Validate that we sanitize away bad characters in the stats prefix.
   ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
-  EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
+  EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
   EXPECT_EQ(4UL, store_->counters().size());
   EXPECT_EQ(2UL, store_->gauges().size());
@@ -190,7 +190,7 @@ TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
   const std::string long_string(128, 'A');
 
   ScopePtr scope = store_->createScope("scope.");
-  Counter& counter = scope->counter(long_string);
+  Counter& counter = scope->counterFromString(long_string);
   EXPECT_EQ(absl::StrCat("scope.", long_string), counter.name());
 }
 

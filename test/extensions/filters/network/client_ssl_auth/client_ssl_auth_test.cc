@@ -112,7 +112,7 @@ ip_white_list:
   std::unique_ptr<ClientSslAuthFilter> instance_;
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Api::ApiPtr api_;
   std::shared_ptr<Ssl::MockConnectionInfo> ssl_;

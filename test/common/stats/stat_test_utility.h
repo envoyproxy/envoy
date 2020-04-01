@@ -95,15 +95,23 @@ public:
   // Constructs a store using a symbol table, allowing for explicit sharing.
   explicit TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
 
+  Counter& counter(const std::string& name) { return counterFromString(name); }
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) {
+    return gaugeFromString(name, import_mode);
+  }
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) {
+    return histogramFromString(name, unit);
+  }
+
   // Override the Stats::Store methods for name-based lookup of stats, to use
   // and update the string-maps in this class. Note that IsolatedStoreImpl
   // does not support deletion of stats, so we only have to track additions
   // to keep the maps up-to-date.
   //
   // Stats::Scope
-  Counter& counter(const std::string& name) override;
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override;
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override;
+  Counter& counterFromString(const std::string& name) override;
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
   Counter& counterFromStatNameWithTags(const StatName& name,
                                        StatNameTagVectorOptConstRef tags) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,

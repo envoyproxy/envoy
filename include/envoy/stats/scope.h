@@ -70,7 +70,7 @@ public:
    * @param name The name, expressed as a string.
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counter(const std::string& name) PURE;
+  virtual Counter& counterFromString(const std::string& name) PURE;
 
   /**
    * Creates a Gauge from the stat name. Tag extraction will be performed on the name.
@@ -99,7 +99,7 @@ public:
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) PURE;
+  virtual Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) PURE;
 
   /**
    * @return a null gauge within the scope's namespace.
@@ -134,7 +134,7 @@ public:
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogram(const std::string& name, Histogram::Unit unit) PURE;
+  virtual Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.

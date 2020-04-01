@@ -5,6 +5,7 @@
 
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -42,7 +43,7 @@ parseProtoFromYaml(const std::string& yaml_string) {
 
 class RedisProxyFilterConfigTest : public testing::Test {
 public:
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   Network::MockDrainDecision drain_decision_;
   Runtime::MockLoader runtime_;
   NiceMock<Api::MockApi> api_;
@@ -138,7 +139,7 @@ public:
   Common::Redis::MockDecoder* decoder_{new Common::Redis::MockDecoder()};
   Common::Redis::DecoderCallbacks* decoder_callbacks_{};
   CommandSplitter::MockInstance splitter_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
   NiceMock<Runtime::MockLoader> runtime_;
   ProxyFilterConfigSharedPtr config_;

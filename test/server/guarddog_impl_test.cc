@@ -71,7 +71,7 @@ protected:
   }
 
   std::unique_ptr<Event::TestTimeSystem> time_system_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   std::unique_ptr<GuardDogImpl> guard_dog_;
 };
