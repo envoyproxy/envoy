@@ -30,6 +30,9 @@ public:
   /**
    * Add a file watch.
    * @param path supplies the path to watch.
+   *        If path is a file, callback is called on events for the given file.
+   *        If path is a directory (ends with "/"), callback is called on events
+   *        for the given directory.
    * @param events supplies the events to watch.
    * @param cb supplies the callback to invoke when a change occurs.
    */
