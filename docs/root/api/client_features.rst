@@ -18,3 +18,6 @@ Currently Defined Client Features
   :ref:`overprovisioning_factor<envoy_api_field_ClusterLoadAssignment.Policy.overprovisioning_factor>`
   field. If graceful failover functionality is required, it must be supplied by the management
   server.
+- **envoy.lrs.supports_send_all_clusters**: This feature indicates that the client supports
+  the :ref:`send_all_clusters<envoy_api_field_service.load_stats.v2.LoadStatsResponse.send_all_clusters>`
+  field in the LRS response.
