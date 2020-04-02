@@ -56,6 +56,7 @@ private:
   Event::Dispatcher& dispatcher_;
 };
 
+template <class ConfigType>
 class FakeResourceMonitorFactory : public Server::Configuration::ResourceMonitorFactory {
 public:
   FakeResourceMonitorFactory(const std::string& name) : monitor_(nullptr), name_(name) {}
@@ -69,7 +70,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new ConfigType()};
   }
 
   std::string name() const override { return name_; }
@@ -134,8 +135,8 @@ protected:
                                                  parseConfig(config), validation_visitor_, *api_);
   }
 
-  FakeResourceMonitorFactory factory1_;
-  FakeResourceMonitorFactory factory2_;
+  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Struct> factory1_;
+  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   NiceMock<Event::MockDispatcher> dispatcher_;
