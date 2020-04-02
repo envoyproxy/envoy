@@ -73,15 +73,16 @@ class ClusterManagerFactory;
 /**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
  * persistent and shared among multiple ongoing requests/connections.
- * Cluster manager is initialed in two phases. In the first phase which begins at the construction
- * all primary (i.e. not provisioned through xDS) clusters are initialized.
- * After the first phase the RTDS (if configured) initialization begins. This allows runtime
- * overrides to be fully configured before the rest of xDS configuration is provisioned.
- * The second phase of cluster manager initialized begins after RTDS has initialized. In the second
- * phase all secondary clusters are initialized and then the rest of the configuration provisioned
- * through xDS.
- * Please note: this order requires that RTDS is provisioned using a primary cluster. If RTDS is
- * provisioned through ADS then ADS must use primary cluster as well.
+ * Cluster manager is initialized in two phases. In the first phase which begins at the construction
+ * all primary (i.e. with endpoint assignments not provisioned through xDS) clusters are
+ * initialized. After the first phase the server instance initializes RTDS, if configured. This
+ * allows runtime overrides to be fully configured before the rest of xDS configuration is
+ * provisioned. The second phase of cluster manager initialized begins after RTDS has fully
+ * initialized or timed out. In the second phase all secondary clusters are initialized and then the
+ * rest of the configuration provisioned through xDS. Please note: this order requires that RTDS is
+ * provisioned using a primary cluster. If RTDS is provisioned through ADS then ADS must use primary
+ * cluster as well. This invariant is enforced during RTDS initialization and invalid configuration
+ * will be rejected.
  */
 class ClusterManager {
 public:
