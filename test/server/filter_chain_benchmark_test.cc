@@ -168,7 +168,6 @@ class FilterChainBenchmarkFixture : public benchmark::Fixture {
 public:
   using Fixture::SetUp;
   void SetUp(const ::benchmark::State& state) override {
-    dummy_builder_ = std::make_unique<MockFilterChainFactoryBuilder>();
     int64_t input_size = state.range(0);
     std::vector<std::string> port_chains;
     port_chains.reserve(input_size);
@@ -217,7 +216,7 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
       init_manager_};
 
-  filter_chain_manager.addFilterChain(filter_chains_, *dummy_builder_, filter_chain_manager);
+  filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
   for (auto _ : state) {
     for (int i = 0; i < state.range(0); i++) {
       filter_chain_manager.findFilterChain(sockets[i]);

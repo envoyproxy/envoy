@@ -348,9 +348,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst);
 
-    listener_filter_factories_.push_back(
-        factory.createListenerFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(),
-                                                     /*listener_filter_matcher=*/nullptr, *this));
+    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
+        Envoy::ProtobufWkt::Empty(),
+        /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
   }
   // Add proxy protocol listener filter if 'use_proxy_proto' flag is set.
   // TODO(jrajahalme): This is the last listener filter on purpose. When filter chain matching
@@ -360,9 +360,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
-    listener_filter_factories_.push_back(
-        factory.createListenerFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(),
-                                                     /*listener_filter_matcher=*/nullptr, *this));
+    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
+        Envoy::ProtobufWkt::Empty(),
+        /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
   }
 
   // TODO(zuercher) remove the deprecated TLS inspector name when the deprecated names are removed.
@@ -394,9 +394,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
-    listener_filter_factories_.push_back(
-        factory.createListenerFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(),
-                                                     /*listener_filter_matcher=*/nullptr, *this));
+    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
+        Envoy::ProtobufWkt::Empty(),
+        /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
   }
 
   if (!workers_started_) {
