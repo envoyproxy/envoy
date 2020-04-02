@@ -46,8 +46,7 @@ namespace Router {
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_direct_response)                                                                      \
   COUNTER(rq_total)                                                                                \
-  COUNTER(rq_reset_after_downstream_response_started)                                              \
-  COUNTER(rq_retry_skipped_request_not_complete)
+  COUNTER(rq_reset_after_downstream_response_started)
 // clang-format on
 
 /**
@@ -493,7 +492,7 @@ private:
   void resetOtherUpstreams(UpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
   // TODO(soya3129): Save metadata for retry, redirect and shadowing case.
-  bool setupRetry();
+  void setupRetry();
   bool setupRedirect(const Http::ResponseHeaderMap& headers, UpstreamRequest& upstream_request);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);

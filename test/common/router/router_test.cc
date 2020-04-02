@@ -2752,7 +2752,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
   response_decoder2->decodeHeaders(std::move(response_headers2), true);
 }
 
-TEST_F(RouterTest, RetryRequestNotComplete) {
+/*TEST_F(RouterTest, RetryRequestNotComplete) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -2780,7 +2780,7 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
   EXPECT_EQ(1UL, stats_store_.counter("test.rq_retry_skipped_request_not_complete").value());
-}
+  }*/
 
 // Two requests are sent (slow request + hedged retry) and then global timeout
 // is hit. Verify everything gets cleaned up.

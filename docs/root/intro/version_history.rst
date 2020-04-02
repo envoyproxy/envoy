@@ -3,6 +3,7 @@ Version history
 
 1.15.0 (Pending)
 ================
+* router: allow retries of streaming or incomplete requests
 
 1.14.1 (April 8, 2020)
 ======================
