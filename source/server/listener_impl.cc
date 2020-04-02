@@ -221,7 +221,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, this, *this,
           parent.factory_.createDrainManager(config.drain_type()))),
-      filter_chain_manager_(address_, listener_factory_context_->parent_factory_context(),
+      filter_chain_manager_(address_, listener_factory_context_->parentFactoryContext(),
                             initManager()),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
         if (workers_started_) {

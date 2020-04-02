@@ -185,9 +185,7 @@ public:
   // ListenerFactoryContext
   const Network::ListenerConfig& listenerConfig() const override;
 
-  ListenerFactoryContextBaseImpl& parent_factory_context() {
-    return *listener_factory_context_base_;
-  }
+  ListenerFactoryContextBaseImpl& parentFactoryContext() { return *listener_factory_context_base_; }
   friend class ListenerImpl;
 
 private:
@@ -199,9 +197,9 @@ private:
 /**
  * Maps proto config to runtime config for a listener with a network filter chain.
  */
-class ListenerImpl : public Network::ListenerConfig,
-                     public Network::FilterChainFactory,
-                     Logger::Loggable<Logger::Id::config> {
+class ListenerImpl final : public Network::ListenerConfig,
+                           public Network::FilterChainFactory,
+                           Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Create a new listener.
