@@ -24,6 +24,7 @@ namespace PostgresProxy {
   COUNTER(errors_fatal)                                                                            \
   COUNTER(errors_panic)                                                                            \
   COUNTER(errors_unknown)                                                                          \
+  COUNTER(messages)                                                                                \
   COUNTER(messages_backend)                                                                        \
   COUNTER(messages_frontend)                                                                       \
   COUNTER(messages_unknown)                                                                        \
@@ -89,15 +90,15 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
 
   // PostgresProxy::DecoderCallback
-  void incBackend() override;
-  void incFrontend() override;
+  void incMessagesBackend() override;
+  void incMessagesFrontend() override;
+  void incMessagesUnknown() override;
   void incSessionsEncrypted() override;
   void incSessionsUnencrypted() override;
   void incStatement(StatementType) override;
   void incTransactions() override;
   void incTransactionsCommit() override;
   void incTransactionsRollback() override;
-  void incUnknown() override;
   void incNotice(NoticeType) override;
   void incError(ErrorType) override;
 

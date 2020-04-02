@@ -34,7 +34,7 @@ void DecoderImpl::initialize() {
   FE_known_msgs['X'] = Message{"Terminate", {&DecoderImpl::decodeFrontendTerminate}};
 
   // Handler for unknown messages
-  std::get<2>(FE_messages_) = Message{"Other", {&DecoderImpl::incUnknown}};
+  std::get<2>(FE_messages_) = Message{"Other", {&DecoderImpl::incMessagesUnknown}};
 
   // Backend messages
   std::get<0>(BE_messages_) = "Backend";
@@ -68,7 +68,7 @@ void DecoderImpl::initialize() {
   BE_known_msgs['T'] = Message{"RowDescription", {}};
 
   // Handler for unknown messages
-  std::get<2>(BE_messages_) = Message{"Other", {&DecoderImpl::incUnknown}};
+  std::get<2>(BE_messages_) = Message{"Other", {&DecoderImpl::incMessagesUnknown}};
 
   // Setup hash map for handling backend statements.
   BE_statements_["BEGIN"] = [this](DecoderImpl*) -> void {
@@ -225,7 +225,7 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 
   std::tuple<std::string, absl::flat_hash_map<char, Message>, Message>& msg_processor =
       std::ref(frontend ? FE_messages_ : BE_messages_);
-  frontend ? callbacks_->incFrontend() : callbacks_->incBackend();
+  frontend ? callbacks_->incMessagesFrontend() : callbacks_->incMessagesBackend();
 
   std::reference_wrapper<Message> msg = std::get<2>(msg_processor);
 

@@ -20,8 +20,9 @@ class DecoderCallbacks {
 public:
   virtual ~DecoderCallbacks() = default;
 
-  virtual void incBackend() PURE;
-  virtual void incFrontend() PURE;
+  virtual void incMessagesBackend() PURE;
+  virtual void incMessagesFrontend() PURE;
+  virtual void incMessagesUnknown() PURE;
 
   virtual void incSessionsEncrypted() PURE;
   virtual void incSessionsUnencrypted() PURE;
@@ -32,8 +33,6 @@ public:
   virtual void incTransactions() PURE;
   virtual void incTransactionsCommit() PURE;
   virtual void incTransactionsRollback() PURE;
-
-  virtual void incUnknown() PURE;
 
   enum class NoticeType { Warning, Notice, Debug, Info, Log, Unknown };
   virtual void incNotice(NoticeType) PURE;
@@ -80,11 +79,9 @@ protected:
   void decodeBackendNoticeResponse();
   void decodeFrontendTerminate();
 
-  void incBackend() { callbacks_->incBackend(); }
-  void incFrontend() { callbacks_->incFrontend(); }
   void incSessionsEncrypted() { callbacks_->incSessionsEncrypted(); }
   void incSessionsUnencrypted() { callbacks_->incSessionsUnencrypted(); }
-  void incUnknown() { callbacks_->incUnknown(); }
+  void incMessagesUnknown() { callbacks_->incMessagesUnknown(); }
 
   DecoderCallbacks* callbacks_;
   PostgresSession session_;
