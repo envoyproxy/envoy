@@ -402,7 +402,7 @@ private:
 
     Base* prev_by_type = nullptr;
     if (valid_config_type) {
-      // If's possible the that no factory was replaced by-name, but that the replacement factory
+      // It's possible the that no factory was replaced by-name, but that the replacement factory
       // is displacing a factory by type. Completely remove the factory by type.
       auto type_it = factoriesByType().find(factory.configType());
       if (type_it != factoriesByType().end()) {
