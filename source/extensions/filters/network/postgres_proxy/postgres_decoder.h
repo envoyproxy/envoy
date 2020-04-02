@@ -28,17 +28,17 @@ public:
   virtual void incSessionsUnencrypted() PURE;
 
   enum class StatementType { Insert, Delete, Select, Update, Other, Noop };
-  virtual void incStatement(StatementType) PURE;
+  virtual void incStatements(StatementType) PURE;
 
   virtual void incTransactions() PURE;
   virtual void incTransactionsCommit() PURE;
   virtual void incTransactionsRollback() PURE;
 
   enum class NoticeType { Warning, Notice, Debug, Info, Log, Unknown };
-  virtual void incNotice(NoticeType) PURE;
+  virtual void incNotices(NoticeType) PURE;
 
   enum class ErrorType { Error, Fatal, Panic, Unknown };
-  virtual void incError(ErrorType) PURE;
+  virtual void incErrors(ErrorType) PURE;
 };
 
 // Postgres message decoder.
@@ -79,9 +79,10 @@ protected:
   void decodeBackendNoticeResponse();
   void decodeFrontendTerminate();
 
+  void incMessagesUnknown() { callbacks_->incMessagesUnknown(); }
+
   void incSessionsEncrypted() { callbacks_->incSessionsEncrypted(); }
   void incSessionsUnencrypted() { callbacks_->incSessionsUnencrypted(); }
-  void incMessagesUnknown() { callbacks_->incMessagesUnknown(); }
 
   DecoderCallbacks* callbacks_;
   PostgresSession session_;
