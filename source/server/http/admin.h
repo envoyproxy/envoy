@@ -164,7 +164,7 @@ public:
   bool shouldMergeSlashes() const override { return true; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
-    return envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST;
+    return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;

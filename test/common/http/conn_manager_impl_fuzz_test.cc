@@ -155,7 +155,7 @@ public:
   bool shouldMergeSlashes() const override { return false; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
-    return envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST;
+    return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager

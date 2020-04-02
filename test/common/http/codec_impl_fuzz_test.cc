@@ -399,8 +399,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
   uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-      headers_with_underscores_action =
-          envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST;
+      headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   ClientConnectionPtr client;
   ServerConnectionPtr server;
   const bool http2 = http_version == HttpVersion::Http2;

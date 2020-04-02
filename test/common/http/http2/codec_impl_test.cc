@@ -191,8 +191,7 @@ public:
   uint32_t max_inbound_window_update_frames_per_data_frame_sent_ =
       CommonUtility::OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-      headers_with_underscores_action_{
-          envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST};
+      headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,
@@ -1248,7 +1247,8 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersAccepted) {
   request_encoder_->encodeHeaders(request_headers, false);
 }
 
-// Tests request headers with name containing underscore are dropped.
+// Tests request headers with name containing underscore are dropped when the option is set to drop
+// header.
 TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreDropped) {
   headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER;
   initialize();
@@ -1262,7 +1262,8 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreDropped) {
   EXPECT_EQ(1, stats_store_.counter("http2.dropped_headers_with_underscores").value());
 }
 
-// Tests that request with header names containing underscore are rejected by default.
+// Tests that request with header names containing underscore are rejected when the option is set to
+// reject request.
 TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejectedByDefault) {
   headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST;
   initialize();
@@ -1275,8 +1276,8 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejectedByDefault) {
   EXPECT_EQ(1, stats_store_.counter("http2.requests_rejected_with_underscores_in_headers").value());
 }
 
-// Tests request headers with name containing underscore are allowed when the feature is
-// disabled.
+// Tests request headers with name containing underscore are allowed when the option is set to
+// allow.
 TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAllowed) {
   headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   initialize();

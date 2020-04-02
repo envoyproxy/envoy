@@ -409,8 +409,7 @@ public:
   bool normalize_path_ = false;
   bool merge_slashes_ = false;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-      headers_with_underscores_action_ =
-          envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST;
+      headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;

@@ -59,7 +59,7 @@ TEST_F(RequestFrameCommentTest, SimpleExampleHuffman) {
   TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-      envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST);
+      envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
   codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -136,7 +136,7 @@ TEST_F(RequestFrameCommentTest, SimpleExamplePlain) {
   TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-      envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST);
+      envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
   codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -200,7 +200,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       TestServerConnectionImpl connection(
           codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
           Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-          envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST);
+          envoy::config::core::v3::HttpProtocolOptions::ALLOW);
       codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
       codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -269,7 +269,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       TestServerConnectionImpl connection(
           codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
           Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-          envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST);
+          envoy::config::core::v3::HttpProtocolOptions::ALLOW);
       codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
       codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
