@@ -219,8 +219,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m1000 = ClusterMemoryTestHelper::computeMemoryDelta(1, 0, 1001, 0, true);
-  const size_t m_per_cluster = (m1000) / 1000;
+  const size_t m100 = ClusterMemoryTestHelper::computeMemoryDelta(1, 0, 101, 0, true);
+  const size_t m_per_cluster = (m100) / 100;
 
   // Note: if you are increasing this golden value because you are adding a
   // stat, please confirm that this will be generally useful to most Envoy
@@ -292,8 +292,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m1000 = ClusterMemoryTestHelper::computeMemoryDelta(1, 0, 1001, 0, true);
-  const size_t m_per_cluster = (m1000) / 1000;
+  const size_t m100 = ClusterMemoryTestHelper::computeMemoryDelta(1, 0, 101, 0, true);
+  const size_t m_per_cluster = (m100) / 100;
 
   // Note: if you are increasing this golden value because you are adding a
   // stat, please confirm that this will be generally useful to most Envoy
@@ -348,8 +348,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m1000 = ClusterMemoryTestHelper::computeMemoryDelta(1, 1, 1, 1001, true);
-  const size_t m_per_host = (m1000) / 1000;
+  const size_t m100 = ClusterMemoryTestHelper::computeMemoryDelta(1, 1, 1, 101, true);
+  const size_t m_per_host = (m100) / 100;
 
   // Note: if you are increasing this golden value because you are adding a
   // stat, please confirm that this will be generally useful to most Envoy
