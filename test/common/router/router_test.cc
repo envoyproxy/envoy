@@ -84,8 +84,6 @@ public:
     return &downstream_connection_;
   }
 
-  FilterConfig& config() { return config_; }
-
   NiceMock<Network::MockConnection> downstream_connection_;
   MockRetryState* retry_state_{};
   bool reject_all_hosts_ = false;
