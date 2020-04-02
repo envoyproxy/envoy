@@ -16,6 +16,7 @@
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "openssl/ssl.h"
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -137,6 +138,7 @@ void Filter::onALPN(const unsigned char* data, unsigned int len) {
     }
     protocols.emplace_back(reinterpret_cast<const char*>(CBS_data(&name)), CBS_len(&name));
   }
+  ENVOY_LOG(info, "lambdai: alpns {}", absl::StrJoin( protocols, ","));
   cb_->socket().setRequestedApplicationProtocols(protocols);
   alpn_found_ = true;
 }
