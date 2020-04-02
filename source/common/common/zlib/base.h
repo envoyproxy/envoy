@@ -1,6 +1,5 @@
 #pragma once
 
-#include "common/common/logger.h"
 #include "envoy/buffer/buffer.h"
 
 #include <memory>
