@@ -379,6 +379,20 @@ void InstanceImpl::initialize(const Options& options,
     dispatcher_->initializeStats(stats_store_, "server.");
   }
 
+  // The broad order of initialization from this point on is the following:
+  // 1. Statically provisioned configuration (bootstrap) are loaded.
+  // 2. Cluster manager is created and all primary (i.e. with endpoint assignments not provisioned
+  //    through xDS) clusters are initialized.
+  // 3. Various services are initialized and configured using the bootstrap config.
+  // 4. RTDS is initialized using primary clusters. This  allows runtime overrides to be fully
+  //    configured before the rest of xDS configuration is provisioned.
+  // 5. Secondary clusters are initialized.
+  // 6. The rest of the dynamic configuration is provisioned.
+  //
+  // Please note: this order requires that RTDS is provisioned using a primary cluster. If RTDS is
+  // provisioned through ADS then ADS must use primary cluster as well. This invariant is enforced
+  // during RTDS initialization and invalid configuration will be rejected.
+
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
@@ -413,6 +427,7 @@ void InstanceImpl::initialize(const Options& options,
   // instantiated (which in turn relies on runtime...).
   Runtime::LoaderSingleton::get().initialize(clusterManager());
 
+  // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
   Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
