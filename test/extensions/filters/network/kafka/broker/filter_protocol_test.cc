@@ -10,6 +10,7 @@
 #include "extensions/filters/network/kafka/external/requests.h"
 #include "extensions/filters/network/kafka/external/responses.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/kafka/buffer_based_test.h"
 #include "test/extensions/filters/network/kafka/message_utilities.h"
 #include "test/test_common/test_time.h"
@@ -32,7 +33,7 @@ class KafkaBrokerFilterProtocolTest : public testing::Test,
                                       protected RequestB,
                                       protected ResponseB {
 protected:
-  Stats::IsolatedStoreImpl scope_;
+  Stats::TestUtil::TestStore scope_;
   Event::TestRealTimeSystem time_source_;
   KafkaBrokerFilter testee_{scope_, time_source_, "prefix"};
 

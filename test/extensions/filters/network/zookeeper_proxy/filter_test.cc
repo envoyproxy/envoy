@@ -500,7 +500,7 @@ public:
     return scope_.findHistogram(storage.statName());
   }
 
-  Stats::IsolatedStoreImpl scope_;
+  Stats::TestUtil::TestStore scope_;
   ZooKeeperFilterConfigSharedPtr config_;
   std::unique_ptr<ZooKeeperFilter> filter_;
   std::string stat_prefix_{"test.zookeeper"};

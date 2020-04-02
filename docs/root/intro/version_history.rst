@@ -28,6 +28,7 @@ Version history
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * http: fixing a bug where the upgrade header was not cleared on responses to non-upgrade requests.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
+* eds: added :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` field for endpoints and :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field for endpoint's health check config. This enables auto host rewrite and customizing the host header during health checks for eds endpoints.
 * ext_authz: disabled the use of lowercase string matcher for headers matching in HTTP-based `ext_authz`.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher` to false.
 * fault: added support for controlling abort faults with :ref:`HTTP header fault configuration <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.

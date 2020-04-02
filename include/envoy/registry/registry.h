@@ -372,40 +372,89 @@ private:
   /**
    * Replaces a factory by name. This method should only be used for testing purposes.
    * @param factory is the factory to inject.
-   * @return Base* a pointer to the previously registered value.
+   * @return std::function<void()> a function that will restore the previously registered factories
+   *         (by name or type).
    */
-  static Base* replaceFactoryForTest(Base& factory) {
+  static std::function<void()> replaceFactoryForTest(Base& factory) {
+    // The by-type map is lazily initialized. Create it before any modifications
+    // are made to the by-name map.
+    factoriesByType();
+
+    Base* prev_by_name = nullptr;
     auto it = factories().find(factory.name());
-    Base* displaced = nullptr;
     if (it != factories().end()) {
-      displaced = it->second;
+      prev_by_name = it->second;
       factories().erase(it);
+
+      factoriesByType().erase(prev_by_name->configType());
+
+      ENVOY_LOG_MISC(
+          info, "Factory '{}' (type '{}') displaced-by-name with test factory '{}' (type '{}')",
+          prev_by_name->name(), prev_by_name->configType(), factory.name(), factory.configType());
     }
 
-    factories().emplace(factory.name(), &factory);
-    RELEASE_ASSERT(getFactory(factory.name()) == &factory, "");
+    // Ignore empty config types and ignore test-registered factories that are using the Struct
+    // type.
+    // TODO(zuercher): convert static factory registrations in tests to use InjectFactory and
+    // remove the struct check.
+    bool valid_config_type =
+        !factory.configType().empty() && factory.configType() != "google.protobuf.Struct";
 
-    auto config_type = factory.configType();
-    Base* prev = getFactoryByType(config_type);
-    if (prev != nullptr) {
-      factoriesByType().emplace(config_type, &factory);
+    Base* prev_by_type = nullptr;
+    if (valid_config_type) {
+      // It's possible the that no factory was replaced by-name, but that the replacement factory
+      // is displacing a factory by type. Completely remove the factory by type.
+      auto type_it = factoriesByType().find(factory.configType());
+      if (type_it != factoriesByType().end()) {
+        prev_by_type = type_it->second;
+        ASSERT(prev_by_type != nullptr);
+
+        factoriesByType().erase(type_it);
+
+        factories().erase(prev_by_type->name());
+
+        ENVOY_LOG_MISC(
+            info, "Factory '{}' (type '{}') displaced-by-type with test factory '{}' (type '{}')",
+            prev_by_type->name(), prev_by_type->configType(), factory.name(), factory.configType());
+      }
     }
 
-    return displaced;
-  }
+    Base* replacement = &factory;
 
-  /**
-   * Remove a factory by name. This method should only be used for testing purposes.
-   * @param name is the name of the factory to remove.
-   */
-  static void removeFactoryForTest(absl::string_view name, absl::string_view config_type) {
-    auto result = factories().erase(name);
-    RELEASE_ASSERT(result == 1, "");
+    factories().emplace(factory.name(), replacement);
+    RELEASE_ASSERT(getFactory(factory.name()) == replacement, "");
 
-    Base* prev = getFactoryByType(config_type);
-    if (prev != nullptr) {
-      factoriesByType().erase(config_type);
+    if (valid_config_type) {
+      factoriesByType().emplace(factory.configType(), replacement);
+      RELEASE_ASSERT(getFactoryByType(factory.configType()) == replacement, "");
     }
+
+    return [replacement, prev_by_name, prev_by_type, valid_config_type]() {
+      factories().erase(replacement->name());
+      if (valid_config_type) {
+        factoriesByType().erase(replacement->configType());
+      }
+
+      if (prev_by_name) {
+        factories().emplace(prev_by_name->name(), prev_by_name);
+        if (!prev_by_name->configType().empty()) {
+          factoriesByType().emplace(prev_by_name->configType(), prev_by_name);
+        }
+
+        ENVOY_LOG_MISC(warn, "Restored factory '{}' (type '{}'), formerly displaced-by-name",
+                       prev_by_name->name(), prev_by_name->configType());
+      }
+
+      if (prev_by_type) {
+        factories().emplace(prev_by_type->name(), prev_by_type);
+        if (!prev_by_type->configType().empty()) {
+          factoriesByType().emplace(prev_by_type->configType(), prev_by_type);
+        }
+
+        ENVOY_LOG_MISC(warn, "Restored factory '{}' (type '{}'), formerly displaced-by-type",
+                       prev_by_type->name(), prev_by_type->configType());
+      }
+    };
   }
 };
 

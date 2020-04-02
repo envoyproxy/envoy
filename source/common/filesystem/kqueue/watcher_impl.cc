@@ -65,9 +65,6 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t
   watch->watching_dir_ = watching_dir;
 
   u_int flags = NOTE_DELETE | NOTE_RENAME | NOTE_WRITE;
-  if (watching_dir) {
-    flags = NOTE_DELETE | NOTE_WRITE;
-  }
 
   struct kevent event;
   EV_SET(&event, watch_fd, EVFILT_VNODE, EV_ADD | EV_CLEAR, flags, 0,
@@ -109,6 +106,8 @@ void WatcherImpl::onKqueueEvent() {
     ASSERT(file != nullptr);
     ASSERT(watch_fd == file->fd_);
 
+    auto pathname = api_.fileSystem().splitPathFromFilename(file->file_);
+
     if (file->watching_dir_) {
       if (event.fflags & NOTE_DELETE) {
         // directory was deleted
@@ -125,6 +124,10 @@ void WatcherImpl::onKqueueEvent() {
 
           events |= Events::MovedTo;
         }
+      }
+    } else if (pathname.file_.empty()) {
+      if (event.fflags & NOTE_WRITE) {
+        events |= Events::MovedTo;
       }
     } else {
       // kqueue doesn't seem to work well with NOTE_RENAME and O_SYMLINK, so instead if we
