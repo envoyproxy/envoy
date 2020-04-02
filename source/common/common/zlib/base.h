@@ -17,8 +17,10 @@ public:
   Base(uint64_t chunk_size, std::function<void(z_stream*)> zstream_deleter);
 
   /**
-   * It returns the checksum of all output produced so far. Decompressor's checksum at the end of
-   * the stream has to match compressor's checksum produced at the end of the compression.
+   * It returns the checksum of all output produced so far. Compressor's checksum at the end of
+   * the stream has to match decompressor's checksum produced at the end of the decompression.
+   * Likewise, the decompressor's checksum has to match the compressor's checksum at the end of
+   * compression.
    * @return uint64_t CRC-32 if a gzip stream is being read or Adler-32 for other compression
    * types.
    */
