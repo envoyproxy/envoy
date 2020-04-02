@@ -12,5 +12,7 @@ bazel build ${BAZEL_BUILD_OPTIONS} --//tools/api_proto_plugin:default_type_db_ta
 TOOLS=$(dirname $(dirname $(realpath $0)))
 # to satisfy dependency on run_command
 export PYTHONPATH="$TOOLS"
+# Build protoprint for use in protoxform_test_helper.py.
+bazel build ${BAZEL_BUILD_OPTIONS} //tools/protoxform:protoprint
 
 ./tools/protoxform/protoxform_test_helper.py ${PROTO_TARGETS}

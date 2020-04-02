@@ -3,6 +3,8 @@
 # Diff or copy protoxform artifacts from Bazel cache back to the source tree.
 
 import argparse
+import functools
+import multiprocessing as mp
 import os
 import pathlib
 import re
@@ -46,7 +48,7 @@ api_proto_package($fields)
 
 IMPORT_REGEX = re.compile('import "(.*)";')
 SERVICE_REGEX = re.compile('service \w+ {')
-PACKAGE_REGEX = re.compile('\npackage ([^="]*);')
+PACKAGE_REGEX = re.compile('\npackage: "([^"]*)"')
 PREVIOUS_MESSAGE_TYPE_REGEX = re.compile(r'previous_message_type\s+=\s+"([^"]*)";')
 
 
@@ -87,20 +89,44 @@ def GetDestinationPath(src):
       matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
 
 
-def SyncProtoFile(cmd, src, dst_root):
+def GetAbsDestinationPath(dst_root, src):
+  """Obtain absolute path from a proto file path combined with destination root.
+
+  Creates the parent directory if necessary.
+
+  Args:
+    dst_root: destination root path.
+    src: source path.
+  """
+  rel_dst_path = GetDestinationPath(src)
+  dst = dst_root.joinpath(rel_dst_path)
+  dst.parent.mkdir(0o755, parents=True, exist_ok=True)
+  return dst
+
+
+def ProtoPrint(src, dst):
+  """Pretty-print FileDescriptorProto to a destination file.
+
+  Args:
+    src: source path for FileDescriptorProto.
+    dst: destination path for formatted proto.
+  """
+  print('ProtoPrint %s' % dst)
+  subprocess.check_output([
+      'bazel-bin/tools/protoxform/protoprint', src,
+      str(dst),
+      './bazel-bin/tools/protoxform/protoprint.runfiles/envoy/tools/type_whisperer/api_type_db.pb_text'
+  ])
+
+
+def SyncProtoFile(src_dst_pair):
   """Diff or in-place update a single proto file from protoxform.py Bazel cache artifacts."
 
   Args:
-    cmd: 'check' or 'fix'.
-    src: source path.
+    src_dst_pair: source/destination path tuple.
   """
-  # Skip empty files, this indicates this file isn't modified in this version.
-  if os.stat(src).st_size == 0:
-    return []
-  rel_dst_path = GetDestinationPath(src)
-  dst = dst_root.joinpath(rel_dst_path)
-  dst.parent.mkdir(0o755, True, True)
-  shutil.copyfile(src, str(dst))
+  rel_dst_path = GetDestinationPath(src_dst_pair[0])
+  ProtoPrint(*src_dst_pair)
   return ['//%s:pkg' % str(rel_dst_path.parent)]
 
 
@@ -250,17 +276,20 @@ def GitStatus(path):
 
 
 def Sync(api_root, mode, labels, shadow):
-  pkg_deps = []
   with tempfile.TemporaryDirectory() as tmp:
     dst_dir = pathlib.Path(tmp).joinpath("b")
+    paths = []
     for label in labels:
-      pkg_deps += SyncProtoFile(mode, utils.BazelBinPathForOutputArtifact(label, '.active.proto'),
-                                dst_dir)
-      pkg_deps += SyncProtoFile(
-          mode,
+      paths.append(utils.BazelBinPathForOutputArtifact(label, '.active.proto'))
+      paths.append(
           utils.BazelBinPathForOutputArtifact(
               label, '.next_major_version_candidate.envoy_internal.proto'
-              if shadow else '.next_major_version_candidate.proto'), dst_dir)
+              if shadow else '.next_major_version_candidate.proto'))
+    src_dst_paths = [
+        (path, GetAbsDestinationPath(dst_dir, path)) for path in paths if os.stat(path).st_size > 0
+    ]
+    with mp.Pool() as p:
+      pkg_deps = p.map(SyncProtoFile, src_dst_paths)
     SyncBuildFiles(mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")
