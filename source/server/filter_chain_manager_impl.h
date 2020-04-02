@@ -283,8 +283,8 @@ private:
                                     const Network::ConnectionSocket& socket) const;
 
   const FilterChainManagerImpl* getOriginFilterChainManager() {
-    ASSERT(!add_filter_chain_done_);
-    return origin_;
+    ASSERT(origin_.has_value());
+    return origin_.value();
   }
   // Duplicate the inherent factory context if any.
   std::shared_ptr<Network::DrainableFilterChain>
@@ -302,11 +302,9 @@ private:
   Configuration::FactoryContext& parent_context_;
   std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
 
-  bool add_filter_chain_done_{false};
   // Reference to the previous generation of filter chain manager to share the filter chains.
-  // Caution: The pointer is valid only during warm up. Check `add_filter_chain_done_` before the
-  // usage.
-  const FilterChainManagerImpl* origin_{};
+  // Caution: only during warm up could the optional have value.
+  absl::optional<const FilterChainManagerImpl*> origin_{};
 
   // For FilterChainFactoryContextCreator
   // init manager owned by the corresponding listener. The reference is valid when building the

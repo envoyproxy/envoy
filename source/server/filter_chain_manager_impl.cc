@@ -147,8 +147,7 @@ void FilterChainManagerImpl::addFilterChain(
     absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
-  ASSERT(!add_filter_chain_done_);
-  Cleanup cleanup([this]() { add_filter_chain_done_ = true; });
+  Cleanup cleanup([this]() { origin_ = absl::nullopt; });
   std::unordered_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
@@ -595,8 +594,8 @@ void FilterChainManagerImpl::convertIPsToTries() {
 
 std::shared_ptr<Network::DrainableFilterChain> FilterChainManagerImpl::findExistingFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain_message) {
-  // origin filter chain manager is empty. *this is the ancestor.
-  auto origin = getOriginFilterChainManager();
+  // Origin filter chain manager could be empty if the current is the ancestor.
+  const auto* origin = getOriginFilterChainManager();
   if (origin == nullptr) {
     return nullptr;
   }

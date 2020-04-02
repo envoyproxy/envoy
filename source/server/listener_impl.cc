@@ -160,8 +160,6 @@ ThreadLocal::Instance& ListenerFactoryContextBaseImpl::threadLocal() {
   return server_.threadLocal();
 }
 Admin& ListenerFactoryContextBaseImpl::admin() { return server_.admin(); }
-// TODO(lambdai): Consider moving away from factory context since listener filter and network filter
-// have independent factory context.
 const envoy::config::core::v3::Metadata& ListenerFactoryContextBaseImpl::listenerMetadata() const {
   return metadata_;
 };
@@ -212,16 +210,6 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this] {
-                            if (workers_started_) {
-                              parent_.onListenerWarmed(*this);
-                            } else {
-                              // Notify Server that this listener is
-                              // ready.
-                              listener_init_target_.ready();
-                            }
-                          }),
       listener_init_target_(fmt::format("Listener-init-target {}", name),
                             [this]() { dynamic_init_manager_->initialize(local_init_watcher_); }),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
@@ -234,7 +222,16 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           parent.server_, validation_visitor_, config, this, *this,
           parent.factory_.createDrainManager(config.drain_type()))),
       filter_chain_manager_(address_, listener_factory_context_->parent_factory_context(),
-                            initManager()) {
+                            initManager()),
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
+        if (workers_started_) {
+          parent_.onListenerWarmed(*this);
+        } else {
+          // Notify Server that this listener is
+          // ready.
+          listener_init_target_.ready();
+        }
+      }) {
   Network::Address::SocketType socket_type =
       Network::Utility::protobufAddressSocketType(config.address());
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, false)) {
@@ -526,10 +523,6 @@ ListenerImpl::~ListenerImpl() {
     // parent's initManager to get ready().
     listener_init_target_.ready();
   }
-
-  // TODO(lambdai): Reorder the members to simplify the dtor.
-  // Destroy immediately to prevent other member destruction triggered the ready().
-  dynamic_init_manager_ = nullptr;
 }
 
 Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }
