@@ -1611,6 +1611,15 @@ TEST_F(Http1ClientConnectionImplTest, GiantPath) {
   codec_->dispatch(response);
 }
 
+TEST_F(Http1ClientConnectionImplTest, PrematureUpgradeResponse) {
+  initialize();
+
+  // make sure upgradeAllowed doesn't cause crashes if run with no pending response.
+  Buffer::OwnedImpl response(
+      "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: upgrade\r\nUpgrade: websocket\r\n\r\n");
+  EXPECT_THROW(codec_->dispatch(response), PrematureResponseException);
+}
+
 TEST_F(Http1ClientConnectionImplTest, UpgradeResponse) {
   initialize();
 

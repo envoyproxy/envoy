@@ -1246,6 +1246,7 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
 
   response->waitForHeaders();
   EXPECT_EQ(nullptr, response->headers().Upgrade());
+  EXPECT_EQ(nullptr, response->headers().Connection());
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("Hello World", response->body());
