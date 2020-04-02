@@ -570,6 +570,7 @@ public:
   COUNTER(upstream_rq_cancelled)                                                                   \
   COUNTER(upstream_rq_completed)                                                                   \
   COUNTER(upstream_rq_maintenance_mode)                                                            \
+  COUNTER(upstream_rq_max_duration_reached)                                                        \
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
@@ -579,7 +580,6 @@ public:
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_rx_reset)                                                                    \
   COUNTER(upstream_rq_timeout)                                                                     \
-  COUNTER(upstream_rq_max_duration_reached)                                                        \
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \
   GAUGE(lb_subsets_active, Accumulate)                                                             \

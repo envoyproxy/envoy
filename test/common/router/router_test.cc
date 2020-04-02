@@ -3558,7 +3558,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
-TEST_F(RouterTest, BasicMaxStreamDurationTest) {
+TEST_F(RouterTest, MaxStreamDurationValidlyConfigured) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   ON_CALL(cm_.conn_pool_.host_->cluster_, maxStreamDuration())
@@ -3577,6 +3577,55 @@ TEST_F(RouterTest, BasicMaxStreamDurationTest) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
   max_stream_duration_timer_->invokeCallback();
+
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, MaxStreamDurationDisabledIfSetToZero) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  ON_CALL(cm_.conn_pool_.host_->cluster_, maxStreamDuration())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+
+  // not to be called timer creation.
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_).Times(0);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, MaxStreamDurationCallbackNotCalled) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  ON_CALL(cm_.conn_pool_.host_->cluster_, maxStreamDuration())
+      .WillByDefault(Return(std::chrono::milliseconds(5000)));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+
+  expectMaxStreamDurationTimer();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
 
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));

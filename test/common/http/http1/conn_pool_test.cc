@@ -138,7 +138,6 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Event::MockTimer>* upstream_ready_timer_;
-  NiceMock<Event::MockTimer>* max_stream_duration_timer_;
   ConnPoolImplForTest conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
@@ -392,26 +391,6 @@ TEST_F(Http1ConnPoolImplTest, ConnectFailure) {
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());
-}
-
-TEST_F(Http1ConnPoolImplTest, BasicMaxStreamDurationTest) {
-  ON_CALL(*cluster_, maxStreamDuration()).WillByDefault(Return(std::chrono::milliseconds(500)));
-  // InSequence s;
-
-  max_stream_duration_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_CALL(*max_stream_duration_timer_, enableTimer(_, _));
-
-  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
-  r1.startRequest();
-  r1.completeResponse(false);
-
-  EXPECT_CALL(*max_stream_duration_timer_, disableTimer());
-  max_stream_duration_timer_->invokeCallback();
-  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_max_duration_reached_.value());
-
-  EXPECT_CALL(conn_pool_, onClientDestroy());
-  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
-  dispatcher_.clearDeferredDeleteList();
 }
 
 /**

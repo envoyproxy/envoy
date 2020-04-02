@@ -74,6 +74,9 @@ UpstreamRequest::~UpstreamRequest() {
     // Allows for testing.
     per_try_timeout_->disableTimer();
   }
+  if (max_stream_duration_timer_ != nullptr) {
+    max_stream_duration_timer_->disableTimer();
+  }
   clearRequestEncoder();
 
   // If desired, fire the per-try histogram when the UpstreamRequest
@@ -361,7 +364,8 @@ void UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
   // only happens when decoding headers filters return ContinueAndEndStream.
   const bool delay_headers_end_stream = end_stream && !downstream_metadata_map_vector_.empty();
 
-  if (upstream_host_->cluster().maxStreamDuration().has_value()) {
+  const auto max_stream_duration = upstream_host_->cluster().maxStreamDuration();
+  if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
     max_stream_duration_timer_ = parent_.callbacks_->dispatcher().createTimer(
         [this]() -> void { onStreamMaxDurationReached(); });
     max_stream_duration_timer_->enableTimer(upstream_host_->cluster().maxStreamDuration().value());
