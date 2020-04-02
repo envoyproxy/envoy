@@ -66,7 +66,7 @@ static std::vector<Buffer::OwnedImpl> generateChunks(const uint64_t chunk_count,
   return vec;
 }
 
-static void compressWith(std::vector<Buffer::OwnedImpl> chunks, CompressionParams params,
+static void compressWith(const std::vector<Buffer::OwnedImpl>&& chunks, CompressionParams params,
                          NiceMock<Http::MockStreamDecoderFilterCallbacks>& decoder_callbacks) {
   Stats::IsolatedStoreImpl stats;
   testing::NiceMock<Runtime::MockLoader> runtime;
