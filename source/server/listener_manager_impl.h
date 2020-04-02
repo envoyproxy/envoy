@@ -64,7 +64,7 @@ public:
       Configuration::ListenerFactoryContext& context);
 
   static Network::ListenerFilterMatcherSharedPtr
-  createListenerFilterMatcher_(const envoy::config::listener::v3::ListenerFilter& listener_filter);
+  createListenerFilterMatcher(const envoy::config::listener::v3::ListenerFilter& listener_filter);
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) override {

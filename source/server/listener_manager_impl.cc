@@ -143,7 +143,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
     ret.push_back(factory.createListenerFilterFactoryFromProto(
-        *message, createListenerFilterMatcher_(proto_config), context));
+        *message, createListenerFilterMatcher(proto_config), context));
   }
   return ret;
 }
@@ -177,7 +177,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
   return ret;
 }
 
-Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createListenerFilterMatcher_(
+Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createListenerFilterMatcher(
     const envoy::config::listener::v3::ListenerFilter& listener_filter) {
   if (!listener_filter.has_filter_disabled()) {
     return nullptr;
