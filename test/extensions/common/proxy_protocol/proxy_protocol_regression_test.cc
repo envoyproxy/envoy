@@ -94,8 +94,10 @@ public:
 
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
-          filter_manager.addAcceptFilter(std::make_unique<ListenerFilters::ProxyProtocol::Filter>(
-              std::make_shared<ListenerFilters::ProxyProtocol::Config>(listenerScope())));
+          filter_manager.addAcceptFilter(
+              nullptr,
+              std::make_unique<ListenerFilters::ProxyProtocol::Filter>(
+                  std::make_shared<ListenerFilters::ProxyProtocol::Config>(listenerScope())));
           maybeExitDispatcher();
           return true;
         }));
