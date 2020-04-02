@@ -10,6 +10,7 @@
 
 #include "test/common/http/common.h"
 #include "test/common/http/http2/http2_frame.h"
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -157,7 +158,7 @@ public:
   const Http2SettingsTuple server_settings_;
   bool allow_metadata_ = false;
   bool stream_error_on_invalid_http_messaging_ = false;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   envoy::config::core::v3::Http2ProtocolOptions client_http2_options_;
   NiceMock<Network::MockConnection> client_connection_;
   MockConnectionCallbacks client_callbacks_;
@@ -262,6 +263,7 @@ protected:
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
   initialize();
+  EXPECT_EQ(absl::nullopt, request_encoder_->http1StreamEncoderOptions());
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);

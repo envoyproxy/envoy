@@ -114,9 +114,11 @@ public:
    * @param error_prefix supplies the prefix to use in error messages.
    * @param cluster_name supplies the cluster name to check.
    * @param cm supplies the cluster manager.
+   * @param allow_added_via_api indicates whether a cluster is allowed to be added via api
+   *                            rather than be a static resource from the bootstrap config.
    */
   static void checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
-                           Upstream::ClusterManager& cm);
+                           Upstream::ClusterManager& cm, bool allow_added_via_api = false);
 
   /**
    * Check cluster/local info for API config sanity. Throws on error.

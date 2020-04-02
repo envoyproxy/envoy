@@ -11,10 +11,16 @@ gRPC Statistics
 
 This is a filter which enables telemetry of gRPC calls. Additionally, the
 filter detects message boundaries in streaming gRPC calls and emits the message
-counts for both the request and the response. The filter emits statistics in
-the *cluster.<route target cluster>.grpc.* namespace.
+counts for both the request and the response. 
 
 More info: wire format in `gRPC over HTTP/2 <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_.
+
+The filter emits statistics in the *cluster.<route target cluster>.grpc.* namespace. Depending on the
+configuration, the stats may be prefixed with `<grpc service>.<grpc method>.`; the stats in the table below
+are shown in this form. See the documentation for
+:ref:`individual_method_stats_allowlist <envoy_api_field_config.filter.http.grpc_stats.v2alpha.FilterConfig.individual_method_stats_allowlist>`
+and :ref:`stats_for_all_methods <envoy_api_field_config.filter.http.grpc_stats.v2alpha.FilterConfig.stats_for_all_methods>`.
+
 
 .. csv-table::
   :header: Name, Type, Description

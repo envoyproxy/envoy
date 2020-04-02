@@ -111,6 +111,7 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientStreamTests, EnvoyQuicClientStreamTest,
                          testing::ValuesIn({true, false}));
 
 TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
+  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   quic_stream_->encodeHeaders(request_headers_, false);
   quic_stream_->encodeData(request_body_, true);
 

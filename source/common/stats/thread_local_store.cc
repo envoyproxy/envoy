@@ -669,7 +669,7 @@ const std::string ParentHistogramImpl::quantileSummary() const {
     const std::vector<double>& supported_quantiles_ref = interval_statistics_.supportedQuantiles();
     summary.reserve(supported_quantiles_ref.size());
     for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
-      summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
+      summary.push_back(fmt::format("P{:g}({},{})", 100 * supported_quantiles_ref[i],
                                     interval_statistics_.computedQuantiles()[i],
                                     cumulative_statistics_.computedQuantiles()[i]));
     }
@@ -685,7 +685,7 @@ const std::string ParentHistogramImpl::bucketSummary() const {
     const std::vector<double>& supported_buckets = interval_statistics_.supportedBuckets();
     bucket_summary.reserve(supported_buckets.size());
     for (size_t i = 0; i < supported_buckets.size(); ++i) {
-      bucket_summary.push_back(fmt::format("B{}({},{})", supported_buckets[i],
+      bucket_summary.push_back(fmt::format("B{:g}({},{})", supported_buckets[i],
                                            interval_statistics_.computedBuckets()[i],
                                            cumulative_statistics_.computedBuckets()[i]));
     }
