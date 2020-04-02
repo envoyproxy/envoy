@@ -110,8 +110,10 @@ static void compressWith(std::vector<Buffer::OwnedImpl>&& chunks, CompressionPar
     ++idx;
   }
 
-  EXPECT_EQ(total_uncompressed_bytes, stats.counterFromString("test.gzip.total_uncompressed_bytes").value());
-  EXPECT_EQ(total_compressed_bytes, stats.counterFromString("test.gzip.total_compressed_bytes").value());
+  EXPECT_EQ(total_uncompressed_bytes,
+            stats.counterFromString("test.gzip.total_uncompressed_bytes").value());
+  EXPECT_EQ(total_compressed_bytes,
+            stats.counterFromString("test.gzip.total_compressed_bytes").value());
   EXPECT_EQ(1U, stats.counterFromString("test.gzip.compressed").value());
 }
 
