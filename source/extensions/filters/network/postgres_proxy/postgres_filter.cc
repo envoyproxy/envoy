@@ -107,19 +107,19 @@ void PostgresFilter::incNotice(NoticeType type) {
 }
 
 void PostgresFilter::incError(ErrorType type) {
-  config_->stats_.messages_backend_error_.inc();
+  config_->stats_.errors_.inc();
   switch (type) {
   case DecoderCallbacks::ErrorType::Error:
-    config_->stats_.messages_backend_error_error_.inc();
+    config_->stats_.errors_error_.inc();
     break;
   case DecoderCallbacks::ErrorType::Fatal:
-    config_->stats_.messages_backend_error_fatal_.inc();
+    config_->stats_.errors_fatal_.inc();
     break;
   case DecoderCallbacks::ErrorType::Panic:
-    config_->stats_.messages_backend_error_panic_.inc();
+    config_->stats_.errors_panic_.inc();
     break;
   case DecoderCallbacks::ErrorType::Unknown:
-    config_->stats_.messages_backend_error_unknown_.inc();
+    config_->stats_.errors_unknown_.inc();
     break;
   }
 }
