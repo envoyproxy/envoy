@@ -595,8 +595,9 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
   if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
-     ('.counter(' in line or '.gauge(' in line or '.histogram(' in line or \
-      '->counter(' in line or '->gauge(' in line or '->histogram(' in line):
+     ('.counterFromString(' in line or '.gaugeFromString(' in line or \
+      '.histogramFromString(' in line or '->counterFromString(' in line or \
+      '->gaugeFromString(' in line or '->histogramFromString(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
   if re.search("envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}", line):
