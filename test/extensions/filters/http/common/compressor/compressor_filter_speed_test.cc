@@ -182,7 +182,7 @@ static std::vector<CompressionParams> compression_params = {
     {Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best,
      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 15, 9}};
 
-static void CompressChunks8192(benchmark::State& state) {
+static void compressChunks8192(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = compression_params[idx];
@@ -192,9 +192,9 @@ static void CompressChunks8192(benchmark::State& state) {
     compressWith(std::move(chunks), params, decoder_callbacks);
   }
 }
-BENCHMARK(CompressChunks8192)->DenseRange(0, 8, 1);
+BENCHMARK(compressChunks8192)->DenseRange(0, 8, 1);
 
-static void CompressChunks4096(benchmark::State& state) {
+static void compressChunks4096(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = compression_params[idx];
@@ -204,9 +204,9 @@ static void CompressChunks4096(benchmark::State& state) {
     compressWith(std::move(chunks), params, decoder_callbacks);
   }
 }
-BENCHMARK(CompressChunks4096)->DenseRange(0, 8, 1);
+BENCHMARK(compressChunks4096)->DenseRange(0, 8, 1);
 
-static void CompressChunks1024(benchmark::State& state) {
+static void compressChunks1024(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = compression_params[idx];
@@ -216,9 +216,9 @@ static void CompressChunks1024(benchmark::State& state) {
     compressWith(std::move(chunks), params, decoder_callbacks);
   }
 }
-BENCHMARK(CompressChunks1024)->DenseRange(0, 8, 1);
+BENCHMARK(compressChunks1024)->DenseRange(0, 8, 1);
 
-static void CompressFull(benchmark::State& state) {
+static void compressFull(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = compression_params[idx];
@@ -228,7 +228,7 @@ static void CompressFull(benchmark::State& state) {
     compressWith(std::move(chunks), params, decoder_callbacks);
   }
 }
-BENCHMARK(CompressFull)->DenseRange(0, 8, 1);
+BENCHMARK(compressFull)->DenseRange(0, 8, 1);
 
 } // namespace Compressors
 } // namespace Common
