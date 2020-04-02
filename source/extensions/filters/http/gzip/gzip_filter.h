@@ -31,7 +31,7 @@ public:
 
   uint64_t memoryLevel() const { return memory_level_; }
   uint64_t windowBits() const { return window_bits_; }
-  uint64_t chunkSize() const { return chunk_size_; }
+  uint32_t chunkSize() const { return chunk_size_; }
 
 private:
   static Compressor::ZlibCompressorImpl::CompressionLevel compressionLevelEnum(
@@ -51,7 +51,7 @@ private:
 
   const int32_t memory_level_;
   const int32_t window_bits_;
-  const uint64_t chunk_size_;
+  const uint32_t chunk_size_;
 };
 
 } // namespace Gzip
