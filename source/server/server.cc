@@ -122,7 +122,9 @@ InstanceImpl::~InstanceImpl() {
   // RdsRouteConfigSubscription is an Init::Target, ~RdsRouteConfigSubscription triggers a callback
   // set at initialization, which goes to unregister it from the top-level InitManager, which has
   // already been destructed (use-after-free) causing a segfault.
+  ENVOY_LOG(debug, "destroying listener manager");
   listener_manager_.reset();
+  ENVOY_LOG(debug, "destroyed listener manager");
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }

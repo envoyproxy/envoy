@@ -46,7 +46,7 @@ envoy_cc_test(
         "//source/common/config:runtime_utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/common/stats:stats_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/init:init_mocks",
