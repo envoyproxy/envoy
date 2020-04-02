@@ -78,13 +78,7 @@ public:
   void newStream() {
     if (!codec_) {
       codec_ = new NiceMock<MockServerConnection>();
-    } else {
-      // Use the same address for codec_. Otherwise, this codec_ is not used to dispatch from the
-      // HCM.
-      codec_->~MockServerConnection();
-      codec_ = new (codec_) NiceMock<MockServerConnection>();
     }
-
     decoder_filter_ = new NiceMock<MockStreamDecoderFilter>();
     encoder_filter_ = new NiceMock<MockStreamEncoderFilter>();
     EXPECT_CALL(filter_factory_, createFilterChain(_))
