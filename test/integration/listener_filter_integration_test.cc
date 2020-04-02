@@ -25,7 +25,7 @@ class ListenerFilterIntegrationTest : public testing::TestWithParam<Network::Add
                                       public BaseIntegrationTest {
 public:
   ListenerFilterIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::BASE_CONFIG + R"EOF(
+      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
     filter_chains:
       filters:
        -  name: envoy.filters.network.echo
@@ -51,7 +51,7 @@ filter_disabled:
 
   void initializeWithListenerFilter(absl::optional<bool> listener_filter_disabled = absl::nullopt) {
     config_helper_.renameListener("echo");
-    std::string tls_inspector_config = ConfigHelper::DEFAULT_TLS_INSPECTOR_LISTENER_FILTER;
+    std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
     if (listener_filter_disabled.has_value()) {
       tls_inspector_config = appendMatcher(tls_inspector_config, listener_filter_disabled.value());
     }
