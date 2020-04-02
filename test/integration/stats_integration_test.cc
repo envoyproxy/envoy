@@ -269,6 +269,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   //                                          clusters and hosts.
   // 2020/03/16  9964     44085       44600   http2: support custom SETTINGS parameters.
   // 2020/03/24  10501    44261       44600   upstream: upstream_rq_retry_limit_exceeded.
+  // 2020/04/02  10624    43356       44000   Use 100 clusters rather than 1000 to avoid timeouts
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -282,8 +283,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 44261);
-  EXPECT_MEMORY_LE(m_per_cluster, 44600);
+  EXPECT_MEMORY_EQ(m_per_cluster, 43356);
+  EXPECT_MEMORY_LE(m_per_cluster, 44000);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
@@ -325,6 +326,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   //                                          upgrading.
   // 2020/03/16  9964     36220       36800   http2: support custom SETTINGS parameters.
   // 2020/03/24  10501    36300       36800   upstream: upstream_rq_retry_limit_exceeded.
+  // 2020/04/02  10624    35564       36000   Use 100 clusters rather than 1000 to avoid timeouts
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -338,8 +340,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 36300);
-  EXPECT_MEMORY_LE(m_per_cluster, 36800);
+  EXPECT_MEMORY_EQ(m_per_cluster, 35564);
+  EXPECT_MEMORY_LE(m_per_cluster, 36000);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
@@ -370,6 +372,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // 2020/01/13  9663     1619         1655   api: deprecate hosts in Cluster.
   // 2020/02/13  10042    1363         1655   Metadata object are shared across different clusters
   //                                          and hosts.
+  // 2020/04/02  10624    1380         1655   Use 100 clusters rather than 1000 to avoid timeouts
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -379,7 +382,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_host, 1363);
+  EXPECT_MEMORY_EQ(m_per_host, 1380);
   EXPECT_MEMORY_LE(m_per_host, 1655);
 }
 
