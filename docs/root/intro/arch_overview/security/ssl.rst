@@ -163,7 +163,9 @@ Only a single TLS certificate is supported today for :ref:`UpstreamTlsContexts
 Secret discovery service (SDS)
 ------------------------------
 
-TLS certificates can be specified in the static resource or can be fetched remotely. Please see :ref:`SDS <config_secret_discovery_service>` for details.
+TLS certificates can be specified in the static resource or can be fetched remotely.
+Certificate rotation is supported for static resources by sourcing :ref:`SDS configuration from the filesystem <xds_certificate_rotation>` or by pushing updates from the SDS server.
+Please see :ref:`SDS <config_secret_discovery_service>` for details.
 
 .. _arch_overview_ssl_auth_filter:
 
