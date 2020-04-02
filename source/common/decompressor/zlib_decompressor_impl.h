@@ -13,9 +13,9 @@ namespace Decompressor {
 /**
  * Implementation of decompressor's interface.
  */
-class ZlibDecompressorImpl : public Decompressor,
-                             public Logger::Loggable<Logger::Id::decompression>,
-                             public Zlib::Base {
+class ZlibDecompressorImpl : public Zlib::Base,
+                             public Decompressor,
+                             public Logger::Loggable<Logger::Id::decompression> {
 public:
   ZlibDecompressorImpl();
 

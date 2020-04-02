@@ -12,7 +12,7 @@ namespace Compressor {
 /**
  * Implementation of compressor's interface.
  */
-class ZlibCompressorImpl : public Compressor, public Zlib::Base {
+class ZlibCompressorImpl : public Zlib::Base, public Compressor {
 public:
   ZlibCompressorImpl();
 
