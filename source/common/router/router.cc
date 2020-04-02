@@ -24,6 +24,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
@@ -76,7 +77,7 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
 
   // Don't allow serving TLS responses over plaintext.
   bool scheme_is_http = schemeIsHttp(downstream_headers, connection);
-  if (scheme_is_http && absolute_url.scheme() == Http::Headers::get().SchemeValues.Https) {
+  if (scheme_is_http && absolute_url.getScheme() == Http::Headers::get().SchemeValues.Https) {
     return false;
   }
 
@@ -104,9 +105,9 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
                    downstream_headers.Path()->value().getStringView()));
 
   // Replace the original host, scheme and path.
-  downstream_headers.setScheme(absolute_url.scheme());
-  downstream_headers.setHost(absolute_url.host_and_port());
-  downstream_headers.setPath(absolute_url.path_and_query_params());
+  downstream_headers.setScheme(absolute_url.getScheme());
+  downstream_headers.setHost(absolute_url.getHostAndPort());
+  downstream_headers.setPath(absolute_url.getPathAndQueryParams());
 
   return true;
 }

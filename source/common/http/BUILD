@@ -336,7 +336,6 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     external_deps = [
         "abseil_optional",
-        "googleurl",
         "nghttp2",
     ],
     deps = [
@@ -359,6 +358,19 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "url_utility_lib",
+    srcs = ["url_utility.cc"],
+    hdrs = ["url_utility.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
+    ] + select({
+        "//bazel:windows_x86_64": ["@com_github_nodejs_http_parser//:http_parser"],
+        "//conditions:default": ["@com_googlesource_googleurl//url:url"],
+    }),
 )
 
 envoy_cc_library(

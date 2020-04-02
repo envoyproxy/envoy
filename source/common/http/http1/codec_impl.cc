@@ -15,6 +15,7 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/header_formatter.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -717,9 +718,9 @@ void ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int me
   // request-target. A proxy that forwards such a request MUST generate a
   // new Host field-value based on the received request-target rather than
   // forward the received Host field-value.
-  headers.setHost(absolute_url.host_and_port());
+  headers.setHost(absolute_url.getHostAndPort());
 
-  headers.setPath(absolute_url.path_and_query_params());
+  headers.setPath(absolute_url.getPathAndQueryParams());
   active_request.request_url_.clear();
 }
 

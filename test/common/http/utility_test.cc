@@ -9,6 +9,7 @@
 #include "common/common/fmt.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 
@@ -1077,6 +1078,7 @@ TEST(Url, ParsingFails) {
   EXPECT_FALSE(url.initialize("foo"));
   EXPECT_FALSE(url.initialize("http://"));
   EXPECT_FALSE(url.initialize("random_scheme://host.com/path"));
+  EXPECT_FALSE(url.initialize("http://host.com:65536/path"));
 }
 
 void validateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
@@ -1084,10 +1086,10 @@ void validateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
                  uint64_t expected_port) {
   Utility::Url url;
   ASSERT_TRUE(url.initialize(raw_url)) << "Failed to initialize " << raw_url;
-  EXPECT_EQ(url.scheme(), expected_scheme);
-  EXPECT_EQ(url.host_and_port(), expected_host_port);
-  EXPECT_EQ(url.path_and_query_params(), expected_path);
-  EXPECT_EQ(url.port(), expected_port);
+  EXPECT_EQ(url.getScheme(), expected_scheme);
+  EXPECT_EQ(url.getHostAndPort(), expected_host_port);
+  EXPECT_EQ(url.getPathAndQueryParams(), expected_path);
+  EXPECT_EQ(url.getPort(), expected_port);
 }
 
 TEST(Url, ParsingTest) {

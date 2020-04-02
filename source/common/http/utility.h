@@ -18,7 +18,6 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
-#include "url/gurl.h"
 
 namespace Envoy {
 namespace Http2 {
@@ -95,25 +94,6 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 
 namespace Http {
 namespace Utility {
-
-/**
- * Given a fully qualified URL, splits the string_view provided into scheme,
- * host and path with query parameters components.
- */
-class Url {
-public:
-  bool initialize(absl::string_view absolute_url);
-  absl::string_view scheme() const { return scheme_; }
-  absl::string_view host_and_port() const { return host_and_port_; }
-  absl::string_view path_and_query_params() const { return path_and_query_params_; }
-  uint64_t port() const { return port_; }
-
-private:
-  std::string scheme_;
-  std::string host_and_port_;
-  std::string path_and_query_params_;
-  uint16_t port_{0};
-};
 
 class PercentEncoding {
 public:

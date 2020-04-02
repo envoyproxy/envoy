@@ -6,6 +6,7 @@
 #include "common/common/empty_string.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -36,7 +37,7 @@ absl::string_view hostAndPort(const Http::HeaderEntry* header) {
   Http::Utility::Url absolute_url;
   if (header != nullptr && !header->value().empty()) {
     if (absolute_url.initialize(header->value().getStringView())) {
-      return absolute_url.host_and_port();
+      return absolute_url.getHostAndPort();
     }
     return header->value().getStringView();
   }
