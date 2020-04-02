@@ -25,15 +25,15 @@ public:
                                            Histogram::Unit unit) override;
   void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
 
-  Counter& counter(const std::string& name) override {
+  Counter& counterFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return Scope::counterFromStatName(storage.statName());
   }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
     return Scope::gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
     return Scope::histogramFromStatName(storage.statName(), unit);
   }

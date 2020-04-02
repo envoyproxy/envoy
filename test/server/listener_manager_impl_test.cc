@@ -440,7 +440,7 @@ public:
 
 private:
   Network::FilterFactoryCb commonFilterFactory(Configuration::FactoryContext& context) {
-    context.scope().counter("bar").inc();
+    context.scope().counterFromString("bar").inc();
     return [](Network::FilterManager&) -> void {};
   }
 };
@@ -464,10 +464,10 @@ filter_chains:
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {false}));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
-  manager_->listeners().front().get().listenerScope().counter("foo").inc();
+  manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
 
-  EXPECT_EQ(1UL, server_.stats_store_.counter("bar").value());
-  EXPECT_EQ(1UL, server_.stats_store_.counter("listener.127.0.0.1_1234.foo").value());
+  EXPECT_EQ(1UL, server_.stats_store_.counterFromString("bar").value());
+  EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.127.0.0.1_1234.foo").value());
 }
 
 TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
@@ -1569,7 +1569,7 @@ filter_chains:
   EXPECT_CALL(*worker_, stopListener(_, _)).Times(1);
   EXPECT_CALL(*listener_factory_.socket_, close()).Times(1);
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
-  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
+  EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 
   // Validate that listener creation in outbound direction is allowed.
   const std::string listener_bar_outbound_yaml = R"EOF(
@@ -1641,7 +1641,7 @@ filter_chains:
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::All);
-  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
+  EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 
   // Validate that adding a listener is not allowed after all listeners are stopped.
   const std::string listener_bar_yaml = R"EOF(
@@ -1712,7 +1712,7 @@ filter_chains:
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
-  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
+  EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 }
 
 TEST_F(ListenerManagerImplTest, AddListenerFailure) {
@@ -1747,7 +1747,9 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
 
-  EXPECT_EQ(1UL, server_.stats_store_.counter("listener_manager.listener_create_failure").value());
+  EXPECT_EQ(
+      1UL,
+      server_.stats_store_.counterFromString("listener_manager.listener_create_failure").value());
 }
 
 TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
@@ -1761,9 +1763,9 @@ filter_chains:
   )EOF";
 
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
-  manager_->listeners().front().get().listenerScope().counter("foo").inc();
+  manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
 
-  EXPECT_EQ(1UL, server_.stats_store_.counter("listener.[__1]_10000.foo").value());
+  EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.[__1]_10000.foo").value());
 }
 
 TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
