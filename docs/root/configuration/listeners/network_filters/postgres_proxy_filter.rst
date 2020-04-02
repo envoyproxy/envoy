@@ -61,13 +61,14 @@ Every configured Postgres proxy filter has statistics rooted at postgres.<stat_p
   :header: Name, Type, Description
   :widths: 2, 1, 2
 
+  errors, Counter, Number of times the server replied with ERROR message
+  errors_error, Counter, Number of times the server replied with ERROR message with ERROR severity
+  errors_fatal, Counter, Number of times the server replied with ERROR message with FATAL severity
+  errors_panic, Counter, Number of times the server replied with ERROR message with PANIC severity
+  errors_unknown, Counter, Number of times the server replied with ERROR message but the decoder could not parse it
   messages_backend, Counter, Total number of backend messages detected by the filter
-  messages_backend_error, Counter, Number of times the server replied with ERROR message
-  messages_backend_error_error, Counter, Number of times the server replied with ERROR message with ERROR severity
-  messages_backend_error_fatal, Counter, Number of times the server replied with ERROR message with FATAL severity
-  messages_backend_error_panic, Counter, Number of times the server replied with ERROR message with PANIC severity
-  messages_backend_error_unknown, Counter, Number of times the server replied with ERROR message but the decoder could not parse it 
   messages_frontend, Counter, Number of frontend messages detected by the filter
+  messages_unknown, Counter, Number of times the filter successfully decoded a message but did not know what to do with it
   sessions, Counter, Total number of successful logins
   sessions_encrypted, Counter, Number of times the filter detected encrypted sessions
   sessions_unencrypted, Counter, Number of messages indicating unencrypted successful login
@@ -87,6 +88,5 @@ Every configured Postgres proxy filter has statistics rooted at postgres.<stat_p
   notices_debug, Counter, Number of NOTICE messages with DEBUG severity
   notices_info, Counter, Number of NOTICE messages with INFO severity
   notices_unknown, Counter, Number of NOTICE messages which could not be recognized
-  messages_unknown, Counter, Number of times the filter successfully decoded a message but did not know what to do with it
 
 
