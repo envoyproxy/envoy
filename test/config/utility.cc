@@ -829,8 +829,7 @@ void ConfigHelper::addNetworkFilter(const std::string& filter_yaml) {
 
 void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
   RELEASE_ASSERT(!finalized_, "");
-  auto* listener =
-      bootstrap_.mutable_static_resources()->mutable_listeners(0); 
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   auto* filter_list_back = listener->add_listener_filters();
   TestUtility::loadFromYaml(filter_yaml, *filter_list_back);
 
