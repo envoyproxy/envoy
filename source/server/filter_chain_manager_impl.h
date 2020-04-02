@@ -304,7 +304,7 @@ private:
 
   // Reference to the previous generation of filter chain manager to share the filter chains.
   // Caution: only during warm up could the optional have value.
-  absl::optional<const FilterChainManagerImpl*> origin_{};
+  absl::optional<const FilterChainManagerImpl*> origin_{nullptr};
 
   // For FilterChainFactoryContextCreator
   // init manager owned by the corresponding listener. The reference is valid when building the
