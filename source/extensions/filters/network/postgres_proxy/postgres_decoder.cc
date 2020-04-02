@@ -72,82 +72,82 @@ void DecoderImpl::initialize() {
 
   // Setup hash map for handling backend statements.
   BE_statements_["BEGIN"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatement(DecoderCallbacks::StatementType::Other);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Other);
     callbacks_->incTransactions();
     session_.setInTransaction(true);
   };
   BE_statements_["ROLLBACK"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatement(DecoderCallbacks::StatementType::Noop);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Noop);
     callbacks_->incTransactionsRollback();
     session_.setInTransaction(false);
   };
   BE_statements_["START"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatement(DecoderCallbacks::StatementType::Other);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Other);
     callbacks_->incTransactions();
     session_.setInTransaction(true);
   };
   BE_statements_["COMMIT"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatement(DecoderCallbacks::StatementType::Noop);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Noop);
     session_.setInTransaction(false);
     callbacks_->incTransactionsCommit();
   };
   BE_statements_["SELECT"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatement(DecoderCallbacks::StatementType::Select);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Select);
     callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
   };
   BE_statements_["INSERT"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatement(DecoderCallbacks::StatementType::Insert);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Insert);
     callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
   };
   BE_statements_["UPDATE"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatement(DecoderCallbacks::StatementType::Update);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Update);
     callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
   };
   BE_statements_["DELETE"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatement(DecoderCallbacks::StatementType::Delete);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Delete);
     callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
   };
 
   // Setup hash map for handling backend ErrorResponse messages.
   std::get<0>(BE_errors_)["ERROR"] = [this](DecoderImpl*) -> void {
-    callbacks_->incError(DecoderCallbacks::ErrorType::Error);
+    callbacks_->incErrors(DecoderCallbacks::ErrorType::Error);
   };
   std::get<0>(BE_errors_)["FATAL"] = [this](DecoderImpl*) -> void {
-    callbacks_->incError(DecoderCallbacks::ErrorType::Fatal);
+    callbacks_->incErrors(DecoderCallbacks::ErrorType::Fatal);
   };
   std::get<0>(BE_errors_)["PANIC"] = [this](DecoderImpl*) -> void {
-    callbacks_->incError(DecoderCallbacks::ErrorType::Panic);
+    callbacks_->incErrors(DecoderCallbacks::ErrorType::Panic);
   };
   // Setup handler which is called when decoder cannot decode the message and treats it as Unknown
   // Error message.
   std::get<1>(BE_errors_) = [this](DecoderImpl*) -> void {
-    callbacks_->incError(DecoderCallbacks::ErrorType::Unknown);
+    callbacks_->incErrors(DecoderCallbacks::ErrorType::Unknown);
   };
 
   // Setup hash map for handling backend NoticeResponse messages.
   std::get<0>(BE_notices_)["WARNING"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Warning);
+    callbacks_->incNotices(DecoderCallbacks::NoticeType::Warning);
   };
   std::get<0>(BE_notices_)["NOTICE"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Notice);
+    callbacks_->incNotices(DecoderCallbacks::NoticeType::Notice);
   };
   std::get<0>(BE_notices_)["DEBUG"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Debug);
+    callbacks_->incNotices(DecoderCallbacks::NoticeType::Debug);
   };
   std::get<0>(BE_notices_)["INFO"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Info);
+    callbacks_->incNotices(DecoderCallbacks::NoticeType::Info);
   };
   std::get<0>(BE_notices_)["LOG"] = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Log);
+    callbacks_->incNotices(DecoderCallbacks::NoticeType::Log);
   };
   // Setup handler which is called when decoder cannot decode the message and treats it as Unknown
   // Notice message.
   std::get<1>(BE_notices_) = [this](DecoderImpl*) -> void {
-    callbacks_->incNotice(DecoderCallbacks::NoticeType::Unknown);
+    callbacks_->incNotices(DecoderCallbacks::NoticeType::Unknown);
   };
 }
 
@@ -267,7 +267,7 @@ void DecoderImpl::decodeBackendStatements() {
   if (it != BE_statements_.end()) {
     (*it).second(this);
   } else {
-    callbacks_->incStatement(DecoderCallbacks::StatementType::Other);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Other);
     callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
   }

@@ -15,12 +15,12 @@ public:
   MOCK_METHOD(void, incMessagesUnknown, (), (override));
   MOCK_METHOD(void, incSessionsEncrypted, (), (override));
   MOCK_METHOD(void, incSessionsUnencrypted, (), (override));
-  MOCK_METHOD(void, incStatement, (StatementType), (override));
+  MOCK_METHOD(void, incStatements, (StatementType), (override));
   MOCK_METHOD(void, incTransactions, (), (override));
   MOCK_METHOD(void, incTransactionsCommit, (), (override));
   MOCK_METHOD(void, incTransactionsRollback, (), (override));
-  MOCK_METHOD(void, incNotice, (NoticeType), (override));
-  MOCK_METHOD(void, incError, (ErrorType), (override));
+  MOCK_METHOD(void, incNotices, (NoticeType), (override));
+  MOCK_METHOD(void, incErrors, (ErrorType), (override));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -182,7 +182,7 @@ TEST_F(PostgresProxyDecoderTest, Unknown) {
   decoder_->onData(data_, true);
 }
 
-// Test if each frontend command calls incMessagesFrontend method
+// Test if each frontend command calls incMessagesFrontend() method
 TEST_P(PostgresProxyFrontendDecoderTest, FrontendInc) {
   EXPECT_CALL(callbacks_, incMessagesFrontend()).Times(1);
   data_.add(GetParam());
@@ -217,7 +217,7 @@ TEST_F(PostgresProxyFrontendDecoderTest, TerminateMessage) {
   ASSERT_FALSE(decoder_->getSession().inTransaction());
 }
 
-// Test if each backend command calls incMessagesBackend method
+// Test if each backend command calls incMessagesBackend()) method
 TEST_P(PostgresProxyBackendDecoderTest, BackendInc) {
   EXPECT_CALL(callbacks_, incMessagesBackend()).Times(1);
   data_.add(GetParam());
@@ -258,7 +258,7 @@ TEST_F(PostgresProxyBackendDecoderTest, ParseStatement) {
 
   // Partial message should be ignored
   EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
-  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Other));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   payload_ = "ROLL";
   data_.add("C");
   length_ = htonl(4 + payload_.length());
@@ -269,7 +269,7 @@ TEST_F(PostgresProxyBackendDecoderTest, ParseStatement) {
 
   // Keyword without a space  should be ignored
   EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
-  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Other));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   payload_ = "ROLLBACK123";
   data_.add("C");
   length_ = htonl(4 + payload_.length());
@@ -283,7 +283,7 @@ TEST_F(PostgresProxyBackendDecoderTest, ParseStatement) {
 // trigger proper stats updates.
 TEST_F(PostgresProxyDecoderTest, Backend) {
   // C message
-  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Other));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   payload_ = "BEGIN 123";
   data_.add("C");
   length_ = htonl(4 + payload_.length());
@@ -293,7 +293,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   data_.drain(data_.length());
   ASSERT_TRUE(decoder_->getSession().inTransaction());
 
-  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Other));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   payload_ = "START TR";
   data_.add("C");
   length_ = htonl(4 + payload_.length());
@@ -302,7 +302,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Noop));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Noop));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload_ = "COMMIT";
   data_.add("C");
@@ -312,7 +312,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Noop));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Noop));
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   payload_ = "ROLLBACK";
   data_.add("C");
@@ -322,7 +322,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Insert));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Insert));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload_ = "INSERT 1";
   data_.add("C");
@@ -332,7 +332,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Update));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Update));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload_ = "UPDATE 1i23";
   data_.add("C");
@@ -342,7 +342,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatement(DecoderCallbacks::StatementType::Delete));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Delete));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   payload_ = "DELETE 88";
   data_.add("C");
@@ -386,7 +386,7 @@ TEST_F(PostgresProxyBackendDecoderTest, AuthenticationMsg) {
 // Test check parsing of E message. The message
 // indicates error.
 TEST_P(PostgresProxyErrorTest, ParseErrorMsgs) {
-  EXPECT_CALL(callbacks_, incError(std::get<1>(GetParam())));
+  EXPECT_CALL(callbacks_, incErrors(std::get<1>(GetParam())));
   payload_ = std::get<0>(GetParam());
   data_.add("E");
   length_ = htonl(4 + payload_.length());
@@ -419,7 +419,7 @@ INSTANTIATE_TEST_SUITE_P(
 // and carries additional information about the
 // purpose of the message.
 TEST_P(PostgresProxyNoticeTest, ParseNoticeMsgs) {
-  EXPECT_CALL(callbacks_, incNotice(std::get<1>(GetParam())));
+  EXPECT_CALL(callbacks_, incNotices(std::get<1>(GetParam())));
   payload_ = std::get<0>(GetParam());
   data_.add("N");
   length_ = htonl(4 + payload_.length());
@@ -462,6 +462,7 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   // Now when decoder detected encrypted traffic is should not
   // react to any messages (even not encrypted ones)
   EXPECT_CALL(callbacks_, incMessagesFrontend()).Times(0);
+
   data_.add("P");
   length_ = htonl(50);
   data_.add(&length_, sizeof(length_));

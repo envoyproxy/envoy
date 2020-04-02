@@ -90,17 +90,17 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
 
   // PostgresProxy::DecoderCallback
+  void incErrors(ErrorType) override;
   void incMessagesBackend() override;
   void incMessagesFrontend() override;
   void incMessagesUnknown() override;
+  void incNotices(NoticeType) override;
   void incSessionsEncrypted() override;
   void incSessionsUnencrypted() override;
-  void incStatement(StatementType) override;
+  void incStatements(StatementType) override;
   void incTransactions() override;
   void incTransactionsCommit() override;
   void incTransactionsRollback() override;
-  void incNotice(NoticeType) override;
-  void incError(ErrorType) override;
 
   void doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);

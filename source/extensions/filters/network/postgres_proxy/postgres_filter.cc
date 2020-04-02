@@ -93,7 +93,7 @@ void PostgresFilter::incTransactionsRollback() {
   }
 }
 
-void PostgresFilter::incNotice(NoticeType type) {
+void PostgresFilter::incNotices(NoticeType type) {
   config_->stats_.notices_.inc();
   switch (type) {
   case DecoderCallbacks::NoticeType::Warning:
@@ -117,7 +117,7 @@ void PostgresFilter::incNotice(NoticeType type) {
   }
 }
 
-void PostgresFilter::incError(ErrorType type) {
+void PostgresFilter::incErrors(ErrorType type) {
   config_->stats_.errors_.inc();
   switch (type) {
   case DecoderCallbacks::ErrorType::Error:
@@ -135,7 +135,7 @@ void PostgresFilter::incError(ErrorType type) {
   }
 }
 
-void PostgresFilter::incStatement(StatementType type) {
+void PostgresFilter::incStatements(StatementType type) {
   config_->stats_.statements_.inc();
 
   switch (type) {
