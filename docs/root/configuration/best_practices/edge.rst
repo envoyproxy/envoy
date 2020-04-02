@@ -11,18 +11,18 @@ TCP proxies should configure:
 
 * restrict access to the admin endpoint,
 * :ref:`overload_manager <config_overload_manager>`,
-* :ref:`listener buffer limits <envoy_api_field_Listener.per_connection_buffer_limit_bytes>` to 32 KiB,
-* :ref:`cluster buffer limits <envoy_api_field_Cluster.per_connection_buffer_limit_bytes>` to 32 KiB.
+* :ref:`listener buffer limits <envoy_api_field_config.listener.v3.Listener.per_connection_buffer_limit_bytes>` to 32 KiB,
+* :ref:`cluster buffer limits <envoy_api_field_config.cluster.v3.Cluster.per_connection_buffer_limit_bytes>` to 32 KiB.
 
 HTTP proxies should additionally configure:
 
-* :ref:`use_remote_address <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>`
+* :ref:`use_remote_address <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
   to true (to avoid consuming HTTP headers from external clients, see :ref:`HTTP header sanitizing <config_http_conn_man_header_sanitizing>`
   for details),
 * :ref:`connection and stream timeouts <faq_configuration_timeouts>`,
-* :ref:`HTTP/2 maximum concurrent streams limit <envoy_api_field_core.Http2ProtocolOptions.max_concurrent_streams>` to 100,
-* :ref:`HTTP/2 initial stream window size limit <envoy_api_field_core.Http2ProtocolOptions.initial_stream_window_size>` to 64 KiB,
-* :ref:`HTTP/2 initial connection window size limit <envoy_api_field_core.Http2ProtocolOptions.initial_connection_window_size>` to 1 MiB.
+* :ref:`HTTP/2 maximum concurrent streams limit <envoy_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>` to 100,
+* :ref:`HTTP/2 initial stream window size limit <envoy_api_field_config.core.v3.Http2ProtocolOptions.initial_stream_window_size>` to 64 KiB,
+* :ref:`HTTP/2 initial connection window size limit <envoy_api_field_config.core.v3.Http2ProtocolOptions.initial_connection_window_size>` to 1 MiB.
 
 The following is a YAML example of the above recommendation.
 
@@ -78,7 +78,7 @@ The following is a YAML example of the above recommendation.
         filters:
         - name: envoy.filters.network.http_connection_manager
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
             stat_prefix: ingress_http
             use_remote_address: true
             common_http_protocol_options:
