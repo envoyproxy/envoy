@@ -54,7 +54,7 @@ public:
                                      Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(
-          std::make_shared<HeaderToFilterStateFilter>("jwt-selector", "jwt-selector"));
+          std::make_shared<HeaderToFilterStateFilter>("jwt_selector", "jwt_selector"));
     };
   }
 };
@@ -232,7 +232,7 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
       audiences:
       - example_service
   filter_state_rules:
-    name: jwt-selector
+    name: jwt_selector
     requires:
       example_provider:
         provider_name: example_provider
@@ -261,7 +261,7 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
       {
           // selector header, but not token header
           {
-              {"jwt-selector", "example_provider"},
+              {"jwt_selector", "example_provider"},
           },
           "401",
       },
@@ -270,7 +270,7 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
       {
           // selector header, and token header
           {
-              {"jwt-selector", "example_provider"},
+              {"jwt_selector", "example_provider"},
               {"Authorization", "Bearer " + std::string(GoodToken)},
           },
           "200",

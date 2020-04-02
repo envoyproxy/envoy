@@ -16,9 +16,9 @@ void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeader
 
 } // namespace
 
-const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response-size-bytes";
-const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect-request-size-bytes";
-const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset-after-request";
+const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
+const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect_request_size_bytes";
+const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
 
 AutonomousStream::AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                                    AutonomousUpstream& upstream, bool allow_incomplete_streams)

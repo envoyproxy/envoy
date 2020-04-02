@@ -58,11 +58,11 @@ void setDoNotValidateRouteConfig(
 class DownstreamProtocolIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
   template <class T> void changeHeadersForStopAllTests(T& headers, bool set_buffer_limit) {
-    headers.addCopy("content-size", std::to_string(count_ * size_));
-    headers.addCopy("added-size", std::to_string(added_decoded_data_size_));
-    headers.addCopy("is-first-trigger", "value");
+    headers.addCopy("content_size", std::to_string(count_ * size_));
+    headers.addCopy("added_size", std::to_string(added_decoded_data_size_));
+    headers.addCopy("is_first_trigger", "value");
     if (set_buffer_limit) {
-      headers.addCopy("buffer-limit", std::to_string(buffer_limit_));
+      headers.addCopy("buffer_limit", std::to_string(buffer_limit_));
     }
   }
 

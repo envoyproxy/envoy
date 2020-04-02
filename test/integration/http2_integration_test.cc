@@ -681,7 +681,7 @@ void Http2MetadataIntegrationTest::testRequestMetadataWithStopAllFilter() {
 
   // Sends multiple metadata.
   const size_t size = 10;
-  default_request_headers_.addCopy("content-size", std::to_string(size));
+  default_request_headers_.addCopy("content_size", std::to_string(size));
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
@@ -737,9 +737,9 @@ name: encode-headers-return-stop-all-filter
   const int size = 1000;
   const int added_decoded_data_size = 1;
 
-  default_response_headers_.addCopy("content-size", std::to_string(count * size));
-  default_response_headers_.addCopy("added-size", std::to_string(added_decoded_data_size));
-  default_response_headers_.addCopy("is-first-trigger", "value");
+  default_response_headers_.addCopy("content_size", std::to_string(count * size));
+  default_response_headers_.addCopy("added_size", std::to_string(added_decoded_data_size));
+  default_response_headers_.addCopy("is_first_trigger", "value");
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   for (int i = 0; i < count - 1; i++) {

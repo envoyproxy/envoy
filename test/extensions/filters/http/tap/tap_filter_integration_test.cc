@@ -136,13 +136,13 @@ public:
   const Http::TestRequestHeaderMapImpl request_headers_no_tap_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 
-  const Http::TestRequestTrailerMapImpl request_trailers_{{"foo-trailer", "bar"}};
+  const Http::TestRequestTrailerMapImpl request_trailers_{{"foo_trailer", "bar"}};
 
   const Http::TestResponseHeaderMapImpl response_headers_tap_{{":status", "200"}, {"bar", "baz"}};
 
   const Http::TestResponseHeaderMapImpl response_headers_no_tap_{{":status", "200"}};
 
-  const Http::TestResponseTrailerMapImpl response_trailers_{{"bar-trailer", "baz"}};
+  const Http::TestResponseTrailerMapImpl response_trailers_{{"bar_trailer", "baz"}};
 
   const std::string admin_filter_config_ =
       R"EOF(
@@ -323,11 +323,11 @@ tap_config:
       rules:
         - http_request_trailers_match:
             headers:
-              - name: foo-trailer
+              - name: foo_trailer
                 exact_match: bar
         - http_response_trailers_match:
             headers:
-              - name: bar-trailer
+              - name: bar_trailer
                 exact_match: baz
   output_config:
     sinks:
@@ -344,9 +344,9 @@ tap_config:
   admin_response_->waitForBodyData(1);
   TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("bar",
-            findHeader("foo-trailer", trace.http_buffered_trace().request().trailers())->value());
+            findHeader("foo_trailer", trace.http_buffered_trace().request().trailers())->value());
   EXPECT_EQ("baz",
-            findHeader("bar-trailer", trace.http_buffered_trace().response().trailers())->value());
+            findHeader("bar_trailer", trace.http_buffered_trace().response().trailers())->value());
 
   admin_client_->close();
 }
