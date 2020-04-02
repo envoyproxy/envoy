@@ -50,9 +50,20 @@ DecoderPtr PostgresFilter::createDecoder(DecoderCallbacks* callbacks) {
   return std::make_unique<DecoderImpl>(callbacks);
 }
 
-void PostgresFilter::incBackend() { config_->stats_.messages_backend_.inc(); }
+void PostgresFilter::incMessagesBackend() {
+  config_->stats_.messages_.inc();
+  config_->stats_.messages_backend_.inc();
+}
 
-void PostgresFilter::incFrontend() { config_->stats_.messages_frontend_.inc(); }
+void PostgresFilter::incMessagesFrontend() {
+  config_->stats_.messages_.inc();
+  config_->stats_.messages_frontend_.inc();
+}
+
+void PostgresFilter::incMessagesUnknown() {
+  config_->stats_.messages_.inc();
+  config_->stats_.messages_unknown_.inc();
+}
 
 void PostgresFilter::incSessionsEncrypted() {
   config_->stats_.sessions_.inc();
@@ -147,8 +158,6 @@ void PostgresFilter::incStatement(StatementType type) {
     break;
   }
 }
-
-void PostgresFilter::incUnknown() { config_->stats_.messages_unknown_.inc(); }
 
 void PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {
   // Keep processing data until buffer is empty or decoder says

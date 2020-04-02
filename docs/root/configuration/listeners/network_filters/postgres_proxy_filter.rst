@@ -66,6 +66,7 @@ Every configured Postgres proxy filter has statistics rooted at postgres.<stat_p
   errors_fatal, Counter, Number of times the server replied with ERROR message with FATAL severity
   errors_panic, Counter, Number of times the server replied with ERROR message with PANIC severity
   errors_unknown, Counter, Number of times the server replied with ERROR message but the decoder could not parse it
+  messages, Counter, Total number of messages processed by the filter
   messages_backend, Counter, Total number of backend messages detected by the filter
   messages_frontend, Counter, Number of frontend messages detected by the filter
   messages_unknown, Counter, Number of times the filter successfully decoded a message but did not know what to do with it

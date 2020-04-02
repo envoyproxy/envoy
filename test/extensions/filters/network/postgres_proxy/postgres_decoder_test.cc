@@ -10,15 +10,15 @@ namespace PostgresProxy {
 
 class DecoderCallbacksMock : public DecoderCallbacks {
 public:
-  MOCK_METHOD(void, incBackend, (), (override));
-  MOCK_METHOD(void, incFrontend, (), (override));
+  MOCK_METHOD(void, incMessagesBackend, (), (override));
+  MOCK_METHOD(void, incMessagesFrontend, (), (override));
+  MOCK_METHOD(void, incMessagesUnknown, (), (override));
   MOCK_METHOD(void, incSessionsEncrypted, (), (override));
   MOCK_METHOD(void, incSessionsUnencrypted, (), (override));
   MOCK_METHOD(void, incStatement, (StatementType), (override));
   MOCK_METHOD(void, incTransactions, (), (override));
   MOCK_METHOD(void, incTransactionsCommit, (), (override));
   MOCK_METHOD(void, incTransactionsRollback, (), (override));
-  MOCK_METHOD(void, incUnknown, (), (override));
   MOCK_METHOD(void, incNotice, (NoticeType), (override));
   MOCK_METHOD(void, incError, (ErrorType), (override));
 };
@@ -174,7 +174,7 @@ TEST_F(PostgresProxyDecoderTest, TwoMessagesInOneBuffer) {
 TEST_F(PostgresProxyDecoderTest, Unknown) {
   // Create invalid message. The first byte is invalid "="
   // Message must be at least 5 bytes to be parsed.
-  EXPECT_CALL(callbacks_, incUnknown()).Times(1);
+  EXPECT_CALL(callbacks_, incMessagesUnknown()).Times(1);
   data_.add("=");
   length_ = htonl(50);
   data_.add(&length_, sizeof(length_));
@@ -182,9 +182,9 @@ TEST_F(PostgresProxyDecoderTest, Unknown) {
   decoder_->onData(data_, true);
 }
 
-// Test if each frontend command calls incFrontend method
+// Test if each frontend command calls incMessagesFrontend method
 TEST_P(PostgresProxyFrontendDecoderTest, FrontendInc) {
-  EXPECT_CALL(callbacks_, incFrontend()).Times(1);
+  EXPECT_CALL(callbacks_, incMessagesFrontend()).Times(1);
   data_.add(GetParam());
   length_ = htonl(50);
   data_.add(&length_, sizeof(length_));
@@ -217,9 +217,9 @@ TEST_F(PostgresProxyFrontendDecoderTest, TerminateMessage) {
   ASSERT_FALSE(decoder_->getSession().inTransaction());
 }
 
-// Test if each backend command calls incBackend method
+// Test if each backend command calls incMessagesBackend method
 TEST_P(PostgresProxyBackendDecoderTest, BackendInc) {
-  EXPECT_CALL(callbacks_, incBackend()).Times(1);
+  EXPECT_CALL(callbacks_, incMessagesBackend()).Times(1);
   data_.add(GetParam());
   length_ = htonl(50);
   data_.add(&length_, sizeof(length_));
@@ -461,7 +461,7 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
 
   // Now when decoder detected encrypted traffic is should not
   // react to any messages (even not encrypted ones)
-  EXPECT_CALL(callbacks_, incFrontend()).Times(0);
+  EXPECT_CALL(callbacks_, incMessagesFrontend()).Times(0);
   data_.add("P");
   length_ = htonl(50);
   data_.add(&length_, sizeof(length_));
