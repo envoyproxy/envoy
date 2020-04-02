@@ -254,12 +254,13 @@ def Sync(api_root, mode, labels, shadow):
   with tempfile.TemporaryDirectory() as tmp:
     dst_dir = pathlib.Path(tmp).joinpath("b")
     for label in labels:
-      pkg_deps += SyncProtoFile(mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'),
+      pkg_deps += SyncProtoFile(mode, utils.BazelBinPathForOutputArtifact(label, '.active.proto'),
                                 dst_dir)
       pkg_deps += SyncProtoFile(
           mode,
           utils.BazelBinPathForOutputArtifact(
-              label, '.v3.envoy_internal.proto' if shadow else '.v3.proto'), dst_dir)
+              label, '.next_major_version_candidate.envoy_internal.proto'
+              if shadow else '.next_major_version_candidate.proto'), dst_dir)
     SyncBuildFiles(mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")

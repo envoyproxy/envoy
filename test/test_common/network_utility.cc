@@ -191,24 +191,23 @@ const Network::FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets()
 
 namespace {
 struct SyncPacketProcessor : public Network::UdpPacketProcessor {
-  SyncPacketProcessor(Network::UdpRecvData& data) : data_(data) { ASSERT(data.buffer_ == nullptr); }
+  SyncPacketProcessor(std::list<Network::UdpRecvData>& data) : data_(data) {}
 
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time) override {
-    data_.addresses_.local_ = std::move(local_address);
-    data_.addresses_.peer_ = std::move(peer_address);
-    data_.buffer_ = std::move(buffer);
-    data_.receive_time_ = receive_time;
+    Network::UdpRecvData datagram{
+        {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
+    data_.push_back(std::move(datagram));
   }
   uint64_t maxPacketSize() const override { return Network::MAX_UDP_PACKET_SIZE; }
 
-  Network::UdpRecvData& data_;
+  std::list<Network::UdpRecvData>& data_;
 };
 } // namespace
 
 Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                                       UdpRecvData& data) {
+                                       std::list<UdpRecvData>& data) {
   SyncPacketProcessor processor(data);
   return Network::Utility::readFromSocket(handle, local_address, processor,
                                           MonotonicTime(std::chrono::seconds(0)), nullptr);
@@ -229,10 +228,13 @@ void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Insta
 }
 
 void UdpSyncPeer::recv(Network::UdpRecvData& datagram) {
-  datagram = Network::UdpRecvData();
-  const auto rc =
-      Network::Test::readFromSocket(socket_->ioHandle(), *socket_->localAddress(), datagram);
-  ASSERT_TRUE(rc.ok());
+  if (received_datagrams_.empty()) {
+    const auto rc = Network::Test::readFromSocket(socket_->ioHandle(), *socket_->localAddress(),
+                                                  received_datagrams_);
+    ASSERT_TRUE(rc.ok());
+  }
+  datagram = std::move(received_datagrams_.front());
+  received_datagrams_.pop_front();
 }
 
 } // namespace Test

@@ -1249,11 +1249,96 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceRegexPatternCheck) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
+// This test verifies that when a hostname is set in the endpoint's HealthCheckConfig, it is used in
+// the health check request.
+TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHost) {
+  const std::string host = "www.envoyproxy.io";
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
+  health_check_config.set_hostname(host);
+  auto test_host = std::make_shared<HostImpl>(
+      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      envoy::config::core::v3::Locality(), health_check_config, 0,
+      envoy::config::core::v3::UNKNOWN);
+  const std::string path = "/healthcheck";
+  setupServiceValidationHC();
+  // Requires non-empty `service_name` in config.
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+        EXPECT_EQ(headers.Host()->value().getStringView(), host);
+        EXPECT_EQ(headers.Path()->value().getStringView(), path);
+      }));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  respond(0, "200", false, false, true, false, health_checked_cluster);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+// This test verifies that when a hostname is set in the endpoint's HealthCheckConfig and in the
+// cluster level configuration, the one in the endpoint takes priority.
+TEST_F(HttpHealthCheckerImplTest,
+       SuccessServiceCheckWithCustomHostValueOnTheHostThatOverridesConfigValue) {
+  const std::string host = "www.envoyproxy.io";
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
+  health_check_config.set_hostname(host);
+  auto test_host = std::make_shared<HostImpl>(
+      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      envoy::config::core::v3::Locality(), health_check_config, 0,
+      envoy::config::core::v3::UNKNOWN);
+  const std::string path = "/healthcheck";
+  // Setup health check config with a different host, to check that we still get the host configured
+  // on the endpoint.
+  setupServiceValidationWithCustomHostValueHC("foo.com");
+  // Requires non-empty `service_name` in config.
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+        EXPECT_EQ(headers.Host()->value().getStringView(), host);
+        EXPECT_EQ(headers.Path()->value().getStringView(), path);
+      }));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  respond(0, "200", false, false, true, false, health_checked_cluster);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
   const std::string host = "www.envoyproxy.io";
   const std::string path = "/healthcheck";
   setupServiceValidationWithCustomHostValueHC(host);
-  // requires non-empty `service_name` in config.
+  // Requires non-empty `service_name` in config.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
@@ -1310,7 +1395,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   const std::string value_downstream_local_address_without_port = "127.0.0.1";
 
   setupServiceValidationWithAdditionalHeaders();
-  // requires non-empty `service_name` in config.
+  // Requires non-empty `service_name` in config.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
@@ -1371,7 +1456,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
 
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithoutUserAgent) {
   setupServiceValidationWithoutUserAgent();
-  // requires non-empty `service_name` in config.
+  // Requires non-empty `service_name` in config.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
@@ -3667,6 +3752,11 @@ public:
 
     cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
         makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+    runHealthCheck(expected_host);
+  }
+
+  void runHealthCheck(std::string expected_host) {
+
     cluster_->info_->stats().upstream_cx_total_.inc();
 
     expectSessionCreate();
@@ -3728,6 +3818,36 @@ class GrpcHealthCheckerImplTest : public testing::Test, public GrpcHealthChecker
 
 // Test single host check success.
 TEST_F(GrpcHealthCheckerImplTest, Success) { testSingleHostSuccess(absl::nullopt); }
+
+TEST_F(GrpcHealthCheckerImplTest, SuccessWithHostname) {
+  std::string expected_host = "www.envoyproxy.io";
+
+  setupServiceNameHC(absl::nullopt);
+
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
+  health_check_config.set_hostname(expected_host);
+  auto test_host = std::make_shared<HostImpl>(
+      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      envoy::config::core::v3::Locality(), health_check_config, 0,
+      envoy::config::core::v3::UNKNOWN);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
+  runHealthCheck(expected_host);
+}
+
+TEST_F(GrpcHealthCheckerImplTest, SuccessWithHostnameOverridesConfig) {
+  std::string expected_host = "www.envoyproxy.io";
+
+  setupServiceNameHC("foo.com");
+
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
+  health_check_config.set_hostname(expected_host);
+  auto test_host = std::make_shared<HostImpl>(
+      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      envoy::config::core::v3::Locality(), health_check_config, 0,
+      envoy::config::core::v3::UNKNOWN);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
+  runHealthCheck(expected_host);
+}
 
 // Test single host check success with custom authority.
 TEST_F(GrpcHealthCheckerImplTest, SuccessWithCustomAuthority) {
