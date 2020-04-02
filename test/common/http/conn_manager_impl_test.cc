@@ -4138,6 +4138,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol(Envoy::Http::Protocol::Http11));
   conn_manager_->onData(fake_input, false);
 }
 
@@ -4613,6 +4614,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol(Envoy::Http::Protocol::Http11));
   conn_manager_->onData(fake_input, false);
 
   Buffer::OwnedImpl decoded_data_to_forward;
@@ -4791,6 +4793,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol(Envoy::Http::Protocol::Http11));
   conn_manager_->onData(fake_input, false);
 
   // Mimic a decoder filter that trapped data and now sends it on, since the data was buffered
