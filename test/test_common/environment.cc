@@ -251,8 +251,9 @@ std::string TestEnvironment::substitute(const std::string& str,
   const std::unordered_map<std::string, std::string> path_map = {
       {"test_tmpdir", TestEnvironment::temporaryDirectory()},
       {"test_udsdir", TestEnvironment::unixDomainSocketDirectory()},
-      {"test_rundir", TestEnvironment::runfilesDirectory()},
+      {"test_rundir", runfiles_ != nullptr ? TestEnvironment::runfilesDirectory() : "invalid"},
   };
+
   std::string out_json_string = str;
   for (const auto& it : path_map) {
     const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
