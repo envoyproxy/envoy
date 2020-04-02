@@ -144,6 +144,8 @@ message ConfigSource {
     option (validate.required) = true;
 
     // Path on the filesystem to source and watch for configuration updates.
+    // When sourcing configuration for :ref:`secret <envoy_api_msg_extensions.transport_sockets.tls.v3.Secret>`,
+    // the certificate and key files are also watched for updates.
     //
     // .. note::
     //
