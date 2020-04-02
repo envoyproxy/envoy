@@ -111,6 +111,7 @@ MockStreamInfo::MockStreamInfo()
 
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
+  ON_CALL(*this, mutableFilterState()).WillByDefault(ReturnRef(filter_state_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
   ON_CALL(Const(*this), filterState()).WillByDefault(ReturnRef(*filter_state_));
   ON_CALL(*this, upstreamFilterState()).WillByDefault(ReturnRef(upstream_filter_state_));

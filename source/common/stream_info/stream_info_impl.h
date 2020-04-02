@@ -22,17 +22,21 @@ struct StreamInfoImpl : public StreamInfo {
         start_time_monotonic_(time_source.monotonicTime()),
         filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
+  StreamInfoImpl(TimeSource& time_source, FilterState::LifeSpan life_span)
+      : time_source_(time_source), start_time_(time_source.systemTime()),
+        start_time_monotonic_(time_source.monotonicTime()),
+        filter_state_(std::make_shared<FilterStateImpl>(life_span)) {}
+
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
         filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
-  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
-                 std::shared_ptr<FilterState>& parent_filter_state)
+  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source, StreamInfo& parent)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
         filter_state_(std::make_shared<FilterStateImpl>(
-            FilterStateImpl::LazyCreateAncestor(parent_filter_state,
+            FilterStateImpl::LazyCreateAncestor(parent.mutableFilterState(),
                                                 FilterState::LifeSpan::DownstreamConnection),
             FilterState::LifeSpan::FilterChain)) {}
 
@@ -217,6 +221,7 @@ struct StreamInfoImpl : public StreamInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
+  FilterStateSharedPtr& mutableFilterState() override { return filter_state_; }
   const FilterStateSharedPtr& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return *filter_state_; }
 
