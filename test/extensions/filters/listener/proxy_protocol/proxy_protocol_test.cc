@@ -110,7 +110,7 @@ public:
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
-              std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
+              nullptr, std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
           maybeExitDispatcher();
           return true;
         }));
@@ -1014,7 +1014,7 @@ public:
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
-              std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
+              nullptr, std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
           return true;
         }));
   }

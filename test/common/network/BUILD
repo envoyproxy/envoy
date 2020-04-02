@@ -320,3 +320,13 @@ envoy_cc_test(
         "//source/common/stream_info:filter_state_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "filter_matcher_test",
+    srcs = ["filter_matcher_test.cc"],
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/network:filter_matcher_lib",
+        "//test/mocks/network:network_mocks",
+    ],
+)
