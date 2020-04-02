@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/buffer/buffer.h"
-
 #include <memory>
+
+#include "envoy/buffer/buffer.h"
 
 #include "zlib.h"
 
