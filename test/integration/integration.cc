@@ -414,10 +414,6 @@ void BaseIntegrationTest::setUpstreamAddress(
   socket_address->set_port_value(fake_upstreams_[upstream_index]->localAddress()->ip()->port());
 }
 
-namespace {
-bool read_flag(bool* flag) { return *flag; }
-} // namespace
-
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
   bool listeners_ready = false;
   absl::Mutex l;
@@ -428,7 +424,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
     listeners_ready = true;
     l.Unlock();
   });
-  l.LockWhen(absl::Condition(read_flag, &listeners_ready));
+  l.LockWhen(absl::Condition(&listeners_ready));
   l.Unlock();
 
   auto listener_it = listeners.cbegin();
