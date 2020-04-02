@@ -6,6 +6,7 @@
 #include "extensions/common/wasm/wasm_vm.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -37,7 +38,6 @@ public:
 };
 
 TestNullVmPlugin* test_null_vm_plugin_ = nullptr;
-Envoy::Registry::RegisterFactory<PluginFactory, Null::NullVmPluginFactory> register_;
 
 std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
   auto result = std::make_unique<TestNullVmPlugin>();
@@ -47,9 +47,12 @@ std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
 
 class BaseVmTest : public testing::Test {
 public:
-  BaseVmTest() : scope_(Stats::ScopeSharedPtr(stats_store.createScope("wasm."))) {}
+  BaseVmTest()
+      : registration_(factory_), scope_(Stats::ScopeSharedPtr(stats_store.createScope("wasm."))) {}
 
 protected:
+  PluginFactory factory_;
+  Envoy::Registry::InjectFactory<Null::NullVmPluginFactory> registration_;
   Stats::IsolatedStoreImpl stats_store;
   Stats::ScopeSharedPtr scope_;
 };
