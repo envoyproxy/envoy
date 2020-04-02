@@ -236,9 +236,40 @@ private:
     void unlink();
     void newConnection();
 
+    class GenericListenerFilter : public Network::ListenerFilter {
+    public:
+      GenericListenerFilter(const Network::ListenerFilterMatcherSharedPtr& matcher,
+                            Network::ListenerFilterPtr listener_filter)
+          : listener_filter_(std::move(listener_filter)), matcher_(std::move(matcher)) {}
+      Network::FilterStatus onAccept(ListenerFilterCallbacks& cb) override {
+        if (isDisabled(cb)) {
+          return Network::FilterStatus::Continue;
+        }
+        return listener_filter_->onAccept(cb);
+      }
+      /**
+       * Check if this filter filter should be disabled on the incoming socket.
+       * @param cb the callbacks the filter instance can use to communicate with the filter chain.
+       **/
+      bool isDisabled(ListenerFilterCallbacks& cb) {
+        if (matcher_ == nullptr) {
+          return false;
+        } else {
+          return matcher_->matches(cb);
+        }
+      }
+
+    private:
+      const Network::ListenerFilterPtr listener_filter_;
+      const Network::ListenerFilterMatcherSharedPtr matcher_;
+    };
+    using ListenerFilterWrapperPtr = std::unique_ptr<GenericListenerFilter>;
+
     // Network::ListenerFilterManager
-    void addAcceptFilter(Network::ListenerFilterPtr&& filter) override {
-      accept_filters_.emplace_back(std::move(filter));
+    void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+                         Network::ListenerFilterPtr&& filter) override {
+      accept_filters_.emplace_back(
+          std::make_unique<GenericListenerFilter>(listener_filter_matcher, std::move(filter)));
     }
 
     // Network::ListenerFilterCallbacks
@@ -249,8 +280,8 @@ private:
     ActiveTcpListener& listener_;
     Network::ConnectionSocketPtr socket_;
     const bool hand_off_restored_destination_connections_;
-    std::list<Network::ListenerFilterPtr> accept_filters_;
-    std::list<Network::ListenerFilterPtr>::iterator iter_;
+    std::list<ListenerFilterWrapperPtr> accept_filters_;
+    std::list<ListenerFilterWrapperPtr>::iterator iter_;
     Event::TimerPtr timer_;
   };
 
