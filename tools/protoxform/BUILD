@@ -8,7 +8,6 @@ py_binary(
         "protoxform.py",
         "utils.py",
     ],
-    python_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         "//tools/api_proto_plugin",
@@ -31,7 +30,6 @@ py_binary(
         "//:.clang-format",
         "//tools/type_whisperer:api_type_db.pb_text",
     ],
-    python_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         "//tools/type_whisperer",
