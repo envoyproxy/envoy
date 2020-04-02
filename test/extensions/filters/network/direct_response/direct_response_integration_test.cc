@@ -10,7 +10,7 @@ public:
   DirectResponseIntegrationTest() : BaseIntegrationTest(GetParam(), directResponseConfig()) {}
 
   static std::string directResponseConfig() {
-    return ConfigHelper::BASE_CONFIG + R"EOF(
+    return absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
       - name: direct_response
@@ -18,7 +18,7 @@ public:
           "@type": type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config
           response:
             inline_string: "hello, world!\n"
-      )EOF";
+      )EOF");
   }
 
   /**

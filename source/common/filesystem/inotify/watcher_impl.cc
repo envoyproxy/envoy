@@ -80,9 +80,14 @@ void WatcherImpl::onInotifyEvent() {
       }
 
       for (FileWatch& watch : callback_map_[file_event->wd].watches_) {
-        if (watch.file_ == file && (watch.events_ & events)) {
-          ENVOY_LOG(debug, "matched callback: file: {}", file);
-          watch.cb_(events);
+        if (watch.events_ & events) {
+          if (watch.file_ == file) {
+            ENVOY_LOG(debug, "matched callback: file: {}", file);
+            watch.cb_(events);
+          } else if (watch.file_.empty()) {
+            ENVOY_LOG(debug, "matched callback: directory: {}", file);
+            watch.cb_(events);
+          }
         }
       }
 

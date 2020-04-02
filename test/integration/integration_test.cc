@@ -141,7 +141,7 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
 }
 
 TEST_P(IntegrationTest, ConnectionClose) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

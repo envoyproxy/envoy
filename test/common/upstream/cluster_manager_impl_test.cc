@@ -345,7 +345,7 @@ static_resources:
       ->second.get()
       .info()
       ->statsScope()
-      .counter("foo")
+      .counterFromString("foo")
       .inc();
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster.cluster_name.foo").value());
 }
