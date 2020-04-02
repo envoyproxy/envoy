@@ -58,7 +58,7 @@ int sslTlsContextIndex() {
   }());
 }
 
-static bool SeekToSubject(CRYPTO_BUFFER* cert, CBS* tbs_certificate) {
+static bool seekToSubject(CRYPTO_BUFFER* cert, CBS* tbs_certificate) {
   CBS der;
   CRYPTO_BUFFER_init_CBS(cert, &der);
   CBS certificate, opt_version, serial, signature, issuer, validity;
@@ -93,9 +93,9 @@ static bool SeekToSubject(CRYPTO_BUFFER* cert, CBS* tbs_certificate) {
   return true;
 }
 
-bool ExtractSPKIFromDERCert(CRYPTO_BUFFER* cert, CBS* spki) {
+bool extractSPKIFromDERCert(CRYPTO_BUFFER* cert, CBS* spki) {
   CBS tbs_certificate;
-  if (!SeekToSubject(cert, &tbs_certificate)) {
+  if (!seekToSubject(cert, &tbs_certificate)) {
     return false;
   }
 
@@ -107,9 +107,9 @@ bool ExtractSPKIFromDERCert(CRYPTO_BUFFER* cert, CBS* spki) {
   return true;
 }
 
-bool ExtractSubjectNameFromDERCert(CRYPTO_BUFFER* cert, absl::string_view* subject_out) {
+bool extractSubjectNameFromDERCert(CRYPTO_BUFFER* cert, absl::string_view* subject_out) {
   CBS tbs_certificate;
-  if (!SeekToSubject(cert, &tbs_certificate)) {
+  if (!seekToSubject(cert, &tbs_certificate)) {
     return false;
   }
 
@@ -122,7 +122,7 @@ bool ExtractSubjectNameFromDERCert(CRYPTO_BUFFER* cert, absl::string_view* subje
   return true;
 }
 
-static void PushBufferIfUnique(STACK_OF(CRYPTO_BUFFER) * stack, absl::string_view value) {
+static void pushBufferIfUnique(STACK_OF(CRYPTO_BUFFER) * stack, absl::string_view value) {
   for (auto buf : stack) {
     if (CRYPTO_BUFFER_len(buf) == value.size() &&
         memcmp(CRYPTO_BUFFER_data(buf), value.data(), value.size()) == 0) {
@@ -393,7 +393,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
 
     CBS spki;
-    if (!ExtractSPKIFromDERCert(ctx.cert_.get(), &spki)) {
+    if (!extractSPKIFromDERCert(ctx.cert_.get(), &spki)) {
       throw EnvoyException(absl::StrCat("Failed to extract SPKI from ", ctx.cert_chain_file_path_));
     }
     bssl::UniquePtr<EVP_PKEY> public_key(EVP_parse_public_key(&spki));
@@ -1458,11 +1458,11 @@ void ServerContextImpl::TlsContext::addClientValidationContext(
     bssl::UniquePtr<uint8_t> der(data);
     bssl::UniquePtr<CRYPTO_BUFFER> cert(CRYPTO_BUFFER_new(data, len, nullptr));
     absl::string_view name;
-    if (!ExtractSubjectNameFromDERCert(cert.get(), &name)) {
+    if (!extractSubjectNameFromDERCert(cert.get(), &name)) {
       throw EnvoyException(
           absl::StrCat("Failed to load trusted client CA certificates from ", config.caCertPath()));
     }
-    PushBufferIfUnique(list.get(), name);
+    pushBufferIfUnique(list.get(), name);
   }
   // Check for EOF.
   const uint32_t err = ERR_peek_last_error();
