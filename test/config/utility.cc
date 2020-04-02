@@ -113,6 +113,13 @@ std::string ConfigHelper::tcpProxyConfig() {
 )EOF");
 }
 
+std::string ConfigHelper::tlsInspectorFilter() {
+  return R"EOF(
+name: "envoy.filters.listener.tls_inspector"
+typed_config:
+)EOF";
+}
+
 std::string ConfigHelper::httpProxyConfig() {
   return absl::StrCat(baseConfig(), R"EOF(
     filter_chains:
@@ -833,6 +840,18 @@ void ConfigHelper::addNetworkFilter(const std::string& filter_yaml) {
   // Now move it to the front.
   for (int i = filter_chain->filters_size() - 1; i > 0; --i) {
     filter_chain->mutable_filters()->SwapElements(i, i - 1);
+  }
+}
+
+void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  auto* filter_list_back = listener->add_listener_filters();
+  TestUtility::loadFromYaml(filter_yaml, *filter_list_back);
+
+  // Now move it to the front.
+  for (int i = listener->listener_filters_size() - 1; i > 0; --i) {
+    listener->mutable_listener_filters()->SwapElements(i, i - 1);
   }
 }
 
