@@ -197,6 +197,11 @@ config_setting(
     values = {"define": "path_normalization_by_default=true"},
 )
 
+config_setting(
+    name = "enable_legacy_codecs_in_test",
+    values = {"define": "use_legacy_codecs_in_test=true"},
+)
+
 cc_proto_library(
     name = "grpc_health_proto",
     deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:_health_proto_only"],
