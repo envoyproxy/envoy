@@ -543,6 +543,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   Http::ConnectionPool::Instance* http_pool = getHttpConnPool();
   Upstream::HostDescriptionConstSharedPtr host;
+
   if (http_pool) {
     host = http_pool->host();
   } else {
@@ -1050,6 +1051,12 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
       basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
       transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}");
   onUpstreamAbort(Http::Code::ServiceUnavailable, response_flags, body, dropped, details);
+}
+
+void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
+  if (retry_state_ && host) {
+    retry_state_->onHostAttempted(host);
+  }
 }
 
 StreamInfo::ResponseFlag

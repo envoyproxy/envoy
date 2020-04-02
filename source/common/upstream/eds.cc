@@ -55,7 +55,8 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager.registerHostForPriority(
-          "", parent_.resolveProtoAddress(lb_endpoint.endpoint().address()), locality_lb_endpoint,
+          lb_endpoint.endpoint().hostname(),
+          parent_.resolveProtoAddress(lb_endpoint.endpoint().address()), locality_lb_endpoint,
           lb_endpoint);
     }
   }
