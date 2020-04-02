@@ -66,7 +66,7 @@ static std::vector<Buffer::OwnedImpl> generateChunks(const uint64_t chunk_count,
   return vec;
 }
 
-static void compressWith(const std::vector<Buffer::OwnedImpl>&& chunks, CompressionParams params,
+static void compressWith(std::vector<Buffer::OwnedImpl>&& chunks, CompressionParams params,
                          NiceMock<Http::MockStreamDecoderFilterCallbacks>& decoder_callbacks) {
   Stats::IsolatedStoreImpl stats;
   testing::NiceMock<Runtime::MockLoader> runtime;
@@ -110,9 +110,9 @@ static void compressWith(const std::vector<Buffer::OwnedImpl>&& chunks, Compress
     ++idx;
   }
 
-  EXPECT_EQ(total_uncompressed_bytes, stats.counter("test.gzip.total_uncompressed_bytes").value());
-  EXPECT_EQ(total_compressed_bytes, stats.counter("test.gzip.total_compressed_bytes").value());
-  EXPECT_EQ(1U, stats.counter("test.gzip.compressed").value());
+  EXPECT_EQ(total_uncompressed_bytes, stats.counterFromString("test.gzip.total_uncompressed_bytes").value());
+  EXPECT_EQ(total_compressed_bytes, stats.counterFromString("test.gzip.total_compressed_bytes").value());
+  EXPECT_EQ(1U, stats.counterFromString("test.gzip.compressed").value());
 }
 
 // SPELLCHECKER(off)
