@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Zlib {
 
 /**
- * Common code Implementation of decompressor's interface.
+ * Shared code between the compressor and the decompressor.
  */
 class Base {
 public:
