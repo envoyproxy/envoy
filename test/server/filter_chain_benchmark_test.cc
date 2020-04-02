@@ -168,6 +168,7 @@ class FilterChainBenchmarkFixture : public benchmark::Fixture {
 public:
   using Fixture::SetUp;
   void SetUp(const ::benchmark::State& state) override {
+    dummy_builder_ = std::make_unique<MockFilterChainFactoryBuilder>();
     int64_t input_size = state.range(0);
     std::vector<std::string> port_chains;
     port_chains.reserve(input_size);
@@ -183,19 +184,17 @@ public:
   absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
   std::string listener_yaml_config_;
   envoy::config::listener::v3::Listener listener_config_;
-  MockFilterChainFactoryBuilder dummy_builder_;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context};
+  std::unique_ptr<MockFilterChainFactoryBuilder> dummy_builder_;
 };
 
+// NOLINTNEXTLINE(readability-redundant-member-init)
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
 (::benchmark::State& state) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   for (auto _ : state) {
     FilterChainManagerImpl filter_chain_manager{
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context};
-    filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
+    filter_chain_manager.addFilterChain(filter_chains_, *dummy_builder_, filter_chain_manager);
   }
 }
 
@@ -211,7 +210,7 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
   FilterChainManagerImpl filter_chain_manager{
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context};
 
-  filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
+  filter_chain_manager.addFilterChain(filter_chains_, *dummy_builder_, filter_chain_manager);
   for (auto _ : state) {
     for (int i = 0; i < state.range(0); i++) {
       filter_chain_manager.findFilterChain(sockets[i]);
@@ -257,4 +256,3 @@ clang-format on
 */
 } // namespace Server
 } // namespace Envoy
-BENCHMARK_MAIN();
