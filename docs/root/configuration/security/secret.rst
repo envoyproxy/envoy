@@ -33,7 +33,7 @@ SDS Configuration
 
 *SdsSecretConfig* is used in two fields in :ref:`CommonTlsContext <envoy_api_msg_auth.CommonTlsContext>`. The first field is *tls_certificate_sds_secret_configs* to use SDS to get :ref:`TlsCertificate <envoy_api_msg_auth.TlsCertificate>`. The second field is *validation_context_sds_secret_config* to use SDS to get :ref:`CertificateValidationContext <envoy_api_msg_auth.CertificateValidationContext>`.
 
-Examples one: static_resource
+Example one: static_resource
 -----------------------------
 
 This example show how to configure secrets in the static_resource:
@@ -88,7 +88,9 @@ This example show how to configure secrets in the static_resource:
 
 In this example, certificates are specified in the bootstrap static_resource, they are not fetched remotely. In the config, *secrets* static resource has 3 secrets: **client_cert**, **server_cert** and **validation_context**. In the cluster config, one of hosts uses **client_cert** in its *tls_certificate_sds_secret_configs*. In the listeners section, one of them uses **server_cert** in its *tls_certificate_sds_secret_configs* and **validation_context** for its *validation_context_sds_secret_config*.
 
-Examples two: SDS server
+.. _sds_server_example:
+
+Example two: SDS server
 ------------------------
 
 This example shows how to configure secrets fetched from remote SDS servers:
@@ -173,6 +175,68 @@ This example shows how to configure secrets fetched from remote SDS servers:
 
 For illustration, above example uses three methods to access the SDS server. A gRPC SDS server can be reached by Unix Domain Socket path **/tmp/uds_path** and **127.0.0.1:8234** by mTLS. It provides three secrets, **client_cert**, **server_cert** and **validation_context**. In the config, cluster **example_cluster** certificate **client_cert** is configured to use Google gRPC with UDS to talk to the SDS server. The Listener needs to fetch **server_cert** and **validation_context** from the SDS server. The **server_cert** is using Envoy gRPC with cluster **sds_server_mtls** configured with client certificate to use mTLS to talk to SDS server. The **validate_context** is using Envoy gRPC with cluster **sds_server_uds** configured with UDS path to talk to the SDS server.
 
+.. _xds_certificate_rotation:
+
+Example three: certificate rotation for xDS gRPC connection
+------------------------------------------------------------
+
+Managing certificates for xDS gRPC connection between Envoy and xDS server introduces a bootstrapping problem: SDS server cannot manage certificates that are required to connect to the server.
+
+This example shows how to set up xDS connection by sourcing SDS configuration from the filesystem.
+The certificate and key files are watched with inotify and reloaded automatically without restart.
+In contrast, :ref:`sds_server_example` requires a restart to reload xDS certificates and key after update.
+
+.. code-block:: yaml
+
+    clusters:
+    - name: control_plane
+      type: LOGICAL_DNS
+      connect_timeout: 1s
+      load_assignment:
+        cluster_name: control_plane
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: controlplane
+                  port_value: 8443
+      http2_protocol_options: {}
+      transport_socket:
+        name: "envoy.transport_sockets.tls"
+        typed_config:
+          "@type": "type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext"
+          common_tls_context:
+            tls_certificate_sds_secret_configs:
+              sds_config:
+                path: /etc/envoy/tls_certificate_sds_secret.yaml
+            validation_context_sds_secret_config:
+              sds_config:
+                path: /etc/envoy/validation_context_sds_secret.yaml
+
+Paths to client certificate, including client's certificate chain and private key are given in SDS config file ``/etc/envoy/tls_certificate_sds_secret.yaml``:
+
+.. code-block:: yaml
+
+    resources:
+      - "@type": "type.googleapis.com/envoy.api.v2.auth.Secret"
+        tls_certificate:
+          certificate_chain:
+            filename: /certs/sds_cert.pem
+          private_key:
+            filename: /certs/sds_key.pem
+
+Path to CA certificate bundle for validating the xDS server certificate is given in SDS config file ``/etc/envoy/validation_context_sds_secret.yaml``:
+
+.. code-block:: yaml
+
+    resources:
+      - "@type": "type.googleapis.com/envoy.api.v2.auth.Secret"
+        validation_context:
+          trusted_ca:
+            filename: /certs/cacert.pem
+
+
 Statistics
 ----------
 SSL socket factory outputs following SDS related statistics. They are all counter type.
@@ -194,4 +258,3 @@ For upstream clusters, they are in the *cluster.<CLUSTER_NAME>.client_ssl_socket
 
      ssl_context_update_by_sds, Total number of ssl context has been updated.
      upstream_context_secrets_not_ready, Total number of upstream connections reset due to empty ssl certificate.
-
