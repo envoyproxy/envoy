@@ -63,8 +63,9 @@ void HazelcastHeaderEntry::readUnifiedData(ObjectDataInput& reader) {
 HazelcastHeaderEntry::HazelcastHeaderEntry() = default;
 
 HazelcastHeaderEntry::HazelcastHeaderEntry(Http::ResponseHeaderMapPtr&& header_map, Key&& key,
-    uint64_t body_size, int32_t version) : header_map_(std::move(header_map)),
-    variant_key_(std::move(key)), body_size_(body_size), version_(version) {}
+                                           uint64_t body_size, int32_t version)
+    : header_map_(std::move(header_map)), variant_key_(std::move(key)), body_size_(body_size),
+      version_(version) {}
 
 HazelcastHeaderEntry::HazelcastHeaderEntry(const HazelcastHeaderEntry& other) {
   body_size_ = other.body_size_;
@@ -73,9 +74,9 @@ HazelcastHeaderEntry::HazelcastHeaderEntry(const HazelcastHeaderEntry& other) {
   version_ = other.version_;
 }
 
-HazelcastHeaderEntry::HazelcastHeaderEntry(HazelcastHeaderEntry&& other) :
-    header_map_(std::move(other.header_map_)), variant_key_(std::move(other.variant_key_)),
-    body_size_(other.body_size_), version_(other.version_) {}
+HazelcastHeaderEntry::HazelcastHeaderEntry(HazelcastHeaderEntry&& other)
+    : header_map_(std::move(other.header_map_)), variant_key_(std::move(other.variant_key_)),
+      body_size_(other.body_size_), version_(other.version_) {}
 
 void HazelcastBodyEntry::writeData(ObjectDataOutput& writer) const {
   writeUnifiedData(writer);
@@ -97,9 +98,9 @@ void HazelcastBodyEntry::readUnifiedData(ObjectDataInput& reader) {
 
 HazelcastBodyEntry::HazelcastBodyEntry() = default;
 
-HazelcastBodyEntry::HazelcastBodyEntry(int64_t header_key,
-    std::vector<hazelcast::byte>&& buffer, int32_t version) : header_key_(header_key),
-    version_(version), body_buffer_(std::move(buffer)) {}
+HazelcastBodyEntry::HazelcastBodyEntry(int64_t header_key, std::vector<hazelcast::byte>&& buffer,
+                                       int32_t version)
+    : header_key_(header_key), version_(version), body_buffer_(std::move(buffer)) {}
 
 HazelcastBodyEntry::HazelcastBodyEntry(const HazelcastBodyEntry& other) {
   body_buffer_ = other.body_buffer_;
@@ -107,9 +108,9 @@ HazelcastBodyEntry::HazelcastBodyEntry(const HazelcastBodyEntry& other) {
   version_ = other.version_;
 }
 
-HazelcastBodyEntry::HazelcastBodyEntry(HazelcastBodyEntry&& other) :
-    header_key_(other.header_key_), version_(other.version_),
-    body_buffer_(std::move(other.body_buffer_)) {}
+HazelcastBodyEntry::HazelcastBodyEntry(HazelcastBodyEntry&& other)
+    : header_key_(other.header_key_), version_(other.version_),
+      body_buffer_(std::move(other.body_buffer_)) {}
 
 void HazelcastResponseEntry::writeData(ObjectDataOutput& writer) const {
   response_header_.writeUnifiedData(writer);
@@ -124,11 +125,11 @@ void HazelcastResponseEntry::readData(ObjectDataInput& reader) {
 HazelcastResponseEntry::HazelcastResponseEntry() = default;
 
 HazelcastResponseEntry::HazelcastResponseEntry(HazelcastHeaderEntry&& header,
-    HazelcastBodyEntry&& body) : response_header_(std::move(header)),
-    response_body_(std::move(body)) {};
+                                               HazelcastBodyEntry&& body)
+    : response_header_(std::move(header)), response_body_(std::move(body)){};
 
-} // HazelcastHttpCache
-} // Cache
-} // HttpFilters
-} // Extensions
-} // Envoy
+} // namespace HazelcastHttpCache
+} // namespace Cache
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

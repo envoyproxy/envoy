@@ -9,70 +9,70 @@ package envoy.source.extensions.filters.http.cache;
 // Hazelcast Http Cache configuration
 message HazelcastHttpCacheConfig {
 
-    // Address for Hazelcast cluster member.
-    message MemberAddress {
-        string ip = 1;
-        int32 port = 2;
-    }
+  // Address for Hazelcast cluster member.
+  message MemberAddress {
+    string ip = 1;
+    int32 port = 2;
+  }
 
-    // Group name of Hazelcast cluster to be connected. Not only the address of a member
-    // but its group name must match.
-    string group_name = 1;
-    // Group password of Hazelcast cluster to be connected.
-    string group_password = 2;
+  // Group name of Hazelcast cluster to be connected. Not only the address of a member
+  // but its group name must match.
+  string group_name = 1;
+  // Group password of Hazelcast cluster to be connected.
+  string group_password = 2;
 
-    // The timeout value in milliseconds for Hazelcast members to accept this client's
-    // connection requests. If the member does not respond within the timeout, the client
-    // will think the connection is lost and retry to connect to cluster as many as
-    // connection_attempt_limit. 5000 by default and 0 is not allowed.
-    uint32 connection_timeout = 3;
+  // The timeout value in milliseconds for Hazelcast members to accept this client's
+  // connection requests. If the member does not respond within the timeout, the client
+  // will think the connection is lost and retry to connect to cluster as many as
+  // connection_attempt_limit. 5000 by default and 0 is not allowed.
+  uint32 connection_timeout = 3;
 
-    // When the client connection to the cluster is down, client will retry as many
-    // as connection_attempt_limit before giving up. After this much of retries, the
-    // client will go offline and cache will not be active from then on permanently.
-    // 10 by default and 0 is not allowed.
-    uint32 connection_attempt_limit = 4;
+  // When the client connection to the cluster is down, client will retry as many
+  // as connection_attempt_limit before giving up. After this much of retries, the
+  // client will go offline and cache will not be active from then on permanently.
+  // 10 by default and 0 is not allowed.
+  uint32 connection_attempt_limit = 4;
 
-    // The duration in milliseconds between the connection attempts to cluster.
-    // 5000 by default and 0 is not allowed.
-    uint32 connection_attempt_period = 5;
+  // The duration in milliseconds between the connection attempts to cluster.
+  // 5000 by default and 0 is not allowed.
+  uint32 connection_attempt_period = 5;
 
-    // The timeout value in seconds for a call to be responded by Hazelcast cluster.
-    // If a member does not respond within the timeout, the lookup or insert operation
-    // will be cancelled and treated as a cache miss or an aborted insertion.
-    // 8 by default and 0 is not allowed.
-    uint32 invocation_timeout = 6;
+  // The timeout value in seconds for a call to be responded by Hazelcast cluster.
+  // If a member does not respond within the timeout, the lookup or insert operation
+  // will be cancelled and treated as a cache miss or an aborted insertion.
+  // 8 by default and 0 is not allowed.
+  uint32 invocation_timeout = 6;
 
-    // Only one member address is enough to connect to the cluster but
-    // providing more than one is recommended.
-    // By default, 127.0.0.1:5701 will be tried.
-    repeated MemberAddress addresses = 7;
+  // Only one member address is enough to connect to the cluster but
+  // providing more than one is recommended.
+  // By default, 127.0.0.1:5701 will be tried.
+  repeated MemberAddress addresses = 7;
 
-    // Application specific name for the cache. Different deployments should
-    // use the same prefix if they want to share the same cache and connect
-    // to the same Hazelcast cluster. Empty string by default.
-    string app_prefix = 8;
+  // Application specific name for the cache. Different deployments should
+  // use the same prefix if they want to share the same cache and connect
+  // to the same Hazelcast cluster. Empty string by default.
+  string app_prefix = 8;
 
-    // In unified mode, cached responses will be stored as a single entry.
-    // On a range HTTP request, regardless of the request range, all the
-    // body will be called from the remote cache and then the requested
-    // range will be served.
-    // In divided mode, cached responses will be stored in two different
-    // maps: header map and body map. For a response to be cached, its
-    // header is stored in the header map and its body is stored in body
-    // map partitioned with body_partition_size. On a range request, only
-    // required body partitions are called from the distributed map. This
-    // option causes extra memory usage per partition on the cache.
-    // False by default.
-    bool unified = 9;
+  // In unified mode, cached responses will be stored as a single entry.
+  // On a range HTTP request, regardless of the request range, all the
+  // body will be called from the remote cache and then the requested
+  // range will be served.
+  // In divided mode, cached responses will be stored in two different
+  // maps: header map and body map. For a response to be cached, its
+  // header is stored in the header map and its body is stored in body
+  // map partitioned with body_partition_size. On a range request, only
+  // required body partitions are called from the distributed map. This
+  // option causes extra memory usage per partition on the cache.
+  // False by default.
+  bool unified = 9;
 
-    // Body partition size for divided cache. Ignored in unified mode.
-    // At most 64 KB allowed. 2 KB by default.
-    uint64 body_partition_size = 10;
+  // Body partition size for divided cache. Ignored in unified mode.
+  // At most 64 KB allowed. 2 KB by default.
+  uint64 body_partition_size = 10;
 
-    // Maximum allowed body size per response. If insertion for a larger
-    // value than the limit is attempted, the first max_body_size bytes
-    // of the response will be cached and the remaining will be ignored.
-    // At most 64 KB for UNIFIED mode, 2 MB for DIVIDED mode.
-    uint64 max_body_size = 11;
+  // Maximum allowed body size per response. If insertion for a larger
+  // value than the limit is attempted, the first max_body_size bytes
+  // of the response will be cached and the remaining will be ignored.
+  // At most 64 KB for UNIFIED mode, 2 MB for DIVIDED mode.
+  uint64 max_body_size = 11;
 }

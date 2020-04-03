@@ -1,6 +1,6 @@
 #pragma once
 
-#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_http_cache.h"
+#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_http_cache_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,7 +14,7 @@ namespace HazelcastHttpCache {
 class HazelcastLookupContextBase : public LookupContext,
                                    public Logger::Loggable<Logger::Id::hazelcast_http_cache> {
 public:
-  HazelcastLookupContextBase(HazelcastHttpCache& cache, LookupRequest&& request)
+  HazelcastLookupContextBase(HazelcastCache& cache, LookupRequest&& request)
       : hz_cache_(cache), lookup_request_(std::move(request)) {
     createVariantKey(lookup_request_.key());
     variant_hash_key_ = stableHashKey(lookup_request_.key());
@@ -34,9 +34,8 @@ public:
   bool isAborted() const { return abort_insertion_; }
 
 protected:
-
   void handleLookupFailure(absl::string_view message, const LookupHeadersCallback& cb,
-      bool warn_log = true) {
+                           bool warn_log = true) {
     if (warn_log) {
       ENVOY_LOG(warn, "{}", message);
     } else {
@@ -46,7 +45,7 @@ protected:
     cb(LookupResult{});
   }
 
-  HazelcastHttpCache& hz_cache_;
+  HazelcastCache& hz_cache_;
   LookupRequest lookup_request_;
 
   /** Hash key aware of vary headers. Lookup will be performed using this. */
@@ -56,7 +55,6 @@ protected:
   bool abort_insertion_ = false;
 
 private:
-
   /**
    * The keys created by the cache filter for lookups and inserts are not aware
    * of the vary headers of the request. Instead, cache filter expects a
@@ -78,7 +76,7 @@ private:
 
     for (const Http::HeaderEntry& header : lookup_request_.vary_headers()) {
       header_strings.push_back(std::make_pair(std::string(header.key().getStringView()),
-          std::string(header.value().getStringView())));
+                                              std::string(header.value().getStringView())));
     }
 
     // Different order of headers causes different hash keys even if their both key and value
@@ -113,7 +111,6 @@ private:
     //  - {accept-language: en-US,tr;q=0.8}
     //  - {accept-language: tr;q=0.8,en-US}
   }
-
 };
 
 /**
@@ -122,11 +119,12 @@ private:
 class HazelcastInsertContextBase : public InsertContext,
                                    public Logger::Loggable<Logger::Id::hazelcast_http_cache> {
 public:
-  HazelcastInsertContextBase(LookupContext& lookup_context, HazelcastHttpCache& cache)
+  HazelcastInsertContextBase(LookupContext& lookup_context, HazelcastCache& cache)
       : hz_cache_(cache), max_body_size_(cache.maxBodySize()),
-      variant_hash_key_(static_cast<HazelcastLookupContextBase&>(lookup_context).variantHashKey()),
-      variant_key_(static_cast<HazelcastLookupContextBase&>(lookup_context).variantKey()),
-      abort_insertion_(static_cast<HazelcastLookupContextBase&>(lookup_context).isAborted()) {}
+        variant_hash_key_(
+            static_cast<HazelcastLookupContextBase&>(lookup_context).variantHashKey()),
+        variant_key_(static_cast<HazelcastLookupContextBase&>(lookup_context).variantKey()),
+        abort_insertion_(static_cast<HazelcastLookupContextBase&>(lookup_context).isAborted()) {}
 
   void insertTrailers(const Http::ResponseTrailerMap&) override {
     // TODO(enozcan): Support trailers
@@ -134,7 +132,7 @@ public:
   }
 
 protected:
-  HazelcastHttpCache& hz_cache_;
+  HazelcastCache& hz_cache_;
   const uint64_t max_body_size_;
   bool committed_end_stream_ = false;
 
@@ -155,9 +153,10 @@ protected:
  */
 class UnifiedLookupContext : public HazelcastLookupContextBase {
 public:
-  UnifiedLookupContext(HazelcastHttpCache& cache, LookupRequest&& request);
+  UnifiedLookupContext(HazelcastCache& cache, LookupRequest&& request);
   void getHeaders(LookupHeadersCallback&& cb) override;
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override;
+
 private:
   HazelcastResponsePtr response_;
 };
@@ -167,10 +166,11 @@ private:
  */
 class UnifiedInsertContext : public HazelcastInsertContextBase {
 public:
-  UnifiedInsertContext(LookupContext& lookup_context, HazelcastHttpCache& cache);
+  UnifiedInsertContext(LookupContext& lookup_context, HazelcastCache& cache);
   void insertHeaders(const Http::ResponseHeaderMap& response_headers, bool end_stream) override;
   void insertBody(const Buffer::Instance& chunk, InsertCallback ready_for_next_chunk,
                   bool end_stream) override;
+
 private:
   void flushEntry();
 };
@@ -180,13 +180,13 @@ private:
  */
 class DividedLookupContext : public HazelcastLookupContextBase {
 public:
-  DividedLookupContext(HazelcastHttpCache& cache, LookupRequest&& request);
+  DividedLookupContext(HazelcastCache& cache, LookupRequest&& request);
   void getHeaders(LookupHeadersCallback&& cb) override;
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override;
 
 private:
   void handleBodyLookupFailure(absl::string_view message, const LookupBodyCallback& cb,
-      bool warn_log = true);
+                               bool warn_log = true);
 
   uint64_t total_body_size_;
 
@@ -203,7 +203,7 @@ private:
  */
 class DividedInsertContext : public HazelcastInsertContextBase {
 public:
-  DividedInsertContext(LookupContext& lookup_context, HazelcastHttpCache& cache);
+  DividedInsertContext(LookupContext& lookup_context, HazelcastCache& cache);
   void insertHeaders(const Http::ResponseHeaderMap& response_headers, bool end_stream) override;
   void insertBody(const Buffer::Instance& chunk, InsertCallback ready_for_next_chunk,
                   bool end_stream) override;
@@ -229,11 +229,10 @@ private:
 
   const int32_t version_;
   uint64_t total_body_size_ = 0;
-
 };
 
-} // HazelcastHttpCache
-} // Cache
-} // HttpFilters
-} // Extensions
-} // Envoy
+} // namespace HazelcastHttpCache
+} // namespace Cache
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

@@ -1,9 +1,10 @@
 #pragma once
 
-#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_http_cache.h"
-#include "gtest/gtest.h"
+#include "test/extensions/filters/http/cache/hazelcast_http_cache/hazelcast_test_cache.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,16 +14,15 @@ namespace HazelcastHttpCache {
 
 class HazelcastTestUtil {
 public:
-
   static constexpr int TEST_PARTITION_SIZE = 10;
   static constexpr int TEST_MAX_BODY_SIZE = TEST_PARTITION_SIZE * 20;
 
-  static Runtime::RandomGeneratorImpl& randomGenerator(){
+  static Runtime::RandomGeneratorImpl& randomGenerator() {
     static Runtime::RandomGeneratorImpl rand;
     return rand;
   }
 
-  static const std::string& abortedBodyResponse(){
+  static const std::string& abortedBodyResponse() {
     static std::string response("NULL_BODY");
     return response;
   }
@@ -50,22 +50,18 @@ public:
     headers.setForwardedProto("https");
     headers.setCacheControl("max-age=3600");
   }
-
 };
 
 /**
- * The base environment for DIVIDED and UNIFIED cache mode tests.
+ * The base test environment for DIVIDED and UNIFIED cache mode tests.
  *
- * A similar test environment to SimpleHttpCacheTest is applied and
+ * A similar environment to SimpleHttpCacheTest is applied and
  * some functions & fields are derived directly.
  *
  */
 class HazelcastHttpCacheTestBase : public testing::Test {
 protected:
-
-  HazelcastHttpCacheTestBase() {
-    HazelcastTestUtil::setRequestHeaders(request_headers_);
-  }
+  HazelcastHttpCacheTestBase() { HazelcastTestUtil::setRequestHeaders(request_headers_); }
 
   // Makes getBody requests until requested range is satisfied.
   // Returns the body on success; HazelcastTestUtil::abortedBodyResponse() on
@@ -79,101 +75,46 @@ protected:
         return HazelcastTestUtil::abortedBodyResponse();
       }
       AdjustedByteRange range(offset, end);
-      context.getBody(range, [&aborted, &body_chunk, &offset,
-          &full_body](Buffer::InstancePtr&& data) {
-        if (data) {
-          body_chunk = data->toString();
-          full_body.append(body_chunk);
-          offset += body_chunk.length();
-        } else {
-          aborted = true;
-        }
-      });
+      context.getBody(range,
+                      [&aborted, &body_chunk, &offset, &full_body](Buffer::InstancePtr&& data) {
+                        if (data) {
+                          body_chunk = data->toString();
+                          full_body.append(body_chunk);
+                          offset += body_chunk.length();
+                        } else {
+                          aborted = true;
+                        }
+                      });
     }
     return full_body;
   }
 
   Http::TestResponseHeaderMapImpl getResponseHeaders() {
-    return Http::TestResponseHeaderMapImpl{
-      {"date", formatter_.fromTime(current_time_)},
-      {"cache-control", "public, max-age=3600"}};
-  }
-
-  /// Test environments make cache calls over these functions.
-
-  void unlockKey(uint64_t key) {
-    cache_->unlock(key);
-  }
-
-  InsertContextPtr makeInsertContext(absl::string_view path) {
-    return cache_->makeInsertContext(lookup(path));
-  }
-
-  void clearMaps() {
-    if (cache_->unified_) {
-      cache_->getResponseMap().clear();
-    } else {
-      cache_->getBodyMap().clear();
-      cache_->getHeaderMap().clear();
-    }
-  }
-
-  void removeBody(uint64_t key, uint64_t order) {
-    ASSERT(!cache_->unified_);
-    cache_->getBodyMap().remove(cache_->orderedMapKey(key, order));
-  }
-
-  IMap<int64_t, HazelcastHeaderEntry> testHeaderMap() {
-    ASSERT(!cache_->unified_);
-    return cache_->getHeaderMap();
-  };
-
-  IMap<std::string, HazelcastBodyEntry> testBodyMap() {
-    ASSERT(!cache_->unified_);
-    return cache_->getBodyMap();
-  };
-
-  IMap<int64_t, HazelcastResponseEntry> testResponseMap() {
-    ASSERT(cache_->unified_);
-    return cache_->getResponseMap();
-  };
-
-  std::string getBodyKey(uint64_t key, uint64_t order){
-    return cache_->orderedMapKey(key, order);
-  }
-
-  int64_t mapKey(uint64_t key){
-    return cache_->mapKey(key);
-  }
-
-  void dropConnection(){
-    cache_->shutdown(false);
-  }
-
-  void restoreConnection() {
-    cache_->connect();
+    return Http::TestResponseHeaderMapImpl{{"date", formatter_.fromTime(current_time_)},
+                                           {"cache-control", "public, max-age=3600"}};
   }
 
   /// from SimpleHttpCacheTest
 
   LookupContextPtr lookup(absl::string_view request_path) {
     LookupRequest request = makeLookupRequest(request_path);
-    LookupContextPtr context = cache_->makeLookupContext(std::move(request));
-    context->getHeaders([this](LookupResult&& result) {lookup_result_ = std::move(result); });
+    LookupContextPtr context = cache_->base().makeLookupContext(std::move(request));
+    context->getHeaders([this](LookupResult&& result) { lookup_result_ = std::move(result); });
     return context;
   }
 
   void insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& response_headers,
-      const absl::string_view response_body) {
-    InsertContextPtr insert_context = cache_->makeInsertContext(move(lookup));
+              const absl::string_view response_body) {
+    InsertContextPtr insert_context = cache_->base().makeInsertContext(move(lookup));
     insert_context->insertHeaders(response_headers, response_body == nullptr);
-    if (response_body == nullptr) return;
+    if (response_body == nullptr)
+      return;
     insert_context->insertBody(Buffer::OwnedImpl(response_body), nullptr, true);
   }
 
   void insert(absl::string_view request_path,
-      const Http::TestResponseHeaderMapImpl& response_headers,
-      const absl::string_view response_body) {
+              const Http::TestResponseHeaderMapImpl& response_headers,
+              const absl::string_view response_body) {
     insert(lookup(request_path), response_headers, response_body);
   }
 
@@ -203,7 +144,7 @@ protected:
     return AssertionSuccess();
   }
 
-  HazelcastHttpCache* cache_;
+  std::unique_ptr<HazelcastTestableHttpCache> cache_;
   LookupResult lookup_result_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Event::SimulatedTimeSystem time_source_;

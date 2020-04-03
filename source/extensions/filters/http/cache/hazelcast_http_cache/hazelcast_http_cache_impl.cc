@@ -1,8 +1,7 @@
-#include "extensions/filters/http/cache/hazelcast_http_cache/config_util.h"
-#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_http_cache.h"
-#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_context.h"
+#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_http_cache_impl.h"
 
-#include "envoy/registry/registry.h"
+#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_context.h"
+#include "extensions/filters/http/cache/hazelcast_http_cache/util.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,7 +27,7 @@ InsertContextPtr HazelcastHttpCache::makeInsertContext(LookupContextPtr&& lookup
 }
 
 void HazelcastHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
-    Http::ResponseHeaderMapPtr&& response_headers) {
+                                       Http::ResponseHeaderMapPtr&& response_headers) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   // TODO(enozcan): Enable when implemented on the filter side.
   //  Depending on the filter's implementation, the cached entry's
@@ -69,7 +68,7 @@ void HazelcastHttpCache::putHeader(const uint64_t& key, const HazelcastHeaderEnt
 }
 
 void HazelcastHttpCache::putBody(const uint64_t& key, const uint64_t& order,
-    const HazelcastBodyEntry& entry) {
+                                 const HazelcastBodyEntry& entry) {
   getBodyMap().set(orderedMapKey(key, order), entry);
 }
 
@@ -81,59 +80,7 @@ HazelcastBodyPtr HazelcastHttpCache::getBody(const uint64_t& key, const uint64_t
   return getBodyMap().get(orderedMapKey(key, order));
 }
 
-void HazelcastHttpCache::putResponseIfAbsent(const uint64_t& key,
-    const HazelcastResponseEntry& entry) {
-  getResponseMap().putIfAbsent(mapKey(key), entry);
-}
-
-HazelcastResponsePtr HazelcastHttpCache::getResponse(const uint64_t& key) {
-  return getResponseMap().get(mapKey(key));
-}
-
-void HazelcastHttpCache::connect() {
-  if (hazelcast_client_ && hazelcast_client_->getLifecycleService().isRunning()) {
-    ENVOY_LOG(warn, "Client is already connected. Cluster name: {}",
-        hazelcast_client_->getClientConfig().getGroupConfig().getName());
-    return;
-  }
-
-  ClientConfig config = ConfigUtil::getClientConfig(cache_config_);
-  config.getSerializationConfig().addDataSerializableFactory(
-      HazelcastCacheEntrySerializableFactory::FACTORY_ID,
-      boost::shared_ptr<serialization::DataSerializableFactory>
-      (new HazelcastCacheEntrySerializableFactory()));
-
-  try {
-    hazelcast_client_ = std::make_unique<HazelcastClient>(config);
-  } catch (...) {
-    throw EnvoyException("Hazelcast Client could not connect to any cluster.");
-  }
-
-  ENVOY_LOG(info, "HazelcastHttpCache has been started with profile: {}. Max body size: {}.",
-       unified_ ? "UNIFIED" : "DIVIDED, partition size: " + std::to_string(body_partition_size_),
-       max_body_size_);
-  ENVOY_LOG(info, "Cache statistics can be observed on Hazelcast Management Center"
-                  " from the map named {}.", unified_ ? response_map_name_ : header_map_name_);
-}
-
-void HazelcastHttpCache::shutdown(bool destroy) {
-  if (!hazelcast_client_) {
-    ENVOY_LOG(warn, "Client is already offline.");
-    return;
-  }
-  if (hazelcast_client_->getLifecycleService().isRunning()) {
-    ENVOY_LOG(info, "Shutting down Hazelcast connection...");
-    hazelcast_client_->shutdown();
-    ENVOY_LOG(info, "Cache is offline now.");
-  } else {
-    ENVOY_LOG(warn, "Cache is already offline.");
-  }
-  if (destroy) {
-    hazelcast_client_.reset();
-  }
-}
-
-void HazelcastHttpCache::onMissingBody(uint64_t key, int32_t version,  uint64_t body_size) {
+void HazelcastHttpCache::onMissingBody(uint64_t key, int32_t version, uint64_t body_size) {
   try {
     if (!tryLock(key)) {
       // Let lock owner context to recover it.
@@ -168,9 +115,22 @@ void HazelcastHttpCache::onVersionMismatch(uint64_t key, int32_t version, uint64
   onMissingBody(key, version, body_size);
 }
 
+void HazelcastHttpCache::putResponseIfAbsent(const uint64_t& key,
+                                             const HazelcastResponseEntry& entry) {
+  getResponseMap().putIfAbsent(mapKey(key), entry);
+}
+
+HazelcastResponsePtr HazelcastHttpCache::getResponse(const uint64_t& key) {
+  return getResponseMap().get(mapKey(key));
+}
+
 bool HazelcastHttpCache::tryLock(const uint64_t& key) {
-  return unified_ ? getResponseMap().tryLock(mapKey(key)) :
-         getHeaderMap().tryLock(mapKey(key));
+  // Internal lock mechanism of Hazelcast specific to map and key pair is
+  // used to make exactly one lookup context responsible for insertions and
+  // secure consistency during updateHeaders(). These locks prevent possible
+  // race for multiple cache filters from multiple proxies when they connect
+  // to the same Hazelcast cluster.
+  return unified_ ? getResponseMap().tryLock(mapKey(key)) : getHeaderMap().tryLock(mapKey(key));
 }
 
 void HazelcastHttpCache::unlock(const uint64_t& key) {
@@ -183,12 +143,58 @@ void HazelcastHttpCache::unlock(const uint64_t& key) {
   }
 }
 
-HazelcastHttpCache::~HazelcastHttpCache() {
-  shutdown(true);
+uint64_t HazelcastHttpCache::random() { return rand_.random(); }
+
+void HazelcastHttpCache::connect() {
+  if (hazelcast_client_ && hazelcast_client_->getLifecycleService().isRunning()) {
+    ENVOY_LOG(warn, "Client is already connected. Cluster name: {}",
+              hazelcast_client_->getClientConfig().getGroupConfig().getName());
+    return;
+  }
+
+  ClientConfig config = ConfigUtil::getClientConfig(cache_config_);
+  config.getSerializationConfig().addDataSerializableFactory(
+      HazelcastCacheEntrySerializableFactory::FACTORY_ID,
+      boost::shared_ptr<serialization::DataSerializableFactory>(
+          new HazelcastCacheEntrySerializableFactory()));
+
+  try {
+    hazelcast_client_ = std::make_unique<HazelcastClient>(config);
+  } catch (...) {
+    throw EnvoyException("Hazelcast Client could not connect to any cluster.");
+  }
+
+  ENVOY_LOG(info, "HazelcastHttpCache has been started with profile: {}. Max body size: {}.",
+            unified_ ? "UNIFIED"
+                     : "DIVIDED, partition size: " + std::to_string(body_partition_size_),
+            max_body_size_);
+  ENVOY_LOG(info,
+            "Cache statistics can be observed on Hazelcast Management Center"
+            " from the map named {}.",
+            unified_ ? response_map_name_ : header_map_name_);
 }
 
+void HazelcastHttpCache::shutdown(bool destroy) {
+  if (!hazelcast_client_) {
+    ENVOY_LOG(warn, "Client is already offline.");
+    return;
+  }
+  if (hazelcast_client_->getLifecycleService().isRunning()) {
+    ENVOY_LOG(info, "Shutting down Hazelcast connection...");
+    hazelcast_client_->shutdown();
+    ENVOY_LOG(info, "Cache is offline now.");
+  } else {
+    ENVOY_LOG(warn, "Cache is already offline.");
+  }
+  if (destroy) {
+    hazelcast_client_.reset();
+  }
+}
+
+HazelcastHttpCache::~HazelcastHttpCache() { shutdown(true); }
+
 void HazelcastHttpCache::updateUnifiedHeaders(LookupContextPtr&& lookup_context,
-    Http::ResponseHeaderMapPtr&& response_headers) {
+                                              Http::ResponseHeaderMapPtr&& response_headers) {
   const uint64_t& key = static_cast<UnifiedLookupContext*>(lookup_context.get())->variantHashKey();
   HazelcastResponsePtr response = getResponse(key);
   if (!response) {
@@ -203,7 +209,7 @@ void HazelcastHttpCache::updateUnifiedHeaders(LookupContextPtr&& lookup_context,
 }
 
 void HazelcastHttpCache::updateDividedHeaders(LookupContextPtr&& lookup_context,
-    Http::ResponseHeaderMapPtr&& response_headers) {
+                                              Http::ResponseHeaderMapPtr&& response_headers) {
   const uint64_t& key = static_cast<UnifiedLookupContext*>(lookup_context.get())->variantHashKey();
   HazelcastHeaderPtr stale = getHeader(key);
   if (!stale) {
@@ -218,6 +224,11 @@ void HazelcastHttpCache::updateDividedHeaders(LookupContextPtr&& lookup_context,
 }
 
 std::string HazelcastHttpCache::constructMapName(const std::string& postfix) {
+  // Maps are differentiated by their names in Hazelcast cluster. Hence each
+  // plugin will connect to a map named with partition size and app_prefix.
+  // When a cache connects to a cluster which already has an active cache
+  // with different body_partition_size, this naming will prevent incompatibility
+  // and separate these two caches in the Hazelcast cluster.
   std::string name(cache_config_.app_prefix());
   if (!unified_) {
     name.append(":").append(std::to_string(body_partition_size_));
@@ -226,34 +237,41 @@ std::string HazelcastHttpCache::constructMapName(const std::string& postfix) {
 }
 
 HazelcastHttpCache::HazelcastHttpCache(HazelcastHttpCacheConfig config)
-    : cache_config_(config), unified_(config.unified()),
-    body_partition_size_(ConfigUtil::validPartitionSize(config.body_partition_size())),
-    max_body_size_(ConfigUtil::validMaxBodySize(config.max_body_size(), config.unified())) {
+    : HazelcastCache(config.unified(), ConfigUtil::validPartitionSize(config.body_partition_size()),
+                     ConfigUtil::validMaxBodySize(config.max_body_size(), config.unified())),
+      cache_config_(config) {
   body_map_name_ = constructMapName("body");
   header_map_name_ = constructMapName("div-cache");
   response_map_name_ = constructMapName("uni-cache");
 }
 
-class HazelcastHttpCacheFactory : public HttpCacheFactory {
-public:
-  // From UntypedFactory
-  std::string name() const override { return std::string(HazelcastCacheName); }
-  // From TypedFactory
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<HazelcastHttpCacheConfig>();
-  }
-  // From HttpCacheFactory
-  HttpCache&
-  getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) override {
+std::string HazelcastHttpCacheFactory::name() const { return std::string(HazelcastCacheName); }
+
+ProtobufTypes::MessagePtr HazelcastHttpCacheFactory::createEmptyConfigProto() {
+  return std::make_unique<HazelcastHttpCacheConfig>();
+}
+
+HttpCache& HazelcastHttpCacheFactory::getCache(
+    const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) {
+  if (!cache_) {
     HazelcastHttpCacheConfig hz_cache_config;
     MessageUtil::unpackTo(config.typed_config(), hz_cache_config);
     cache_ = std::make_unique<HazelcastHttpCache>(hz_cache_config);
-    cache_->connect();
-    return *cache_;
   }
-private:
-  std::unique_ptr<HazelcastHttpCache> cache_;
-};
+  cache_->connect();
+  return *cache_;
+}
+
+HttpCache& HazelcastHttpCacheFactory::getOfflineCache(
+    const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) {
+  if (!cache_) {
+    HazelcastHttpCacheConfig hz_cache_config;
+    MessageUtil::unpackTo(config.typed_config(), hz_cache_config);
+    cache_ = std::make_unique<HazelcastHttpCache>(hz_cache_config);
+  }
+  cache_->shutdown(false);
+  return *cache_;
+}
 
 static Registry::RegisterFactory<HazelcastHttpCacheFactory, HttpCacheFactory> register_;
 

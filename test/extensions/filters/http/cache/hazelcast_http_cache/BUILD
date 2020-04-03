@@ -14,7 +14,7 @@ envoy_extension_cc_test(
     srcs = ["hazelcast_unified_cache_test.cc"],
     extension_name = "envoy.filters.http.cache.hazelcast_http_cache",
     deps = [
-        ":hazelcast_test_util_lib",
+        ":hazelcast_test_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
@@ -25,7 +25,7 @@ envoy_extension_cc_test(
     srcs = ["hazelcast_divided_cache_test.cc"],
     extension_name = "envoy.filters.http.cache.hazelcast_http_cache",
     deps = [
-        ":hazelcast_test_util_lib",
+        ":hazelcast_test_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
@@ -36,16 +36,19 @@ envoy_extension_cc_test(
     srcs = ["hazelcast_common_cache_test.cc"],
     extension_name = "envoy.filters.http.cache.hazelcast_http_cache",
     deps = [
-        ":hazelcast_test_util_lib",
+        ":hazelcast_test_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
-
 envoy_extension_cc_test_library(
-    name = "hazelcast_test_util_lib",
-    hdrs = ["util.h"],
+    name = "hazelcast_test_lib",
+    srcs = ["hazelcast_test_cache.cc"],
+    hdrs = [
+        "hazelcast_test_cache.h",
+        "util.h",
+    ],
     extension_name = "envoy.filters.http.cache.hazelcast_http_cache",
     deps = [
         "//source/extensions/filters/http/cache/hazelcast_http_cache:hazelcast_http_cache_lib",

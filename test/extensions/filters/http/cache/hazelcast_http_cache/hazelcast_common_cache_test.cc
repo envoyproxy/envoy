@@ -1,5 +1,6 @@
-#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_context.h"
 #include "envoy/registry/registry.h"
+
+#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_context.h"
 
 #include "test/extensions/filters/http/cache/hazelcast_http_cache/util.h"
 
@@ -15,12 +16,14 @@ namespace HazelcastHttpCache {
 class HazelcastHttpCacheTest : public HazelcastHttpCacheTestBase,
                                public testing::WithParamInterface<bool> {
 protected:
-
   void SetUp() {
     HazelcastHttpCacheConfig cfg = HazelcastTestUtil::getTestConfig(GetParam());
-    cache_ = new HazelcastHttpCache(cfg);
-    cache_->connect();
-    clearMaps();
+    // To test the cache with a real Hazelcast instance, remote cache
+    // must be used during tests.
+    // cache_ = std::make_unique<HazelcastTestableRemoteCache>(cfg);
+    cache_ = std::make_unique<HazelcastTestableLocalCache>(cfg);
+    cache_->restoreTestConnection();
+    cache_->clearTestMaps();
   }
 };
 
@@ -68,24 +71,22 @@ TEST_P(HazelcastHttpCacheTest, HandleRangedResponses) {
   lookup_context1 = lookup(RequestPath);
 
   // 'h' * (size)
-  EXPECT_EQ(absl::string_view(Body.c_str(), size),
-    getBody(*lookup_context1, 0, size));
+  EXPECT_EQ(absl::string_view(Body.c_str(), size), getBody(*lookup_context1, 0, size));
 
   // 'z' * (size)
   EXPECT_EQ(absl::string_view(Body.c_str() + size, size),
-    getBody(*lookup_context1, size, size * 2));
+            getBody(*lookup_context1, size, size * 2));
 
   // 'h' * (size/2) + 'z' * (size/2)
   EXPECT_EQ(absl::string_view(Body.c_str() + size / 2, size),
-    getBody(*lookup_context1, size / 2, size + size / 2));
+            getBody(*lookup_context1, size / 2, size + size / 2));
 
   // 'h' + 'z' * (size) + 'c'
   EXPECT_EQ(absl::string_view(Body.c_str() + size - 1, size + 2),
-    getBody(*lookup_context1, size - 1, 2 * size + 1));
+            getBody(*lookup_context1, size - 1, 2 * size + 1));
 
   // 'h' * (size) + 'z' * (size) + 'c' * (size)
-  EXPECT_EQ(absl::string_view(Body.c_str(), size * 3),
-    getBody(*lookup_context1, 0, size * 3));
+  EXPECT_EQ(absl::string_view(Body.c_str(), size * 3), getBody(*lookup_context1, 0, size * 3));
 }
 
 //
@@ -124,11 +125,11 @@ TEST_P(HazelcastHttpCacheTest, PrivateResponse) {
 TEST_P(HazelcastHttpCacheTest, Miss) {
   LookupContextPtr name_lookup_context = lookup("/no/such/entry");
   uint64_t variant_hash_key =
-    static_cast<HazelcastLookupContextBase&>(*name_lookup_context).variantHashKey();
+      static_cast<HazelcastLookupContextBase&>(*name_lookup_context).variantHashKey();
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   // Do not left over a missed lookup without inserting or releasing its lock.
-  unlockKey(variant_hash_key);
+  cache_->base().unlock(variant_hash_key);
 }
 
 TEST_P(HazelcastHttpCacheTest, Fresh) {
@@ -151,10 +152,9 @@ TEST_P(HazelcastHttpCacheTest, RequestSmallMinFresh) {
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-  Http::TestResponseHeaderMapImpl response_headers{
-    {"date", formatter_.fromTime(current_time_)},
-    {"age", "6000"},
-    {"cache-control", "public, max-age=9000"}};
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"age", "6000"},
+                                                   {"cache-control", "public, max-age=9000"}};
   const std::string Body("content");
   insert(move(name_lookup_context), response_headers, Body);
   EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path).get(), Body));
@@ -167,10 +167,9 @@ TEST_P(HazelcastHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-  Http::TestResponseHeaderMapImpl response_headers{
-    {"date", formatter_.fromTime(current_time_)},
-    {"age", "7200"},
-    {"cache-control", "public, max-age=3600"}};
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"age", "7200"},
+                                                   {"cache-control", "public, max-age=3600"}};
 
   const std::string Body("content");
   insert(move(name_lookup_context), response_headers, Body);
@@ -178,11 +177,10 @@ TEST_P(HazelcastHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
 }
 
 TEST_P(HazelcastHttpCacheTest, StreamingPutAndRangeGet) {
-  InsertContextPtr inserter = makeInsertContext("/streaming/put");
+  InsertContextPtr inserter = cache_->base().makeInsertContext(lookup("/streaming/put"));
   inserter->insertHeaders(getResponseHeaders(), false);
   inserter->insertBody(
-    Buffer::OwnedImpl("Hello, "),
-    [](bool ready){EXPECT_TRUE(ready); }, false);
+      Buffer::OwnedImpl("Hello, "), [](bool ready) { EXPECT_TRUE(ready); }, false);
   inserter->insertBody(Buffer::OwnedImpl("World!"), nullptr, true);
   LookupContextPtr name_lookup_context = lookup("/streaming/put");
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
@@ -194,18 +192,21 @@ TEST_P(HazelcastHttpCacheTest, StreamingPutAndRangeGet) {
 
 TEST(Registration, GetFactory) {
   HttpCacheFactory* factory = Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(
-    "envoy.source.extensions.filters.http.cache.HazelcastHttpCacheConfig");
+      "envoy.source.extensions.filters.http.cache.HazelcastHttpCacheConfig");
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
   HazelcastHttpCacheConfig hz_cache_config = HazelcastTestUtil::getTestConfig(true);
+  hz_cache_config.set_group_name("do-not-connect-any-cluster");
+  hz_cache_config.set_connection_attempt_limit(1);
+  hz_cache_config.set_connection_attempt_period(1); // give up immediately.
   config.mutable_typed_config()->PackFrom(hz_cache_config);
-  HazelcastHttpCache& cache = static_cast<HazelcastHttpCache&>(factory->getCache(config));
-  EXPECT_EQ(cache.cacheInfo().name_, "envoy.extensions.http.cache.hazelcast");
 
-  // Explicitly destroy Hazelcast connection here. Otherwise the test
-  // environment does not wait for cache destructor to be completed
-  // and this causes segfault when Hazelcast Client is shutting down.
-  cache.shutdown(true);
+  // getOfflineCache() call is for testing. It creates a HazelcastHttpCache but does
+  // not make it operational until a connect() call.
+  HttpCache& cache = static_cast<HazelcastHttpCacheFactory*>(factory)->getOfflineCache(config);
+  EXPECT_EQ(cache.cacheInfo().name_, "envoy.extensions.http.cache.hazelcast");
+  EXPECT_THROW_WITH_MESSAGE(static_cast<HazelcastHttpCache&>(cache).connect(), EnvoyException,
+                            "Hazelcast Client could not connect to any cluster.");
 }
 
 } // namespace HazelcastHttpCache

@@ -2,12 +2,11 @@
 
 #include "common/http/header_map_impl.h"
 
-#include "hazelcast/client/serialization/IdentifiedDataSerializable.h"
-#include "hazelcast/client/serialization/ObjectDataInput.h"
-#include "hazelcast/client/serialization/ObjectDataOutput.h"
-#include "hazelcast/client/PartitionAware.h"
-
 #include "source/extensions/filters/http/cache/key.pb.h"
+
+#include "hazelcast/client/EntryView.h"
+#include "hazelcast/client/PartitionAware.h"
+#include "hazelcast/client/serialization/ObjectDataOutput.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,10 +15,10 @@ namespace Cache {
 namespace HazelcastHttpCache {
 
 using hazelcast::client::PartitionAware;
-using hazelcast::client::serialization::IdentifiedDataSerializable;
-using hazelcast::client::serialization::ObjectDataOutput;
-using hazelcast::client::serialization::ObjectDataInput;
 using hazelcast::client::serialization::DataSerializableFactory;
+using hazelcast::client::serialization::IdentifiedDataSerializable;
+using hazelcast::client::serialization::ObjectDataInput;
+using hazelcast::client::serialization::ObjectDataOutput;
 
 static const int HAZELCAST_BODY_TYPE_ID = 100;
 static const int HAZELCAST_HEADER_TYPE_ID = 101;
@@ -38,7 +37,7 @@ class HazelcastHeaderEntry : public IdentifiedDataSerializable {
 public:
   HazelcastHeaderEntry();
   HazelcastHeaderEntry(Http::ResponseHeaderMapPtr&& header_map, Key&& key, uint64_t body_size,
-      int32_t version);
+                       int32_t version);
   HazelcastHeaderEntry(const HazelcastHeaderEntry& other);
   HazelcastHeaderEntry(HazelcastHeaderEntry&& other);
 
@@ -80,15 +79,15 @@ private:
 };
 
 /**
-* Response body wrapper for cache entries.
-*
-* @note In DIVIDED cache mode, response headers and corresponding bodies will be stored in
-* different distributed maps. For a response HeaderEntry with 64 bit hash key <H>, bodies
-* will be stored with keys <H>"0", <H>"1", <H>"2".. and so on in a contiguous manner.
-* Body partition size is fixed and configurable via cache config. On a range request, only
-* necessary partitions according to the request will be fetched from distributed map,
-* not the whole response.
-*/
+ * Response body wrapper for cache entries.
+ *
+ * @note In DIVIDED cache mode, response headers and corresponding bodies will be stored in
+ * different distributed maps. For a response HeaderEntry with 64 bit hash key <H>, bodies
+ * will be stored with keys <H>"0", <H>"1", <H>"2".. and so on in a contiguous manner.
+ * Body partition size is fixed and configurable via cache config. On a range request, only
+ * necessary partitions according to the request will be fetched from distributed map,
+ * not the whole response.
+ */
 class HazelcastBodyEntry : public IdentifiedDataSerializable, public PartitionAware<int64_t> {
 public:
   HazelcastBodyEntry();
@@ -133,13 +132,13 @@ private:
 };
 
 /**
-* Response wrapper for cache entries.
-*
-* @note In UNIFIED cache mode, unlike DIVIDED, there is only one cache entry containing
-* the response as a whole. Even if a range request arrives, all the body is fetched from
-* the cache. This option is in favor of the efficiency of http responses with small body
-* sizes. Hence it prevents extra calls for bodies after fetching header.
-*/
+ * Response wrapper for cache entries.
+ *
+ * @note In UNIFIED cache mode, unlike DIVIDED, there is only one cache entry containing
+ * the response as a whole. Even if a range request arrives, all the body is fetched from
+ * the cache. This option is in favor of the efficiency of http responses with small body
+ * sizes. Hence it prevents extra calls for bodies after fetching header.
+ */
 class HazelcastResponseEntry : public IdentifiedDataSerializable {
 public:
   HazelcastResponseEntry();
@@ -189,8 +188,8 @@ public:
 
 #pragma GCC diagnostic pop
 
-} // HazelcastHttpCache
-} // Cache
-} // HttpFilters
-} // Extensions
-} // Envoy
+} // namespace HazelcastHttpCache
+} // namespace Cache
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

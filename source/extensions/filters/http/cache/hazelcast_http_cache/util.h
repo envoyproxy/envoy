@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/extensions/filters/http/cache/hazelcast_http_cache/config.pb.h"
+
 #include "hazelcast/client/ClientConfig.h"
 
 namespace Envoy {
@@ -11,11 +12,10 @@ namespace HazelcastHttpCache {
 
 class ConfigUtil {
 public:
-
   static uint64_t validPartitionSize(const uint64_t config_value) {
-    return config_value == 0 ?
-      DEFAULT_PARTITION_SIZE : (config_value > MAX_PARTITION_SIZE) ?
-      MAX_PARTITION_SIZE : config_value;
+    return config_value == 0
+               ? DEFAULT_PARTITION_SIZE
+               : (config_value > MAX_PARTITION_SIZE) ? MAX_PARTITION_SIZE : config_value;
   }
 
   static uint64_t validMaxBodySize(const uint64_t config_value, const bool unified) {
@@ -23,31 +23,34 @@ public:
     return config_value == 0 || (config_value > max_size) ? max_size : config_value;
   }
 
-  static hazelcast::client::ClientConfig getClientConfig(const
-    envoy::source::extensions::filters::http::cache::HazelcastHttpCacheConfig& cache_config) {
+  static hazelcast::client::ClientConfig
+  getClientConfig(const envoy::source::extensions::filters::http::cache::HazelcastHttpCacheConfig&
+                      cache_config) {
     hazelcast::client::ClientConfig config;
     config.getGroupConfig().setName(cache_config.group_name());
-    config.getNetworkConfig().setConnectionTimeout(cache_config.connection_timeout()
-      == 0 ? DEFAULT_CONNECTION_TIMEOUT_MS : cache_config.connection_timeout());
-    config.getNetworkConfig().setConnectionAttemptLimit(cache_config.connection_attempt_limit()
-      == 0 ? DEFAULT_CONNECTION_ATTEMPT_LIMIT : cache_config.connection_attempt_limit());
-    config.getNetworkConfig().setConnectionAttemptPeriod(cache_config.connection_attempt_period()
-      == 0 ? DEFAULT_CONNECTION_ATTEMPT_PERIOD_MS : cache_config.connection_attempt_period());
+    config.getNetworkConfig().setConnectionTimeout(cache_config.connection_timeout() == 0
+                                                       ? DEFAULT_CONNECTION_TIMEOUT_MS
+                                                       : cache_config.connection_timeout());
+    config.getNetworkConfig().setConnectionAttemptLimit(
+        cache_config.connection_attempt_limit() == 0 ? DEFAULT_CONNECTION_ATTEMPT_LIMIT
+                                                     : cache_config.connection_attempt_limit());
+    config.getNetworkConfig().setConnectionAttemptPeriod(
+        cache_config.connection_attempt_period() == 0 ? DEFAULT_CONNECTION_ATTEMPT_PERIOD_MS
+                                                      : cache_config.connection_attempt_period());
     config.getConnectionStrategyConfig().setReconnectMode(
-      hazelcast::client::config::ClientConnectionStrategyConfig::ReconnectMode::ASYNC);
-    for (auto &address : cache_config.addresses()) {
-      config.getNetworkConfig().addAddress(hazelcast::client::Address(address.ip(),
-        address.port()));
+        hazelcast::client::config::ClientConnectionStrategyConfig::ReconnectMode::ASYNC);
+    for (auto& address : cache_config.addresses()) {
+      config.getNetworkConfig().addAddress(
+          hazelcast::client::Address(address.ip(), address.port()));
     }
     config.setProperty("hazelcast.client.invocation.timeout.seconds",
-      std::to_string(cache_config.invocation_timeout() == 0 ?
-      DEFAULT_INVOCATION_TIMEOUT_SEC : cache_config.invocation_timeout()));
+                       std::to_string(cache_config.invocation_timeout() == 0
+                                          ? DEFAULT_INVOCATION_TIMEOUT_SEC
+                                          : cache_config.invocation_timeout()));
     return config;
   }
 
-  static short partitionWarnLimit() {
-    return WARN_PARTITION_LIMIT;
-  }
+  static short partitionWarnLimit() { return WARN_PARTITION_LIMIT; }
 
 private:
   // After this much body partitions stored for a response in DIVIDED mode,
@@ -78,8 +81,8 @@ private:
   static constexpr uint32_t DEFAULT_INVOCATION_TIMEOUT_SEC = 8;
 };
 
-} // HazelcastHttpCache
-} // Cache
-} // HttpFilters
-} // Extensions
-} // Envoy
+} // namespace HazelcastHttpCache
+} // namespace Cache
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
