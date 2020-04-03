@@ -21,6 +21,8 @@ are shown in this form. See the documentation for
 :ref:`individual_method_stats_allowlist <envoy_api_field_config.filter.http.grpc_stats.v2alpha.FilterConfig.individual_method_stats_allowlist>`
 and :ref:`stats_for_all_methods <envoy_api_field_config.filter.http.grpc_stats.v2alpha.FilterConfig.stats_for_all_methods>`.
 
+To enable *upstream_rq_time* see :ref:`enable_upstream_stats <envoy_api_field_config.filter.http.grpc_stats.v2alpha.FilterConfig.enable_upstream_stats>`.
+
 
 .. csv-table::
   :header: Name, Type, Description
@@ -31,3 +33,4 @@ and :ref:`stats_for_all_methods <envoy_api_field_config.filter.http.grpc_stats.v
   <grpc service>.<grpc method>.total, Counter, Total service/method calls
   <grpc service>.<grpc method>.request_message_count, Counter, Total request message count for service/method calls
   <grpc service>.<grpc method>.response_message_count, Counter, Total response message count for service/method calls
+  <grpc service>.<grpc method>.upstream_rq_time, Histogram, Request time milliseconds

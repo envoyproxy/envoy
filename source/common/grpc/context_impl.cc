@@ -15,6 +15,7 @@ ContextImpl::ContextImpl(Stats::SymbolTable& symbol_table)
       total_(stat_name_pool_.add("total")), zero_(stat_name_pool_.add("0")),
       request_message_count_(stat_name_pool_.add("request_message_count")),
       response_message_count_(stat_name_pool_.add("response_message_count")),
+      upstream_rq_time_(stat_name_pool_.add("upstream_rq_time")),
       stat_names_(symbol_table) {}
 
 // Makes a stat name from a string, if we don't already have one for it.
@@ -112,6 +113,20 @@ void ContextImpl::chargeResponseMessageStat(const Upstream::ClusterInfo& cluster
   cluster.statsScope()
       .counterFromStatName(Stats::StatName(response_message_count.get()))
       .add(amount);
+}
+
+void ContextImpl::chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
+                                     const absl::optional<RequestStatNames>& request_names,
+                                     uint64_t duration) {
+  auto prefix_and_storage = getPrefix(Protocol::Grpc, request_names);
+  Stats::StatName prefix = prefix_and_storage.first;
+
+  const Stats::SymbolTable::StoragePtr upstream_rq_time =
+      symbol_table_.join({prefix, upstream_rq_time_});
+
+  cluster.statsScope()
+      .histogramFromStatName(Stats::StatName(upstream_rq_time.get()), Stats::Histogram::Unit::Milliseconds)
+      .recordValue(duration);
 }
 
 absl::optional<ContextImpl::RequestStatNames>
