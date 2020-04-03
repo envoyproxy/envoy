@@ -17,9 +17,6 @@ Version history
 * aws_request_signing: a few fixes so that it works with S3.
 * buffer: force copy when appending small slices to OwnedImpl buffer to avoid fragmentation.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
-* grpc-json: added support for building HTTP request into
-  `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
-* grpc-stats: add options to limit which messages stats are created for.
 * config: added stat :ref:`update_time <config_cluster_manager_cds>`.
 * datasource: added retry policy for remote async data source.
 * dns: the STRICT_DNS cluster now only resolves to 0 hosts if DNS resolution successfully returns 0 hosts.
@@ -32,6 +29,7 @@ Version history
 * fault: added support for controlling abort faults with :ref:`HTTP header fault configuration <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
 * grpc-json: added support for building HTTP request into
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
+* grpc-stats: add options to limit which messages stats are created for.
 * gzip filter: added option to set zlib's next output buffer.
 * http: added HTTP/1.1 flood protection. Can be temporarily disabled using the runtime feature `envoy.reloadable_features.http1_flood_protection`
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
