@@ -20,7 +20,9 @@ public:
     directory_ = TestEnvironment::temporaryDirectory() + "/test/config_test/";
   }
 
-  static void SetUpTestSuite() { SetupTestDirectory(); }
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    SetupTestDirectory();
+  }
 
 protected:
   ValidationServerTest() : options_(directory_ + GetParam()) {}

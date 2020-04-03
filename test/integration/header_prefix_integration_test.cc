@@ -18,7 +18,7 @@ static const char* custom_prefix_ = "x-custom";
 
 class HeaderPrefixIntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  static void SetUpTestSuite() {
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(custom_prefix_);
   }
 };

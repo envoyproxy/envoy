@@ -27,7 +27,7 @@ public:
   RoleBasedAccessControlNetworkFilterIntegrationTest()
       : BaseIntegrationTest(GetParam(), rbac_config) {}
 
-  static void SetUpTestSuite() {
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     rbac_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
