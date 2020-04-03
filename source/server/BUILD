@@ -368,6 +368,7 @@ envoy_cc_library(
         "//source/common/config:version_converter_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/init:manager_lib",
+        "//source/common/network:filter_matcher_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",

@@ -228,7 +228,7 @@ typed_config:
 
 // Add a health check filter and verify correct behavior when draining.
 TEST_P(ProtocolIntegrationTest, DrainClose) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   test_server_->drainManager().draining_ = true;
