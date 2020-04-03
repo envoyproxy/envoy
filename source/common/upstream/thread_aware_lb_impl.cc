@@ -142,7 +142,20 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   if (per_priority_state->global_panic_) {
     stats_.lb_healthy_panic_.inc();
   }
-  return per_priority_state->current_lb_->chooseHost(h);
+
+  HostConstSharedPtr host;
+  const uint32_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
+  for (uint32_t i = 0; i < max_attempts; ++i) {
+    host = per_priority_state->current_lb_->chooseHost(h, i);
+
+    // If host selection failed or the host is accepted by the filter, return.
+    // Otherwise, try again.
+    if (!host || !context || !context->shouldSelectAnotherHost(*host)) {
+      return host;
+    }
+  }
+
+  return host;
 }
 
 LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {

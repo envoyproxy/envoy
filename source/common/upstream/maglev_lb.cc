@@ -80,9 +80,16 @@ MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weigh
   }
 }
 
-HostConstSharedPtr MaglevTable::chooseHost(uint64_t hash) const {
+HostConstSharedPtr MaglevTable::chooseHost(uint64_t hash, uint32_t attempt) const {
   if (table_.empty()) {
     return nullptr;
+  }
+
+  if (attempt > 0) {
+    // If a retry host predicate is being applied, mutate the hash to choose an alternate host.
+    // By using value with most bits set for the retry attempts, we achieve a larger change in
+    // the hash, thereby reducing the likelihood that all retries are directed to a single host.
+    hash ^= ~0ULL - attempt + 1;
   }
 
   return table_[hash % table_size_];
