@@ -1,4 +1,5 @@
-Checks:           'abseil-duration-*,
+Checks:           '-clang-analyzer-optin.cplusplus.UninitializedObject,
+                   abseil-duration-*,
                    abseil-faster-strsplit-delimiter,
                    abseil-no-namespace,
                    abseil-redundant-strcat-calls,
