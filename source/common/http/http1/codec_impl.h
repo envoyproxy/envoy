@@ -60,6 +60,8 @@ public:
   // Http::Stream
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
   void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
+  // After this is called, for the HTTP/1 codec, the connection should be closed, i.e. no further
+  // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
   void readDisable(bool disable) override;
   uint32_t bufferLimit() override;
