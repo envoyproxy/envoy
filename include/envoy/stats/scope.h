@@ -156,7 +156,7 @@ public:
   virtual TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                        StatNameTagVectorOptConstRef tags) PURE;
 
-  /**v
+  /**
    * TODO(#6667): this variant is deprecated: use textReadoutFromStatName.
    * @param name The name, expressed as a string.
    * @return a text readout within the scope's namespace.

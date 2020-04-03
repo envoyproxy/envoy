@@ -39,7 +39,7 @@ void AllocatorImpl::debugPrint() {
 }
 #endif
 
-// Counter and Gauge both inherit from from RefcountInterface and
+// Counter, Gauge and TextReadout inherit from RefcountInterface and
 // Metric. MetricImpl takes care of most of the Metric API, but we need to cover
 // symbolTable() here, which we don't store directly, but get it via the alloc,
 // which we need in order to clean up the counter and gauge maps in that class
@@ -101,10 +101,6 @@ public:
 protected:
   AllocatorImpl& alloc_;
 
-  // Holds backing store shared by both CounterImpl and GaugeImpl. CounterImpl
-  // adds another field, pending_increment_, that is not used in Gauge.
-  std::atomic<uint64_t> value_{0};
-
   // ref_count_ can be incremented as an atomic, without taking a new lock, as
   // the critical 0->1 transition occurs in makeCounter and makeGauge, which
   // already hold the lock. Increment also occurs when copying shared pointers,
@@ -144,6 +140,7 @@ public:
   uint64_t value() const override { return value_; }
 
 private:
+  std::atomic<uint64_t> value_{0};
   std::atomic<uint64_t> pending_increment_{0};
 };
 
@@ -226,6 +223,8 @@ public:
       break;
     }
   }
+private:
+  std::atomic<uint64_t> value_{0};
 };
 
 class TextReadoutImpl : public StatsSharedImpl<TextReadout> {
