@@ -621,7 +621,7 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerHostWeightsLimit) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(
       config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
-      "Load balancing hosts weights has accumulated over its maximum value 4294967295");
+      "The sum of weights of all upstream hosts in a locality exceeds 4294967295");
 }
 
 TEST_F(ConfigurationImplTest, ExceedLoadBalancerLocalityWeightsLimit) {
@@ -727,7 +727,7 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerLocalityWeightsLimit) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(
       config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
-      "Load balancing locality weights has accumulated over its maximum value 4294967295");
+      "The sum of weights of all localities at the same priority exceeds 4294967295");
 }
 
 } // namespace
