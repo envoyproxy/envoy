@@ -34,7 +34,6 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = [
         ":runtime_features_lib",
-        "//include/envoy/config:discovery_service_base_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/init:manager_interface",
@@ -48,6 +47,7 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:api_version_lib",
+        "//source/common/config:subscription_base_interface",
         "//source/common/filesystem:directory_lib",
         "//source/common/grpc:common_lib",
         "//source/common/init:target_lib",

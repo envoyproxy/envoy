@@ -3,7 +3,6 @@
 #include <functional>
 
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
@@ -13,6 +12,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
+#include "common/config/subscription_base.h"
 #include "common/init/target_impl.h"
 
 namespace Envoy {

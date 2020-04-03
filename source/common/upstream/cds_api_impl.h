@@ -5,7 +5,6 @@
 #include "envoy/api/api.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/local_info/local_info.h"
@@ -14,6 +13,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
+#include "common/config/subscription_base.h"
 
 namespace Envoy {
 namespace Upstream {

@@ -9,7 +9,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/subscription.h"
 #include "envoy/init/manager.h"
 #include "envoy/runtime/runtime.h"
@@ -24,6 +23,7 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+#include "common/config/subscription_base.h"
 #include "common/init/target_impl.h"
 #include "common/singleton/threadsafe_singleton.h"
 

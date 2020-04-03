@@ -44,7 +44,6 @@ envoy_cc_library(
     srcs = ["sds_api.cc"],
     hdrs = ["sds_api.h"],
     deps = [
-        "//include/envoy/config:discovery_service_base_interface",
         "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -57,7 +56,7 @@ envoy_cc_library(
         "//source/common/common:callback_impl_lib",
         "//source/common/common:cleanup_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/config:resources_lib",
+        "//source/common/config:subscription_base_interface",
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",

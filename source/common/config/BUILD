@@ -252,6 +252,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "resource_name_lib",
+    hdrs = ["resource_name.h"],
+    deps = [
+        ":api_type_oracle_lib",
+        "//source/common/common:assert_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "resources_lib",
     hdrs = ["resources.h"],
     deps = ["//source/common/singleton:const_singleton"],
@@ -358,6 +368,15 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "subscription_base_interface",
+    hdrs = ["subscription_base.h"],
+    deps = [
+        ":resource_name_lib",
+        "//include/envoy/config:subscription_interface",
     ],
 )
 
