@@ -28,7 +28,7 @@
 namespace Envoy {
 namespace Network {
 
-// TODO(lambdai): Remove below redeclare in C++17.
+// TODO(lambdai): Remove below re-declare in C++17.
 constexpr absl::string_view Utility::TCP_SCHEME;
 constexpr absl::string_view Utility::UDP_SCHEME;
 constexpr absl::string_view Utility::UNIX_SCHEME;
