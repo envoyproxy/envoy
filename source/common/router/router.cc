@@ -541,23 +541,27 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  auto conn_pool = getConnPool();
+  Http::ConnectionPool::Instance* http_pool = getHttpConnPool();
+  Upstream::HostDescriptionConstSharedPtr host;
 
-  if (!conn_pool) {
+  if (http_pool) {
+    host = http_pool->host();
+  } else {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
+
   if (debug_config && debug_config->append_upstream_host_) {
     // The hostname and address will be appended to any local or upstream responses from this point,
     // possibly in addition to the cluster name.
-    modify_headers = [modify_headers, debug_config, conn_pool](Http::ResponseHeaderMap& headers) {
+    modify_headers = [modify_headers, debug_config, host](Http::ResponseHeaderMap& headers) {
       modify_headers(headers);
       headers.addCopy(
           debug_config->hostname_header_.value_or(Http::Headers::get().EnvoyUpstreamHostname),
-          conn_pool->host()->hostname());
+          host->hostname());
       headers.addCopy(debug_config->host_address_header_.value_or(
                           Http::Headers::get().EnvoyUpstreamHostAddress),
-                      conn_pool->host()->address()->asString());
+                      host->address()->asString());
     };
   }
 
@@ -608,8 +612,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
-  FilterUtility::setUpstreamScheme(
-      headers, conn_pool->host()->transportSocketFactory().implementsSecureTransport());
+  FilterUtility::setUpstreamScheme(headers,
+                                   host->transportSocketFactory().implementsSecureTransport());
 
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
@@ -632,7 +636,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
-  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
+  UpstreamRequestPtr upstream_request =
+      std::make_unique<UpstreamRequest>(*this, std::make_unique<HttpConnPool>(*http_pool));
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
@@ -642,7 +647,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::ConnectionPool::Instance* Filter::getConnPool() {
+Http::ConnectionPool::Instance* Filter::getHttpConnPool() {
   // Choose protocol based on cluster configuration and downstream connection
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
@@ -1048,6 +1053,12 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   onUpstreamAbort(Http::Code::ServiceUnavailable, response_flags, body, dropped, details);
 }
 
+void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
+  if (retry_state_ && host) {
+    retry_state_->onHostAttempted(host);
+  }
+}
+
 StreamInfo::ResponseFlag
 Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   switch (reset_reason) {
@@ -1425,8 +1436,15 @@ void Filter::doRetry() {
   attempt_count_++;
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
-  Http::ConnectionPool::Instance* conn_pool = getConnPool();
-  if (!conn_pool) {
+  UpstreamRequestPtr upstream_request;
+
+  Http::ConnectionPool::Instance* conn_pool = getHttpConnPool();
+  if (conn_pool) {
+    upstream_request =
+        std::make_unique<UpstreamRequest>(*this, std::make_unique<HttpConnPool>(*conn_pool));
+  }
+
+  if (!upstream_request) {
     sendNoHealthyUpstreamResponse();
     cleanup();
     return;
@@ -1437,7 +1455,6 @@ void Filter::doRetry() {
   }
 
   ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);
-  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(!callbacks_->decodingBuffer() && !downstream_trailers_);

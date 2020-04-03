@@ -25,16 +25,15 @@ using testing::MatchesRegex;
 using testing::NiceMock;
 
 namespace Envoy {
-namespace {
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
 
 void TcpProxyIntegrationTest::initialize() {
   config_helper_.renameListener("tcp_proxy");
   BaseIntegrationTest::initialize();
 }
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Test upstream writing before downstream downstream does.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
@@ -807,5 +806,4 @@ TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
 }
 
-} // namespace
 } // namespace Envoy

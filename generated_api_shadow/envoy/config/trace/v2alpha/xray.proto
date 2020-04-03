@@ -21,8 +21,8 @@ message XRayConfig {
   // If this value is not set, the default value of 127.0.0.1:2000 will be used.
   api.v2.core.SocketAddress daemon_endpoint = 1;
 
-  // The name of the X-Ray segment. By default this will be set to the cluster name.
-  string segment_name = 2;
+  // The name of the X-Ray segment.
+  string segment_name = 2 [(validate.rules).string = {min_len: 1}];
 
   // The location of a local custom sampling rules JSON file.
   // For an example of the sampling rules see:
