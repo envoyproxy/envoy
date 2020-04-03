@@ -34,6 +34,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Http {
+namespace Legacy {
 namespace Http2 {
 
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
@@ -1731,5 +1732,6 @@ TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
 }
 
 } // namespace Http2
+} // namespace Legacy
 } // namespace Http
 } // namespace Envoy

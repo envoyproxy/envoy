@@ -33,6 +33,7 @@ using testing::StrictMock;
 
 namespace Envoy {
 namespace Http {
+namespace Legacy {
 namespace Http1 {
 namespace {
 std::string createHeaderFragment(int num_headers) {
@@ -1954,5 +1955,6 @@ TEST_F(Http1ClientConnectionImplTest, ManyResponseHeadersAccepted) {
 }
 
 } // namespace Http1
+} // namespace Legacy
 } // namespace Http
 } // namespace Envoy
