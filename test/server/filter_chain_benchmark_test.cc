@@ -27,11 +27,6 @@ namespace Envoy {
 namespace Server {
 
 namespace {
-
-Configuration::FactoryContext& getFactoryContext() {
-MUTABLE_CONSTRUCT_ON_FIRST_USE(Server::Configuration::MockFactoryContext);
-
-}
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   std::shared_ptr<Network::DrainableFilterChain>
   buildFilterChain(const envoy::config::listener::v3::FilterChain&,
@@ -171,7 +166,6 @@ const char YamlSingleDstPortBottom[] = R"EOF(
 
 class FilterChainBenchmarkFixture : public benchmark::Fixture {
 public:
-  using Fixture::SetUp;
   void SetUp(const ::benchmark::State& state) override {
     int64_t input_size = state.range(0);
     std::vector<std::string> port_chains;
@@ -187,27 +181,22 @@ public:
   }
   std::string listener_yaml_config_;
   envoy::config::listener::v3::Listener listener_config_;
-      absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
-
+  absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
   MockFilterChainFactoryBuilder dummy_builder_;
-  //Server::Configuration::MockFactoryContext factory_context_;
   Init::ManagerImpl init_manager_{"fcm_benchmark"};
-  FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), getFactoryContext(),
-      init_manager_};
 };
 
 // NOLINTNEXTLINE(readability-redundant-member-init)
-// BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
-// (::benchmark::State& state) {
-//   for (auto _ : state) {
-// //    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-//     FilterChainManagerImpl filter_chain_manager{
-//         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context_,
-//         init_manager_};
-//     filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
-//   }
-// }
+BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
+(::benchmark::State& state) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  for (auto _ : state) {
+    FilterChainManagerImpl filter_chain_manager{
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
+        init_manager_};
+    filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
+  }
+}
 
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
 (::benchmark::State& state) {
@@ -217,9 +206,9 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
     sockets.push_back(std::move(*MockConnectionSocket::createMockConnectionSocket(
         10000 + i, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111)));
   }
-  //NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   FilterChainManagerImpl filter_chain_manager{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), getFactoryContext(),
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
       init_manager_};
 
   filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
@@ -229,11 +218,11 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
     }
   }
 }
-// BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
-//     ->Ranges({
-//         // scale of the chains
-//         {1, 4096},
-//     });
+BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
+    ->Ranges({
+        // scale of the chains
+        {1, 4096},
+    });
 BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainFindTest)
     ->Ranges({
         // scale of the chains
@@ -253,16 +242,16 @@ Load Average: 19.05, 9.89, 3.92
 -------------------------------------------------------------------------------------------------------
 Benchmark                                                             Time             CPU   Iterations
 -------------------------------------------------------------------------------------------------------
-FilterChainBenchmarkFixture/FilterChainManagerBuildTest/1         51002 ns        50998 ns        12033
-FilterChainBenchmarkFixture/FilterChainManagerBuildTest/8        205175 ns       205161 ns         3782
-FilterChainBenchmarkFixture/FilterChainManagerBuildTest/64      1400449 ns      1400328 ns          485
-FilterChainBenchmarkFixture/FilterChainManagerBuildTest/512    10488106 ns     10485949 ns           62
-FilterChainBenchmarkFixture/FilterChainManagerBuildTest/4096  118373326 ns    117786871 ns            7
-FilterChainBenchmarkFixture/FilterChainFindTest/1                   209 ns          209 ns      3257004
-FilterChainBenchmarkFixture/FilterChainFindTest/8                  1780 ns         1780 ns       391501
-FilterChainBenchmarkFixture/FilterChainFindTest/64                16707 ns        16705 ns        42110
-FilterChainBenchmarkFixture/FilterChainFindTest/512              150220 ns       150072 ns         4675
-FilterChainBenchmarkFixture/FilterChainFindTest/4096            2227852 ns      2227703 ns          320
+FilterChainBenchmarkFixture/FilterChainManagerBuildTest/1        136994 ns       134510 ns         5183
+FilterChainBenchmarkFixture/FilterChainManagerBuildTest/8        583649 ns       574596 ns         1207
+FilterChainBenchmarkFixture/FilterChainManagerBuildTest/64      4483799 ns      4419618 ns          157
+FilterChainBenchmarkFixture/FilterChainManagerBuildTest/512    38864048 ns     38340468 ns           19
+FilterChainBenchmarkFixture/FilterChainManagerBuildTest/4096  318686843 ns    318568578 ns            2
+FilterChainBenchmarkFixture/FilterChainFindTest/1                   201 ns          201 ns      3494470
+FilterChainBenchmarkFixture/FilterChainFindTest/8                  1592 ns         1592 ns       435045
+FilterChainBenchmarkFixture/FilterChainFindTest/64                16057 ns        16053 ns        44275
+FilterChainBenchmarkFixture/FilterChainFindTest/512              172423 ns       172269 ns         4253
+FilterChainBenchmarkFixture/FilterChainFindTest/4096            2676478 ns      2676167 ns          254
 
 clang-format on
 */
