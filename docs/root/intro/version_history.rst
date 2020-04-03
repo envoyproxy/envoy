@@ -12,6 +12,9 @@ Version history
   minimum.
 * admin: added support for displaying ip address subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * admin: added :http:post:`/reopen_logs` endpoint to control log rotation.
+* api: froze v2 xDS API. New feature development in the API should occur in v3 xDS. While the v2 xDS API has
+  been deprecated since 1.13.0, it will continue to be supported by Envoy until EOY 2020. See
+  :ref:`api_supported_versions`.
 * aws_lambda: added :ref:`AWS Lambda filter <config_http_filters_aws_lambda>` that converts HTTP requests to Lambda
   invokes. This effectively makes Envoy act as an egress gateway to AWS Lambda.
 * aws_request_signing: a few fixes so that it works with S3.
