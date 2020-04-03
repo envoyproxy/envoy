@@ -73,7 +73,7 @@ protected:
 
     quic_listener_ = std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_,
                                                           listen_socket_, listener_config_,
-                                                          quic_config_, nullptr, enabled_flag());
+                                                          quic_config_, nullptr, enabledFlag());
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 
@@ -82,7 +82,7 @@ protected:
         .WillRepeatedly(Return(runtime_enabled));
   }
 
-  void ConfigureMocks(int connection_count) {
+  void configureMocks(int connection_count) {
     EXPECT_CALL(listener_config_, filterChainManager())
         .Times(connection_count)
         .WillRepeatedly(ReturnRef(filter_chain_manager_));
@@ -128,8 +128,8 @@ protected:
 
   // TODO(bencebeky): Factor out parts common with
   // EnvoyQuicDispatcherTest::createFullChloPacket() to test_utils.
-  void SendFullCHLO(quic::QuicConnectionId connection_id) {
-    client_sockets_.emplace_back(std::make_unique<Socket>(local_address_, nullptr, /*bind*/ false));
+  void sendFullCHLO(quic::QuicConnectionId connection_id) {
+    client_sockets_.push_back(std::make_unique<Socket>(local_address_, nullptr, /*bind*/ false));
     quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
         &clock_, quic::AllSupportedVersions()[0].transport_version,
         &ActiveQuicListenerPeer::crypto_config(*quic_listener_));
@@ -201,7 +201,7 @@ protected:
   }
 
 protected:
-  envoy::config::core::v3::RuntimeFeatureFlag enabled_flag() const {
+  envoy::config::core::v3::RuntimeFeatureFlag enabledFlag() const {
     envoy::config::core::v3::RuntimeFeatureFlag enabled_proto;
     std::string yaml(R"EOF(
 runtime_key: "quic.enabled"
@@ -248,7 +248,7 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   options->emplace_back(std::move(option));
   EXPECT_THROW_WITH_REGEX(
       std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_, listen_socket_,
-                                           listener_config_, quic_config_, options, enabled_flag()),
+                                           listener_config_, quic_config_, options, enabledFlag()),
       EnvoyException, "Failed to apply socket options.");
 }
 
