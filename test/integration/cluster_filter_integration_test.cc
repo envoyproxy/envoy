@@ -1,9 +1,9 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/filter.h"
-#include "envoy/registry/registry.h"
 
 #include "test/config/utility.h"
 #include "test/integration/integration.h"
+#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 
