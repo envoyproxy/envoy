@@ -38,6 +38,9 @@ default_value: 4.2
 
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.bar", 4.2)).WillOnce(Return(1.337));
   EXPECT_EQ(1.337, test_double.value());
+
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.bar", 4.2)).WillOnce(Return(1));
+  EXPECT_EQ(1.0, test_double.value());
 }
 
 TEST_F(RuntimeProtosTest, FeatureFlagBasicTest) {
