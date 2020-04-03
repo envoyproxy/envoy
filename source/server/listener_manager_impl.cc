@@ -216,8 +216,8 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   }
 
   const std::string scheme = (socket_type == Network::Address::SocketType::Stream)
-                                 ? Network::Utility::TCP_SCHEME
-                                 : Network::Utility::UDP_SCHEME;
+                                 ? std::string(Network::Utility::TCP_SCHEME)
+                                 : std::string(Network::Utility::UDP_SCHEME);
   const std::string addr = absl::StrCat(scheme, address->asString());
 
   if (params.bind_to_port && params.duplicate_parent_socket) {
