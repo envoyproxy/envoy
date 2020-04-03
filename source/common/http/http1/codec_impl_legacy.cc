@@ -269,9 +269,11 @@ void ServerConnectionImpl::doFloodProtectionChecks() const {
   if (!flood_protection_) {
     return;
   }
-  // Before sending another response, make sure it won't exceed flood protection thresholds.
+  // Before processing another request, make sure that we are below the response flood protection
+  // threshold.
   if (outbound_responses_ >= max_outbound_responses_) {
-    ENVOY_CONN_LOG(trace, "error sending response: Too many pending responses queued", connection_);
+    ENVOY_CONN_LOG(trace, "error accepting request: too many pending responses queued",
+                   connection_);
     stats_.response_flood_.inc();
     throw FrameFloodException("Too many responses queued.");
   }
@@ -313,9 +315,6 @@ static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
 void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
-  // Do flood checks before attempting to write any responses.
-  flood_checks_();
-
   started_response_ = true;
 
   // The contract is that client codecs must ensure that :status is present.
@@ -413,6 +412,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_header_sanitization")),
       enable_trailers_(enable_trailers),
+      reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                      [&]() -> void { this->onAboveHighWatermark(); }),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
@@ -597,8 +598,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding =
         request_or_response_headers.TransferEncoding()->value().getStringView();
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
+    if (reject_unsupported_transfer_encodings_ &&
         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
@@ -792,9 +792,14 @@ int ServerConnectionImpl::onHeadersComplete() {
 void ServerConnectionImpl::onMessageBegin() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_.has_value());
-    active_request_.emplace(*this, header_key_formatter_.get(), flood_checks_);
+    active_request_.emplace(*this, header_key_formatter_.get());
     auto& active_request = active_request_.value();
     active_request.request_decoder_ = &callbacks_.newStream(active_request.response_encoder_);
+
+    // Check for pipelined request flood as we prepare to accept a new request.
+    // Parse errors that happen prior to onMessageBegin result in stream termination, it is not
+    // possible to overflow output buffers with early parse errors.
+    doFloodProtectionChecks();
   }
 }
 
@@ -890,6 +895,7 @@ bool ClientConnectionImpl::cannotHaveBody() {
   if ((pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) ||
       parser_.status_code == 204 || parser_.status_code == 304 ||
       (parser_.status_code >= 200 && parser_.content_length == 0)) {
+    ASSERT(!pending_response_done_);
     return true;
   } else {
     return false;
@@ -906,7 +912,9 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   ASSERT(connection_.readEnabled());
 
   ASSERT(!pending_response_.has_value());
+  ASSERT(pending_response_done_);
   pending_response_.emplace(*this, header_key_formatter_.get(), &response_decoder);
+  pending_response_done_ = false;
   return pending_response_.value().encoder_;
 }
 
@@ -917,6 +925,7 @@ int ClientConnectionImpl::onHeadersComplete() {
   if (!pending_response_.has_value() && !resetStreamCalled()) {
     throw PrematureResponseException(static_cast<Http::Code>(parser_.status_code));
   } else if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
     ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
     headers->setStatus(parser_.status_code);
@@ -945,6 +954,7 @@ int ClientConnectionImpl::onHeadersComplete() {
 void ClientConnectionImpl::onBody(const char* data, size_t length) {
   ASSERT(!deferred_end_stream_headers_);
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     Buffer::OwnedImpl buffer;
     buffer.add(data, length);
     pending_response_.value().decoder_->decodeData(buffer, false);
@@ -958,9 +968,12 @@ void ClientConnectionImpl::onMessageComplete() {
     return;
   }
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     // After calling decodeData() with end stream set to true, we should no longer be able to reset.
-    PendingResponse response = std::move(pending_response_.value());
-    pending_response_.reset();
+    PendingResponse& response = pending_response_.value();
+    // Encoder is used as part of decode* calls later in this function so pending_response_ can not
+    // be reset just yet. Preserve the state in pending_response_done_ instead.
+    pending_response_done_ = true;
 
     // Streams are responsible for unwinding any outstanding readDisable(true)
     // calls done on the underlying connection as they are destroyed. As this is
@@ -986,20 +999,23 @@ void ClientConnectionImpl::onMessageComplete() {
     }
 
     // Reset to ensure no information from one requests persists to the next.
+    pending_response_.reset();
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
   }
 }
 
 void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   // Only raise reset if we did not already dispatch a complete response.
-  if (pending_response_.has_value()) {
+  if (pending_response_.has_value() && !pending_response_done_) {
     pending_response_.value().encoder_.runResetCallbacks(reason);
+    pending_response_done_ = true;
     pending_response_.reset();
   }
 }
 
 void ClientConnectionImpl::sendProtocolError(absl::string_view details) {
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     pending_response_.value().encoder_.setDetails(details);
   }
 }
@@ -1014,6 +1030,7 @@ void ClientConnectionImpl::onBelowLowWatermark() {
   // such as sending multiple responses to the same request, causing us to close the connection, but
   // in doing so go below low watermark.
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     pending_response_.value().encoder_.runLowWatermarkCallbacks();
   }
 }
