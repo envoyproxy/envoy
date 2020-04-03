@@ -16,7 +16,7 @@ offers the following features:
 * Capture transaction information, including commits and rollbacks.
 * Basic decoding of the incoming SQL, exposing counters for different types of
   transactions (INSERTs, DELETEs, UPDATEs, etc).
-* Count backend messages, distinguising OK messages, errors and warnings.
+* Count backend messages, distinguishing OK messages, errors and warnings.
 
 The Postgres filter solves a notable problem for Postgres deployments:
 gathering this information either imposes additional load to the server; or
