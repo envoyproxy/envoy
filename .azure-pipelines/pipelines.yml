@@ -50,6 +50,19 @@ jobs:
         parameters:
           ciTarget: bazel.release
 
+  - job: release_arm64
+    displayName: "Linux-aarch64 release.server_only"
+    dependsOn: ["format"]
+    condition: ne(variables['Build.Reason'], 'PullRequest')
+    pool: "arm-large"
+    steps:
+      - template: bazel.yml
+        parameters:
+          managedAgent: false
+          ciTarget: bazel.release.server_only
+          rbe: ""
+          bazelBuildExtraOptions: "--curses=no"
+
   - job: bazel
     displayName: "Linux-x64"
     dependsOn: ["release"]
