@@ -49,7 +49,7 @@ class ProtoFormatVisitor(visitor.Visitor):
     return None
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
-    # Freeze protos that have next major version canddidates.
+    # Freeze protos that have next major version candidates.
     typedb = utils.GetTypeDb()
     output_proto = copy.deepcopy(file_proto)
     existing_pkg_version_status = output_proto.options.Extensions[

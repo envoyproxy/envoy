@@ -13,7 +13,7 @@ from tools.type_whisperer.types_pb2 import Types, TypeDescription
 # Regexes governing v3upgrades. TODO(htuch): The regex approach will have
 # to be rethought as we go beyond v3, this is WiP.
 TYPE_UPGRADE_REGEXES = [
-    (r'(envoy[\w\.]*\.)(v3alpha\d?|v3)', r'\1v4alpha'),
+    (r'(envoy[\w\.]*\.)(v3alpha|v3)', r'\1v4alpha'),
     (r'(envoy[\w\.]*\.)(v1alpha\d?|v1)', r'\1v3'),
     (r'(envoy[\w\.]*\.)(v2alpha\d?|v2)', r'\1v3'),
     # These are special cases, e.g. upgrading versionless packages.
