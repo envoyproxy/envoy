@@ -17,6 +17,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/singleton/const_singleton.h"
 
 #include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
 
@@ -30,6 +31,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AwsLambdaFilter {
 
+class LambdaFilterNameValues {
+public:
+  Http::LowerCaseString InvocationTypeHeader{std::string{"x-amz-invocation-type"}};
+  Http::LowerCaseString FunctionErrorHeader{std::string{"x-amz-function-error"}};
+};
+
+using LambdaFilterNames = ConstSingleton<LambdaFilterNameValues>;
+
 namespace {
 
 constexpr auto filter_metadata_key = "com.amazonaws.lambda";
@@ -40,9 +49,9 @@ void setLambdaHeaders(Http::RequestHeaderMap& headers, absl::string_view functio
   headers.setMethod(Http::Headers::get().MethodValues.Post);
   headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", function_name));
   if (mode == InvocationMode::Synchronous) {
-    headers.setCopy(Http::LowerCaseString{"x-amz-invocation-type"}, "RequestResponse");
+    headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "RequestResponse");
   } else {
-    headers.setCopy(Http::LowerCaseString{"x-amz-invocation-type"}, "Event");
+    headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "Event");
   }
 }
 
@@ -213,7 +222,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   // Just the existence of this header means we have an error, so skip.
-  if (headers.get(Http::LowerCaseString("x-amz-function-error"))) {
+  if (headers.get(LambdaFilterNames::get().FunctionErrorHeader)) {
     skip_ = true;
     return Http::FilterHeadersStatus::Continue;
   }

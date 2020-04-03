@@ -40,7 +40,7 @@ message Config {
   bool payload_passthrough = 2;
 
   // Determines the way to invoke the Lambda function.
-  InvocationMode invocation_mode = 3;
+  InvocationMode invocation_mode = 3 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Per-route configuration for AWS Lambda. This can be useful when invoking a different Lambda function or a different
