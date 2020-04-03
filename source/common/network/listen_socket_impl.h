@@ -15,7 +15,11 @@ namespace Network {
 
 class SocketImpl : public virtual Socket {
 public:
-  ~SocketImpl() override { close(); }
+  ~SocketImpl() override {
+    if (io_handle_->isOpen()) {
+      io_handle_->close();
+    }
+  }
 
   // Network::Socket
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
