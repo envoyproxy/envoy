@@ -14,8 +14,7 @@ namespace Decompressor {
 ZlibDecompressorImpl::ZlibDecompressorImpl() : ZlibDecompressorImpl(4096) {}
 
 ZlibDecompressorImpl::ZlibDecompressorImpl(uint64_t chunk_size)
-    : chunk_size_{chunk_size}, initialized_{false}, chunk_char_ptr_(new unsigned char[chunk_size]),
-      zstream_ptr_(new z_stream(), [](z_stream* z) {
+    : Zlib::Base(chunk_size, [](z_stream* z) {
         inflateEnd(z);
         delete z;
       }) {
@@ -32,8 +31,6 @@ void ZlibDecompressorImpl::init(int64_t window_bits) {
   RELEASE_ASSERT(result >= 0, "");
   initialized_ = true;
 }
-
-uint64_t ZlibDecompressorImpl::checksum() { return zstream_ptr_->adler; }
 
 void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
@@ -75,16 +72,6 @@ bool ZlibDecompressorImpl::inflateNext() {
   }
 
   return true;
-}
-
-void ZlibDecompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
-  const uint64_t n_output = chunk_size_ - zstream_ptr_->avail_out;
-  if (n_output > 0) {
-    output_buffer.add(static_cast<void*>(chunk_char_ptr_.get()), n_output);
-  }
-  chunk_char_ptr_ = std::make_unique<unsigned char[]>(chunk_size_);
-  zstream_ptr_->avail_out = chunk_size_;
-  zstream_ptr_->next_out = chunk_char_ptr_.get();
 }
 
 } // namespace Decompressor
