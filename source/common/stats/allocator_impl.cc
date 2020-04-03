@@ -228,6 +228,25 @@ public:
   }
 };
 
+class TextReadoutImpl : public StatsSharedImpl<TextReadout> {
+public:
+  TextReadoutImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
+                  const StatNameTagVector& stat_name_tags)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
+
+  void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
+    const size_t count = alloc_.text_readouts_.erase(statName());
+    ASSERT(count == 1);
+  }
+
+  // Stats::TextReadout
+  void set(const std::string& value) override { value_ = value; }
+  std::string value() const override { return value_; }
+
+private:
+  std::string value_;
+};
+
 CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracted_name,
                                             const StatNameTagVector& stat_name_tags) {
   Thread::LockGuard lock(mutex_);
@@ -256,6 +275,19 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
   return gauge;
 }
 
+TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_extracted_name,
+                                                    const StatNameTagVector& stat_name_tags) {
+  Thread::LockGuard lock(mutex_);
+  ASSERT(gauges_.find(name) == gauges_.end());
+  auto iter = text_readouts_.find(name);
+  if (iter != text_readouts_.end()) {
+    return TextReadoutSharedPtr(*iter);
+  }
+  auto text_readout =
+      TextReadoutSharedPtr(new TextReadoutImpl(name, *this, tag_extracted_name, stat_name_tags));
+  text_readouts_.insert(text_readout.get());
+  return text_readout;
+}
 bool AllocatorImpl::isMutexLockedForTest() {
   bool locked = mutex_.tryLock();
   if (locked) {

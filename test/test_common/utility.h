@@ -184,7 +184,7 @@ public:
    * Find a counter in a stats store.
    * @param store supplies the stats store.
    * @param name supplies the name to search for.
-   * @return Stats::CounterSharedPtr the counter or nullptr if there is none.
+   * @return Stats::CounterSharedPtr the counter, or nullptr if there is none.
    */
   static Stats::CounterSharedPtr findCounter(Stats::Store& store, const std::string& name);
 
@@ -192,7 +192,7 @@ public:
    * Find a gauge in a stats store.
    * @param store supplies the stats store.
    * @param name supplies the name to search for.
-   * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
+   * @return Stats::GaugeSharedPtr the gauge, or nullptr if there is none.
    */
   static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
 
@@ -235,6 +235,14 @@ public:
    */
   static void waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
                              Event::TestTimeSystem& time_system);
+
+  /**
+   * Find a readout in a stats store.
+   * @param store supplies the stats store.
+   * @param name supplies the name to search for.
+   * @return Stats::TextReadoutSharedPtr the readout, or nullptr if there is none.
+   */
+  static Stats::TextReadoutSharedPtr findTextReadout(Stats::Store& store, const std::string& name);
 
   /**
    * Convert a string list of IP addresses into a list of network addresses usable for DNS

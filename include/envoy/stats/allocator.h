@@ -49,6 +49,15 @@ public:
                                    const StatNameTagVector& stat_name_tags,
                                    Gauge::ImportMode import_mode) PURE;
 
+  /**
+   * @param name the full name of the stat.
+   * @param tag_extracted_name the name of the stat with tag-values stripped out.
+   * @param tags the tag values.
+   * @return TextReadoutSharedPtr a text readout, or nullptr if allocation failed, in which case
+   *     tag_extracted_name and tags are not moved.
+   */
+  virtual TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
+                                               const StatNameTagVector& stat_name_tags) PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 

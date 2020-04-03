@@ -141,6 +141,11 @@ Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::str
   return findByName(store.gauges(), name);
 }
 
+Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
+                                                         const std::string& name) {
+  return findByName(store.textReadouts(), name);
+}
+
 void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
                                    Event::TestTimeSystem& time_system) {
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {

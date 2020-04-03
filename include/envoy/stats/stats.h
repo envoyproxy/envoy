@@ -156,5 +156,18 @@ public:
 
 using GaugeSharedPtr = RefcountPtr<Gauge>;
 
+/**
+ * A string, possibly non-ASCII.
+ */
+class TextReadout : public virtual Metric {
+public:
+  virtual ~TextReadout() {}
+
+  virtual void set(const std::string& value) PURE;
+  virtual std::string value() const PURE;
+};
+
+using TextReadoutSharedPtr = RefcountPtr<TextReadout>;
+
 } // namespace Stats
 } // namespace Envoy
