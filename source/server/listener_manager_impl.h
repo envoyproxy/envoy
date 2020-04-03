@@ -263,14 +263,15 @@ public:
       ListenerComponentFactory& listener_component_factory,
       Server::Configuration::TransportSocketFactoryContextImpl& factory_context);
 
-  std::unique_ptr<Network::FilterChain>
+  std::shared_ptr<Network::DrainableFilterChain>
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const override;
 
 private:
-  std::unique_ptr<Network::FilterChain> buildFilterChainInternal(
-      const envoy::config::listener::v3::FilterChain& filter_chain,
-      Configuration::FilterChainFactoryContext& filter_chain_factory_context) const;
+  std::shared_ptr<Network::DrainableFilterChain>
+  buildFilterChainInternal(const envoy::config::listener::v3::FilterChain& filter_chain,
+                           std::unique_ptr<Configuration::FilterChainFactoryContext>&&
+                               filter_chain_factory_context) const;
 
   ProtobufMessage::ValidationVisitor& validator_;
   ListenerComponentFactory& listener_component_factory_;

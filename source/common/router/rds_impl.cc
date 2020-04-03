@@ -68,7 +68,9 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
     const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
-    : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
+    : Envoy::Config::SubscriptionBase<envoy::config::route::v3::RouteConfiguration>(
+          rds.config_source().resource_api_version()),
+      route_config_name_(rds.route_config_name()), factory_context_(factory_context),
       validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
       parent_init_target_(fmt::format("RdsRouteConfigSubscription init {}", route_config_name_),
                           [this]() { local_init_manager_.initialize(local_init_watcher_); }),
@@ -82,7 +84,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier) {
-  const auto resource_name = getResourceName(rds.config_source().resource_api_version());
+  const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           rds.config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this);

@@ -173,7 +173,7 @@ protected:
   void testRouterVirtualClusters();
 
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
-                                            bool big_header,
+                                            bool big_header, bool set_content_length_header = false,
                                             ConnectionCreationFunction* creator = nullptr);
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0,
