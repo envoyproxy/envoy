@@ -19,7 +19,7 @@ void normalizeHostWeights(const HostVector& hosts, double normalized_locality_we
     sum += host->weight();
     if (sum > std::numeric_limits<uint32_t>::max()) {
       throw EnvoyException(
-          fmt::format("Load balancing hosts weights has accumulated over its maximum value {}",
+          fmt::format("The sum of weights of all upstream hosts in a locality exceeds {}",
                       std::numeric_limits<uint32_t>::max()));
     }
   }
@@ -45,7 +45,7 @@ void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
     sum += weight;
     if (sum > std::numeric_limits<uint32_t>::max()) {
       throw EnvoyException(
-          fmt::format("Load balancing locality weights has accumulated over its maximum value {}",
+          fmt::format("The sum of weights of all localities at the same priority exceeds {}",
                       std::numeric_limits<uint32_t>::max()));
     }
   }
