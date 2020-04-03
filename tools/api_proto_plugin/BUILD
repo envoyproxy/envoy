@@ -12,7 +12,6 @@ py_library(
         "type_context.py",
         "visitor.py",
     ],
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_protobuf//:protobuf_python",
@@ -22,7 +21,6 @@ py_library(
 py_library(
     name = "utils",
     srcs = ["utils.py"],
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
 )
 
