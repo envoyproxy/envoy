@@ -86,7 +86,7 @@ stat_prefix: name
 failure_mode_deny: true
 )EOF";
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   ConfigSharedPtr config_;
   Filters::Common::RateLimit::MockClient* client_;

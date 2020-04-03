@@ -1,15 +1,16 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/http/conn_manager_utility.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/runtime/uuid_util.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -33,6 +34,42 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Http {
 
+class MockRequestIDExtension : public RequestIDExtension {
+public:
+  explicit MockRequestIDExtension(Runtime::RandomGenerator& random)
+      : real_(RequestIDExtensionFactory::defaultInstance(random)) {
+    ON_CALL(*this, set(_, _))
+        .WillByDefault([this](Http::RequestHeaderMap& request_headers, bool force) {
+          return real_->set(request_headers, force);
+        });
+    ON_CALL(*this, setInResponse(_, _))
+        .WillByDefault([this](Http::ResponseHeaderMap& response_headers,
+                              const Http::RequestHeaderMap& request_headers) {
+          return real_->setInResponse(response_headers, request_headers);
+        });
+    ON_CALL(*this, modBy(_, _, _))
+        .WillByDefault([this](const Http::RequestHeaderMap& request_headers, uint64_t& out,
+                              uint64_t mod) { return real_->modBy(request_headers, out, mod); });
+    ON_CALL(*this, getTraceStatus(_))
+        .WillByDefault([this](const Http::RequestHeaderMap& request_headers) {
+          return real_->getTraceStatus(request_headers);
+        });
+    ON_CALL(*this, setTraceStatus(_, _))
+        .WillByDefault([this](Http::RequestHeaderMap& request_headers, TraceStatus trace_status) {
+          real_->setTraceStatus(request_headers, trace_status);
+        });
+  }
+
+  MOCK_METHOD(void, set, (Http::RequestHeaderMap&, bool));
+  MOCK_METHOD(void, setInResponse, (Http::ResponseHeaderMap&, const Http::RequestHeaderMap&));
+  MOCK_METHOD(bool, modBy, (const Http::RequestHeaderMap&, uint64_t&, uint64_t));
+  MOCK_METHOD(TraceStatus, getTraceStatus, (const Http::RequestHeaderMap&));
+  MOCK_METHOD(void, setTraceStatus, (Http::RequestHeaderMap&, TraceStatus));
+
+private:
+  RequestIDExtensionSharedPtr real_;
+};
+
 class MockInternalAddressConfig : public Http::InternalAddressConfig {
 public:
   MOCK_METHOD(bool, isInternalAddress, (const Network::Address::Instance&), (const));
@@ -52,6 +89,7 @@ public:
     return ServerConnectionPtr{createCodec_(connection, instance, callbacks)};
   }
 
+  MOCK_METHOD(RequestIDExtensionSharedPtr, requestIDExtension, ());
   MOCK_METHOD(const std::list<AccessLog::InstanceSharedPtr>&, accessLogs, ());
   MOCK_METHOD(ServerConnection*, createCodec_,
               (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&));
@@ -101,9 +139,15 @@ public:
       std::make_unique<DefaultInternalAddressConfig>();
 };
 
+const Http::LowerCaseString& traceStatusHeader() {
+  static Http::LowerCaseString header("x-trace-status");
+  return header;
+}
+
 class ConnectionManagerUtilityTest : public testing::Test {
 public:
-  ConnectionManagerUtilityTest() {
+  ConnectionManagerUtilityTest()
+      : request_id_extension_(std::make_shared<NiceMock<MockRequestIDExtension>>(random_)) {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
     envoy::type::v3::FractionalPercent percent1;
@@ -116,6 +160,7 @@ public:
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
+    ON_CALL(config_, requestIDExtension()).WillByDefault(Return(request_id_extension_));
   }
 
   struct MutateRequestRet {
@@ -132,10 +177,9 @@ public:
   // the request is internal/external, given the importance of these two pieces of data.
   MutateRequestRet callMutateRequestHeaders(RequestHeaderMap& headers, Protocol) {
     MutateRequestRet ret;
-    ret.downstream_address_ =
-        ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                       random_, local_info_)
-            ->asString();
+    ret.downstream_address_ = ConnectionManagerUtility::mutateRequestHeaders(
+                                  headers, connection_, config_, route_config_, local_info_)
+                                  ->asString();
     ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
     ret.internal_ = HeaderUtility::isEnvoyInternalRequest(headers);
     return ret;
@@ -143,6 +187,7 @@ public:
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  std::shared_ptr<NiceMock<MockRequestIDExtension>> request_id_extension_;
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
   NiceMock<Router::MockRoute> route_;
@@ -337,7 +382,8 @@ TEST_F(ConnectionManagerUtilityTest, ViaEmpty) {
   EXPECT_FALSE(request_headers.has(Headers::get().Via));
 
   TestResponseHeaderMapImpl response_headers;
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, via_);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                  config_.requestIDExtension(), via_);
   EXPECT_FALSE(response_headers.has(Headers::get().Via));
 }
 
@@ -354,9 +400,11 @@ TEST_F(ConnectionManagerUtilityTest, ViaAppend) {
 
   TestResponseHeaderMapImpl response_headers;
   // Pretend we're doing a 100-continue transform here.
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                  config_.requestIDExtension(), "");
   // The actual response header processing.
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, via_);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                  config_.requestIDExtension(), via_);
   EXPECT_EQ("foo", response_headers.get_(Headers::get().Via));
 }
 
@@ -703,7 +751,8 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
       {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "custom_value"}};
   TestRequestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                  config_.requestIDExtension(), "");
 
   EXPECT_EQ(1UL, response_headers.size());
   EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
@@ -718,7 +767,8 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRes
       {"connection", "upgrade"}, {"transfer-encoding", "foo"}, {"upgrade", "bar"}};
   EXPECT_TRUE(Utility::isUpgrade(request_headers));
   EXPECT_TRUE(Utility::isUpgrade(response_headers));
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                  config_.requestIDExtension(), "");
 
   EXPECT_EQ(2UL, response_headers.size()) << response_headers;
   EXPECT_EQ("upgrade", response_headers.get_("connection"));
@@ -733,7 +783,8 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
         {"connection", "foo"}, {"transfer-encoding", "bar"}, {"custom_header", "custom_value"}};
     EXPECT_FALSE(Utility::isUpgrade(request_headers));
     EXPECT_FALSE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                    config_.requestIDExtension(), "");
 
     EXPECT_EQ(1UL, response_headers.size()) << response_headers;
     EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
@@ -748,7 +799,8 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
                                                {"custom_header", "custom_value"}};
     EXPECT_FALSE(Utility::isUpgrade(request_headers));
     EXPECT_TRUE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                    config_.requestIDExtension(), "");
 
     EXPECT_EQ(2UL, response_headers.size()) << response_headers;
     EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
@@ -761,7 +813,8 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
     TestResponseHeaderMapImpl response_headers{{"transfer-encoding", "foo"}, {"upgrade", "bar"}};
     EXPECT_TRUE(Utility::isUpgrade(request_headers));
     EXPECT_FALSE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                    config_.requestIDExtension(), "");
 
     EXPECT_EQ(1UL, response_headers.size()) << response_headers;
     EXPECT_EQ("bar", response_headers.get_("upgrade"));
@@ -774,8 +827,25 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   TestRequestHeaderMapImpl request_headers{{"x-request-id", "request-id"},
                                            {"x-envoy-force-trace", "true"}};
 
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
+  EXPECT_CALL(*request_id_extension_,
+              setInResponse(testing::Ref(response_headers), testing::Ref(request_headers)))
+      .Times(1);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                  config_.requestIDExtension(), "");
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
+}
+
+// Test that we do not return x-request-id if we were not requested to force a trace.
+TEST_F(ConnectionManagerUtilityTest, SkipMutateResponseHeadersReturnXRequestId) {
+  TestResponseHeaderMapImpl response_headers;
+  TestRequestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
+
+  EXPECT_CALL(*request_id_extension_,
+              setInResponse(testing::Ref(response_headers), testing::Ref(request_headers)))
+      .Times(0);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                  config_.requestIDExtension(), "");
+  EXPECT_EQ("", response_headers.get_("x-request-id"));
 }
 
 // Test full sanitization of x-forwarded-client-cert.
@@ -1075,10 +1145,12 @@ TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  EXPECT_CALL(*request_id_extension_,
+              setTraceStatus(testing::Ref(request_headers), TraceStatus::Sampled))
+      .Times(1);
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::Sampled,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(TraceStatus::Sampled, request_id_extension_->getTraceStatus(request_headers));
 }
 
 TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
@@ -1093,10 +1165,12 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  EXPECT_CALL(*request_id_extension_,
+              setTraceStatus(testing::Ref(request_headers), TraceStatus::Sampled))
+      .Times(1);
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::Sampled,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(TraceStatus::Sampled, request_id_extension_->getTraceStatus(request_headers));
 }
 
 TEST_F(ConnectionManagerUtilityTest, SamplingWithRouteOverride) {
@@ -1118,10 +1192,12 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithRouteOverride) {
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  EXPECT_CALL(*request_id_extension_,
+              setTraceStatus(testing::Ref(request_headers), TraceStatus::NoTrace))
+      .Times(1);
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::NoTrace,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(request_headers));
 }
 
 // Sampling must not be done on client traced.
@@ -1138,10 +1214,10 @@ TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
   // The x_request_id has TRACE_FORCED(a) set in the TRACE_BYTE_POSITION(14) character.
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}};
+  EXPECT_CALL(*request_id_extension_, setTraceStatus(_, _)).Times(0);
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::Forced,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(TraceStatus::Forced, request_id_extension_->getTraceStatus(request_headers));
 }
 
 // Sampling, global off.
@@ -1157,10 +1233,15 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  EXPECT_CALL(*request_id_extension_,
+              setTraceStatus(testing::Ref(request_headers), TraceStatus::Sampled))
+      .Times(1);
+  EXPECT_CALL(*request_id_extension_,
+              setTraceStatus(testing::Ref(request_headers), TraceStatus::NoTrace))
+      .Times(1);
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::NoTrace,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(request_headers));
 }
 
 // Client, client enabled, global on.
@@ -1176,10 +1257,12 @@ TEST_F(ConnectionManagerUtilityTest, ClientSamplingWhenGlobalSet) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-client-trace-id", "f4dca0a9-12c7-4307-8002-969403baf480"},
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  EXPECT_CALL(*request_id_extension_,
+              setTraceStatus(testing::Ref(request_headers), TraceStatus::Client))
+      .Times(1);
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::Client,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(TraceStatus::Client, request_id_extension_->getTraceStatus(request_headers));
 }
 
 // Client, client disabled, global on.
@@ -1199,10 +1282,10 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenClientSamplingNotSetAndGlobalSet
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-client-trace-id", "f4dca0a9-12c7-4307-8002-969403baf480"},
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  EXPECT_CALL(*request_id_extension_, setTraceStatus(_, _)).Times(0);
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::NoTrace,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(request_headers));
 }
 
 // Forced, global on.
@@ -1217,10 +1300,12 @@ TEST_F(ConnectionManagerUtilityTest, ForcedTracedWhenGlobalSet) {
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
+  EXPECT_CALL(*request_id_extension_, setTraceStatus(testing::Ref(headers), TraceStatus::Forced))
+      .Times(1);
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_EQ(UuidTraceStatus::Forced, UuidUtils::isTraceableUuid(headers.get_("x-request-id")));
+  EXPECT_EQ(TraceStatus::Forced, request_id_extension_->getTraceStatus(headers));
 }
 
 // Forced, global off.
@@ -1235,30 +1320,35 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenForcedTracedButGlobalNotSet) {
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(false));
+  EXPECT_CALL(*request_id_extension_, setTraceStatus(testing::Ref(headers), TraceStatus::Forced))
+      .Times(1);
+  EXPECT_CALL(*request_id_extension_, setTraceStatus(testing::Ref(headers), TraceStatus::NoTrace))
+      .Times(1);
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_EQ(UuidTraceStatus::NoTrace, UuidUtils::isTraceableUuid(headers.get_("x-request-id")));
+  EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(headers));
 }
 
 // Forced, global on, broken uuid.
 TEST_F(ConnectionManagerUtilityTest, NoTraceOnBrokenUuid) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-force-trace", "true"},
                                                  {"x-request-id", "bb"}};
+  EXPECT_CALL(*request_id_extension_, setTraceStatus(_, _)).Times(0);
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::NoTrace,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(request_headers));
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   Http::TestRequestHeaderMapImpl request_headers{{}};
   Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},
                                                    {"proxy-connection", "proxy-header"}};
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
+  EXPECT_CALL(*request_id_extension_, setTraceStatus(_, _)).Times(0);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                  config_.requestIDExtension(), "");
 
-  EXPECT_EQ(UuidTraceStatus::NoTrace,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(request_headers));
 
   EXPECT_FALSE(response_headers.has("keep-alive"));
   EXPECT_FALSE(response_headers.has("proxy-connection"));
@@ -1340,6 +1430,8 @@ TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestId) {
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-request-id", "my-request-id"},
                                    {"x-forwarded-for", "198.51.100.1"}};
+  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
+  EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
   EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_CALL(random_, uuid()).Times(0);
@@ -1352,6 +1444,8 @@ TEST_F(ConnectionManagerUtilityTest, PreseverExternalRequestIdNoReqId) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
+  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
+  EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
   EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
@@ -1361,7 +1455,10 @@ TEST_F(ConnectionManagerUtilityTest, PreseverExternalRequestIdNoReqId) {
 // requestID
 TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestKeepRequestId) {
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
-  TestHeaderMapImpl headers{{"x-request-id", "myReqId"}};
+  TestRequestHeaderMapImpl headers{{"x-request-id", "myReqId"}};
+  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
+  EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
+  callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ("myReqId", headers.get_(Headers::get().RequestId));
 }
 
@@ -1370,6 +1467,8 @@ TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestKeepR
 TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestGenerateNewRequestId) {
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
+  EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
 }
@@ -1378,12 +1477,14 @@ TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestGener
 TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdEdgeRequestGenerateRequestId) {
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(false));
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+
   // with request id
   {
-
     ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
     TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"},
                                      {"x-request-id", "my-request-id"}};
+    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), true)).Times(1);
+    EXPECT_CALL(*request_id_extension_, set(_, false)).Times(0);
     EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
@@ -1392,6 +1493,8 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdEdgeRequestGener
   // with no request id
   {
     TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
+    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), true)).Times(1);
+    EXPECT_CALL(*request_id_extension_, set(_, false)).Times(0);
     EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
@@ -1405,6 +1508,8 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
   // with no request id
   {
     TestRequestHeaderMapImpl headers;
+    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
+    EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
     callMutateRequestHeaders(headers, Protocol::Http2);
     EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
   }
@@ -1412,6 +1517,8 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
   // with request id
   {
     TestRequestHeaderMapImpl headers{{"x-request-id", "my-request-id"}};
+    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
+    EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
     callMutateRequestHeaders(headers, Protocol::Http2);
     EXPECT_EQ("my-request-id", headers.get_(Headers::get().RequestId));
   }

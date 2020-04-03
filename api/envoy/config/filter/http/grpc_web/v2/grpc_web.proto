@@ -3,12 +3,14 @@ syntax = "proto3";
 package envoy.config.filter.http.grpc_web.v2;
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.grpc_web.v2";
 option java_outer_classname = "GrpcWebProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.grpc_web.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: gRPC Web]
 // gRPC Web :ref:`configuration overview <config_http_filters_grpc_web>`.

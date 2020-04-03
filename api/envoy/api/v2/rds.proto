@@ -9,6 +9,7 @@ import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/resource.proto";
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 import public "envoy/api/v2/route.proto";
@@ -18,6 +19,7 @@ option java_outer_classname = "RdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.service.route.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: RDS]
 

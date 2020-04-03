@@ -186,6 +186,8 @@ public:
   const Network::FilterChain*
   findFilterChain(const Network::ConnectionSocket& socket) const override;
 
+  // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
+  // should be called at most once.
   void addFilterChain(
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
@@ -280,6 +282,7 @@ private:
   findFilterChainForSourceIpAndPort(const SourceIPsTrie& source_ips_trie,
                                     const Network::ConnectionSocket& socket) const;
 
+  const FilterChainManagerImpl* getOriginFilterChainManager() { return origin_.value(); }
   // Duplicate the inherent factory context if any.
   std::shared_ptr<Network::DrainableFilterChain>
   findExistingFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain_message);
@@ -297,9 +300,8 @@ private:
   std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
 
   // Reference to the previous generation of filter chain manager to share the filter chains.
-  // Caution: the pointer is valid only during warm up.
-  // TODO(lambdai): Add state and getter method to explain when the point is valid.
-  const FilterChainManagerImpl* origin_{};
+  // Caution: only during warm up could the optional have value.
+  absl::optional<const FilterChainManagerImpl*> origin_{nullptr};
 
   // For FilterChainFactoryContextCreator
   // init manager owned by the corresponding listener. The reference is valid when building the

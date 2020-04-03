@@ -225,9 +225,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   }
 
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  if (!decoder_callbacks_->decodingBuffer()) {
-    decoder_callbacks_->addDecodedData(data, false);
-  }
+  decoder_callbacks_->addDecodedData(data, false);
 
   const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
 

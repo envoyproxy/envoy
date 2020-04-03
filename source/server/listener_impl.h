@@ -134,7 +134,8 @@ private:
 class ListenerImpl;
 
 // TODO(lambdai): Strip the interface since ListenerFactoryContext only need to support
-// ListenerFilterChain creation.
+// ListenerFilterChain creation. e.g, Is listenerMetaData() required? Is it required only at
+// listener update or during the lifetime of listener?
 class PerListenerFactoryContextImpl : public Configuration::ListenerFactoryContext {
 public:
   PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
@@ -184,9 +185,7 @@ public:
   // ListenerFactoryContext
   const Network::ListenerConfig& listenerConfig() const override;
 
-  ListenerFactoryContextBaseImpl& parent_factory_context() {
-    return *listener_factory_context_base_;
-  }
+  ListenerFactoryContextBaseImpl& parentFactoryContext() { return *listener_factory_context_base_; }
   friend class ListenerImpl;
 
 private:
@@ -198,9 +197,9 @@ private:
 /**
  * Maps proto config to runtime config for a listener with a network filter chain.
  */
-class ListenerImpl : public Network::ListenerConfig,
-                     public Network::FilterChainFactory,
-                     Logger::Loggable<Logger::Id::config> {
+class ListenerImpl final : public Network::ListenerConfig,
+                           public Network::FilterChainFactory,
+                           Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Create a new listener.
@@ -323,9 +322,6 @@ private:
   const uint64_t hash_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
-  // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
-  // listener initialization is complete.
-  Init::WatcherImpl local_init_watcher_;
   // A target is added to Server's InitManager if workers_started_ is false.
   Init::TargetImpl listener_init_target_;
   // This init manager is populated with targets from the filter chain factories, namely
@@ -346,6 +342,12 @@ private:
   Network::ConnectionBalancerPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
+
+  // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
+  // listener initialization is complete.
+  // Important: local_init_watcher_ must be the last field in the class to avoid unexpected watcher
+  // callback during the destroy of ListenerImpl.
+  Init::WatcherImpl local_init_watcher_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

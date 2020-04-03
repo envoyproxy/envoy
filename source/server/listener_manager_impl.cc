@@ -7,6 +7,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -16,6 +18,7 @@
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/network/filter_matcher.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
@@ -139,7 +142,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
             proto_config);
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
-    ret.push_back(factory.createFilterFactoryFromProto(*message, context));
+    ret.push_back(factory.createListenerFilterFactoryFromProto(
+        *message, createListenerFilterMatcher(proto_config), context));
   }
   return ret;
 }
@@ -173,6 +177,16 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
   return ret;
 }
 
+Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createListenerFilterMatcher(
+    const envoy::config::listener::v3::ListenerFilter& listener_filter) {
+  if (!listener_filter.has_filter_disabled()) {
+    return nullptr;
+  }
+  return std::shared_ptr<Network::ListenerFilterMatcher>(
+      Network::ListenerFilterMatcherBuilder::buildListenerFilterMatcher(
+          listener_filter.filter_disabled()));
+}
+
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
     const Network::Socket::OptionsSharedPtr& options, const ListenSocketCreationParams& params) {
@@ -202,8 +216,8 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   }
 
   const std::string scheme = (socket_type == Network::Address::SocketType::Stream)
-                                 ? Network::Utility::TCP_SCHEME
-                                 : Network::Utility::UDP_SCHEME;
+                                 ? std::string(Network::Utility::TCP_SCHEME)
+                                 : std::string(Network::Utility::UDP_SCHEME);
   const std::string addr = absl::StrCat(scheme, address->asString());
 
   if (params.bind_to_port && params.duplicate_parent_socket) {

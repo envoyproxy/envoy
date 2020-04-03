@@ -74,8 +74,9 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                                 POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
       time_source_(time_source) {
-  Config::Utility::checkCluster(TracerNames::get().Zipkin, zipkin_config.collector_cluster(), cm_);
-  cluster_ = cm_.get(zipkin_config.collector_cluster())->info();
+  Config::Utility::checkCluster(TracerNames::get().Zipkin, zipkin_config.collector_cluster(), cm_,
+                                /* allow_added_via_api */ true);
+  cluster_ = zipkin_config.collector_cluster();
 
   CollectorInfo collector;
   if (!zipkin_config.collector_endpoint().empty()) {
@@ -133,7 +134,8 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
                            const CollectorInfo& collector)
     : driver_(driver),
       collector_(collector), span_buffer_{std::make_unique<SpanBuffer>(
-                                 collector.version_, collector.shared_span_context_)} {
+                                 collector.version_, collector.shared_span_context_)},
+      collector_cluster_(driver_.clusterManager(), driver_.cluster()) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
     flushSpans();
@@ -176,7 +178,7 @@ void ReporterImpl::flushSpans() {
     Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>();
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     message->headers().setPath(collector_.endpoint_);
-    message->headers().setHost(driver_.cluster()->name());
+    message->headers().setHost(driver_.cluster());
     message->headers().setReferenceContentType(
         collector_.version_ == envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO
             ? Http::Headers::get().ContentTypeValues.Protobuf
@@ -188,20 +190,35 @@ void ReporterImpl::flushSpans() {
 
     const uint64_t timeout =
         driver_.runtime().snapshot().getInteger("tracing.zipkin.request_timeout", 5000U);
-    driver_.clusterManager()
-        .httpAsyncClientForCluster(driver_.cluster()->name())
-        .send(std::move(message), *this,
-              Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
+
+    if (collector_cluster_.exists()) {
+      Http::AsyncClient::Request* request =
+          driver_.clusterManager()
+              .httpAsyncClientForCluster(collector_cluster_.info()->name())
+              .send(std::move(message), *this,
+                    Http::AsyncClient::RequestOptions().setTimeout(
+                        std::chrono::milliseconds(timeout)));
+      if (request) {
+        active_requests_.add(*request);
+      }
+    } else {
+      ENVOY_LOG(debug, "collector cluster '{}' does not exist", driver_.cluster());
+      driver_.tracerStats().reports_skipped_no_cluster_.inc();
+    }
 
     span_buffer_->clear();
   }
 }
 
-void ReporterImpl::onFailure(Http::AsyncClient::FailureReason) {
+void ReporterImpl::onFailure(const Http::AsyncClient::Request& request,
+                             Http::AsyncClient::FailureReason) {
+  active_requests_.remove(request);
   driver_.tracerStats().reports_failed_.inc();
 }
 
-void ReporterImpl::onSuccess(Http::ResponseMessagePtr&& http_response) {
+void ReporterImpl::onSuccess(const Http::AsyncClient::Request& request,
+                             Http::ResponseMessagePtr&& http_response) {
+  active_requests_.remove(request);
   if (Http::Utility::getResponseStatus(http_response->headers()) !=
       enumToInt(Http::Code::Accepted)) {
     driver_.tracerStats().reports_dropped_.inc();

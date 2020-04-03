@@ -63,6 +63,9 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context);
 
+  static Network::ListenerFilterMatcherSharedPtr
+  createListenerFilterMatcher(const envoy::config::listener::v3::ListenerFilter& listener_filter);
+
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) override {
     return std::make_unique<LdsApiImpl>(

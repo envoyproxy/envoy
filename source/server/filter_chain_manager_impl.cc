@@ -2,6 +2,7 @@
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
+#include "common/common/cleanup.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
@@ -146,6 +147,7 @@ void FilterChainManagerImpl::addFilterChain(
     absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
+  Cleanup cleanup([this]() { origin_ = absl::nullopt; });
   std::unordered_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
@@ -592,12 +594,13 @@ void FilterChainManagerImpl::convertIPsToTries() {
 
 std::shared_ptr<Network::DrainableFilterChain> FilterChainManagerImpl::findExistingFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain_message) {
-  // origin filter chain manager is empty. *this is the ancestor.
-  if (origin_ == nullptr) {
+  // Origin filter chain manager could be empty if the current is the ancestor.
+  const auto* origin = getOriginFilterChainManager();
+  if (origin == nullptr) {
     return nullptr;
   }
-  auto iter = origin_->fc_contexts_.find(filter_chain_message);
-  if (iter != origin_->fc_contexts_.end()) {
+  auto iter = origin->fc_contexts_.find(filter_chain_message);
+  if (iter != origin->fc_contexts_.end()) {
     // copy the context to this filter chain manager.
     fc_contexts_.emplace(filter_chain_message, iter->second);
     return iter->second;

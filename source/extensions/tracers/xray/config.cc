@@ -21,7 +21,7 @@ namespace XRay {
 
 XRayTracerFactory::XRayTracerFactory() : FactoryBase(TracerNames::get().XRay) {}
 
-Tracing::HttpTracerPtr
+Tracing::HttpTracerSharedPtr
 XRayTracerFactory::createHttpTracerTyped(const envoy::config::trace::v3::XRayConfig& proto_config,
                                          Server::Configuration::TracerFactoryContext& context) {
   std::string sampling_rules_json;
@@ -47,7 +47,7 @@ XRayTracerFactory::createHttpTracerTyped(const envoy::config::trace::v3::XRayCon
   XRayConfiguration xconfig{endpoint, proto_config.segment_name(), sampling_rules_json};
   auto xray_driver = std::make_unique<XRay::Driver>(xconfig, context);
 
-  return std::make_unique<Tracing::HttpTracerImpl>(std::move(xray_driver),
+  return std::make_shared<Tracing::HttpTracerImpl>(std::move(xray_driver),
                                                    context.serverFactoryContext().localInfo());
 }
 

@@ -45,12 +45,17 @@ class ConnectionImpl;
 class StreamEncoderImpl : public virtual StreamEncoder,
                           public Stream,
                           Logger::Loggable<Logger::Id::http>,
-                          public StreamCallbackHelper {
+                          public StreamCallbackHelper,
+                          public Http1StreamEncoderOptions {
 public:
   // Http::StreamEncoder
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeMetadata(const MetadataMapVector&) override;
   Stream& getStream() override { return *this; }
+  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return *this; }
+
+  // Http::Http1StreamEncoderOptions
+  void disableChunkEncoding() override { disable_chunk_encoding_ = true; }
 
   // Http::Stream
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
@@ -74,6 +79,7 @@ protected:
   static const std::string LAST_CHUNK;
 
   ConnectionImpl& connection_;
+  bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
@@ -112,11 +118,8 @@ private:
  */
 class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
-  using FloodChecks = std::function<void()>;
-
-  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
-                      FloodChecks& flood_checks)
-      : StreamEncoderImpl(connection, header_key_formatter), flood_checks_(flood_checks) {}
+  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+      : StreamEncoderImpl(connection, header_key_formatter) {}
 
   bool startedResponse() { return started_response_; }
 
@@ -126,7 +129,6 @@ public:
   void encodeTrailers(const ResponseTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
-  FloodChecks& flood_checks_;
   bool started_response_{};
 };
 
@@ -222,6 +224,7 @@ protected:
   const bool strict_header_validation_ : 1;
   const bool connection_header_sanitization_ : 1;
   const bool enable_trailers_ : 1;
+  const bool reject_unsupported_transfer_encodings_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -242,6 +245,18 @@ private:
    * @len supplies the length of the span.
    */
   size_t dispatchSlice(const char* slice, size_t len);
+
+  /**
+   * Called by the http_parser when body data is received.
+   * @param data supplies the start address.
+   * @param length supplies the length.
+   */
+  void bufferBody(const char* data, size_t length);
+
+  /**
+   * Push the accumulated body through the filter pipeline.
+   */
+  void dispatchBufferedBody();
 
   /**
    * Called when a request/response is beginning. A base routine happens first then a virtual
@@ -281,17 +296,27 @@ private:
   virtual int onHeadersComplete() PURE;
 
   /**
-   * Called when body data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
+   * Called with body data is available for processing when either:
+   * - There is an accumulated partial body after the parser is done processing bytes read from the
+   * socket
+   * - The parser encounters the last byte of the body
+   * - The codec does a direct dispatch from the read buffer
+   * For performance reasons there is at most one call to onBody per call to HTTP/1
+   * ConnectionImpl::dispatch call.
+   * @param data supplies the body data
    */
-  virtual void onBody(const char* data, size_t length) PURE;
+  virtual void onBody(Buffer::Instance& data) PURE;
 
   /**
    * Called when the request/response is complete.
    */
   void onMessageCompleteBase();
   virtual void onMessageComplete() PURE;
+
+  /**
+   * Called when accepting a chunk header.
+   */
+  void onChunkHeader(bool is_final_chunk);
 
   /**
    * @see onResetStreamBase().
@@ -320,6 +345,10 @@ private:
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
   HeaderString current_header_value_;
+  // Used to accumulate the HTTP message body during the current dispatch call. The accumulated body
+  // is pushed through the filter pipeline either at the end of the current dispatch call, or when
+  // the last byte of the body is processed (whichever happens first).
+  Buffer::OwnedImpl buffered_body_;
   Buffer::WatermarkBuffer output_buffer_;
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
@@ -331,7 +360,6 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  using FloodChecks = std::function<void()>;
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count);
@@ -343,9 +371,8 @@ private:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
-                  FloodChecks& flood_checks)
-        : response_encoder_(connection, header_key_formatter, flood_checks) {}
+    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+        : response_encoder_(connection, header_key_formatter) {}
 
     HeaderString request_url_;
     RequestDecoder* request_decoder_{};
@@ -368,7 +395,7 @@ private:
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete() override;
-  void onBody(const char* data, size_t length) override;
+  void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;
@@ -400,7 +427,6 @@ private:
   void doFloodProtectionChecks() const;
 
   ServerConnectionCallbacks& callbacks_;
-  std::function<void()> flood_checks_{[&]() { this->doFloodProtectionChecks(); }};
   absl::optional<ActiveRequest> active_request_;
   Http1Settings codec_settings_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
@@ -447,7 +473,7 @@ private:
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete() override;
-  void onBody(const char* data, size_t length) override;
+  void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;
@@ -476,6 +502,7 @@ private:
   }
 
   absl::optional<PendingResponse> pending_response_;
+  bool pending_response_done_{true};
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
   // TODO(mattklein123): This should be a member of PendingResponse but this change needs dedicated

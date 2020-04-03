@@ -26,9 +26,6 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "aws_lambda_filter_integration_test",
     srcs = ["aws_lambda_filter_integration_test.cc"],
-    # TODO(marcomagdy): Excluding this test from coverage until we figure out why it fails *only* during
-    # the CI coverage phase (and only there). It passes in other CI test jobs (asan/tsan) and locally every time.
-    coverage = False,
     extension_name = "envoy.filters.http.aws_lambda",
     deps = [
         "//source/common/http:header_map_lib",

@@ -22,7 +22,9 @@ namespace AwsLambdaFilter {
 namespace {
 
 using Common::Aws::MockSigner;
+using ::testing::An;
 using ::testing::ElementsAre;
+using ::testing::InSequence;
 using ::testing::Invoke;
 using ::testing::Pair;
 using ::testing::Return;
@@ -167,7 +169,12 @@ TEST_F(AwsLambdaFilterTest, DecodeDataShouldSign) {
   const auto header_result = filter_->decodeHeaders(headers, false /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, header_result);
   Buffer::OwnedImpl buffer;
-  ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault(Return(&buffer));
+
+  InSequence seq;
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false)).Times(1);
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
+  EXPECT_CALL(*signer_, sign(An<Http::RequestHeaderMap&>(), An<const std::string&>())).Times(1);
+
   const auto data_result = filter_->decodeData(buffer, true /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, data_result);
 }

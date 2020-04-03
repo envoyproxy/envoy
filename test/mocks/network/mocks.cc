@@ -198,5 +198,8 @@ MockConnectionBalancer::~MockConnectionBalancer() = default;
 MockDrainingFilterChains::MockDrainingFilterChains() = default;
 MockDrainingFilterChains::~MockDrainingFilterChains() = default;
 
+MockListenerFilterMatcher::MockListenerFilterMatcher() = default;
+MockListenerFilterMatcher::~MockListenerFilterMatcher() = default;
+
 } // namespace Network
 } // namespace Envoy

@@ -69,6 +69,9 @@ public:
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::RequestTrailerMapPtr& trailers() { return trailers_; }
   bool receivedData() { return received_data_; }
+  Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
+    return encoder_.http1StreamEncoderOptions();
+  }
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult

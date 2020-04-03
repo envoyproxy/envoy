@@ -174,6 +174,7 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
 }
 
 TEST_P(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
+  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   sendRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }

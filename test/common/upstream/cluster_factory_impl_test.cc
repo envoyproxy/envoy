@@ -219,6 +219,35 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
       "'envoy.clusters.bad_cluster_name'");
 }
 
+TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
+  const std::string yaml = R"EOF(
+      name: staticcluster
+      connect_timeout: 0.25s
+      lb_policy: ROUND_ROBIN
+      common_lb_config:
+        consistent_hashing_lb_config:
+          use_hostname_for_hashing: true
+      hosts:
+      - socket_address:
+          address: 10.0.0.1
+          port_value: 443
+      cluster_type:
+        name: envoy.clusters.test_static
+    )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+        ClusterFactoryImplBase::create(
+            cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
+            random_, dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
+            std::move(outlier_event_logger_), false, validation_visitor_, *api_);
+      },
+      EnvoyException,
+      "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "
+      "'envoy.clusters.test_static'");
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

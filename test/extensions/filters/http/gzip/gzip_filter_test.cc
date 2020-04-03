@@ -93,9 +93,8 @@ protected:
   }
 
   void expectValidFinishedBuffer(const uint32_t content_length) {
-    uint64_t num_comp_slices = data_.getRawSlices(nullptr, 0);
-    absl::FixedArray<Buffer::RawSlice> compressed_slices(num_comp_slices);
-    data_.getRawSlices(compressed_slices.begin(), num_comp_slices);
+    Buffer::RawSliceVector compressed_slices = data_.getRawSlices();
+    const uint64_t num_comp_slices = compressed_slices.size();
 
     const std::string header_hex_str = Hex::encode(
         reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
@@ -158,7 +157,7 @@ protected:
   Decompressor::ZlibDecompressorImpl decompressor_;
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

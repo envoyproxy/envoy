@@ -160,8 +160,6 @@ ThreadLocal::Instance& ListenerFactoryContextBaseImpl::threadLocal() {
   return server_.threadLocal();
 }
 Admin& ListenerFactoryContextBaseImpl::admin() { return server_.admin(); }
-// TODO(lambdai): Consider moving away from factory context since listener filter and network filter
-// have independent factory context.
 const envoy::config::core::v3::Metadata& ListenerFactoryContextBaseImpl::listenerMetadata() const {
   return metadata_;
 };
@@ -212,16 +210,6 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this] {
-                            if (workers_started_) {
-                              parent_.onListenerWarmed(*this);
-                            } else {
-                              // Notify Server that this listener is
-                              // ready.
-                              listener_init_target_.ready();
-                            }
-                          }),
       listener_init_target_(fmt::format("Listener-init-target {}", name),
                             [this]() { dynamic_init_manager_->initialize(local_init_watcher_); }),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
@@ -233,8 +221,17 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, this, *this,
           parent.factory_.createDrainManager(config.drain_type()))),
-      filter_chain_manager_(address_, listener_factory_context_->parent_factory_context(),
-                            initManager()) {
+      filter_chain_manager_(address_, listener_factory_context_->parentFactoryContext(),
+                            initManager()),
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
+        if (workers_started_) {
+          parent_.onListenerWarmed(*this);
+        } else {
+          // Notify Server that this listener is
+          // ready.
+          listener_init_target_.ready();
+        }
+      }) {
   Network::Address::SocketType socket_type =
       Network::Utility::protobufAddressSocketType(config.address());
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, false)) {
@@ -350,8 +347,10 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst);
-    listener_filter_factories_.push_back(factory.createFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(), *listener_factory_context_));
+
+    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
+        Envoy::ProtobufWkt::Empty(),
+        /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
   }
   // Add proxy protocol listener filter if 'use_proxy_proto' flag is set.
   // TODO(jrajahalme): This is the last listener filter on purpose. When filter chain matching
@@ -361,8 +360,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
-    listener_filter_factories_.push_back(factory.createFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(), *listener_factory_context_));
+    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
+        Envoy::ProtobufWkt::Empty(),
+        /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
   }
 
   // TODO(zuercher) remove the deprecated TLS inspector name when the deprecated names are removed.
@@ -394,8 +394,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
-    listener_filter_factories_.push_back(factory.createFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(), *listener_factory_context_));
+    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
+        Envoy::ProtobufWkt::Empty(),
+        /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
   }
 
   if (!workers_started_) {
