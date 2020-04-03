@@ -360,6 +360,7 @@ envoy_cc_benchmark_binary(
 
 envoy_benchmark_test(
     name = "load_balancer_benchmark_test",
+    timeout = "long",
     benchmark_binary = "load_balancer_benchmark",
 )
 
