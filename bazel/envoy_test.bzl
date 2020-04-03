@@ -221,6 +221,12 @@ def envoy_cc_test_library(
     deps = deps + [
         repository + "//test/test_common:printers_includes",
     ]
+
+    # Same as envoy_cc_library
+    srcs += select({
+        "@envoy//bazel:compdb_build": ["@envoy//bazel/external:empty.cc"],
+        "//conditions:default": [],
+    })
     _envoy_cc_test_infrastructure_library(
         name,
         srcs,
@@ -264,12 +270,14 @@ def envoy_cc_benchmark_binary(
 def envoy_benchmark_test(
         name,
         benchmark_binary,
-        data = []):
+        data = [],
+        **kargs):
     native.sh_test(
         name = name,
         srcs = ["//bazel:test_for_benchmark_wrapper.sh"],
         data = [":" + benchmark_binary] + data,
         args = ["%s/%s" % (native.package_name(), benchmark_binary)],
+        **kargs
     )
 
 # Envoy Python test binaries should be specified with this function.

@@ -60,7 +60,7 @@ public:
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
   ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
-               const std::string& config = HTTP_PROXY_CONFIG);
+               const std::string& config = httpProxyConfig());
 
   static void
   initializeTls(const ServerSslOptions& options,
@@ -71,25 +71,28 @@ public:
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&)>;
 
   // A basic configuration (admin port, cluster_0, one listener) with no network filters.
-  static const std::string BASE_CONFIG;
+  static std::string baseConfig();
 
   // A basic configuration (admin port, cluster_0, one udp listener) with no network filters.
-  static const std::string BASE_UDP_LISTENER_CONFIG;
+  static std::string baseUdpListenerConfig();
+
+  // A string for a tls inspector listener filter which can be used with addListenerFilter()
+  static std::string tlsInspectorFilter();
 
   // A basic configuration for L4 proxying.
-  static const std::string TCP_PROXY_CONFIG;
+  static std::string tcpProxyConfig();
   // A basic configuration for L7 proxying.
-  static const std::string HTTP_PROXY_CONFIG;
+  static std::string httpProxyConfig();
   // A basic configuration for L7 proxying with QUIC transport.
-  static const std::string QUIC_HTTP_PROXY_CONFIG;
+  static std::string quicHttpProxyConfig();
   // A string for a basic buffer filter, which can be used with addFilter()
-  static const std::string DEFAULT_BUFFER_FILTER;
+  static std::string defaultBufferFilter();
   // A string for a small buffer filter, which can be used with addFilter()
-  static const std::string SMALL_BUFFER_FILTER;
-  // a string for a health check filter which can be used with addFilter()
-  static const std::string DEFAULT_HEALTH_CHECK_FILTER;
-  // a string for a squash filter which can be used with addFilter()
-  static const std::string DEFAULT_SQUASH_FILTER;
+  static std::string smallBufferFilter();
+  // A string for a health check filter which can be used with addFilter()
+  static std::string defaultHealthCheckFilter();
+  // A string for a squash filter which can be used with addFilter()
+  static std::string defaultSquashFilter();
 
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
@@ -139,6 +142,9 @@ public:
 
   // Add a network filter prior to existing filters.
   void addNetworkFilter(const std::string& filter_yaml);
+
+  // Add a listener filter prior to existing filters.
+  void addListenerFilter(const std::string& filter_yaml);
 
   // Sets the client codec to the specified type.
   void setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::

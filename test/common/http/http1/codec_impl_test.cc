@@ -11,6 +11,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/runtime/runtime_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -89,7 +90,7 @@ public:
 protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
 };
 
 void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,
@@ -667,7 +668,8 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
     response_encoder->encodeHeaders(headers, true);
   }
 
-  // Trying to shove a third response in the queue should trigger flood protection.
+  // Trying to accept a third request with two buffered responses in the queue should trigger flood
+  // protection.
   {
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
@@ -677,10 +679,7 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
         }));
 
     Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-    codec_->dispatch(buffer);
-
-    TestResponseHeaderMapImpl headers{{":status", "200"}};
-    EXPECT_THROW_WITH_MESSAGE(response_encoder->encodeHeaders(headers, true), FrameFloodException,
+    EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), FrameFloodException,
                               "Too many responses queued.");
     EXPECT_EQ(1, store_.counter("http1.response_flood").value());
   }
@@ -1382,7 +1381,7 @@ public:
   std::unique_ptr<ClientConnectionImpl> codec_;
 
 protected:
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
 };
 
