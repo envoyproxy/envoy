@@ -123,7 +123,7 @@ All http2 statistics are rooted at *http2.*
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   header_overflow, Counter, Total number of connections reset due to the headers being larger than the :ref:`configured value <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.max_request_headers_kb>`.
+   header_overflow, Counter, Total number of connections reset due to the headers being larger than the :ref:`configured value <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
    headers_cb_no_stream, Counter, Total number of errors where a header callback is called without an associated stream. This tracks an unexpected occurrence due to an as yet undiagnosed bug
    inbound_empty_frames_flood, Counter, Total number of connections terminated for exceeding the limit on consecutive inbound frames with an empty payload and no end stream flag. The limit is configured by setting the :ref:`max_consecutive_inbound_frames_with_empty_payload config setting <envoy_api_field_core.Http2ProtocolOptions.max_consecutive_inbound_frames_with_empty_payload>`.
    inbound_priority_frames_flood, Counter, Total number of connections terminated for exceeding the limit on inbound frames of type PRIORITY. The limit is configured by setting the :ref:`max_inbound_priority_frames_per_stream config setting <envoy_api_field_core.Http2ProtocolOptions.max_inbound_priority_frames_per_stream>`.
