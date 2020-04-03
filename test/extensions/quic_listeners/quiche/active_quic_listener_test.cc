@@ -129,7 +129,7 @@ protected:
   // TODO(bencebeky): Factor out parts common with
   // EnvoyQuicDispatcherTest::createFullChloPacket() to test_utils.
   void SendFullCHLO(quic::QuicConnectionId connection_id) {
-    client_sockets_.push_back(std::make_unique<Socket>(local_address_, nullptr, /*bind*/ false));
+    client_sockets_.emplace_back(std::make_unique<Socket>(local_address_, nullptr, /*bind*/ false));
     quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
         &clock_, quic::AllSupportedVersions()[0].transport_version,
         &ActiveQuicListenerPeer::crypto_config(*quic_listener_));
