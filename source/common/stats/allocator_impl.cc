@@ -223,6 +223,7 @@ public:
       break;
     }
   }
+
 private:
   std::atomic<uint64_t> value_{0};
 };
@@ -239,10 +240,17 @@ public:
   }
 
   // Stats::TextReadout
-  void set(const std::string& value) override { value_ = value; }
-  std::string value() const override { return value_; }
+  void set(const std::string& value) override {
+    Thread::LockGuard lock(mutex_);
+    value_ = value;
+  }
+  std::string value() const override {
+    Thread::LockGuard lock(mutex_);
+    return value_;
+  }
 
 private:
+  mutable Thread::MutexBasicLockable mutex_;
   std::string value_;
 };
 
