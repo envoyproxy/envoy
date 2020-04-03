@@ -28,13 +28,18 @@ namespace Server {
 
 class ListenerHandle {
 public:
-  ListenerHandle() { EXPECT_CALL(*drain_manager_, startParentShutdownSequence()).Times(0); }
+  ListenerHandle(bool need_local_drain_manager = true) {
+    if (need_local_drain_manager) {
+      drain_manager_ = new MockDrainManager();
+      EXPECT_CALL(*drain_manager_, startParentShutdownSequence()).Times(0);
+    }
+  }
   ~ListenerHandle() { onDestroy(); }
 
   MOCK_METHOD(void, onDestroy, ());
 
   Init::ExpectableTargetImpl target_;
-  MockDrainManager* drain_manager_ = new MockDrainManager();
+  MockDrainManager* drain_manager_{};
   Configuration::FactoryContext* context_{};
 };
 

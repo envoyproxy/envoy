@@ -75,9 +75,9 @@ public:
   virtual void drainListeners() PURE;
 
   /**
-   * @return const DrainManager& singleton for use by the entire server.
+   * @return DrainManager& singleton for use by the entire server.
    */
-  virtual const DrainManager& drainManager() PURE;
+  virtual DrainManager& drainManager() PURE;
 
   /**
    * @return AccessLogManager for use by the entire server.

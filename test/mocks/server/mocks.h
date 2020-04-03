@@ -495,6 +495,7 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
   Grpc::Context& grpcContext() override { return grpc_context_; }
+  MOCK_METHOD(Server::DrainManager&, drainManager, ());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;

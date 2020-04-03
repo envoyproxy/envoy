@@ -349,6 +349,14 @@ public:
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
 
 /**
+ * A filter chain that can be drained.
+ */
+class DrainableFilterChain : public FilterChain {
+public:
+  virtual void startDraining() PURE;
+};
+
+/**
  * Interface for searching through configured filter chains.
  */
 class FilterChainManager {

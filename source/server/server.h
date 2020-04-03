@@ -169,6 +169,7 @@ public:
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
+  Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
