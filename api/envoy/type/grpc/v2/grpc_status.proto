@@ -10,9 +10,9 @@ option java_outer_classname = "GrpcStatusProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.type.grpc.v3";
 
-// [#protodoc-title: GRPC status codes]
+// [#protodoc-title: gRPC status codes]
 
-// GRPC response codes supported.
+// gRPC response codes supported.
 enum Status {
   OK = 0;
   CANCELED = 1;
@@ -33,8 +33,8 @@ enum Status {
   UNAUTHENTICATED = 16;
 }
 
-// GRPC status.
+// gRPC status.
 message GrpcStatus {
-  // Supplies GRPC response code.
-  Status status = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
+  // Supplies gRPC response code.
+  Status status = 1 [(validate.rules).enum = {defined_only: true}];
 }
