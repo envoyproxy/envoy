@@ -980,7 +980,9 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
           this);
     }
 
-    if (!session_ticket_keys_.empty()) {
+    if (config.disableStatelessSessionResumption()) {
+      SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_NO_TICKET);
+    } else if (!session_ticket_keys_.empty()) {
       SSL_CTX_set_tlsext_ticket_key_cb(
           ctx.ssl_ctx_.get(),
           [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,

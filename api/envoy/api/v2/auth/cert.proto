@@ -415,7 +415,7 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DownstreamTlsContext {
   // Common TLS context settings.
   CommonTlsContext common_tls_context = 1;
@@ -434,6 +434,16 @@ message DownstreamTlsContext {
 
     // Config for fetching TLS session ticket keys via SDS API.
     SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
+
+    // Config for controlling stateless TLS session resumption: setting this to true will cause the TLS
+    // server to not issue TLS session tickets for the purposes of stateless TLS session resumption.
+    // If set to false, the TLS server will issue TLS session tickets and encrypt/decrypt them using
+    // the keys specified through either :ref:`session_ticket_keys <envoy_api_field_auth.DownstreamTlsContext.session_ticket_keys>`
+    // or :ref:`session_ticket_keys_sds_secret_config <envoy_api_field_auth.DownstreamTlsContext.session_ticket_keys_sds_secret_config>`.
+    // If this config is set to false and no keys are explicitly configured, the TLS server will issue
+    // TLS session tickets and encrypt/decrypt them using an internally-generated and managed key, with the
+    // implication that sessions cannot be resumed across hot restarts or on different hosts.
+    bool disable_stateless_session_resumption = 7;
   }
 
   // If specified, session_timeout will change maximum lifetime (in seconds) of TLS session
