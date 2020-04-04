@@ -49,10 +49,10 @@ private:
  */
 template <class Base> class InjectFactoryCategory {
 public:
-  InjectFactoryCategory(Base& instance) : instance_(instance) {
+  InjectFactoryCategory(Base& instance)
+      : proxy_(std::make_unique<FactoryRegistryProxyImpl<Base>>()), instance_(instance) {
     // Register a new category.
-    FactoryCategoryRegistry::registerCategory(instance_.category(),
-                                              new FactoryRegistryProxyImpl<Base>());
+    FactoryCategoryRegistry::registerCategory(instance_.category(), proxy_.get());
   }
 
   ~InjectFactoryCategory() {
@@ -60,6 +60,7 @@ public:
   }
 
 private:
+  std::unique_ptr<FactoryRegistryProxyImpl<Base>> proxy_;
   Base& instance_;
 };
 
