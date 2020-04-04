@@ -41,8 +41,6 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       }
       ASSERT(false, absl::StrCat("fail to replace tcp listener ", config.name(), " tagged ",
                                  overridden_listener.value()));
-      // TODO(lambdai): Fallback to addListener.
-      // Requires returning code to trigger a remove listener on failure.
     }
     auto tcp_listener = std::make_unique<ActiveTcpListener>(*this, config);
     details.tcp_listener_ = *tcp_listener;
@@ -83,7 +81,6 @@ void ConnectionHandlerImpl::removeFilterChains(
   }
   // Fallback to iterate over all listeners. The reason is that the target listener might have began
   // another update and the previous tag is lost.
-  // TODO(lambdai): lookup the correct listener
   for (auto& listener : listeners_) {
     if (listener.second.tcp_listener_.has_value()) {
       listener.second.tcp_listener_->get().removeFilterChains(
@@ -433,10 +430,7 @@ ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(
 
 void ConnectionHandlerImpl::ActiveTcpListener::removeFilterChains(
     const std::list<const Network::FilterChain*>& draining_filter_chains) {
-  // need to recover the original deleting state
-  // TODO(lambdai): determine if removeFilterChains could be invoked when is_deleting
-  // TODO(lambdai): RAII
-  // alternatively, erase the iterator of connections prior to the connection removal
+  // Need to recover the original deleting state
   bool was_deleting = is_deleting_;
   is_deleting_ = true;
   for (const auto* filter_chain : draining_filter_chains) {

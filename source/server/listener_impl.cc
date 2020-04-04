@@ -527,10 +527,6 @@ ListenerImpl::~ListenerImpl() {
     // parent's initManager to get ready().
     listener_init_target_.ready();
   }
-
-  // TODO(lambdai): Reorder the members to simplify the dtor.
-  // Destroy immediately to prevent other member destruction triggered the ready().
-  dynamic_init_manager_ = nullptr;
 }
 
 Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }

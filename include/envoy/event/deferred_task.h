@@ -17,7 +17,6 @@ private:
   };
 
 public:
-  // TODO(lambdai): moving to dispatcher?
   static void deferredRun(Dispatcher& dispatcher, std::function<void()>&& func) {
     dispatcher.deferredDelete(std::make_unique<DeferredTask>(std::move(func)));
   }

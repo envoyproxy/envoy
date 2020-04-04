@@ -218,9 +218,6 @@ public:
                bool workers_started, uint64_t hash, uint32_t concurrency);
   ~ListenerImpl() override;
 
-  // ListenerFactoryContext may be shared by generations of listeners
-  std::shared_ptr<Configuration::ListenerFactoryContext> getListenerFactoryContext();
-
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
    */

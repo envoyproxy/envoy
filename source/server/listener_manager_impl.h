@@ -129,22 +129,27 @@ struct ListenerManagerStats {
 };
 
 /**
- * Struct to bind the draining listener instance and the filter chains. Due to the decedent of the
- * listener could take over some of the filter chains, the draining filter chains are a subset of
- * which listener manages.
+ * An implementation of DrainingFilterChains. It provides the draining filter chains and the
+ * functionality to schedule listener destroy.
  */
-struct DrainingFilterChains : public Network::DrainingFilterChains {
-  DrainingFilterChains(ListenerImplPtr&& draining_listener, uint64_t workers_pending_removal);
-  virtual ~DrainingFilterChains() = default;
+class DrainingFilterChainsImpl : public Network::DrainingFilterChains {
+public:
+  DrainingFilterChainsImpl(ListenerImplPtr&& draining_listener, uint64_t workers_pending_removal);
+  virtual ~DrainingFilterChainsImpl() = default;
+  // Network::DrainingFilterChains
   virtual uint64_t getDrainingListenerTag() const override {
     return draining_listener_->listenerTag();
   }
   virtual const std::list<const Network::FilterChain*>& getDrainingFilterChains() const override {
     return draining_filter_chains_;
   }
+
+  ListenerImpl& getDrainingListener() { return *draining_listener_; }
+  uint64_t decWorkersPendingRemoval() { return --workers_pending_removal_; }
+
+  // Schedule listener destroy.
   void startDrainSequence(std::chrono::seconds drain_time, Event::Dispatcher& dispatcher,
                           std::function<void()> completion) {
-    ENVOY_LOG_MISC(debug, "draintime = {}", drain_time.count());
     drain_sequence_completion_ = completion;
     ASSERT(!drain_timer_);
 
@@ -152,10 +157,11 @@ struct DrainingFilterChains : public Network::DrainingFilterChains {
     drain_timer_->enableTimer(drain_time);
   }
 
+private:
   ListenerImplPtr draining_listener_;
   std::list<const Network::FilterChain*> draining_filter_chains_;
-  uint64_t workers_pending_removal_;
 
+  uint64_t workers_pending_removal_;
   Event::TimerPtr drain_timer_;
   std::function<void()> drain_sequence_completion_;
 };
@@ -282,7 +288,7 @@ private:
   // connections are drained. Then after that time period the listener is removed from all workers
   // and any remaining connections are closed.
   std::list<DrainingListener> draining_listeners_;
-  std::list<DrainingFilterChains> draining_filter_groups_;
+  std::list<DrainingFilterChainsImpl> draining_filter_groups_;
 
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
