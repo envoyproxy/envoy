@@ -123,8 +123,8 @@ private:
   template <class T, class Base> friend class RegisterFactory;
   template <class Base> friend class InjectFactoryCategory;
 
-  static void registerCategory(const std::string& category, FactoryRegistryProxy* factoryNames) {
-    auto result = factories().emplace(std::make_pair(category, factoryNames));
+  static void registerCategory(const std::string& category, FactoryRegistryProxy* factory_names) {
+    auto result = factories().emplace(std::make_pair(category, factory_names));
     RELEASE_ASSERT(result.second == true,
                    fmt::format("Double registration for category: '{}'", category));
   }
