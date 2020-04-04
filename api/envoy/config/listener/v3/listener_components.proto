@@ -208,9 +208,32 @@ message FilterChain {
   string name = 7;
 }
 
-// [#not-implemented-hide:]
 // Listener filter chain match configuration. This is a recursive structure which allows complex
 // nested match configurations to be built using various logical operators.
+//
+// Examples:
+//
+// * Matches if the destination port is 3306.
+//
+// .. code-block:: yaml
+//
+//  destination_port_range:
+//   start: 3306
+//   end: 3307
+//
+// * Matches if the destination port is 3306 or 15000.
+//
+// .. code-block:: yaml
+//
+//  or_match:
+//    rules:
+//      - destination_port_range:
+//          start: 3306
+//          end: 3306
+//      - destination_port_range:
+//          start: 15000
+//          end: 15001
+//
 // [#next-free-field: 6]
 message ListenerFilterChainMatchPredicate {
   option (udpa.annotations.versioning).previous_message_type =
@@ -267,17 +290,8 @@ message ListenerFilter {
     google.protobuf.Any typed_config = 3;
   }
 
-  // [#not-implemented-hide:]
-  // Decide when to disable this listener filter on incoming traffic.
-  // Example:
-  // 0. always enable filter
-  //    don't set `filter_disabled`
-  // 1. disable when the destination port is 3306
-  //    rule.destination_port_range = Int32Range {start = 3306, end = 3307}
-  // 2. disable when the destination port is 3306 or 15000
-  //    rule.or_match = MatchSet.rules [
-  //       rule.destination_port_range = Int32Range {start = 3306, end = 3307},
-  //       rule.destination_port_range = Int32Range {start = 15000, end = 15001},
-  //    ]
+  // Optional match predicate used to disable the filter. The filter is enabled when this field is empty.
+  // See :ref:`ListenerFilterChainMatchPredicate <envoy_api_msg_config.listener.v3.ListenerFilterChainMatchPredicate>`
+  // for further examples.
   ListenerFilterChainMatchPredicate filter_disabled = 4;
 }

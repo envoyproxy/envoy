@@ -165,7 +165,7 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
     return makeAltsConnection();
   };
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 class AltsIntegrationTestEmptyPeer : public AltsIntegrationTestBase {
@@ -186,7 +186,7 @@ TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
     return makeAltsConnection();
   };
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 class AltsIntegrationTestClientInvalidPeer : public AltsIntegrationTestBase {

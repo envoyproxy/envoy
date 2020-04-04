@@ -26,10 +26,12 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
-    : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
+    : Envoy::Config::SubscriptionBase<envoy::config::listener::v3::Listener>(
+          lds_config.resource_api_version()),
+      listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }),
       validation_visitor_(validation_visitor) {
-  const auto resource_name = getResourceName(lds_config.resource_api_version());
+  const auto resource_name = getResourceName();
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
       lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this);
   init_manager.add(init_target_);

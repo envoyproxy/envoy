@@ -76,6 +76,9 @@ public:
   // A basic configuration (admin port, cluster_0, one udp listener) with no network filters.
   static std::string baseUdpListenerConfig();
 
+  // A string for a tls inspector listener filter which can be used with addListenerFilter()
+  static std::string tlsInspectorFilter();
+
   // A basic configuration for L4 proxying.
   static std::string tcpProxyConfig();
   // A basic configuration for L7 proxying.
@@ -86,9 +89,9 @@ public:
   static std::string defaultBufferFilter();
   // A string for a small buffer filter, which can be used with addFilter()
   static std::string smallBufferFilter();
-  // a string for a health check filter which can be used with addFilter()
+  // A string for a health check filter which can be used with addFilter()
   static std::string defaultHealthCheckFilter();
-  // a string for a squash filter which can be used with addFilter()
+  // A string for a squash filter which can be used with addFilter()
   static std::string defaultSquashFilter();
 
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
@@ -139,6 +142,9 @@ public:
 
   // Add a network filter prior to existing filters.
   void addNetworkFilter(const std::string& filter_yaml);
+
+  // Add a listener filter prior to existing filters.
+  void addListenerFilter(const std::string& filter_yaml);
 
   // Sets the client codec to the specified type.
   void setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::

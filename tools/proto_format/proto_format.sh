@@ -37,6 +37,8 @@ bazel build ${BAZEL_BUILD_OPTIONS} --//tools/api_proto_plugin:default_type_db_ta
 TOOLS=$(dirname $(dirname $(realpath $0)))
 # to satisfy dependency on api_proto_plugin
 export PYTHONPATH="$TOOLS"
+# Build protoprint for use in proto_sync.py.
+bazel build ${BAZEL_BUILD_OPTIONS} //tools/protoxform:protoprint
 ./tools/proto_format/proto_sync.py "--mode=$1" ${PROTO_TARGETS}
 
 bazel build ${BAZEL_BUILD_OPTIONS} //tools/type_whisperer:api_build_file
