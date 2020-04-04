@@ -360,8 +360,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     RELEASE_ASSERT(bio != nullptr, "");
     uint8_t* data = nullptr;
     long len;
-    if (!PEM_bytes_read_bio(&data, &len, nullptr, PEM_STRING_X509, bio.get(), nullptr, nullptr) ||
-        !data) {
+    if (!PEM_bytes_read_bio(&data, &len, nullptr, PEM_STRING_X509, bio.get(), nullptr, nullptr)) {
       throw EnvoyException(
           absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
     }
