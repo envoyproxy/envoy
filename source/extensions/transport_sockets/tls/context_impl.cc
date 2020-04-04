@@ -58,7 +58,7 @@ int sslTlsContextIndex() {
   }());
 }
 
-static bool seekToSubject(CRYPTO_BUFFER* cert, CBS* tbs_certificate) {
+bool seekToSubject(CRYPTO_BUFFER* cert, CBS* tbs_certificate) {
   CBS der;
   CRYPTO_BUFFER_init_CBS(cert, &der);
   CBS certificate, opt_version, serial, signature, issuer, validity;
@@ -122,7 +122,7 @@ bool extractSubjectNameFromDERCert(CRYPTO_BUFFER* cert, absl::string_view* subje
   return true;
 }
 
-static void pushBufferIfUnique(STACK_OF(CRYPTO_BUFFER) * stack, absl::string_view value) {
+void pushBufferIfUnique(STACK_OF(CRYPTO_BUFFER) * stack, absl::string_view value) {
   for (auto buf : stack) {
     if (CRYPTO_BUFFER_len(buf) == value.size() &&
         memcmp(CRYPTO_BUFFER_data(buf), value.data(), value.size()) == 0) {
