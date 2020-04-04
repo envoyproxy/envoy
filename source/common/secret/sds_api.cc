@@ -10,7 +10,6 @@
 
 #include "common/common/assert.h"
 #include "common/config/api_version.h"
-#include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
@@ -21,7 +20,9 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
                ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                Init::Manager& init_manager, std::function<void()> destructor_cb,
                Event::Dispatcher& dispatcher, Api::Api& api)
-    : init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
+    : Envoy::Config::SubscriptionBase<envoy::extensions::transport_sockets::tls::v3::Secret>(
+          sds_config.resource_api_version()),
+      init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
       stats_(stats), sds_config_(std::move(sds_config)), sds_config_name_(sds_config_name),
       secret_hash_(0), clean_up_(std::move(destructor_cb)), validation_visitor_(validation_visitor),
       subscription_factory_(subscription_factory),
@@ -110,7 +111,7 @@ void SdsApi::validateUpdateSize(int num_resources) {
 }
 
 void SdsApi::initialize() {
-  const auto resource_name = getResourceName(sds_config_.resource_api_version());
+  const auto resource_name = getResourceName();
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
       sds_config_, Grpc::Common::typeUrl(resource_name), stats_, *this);
   subscription_->start({sds_config_name_});

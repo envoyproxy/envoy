@@ -4,7 +4,6 @@
 
 #include "envoy/common/callback.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -13,6 +12,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/config/config_provider_impl.h"
+#include "common/config/subscription_base.h"
 #include "common/init/manager_impl.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_config_impl.h"
