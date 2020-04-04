@@ -135,12 +135,11 @@ struct ListenerManagerStats {
 class DrainingFilterChainsImpl : public Network::DrainingFilterChains {
 public:
   DrainingFilterChainsImpl(ListenerImplPtr&& draining_listener, uint64_t workers_pending_removal);
-  virtual ~DrainingFilterChainsImpl() = default;
+  ~DrainingFilterChainsImpl() override = default;
+
   // Network::DrainingFilterChains
-  virtual uint64_t getDrainingListenerTag() const override {
-    return draining_listener_->listenerTag();
-  }
-  virtual const std::list<const Network::FilterChain*>& getDrainingFilterChains() const override {
+  uint64_t getDrainingListenerTag() const override { return draining_listener_->listenerTag(); }
+  const std::list<const Network::FilterChain*>& getDrainingFilterChains() const override {
     return draining_filter_chains_;
   }
 
