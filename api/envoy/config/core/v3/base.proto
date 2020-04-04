@@ -239,6 +239,17 @@ message RuntimeUInt32 {
   string runtime_key = 3 [(validate.rules).string = {min_bytes: 1}];
 }
 
+// Runtime derived double with a default when not specified.
+message RuntimeDouble {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RuntimeDouble";
+
+  // Default value if runtime value is not available.
+  double default_value = 1;
+
+  // Runtime key to get value for comparison. This value is used if defined.
+  string runtime_key = 2 [(validate.rules).string = {min_bytes: 1}];
+}
+
 // Runtime derived bool with a default when not specified.
 message RuntimeFeatureFlag {
   option (udpa.annotations.versioning).previous_message_type =
