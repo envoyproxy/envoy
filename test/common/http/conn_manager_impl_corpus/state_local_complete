@@ -1,0 +1,18 @@
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+        headers {
+          key: "\177\177\177\177\177\177\177\177"
+        }
+      }
+    }
+  }
+}
+actions {
+}
