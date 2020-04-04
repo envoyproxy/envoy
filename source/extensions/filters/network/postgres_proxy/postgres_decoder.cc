@@ -288,7 +288,8 @@ void DecoderImpl::decodeFrontendTerminate() {
 void DecoderImpl::decodeAuthentication() {
   // check if auth message indicates successful authentication
   // Length must be 8 and payload must be 0
-  if ((8 == message_len_) && (0 == *(reinterpret_cast<const uint32_t*>(message_.data())))) {
+  if ((8 == message_len_) && (0 == message_.data()[0]) && (0 == message_.data()[1]) &&
+      (0 == message_.data()[2]) && (0 == message_.data()[3])) {
     incSessionsUnencrypted();
   }
 }
