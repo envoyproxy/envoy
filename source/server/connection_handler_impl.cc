@@ -356,7 +356,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
   ActiveTcpConnectionPtr active_connection(
-      new ActiveTcpConnection(active_connections, std::move(server_conn_ptr);
+      new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               parent_.dispatcher_.timeSource(), config_, std::move(stream_info)));
   active_connection->connection_->setBufferLimits(config_.perConnectionBufferLimitBytes());
 
