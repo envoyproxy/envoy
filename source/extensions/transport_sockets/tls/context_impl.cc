@@ -104,22 +104,22 @@ bool extractSPKIFromDERCert(CRYPTO_BUFFER* cert, CBS* spki) {
       !CBS_get_asn1_element(&tbs_certificate, spki, CBS_ASN1_SEQUENCE)) {
     return false;
   }
+
   return true;
 }
 
-bool extractSubjectNameFromDERCert(CRYPTO_BUFFER* cert, absl::string_view* subject_out) {
+absl::optional<absl::string_view> extractSubjectNameFromDERCert(CRYPTO_BUFFER* cert) {
   CBS tbs_certificate;
   if (!seekToSubject(cert, &tbs_certificate)) {
-    return false;
+    return absl::nullopt;
   }
 
   CBS subject;
   if (!CBS_get_asn1_element(&tbs_certificate, &subject, CBS_ASN1_SEQUENCE)) {
-    return false;
+    return absl::nullopt;
   }
-  *subject_out =
-      absl::string_view(reinterpret_cast<const char*>(CBS_data(&subject)), CBS_len(&subject));
-  return true;
+
+  return absl::string_view(reinterpret_cast<const char*>(CBS_data(&subject)), CBS_len(&subject));
 }
 
 void pushBufferIfUnique(STACK_OF(CRYPTO_BUFFER) * stack, absl::string_view value) {
@@ -1457,12 +1457,12 @@ void ServerContextImpl::TlsContext::addClientValidationContext(
     }
     bssl::UniquePtr<uint8_t> der(data);
     bssl::UniquePtr<CRYPTO_BUFFER> cert(CRYPTO_BUFFER_new(data, len, nullptr));
-    absl::string_view name;
-    if (!extractSubjectNameFromDERCert(cert.get(), &name)) {
+    auto name = extractSubjectNameFromDERCert(cert.get());
+    if (!name) {
       throw EnvoyException(
           absl::StrCat("Failed to load trusted client CA certificates from ", config.caCertPath()));
     }
-    pushBufferIfUnique(list.get(), name);
+    pushBufferIfUnique(list.get(), name.value());
   }
   // Check for EOF.
   const uint32_t err = ERR_peek_last_error();
