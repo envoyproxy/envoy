@@ -1,5 +1,6 @@
 #include <functional>
 
+#include "envoy/event/deferred_task.h"
 #include "envoy/thread/thread.h"
 
 #include "common/api/api_impl.h"
@@ -60,6 +61,27 @@ TEST(DeferredDeleteTest, DeferredDelete) {
   EXPECT_CALL(watcher2, ready());
   dispatcher->clearDeferredDeleteList();
 
+  EXPECT_CALL(watcher3, ready());
+  dispatcher->clearDeferredDeleteList();
+}
+
+TEST(DeferredTaskTest, DeferredTask) {
+  InSequence s;
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher());
+  ReadyWatcher watcher1;
+
+  DeferredTaskUtil::deferredRun(*dispatcher, [&watcher1]() -> void { watcher1.ready(); });
+  // The first one will get deleted inline.
+  EXPECT_CALL(watcher1, ready());
+  dispatcher->clearDeferredDeleteList();
+
+  // Deferred task is scheduled FIFO.
+  ReadyWatcher watcher2;
+  ReadyWatcher watcher3;
+  DeferredTaskUtil::deferredRun(*dispatcher, [&watcher2]() -> void { watcher2.ready(); });
+  DeferredTaskUtil::deferredRun(*dispatcher, [&watcher3]() -> void { watcher3.ready(); });
+  EXPECT_CALL(watcher2, ready());
   EXPECT_CALL(watcher3, ready());
   dispatcher->clearDeferredDeleteList();
 }

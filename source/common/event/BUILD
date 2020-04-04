@@ -70,6 +70,7 @@ envoy_cc_library(
         ":libevent_scheduler_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:deferred_deletable",
+        "//include/envoy/event:deferred_task",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
         "//include/envoy/network:connection_handler_interface",
