@@ -113,25 +113,25 @@ void Utility::checkApiConfigSourceNames(
 
   if (is_grpc) {
     if (!api_config_source.cluster_names().empty()) {
-      throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource::(DELTA_)GRPC "
+      throw EnvoyException(fmt::format("envoy::api::v3::core::ConfigSource::(DELTA_)GRPC "
                                        "must not have a cluster name specified: {}",
                                        api_config_source.DebugString()));
     }
     if (api_config_source.grpc_services().size() > 1) {
-      throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource::(DELTA_)GRPC "
+      throw EnvoyException(fmt::format("envoy::api::v3::core::ConfigSource::(DELTA_)GRPC "
                                        "must have a single gRPC service specified: {}",
                                        api_config_source.DebugString()));
     }
   } else {
     if (!api_config_source.grpc_services().empty()) {
       throw EnvoyException(
-          fmt::format("envoy::api::v2::core::ConfigSource, if not a gRPC type, must not have "
+          fmt::format("envoy::api::v3::core::ConfigSource, if not a gRPC type, must not have "
                       "a gRPC service specified: {}",
                       api_config_source.DebugString()));
     }
     if (api_config_source.cluster_names().size() != 1) {
       throw EnvoyException(fmt::format(
-          "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified: {}",
+          "envoy::api::v3::core::ConfigSource must have a singleton cluster name specified: {}",
           api_config_source.DebugString()));
     }
   }
@@ -144,7 +144,7 @@ void Utility::validateClusterName(const Upstream::ClusterManager::ClusterInfoMap
   if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
       it->second.get().info()->type() == envoy::config::cluster::v3::Cluster::EDS) {
     throw EnvoyException(fmt::format(
-        "envoy::api::v2::core::ConfigSource must have a statically "
+        "envoy::api::v3::core::ConfigSource must have a statically "
         "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
         cluster_name));
   }
@@ -224,19 +224,20 @@ Utility::createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& boots
 
 Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
     Grpc::AsyncClientManager& async_client_manager,
-    const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope) {
+    const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
+    bool skip_cluster_check) {
   Utility::checkApiConfigSourceNames(api_config_source);
 
   if (api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::GRPC &&
       api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-    throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource type must be gRPC: {}",
+    throw EnvoyException(fmt::format("envoy::api::v3::core::ConfigSource type must be gRPC: {}",
                                      api_config_source.DebugString()));
   }
 
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.MergeFrom(api_config_source.grpc_services(0));
 
-  return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
+  return async_client_manager.factoryForGrpcService(grpc_service, scope, skip_cluster_check);
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment Utility::translateClusterHosts(

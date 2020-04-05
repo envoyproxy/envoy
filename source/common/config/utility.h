@@ -317,13 +317,14 @@ public:
   /**
    * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
-   * @param api_config_source envoy::api::v2::core::ApiConfigSource. Must have config type GRPC.
+   * @param api_config_source envoy::api::v3::core::ApiConfigSource. Must have config type GRPC.
+   * @param skip_cluster_check whether to skip cluster validation.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
   static Grpc::AsyncClientFactoryPtr
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
-                                Stats::Scope& scope);
+                                Stats::Scope& scope, bool skip_cluster_check);
 
   /**
    * Translate a set of cluster's hosts into a load assignment configuration.

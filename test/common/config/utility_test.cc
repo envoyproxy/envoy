@@ -156,7 +156,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     EXPECT_THROW_WITH_REGEX(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                               false),
         EnvoyException, "API configs must have either a gRPC service or a cluster name defined:");
   }
 
@@ -166,9 +167,10 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_grpc_services();
     api_config_source.add_grpc_services();
     EXPECT_THROW_WITH_REGEX(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                               false),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::.DELTA_.GRPC must have a single gRPC service "
+        "envoy::api::v3::core::ConfigSource::.DELTA_.GRPC must have a single gRPC service "
         "specified:");
   }
 
@@ -178,9 +180,10 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_cluster_names();
     // this also logs a warning for setting REST cluster names for a gRPC API config.
     EXPECT_THROW_WITH_REGEX(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                               false),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::.DELTA_.GRPC must not have a cluster name "
+        "envoy::api::v3::core::ConfigSource::.DELTA_.GRPC must not have a cluster name "
         "specified:");
   }
 
@@ -190,9 +193,10 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_cluster_names();
     api_config_source.add_cluster_names();
     EXPECT_THROW_WITH_REGEX(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                               false),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::.DELTA_.GRPC must not have a cluster name "
+        "envoy::api::v3::core::ConfigSource::.DELTA_.GRPC must not have a cluster name "
         "specified:");
   }
 
@@ -202,9 +206,10 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
     // this also logs a warning for configuring gRPC clusters for a REST API config.
     EXPECT_THROW_WITH_REGEX(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                               false),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource, if not a gRPC type, must not have a gRPC service "
+        "envoy::api::v3::core::ConfigSource, if not a gRPC type, must not have a gRPC service "
         "specified:");
   }
 
@@ -212,9 +217,10 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
     api_config_source.add_cluster_names("foo");
-    EXPECT_THROW_WITH_REGEX(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
-        EnvoyException, "envoy::api::v2::core::ConfigSource type must be gRPC:");
+    EXPECT_THROW_WITH_REGEX(Utility::factoryForGrpcApiConfigSource(async_client_manager,
+                                                                   api_config_source, scope, false),
+                            EnvoyException,
+                            "envoy::api::v3::core::ConfigSource type must be gRPC:");
   }
 
   {
@@ -224,17 +230,18 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     envoy::config::core::v3::GrpcService expected_grpc_service;
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
-                factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), _));
-    Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope);
+                factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false));
+    Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope, false);
   }
 
   {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
-    EXPECT_CALL(async_client_manager,
-                factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), _));
-    Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope);
+    EXPECT_CALL(
+        async_client_manager,
+        factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), true));
+    Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope, true);
   }
 }
 
@@ -532,7 +539,7 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS cluster: "
+      "envoy::api::v3::core::ConfigSource must have a statically defined non-EDS cluster: "
       "'foo_cluster' does not exist, was added via api, or is an EDS cluster");
 
   // Dynamic Cluster.
@@ -543,7 +550,7 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS cluster: "
+      "envoy::api::v3::core::ConfigSource must have a statically defined non-EDS cluster: "
       "'foo_cluster' does not exist, was added via api, or is an EDS cluster");
 
   // EDS Cluster backing EDS Cluster.
@@ -553,7 +560,7 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS cluster: "
+      "envoy::api::v3::core::ConfigSource must have a statically defined non-EDS cluster: "
       "'foo_cluster' does not exist, was added via api, or is an EDS cluster");
 
   // All ok.
@@ -567,7 +574,7 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   EXPECT_THROW_WITH_REGEX(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
-      "envoy::api::v2::core::ConfigSource::.DELTA_.GRPC must not have a cluster name "
+      "envoy::api::v3::core::ConfigSource::.DELTA_.GRPC must not have a cluster name "
       "specified:");
 }
 
@@ -582,7 +589,7 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTy
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS cluster: "
+      "envoy::api::v3::core::ConfigSource must have a statically defined non-EDS cluster: "
       "'foo_cluster' does not exist, was added via api, or is an EDS cluster");
 
   // Dynamic Cluster.
@@ -593,7 +600,7 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTy
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS cluster: "
+      "envoy::api::v3::core::ConfigSource must have a statically defined non-EDS cluster: "
       "'foo_cluster' does not exist, was added via api, or is an EDS cluster");
 
   // EDS Cluster backing EDS Cluster.
@@ -603,7 +610,7 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTy
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS cluster: "
+      "envoy::api::v3::core::ConfigSource must have a statically defined non-EDS cluster: "
       "'foo_cluster' does not exist, was added via api, or is an EDS cluster");
 
   // All ok.
@@ -611,6 +618,32 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTy
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type());
   Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source);
+}
+
+// Validates CheckCluster functionality.
+TEST(UtilityTest, CheckCluster) {
+  Upstream::MockClusterManager cm;
+
+  // Validate that proper error is thrown, when cluster is not available.
+  EXPECT_CALL(cm, get("foo")).WillOnce(Return(nullptr));
+  EXPECT_THROW_WITH_MESSAGE(Utility::checkCluster("prefix", "foo", cm, false), EnvoyException,
+                            "prefix: unknown cluster 'foo'");
+
+  // Validate that proper error is thrown, when dynamic cluster is passed when it is not expected.
+  NiceMock<Upstream::MockThreadLocalCluster> api_cluster;
+  EXPECT_CALL(cm, get("foo")).Times(2).WillRepeatedly(Return(&api_cluster));
+  EXPECT_CALL(api_cluster, info());
+  EXPECT_CALL(*api_cluster.cluster_.info_, addedViaApi()).WillOnce(Return(true));
+  EXPECT_THROW_WITH_MESSAGE(Utility::checkCluster("prefix", "foo", cm, false), EnvoyException,
+                            "prefix: invalid cluster 'foo': currently only "
+                            "static (non-CDS) clusters are supported");
+  EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, true));
+
+  // Validate that bootstrap cluster does not throw any exceptions.
+  NiceMock<Upstream::MockThreadLocalCluster> bootstrap_cluster;
+  EXPECT_CALL(cm, get("foo")).Times(2).WillRepeatedly(Return(&bootstrap_cluster));
+  EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, true));
+  EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, false));
 }
 
 } // namespace
