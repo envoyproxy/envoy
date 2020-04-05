@@ -24,6 +24,7 @@ Version history
 * datasource: added retry policy for remote async data source.
 * dns: the STRICT_DNS cluster now only resolves to 0 hosts if DNS resolution successfully returns 0 hosts.
 * dns: added support for :ref:`dns_failure_refresh_rate <envoy_api_field_config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig.dns_failure_refresh_rate>` for the :ref:`dns cache <envoy_api_msg_config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig>` to set the DNS refresh rate during failures.
+* http: added :ref:`headers_with_underscores_action setting <envoy_api_field_core.HttpProtocolOptions.headers_with_underscores_action>` to control how client requests with header names containing underscore characters are handled. The options are to allow such headers, reject request or drop headers. The default is to allow headers, preserving existing behavior.
 * http filters: http filter extensions use the "envoy.filters.http" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * eds: added :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` field for endpoints and :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field for endpoint's health check config. This enables auto host rewrite and customizing the host header during health checks for eds endpoints.
