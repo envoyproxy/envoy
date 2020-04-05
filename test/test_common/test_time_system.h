@@ -37,14 +37,13 @@ public:
    * @param duration The maximum amount of time to wait.
    * @return Thread::CondVar::WaitStatus whether the condition timed out or not.
    */
-  virtual Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
+  virtual void waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+                       const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
 
   template <class D>
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const D& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    return waitFor(mutex, condvar, std::chrono::duration_cast<Duration>(duration));
+  void waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+               const D& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+    waitFor(mutex, condvar, std::chrono::duration_cast<Duration>(duration));
   }
 };
 
@@ -83,10 +82,9 @@ template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public T
 public:
   void sleep(const Duration& duration) override { timeSystem().sleep(duration); }
 
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return timeSystem().waitFor(mutex, condvar, duration);
+  void waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+               const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+    timeSystem().waitFor(mutex, condvar, duration);
   }
 
   SchedulerPtr createScheduler(Scheduler& base_scheduler) override {

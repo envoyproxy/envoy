@@ -276,7 +276,7 @@ Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encod
   return *new_streams_.back();
 }
 
-AssertionResult FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events,
+AssertionResult FakeConnectionBase::waitForDisconnect(bool /*ignore_spurious_events*/,
                                                       milliseconds timeout) {
   ENVOY_LOG(trace, "FakeConnectionBase waiting for disconnect");
   auto end_time = time_system_.monotonicTime() + timeout;
@@ -285,15 +285,7 @@ AssertionResult FakeConnectionBase::waitForDisconnect(bool ignore_spurious_event
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for disconnect.";
     }
-    Thread::CondVar::WaitStatus status = time_system_.waitFor(lock_, connection_event_, 5ms);
-    // The default behavior of waitForDisconnect is to assume the test cleanly
-    // calls waitForData, waitForNewStream, etc. to handle all events on the
-    // connection. If the caller explicitly notes that other events should be
-    // ignored, continue looping until a disconnect is detected. Otherwise fall
-    // through and hit the assert below.
-    if ((status == Thread::CondVar::WaitStatus::NoTimeout) && !ignore_spurious_events) {
-      break;
-    }
+    time_system_.waitFor(lock_, connection_event_, 5ms);
   }
 
   if (shared_connection_.connected()) {
@@ -303,7 +295,7 @@ AssertionResult FakeConnectionBase::waitForDisconnect(bool ignore_spurious_event
   return AssertionSuccess();
 }
 
-AssertionResult FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events,
+AssertionResult FakeConnectionBase::waitForHalfClose(bool /*ignore_spurious_events*/,
                                                      milliseconds timeout) {
   auto end_time = time_system_.monotonicTime() + timeout;
   Thread::LockGuard lock(lock_);
@@ -311,15 +303,7 @@ AssertionResult FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for half close.";
     }
-    Thread::CondVar::WaitStatus status = time_system_.waitFor(lock_, connection_event_, 5ms);
-    // The default behavior of waitForHalfClose is to assume the test cleanly
-    // calls waitForData, waitForNewStream, etc. to handle all events on the
-    // connection. If the caller explicitly notes that other events should be
-    // ignored, continue looping until a disconnect is detected. Otherwise fall
-    // through and hit the assert below.
-    if (status == Thread::CondVar::WaitStatus::NoTimeout && !ignore_spurious_events) {
-      break;
-    }
+    time_system_.waitFor(lock_, connection_event_, 5ms);
   }
 
   return half_closed_
@@ -329,7 +313,7 @@ AssertionResult FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events
 
 AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dispatcher,
                                                      FakeStreamPtr& stream,
-                                                     bool ignore_spurious_events,
+                                                     bool /*ignore_spurious_events*/,
                                                      milliseconds timeout) {
   auto end_time = time_system_.monotonicTime() + timeout;
   Thread::LockGuard lock(lock_);
@@ -337,13 +321,7 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for new stream.";
     }
-    Thread::CondVar::WaitStatus status = time_system_.waitFor(lock_, connection_event_, 5ms);
-    // As with waitForDisconnect, by default, waitForNewStream returns after the next event.
-    // If the caller explicitly notes other events should be ignored, it will instead actually
-    // wait for the next new stream, ignoring other events such as onData()
-    if (status == Thread::CondVar::WaitStatus::NoTimeout && !ignore_spurious_events) {
-      break;
-    }
+    time_system_.waitFor(lock_, connection_event_, 5ms);
     if (new_streams_.empty()) {
       // Run the client dispatcher since we may need to process window updates, etc.
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);

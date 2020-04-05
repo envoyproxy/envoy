@@ -23,11 +23,10 @@ void TestRealTimeSystem::sleep(const Duration& duration) {
   std::this_thread::sleep_for(duration);
 }
 
-Thread::CondVar::WaitStatus TestRealTimeSystem::waitFor(Thread::MutexBasicLockable& lock,
-                                                        Thread::CondVar& condvar,
-                                                        const Duration& duration) noexcept {
+void TestRealTimeSystem::waitFor(Thread::MutexBasicLockable& lock, Thread::CondVar& condvar,
+                                 const Duration& duration) noexcept {
   only_one_thread_.checkOneThread();
-  return condvar.waitFor(lock, duration);
+  condvar.waitFor(lock, duration);
 }
 
 SystemTime TestRealTimeSystem::systemTime() { return real_time_system_.systemTime(); }

@@ -285,10 +285,7 @@ public:
         });
     Event::TestTimeSystem& time_system =
         dynamic_cast<Event::TestTimeSystem&>(connection_.dispatcher().timeSource());
-    Thread::CondVar::WaitStatus status = time_system.waitFor(lock_, callback_ready_event, timeout);
-    if (status == Thread::CondVar::WaitStatus::Timeout) {
-      return testing::AssertionFailure() << "Timed out while executing on dispatcher.";
-    }
+    time_system.waitFor(lock_, callback_ready_event, timeout);
     if (unexpected_disconnect && !allow_unexpected_disconnects_) {
       return testing::AssertionFailure()
              << "The connection disconnected unexpectedly, and allow_unexpected_disconnects_ is "

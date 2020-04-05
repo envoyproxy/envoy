@@ -232,7 +232,7 @@ void SimulatedTimeSystemHelper::sleep(const Duration& duration) {
   setMonotonicTimeAndUnlock(monotonic_time);
 }
 
-Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
+void SimulatedTimeSystemHelper::waitFor(
     Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
     const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
   only_one_thread_.checkOneThread();
@@ -243,7 +243,7 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
   while (true) {
     // First check to see if the condition is already satisfied without advancing sim time.
     if (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::NoTimeout) {
-      return Thread::CondVar::WaitStatus::NoTimeout;
+      return;
     }
 
     // Wait for the libevent poll in another thread to catch up prior to advancing time.
@@ -268,7 +268,6 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
       break;
     }
   }
-  return Thread::CondVar::WaitStatus::Timeout;
 }
 
 MonotonicTime SimulatedTimeSystemHelper::alarmTimeLockHeld(Alarm* alarm) NO_THREAD_SAFETY_ANALYSIS {
