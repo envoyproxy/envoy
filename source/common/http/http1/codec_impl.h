@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
@@ -28,7 +29,9 @@ namespace Http1 {
  * All stats for the HTTP/1 codec. @see stats_macros.h
  */
 #define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
+  COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(metadata_not_supported_error)                                                            \
+  COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(response_flood)
 
 /**
@@ -213,6 +216,8 @@ protected:
   Http::Code error_code_{Http::Code::BadRequest};
   bool handling_upgrade_{};
   const HeaderKeyFormatterPtr header_key_formatter_;
+  HeaderString current_header_field_;
+  HeaderString current_header_value_;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -221,6 +226,18 @@ private:
    * Called in order to complete an in progress header decode.
    */
   void completeLastHeader();
+
+  /**
+   * Check if header name contains underscore character.
+   * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
+   * as a security measure due to systems that treat '_' and '-' as interchangeable.
+   * The ServerConnectionImpl may drop header or reject request based on the
+   * `common_http_protocol_options.headers_with_underscores_action` configuration option in the
+   * HttpConnectionManager.
+   */
+  virtual bool shouldDropHeaderWithUnderscoresInNames(absl::string_view /* header_name */) const {
+    return false;
+  }
 
   /**
    * Dispatch a memory span.
@@ -300,13 +317,17 @@ private:
    */
   virtual void onBelowLowWatermark() PURE;
 
+  /**
+   * Check if header name contains underscore character.
+   * The ServerConnectionImpl may drop header or reject request based on configuration.
+   */
+  virtual void checkHeaderNameForUnderscores() {}
+
   static http_parser_settings settings_;
   static const ToLowerTable& toLowerTable();
 
   HeaderMapImplPtr current_header_map_;
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
-  HeaderString current_header_field_;
-  HeaderString current_header_value_;
   bool reset_stream_called_{};
   Buffer::WatermarkBuffer output_buffer_;
   Buffer::RawSlice reserved_iovec_;
@@ -326,7 +347,9 @@ public:
   using FloodChecks = std::function<void()>;
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ServerConnectionCallbacks& callbacks, Http1Settings settings,
-                       uint32_t max_request_headers_kb, const uint32_t max_request_headers_count);
+                       uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
+                       envoy::api::v2::core::HttpProtocolOptions::HeadersWithUnderscoresAction
+                           headers_with_underscores_action);
 
   bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
@@ -371,6 +394,7 @@ private:
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
   void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
   void doFloodProtectionChecks() const;
+  void checkHeaderNameForUnderscores() override;
 
   ServerConnectionCallbacks& callbacks_;
   std::function<void()> flood_checks_{[&]() { this->doFloodProtectionChecks(); }};
@@ -383,6 +407,9 @@ private:
   // we could make this configurable.
   uint32_t max_outbound_responses_{};
   bool flood_protection_{};
+  // The action to take when a request header name contains underscore characters.
+  const envoy::api::v2::core::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_;
 };
 
 /**

@@ -42,15 +42,17 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     ServerConnectionCallbacks& callbacks, Stats::Scope& scope, const Http1Settings& http1_settings,
     const Http2Settings& http2_settings, uint32_t max_request_headers_kb,
-    uint32_t max_request_headers_count) {
+    uint32_t max_request_headers_count,
+    envoy::api::v2::core::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
-    return std::make_unique<Http2::ServerConnectionImpl>(connection, callbacks, scope,
-                                                         http2_settings, max_request_headers_kb,
-                                                         max_request_headers_count);
+    return std::make_unique<Http2::ServerConnectionImpl>(
+        connection, callbacks, scope, http2_settings, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   } else {
-    return std::make_unique<Http1::ServerConnectionImpl>(connection, scope, callbacks,
-                                                         http1_settings, max_request_headers_kb,
-                                                         max_request_headers_count);
+    return std::make_unique<Http1::ServerConnectionImpl>(
+        connection, scope, callbacks, http1_settings, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   }
 }
 

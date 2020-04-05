@@ -58,7 +58,8 @@ TEST_F(RequestFrameCommentTest, SimpleExampleHuffman) {
   ServerCodecFrameInjector codec;
   TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
-      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+      envoy::api::v2::core::HttpProtocolOptions::ALLOW);
   codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
   codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -134,7 +135,8 @@ TEST_F(RequestFrameCommentTest, SimpleExamplePlain) {
   ServerCodecFrameInjector codec;
   TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
-      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+      envoy::api::v2::core::HttpProtocolOptions::ALLOW);
   codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
   codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -197,7 +199,8 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       ServerCodecFrameInjector codec;
       TestServerConnectionImpl connection(
           codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
-          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+          envoy::api::v2::core::HttpProtocolOptions::ALLOW);
       codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
       codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -265,7 +268,8 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       ServerCodecFrameInjector codec;
       TestServerConnectionImpl connection(
           codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
-          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+          envoy::api::v2::core::HttpProtocolOptions::ALLOW);
       codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
       codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);

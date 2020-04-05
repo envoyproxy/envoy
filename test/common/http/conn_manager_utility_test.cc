@@ -91,6 +91,8 @@ public:
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
   MOCK_CONST_METHOD0(shouldNormalizePath, bool());
   MOCK_CONST_METHOD0(shouldMergeSlashes, bool());
+  MOCK_CONST_METHOD0(headersWithUnderscoresAction,
+                     envoy::api::v2::core::HttpProtocolOptions::HeadersWithUnderscoresAction());
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
