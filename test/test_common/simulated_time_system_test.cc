@@ -99,8 +99,12 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
   // and the event-loop thread will call the corresponding callback quickly.
   {
     Thread::LockGuard lock(mutex);
-    EXPECT_EQ(Thread::CondVar::WaitStatus::NoTimeout,
-              time_system_.waitFor(mutex, condvar, std::chrono::seconds(10)));
+    // We don't check for the return value of waitFor() as it can spuriously
+    // return timeout even if the condition is satisfied before entering into
+    // the waitFor().
+    //
+    // TODO(jmarantz): just drop the return value in the API.
+    time_system_.waitFor(mutex, condvar, std::chrono::seconds(10));
   }
   EXPECT_TRUE(done);
   EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
@@ -233,8 +237,7 @@ TEST_F(SimulatedTimeSystemTest, DuplicateTimer) {
 
   {
     Thread::LockGuard lock(mutex);
-    EXPECT_EQ(Thread::CondVar::WaitStatus::NoTimeout,
-              time_system_.waitFor(mutex, condvar, std::chrono::seconds(10)));
+    time_system_.waitFor(mutex, condvar, std::chrono::seconds(10));
   }
   EXPECT_TRUE(done);
 

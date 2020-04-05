@@ -252,124 +252,39 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
   // This real-time polling delay should not be necessary. But without it,
   // /test/extensions/filters/http/cache:cache_filter_integration_test fails
   // about 40% of the time.
-#define ADD_POLL_DELAY 1
-#if ADD_POLL_DELAY
   const Duration real_time_poll_delay(
-      std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(1)), duration));
-#endif
+      std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(50)), duration));
   const MonotonicTime end_time = monotonicTime() + duration;
 
-#if 1
-  while (true) {
-    if (condvar.signaled()) {
-      condvar.clearSignaled();
-      return Thread::CondVar::WaitStatus::NoTimeout;
-    }
-
-    mutex.unlock();
-    mutex_.Lock();
-    // If we reached our end_time, break the loop and return timeout.
-    if (monotonic_time_ >= end_time) {
-      mutex_.Unlock();
-      mutex.lock();
-      break;
-    }
-
-    if (alarms_.empty()) {
-      // If no alarms are pending, sleep till the end time.
-      setMonotonicTimeLockHeld(end_time);
-    } else {
-      // If there's another alarm pending, sleep forward to it.
-      Alarm* alarm = (*alarms_.begin());
-      MonotonicTime next_wakeup = alarmTimeLockHeld(alarm);
-      setMonotonicTimeLockHeld(std::min(next_wakeup, end_time));
-    }
-    waitForNoPendingLockHeld();
-    mutex_.Unlock();
-    mutex.lock();
-
-#if ADD_POLL_DELAY
-    condvar.waitFor(mutex, real_time_poll_delay);
-#endif
-  }
-  return Thread::CondVar::WaitStatus::Timeout;
-#else
-
-  // First check to see if the condition is already satisfied without advancing sim time.
-  // while (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::Timeout) {
-
-#if 1
-  mutex.unlock();
-  mutex_.Lock();
-
-  while (true) {
-    // Wait for the libevent poll in another thread to catch up prior to advancing time.
-    waitForNoPendingLockHeld();
-    mutex_.Unlock();
-
-    mutex.lock();
-    if (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::NoTimeout) {
-      return Thread::CondVar::WaitStatus::NoTimeout;
-    }
-    mutex.unlock();
-
-    mutex_.Lock();
-
-    // If we reached our end_time, break the loop and return timeout.
-    if (monotonic_time_ >= end_time) {
-      break;
-    }
-
-    if (alarms_.empty()) {
-      // If no alarms are pending, sleep till the end time.
-      setMonotonicTimeLockHeld(end_time);
-    } else {
-      // If there's another alarm pending, sleep forward to it.
-      Alarm* alarm = (*alarms_.begin());
-      MonotonicTime next_wakeup = alarmTimeLockHeld(alarm);
-      setMonotonicTimeLockHeld(std::min(next_wakeup, end_time));
-    }
-  }
-
-  mutex_.Unlock();
-  mutex.lock();
-  return Thread::CondVar::WaitStatus::Timeout;
-#else
-  while (true) {
+  bool cont = true;
+  while (cont) {
     // First check to see if the condition is already satisfied without advancing sim time.
     if (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::NoTimeout) {
       return Thread::CondVar::WaitStatus::NoTimeout;
     }
 
-    // Wait for the libevent poll in another thread to catch up prior to advancing time.
-    // if (hasPending()) {
-    //  continue;
-    // }
-
-    mutex_unlock();
+    mutex.unlock();
     {
       absl::MutexLock lock(&mutex_);
-      waitForNoPendingLockHeld();
-
-      // If we reached our end_time, break the loop and return timeout.
-      if (monotonic_time_ >= end_time) {
-        break;
-      }
-
-      if (alarms_.empty()) {
-        // If no alarms are pending, sleep till the end time.
-        setMonotonicTimeLockHeld(end_time);
+      if (monotonic_time_ < end_time) {
+        MonotonicTime next_wakeup = end_time;
+        if (!alarms_.empty()) {
+          // If there's another alarm pending, sleep forward to it.
+          Alarm* alarm = (*alarms_.begin());
+          next_wakeup = std::min(alarmTimeLockHeld(alarm), next_wakeup);
+        }
+        setMonotonicTimeLockHeld(next_wakeup);
+        waitForNoPendingLockHeld();
       } else {
-        // If there's another alarm pending, sleep forward to it.
-        Alarm* alarm = (*alarms_.begin());
-        MonotonicTime next_wakeup = alarmTimeLockHeld(alarm);
-        setMonotonicTimeLockHeld(std::min(next_wakeup, end_time));
+        // If we reached our end_time, break the loop and return timeout. We
+        // don't break immediately as we have to drop mutex_ and re-take mutex,
+        // and it's cleaner to have a linear flow to the end of the loop.
+        cont = false;
       }
     }
+    mutex.lock();
   }
   return Thread::CondVar::WaitStatus::Timeout;
-#endif
-#endif
 }
 
 MonotonicTime SimulatedTimeSystemHelper::alarmTimeLockHeld(Alarm* alarm) NO_THREAD_SAFETY_ANALYSIS {
@@ -434,11 +349,6 @@ void SimulatedTimeSystemHelper::setMonotonicTimeLockHeld(const MonotonicTime& mo
     monotonic_time_ = monotonic_time;
   }
 }
-
-/*void SimulatedTimeSystemHelper::setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) {
-  setMonotonicTimeLockHeld(monotonic_time);
-  mutex_.Unlock();
-  }*/
 
 void SimulatedTimeSystemHelper::setSystemTime(const SystemTime& system_time) {
   absl::MutexLock lock(&mutex_);

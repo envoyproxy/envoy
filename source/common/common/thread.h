@@ -42,19 +42,8 @@ public:
    *     http://en.cppreference.com/w/cpp/thread/condition_variable_any/notify_one
    * for more details.
    */
-  void notifyOne() noexcept {
-    signaled_ = true;
-    condvar_.Signal();
-  }
-
-  void notifyAll() noexcept {
-    signaled_ = true;
-    condvar_.SignalAll();
-  }
-
-  bool signaled() { return signaled_; }
-
-  void clearSignaled() { signaled_ = false; }
+  void notifyOne() noexcept { condvar_.Signal(); }
+  void notifyAll() noexcept { condvar_.SignalAll(); };
 
   /**
    * wait() and waitFor do not throw, and never will, as they are based on
@@ -63,7 +52,7 @@ public:
    * source/source/thread.h for an alternate implementation, which does not work
    * with thread annotation.
    */
-  void wait(MutexBasicLockable& mutex) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+  void wait(MutexBasicLockable& mutex) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     condvar_.Wait(&mutex.mutex_);
   }
 
@@ -84,7 +73,6 @@ private:
   // https://gist.github.com/jmarantz/d22b836cee3ca203cc368553eda81ce5
   // does not currently work well with thread-annotation.
   absl::CondVar condvar_;
-  std::atomic<bool> signaled_{false};
 };
 
 } // namespace Thread

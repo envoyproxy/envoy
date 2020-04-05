@@ -185,11 +185,7 @@ private:
   FakeHttpConnection& parent_;
   Http::ResponseEncoder& encoder_;
   Thread::MutexBasicLockable lock_;
-  Thread::CondVar decode_data_event_;
-  Thread::CondVar decode_end_stream_event_;
-  Thread::CondVar decode_headers_event_;
-  Thread::CondVar decode_reset_event_;
-  Thread::CondVar decode_trailers_event_;
+  Thread::CondVar decoder_event_;
   Http::RequestTrailerMapPtr trailers_;
   bool end_stream_{};
   Buffer::OwnedImpl body_;
