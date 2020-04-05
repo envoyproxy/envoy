@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <iterator>
 #include <list>
 #include <map>
 #include <memory>
@@ -69,7 +70,56 @@ private:
 };
 
 class RouteEntryImplBase;
+class RouteMatchContext;
+class VirtualHostImpl;
+
 using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBase>;
+using RouteEntryImplBaseConstSharedPtrItr =
+    std::vector<RouteEntryImplBaseConstSharedPtr>::const_iterator;
+using RouteEntryImplBaseConstSharedPtrItrOptional =
+    absl::optional<RouteEntryImplBaseConstSharedPtrItr>;
+
+class RouteMatchContext {
+public:
+  RouteMatchContext() : virtual_host_{nullptr}, route_{nullptr}, has_more_routes_{false} {}
+
+  RouteMatchContext(RouteConstSharedPtr route)
+      : virtual_host_{nullptr}, route_{route}, has_more_routes_{false} {}
+
+  RouteMatchContext(const VirtualHostImpl* virtual_host, RouteConstSharedPtr route,
+                    RouteEntryImplBaseConstSharedPtrItr route_entry, bool has_more_routes)
+      : virtual_host_{virtual_host}, route_{route}, has_more_routes_{has_more_routes} {
+    route_entry_.emplace(route_entry);
+  }
+
+  /**
+   * @return VirtualHostImpl* corresponding to the route or nullptr
+   */
+  const VirtualHostImpl* getVirtualHost() const { return virtual_host_; }
+
+  /**
+   * @return const RouteEntryImplBase* corresponding to the route
+   */
+  RouteEntryImplBaseConstSharedPtrItrOptional getRouteEntry() const { return route_entry_; }
+
+  /**
+   * @return const Route* if a matching route is found or nullptr
+   */
+  RouteConstSharedPtr getRoute() const { return route_; }
+
+  /**
+   * @return true is more routes available to match
+   */
+  bool hasMoreRoutes() const { return has_more_routes_; }
+
+private:
+  const VirtualHostImpl* virtual_host_{nullptr};
+  RouteConstSharedPtr route_{nullptr};
+  RouteEntryImplBaseConstSharedPtrItrOptional route_entry_{};
+  bool has_more_routes_{false};
+};
+
+using RouteMatchContextConstSharedPtr = std::shared_ptr<const RouteMatchContext>;
 
 /**
  * Direct response entry that does an SSL redirect.
@@ -160,9 +210,10 @@ public:
                   Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
                   ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
-  RouteConstSharedPtr getRouteFromEntries(const Http::RequestHeaderMap& headers,
-                                          const StreamInfo::StreamInfo& stream_info,
-                                          uint64_t random_value) const;
+  RouteMatchContextConstSharedPtr
+  getRouteFromEntries(const RouteMatchContextConstSharedPtr& route_match_context,
+                      const Http::RequestHeaderMap& headers,
+                      const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
   const ConfigImpl& globalRouteConfig() const { return global_route_config_; }
   const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; }
@@ -835,8 +886,10 @@ public:
                Server::Configuration::ServerFactoryContext& factory_context,
                ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
-  RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
+  RouteMatchContextConstSharedPtr route(const RouteMatchContextConstSharedPtr& route_match_ctx,
+                                        const Http::RequestHeaderMap& headers,
+                                        const StreamInfo::StreamInfo& stream_info,
+                                        uint64_t random_value) const;
 
   const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
 
@@ -885,8 +938,13 @@ public:
   RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info,
                             uint64_t random_value) const override {
-    return route_matcher_->route(headers, stream_info, random_value);
+    return route_matcher_
+        ->route(std::make_shared<RouteMatchContext>(), headers, stream_info, random_value)
+        ->getRoute();
   }
+
+  void route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+             const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;
@@ -920,6 +978,11 @@ public:
   RouteConstSharedPtr route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                             uint64_t) const override {
     return nullptr;
+  }
+
+  void route(const RouteCallback& cb, const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
+             uint64_t) const override {
+    cb(nullptr, false);
   }
 
   const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {

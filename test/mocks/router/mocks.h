@@ -428,6 +428,11 @@ public:
               (const Http::RequestHeaderMap&, const Envoy::StreamInfo::StreamInfo&,
                uint64_t random_value),
               (const));
+  MOCK_METHOD(void, route,
+              (const RouteCallback& cb, const Http::RequestHeaderMap&,
+               const Envoy::StreamInfo::StreamInfo&, uint64_t random_value),
+              (const));
+
   MOCK_METHOD(const std::list<Http::LowerCaseString>&, internalOnlyHeaders, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(bool, usesVhds, (), (const));

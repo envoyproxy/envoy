@@ -951,6 +951,32 @@ public:
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
 
 /**
+ * RouteCallback, return these codes to the route matcher to indicate
+ * whether it should continue matching routes beyond the last matched
+ * route or stop matching.
+ */
+enum class RouteMatchStatus {
+  // Continue matching route
+  Continue,
+  // Stop matching route
+  Stop
+};
+
+/**
+ * RouteCallback can be used to override routing decision made by the Route::Config::route,
+ * this callback is passed the RouteConstSharedPtr which can be nullptr of no matching route
+ * was found and a bool indicating if there are more routes remaining to be matched.
+ *
+ * RouteCallback will be called back at least once, RouteCallback can return
+ * one of the RouteMatchStatus enum to indicate if the matching should continue or stop.
+ *
+ * Returning RouteMatchStatus::Continue, when no more routes available
+ * to match will result in no further callbacks.
+ */
+using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, bool)>;
+using RouteCallbackSharedPtr = std::shared_ptr<RouteCallback>;
+
+/**
  * The router configuration.
  */
 class Config {
@@ -968,6 +994,23 @@ public:
   virtual RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const PURE;
+
+  /**
+   * Based on the incoming HTTP request headers, determine the target route (containing either a
+   * route entry or a direct response entry) for the request.
+   *
+   * Invokes callback with matched route, callback can choose to accept the route by returning
+   * RouteStatus::Stop or continue route match from last matched route by returning
+   * RouteMatchStatus::Continue, when more routes available.
+   *
+   * @param cb supplies callback to be invoked upon route match.
+   * @param headers supplies the request headers.
+   * @param random_value supplies the random seed to use if a runtime choice is required. This
+   *        allows stable choices between calls if desired.
+   */
+
+  virtual void route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                     const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const PURE;
 
   /**
    * Return a list of headers that will be cleaned from any requests that are not from an internal

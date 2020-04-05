@@ -821,6 +821,180 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+  }));
+
+  setupFilterChain(2, 0);
+  const std::string foo_bar_baz_cluster_name = "foo_bar_baz";
+  const std::string foo_bar_cluster_name = "foo_bar";
+  const std::string foo_cluster_name = "foo";
+  const std::string default_cluster_name = "default";
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> foo_bar_baz_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> foo_bar_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, get(absl::string_view{foo_bar_cluster_name}))
+      .WillOnce(Return(foo_bar_cluster.get()));
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> foo_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> default_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, get(absl::string_view{default_cluster_name}))
+      .Times(2)
+      .WillRepeatedly(Return(default_cluster.get()));
+
+  std::shared_ptr<Router::MockRoute> foo_bar_baz_route =
+      std::make_shared<NiceMock<Router::MockRoute>>();
+
+  std::shared_ptr<Router::MockRoute> foo_bar_route =
+      std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(foo_bar_route->route_entry_, clusterName()).WillOnce(ReturnRef(foo_bar_cluster_name));
+
+  std::shared_ptr<Router::MockRoute> foo_route = std::make_shared<NiceMock<Router::MockRoute>>();
+
+  std::shared_ptr<Router::MockRoute> default_route =
+      std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(default_route->route_entry_, clusterName())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(default_cluster_name));
+
+  using ::testing::InSequence;
+  {
+    InSequence seq;
+    EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _))
+        .WillOnce(Return(default_route));
+
+    // This filter iterates through all possible route matches and choose the last matched route
+    EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+        .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
+          EXPECT_EQ(default_route->routeEntry(),
+                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+
+          int ctr = 0;
+          Router::RouteCallbackSharedPtr cb = std::make_shared<Router::RouteCallback>(
+              [&](Router::RouteConstSharedPtr route,
+                  bool has_more_routes) -> Router::RouteMatchStatus {
+                EXPECT_LE(ctr, 3);
+                if (ctr == 0) {
+                  ++ctr;
+                  EXPECT_EQ(foo_bar_baz_route, route);
+                  EXPECT_TRUE(has_more_routes);
+                  return Router::RouteMatchStatus::Continue;
+                }
+
+                if (ctr == 1) {
+                  ++ctr;
+                  EXPECT_EQ(foo_bar_route, route);
+                  EXPECT_TRUE(has_more_routes);
+                  return Router::RouteMatchStatus::Continue;
+                }
+
+                if (ctr == 2) {
+                  ++ctr;
+                  EXPECT_EQ(foo_route, route);
+                  EXPECT_TRUE(has_more_routes);
+                  return Router::RouteMatchStatus::Continue;
+                }
+
+                if (ctr == 3) {
+                  ctr++;
+                  EXPECT_EQ(default_route, route);
+                  EXPECT_FALSE(has_more_routes);
+                  return Router::RouteMatchStatus::Stop;
+                }
+                return Router::RouteMatchStatus::Stop;
+              });
+
+          decoder_filters_[0]->callbacks_->route(cb);
+
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
+          EXPECT_EQ(default_route->routeEntry(),
+                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+
+          return FilterHeadersStatus::Continue;
+        }));
+
+    // This route config expected to be invoked for all matching routes
+    EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+        .WillOnce(Invoke([&](const Router::RouteCallback& cb, const Http::RequestHeaderMap&,
+                             const Envoy::StreamInfo::StreamInfo&, uint64_t) {
+          EXPECT_EQ(cb(foo_bar_baz_route, true), Router::RouteMatchStatus::Continue);
+          EXPECT_EQ(cb(foo_bar_route, true), Router::RouteMatchStatus::Continue);
+          EXPECT_EQ(cb(foo_route, true), Router::RouteMatchStatus::Continue);
+          EXPECT_EQ(cb(default_route, false), Router::RouteMatchStatus::Stop);
+        }));
+
+    EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+    // This filter chooses second route
+    EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+        .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+          EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->route());
+          EXPECT_EQ(default_route->routeEntry(),
+                    decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(default_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
+
+          int ctr = 0;
+          Router::RouteCallbackSharedPtr cb = std::make_shared<Router::RouteCallback>(
+              [&](Router::RouteConstSharedPtr route,
+                  bool has_more_routes) -> Router::RouteMatchStatus {
+                EXPECT_LE(ctr, 1);
+                if (ctr == 0) {
+                  ++ctr;
+                  EXPECT_EQ(foo_bar_baz_route, route);
+                  EXPECT_TRUE(has_more_routes);
+                  return Router::RouteMatchStatus::Continue;
+                }
+
+                if (ctr == 1) {
+                  ++ctr;
+                  EXPECT_EQ(foo_bar_route, route);
+                  EXPECT_TRUE(has_more_routes);
+                  return Router::RouteMatchStatus::Stop;
+                }
+                return Router::RouteMatchStatus::Stop;
+              });
+
+          decoder_filters_[1]->callbacks_->route(cb);
+
+          EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->route());
+          EXPECT_EQ(foo_bar_route->routeEntry(),
+                    decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(foo_bar_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
+
+          return FilterHeadersStatus::Continue;
+        }));
+
+    // This route config expected to be invoked for first two matching routes
+    EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+        .WillOnce(Invoke([&](const Router::RouteCallback& cb, const Http::RequestHeaderMap&,
+                             const Envoy::StreamInfo::StreamInfo&, uint64_t) {
+          EXPECT_EQ(cb(foo_bar_baz_route, true), Router::RouteMatchStatus::Continue);
+          EXPECT_EQ(cb(foo_bar_route, true), Router::RouteMatchStatus::Stop);
+        }));
+
+    EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  }
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   setup(false, "");
 
@@ -3671,9 +3845,8 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 }
 
-TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
+TEST_F(HttpConnectionManagerImplTest, Filter) {
   setup(false, "");
-
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{

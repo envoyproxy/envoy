@@ -1103,34 +1103,44 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
   }
 }
 
-RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::RequestHeaderMap& headers,
-                                                         const StreamInfo::StreamInfo& stream_info,
-                                                         uint64_t random_value) const {
+RouteMatchContextConstSharedPtr VirtualHostImpl::getRouteFromEntries(
+    const RouteMatchContextConstSharedPtr& route_match_ctx, const Http::RequestHeaderMap& headers,
+    const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const {
   // No x-forwarded-proto header. This normally only happens when ActiveStream::decodeHeaders
   // bails early (as it rejects a request), so there is no routing is going to happen anyway.
   const auto* forwarded_proto_header = headers.ForwardedProto();
   if (forwarded_proto_header == nullptr) {
-    return nullptr;
+    return std::make_shared<RouteMatchContext>();
   }
 
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::All && forwarded_proto_header->value() != "https") {
-    return SSL_REDIRECT_ROUTE;
+    return std::make_shared<RouteMatchContext>(SSL_REDIRECT_ROUTE);
   } else if (ssl_requirements_ == SslRequirements::ExternalOnly &&
              forwarded_proto_header->value() != "https" &&
              !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
-    return SSL_REDIRECT_ROUTE;
+    return std::make_shared<RouteMatchContext>(SSL_REDIRECT_ROUTE);
   }
 
   // Check for a route that matches the request.
-  for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
-    RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
+  // Start matching from first route
+  RouteEntryImplBaseConstSharedPtrItr route = routes_.cbegin();
+
+  // Start matching from one past the previous match
+  if (route_match_ctx->getRouteEntry().has_value() &&
+      route_match_ctx->getRouteEntry().value() != routes_.end()) {
+    route = ++route_match_ctx->getRouteEntry().value();
+  }
+
+  for (; route != routes_.end(); ++route) {
+    RouteConstSharedPtr route_entry = (*route)->matches(headers, stream_info, random_value);
     if (nullptr != route_entry) {
-      return route_entry;
+      return std::make_shared<RouteMatchContext>(this, route_entry, route,
+                                                 std::next(route) != routes_.end());
     }
   }
 
-  return nullptr;
+  return std::make_shared<RouteMatchContext>();
 }
 
 const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMap& headers) const {
@@ -1172,14 +1182,17 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   return default_virtual_host_.get();
 }
 
-RouteConstSharedPtr RouteMatcher::route(const Http::RequestHeaderMap& headers,
-                                        const StreamInfo::StreamInfo& stream_info,
-                                        uint64_t random_value) const {
-  const VirtualHostImpl* virtual_host = findVirtualHost(headers);
+RouteMatchContextConstSharedPtr
+RouteMatcher::route(const RouteMatchContextConstSharedPtr& route_match_ctx,
+                    const Http::RequestHeaderMap& headers,
+                    const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const {
+  const VirtualHostImpl* virtual_host = route_match_ctx->getVirtualHost()
+                                            ? route_match_ctx->getVirtualHost()
+                                            : findVirtualHost(headers);
   if (virtual_host) {
-    return virtual_host->getRouteFromEntries(headers, stream_info, random_value);
+    return virtual_host->getRouteFromEntries(route_match_ctx, headers, stream_info, random_value);
   } else {
-    return nullptr;
+    return std::make_shared<RouteMatchContext>();
   }
 }
 
@@ -1221,6 +1234,17 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
       HeaderParser::configure(config.request_headers_to_add(), config.request_headers_to_remove());
   response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
                                                      config.response_headers_to_remove());
+}
+
+void ConfigImpl::route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                       const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const {
+
+  RouteMatchStatus status = RouteMatchStatus::Continue;
+  RouteMatchContextConstSharedPtr ctx = std::make_shared<RouteMatchContext>();
+  do {
+    ctx = route_matcher_->route(ctx, headers, stream_info, random_value);
+    status = cb(ctx->getRoute(), ctx->hasMoreRoutes());
+  } while (ctx->hasMoreRoutes() && status == RouteMatchStatus::Continue);
 }
 
 namespace {
