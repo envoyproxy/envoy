@@ -43,6 +43,7 @@ using testing::AtLeast;
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
+using testing::SaveArg;
 using testing::Throw;
 
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
@@ -790,6 +791,115 @@ static_listeners:
     EXPECT_CALL(*listener_foo2, onDestroy());
     EXPECT_TRUE(manager_->removeListener("foo"));
   }
+}
+
+TEST_F(ListenerManagerImplTest, OverrideListener) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
+
+  InSequence s;
+
+  auto* lds_api = new MockLdsApi();
+  EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
+  envoy::config::core::v3::ConfigSource lds_config;
+  manager_->createLdsApi(lds_config);
+
+  // Add foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: "foo"
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1234
+filter_chains: {}
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "version1", true));
+  checkStats(1, 0, 0, 0, 1, 0);
+
+  // Start workers and capture ListenerImpl.
+  Network::ListenerConfig* listener_config = nullptr;
+  EXPECT_CALL(*worker_, addListener(_, _, _))
+      .WillOnce(Invoke([&listener_config](auto, Network::ListenerConfig& config, auto) -> void {
+        listener_config = &config;
+      }))
+      .RetiresOnSaturation();
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_create_success").value());
+
+  // TODO(lambdai): No need to invoke `addListenerToWorkerForTest` explicitly when intelligent warm
+  // up procedure is added.
+  ListenerImpl* listener_impl = dynamic_cast<ListenerImpl*>(listener_config);
+  auto overriden_listener = absl::make_optional<uint64_t>(1);
+  EXPECT_CALL(*worker_, addListener(_, _, _))
+      .WillOnce(Invoke([](absl::optional<uint64_t>, Network::ListenerConfig&,
+                          auto completion) -> void { completion(true); }));
+  manager_->addListenerToWorkerForTest(*worker_, overriden_listener, *listener_impl, nullptr);
+
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_create_success").value());
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_F(ListenerManagerImplTest, DrainFilterChains) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
+
+  InSequence s;
+
+  auto* lds_api = new MockLdsApi();
+  EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
+  envoy::config::core::v3::ConfigSource lds_config;
+  manager_->createLdsApi(lds_config);
+
+  // Add foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: "foo"
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1234
+filter_chains:
+- filters:
+  - name: fake
+    config: {}
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "version1", true));
+  checkStats(1, 0, 0, 0, 1, 0);
+
+  // Start workers and capture ListenerImpl.
+  Network::ListenerConfig* listener_config = nullptr;
+  EXPECT_CALL(*worker_, addListener(_, _, _))
+      .WillOnce(Invoke([&listener_config](auto, Network::ListenerConfig& config, auto) -> void {
+        listener_config = &config;
+      }))
+      .RetiresOnSaturation();
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  ENVOY_LOG_MISC(debug, "lambdai: config ptr {}", static_cast<void*>(listener_config));
+
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_create_success").value());
+
+  // TODO(lambdai): No need to invoke `drainFilterChains` explicitly when intelligent warm
+  // up procedure is added.
+  ListenerImpl* listener_impl = dynamic_cast<ListenerImpl*>(listener_config);
+  ASSERT(listener_impl != nullptr);
+  auto* timer = new Event::MockTimer(dynamic_cast<Event::MockDispatcher*>(&server_.dispatcher()));
+  EXPECT_CALL(*timer, enableTimer(_, _));
+  manager_->drainFilterChainsForTest(listener_impl);
+  EXPECT_CALL(*worker_, removeFilterChains(_, _));
+  timer->invokeCallback();
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callDrainFilterChainsComplete();
 }
 
 TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {

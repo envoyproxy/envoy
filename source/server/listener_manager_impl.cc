@@ -630,8 +630,13 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
                                               ListenerCompletionCallback completion_callback) {
   if (overridden_listener.has_value()) {
     ENVOY_LOG(debug, "replacing existing listener {}", overridden_listener.value());
-    worker.addListener(overridden_listener, listener, [this](bool) -> void {
-      server_.dispatcher().post([this]() -> void { stats_.listener_create_success_.inc(); });
+    worker.addListener(overridden_listener, listener, [this, completion_callback](bool) -> void {
+      server_.dispatcher().post([this, completion_callback]() -> void {
+        stats_.listener_create_success_.inc();
+        if (completion_callback) {
+          completion_callback();
+        }
+      });
     });
     return;
   }
@@ -690,7 +695,10 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   updateWarmingActiveGauges();
 }
 
-void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener, ListenerImpl&) {
+void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
+                                            ListenerImpl& new_listener) {
+  // TODO(lambdai): Calculate the filter chains to drain.
+  UNREFERENCED_PARAMETER(new_listener);
   // First add the listener to the draining list.
   std::list<DrainingFilterChainsImpl>::iterator draining_group = draining_filter_groups_.emplace(
       draining_filter_groups_.begin(), std::move(listener), workers_.size());

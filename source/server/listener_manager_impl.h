@@ -193,6 +193,28 @@ public:
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
 
+  // TODO(lambdai): Remove follow 2 test helper once intelligent listener warm up is added.
+  // Delegate to private addListenerToWorker.
+  void addListenerToWorkerForTest(Worker& worker, absl::optional<uint64_t> overridden_listener,
+                                  ListenerImpl& listener,
+                                  std::function<void()> completion_callback) {
+    addListenerToWorker(worker, overridden_listener, listener, completion_callback);
+  }
+  // Erase the the listener draining filter chain from active listeners and then start the drain
+  // sequence.
+  void drainFilterChainsForTest(ListenerImpl* listener_raw_ptr) {
+    auto iter = std::find_if(active_listeners_.begin(), active_listeners_.end(),
+                             [listener_raw_ptr](const ListenerImplPtr& ptr) {
+                               return ptr != nullptr && ptr.get() == listener_raw_ptr;
+                             });
+    ASSERT(iter != active_listeners_.end());
+
+    auto& new_listener_ref = *listener_raw_ptr;
+    ListenerImplPtr listener_impl_ptr = std::move(*iter);
+    active_listeners_.erase(iter);
+    drainFilterChains(std::move(listener_impl_ptr), new_listener_ref);
+  }
+
   Instance& server_;
   ListenerComponentFactory& factory_;
 
@@ -247,10 +269,10 @@ private:
   void drainListener(ListenerImplPtr&& listener);
 
   /**
-   * Mark filter chains which owned by listener for draining. Expecting the descendant of the
-   * listener took over the listener socket but these filter chains are not attached by that
-   * descendant.
+   * Mark filter chains which owned by listener for draining. The new listener should have taken
+   * over the listener socket and partial of the filter chains from listener.
    * @param listener supplies the listener to drain.
+   * @param new_listener supplies the new listener which co-owns partial of the filter chains.
    */
   void drainFilterChains(ListenerImplPtr&& listener, ListenerImpl& new_listener);
 
