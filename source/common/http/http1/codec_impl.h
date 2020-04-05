@@ -247,6 +247,18 @@ private:
   size_t dispatchSlice(const char* slice, size_t len);
 
   /**
+   * Called by the http_parser when body data is received.
+   * @param data supplies the start address.
+   * @param length supplies the length.
+   */
+  void bufferBody(const char* data, size_t length);
+
+  /**
+   * Push the accumulated body through the filter pipeline.
+   */
+  void dispatchBufferedBody();
+
+  /**
    * Called when a request/response is beginning. A base routine happens first then a virtual
    * dispatch is invoked.
    */
@@ -284,17 +296,27 @@ private:
   virtual int onHeadersComplete() PURE;
 
   /**
-   * Called when body data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
+   * Called with body data is available for processing when either:
+   * - There is an accumulated partial body after the parser is done processing bytes read from the
+   * socket
+   * - The parser encounters the last byte of the body
+   * - The codec does a direct dispatch from the read buffer
+   * For performance reasons there is at most one call to onBody per call to HTTP/1
+   * ConnectionImpl::dispatch call.
+   * @param data supplies the body data
    */
-  virtual void onBody(const char* data, size_t length) PURE;
+  virtual void onBody(Buffer::Instance& data) PURE;
 
   /**
    * Called when the request/response is complete.
    */
   void onMessageCompleteBase();
   virtual void onMessageComplete() PURE;
+
+  /**
+   * Called when accepting a chunk header.
+   */
+  void onChunkHeader(bool is_final_chunk);
 
   /**
    * @see onResetStreamBase().
@@ -323,6 +345,10 @@ private:
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
   HeaderString current_header_value_;
+  // Used to accumulate the HTTP message body during the current dispatch call. The accumulated body
+  // is pushed through the filter pipeline either at the end of the current dispatch call, or when
+  // the last byte of the body is processed (whichever happens first).
+  Buffer::OwnedImpl buffered_body_;
   Buffer::WatermarkBuffer output_buffer_;
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
@@ -369,7 +395,7 @@ private:
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete() override;
-  void onBody(const char* data, size_t length) override;
+  void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;
@@ -447,7 +473,7 @@ private:
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete() override;
-  void onBody(const char* data, size_t length) override;
+  void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;

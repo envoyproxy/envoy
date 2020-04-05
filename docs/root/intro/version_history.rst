@@ -39,8 +39,10 @@ Version history
 * http: the runtime feature `http.connection_manager.log_flood_exception` is removed and replaced with a connection access log response code.
 * listener filters: listener filter extensions use the "envoy.filters.listener" name space. A
   mapping of extension names is available in the :ref:`deprecated <deprecated>` documentation.
+* listeners: added :ref:`listener filter matcher api <envoy_api_field_listener.ListenerFilter.filter_disabled>` to disable individual listener filter on matching downstream connections.
 * listeners: fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` could have been bypassed by a client using only TLS 1.3.
 * loadbalancing: added support for using hostname for consistent hash loadbalancing via :ref:`consistent_hash_lb_config <envoy_api_field_Cluster.CommonLbConfig.consistent_hashing_lb_config>`.
+* loadbalancing: added support for :ref:`retry host predicates <envoy_api_field_route.RetryPolicy.retry_host_predicate>` in conjunction with consistent hashing load balancers (ring hash and maglev).
 * lua: added a parameter to `httpCall` that makes it possible to have the call be asynchronous.
 * lua: added moonjit support.
 * mongo: the stat emitted for queries without a max time set in the :ref:`MongoDB filter<config_network_filters_mongo_proxy>` was modified to emit correctly for Mongo v3.2+.
@@ -65,10 +67,12 @@ Version history
   disables the use of deprecated extension names.
 * runtime: integer values may now be parsed as booleans.
 * sds: added :ref:`GenericSecret <envoy_api_msg_auth.GenericSecret>` to support secret of generic type.
+* sds: added :ref:`certificate rotation <xds_certificate_rotation>` support for certificates in static resources.
 * sds: fix the SDS vulnerability that TLS validation context (e.g., subject alt name or hash) cannot be effectively validated in some cases.
 * stat sinks: stat sink extensions use the "envoy.stat_sinks" name space. A mapping of extension
   names is available in the :ref:`deprecated <deprecated>` documentation.
 * thrift_proxy: add router filter stats to docs.
+* tls: added configuration to disable stateless TLS session resumption :ref:`disable_stateless_session_resumption <envoy_api_field_auth.DownstreamTlsContext.disable_stateless_session_resumption>`
 * tracers: tracer extensions use the "envoy.tracers" name space. A mapping of extension names is
   available in the :ref:`deprecated <deprecated>` documentation.
 * tracing: added gRPC service configuration to the OpenCensus Stackdriver and OpenCensus Agent tracers.
