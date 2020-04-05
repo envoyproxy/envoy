@@ -835,11 +835,11 @@ filter_chains: {}
   // TODO(lambdai): No need to invoke `addListenerToWorkerForTest` explicitly when intelligent warm
   // up procedure is added.
   ListenerImpl* listener_impl = dynamic_cast<ListenerImpl*>(listener_config);
-  auto overriden_listener = absl::make_optional<uint64_t>(1);
+  auto overridden_listener = absl::make_optional<uint64_t>(1);
   EXPECT_CALL(*worker_, addListener(_, _, _))
       .WillOnce(Invoke([](absl::optional<uint64_t>, Network::ListenerConfig&,
                           auto completion) -> void { completion(true); }));
-  manager_->addListenerToWorkerForTest(*worker_, overriden_listener, *listener_impl, nullptr);
+  manager_->addListenerToWorkerForTest(*worker_, overridden_listener, *listener_impl, nullptr);
 
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_create_success").value());
   EXPECT_CALL(*listener_foo, onDestroy());
