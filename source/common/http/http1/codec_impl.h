@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
@@ -27,7 +28,9 @@ namespace Http1 {
  * All stats for the HTTP/1 codec. @see stats_macros.h
  */
 #define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
+  COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(metadata_not_supported_error)                                                            \
+  COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(response_flood)
 
 /**
@@ -214,6 +217,8 @@ protected:
   http_parser parser_;
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterPtr header_key_formatter_;
+  HeaderString current_header_field_;
+  HeaderString current_header_value_;
   bool processing_trailers_ : 1;
   bool handling_upgrade_ : 1;
   bool reset_stream_called_ : 1;
@@ -238,6 +243,18 @@ private:
    * Called in order to complete an in progress header decode.
    */
   void completeLastHeader();
+
+  /**
+   * Check if header name contains underscore character.
+   * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
+   * as a security measure due to systems that treat '_' and '-' as interchangeable.
+   * The ServerConnectionImpl may drop header or reject request based on the
+   * `common_http_protocol_options.headers_with_underscores_action` configuration option in the
+   * HttpConnectionManager.
+   */
+  virtual bool shouldDropHeaderWithUnderscoresInNames(absl::string_view /* header_name */) const {
+    return false;
+  }
 
   /**
    * Dispatch a memory span.
@@ -340,11 +357,15 @@ private:
    */
   virtual void onBelowLowWatermark() PURE;
 
+  /**
+   * Check if header name contains underscore character.
+   * The ServerConnectionImpl may drop header or reject request based on configuration.
+   */
+  virtual void checkHeaderNameForUnderscores() {}
+
   static http_parser_settings settings_;
 
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
-  HeaderString current_header_field_;
-  HeaderString current_header_value_;
   // Used to accumulate the HTTP message body during the current dispatch call. The accumulated body
   // is pushed through the filter pipeline either at the end of the current dispatch call, or when
   // the last byte of the body is processed (whichever happens first).
@@ -362,7 +383,9 @@ class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
-                       uint32_t max_request_headers_kb, const uint32_t max_request_headers_count);
+                       uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
+                       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+                           headers_with_underscores_action);
 
   bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
@@ -425,6 +448,7 @@ private:
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
   void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
   void doFloodProtectionChecks() const;
+  void checkHeaderNameForUnderscores() override;
 
   ServerConnectionCallbacks& callbacks_;
   absl::optional<ActiveRequest> active_request_;
@@ -442,6 +466,9 @@ private:
   // trailers are enabled). The variant is reset to null headers on message complete for assertion
   // purposes.
   absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
+  // The action to take when a request header name contains underscore characters.
+  const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_;
 };
 
 /**

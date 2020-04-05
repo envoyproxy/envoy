@@ -398,6 +398,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
   uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
+  const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   ClientConnectionPtr client;
   ServerConnectionPtr server;
   const bool http2 = http_version == HttpVersion::Http2;
@@ -419,12 +421,12 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         fromHttp2Settings(input.h2_settings().server())};
     server = std::make_unique<Http2::TestServerConnectionImpl>(
         server_connection, server_callbacks, stats_store, server_http2_options,
-        max_request_headers_kb, max_request_headers_count);
+        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
     server = std::make_unique<Http1::ServerConnectionImpl>(
         server_connection, stats_store, server_callbacks, server_http1settings,
-        max_request_headers_kb, max_request_headers_count);
+        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   }
 
   ReorderBuffer client_write_buf{*server};
