@@ -353,10 +353,10 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
+  auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
+      std::move(socket), std::move(transport_socket), *stream_info);
   ActiveTcpConnectionPtr active_connection(
-      new ActiveTcpConnection(active_connections,
-                              parent_.dispatcher_.createServerConnection(
-                                  std::move(socket), std::move(transport_socket), *stream_info),
+      new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               parent_.dispatcher_.timeSource(), config_, std::move(stream_info)));
   active_connection->connection_->setBufferLimits(config_.perConnectionBufferLimitBytes());
 
