@@ -8,11 +8,14 @@ namespace Http2 {
 
 class TestServerConnectionImpl : public ServerConnectionImpl {
 public:
-  TestServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                           Stats::Scope& scope, const Http2Settings& http2_settings,
-                           uint32_t max_request_headers_kb, uint32_t max_request_headers_count)
+  TestServerConnectionImpl(
+      Network::Connection& connection, ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
+      const Http2Settings& http2_settings, uint32_t max_request_headers_kb,
+      uint32_t max_request_headers_count,
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action)
       : ServerConnectionImpl(connection, callbacks, scope, http2_settings, max_request_headers_kb,
-                             max_request_headers_count) {}
+                             max_request_headers_count, headers_with_underscores_action) {}
   nghttp2_session* session() { return session_; }
   using ServerConnectionImpl::getStream;
 };
