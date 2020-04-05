@@ -56,9 +56,9 @@ Buffer::OwnedImpl createBufferWithOneByteSlices(absl::string_view input) {
 class Http1ServerConnectionImplTest : public testing::Test {
 public:
   void initialize() {
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_, max_request_headers_count_);
+    codec_ = std::make_unique<ServerConnectionImpl>(
+        connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, headers_with_underscores_action_);
   }
 
   NiceMock<Network::MockConnection> connection_;
@@ -97,6 +97,8 @@ public:
 protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
   Stats::TestUtil::TestStore store_;
 };
 
@@ -110,9 +112,9 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
 
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_, max_request_headers_count_);
+    codec_ = std::make_unique<ServerConnectionImpl>(
+        connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   }
 
   MockRequestDecoder decoder;
@@ -139,9 +141,9 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
   // Make a new 'codec' with the right settings
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_, max_request_headers_count_);
+    codec_ = std::make_unique<ServerConnectionImpl>(
+        connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   }
 
   MockRequestDecoder decoder;
@@ -159,9 +161,9 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
   // Make a new 'codec' with the right settings
   if (enable_trailers) {
     codec_settings_.enable_trailers_ = enable_trailers;
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_, max_request_headers_count_);
+    codec_ = std::make_unique<ServerConnectionImpl>(
+        connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   }
 
   InSequence sequence;
@@ -193,9 +195,9 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   initialize();
   // Make a new 'codec' with the right settings
   codec_settings_.enable_trailers_ = enable_trailers;
-  codec_ =
-      std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_, codec_settings_,
-                                             max_request_headers_kb_, max_request_headers_count_);
+  codec_ = std::make_unique<ServerConnectionImpl>(
+      connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   std::string exception_reason;
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _))
@@ -888,6 +890,72 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
   EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
                             "http/1.1 protocol error: header value contains invalid chars");
   EXPECT_EQ("http1.invalid_characters", response_encoder->getStream().responseDetails());
+}
+
+// Ensures that request headers with names containing the underscore character are allowed
+// when the option is set to allow.
+TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAllowed) {
+  headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
+  initialize();
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "h.com"},
+      {":path", "/"},
+      {":method", "GET"},
+      {"foo_bar", "bar"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+
+  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(0, store_.counter("http1.dropped_headers_with_underscores").value());
+}
+
+// Ensures that request headers with names containing the underscore character are dropped
+// when the option is set to drop headers.
+TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAreDropped) {
+  headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER;
+  initialize();
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "h.com"},
+      {":path", "/"},
+      {":method", "GET"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+
+  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(1, store_.counter("http1.dropped_headers_with_underscores").value());
+}
+
+// Ensures that request with header names containing the underscore character are rejected
+// when the option is set to reject request.
+TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreCauseRequestRejected) {
+  headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST;
+  initialize();
+
+  MockRequestDecoder decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
+                            "http/1.1 protocol error: header name contains underscores");
+  EXPECT_EQ("http1.invalid_characters", response_encoder->getStream().responseDetails());
+  EXPECT_EQ(1, store_.counter("http1.requests_rejected_with_underscores_in_headers").value());
 }
 
 TEST_F(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {

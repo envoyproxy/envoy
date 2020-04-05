@@ -455,13 +455,13 @@ TEST(HeaderIsValidTest, InvalidHeaderValuesAreRejected) {
       continue;
     }
 
-    EXPECT_FALSE(HeaderUtility::headerIsValid(std::string(1, i)));
+    EXPECT_FALSE(HeaderUtility::headerValueIsValid(std::string(1, i)));
   }
 }
 
 TEST(HeaderIsValidTest, ValidHeaderValuesAreAccepted) {
-  EXPECT_TRUE(HeaderUtility::headerIsValid("some-value"));
-  EXPECT_TRUE(HeaderUtility::headerIsValid("Some Other Value"));
+  EXPECT_TRUE(HeaderUtility::headerValueIsValid("some-value"));
+  EXPECT_TRUE(HeaderUtility::headerValueIsValid("Some Other Value"));
 }
 
 TEST(HeaderIsValidTest, AuthorityIsValid) {
@@ -483,6 +483,14 @@ TEST(HeaderAddTest, HeaderAdd) {
         return Http::HeaderMap::Iterate::Continue;
       },
       &headers);
+}
+
+TEST(HeaderIsValidTest, HeaderNameContainsUnderscore) {
+  EXPECT_FALSE(HeaderUtility::headerNameContainsUnderscore("cookie"));
+  EXPECT_FALSE(HeaderUtility::headerNameContainsUnderscore("x-something"));
+  EXPECT_TRUE(HeaderUtility::headerNameContainsUnderscore("_cookie"));
+  EXPECT_TRUE(HeaderUtility::headerNameContainsUnderscore("cookie_"));
+  EXPECT_TRUE(HeaderUtility::headerNameContainsUnderscore("x_something"));
 }
 
 } // namespace Http

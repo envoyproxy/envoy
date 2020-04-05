@@ -951,6 +951,61 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesFalse) {
   EXPECT_FALSE(config.shouldMergeSlashes());
 }
 
+// Validated that by default we allow requests with header names containing underscores.
+TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresAllowedByDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_EQ(envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+            config.headersWithUnderscoresAction());
+}
+
+// Validated that when configured, we drop headers with underscores.
+TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresDroppedByConfig) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    headers_with_underscores_action: DROP_HEADER
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_EQ(envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER,
+            config.headersWithUnderscoresAction());
+}
+
+// Validated that when configured, we reject requests with header names containing underscores.
+TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresRequestRejectedByConfig) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    headers_with_underscores_action: REJECT_REQUEST
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_EQ(envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST,
+            config.headersWithUnderscoresAction());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
