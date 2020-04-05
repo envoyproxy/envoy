@@ -28,6 +28,7 @@ public:
                       cache_config) {
     hazelcast::client::ClientConfig config;
     config.getGroupConfig().setName(cache_config.group_name());
+    config.getGroupConfig().setPassword(cache_config.group_password());
     config.getNetworkConfig().setConnectionTimeout(cache_config.connection_timeout() == 0
                                                        ? DEFAULT_CONNECTION_TIMEOUT_MS
                                                        : cache_config.connection_timeout());
@@ -50,12 +51,12 @@ public:
     return config;
   }
 
-  static short partitionWarnLimit() { return WARN_PARTITION_LIMIT; }
+  static uint16_t partitionWarnLimit() { return PARTITION_WARN_LIMIT; }
 
 private:
   // After this much body partitions stored for a response in DIVIDED mode,
   // a suggestion log will be appeared to increase partition size.
-  static constexpr short WARN_PARTITION_LIMIT = 16;
+  static constexpr uint16_t PARTITION_WARN_LIMIT = 16;
 
   // Sizes for each divided body entry.
   static constexpr uint64_t DEFAULT_PARTITION_SIZE = 2048;
@@ -79,6 +80,8 @@ private:
 
   // Duration for an invocation to be cancelled.
   static constexpr uint32_t DEFAULT_INVOCATION_TIMEOUT_SEC = 8;
+
+  friend class ConfigUtilsTest;
 };
 
 } // namespace HazelcastHttpCache

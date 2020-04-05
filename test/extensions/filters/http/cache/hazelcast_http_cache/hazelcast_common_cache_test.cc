@@ -17,11 +17,11 @@ class HazelcastHttpCacheTest : public HazelcastHttpCacheTestBase,
                                public testing::WithParamInterface<bool> {
 protected:
   void SetUp() {
-    HazelcastHttpCacheConfig cfg = HazelcastTestUtil::getTestConfig(GetParam());
+    HazelcastHttpCacheConfig config = HazelcastTestUtil::getTestConfig(GetParam());
     // To test the cache with a real Hazelcast instance, remote cache
     // must be used during tests.
-    // cache_ = std::make_unique<HazelcastTestableRemoteCache>(cfg);
-    cache_ = std::make_unique<HazelcastTestableLocalCache>(cfg);
+    // cache_ = std::make_unique<HazelcastTestableRemoteCache>(config);
+    cache_ = std::make_unique<HazelcastTestableLocalCache>(config);
     cache_->restoreTestConnection();
     cache_->clearTestMaps();
   }

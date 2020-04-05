@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.source.extensions.filters.http.cache;
 
 // [#protodoc-title: HazelcastHttpCache CacheFilter storage plugin]
-// CacheFilter plugin backed by Hazelcast IMDG.
+// CacheFilter plugin backed by Hazelcast In Memory Data Grid.
 // [#extension: envoy.extensions.http.cache]
 
 // Hazelcast Http Cache configuration

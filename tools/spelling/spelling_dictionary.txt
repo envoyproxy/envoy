@@ -120,6 +120,7 @@ GRPC
 GTEST
 GURL
 Grabbit
+HAZELCAST
 Hashable
 HC
 HCM

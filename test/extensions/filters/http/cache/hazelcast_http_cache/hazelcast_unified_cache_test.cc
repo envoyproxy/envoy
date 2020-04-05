@@ -15,11 +15,11 @@ namespace HazelcastHttpCache {
  */
 class HazelcastUnifiedCacheTest : public HazelcastHttpCacheTestBase {
   void SetUp() {
-    HazelcastHttpCacheConfig cfg = HazelcastTestUtil::getTestConfig(true);
+    HazelcastHttpCacheConfig config = HazelcastTestUtil::getTestConfig(true);
     // To test the cache with a real Hazelcast instance, remote cache
     // must be used during tests.
-    // cache_ = std::make_unique<HazelcastTestableRemoteCache>(cfg);
-    cache_ = std::make_unique<HazelcastTestableLocalCache>(cfg);
+    // cache_ = std::make_unique<HazelcastTestableRemoteCache>(config);
+    cache_ = std::make_unique<HazelcastTestableLocalCache>(config);
     cache_->restoreTestConnection();
     cache_->clearTestMaps();
   }
@@ -37,7 +37,7 @@ TEST_F(HazelcastUnifiedCacheTest, AbortUnifiedInsertionWhenMaxSizeReached) {
   }
 
   EXPECT_TRUE(expectLookupSuccessWithBody(
-      lookup(RequestPath).get(), std::string(HazelcastTestUtil::TEST_PARTITION_SIZE, 'h')));
+      lookup(RequestPath).get(), std::string(HazelcastTestUtil::TEST_MAX_BODY_SIZE, 'h')));
 }
 
 TEST_F(HazelcastUnifiedCacheTest, PutResponseOnlyWhenAbsent) {

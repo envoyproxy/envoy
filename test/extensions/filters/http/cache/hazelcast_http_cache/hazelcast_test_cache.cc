@@ -1,6 +1,6 @@
-#include "test/extensions/filters/http/cache/hazelcast_http_cache/hazelcast_test_cache.h"
-
 #include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_context.h"
+
+#include "test/extensions/filters/http/cache/hazelcast_http_cache/hazelcast_test_cache.h"
 
 namespace Envoy {
 namespace Extensions {
