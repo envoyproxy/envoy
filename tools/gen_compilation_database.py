@@ -10,9 +10,15 @@ from pathlib import Path
 
 
 def runBazelBuildForCompilationDatabase(bazel_options, bazel_targets):
-  query = 'attr(include_prefix, ".+", kind(cc_library, deps({})))'.format(
-      ' union '.join(bazel_targets))
-  build_targets = subprocess.check_output(["bazel", "query", query]).decode().splitlines()
+  query_targets = ' union '.join(bazel_targets)
+  query = ' union '.join(
+      q.format(query_targets) for q in [
+          'attr(include_prefix, ".+", kind(cc_library, deps({})))',
+          'attr(strip_include_prefix, ".+", kind(cc_library, deps({})))',
+          'attr(generator_function, ".*proto_library", kind(cc_.*, deps({})))',
+      ])
+  build_targets = subprocess.check_output(["bazel", "query", "--notool_deps",
+                                           query]).decode().splitlines()
   subprocess.check_call(["bazel", "build"] + bazel_options + build_targets)
 
 
