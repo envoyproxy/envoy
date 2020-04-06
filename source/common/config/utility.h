@@ -158,11 +158,13 @@ public:
   /**
    * Check the validity of a cluster backing an api config source. Throws on error.
    * @param clusters the clusters currently loaded in the cluster manager.
-   * @param api_config_source the config source to validate.
+   * @param cluster_name the cluster name to validate.
+   * @param config_source the config source typed name.
    * @throws EnvoyException when an API config doesn't have a statically defined non-EDS cluster.
    */
   static void validateClusterName(const Upstream::ClusterManager::ClusterInfoMap& clusters,
-                                  const std::string& cluster_name);
+                                  const std::string& cluster_name,
+                                  const std::string& config_source);
 
   /**
    * Potentially calls Utility::validateClusterName, if a cluster name can be found.
