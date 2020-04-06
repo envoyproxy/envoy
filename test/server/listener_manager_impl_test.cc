@@ -43,7 +43,6 @@ using testing::AtLeast;
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
-using testing::SaveArg;
 using testing::Throw;
 
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
