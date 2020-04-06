@@ -103,7 +103,15 @@ public:
             compression_strategy: rle
     )EOF"};
 
-  const std::string default_config{"name: envoy.filters.http.compressor"};
+  const std::string default_config{R"EOF(
+      name: envoy.filters.http.compressor
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+        compressor_library:
+          name: envoy.filters.http.compressor.gzip
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip
+    )EOF"};
 
   const uint64_t window_bits{15 | 16};
 

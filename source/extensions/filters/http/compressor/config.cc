@@ -14,19 +14,13 @@ namespace Compressor {
 Http::FilterFactoryCb CompressorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  CompressorFactoryPtr compressor_factory;
-
-  if (proto_config.has_compressor_library()) {
-    auto& config_factory = Config::Utility::getAndCheckFactory<NamedCompressorLibraryConfigFactory>(
-        proto_config.compressor_library());
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        proto_config.compressor_library(), context.messageValidationVisitor(), config_factory);
-    compressor_factory = config_factory.createCompressorLibraryFromProto(*message, context);
-  } else {
-    // By default use gzip compression.
-    compressor_factory = std::make_unique<Gzip::GzipCompressorFactory>(
-        envoy::extensions::filters::http::compressor::gzip::v3::Gzip());
-  }
+  auto& config_factory = Config::Utility::getAndCheckFactory<NamedCompressorLibraryConfigFactory>(
+      proto_config.compressor_library());
+  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+      proto_config.compressor_library().typed_config(), context.messageValidationVisitor(),
+      config_factory);
+  CompressorFactoryPtr compressor_factory =
+      config_factory.createCompressorLibraryFromProto(*message, context);
   Common::Compressors::CompressorFilterConfigSharedPtr config =
       std::make_shared<CompressorFilterConfig>(proto_config, stats_prefix, context.scope(),
                                                context.runtime(), std::move(compressor_factory));

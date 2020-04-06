@@ -21,9 +21,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 10]
 message Gzip {
   enum CompressionStrategy {
+    // The DEFAULT value translates directly to zlib's Z_DEFAULT_STRATEGY. It doesn't
+    // equate to any other strategy.
     DEFAULT = 0;
+
     FILTERED = 1;
+
     HUFFMAN = 2;
+
     RLE = 3;
   }
 

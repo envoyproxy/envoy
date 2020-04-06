@@ -4,8 +4,8 @@ Compressor
 ==========
 Compressor is an HTTP filter which enables Envoy to compress dispatched data
 from an upstream service upon client request. Compression is useful in
-situations where large payloads need to be transmitted without
-compromising the response time.
+situations when bandwidth is scarce and large payloads can be effectively compressed
+at the expense of higher CPU load or offloading it to a compression accelerator.
 
 .. note::
 
@@ -25,6 +25,28 @@ response and request allow.
 
 Currently the filter supports :ref:`gzip compression<envoy_api_msg_config.filter.http.compressor.gzip.v2.Gzip>`
 only. Other compression libraries can be supported as extensions.
+
+An example configuration of the filter may look like the following:
+
+.. code-block:: yaml
+
+    http_filters:
+    - name: compressor
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+        disable_on_etag_header: true
+        content_length: 100
+        content_type:
+          - text/html
+          - application/json
+        compressor_library:
+          name: gzip
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip
+            memory_level: 3
+            window_bits: 10
+            compression_level: best
+            compression_strategy: rle
 
 By *default* compression will be *skipped* when:
 
