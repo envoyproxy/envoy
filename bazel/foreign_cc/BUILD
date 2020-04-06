@@ -221,3 +221,42 @@ envoy_cmake_external(
         "//conditions:default": ["libz.a"],
     }),
 )
+
+configure_make(
+    name = "icuuc",
+    configure_command = "source/configure",
+    configure_env_vars = select({
+        "//bazel:windows_x86_64": {
+            "CXXFLAGS": "/utf-8 /DLOCALE_ALLOW_NEUTRAL_NAMES=0 /std:c++11",
+        },
+        "//bazel:apple": {
+            "CXXFLAGS": "-Wno-shorten-64-to-32 -Wno-unused-variable -std=c++11",
+        },
+        "//conditions:default": {
+            "CXXFLAGS": "-std=c++11 -DU_STATIC_IMPLEMENTATION -DU_HAVE_STD_ATOMICS",
+        },
+    }),
+    configure_options = [
+        "--enable-option-checking",
+        "--enable-static",
+        "--enable-tools",
+        "--disable-shared",
+        "--disable-dyload",
+        "--disable-extras",
+        "--disable-plugins",
+        "--disable-tests",
+        "--disable-samples",
+        "--with-data-packaging=static",
+    ],
+    lib_source = "@org_unicode_icuuc//:all",
+    static_libraries = select({
+        "//bazel:windows_x86_64": [
+            "libicuuc.lib",
+            "libicudata.lib",
+        ],
+        "//conditions:default": [
+            "libicuuc.a",
+            "libicudata.a",
+        ],
+    }),
+)

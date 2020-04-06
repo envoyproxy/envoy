@@ -364,10 +364,12 @@ envoy_cc_library(
     name = "url_utility_lib",
     srcs = ["url_utility.cc"],
     hdrs = ["url_utility.h"],
+    external_deps = [
+        "googleurl",
+    ],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
-        "@com_googlesource_googleurl//url",
     ],
 )
 
