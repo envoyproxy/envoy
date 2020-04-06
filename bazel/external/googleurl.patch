@@ -14,10 +14,10 @@ index 2962537..ebdac08 100644
  // (Typically used to silence a compiler warning when the assignment
  // is important for some other reason.)
 diff --git a/base/strings/BUILD b/base/strings/BUILD
-index 7a06170..21e9b73 100644
+index 7a06170..7c86a5f 100644
 --- a/base/strings/BUILD
 +++ b/base/strings/BUILD
-@@ -6,23 +6,20 @@ load("//:build_config.bzl", "build_config")
+@@ -6,23 +6,21 @@ load("//:build_config.bzl", "build_config")
  cc_library(
      name = "strings",
      srcs = [
@@ -31,7 +31,7 @@ index 7a06170..21e9b73 100644
 +    ] + build_config.strings_srcs,
      hdrs = [
          "char_traits.h",
--        "string16.h",
+         "string16.h",
          "string_piece.h",
          "string_piece_forward.h",
          "string_util.h",
@@ -44,7 +44,7 @@ index 7a06170..21e9b73 100644
      visibility = ["//visibility:public"],
      deps = [
 diff --git a/build_config.bzl b/build_config.bzl
-index d5fca65..4e938e4 100644
+index d5fca65..fc0d7e5 100644
 --- a/build_config.bzl
 +++ b/build_config.bzl
 @@ -1,8 +1,25 @@
@@ -69,7 +69,7 @@ index d5fca65..4e938e4 100644
 +
 +_strings_hdrs = select({
 +    "@envoy//bazel:windows_x86_64": ["string_util_win.h"],
-+    "//conditions:default": ["string16.h", "string_util_posix.h"],
++    "//conditions:default": ["string_util_posix.h"],
 +})
 
  build_config = struct(
