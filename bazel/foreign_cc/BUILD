@@ -226,15 +226,12 @@ configure_make(
     name = "icuuc",
     configure_command = "source/configure",
     configure_env_vars = select({
-        "//bazel:windows_x86_64": {
-            "CXXFLAGS": "/utf-8 /DLOCALE_ALLOW_NEUTRAL_NAMES=0 /std:c++11",
-        },
         "//bazel:apple": {
             "CXXFLAGS": "-Wno-shorten-64-to-32 -Wno-unused-variable -std=c++11",
             "AR": "/usr/bin/ar",
         },
         "//conditions:default": {
-            "CXXFLAGS": "-std=c++11 -DU_STATIC_IMPLEMENTATION -DU_HAVE_STD_ATOMICS",
+            "CXXFLAGS": "-std=c++11",
         },
     }),
     configure_options = [
