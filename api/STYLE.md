@@ -106,7 +106,7 @@ To add an extension config to the API, the steps below should be followed:
    below. Refer to the [Cache filter config](envoy/extensions/filter/http/cache/v3alpha/cache.proto)
    as an example of `v3alpha`, and the
    [Buffer filter config](envoy/extensions/filter/http/buffer/v3/buffer.proto) as an example of `v3`.
-1. Place the v3 extension configuration `.proto` in `api/envoy/config`, e.g.
+1. Place the v3 extension configuration `.proto` in `api/envoy/extensions`, e.g.
    `api/envoy/extensions/filter/http/foobar/v3/foobar.proto` together with an initial BUILD file:
    ```bazel
    load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
@@ -118,8 +118,12 @@ To add an extension config to the API, the steps below should be followed:
    )
    ```
 1. Add to the v3 extension config proto `import "udpa/annotations/migrate.proto";`
-1. If this is still WiP and subject to breaking changes, import
-   `udpa/annotations/status.proto` and set `option (udpa.annotations.file_status).work_in_progress = true;`.
+   and `import "udpa/annotations/status.proto";`
+1. If this is still WiP and subject to breaking changes, set
+   `option (udpa.annotations.file_status).work_in_progress = true;`.
+1. Add to the v3 extension config proto a file level
+   `option (udpa.annotations.file_status).package_version_status = ACTIVE;`.
+   This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD).
 1. Add a reference to the v3 extension config in (1) in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
 1. Run `./tools/proto_format/proto_format.sh fix`. This should regenerate the `BUILD` file,
    reformat `foobar.proto` as needed and also generate the v4alpha extension config (if needed),
