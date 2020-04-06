@@ -13,8 +13,8 @@
 // template bloat because everything is inlined when anybody calls any of our
 // functions.
 
-#include <cstddef>
-#include <cstdlib>
+#include <stddef.h>
+#include <stdlib.h>
 
 #include "common/chromium_url/envoy_shim.h"
 #include "common/chromium_url/url_canon.h"

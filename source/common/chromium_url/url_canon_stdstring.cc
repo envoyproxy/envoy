@@ -9,9 +9,9 @@
 
 namespace chromium_url {
 
-StdStringCanonOutput::StdStringCanonOutput(std::string* str) : str_(str) {
+StdStringCanonOutput::StdStringCanonOutput(std::string* str) : CanonOutput(), str_(str) {
   cur_len_ = static_cast<int>(str_->size()); // Append to existing data.
-  buffer_ = str_->empty() ? nullptr : &(*str_)[0];
+  buffer_ = str_->empty() ? NULL : &(*str_)[0];
   buffer_len_ = static_cast<int>(str_->size());
 }
 
@@ -26,7 +26,7 @@ void StdStringCanonOutput::Complete() {
 
 void StdStringCanonOutput::Resize(int sz) {
   str_->resize(sz);
-  buffer_ = str_->empty() ? nullptr : &(*str_)[0];
+  buffer_ = str_->empty() ? NULL : &(*str_)[0];
   buffer_len_ = sz;
 }
 

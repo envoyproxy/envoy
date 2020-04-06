@@ -5,7 +5,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <climits>
+#include <limits.h>
 
 #include "common/chromium_url/url_canon.h"
 #include "common/chromium_url/url_canon_internal.h"
@@ -169,15 +169,13 @@ void BackUpToPreviousSlash(int path_begin_in_output, CanonOutput* output) {
 
   int i = output->length() - 1;
   DCHECK(output->at(i) == '/');
-  if (i == path_begin_in_output) {
+  if (i == path_begin_in_output)
     return; // We're at the first slash, nothing to do.
-  }
 
   // Now back up (skipping the trailing slash) until we find another slash.
   i--;
-  while (output->at(i) != '/' && i > path_begin_in_output) {
+  while (output->at(i) != '/' && i > path_begin_in_output)
     i--;
-  }
 
   // Now shrink the output to just include that last slash we found.
   output->set_length(i + 1);
@@ -226,9 +224,8 @@ void CheckForNestedEscapes(const CHAR* spec, int next_input_index, int input_len
   if (append_next_char) {
     // If the input doesn't contain a 7-bit character next, this case won't be a
     // problem.
-    if ((next_input_index == input_len) || (spec[next_input_index] >= 0x80)) {
+    if ((next_input_index == input_len) || (spec[next_input_index] >= 0x80))
       return;
-    }
     output->push_back(static_cast<char>(spec[next_input_index]));
   }
 
@@ -239,9 +236,8 @@ void CheckForNestedEscapes(const CHAR* spec, int next_input_index, int input_len
     // New escape sequence found. Overwrite the characters following the '%'
     // with "25", and push_back() the one or two characters that were following
     // the '%' when we were called.
-    if (!append_next_char) {
+    if (!append_next_char)
       output->push_back(output->at(last_invalid_percent_index + 1));
-    }
     output->set(last_invalid_percent_index + 1, '2');
     output->set(last_invalid_percent_index + 2, '5');
     output->push_back(last_unescaped_char);
@@ -355,9 +351,8 @@ bool DoPartialPath(const CHAR* spec, const Component& path, int path_begin_in_ou
               output->push_back('%');
               output->push_back(static_cast<char>(spec[i - 1]));
               output->push_back(static_cast<char>(spec[i]));
-              if (unescaped_flags & INVALID_BIT) {
+              if (unescaped_flags & INVALID_BIT)
                 success = false;
-              }
             }
           } else {
             // Invalid escape sequence. IE7+ rejects any URLs with such
@@ -396,9 +391,8 @@ bool DoPath(const CHAR* spec, const Component& path, CanonOutput* output, Compon
     // and then canonicalize it, it will of course have a slash already. This
     // check is for the replacement and relative URL resolving cases of file
     // URLs.
-    if (!IsURLSlash(spec[path.begin])) {
+    if (!IsURLSlash(spec[path.begin]))
       output->push_back('/');
-    }
 
     success = DoPartialPath<CHAR, UCHAR>(spec, path, out_path->begin, output);
   } else {

@@ -14,7 +14,7 @@ namespace chromium_url {
 
 // Represents a substring for URL parsing.
 struct Component {
-  Component() {}
+  Component() : begin(0), len(-1) {}
 
   // Normal constructor: takes an offset and a length.
   Component(int b, int l) : begin(b), len(l) {}
@@ -36,13 +36,13 @@ struct Component {
 
   bool operator==(const Component& other) const { return begin == other.begin && len == other.len; }
 
-  int begin{0}; // Byte offset in the string of this component.
-  int len{-1};  // Will be -1 if the component is unspecified.
+  int begin; // Byte offset in the string of this component.
+  int len;   // Will be -1 if the component is unspecified.
 };
 
 // Helper that returns a component created with the given begin and ending
 // points. The ending point is non-inclusive.
-inline Component MakeRange(int begin, int end) { return {begin, end - begin}; }
+inline Component MakeRange(int begin, int end) { return Component(begin, end - begin); }
 
 } // namespace chromium_url
 
