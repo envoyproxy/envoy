@@ -258,8 +258,8 @@ TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
   configureQuicRuntimeFlag(/* runtime_enabled = */ true);
-  ConfigureMocks(/* connection_count = */ 1);
-  SendFullCHLO(quic::test::TestConnectionId(1));
+  configureMocks(/* connection_count = */ 1);
+  sendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_FALSE(envoy_quic_dispatcher->session_map().empty());
@@ -273,8 +273,8 @@ TEST_P(ActiveQuicListenerTest, ReceiveFullChloQuicEnabledByDefault) {
       ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
-  ConfigureMocks(/* connection_count = */ 1);
-  SendFullCHLO(quic::test::TestConnectionId(1));
+  configureMocks(/* connection_count = */ 1);
+  sendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_FALSE(envoy_quic_dispatcher->session_map().empty());
@@ -287,11 +287,11 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
   configureQuicRuntimeFlag(/* runtime_enabled = */ true);
-  ConfigureMocks(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2);
+  configureMocks(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2);
 
   // Generate one more CHLO than can be processed immediately.
   for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerLoop + 1; ++i) {
-    SendFullCHLO(quic::test::TestConnectionId(i));
+    sendFullCHLO(quic::test::TestConnectionId(i));
   }
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
@@ -306,7 +306,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   EXPECT_FALSE(envoy_quic_dispatcher->session_map().empty());
 
   // Generate more data to trigger a socket read during the next event loop.
-  SendFullCHLO(quic::test::TestConnectionId(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2));
+  sendFullCHLO(quic::test::TestConnectionId(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // The socket read results in processing all CHLOs.
@@ -322,7 +322,7 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabled) {
   EnvoyQuicDispatcher* const envoy_quic_dispatcher =
       ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
   configureQuicRuntimeFlag(/* runtime_enabled = */ false);
-  SendFullCHLO(quic::test::TestConnectionId(1));
+  sendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // If listener was enabled, there should have been session created for active connection.
   EXPECT_TRUE(envoy_quic_dispatcher->session_map().empty());
