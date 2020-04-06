@@ -1,5 +1,5 @@
 diff --git a/base/compiler_specific.h b/base/compiler_specific.h
-index 2962537..ebdac08 100644
+index 2962537..6193b56 100644
 --- a/base/compiler_specific.h
 +++ b/base/compiler_specific.h
 @@ -7,10 +7,6 @@
@@ -13,6 +13,26 @@ index 2962537..ebdac08 100644
  // Annotate a variable indicating it's ok if the variable is not used.
  // (Typically used to silence a compiler warning when the assignment
  // is important for some other reason.)
+@@ -212,7 +208,9 @@
+ #endif
+ #endif
+
+-#if defined(__clang__) && __has_attribute(uninitialized)
++#if defined(__clang__)
++#if defined(__has_attribute)
++#if __has_attribute(uninitialized)
+ // Attribute "uninitialized" disables -ftrivial-auto-var-init=pattern for
+ // the specified variable.
+ // Library-wide alternative is
+@@ -243,6 +241,8 @@
+ // E.g. platform, bot, benchmark or test name in patch description or next to
+ // the attribute.
+ #define STACK_UNINITIALIZED __attribute__((uninitialized))
++#endif
++#endif
+ #else
+ #define STACK_UNINITIALIZED
+ #endif
 diff --git a/base/strings/BUILD b/base/strings/BUILD
 index 7a06170..7c86a5f 100644
 --- a/base/strings/BUILD
