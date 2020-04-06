@@ -15,6 +15,9 @@ TEST(Utility, ParseStdRegex) {
   EXPECT_THROW_WITH_REGEX(Utility::parseStdRegex("(+invalid)"), EnvoyException,
                           "Invalid regex '\\(\\+invalid\\)': .+");
 
+  EXPECT_THROW_WITH_REGEX(Utility::parseStdRegexAsCompiledMatcher("(+invalid)"), EnvoyException,
+                          "Invalid regex '\\(\\+invalid\\)': .+");
+
   {
     std::regex regex = Utility::parseStdRegex("x*");
     EXPECT_NE(0, regex.flags() & std::regex::optimize);
@@ -24,6 +27,23 @@ TEST(Utility, ParseStdRegex) {
     std::regex regex = Utility::parseStdRegex("x*", std::regex::icase);
     EXPECT_NE(0, regex.flags() & std::regex::icase);
     EXPECT_EQ(0, regex.flags() & std::regex::optimize);
+  }
+
+  {
+    auto matcher = Utility::parseStdRegexAsCompiledMatcher(
+        "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
+    EXPECT_THROW_WITH_REGEX(matcher->match("0"), EnvoyException,
+                            "Invalid regex match: The complexity of an attempted match against a "
+                            "regular expression exceeded a pre-set level.");
+  }
+
+  {
+    auto matcher = Utility::parseStdRegexAsCompiledMatcher(
+        "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
+        "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
+    EXPECT_THROW_WITH_REGEX(matcher->match("0"), EnvoyException,
+                            "Invalid regex match: The complexity of an attempted match against a "
+                            "regular expression exceeded a pre-set level.");
   }
 }
 
