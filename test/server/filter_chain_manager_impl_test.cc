@@ -45,12 +45,15 @@ namespace Envoy {
 namespace Server {
 
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-  std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const envoy::config::listener::v3::FilterChain&,
-                   FilterChainFactoryContextCreator&) const override {
-    // Won't dereference but requires not nullptr.
-    return std::make_unique<Network::MockFilterChain>();
+public:
+  MockFilterChainFactoryBuilder() {
+    ON_CALL(*this, buildFilterChain(_, _))
+        .WillByDefault(Return(std::make_shared<Network::MockFilterChain>()));
   }
+
+  MOCK_METHOD(std::shared_ptr<Network::DrainableFilterChain>, buildFilterChain,
+              (const envoy::config::listener::v3::FilterChain&, FilterChainFactoryContextCreator&),
+              (const));
 };
 
 class FilterChainManagerImplTest : public testing::Test {
@@ -122,13 +125,14 @@ public:
             keys:
             - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
   )EOF";
+  Init::ManagerImpl init_manager_{"for_filter_chain_manager_test"};
   envoy::config::listener::v3::FilterChain filter_chain_template_;
-  MockFilterChainFactoryBuilder filter_chain_factory_builder_;
+  NiceMock<MockFilterChainFactoryBuilder> filter_chain_factory_builder_;
   NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
-
   // Test target.
   FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), parent_context_};
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), parent_context_,
+      init_manager_};
 };
 
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
@@ -142,17 +146,80 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
   EXPECT_NE(filter_chain, nullptr);
 }
 
-// The current implementation generates independent contexts for the same filter chain
-TEST_F(FilterChainManagerImplTest, FilterChainContextsAreUnique) {
-  std::set<Configuration::FilterChainFactoryContext*> contexts;
-  {
-    for (int i = 0; i < 2; i++) {
-      contexts.insert(
-          &filter_chain_manager_.createFilterChainFactoryContext(&filter_chain_template_));
-    }
+TEST_F(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage) {
+  std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
+
+  for (int i = 0; i < 2; i++) {
+    envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+    new_filter_chain.set_name(absl::StrCat("filter_chain_", i));
+    // For sanity check
+    new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
+    filter_chain_messages.push_back(std::move(new_filter_chain));
   }
-  EXPECT_EQ(contexts.size(), 2);
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(2);
+  filter_chain_manager_.addFilterChain(
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0],
+                                                                   &filter_chain_messages[1]},
+      filter_chain_factory_builder_, filter_chain_manager_);
 }
 
+TEST_F(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
+  std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
+
+  for (int i = 0; i < 3; i++) {
+    envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+    new_filter_chain.set_name(absl::StrCat("filter_chain_", i));
+    // For sanity check
+    new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
+    filter_chain_messages.push_back(std::move(new_filter_chain));
+  }
+
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(1);
+  filter_chain_manager_.addFilterChain(
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0]},
+      filter_chain_factory_builder_, filter_chain_manager_);
+
+  FilterChainManagerImpl new_filter_chain_manager{
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), parent_context_,
+      init_manager_, filter_chain_manager_};
+  // The new filter chain manager maintains 3 filter chains, but only 2 filter chain context is
+  // built because it reuse the filter chain context in the previous filter chain manager
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(2);
+  new_filter_chain_manager.addFilterChain(
+      std::vector<const envoy::config::listener::v3::FilterChain*>{
+          &filter_chain_messages[0], &filter_chain_messages[1], &filter_chain_messages[2]},
+      filter_chain_factory_builder_, new_filter_chain_manager);
+}
+
+TEST_F(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependentDrainClose) {
+  std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
+  for (int i = 0; i < 3; i++) {
+    envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+    new_filter_chain.set_name(absl::StrCat("filter_chain_", i));
+    // For sanity check
+    new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
+    filter_chain_messages.push_back(std::move(new_filter_chain));
+  }
+  auto context0 = filter_chain_manager_.createFilterChainFactoryContext(&filter_chain_messages[0]);
+  auto context1 = filter_chain_manager_.createFilterChainFactoryContext(&filter_chain_messages[1]);
+
+  // Server as whole is not draining.
+  MockDrainManager not_a_draining_manager;
+  EXPECT_CALL(not_a_draining_manager, drainClose).WillRepeatedly(Return(false));
+  Configuration::MockServerFactoryContext mock_server_context;
+  EXPECT_CALL(mock_server_context, drainManager).WillRepeatedly(ReturnRef(not_a_draining_manager));
+  EXPECT_CALL(parent_context_, getServerFactoryContext)
+      .WillRepeatedly(ReturnRef(mock_server_context));
+
+  EXPECT_FALSE(context0->drainDecision().drainClose());
+  EXPECT_FALSE(context1->drainDecision().drainClose());
+
+  // Drain filter chain 0
+  auto* context_impl_0 = dynamic_cast<PerFilterChainFactoryContextImpl*>(context0.get());
+  context_impl_0->startDraining();
+
+  EXPECT_TRUE(context0->drainDecision().drainClose());
+  EXPECT_FALSE(context1->drainDecision().drainClose());
+}
 } // namespace Server
 } // namespace Envoy
