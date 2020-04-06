@@ -8,7 +8,7 @@ exports_files([
 icuuc_copts = [
     "-DU_STATIC_IMPLEMENTATION",
     "-DU_COMMON_IMPLEMENTATION",
-    "-DU_HAVE_STD_ATOMICS",  # TODO(gunan): Remove when TF is on ICU 64+.
+    "-DU_HAVE_STD_ATOMICS",
 ] + select({
     "@envoy//bazel:apple": [
         "-Wno-shorten-64-to-32",
