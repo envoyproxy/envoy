@@ -114,7 +114,7 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
 constexpr uint64_t TimeoutPrecisionFactor = 100;
 
 bool shouldProxy(Http::RequestHeaderMap& headers, const RouteEntry* route_entry) {
-  return route_entry->proxyingConfig().has_value() &&
+  return route_entry->proxyConfig().has_value() &&
          headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect;
 }
 

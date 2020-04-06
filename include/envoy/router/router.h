@@ -484,8 +484,8 @@ public:
    * TCP  upstream.
    * @return configuration for TCP proxying, if present.
    */
-  using ProxyingConfig = envoy::config::route::v3::VirtualHost::ProxyingConfig;
-  virtual const absl::optional<ProxyingConfig> proxyingConfig() const PURE;
+  using ProxyConfig = envoy::config::route::v3::VirtualHost::ProxyConfig;
+  virtual const absl::optional<ProxyConfig>& proxyConfig() const PURE;
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
@@ -835,8 +835,8 @@ public:
    * TCP  upstream.
    * @return configuration for TCP proxying, if present.
    */
-  using ProxyingConfig = envoy::config::route::v3::VirtualHost::ProxyingConfig;
-  virtual const absl::optional<ProxyingConfig> proxyingConfig() const PURE;
+  using ProxyConfig = envoy::config::route::v3::VirtualHost::ProxyConfig;
+  virtual const absl::optional<ProxyConfig>& proxyConfig() const PURE;
 
   using UpgradeMap = std::map<std::string, bool>;
   /**

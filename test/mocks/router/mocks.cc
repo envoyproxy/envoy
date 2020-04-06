@@ -60,6 +60,7 @@ MockShadowWriter::~MockShadowWriter() = default;
 MockVirtualHost::MockVirtualHost() {
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
+  ON_CALL(*this, proxyConfig()).WillByDefault(ReturnRef(proxy_config_));
 }
 
 MockVirtualHost::~MockVirtualHost() = default;
@@ -97,6 +98,7 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
+  ON_CALL(*this, proxyConfig()).WillByDefault(ReturnRef(proxy_config_));
 }
 
 MockRouteEntry::~MockRouteEntry() = default;

@@ -51,8 +51,8 @@ message VirtualHost {
 
   // [#not-implemented-hide:]
   // Configuration for sending data upstream as a raw data payload. This is used for
-  // CONNECT requests, when translating HTTP body data to TCP payload.
-  message ProxyingConfig {
+  // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+  message ProxyConfig {
     // TODO(alyssawilk) add proxy proto configuration here.
   }
 
@@ -193,7 +193,7 @@ message VirtualHost {
   // CONNECT requests. If this message is present, the HTTP body of incoming CONNECT request
   // will be proxied upstream as raw TCP. Upstream TCP payload will result in Envoy synthesizing
   // response headers and forwarding the TCP response payload in the HTTP response body.
-  ProxyingConfig proxying_config = 22;
+  ProxyConfig proxying_config = 22;
 }
 
 // A filter-defined action type.

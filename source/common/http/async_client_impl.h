@@ -186,12 +186,15 @@ private:
     }
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
-    const absl::optional<ProxyingConfig> proxyingConfig() const override { return absl::nullopt; }
+    const absl::optional<ProxyConfig>& proxyConfig() const override {
+      return proxy_config_nullopt_;
+    }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
+    static const absl::optional<ProxyConfig> proxy_config_nullopt_;
   };
 
   struct NullPathMatchCriterion : public Router::PathMatchCriterion {
@@ -272,7 +275,9 @@ private:
 
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
-    const absl::optional<ProxyingConfig> proxyingConfig() const override { return absl::nullopt; }
+    const absl::optional<ProxyConfig>& proxyConfig() const override {
+      return proxy_config_nullopt_;
+    }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     Router::InternalRedirectAction internalRedirectAction() const override {
       return Router::InternalRedirectAction::PassThrough;
@@ -294,6 +299,7 @@ private:
     Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
+    static const absl::optional<ProxyConfig> proxy_config_nullopt_;
     const std::string route_name_;
   };
 
