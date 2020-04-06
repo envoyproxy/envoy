@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -40,6 +41,7 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
  * All stats for the HTTP/2 codec. @see stats_macros.h
  */
 #define ALL_HTTP2_CODEC_STATS(COUNTER)                                                             \
+  COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(header_overflow)                                                                         \
   COUNTER(headers_cb_no_stream)                                                                    \
   COUNTER(inbound_empty_frames_flood)                                                              \
@@ -47,6 +49,7 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
   COUNTER(inbound_window_update_frames_flood)                                                      \
   COUNTER(outbound_control_flood)                                                                  \
   COUNTER(outbound_flood)                                                                          \
+  COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(rx_messaging_error)                                                                      \
   COUNTER(rx_reset)                                                                                \
   COUNTER(too_many_header_frames)                                                                  \
@@ -341,6 +344,18 @@ protected:
   // NOTE: This is only used for tests.
   virtual void onSettingsForTest(const nghttp2_settings&) {}
 
+  /**
+   * Check if header name contains underscore character.
+   * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
+   * as a security measure due to systems that treat '_' and '-' as interchangeable.
+   * The ServerConnectionImpl may drop header or reject request based on the
+   * `common_http_protocol_options.headers_with_underscores_action` configuration option in the
+   * HttpConnectionManager.
+   */
+  virtual absl::optional<int> checkHeaderNameForUnderscores(absl::string_view /* header_name */) {
+    return absl::nullopt;
+  }
+
   static Http2Callbacks http2_callbacks_;
 
   std::list<StreamImplPtr> active_streams_;
@@ -490,7 +505,9 @@ public:
                        Stats::Scope& scope,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_request_headers_kb,
-                       const uint32_t max_request_headers_count);
+                       const uint32_t max_request_headers_count,
+                       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+                           headers_with_underscores_action);
 
 private:
   // ConnectionImpl
@@ -500,6 +517,7 @@ private:
   void checkOutboundQueueLimits() override;
   bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
   bool checkInboundFrameLimits() override;
+  absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when
@@ -515,6 +533,10 @@ private:
   // This flag indicates that downstream data is being dispatched and turns on flood mitigation
   // in the checkMaxOutbound*Framed methods.
   bool dispatching_downstream_data_{false};
+
+  // The action to take when a request header name contains underscore characters.
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_;
 };
 
 } // namespace Http2

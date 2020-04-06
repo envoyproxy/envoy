@@ -642,6 +642,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   // Double getting.
   EXPECT_EQ(1.1, loader_->snapshot().getDouble("file_with_words", 1.1));
   EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
+  EXPECT_EQ(2.0, loader_->snapshot().getDouble("file3", 3.3));
 
   // Boolean getting.
   const auto snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
