@@ -140,7 +140,8 @@ To add an extension config to the API, the steps below should be followed:
    This places the filter in the correct [v3 package hierarchy](#package-organization).
 1. If this is still WiP and subject to breaking changes, import
    `udpa/annotations/status.proto` and set `option (udpa.annotations.file_status).work_in_progress = true;`.
-1. Add a reference to the v2 extension config in (1) in [api/versioning/BUILD](versioning/BUILD).
+1. Add to the v2 extension config proto a file level `option (udpa.annotations.file_status).package_version_status = ACTIVE;`.
+   This is required to automatically include the proto config in [api/versioning/BUILD](versioning/BUILD).
 1. Run `./tools/proto_format/proto_format.sh fix`. This should regenerate the `BUILD` file,
    reformat `foobar.proto` as needed and also generate the v3 extension config,
    together with shadow API protos.
