@@ -368,19 +368,3 @@ envoy_cc_test(
         "//source/common/http:path_utility_lib",
     ],
 )
-
-envoy_cc_test(
-    name = "status_test",
-    srcs = ["status_test.cc"],
-    deps = [
-        "//source/common/http:status_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "status_or_test",
-    srcs = ["status_or_test.cc"],
-    deps = [
-        "//source/common/http:status_or_lib",
-    ],
-)

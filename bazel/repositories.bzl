@@ -515,6 +515,10 @@ def _com_google_absl():
         name = "abseil_variant",
         actual = "@com_google_absl//absl/types:variant",
     )
+    native.bind(
+        name = "abseil_status",
+        actual = "@com_google_absl//absl/status",
+    )
 
 def _com_google_protobuf():
     _repository_impl("rules_python")

@@ -419,3 +419,15 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "status_lib",
+    srcs = ["status.cc"],
+    hdrs = ["status.h"],
+    external_deps = [
+        "abseil_status",
+    ],
+    deps = [
+        "//include/envoy/http:codes_interface",
+    ],
+)

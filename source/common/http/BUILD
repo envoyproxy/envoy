@@ -393,25 +393,3 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
     ],
 )
-
-envoy_cc_library(
-    name = "status_lib",
-    srcs = ["status.cc"],
-    hdrs = ["status.h"],
-    external_deps = [
-        "abseil_base",
-        "abseil_optional",
-    ],
-    deps = [
-        "//include/envoy/http:codes_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "status_or_lib",
-    hdrs = ["status_or.h"],
-    external_deps = [
-        "abseil_variant",
-    ],
-    deps = [":status_lib"],
-)
