@@ -2,6 +2,7 @@
 
 import argparse
 import common
+import difflib
 import functools
 import multiprocessing
 import os
@@ -76,6 +77,16 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./tools/clang_tools/api_booster/main.cc",
                        "./tools/clang_tools/api_booster/proto_cxx_utils.cc",
                        "./source/common/common/version.cc")
+
+# These triples (file1, file2, diff) represent two files, file1 and file2 that should maintain
+# the diff diff. This is meant to keep these two files in sync.
+CODEC_DIFFS = (
+    ("./source/common/http/http1/codec_impl.h", "./source/common/http/http1/codec_impl_legacy.h", "./tools/code_format/codec_diffs/http1_codec_impl_h"),
+    ("./source/common/http/http1/codec_impl.cc", "./source/common/http/http1/codec_impl_legacy.cc", "./tools/code_format/codec_diffs/http1_codec_impl_cc"),
+    ("./source/common/http/http2/codec_impl.h", "./source/common/http/http2/codec_impl_legacy.h", "./tools/code_format/codec_diffs/http2_codec_impl_h"),
+    ("./source/common/http/http2/codec_impl.cc", "./source/common/http/http2/codec_impl_legacy.cc", "./tools/code_format/codec_diffs/http2_codec_impl_cc"),
+    ("./test/common/http/http2/codec_impl_test.cc", "./test/common/http/http2/codec_impl_legacy_test.cc", "./tools/code_format/codec_diffs/http2_codec_impl_test_cc")
+)
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -464,6 +475,27 @@ def fixSourceLine(line, line_number):
 
   return line
 
+def codecDiffHelper(file1, file2, diff):
+  f1 = open(file1).readlines()
+  f2 = open(file2).readlines()
+
+  # Create diff between two files
+  code_diff = difflib.unified_diff(f1, f2)
+  # Compare with golden diff.
+  golden_diff = [line for line in open(diff).readlines()]
+  # It is fairly ugly to diff a diff, so return a warning to sync codec changes
+  # and/or update golden_diff.
+  if list(code_diff) != golden_diff:
+    error_message = "Codecs are not synced: %s does not match %s. Update codec implementations to sync and/or update the diff %s" % (file1, file2, diff)
+    return error_message
+
+def checkCodecDiffs():
+  error_messages = []
+  for triple in CODEC_DIFFS:
+    codec_diff = codecDiffHelper(*triple)
+    if codec_diff != None:
+      error_messages.append(codecDiffHelper(*triple))
+  return error_messages
 
 # We want to look for a call to condvar.waitFor, but there's no strong pattern
 # to the variable name of the condvar. If we just look for ".waitFor" we'll also
@@ -956,6 +988,9 @@ if __name__ == "__main__":
   # Calculate the list of owned directories once per run.
   error_messages = []
   owned_directories = ownedDirectories(error_messages)
+
+  # Check codec synchronization once per run.
+  error_messages += checkCodecDiffs()
 
   if os.path.isfile(target_path):
     error_messages += checkFormat("./" + target_path)

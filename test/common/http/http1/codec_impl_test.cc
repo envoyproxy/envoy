@@ -53,7 +53,7 @@ Buffer::OwnedImpl createBufferWithOneByteSlices(absl::string_view input) {
 }
 } // namespace
 
-// This test class is parametrized on codec types (new and legacy behavior).
+// This test class is parameterized on codec types (new and legacy behavior).
 class Http1ServerConnectionImplTest : public testing::TestWithParam<bool> {
 public:
   void initialize() {

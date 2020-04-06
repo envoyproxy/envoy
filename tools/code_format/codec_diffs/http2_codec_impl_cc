@@ -1,0 +1,65 @@
+--- 
++++ 
+@@ -1,4 +1,4 @@
+-#include "common/http/http2/codec_impl.h"
++#include "common/http/http2/codec_impl_legacy.h"
+ 
+ #include <cstdint>
+ #include <memory>
+@@ -26,6 +26,7 @@
+ 
+ namespace Envoy {
+ namespace Http {
++namespace Legacy {
+ namespace Http2 {
+ 
+ class Http2ResponseCodeDetailValues {
+@@ -190,7 +191,7 @@
+ 
+ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
+   ASSERT(parent_.allow_metadata_);
+-  MetadataEncoder& metadata_encoder = getMetadataEncoder();
++  Envoy::Http::Http2::MetadataEncoder& metadata_encoder = getMetadataEncoder();
+   if (!metadata_encoder.createPayload(metadata_map_vector)) {
+     return;
+   }
+@@ -404,19 +405,19 @@
+   ASSERT(rc == 0);
+ }
+ 
+-MetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
++Envoy::Http::Http2::MetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
+   if (metadata_encoder_ == nullptr) {
+-    metadata_encoder_ = std::make_unique<MetadataEncoder>();
++    metadata_encoder_ = std::make_unique<Envoy::Http::Http2::MetadataEncoder>();
+   }
+   return *metadata_encoder_;
+ }
+ 
+-MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
++Envoy::Http::Http2::MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
+   if (metadata_decoder_ == nullptr) {
+     auto cb = [this](MetadataMapPtr&& metadata_map_ptr) {
+       this->onMetadataDecoded(std::move(metadata_map_ptr));
+     };
+-    metadata_decoder_ = std::make_unique<MetadataDecoder>(cb);
++    metadata_decoder_ = std::make_unique<Envoy::Http::Http2::MetadataDecoder>(cb);
+   }
+   return *metadata_decoder_;
+ }
+@@ -832,7 +833,7 @@
+   StreamImpl* stream = getStream(stream_id);
+   ASSERT(stream != nullptr);
+ 
+-  MetadataEncoder& encoder = stream->getMetadataEncoder();
++  Envoy::Http::Http2::MetadataEncoder& encoder = stream->getMetadataEncoder();
+   return encoder.packNextFramePayload(buf, len);
+ }
+ 
+@@ -1352,5 +1353,6 @@
+ }
+ 
+ } // namespace Http2
++} // namespace Legacy
+ } // namespace Http
+ } // namespace Envoy
