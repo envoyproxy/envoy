@@ -174,6 +174,7 @@ public:
   MOCK_METHOD(Http::RequestHeaderMap&, getRequestHeaders, (), (const));
   MOCK_METHOD(NiceMock<Http::MockStreamDecoderFilterCallbacks>&, getDecoderFilterCallbacks, (),
               (const));
+  MOCK_METHOD(Http::Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 };
 
 class MockDrainManager : public DrainManager {
@@ -494,6 +495,7 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
   Grpc::Context& grpcContext() override { return grpc_context_; }
+  MOCK_METHOD(Server::DrainManager&, drainManager, ());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;

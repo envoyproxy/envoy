@@ -135,6 +135,8 @@ message ConfigSource {
     option (validate.required) = true;
 
     // Path on the filesystem to source and watch for configuration updates.
+    // When sourcing configuration for :ref:`secret <envoy_api_msg_auth.Secret>`,
+    // the certificate and key files are also watched for updates.
     //
     // .. note::
     //

@@ -6,6 +6,9 @@ using testing::Invoke;
 namespace Envoy {
 namespace Http {
 
+MockHttp1StreamEncoderOptions::MockHttp1StreamEncoderOptions() = default;
+MockHttp1StreamEncoderOptions::~MockHttp1StreamEncoderOptions() = default;
+
 MockStreamEncoder::MockStreamEncoder() {
   ON_CALL(*this, getStream()).WillByDefault(ReturnRef(stream_));
 }

@@ -9,8 +9,8 @@
 
 #include "common/config/runtime_utility.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/stats/isolated_store_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/init/mocks.h"
@@ -111,7 +111,7 @@ protected:
 
   Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   MockRandomGenerator generator_;
   std::unique_ptr<LoaderImpl> loader_;
   Api::ApiPtr api_;
@@ -422,7 +422,7 @@ TEST_F(DiskLoaderImplTest, PercentHandling) {
   }
 }
 
-void testNewOverrides(Loader& loader, Stats::Store& store) {
+void testNewOverrides(Loader& loader, Stats::TestUtil::TestStore& store) {
   Stats::Gauge& admin_overrides_active =
       store.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport);
 
@@ -642,6 +642,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   // Double getting.
   EXPECT_EQ(1.1, loader_->snapshot().getDouble("file_with_words", 1.1));
   EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
+  EXPECT_EQ(2.0, loader_->snapshot().getDouble("file3", 3.3));
 
   // Boolean getting.
   const auto snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
@@ -795,7 +796,7 @@ class DiskLayerTest : public testing::Test {
 protected:
   DiskLayerTest() : api_(Api::createApiForTest()) {}
 
-  static void SetUpTestSuite() {
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     TestEnvironment::exec(
         {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
   }

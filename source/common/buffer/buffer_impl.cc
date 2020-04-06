@@ -183,7 +183,13 @@ RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) cons
       continue;
     }
 
-    raw_slices.emplace_back(RawSlice{slice->data(), slice->dataSize()});
+    // Temporary cast to fix 32-bit Envoy mobile builds, where sizeof(uint64_t) != sizeof(size_t).
+    // dataSize represents the size of a buffer so size_t should always be large enough to hold its
+    // size regardless of architecture. Buffer slices should in practice be relatively small, but
+    // there is currently no max size validation.
+    // TODO(antoniovicente) Set realistic limits on the max size of BufferSlice and consider use of
+    // size_t instead of uint64_t in the Slice interface.
+    raw_slices.emplace_back(RawSlice{slice->data(), static_cast<size_t>(slice->dataSize())});
   }
   return raw_slices;
 }
