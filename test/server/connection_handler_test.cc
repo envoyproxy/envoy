@@ -222,6 +222,7 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
   // The original test continues without the previous line being run. To avoid the same assert
   // firing during teardown, run the posted callback now.
   post_cb();
+  ASSERT(post_cb != nullptr);
   EXPECT_CALL(*listener, onDestroy());
 #else
   // On release builds this should be fine.
