@@ -343,3 +343,19 @@ envoy_cc_library(
         "//source/common/common:macros",
     ],
 )
+
+envoy_cc_library(
+    name = "filter_matcher_lib",
+    srcs = [
+        "filter_matcher.cc",
+    ],
+    hdrs = ["filter_matcher.h"],
+    external_deps = [
+        "abseil_str_format",
+    ],
+    deps = [
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:listen_socket_interface",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)

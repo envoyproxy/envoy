@@ -20,6 +20,17 @@ message Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.aws_lambda.v2alpha.Config";
 
+  enum InvocationMode {
+    // This is the more common mode of invocation, in which Lambda responds after it has completed the function. In
+    // this mode the output of the Lambda function becomes the response of the HTTP request.
+    SYNCHRONOUS = 0;
+
+    // In this mode Lambda responds immediately but continues to process the function asynchronously. This mode can be
+    // used to signal events for example. In this mode, Lambda responds with an acknowledgment that it received the
+    // call which is translated to an HTTP 200 OK by the filter.
+    ASYNCHRONOUS = 1;
+  }
+
   // The ARN of the AWS Lambda to invoke when the filter is engaged
   // Must be in the following format:
   // arn:<partition>:lambda:<region>:<account-number>:function:<function-name>
@@ -27,6 +38,9 @@ message Config {
 
   // Whether to transform the request (headers and body) to a JSON payload or pass it as is.
   bool payload_passthrough = 2;
+
+  // Determines the way to invoke the Lambda function.
+  InvocationMode invocation_mode = 3 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Per-route configuration for AWS Lambda. This can be useful when invoking a different Lambda function or a different

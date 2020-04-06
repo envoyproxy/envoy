@@ -129,6 +129,11 @@ public:
    * Session timeout is used to specify lifetime hint of tls tickets.
    */
   virtual absl::optional<std::chrono::seconds> sessionTimeout() const PURE;
+
+  /**
+   * @return True if stateless TLS session resumption is disabled, false otherwise.
+   */
+  virtual bool disableStatelessSessionResumption() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;
