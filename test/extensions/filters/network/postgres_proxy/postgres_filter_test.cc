@@ -12,7 +12,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
-using ::testing::WithArg;
 using ::testing::WithArgs;
 
 class DecoderTest : public Decoder {
@@ -31,12 +30,14 @@ public:
     filter_ = std::make_unique<PostgresFilter>(config_);
 
     filter_->setDecoder(std::make_unique<DecoderTest>());
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
   Stats::IsolatedStoreImpl scope_;
   std::string stat_prefix_{"test."};
   std::unique_ptr<PostgresFilter> filter_;
   PostgresFilterConfigSharedPtr config_;
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
 
   // These variables are used internally in tests
   Buffer::OwnedImpl data_;

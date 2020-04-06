@@ -240,7 +240,7 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   }
 
   std::vector<MsgAction>& actions = std::get<1>(msg.get());
-  for (const auto action : actions) {
+  for (const auto& action : actions) {
     action(this);
   }
 
@@ -261,7 +261,7 @@ void DecoderImpl::decodeBackendStatements() {
   // The message_ contains the statement. Find space character
   // and the statement is the first word. If space cannot be found
   // take the whole message
-  std::string statement = message_.substr(0, message_.find(" "));
+  std::string statement = message_.substr(0, message_.find(' '));
 
   auto it = BE_statements_.find(statement);
   if (it != BE_statements_.end()) {
@@ -304,7 +304,7 @@ void DecoderImpl::decodeErrorNotice(
     return;
   }
 
-  for (const auto it : std::get<0>(types)) {
+  for (const auto& it : std::get<0>(types)) {
     // Try to find a keyword with S prefix or V prefix.
     // Postgres versions prior to 9.6 use only S prefix while
     // versions higher than 9.6 use S and V prefixes.

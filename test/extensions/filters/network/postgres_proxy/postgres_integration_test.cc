@@ -17,7 +17,7 @@ namespace PostgresProxy {
 class PostgresIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
 
-  std::string postgres_config() {
+  std::string postgresConfig() {
     return fmt::format(
         TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
             "test/extensions/filters/network/postgres_proxy/postgres_test_config.yaml")),
@@ -27,7 +27,7 @@ class PostgresIntegrationTest : public testing::TestWithParam<Network::Address::
   }
 
 public:
-  PostgresIntegrationTest() : BaseIntegrationTest(GetParam(), postgres_config()){};
+  PostgresIntegrationTest() : BaseIntegrationTest(GetParam(), postgresConfig()){};
 
   void SetUp() override { BaseIntegrationTest::initialize(); }
 

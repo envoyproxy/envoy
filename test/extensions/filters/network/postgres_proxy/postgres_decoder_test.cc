@@ -312,6 +312,16 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Select));
+  EXPECT_CALL(callbacks_, incTransactionsCommit());
+  payload_ = "SELECT";
+  data_.add("C");
+  length_ = htonl(4 + payload_.length());
+  data_.add(&length_, sizeof(length_));
+  data_.add(payload_);
+  decoder_->onData(data_, false);
+  data_.drain(data_.length());
+
   EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Noop));
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   payload_ = "ROLLBACK";
