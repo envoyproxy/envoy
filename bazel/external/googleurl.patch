@@ -14,38 +14,69 @@ index 2962537..ebdac08 100644
  // (Typically used to silence a compiler warning when the assignment
  // is important for some other reason.)
 diff --git a/base/strings/BUILD b/base/strings/BUILD
-index 7a06170..5aa84b4 100644
+index 7a06170..21e9b73 100644
 --- a/base/strings/BUILD
 +++ b/base/strings/BUILD
-@@ -20,6 +20,7 @@ cc_library(
+@@ -6,23 +6,20 @@ load("//:build_config.bzl", "build_config")
+ cc_library(
+     name = "strings",
+     srcs = [
+-        "string16.cc",
+         "string_piece.cc",
+         "string_util.cc",
+         "string_util_constants.cc",
+         "utf_string_conversion_utils.cc",
+         "utf_string_conversions.cc",
+-    ],
++    ] + build_config.strings_srcs,
+     hdrs = [
+         "char_traits.h",
+-        "string16.h",
+         "string_piece.h",
          "string_piece_forward.h",
          "string_util.h",
-         "string_util_posix.h",
-+        "string_util_win.h",
+-        "string_util_posix.h",
          "utf_string_conversion_utils.h",
          "utf_string_conversions.h",
-     ],
+-    ],
++    ] + build_config.strings_hdrs,
+     copts = build_config.default_copts,
+     visibility = ["//visibility:public"],
+     deps = [
 diff --git a/build_config.bzl b/build_config.bzl
-index d5fca65..b1bc3a4 100644
+index d5fca65..4e938e4 100644
 --- a/build_config.bzl
 +++ b/build_config.bzl
-@@ -1,7 +1,12 @@
+@@ -1,8 +1,25 @@
 -_default_copts = [
 -    "-std=c++14",
 -    "-fno-strict-aliasing",
 -]
 +_default_copts = select({
 +    "@envoy//bazel:windows_x86_64": [
-+        "/std:c++14"
++        "/std:c++14",
 +    ],
 +    "//conditions:default": [
 +        "-std=c++14",
 +        "-fno-strict-aliasing",
-+    ]
++    ],
++})
++
++_strings_srcs = select({
++    "@envoy//bazel:windows_x86_64": [],
++    "//conditions:default": ["string16.cc"],
++})
++
++_strings_hdrs = select({
++    "@envoy//bazel:windows_x86_64": ["string_util_win.h"],
++    "//conditions:default": ["string16.h", "string_util_posix.h"],
 +})
 
  build_config = struct(
      default_copts = _default_copts,
++    strings_srcs = _strings_srcs,
++    strings_hdrs = _strings_hdrs,
+ )
 diff --git a/url/BUILD b/url/BUILD
 index 0126bdc..5d1a171 100644
 --- a/url/BUILD
