@@ -393,6 +393,11 @@ private:
       ASSERT(parent_.state_.latest_data_encoding_filter_ == this);
       callback(*parent_.buffered_response_data_.get());
     }
+    Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
+      // TODO(mattklein123): At some point we might want to actually wrap this interface but for now
+      // we give the filter direct access to the encoder options.
+      return parent_.response_encoder_->http1StreamEncoderOptions();
+    }
 
     void responseDataTooLarge();
     void responseDataDrained();
@@ -659,7 +664,8 @@ private:
     void resetIdleTimer();
     // Per-stream request timeout callback
     void onRequestTimeout();
-
+    // Per-stream alive duration reached.
+    void onStreamMaxDurationReached();
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
 
     friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
@@ -702,6 +708,8 @@ private:
     Event::TimerPtr stream_idle_timer_;
     // Per-stream request timeout.
     Event::TimerPtr request_timer_;
+    // Per-stream alive duration.
+    Event::TimerPtr max_stream_duration_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
     StreamInfo::StreamInfoImpl stream_info_;

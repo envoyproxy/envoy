@@ -45,11 +45,18 @@ public:
    * HttpTracer with the provided parameters, it should throw an EnvoyException in the case of
    * general error or a Json::Exception if the json configuration is erroneous. The returned
    * pointer should always be valid.
+   *
+   * NOTE: Due to the corner case of OpenCensus, who can only support a single tracing
+   *       configuration per entire process, the returned HttpTracer instance is not guaranteed
+   *       to be unique.
+   *       That is why the return type has been changed to std::shared_ptr<> instead of a more
+   *       idiomatic std::unique_ptr<>.
+   *
    * @param config supplies the proto configuration for the HttpTracer
    * @param context supplies the factory context
    */
-  virtual Tracing::HttpTracerPtr createHttpTracer(const Protobuf::Message& config,
-                                                  TracerFactoryContext& context) PURE;
+  virtual Tracing::HttpTracerSharedPtr createHttpTracer(const Protobuf::Message& config,
+                                                        TracerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.tracers"; }
 };

@@ -89,6 +89,9 @@ public:
     return envoy::config::core::v3::UNSPECIFIED;
   }
   Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    return empty_access_logs_;
+  }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -107,7 +110,7 @@ public:
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
-              std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
+              nullptr, std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
           maybeExitDispatcher();
           return true;
         }));
@@ -170,7 +173,7 @@ public:
     EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
@@ -186,6 +189,7 @@ public:
   std::string name_;
   Api::OsSysCallsImpl os_sys_calls_actual_;
   const Network::FilterChainSharedPtr filter_chain_;
+  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
 };
 
 // Parameterize the listener socket address version.
@@ -1010,7 +1014,7 @@ public:
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
-              std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
+              nullptr, std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
           return true;
         }));
   }
@@ -1034,6 +1038,9 @@ public:
     return envoy::config::core::v3::UNSPECIFIED;
   }
   Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    return empty_access_logs_;
+  }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -1099,6 +1106,7 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
+  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
 };
 
 // Parameterize the listener socket address version.

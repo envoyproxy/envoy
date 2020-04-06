@@ -2,11 +2,14 @@
 
 set -e
 
-# This works only on Linux-x86_64 and macOS-x86_64.
-if [[ ( `uname` != "Linux" && `uname` != "Darwin" ) || `uname -m` != "x86_64" ]]; then
-  echo "ERROR: wee8 is currently supported only on Linux-x86_64 and macOS-x86_64."
+# This works only on Linux-{x86_64,s390x,aarch64} and macOS-x86_64.
+case "$$(uname -s)-$$(uname -m)" in
+Linux-x86_64|Linux-s390x|Linux-aarch64|Darwin-x86_64)
+  ;;
+*)
+  echo "ERROR: wee8 is currently supported only on Linux-{x86_64,s390x,aarch64} and macOS-x86_64." >&2
   exit 1
-fi
+esac
 
 # Bazel magic.
 ROOT=$$(dirname $(rootpath wee8/BUILD.gn))/..
@@ -70,14 +73,25 @@ WEE8_BUILD_ARGS+=" v8_use_external_startup_data=false"
 # Disable read-only heap, since it's leaky and HEAPCHECK complains about it.
 # TODO(PiotrSikora): remove when fixed upstream.
 WEE8_BUILD_ARGS+=" v8_enable_shared_ro_heap=false"
+# Support Arm64
+if [[ `uname -m` == "aarch64" ]]; then
+  WEE8_BUILD_ARGS+=" target_cpu=\"arm64\""
+fi
 
 # Build wee8.
-if [[ `uname` == "Darwin" ]]; then
-  buildtools/mac/gn gen out/wee8 --args="$$WEE8_BUILD_ARGS"
+if [[ "$$(uname -s)" == "Darwin" ]]; then
+  gn=buildtools/mac/gn
+  ninja=third_party/depot_tools/ninja
+elif [[ "$$(uname -s)-$$(uname -m)" == "Linux-x86_64" ]]; then
+  gn=buildtools/linux64/gn
+  ninja=third_party/depot_tools/ninja
 else
-  buildtools/linux64/gn gen out/wee8 --args="$$WEE8_BUILD_ARGS"
+  # Using system default ninja & gn tools
+  gn=$$(command -v gn)
+  ninja=$$(command -v ninja)
 fi
-third_party/depot_tools/ninja -C out/wee8 wee8
+"$$gn" gen out/wee8 --args="$$WEE8_BUILD_ARGS"
+"$$ninja" -C out/wee8 wee8
 
 # Move compiled library to the expected destinations.
 popd

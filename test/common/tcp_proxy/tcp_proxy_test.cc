@@ -914,6 +914,12 @@ public:
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
+      filter_callbacks_.connection_.streamInfo().setDownstreamSslConnection(
+          filter_callbacks_.connection_.ssl());
+      filter_callbacks_.connection_.streamInfo().setDownstreamLocalAddress(
+          filter_callbacks_.connection_.localAddress());
+      filter_callbacks_.connection_.streamInfo().setDownstreamRemoteAddress(
+          filter_callbacks_.connection_.remoteAddress());
       EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
       EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
@@ -1586,34 +1592,6 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogDownstreamAddress)) {
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }
 
-// Test that access log fields %BYTES_RECEIVED%, %BYTES_SENT%, %START_TIME%, %DURATION% are
-// all correctly logged.
-TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogBytesRxTxDuration)) {
-  setup(1, accessLogConfig("bytesreceived=%BYTES_RECEIVED% bytessent=%BYTES_SENT% "
-                           "datetime=%START_TIME% nonzeronum=%DURATION%"));
-
-  raiseEventUpstreamConnected(0);
-  Buffer::OwnedImpl buffer("a");
-  filter_->onData(buffer, false);
-  Buffer::OwnedImpl response("bb");
-  upstream_callbacks_->onUpstreamData(response, false);
-
-  timeSystem().sleep(std::chrono::milliseconds(1));
-  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
-  filter_.reset();
-
-#ifndef GTEST_USES_SIMPLE_RE
-  EXPECT_THAT(access_log_data_,
-              MatchesRegex(
-                  "bytesreceived=1 bytessent=2 datetime=[0-9-]+T[0-9:.]+Z nonzeronum=[1-9][0-9]*"));
-#else
-  EXPECT_THAT(access_log_data_,
-              MatchesRegex("bytesreceived=1 bytessent=2 "
-                           "datetime=\\d+-\\d+-\\d+T\\d+:\\d+:\\d+\\.\\d+Z nonzeronum=\\d+"));
-  EXPECT_THAT(access_log_data_, Not(MatchesRegex("nonzeronum=0")));
-#endif
-}
-
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogUpstreamSSLConnection)) {
   setup(1);
 
@@ -1925,6 +1903,45 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   filter_->onNewConnection();
+}
+
+class TcpProxyNonDeprecatedConfigRoutingTest : public TcpProxyRoutingTest {
+public:
+  TcpProxyNonDeprecatedConfigRoutingTest() = default;
+
+  void setup() {
+    const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    )EOF";
+
+    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+  }
+};
+
+TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
+  setup();
+
+  initializeFilter();
+
+  // Port 9999 is within the specified destination port range.
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
+  // Expect filter to try to open a connection to specified cluster.
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(nullptr));
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info;
+  EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
+      .WillOnce(
+          Invoke([&cluster_info](const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) {
+            cluster_info = upstream_cluster_info;
+          }));
+  EXPECT_CALL(connection_.stream_info_, upstreamClusterInfo())
+      .WillOnce(ReturnPointee(&cluster_info));
+
+  filter_->onNewConnection();
+
+  EXPECT_EQ(connection_.stream_info_.upstreamClusterInfo().value()->name(), "fake_cluster");
 }
 
 class TcpProxyHashingTest : public testing::Test {

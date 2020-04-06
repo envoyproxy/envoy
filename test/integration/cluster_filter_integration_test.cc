@@ -81,7 +81,7 @@ class ClusterFilterIntegrationTest : public testing::TestWithParam<Network::Addr
                                      public BaseIntegrationTest {
 public:
   ClusterFilterIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::TCP_PROXY_CONFIG) {}
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
 
   void initialize() override {
     enable_half_close_ = true;

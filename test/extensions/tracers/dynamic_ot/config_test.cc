@@ -45,7 +45,7 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   DynamicOpenTracingTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  const Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, context);
+  const Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, tracer);
 }
 

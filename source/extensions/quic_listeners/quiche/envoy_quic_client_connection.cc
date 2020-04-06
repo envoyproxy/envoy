@@ -58,12 +58,10 @@ void EnvoyQuicClientConnection::processPacket(
       quic::QuicTime::Delta::FromMicroseconds(
           std::chrono::duration_cast<std::chrono::microseconds>(receive_time.time_since_epoch())
               .count());
-  uint64_t num_slice = buffer->getRawSlices(nullptr, 0);
-  ASSERT(num_slice == 1);
-  Buffer::RawSlice slice;
-  buffer->getRawSlices(&slice, 1);
-  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
-                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
+  ASSERT(buffer->getRawSlices().size() == 1);
+  Buffer::RawSliceVector slices = buffer->getRawSlices(/*max_slices=*/1);
+  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slices[0].mem_), slices[0].len_,
+                                  timestamp, /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
   ProcessUdpPacket(envoyAddressInstanceToQuicSocketAddress(local_address),

@@ -4,6 +4,8 @@
 
 #include "envoy/http/filter.h"
 
+#include "common/buffer/buffer_impl.h"
+
 #include "extensions/common/aws/signer.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
@@ -51,16 +53,25 @@ private:
  */
 absl::optional<Arn> parseArn(absl::string_view arn);
 
+/**
+ * Lambda invocation mode.
+ * Synchronous mode is analogous to a blocking call; Lambda responds when it's completed processing.
+ * In the Asynchronous mode, Lambda responds immediately acknowledging it received the request.
+ */
+enum class InvocationMode { Synchronous, Asynchronous };
+
 class FilterSettings : public Router::RouteSpecificFilterConfig {
 public:
-  FilterSettings(const std::string& arn, bool payload_passthrough)
-      : arn_(arn), payload_passthrough_(payload_passthrough) {}
+  FilterSettings(const std::string& arn, InvocationMode mode, bool payload_passthrough)
+      : arn_(arn), invocation_mode_(mode), payload_passthrough_(payload_passthrough) {}
 
   const std::string& arn() const { return arn_; }
   bool payloadPassthrough() const { return payload_passthrough_; }
+  InvocationMode invocationMode() const { return invocation_mode_; }
 
 private:
   std::string arn_;
+  InvocationMode invocation_mode_;
   bool payload_passthrough_;
 };
 
@@ -70,19 +81,39 @@ public:
   Filter(const FilterSettings& config,
          const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer);
 
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
-                                          bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
-private:
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
+
   /**
-   * Calculates the route specific Lambda ARN if any.
+   * Calculates the function ARN, value of pass-through, etc. by checking per-filter configurations
+   * and general filter configuration. Ultimately, the most specific configuration wins.
+   * @return error message if settings are invalid. Otherwise, empty string.
    */
-  absl::optional<Arn> calculateRouteArn();
+  std::string resolveSettings();
+
+  /**
+   * Used for unit testing only
+   */
+  const FilterSettings& settingsForTest() const { return settings_; }
+
+private:
+  absl::optional<FilterSettings> getRouteSpecificSettings() const;
+  // Convert the HTTP request to JSON request.
+  void jsonizeRequest(const Http::RequestHeaderMap& headers, const Buffer::Instance* body,
+                      Buffer::Instance& out) const;
+  // Convert the JSON response to a standard HTTP response.
+  void dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::Instance& body,
+                         Buffer::Instance& out) const;
   const FilterSettings settings_;
-  Http::RequestHeaderMap* headers_ = nullptr;
+  Http::RequestHeaderMap* request_headers_ = nullptr;
+  Http::ResponseHeaderMap* response_headers_ = nullptr;
   std::shared_ptr<Extensions::Common::Aws::Signer> sigv4_signer_;
   absl::optional<Arn> arn_;
+  InvocationMode invocation_mode_ = InvocationMode::Synchronous;
+  bool payload_passthrough_ = false;
   bool skip_ = false;
 };
 

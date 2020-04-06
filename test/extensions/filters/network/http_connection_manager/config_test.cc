@@ -1,13 +1,17 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+#include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/date_provider_impl.h"
+#include "common/http/request_id_extension_uuid_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
 
+#include "test/extensions/filters/network/http_connection_manager/config.pb.h"
+#include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -111,7 +115,9 @@ http_filters:
       HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                   date_provider_, route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException, "Error: envoy.filters.http.router must be the terminal http filter.");
+      EnvoyException,
+      "Error: terminal filter named envoy.filters.http.router of type envoy.filters.http.router "
+      "must be the last filter in a http filter chain.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, NonTerminalFilter) {
@@ -141,7 +147,9 @@ http_filters:
                                   date_provider_, route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_, http_tracer_manager_),
       EnvoyException,
-      "Error: non-terminal filter health_check is the last filter in a http filter chain.");
+      "Error: non-terminal filter named health_check of type "
+      "envoy.filters.http.health_check is the last filter in a http filter "
+      "chain.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
@@ -943,6 +951,61 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesFalse) {
   EXPECT_FALSE(config.shouldMergeSlashes());
 }
 
+// Validated that by default we allow requests with header names containing underscores.
+TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresAllowedByDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_EQ(envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+            config.headersWithUnderscoresAction());
+}
+
+// Validated that when configured, we drop headers with underscores.
+TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresDroppedByConfig) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    headers_with_underscores_action: DROP_HEADER
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_EQ(envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER,
+            config.headersWithUnderscoresAction());
+}
+
+// Validated that when configured, we reject requests with header names containing underscores.
+TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresRequestRejectedByConfig) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    headers_with_underscores_action: REJECT_REQUEST
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_EQ(envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST,
+            config.headersWithUnderscoresAction());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -1138,6 +1201,226 @@ access_log:
                           "bad_type: Cannot find field");
 }
 
+// Validates that HttpConnectionManagerConfig construction succeeds when there are no collisions
+// between named and user defined parameters, and server push is not modified.
+TEST_F(HttpConnectionManagerConfigTest, UserDefinedSettingsNoCollision) {
+  const std::string yaml_string = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.filters.http.router
+  typed_config: {}
+http2_protocol_options:
+  hpack_table_size: 1024
+  custom_settings_parameters: { identifier: 3, value: 2048 }
+  )EOF";
+  // This will throw when Http2ProtocolOptions validation fails.
+  HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                              date_provider_, route_config_provider_manager_,
+                              scoped_routes_config_provider_manager_, http_tracer_manager_);
+}
+
+// Validates that named and user defined parameter collisions will trigger a config validation
+// failure.
+TEST_F(HttpConnectionManagerConfigTest, UserDefinedSettingsNamedParameterCollision) {
+  // Override both hpack_table_size (id = 0x1) and max_concurrent_streams (id = 0x3) with custom
+  // parameters of the same and different values (respectively).
+  const std::string yaml_string = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.http_dynamo_filter
+  typed_config: {}
+http2_protocol_options:
+  hpack_table_size: 2048
+  max_concurrent_streams: 4096
+  custom_settings_parameters:
+    - { identifier: 1, value: 2048 }
+    - { identifier: 3, value: 1024 }
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      EnvoyException,
+      R"(the \{hpack_table_size,max_concurrent_streams\} HTTP/2 SETTINGS parameter\(s\) can not be)"
+      " configured");
+}
+
+// Validates that `allow_connect` can only be configured through the named field. All other
+// SETTINGS parameters can be set via the named _or_ custom parameters fields, but `allow_connect`
+// required an exception due to the use of a primitive type which does not support presence
+// checks.
+TEST_F(HttpConnectionManagerConfigTest, UserDefinedSettingsAllowConnectOnlyViaNamedField) {
+  const std::string yaml_string = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.filters.http.router
+  typed_config: {}
+http2_protocol_options:
+  custom_settings_parameters:
+    - { identifier: 8, value: 0 }
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      EnvoyException,
+      "the \"allow_connect\" SETTINGS parameter must only be configured through the named field");
+
+  const std::string yaml_string2 = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.filters.http.router
+  typed_config: {}
+http2_protocol_options:
+  allow_connect: true
+  )EOF";
+  HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string2), context_,
+                              date_provider_, route_config_provider_manager_,
+                              scoped_routes_config_provider_manager_, http_tracer_manager_);
+}
+
+// Validates that setting the server push parameter via user defined parameters is disallowed.
+TEST_F(HttpConnectionManagerConfigTest, UserDefinedSettingsDisallowServerPush) {
+  const std::string yaml_string = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.http_dynamo_filter
+  typed_config: {}
+http2_protocol_options:
+  custom_settings_parameters: { identifier: 2, value: 1 }
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      EnvoyException,
+      "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.");
+
+  // Specify both the server push parameter and colliding named and user defined parameters.
+  const std::string yaml_string2 = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.http_dynamo_filter
+  typed_config: {}
+http2_protocol_options:
+  hpack_table_size: 2048
+  max_concurrent_streams: 4096
+  custom_settings_parameters:
+    - { identifier: 1, value: 2048 }
+    - { identifier: 2, value: 1 }
+    - { identifier: 3, value: 1024 }
+  )EOF";
+
+  // The server push exception is thrown first.
+  EXPECT_THROW_WITH_REGEX(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      EnvoyException,
+      "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.");
+}
+
+// Validates that inconsistent custom parameters are rejected.
+TEST_F(HttpConnectionManagerConfigTest, UserDefinedSettingsRejectInconsistentCustomParameters) {
+  const std::string yaml_string = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.filters.http.router
+  typed_config: {}
+http2_protocol_options:
+  custom_settings_parameters:
+    - { identifier: 10, value: 0 }
+    - { identifier: 10, value: 1 }
+    - { identifier: 12, value: 10 }
+    - { identifier: 14, value: 1 }
+    - { identifier: 12, value: 10 }
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      EnvoyException,
+      R"(inconsistent HTTP/2 custom SETTINGS parameter\(s\) detected; identifiers = \{0x0a\})");
+}
+
 // Test that the deprecated extension name still functions.
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.http_connection_manager";
@@ -1146,6 +1429,111 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtens
       nullptr,
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
           deprecated_name));
+}
+
+namespace {
+
+class TestRequestIDExtension : public Http::RequestIDExtension {
+public:
+  TestRequestIDExtension(const test::http_connection_manager::CustomRequestIDExtension& config)
+      : config_(config) {}
+
+  void set(Http::RequestHeaderMap&, bool) override {}
+  void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
+  bool modBy(const Http::RequestHeaderMap&, uint64_t&, uint64_t) override { return false; }
+  Http::TraceStatus getTraceStatus(const Http::RequestHeaderMap&) override {
+    return Http::TraceStatus::Sampled;
+  }
+  void setTraceStatus(Http::RequestHeaderMap&, Http::TraceStatus) override {}
+
+  std::string testField() { return config_.test_field(); }
+
+private:
+  test::http_connection_manager::CustomRequestIDExtension config_;
+};
+
+class TestRequestIDExtensionFactory : public Server::Configuration::RequestIDExtensionFactory {
+public:
+  std::string name() const override {
+    return "test.http_connection_manager.CustomRequestIDExtension";
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::http_connection_manager::CustomRequestIDExtension>();
+  }
+
+  Http::RequestIDExtensionSharedPtr
+  createExtensionInstance(const Protobuf::Message& config,
+                          Server::Configuration::FactoryContext& context) override {
+    const auto& custom_config = MessageUtil::downcastAndValidate<
+        const test::http_connection_manager::CustomRequestIDExtension&>(
+        config, context.messageValidationVisitor());
+    return std::make_shared<TestRequestIDExtension>(custom_config);
+  }
+};
+
+} // namespace
+
+TEST_F(HttpConnectionManagerConfigTest, CustomRequestIDExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  request_id_extension:
+    typed_config:
+      "@type": type.googleapis.com/test.http_connection_manager.CustomRequestIDExtension
+      test_field: example
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+  Registry::RegisterFactory<TestRequestIDExtensionFactory,
+                            Server::Configuration::RequestIDExtensionFactory>
+      registered;
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  auto request_id_extension =
+      dynamic_cast<TestRequestIDExtension*>(config.requestIDExtension().get());
+  ASSERT_NE(nullptr, request_id_extension);
+  EXPECT_EQ("example", request_id_extension->testField());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnknownRequestIDExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  request_id_extension:
+    typed_config:
+      "@type": type.googleapis.com/test.http_connection_manager.UnknownRequestIDExtension
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      EnvoyException, "Didn't find a registered implementation for type");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  request_id_extension: {}
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  auto request_id_extension =
+      dynamic_cast<Http::UUIDRequestIDExtension*>(config.requestIDExtension().get());
+  ASSERT_NE(nullptr, request_id_extension);
 }
 
 class FilterChainTest : public HttpConnectionManagerConfigTest {
@@ -1335,7 +1723,9 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
       HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
                                   route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException, "Error: envoy.filters.http.router must be the terminal http upgrade filter.");
+      EnvoyException,
+      "Error: terminal filter named envoy.filters.http.router of type envoy.filters.http.router "
+      "must be the last filter in a http upgrade filter chain.");
 }
 
 TEST_F(FilterChainTest, InvalidConfig) {
@@ -1350,9 +1740,9 @@ TEST_F(FilterChainTest, InvalidConfig) {
       EnvoyException, "Error: multiple upgrade configs with the same name: 'websocket'");
 }
 
-class UtilityTest : public testing::Test {
+class HcmUtilityTest : public testing::Test {
 public:
-  UtilityTest() {
+  HcmUtilityTest() {
     // Although different Listeners will have separate FactoryContexts,
     // those contexts must share the same SingletonManager.
     ON_CALL(context_two_, singletonManager()).WillByDefault([&]() -> Singleton::Manager& {
@@ -1363,7 +1753,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_two_;
 };
 
-TEST_F(UtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
+TEST_F(HcmUtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
   // Simulate `HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped()`
   // call for filter instance "one".
   auto singletons_one = Utility::createSingletons(context_one_);

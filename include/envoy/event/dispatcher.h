@@ -20,6 +20,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {
@@ -75,11 +76,13 @@ public:
    * @param socket supplies an open file descriptor and connection metadata to use for the
    *        connection. Takes ownership of the socket.
    * @param transport_socket supplies a transport socket to be used by the connection.
+   * @param stream_info info object for the server connection
    * @return Network::ConnectionPtr a server connection that is owned by the caller.
    */
   virtual Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
-                         Network::TransportSocketPtr&& transport_socket) PURE;
+                         Network::TransportSocketPtr&& transport_socket,
+                         StreamInfo::StreamInfo& stream_info) PURE;
 
   /**
    * Creates an instance of Envoy's Network::ClientConnection. Does NOT initiate the connection;

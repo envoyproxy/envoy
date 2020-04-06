@@ -6,12 +6,14 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.data.cluster.v2alpha";
 option java_outer_classname = "OutlierDetectionEventProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.data.cluster.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Outlier detection logging events]
 // :ref:`Outlier detection logging <arch_overview_outlier_detection_logging>`.

@@ -165,19 +165,24 @@ public:
   MockListenerFilterManager();
   ~MockListenerFilterManager() override;
 
-  void addAcceptFilter(ListenerFilterPtr&& filter) override { addAcceptFilter_(filter); }
+  void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+                       ListenerFilterPtr&& filter) override {
+    addAcceptFilter_(listener_filter_matcher, filter);
+  }
 
-  MOCK_METHOD(void, addAcceptFilter_, (Network::ListenerFilterPtr&));
+  MOCK_METHOD(void, addAcceptFilter_,
+              (const Network::ListenerFilterMatcherSharedPtr&, Network::ListenerFilterPtr&));
 };
 
-class MockFilterChain : public FilterChain {
+class MockFilterChain : public DrainableFilterChain {
 public:
   MockFilterChain();
   ~MockFilterChain() override;
 
-  // Network::FilterChain
+  // Network::DrainableFilterChain
   MOCK_METHOD(const TransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
+  MOCK_METHOD(void, startDraining, ());
 };
 
 class MockFilterChainManager : public FilterChainManager {
@@ -253,6 +258,7 @@ public:
   MOCK_METHOD(bool, localAddressRestored, (), (const));
   MOCK_METHOD(void, setRemoteAddress, (const Address::InstanceConstSharedPtr&));
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, remoteAddress, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directRemoteAddress, (), (const));
   MOCK_METHOD(void, setDetectedTransportProtocol, (absl::string_view));
   MOCK_METHOD(absl::string_view, detectedTransportProtocol, (), (const));
   MOCK_METHOD(void, setRequestedApplicationProtocols, (const std::vector<absl::string_view>&));
@@ -319,11 +325,16 @@ public:
     return envoy::config::core::v3::UNSPECIFIED;
   }
 
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    return empty_access_logs_;
+  }
+
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
   MockListenSocketFactory socket_factory_;
   SocketSharedPtr socket_;
   Stats::IsolatedStoreImpl scope_;
   std::string name_;
+  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
 };
 
 class MockListener : public Listener {
@@ -463,5 +474,11 @@ public:
               (BalancedConnectionHandler & current_handler));
 };
 
+class MockListenerFilterMatcher : public ListenerFilterMatcher {
+public:
+  MockListenerFilterMatcher();
+  ~MockListenerFilterMatcher() override;
+  MOCK_METHOD(bool, matches, (Network::ListenerFilterCallbacks & cb), (const));
+};
 } // namespace Network
 } // namespace Envoy

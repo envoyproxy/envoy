@@ -14,6 +14,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/drain_manager.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/process_context.h"
@@ -116,6 +117,11 @@ public:
    * @return the server-wide grpc context.
    */
   virtual Grpc::Context& grpcContext() PURE;
+
+  /**
+   * @return DrainManager& the server-wide drain manager.
+   */
+  virtual Envoy::Server::DrainManager& drainManager() PURE;
 };
 
 /**
@@ -218,7 +224,15 @@ public:
  * The life time is no longer than the owning listener. It should be used to create
  * NetworkFilterChain.
  */
-class FilterChainFactoryContext : public virtual FactoryContext {};
+class FilterChainFactoryContext : public virtual FactoryContext {
+public:
+  /**
+   * Set the flag that all attached filter chains will be destroyed.
+   */
+  virtual void startDraining() PURE;
+};
+
+using FilterChainFactoryContextPtr = std::unique_ptr<FilterChainFactoryContext>;
 
 /**
  * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
@@ -253,13 +267,15 @@ public:
    * produce a factory with the provided parameters, it should throw an EnvoyException in the case
    * of general error or a Json::Exception if the json configuration is erroneous. The returned
    * callback should always be initialized.
-   * @param config supplies the general protobuf configuration for the filter
+   * @param config supplies the general protobuf configuration for the filter.
+   * @param listener_filter_matcher supplies the matcher to decide when filter is enabled.
    * @param context supplies the filter's context.
    * @return Network::ListenerFilterFactoryCb the factory creation function.
    */
-  virtual Network::ListenerFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& config,
-                               ListenerFactoryContext& context) PURE;
+  virtual Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message& config,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      ListenerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.filters.listener"; }
 };

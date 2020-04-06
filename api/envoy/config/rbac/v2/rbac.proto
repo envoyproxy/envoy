@@ -10,11 +10,13 @@ import "envoy/type/matcher/string.proto";
 
 import "google/api/expr/v1alpha1/syntax.proto";
 
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.rbac.v2";
 option java_outer_classname = "RbacProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Role Based Access Control (RBAC)]
 

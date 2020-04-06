@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -40,6 +41,7 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
  * All stats for the HTTP/2 codec. @see stats_macros.h
  */
 #define ALL_HTTP2_CODEC_STATS(COUNTER)                                                             \
+  COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(header_overflow)                                                                         \
   COUNTER(headers_cb_no_stream)                                                                    \
   COUNTER(inbound_empty_frames_flood)                                                              \
@@ -47,6 +49,7 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
   COUNTER(inbound_window_update_frames_flood)                                                      \
   COUNTER(outbound_control_flood)                                                                  \
   COUNTER(outbound_flood)                                                                          \
+  COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(rx_messaging_error)                                                                      \
   COUNTER(rx_reset)                                                                                \
   COUNTER(too_many_header_frames)                                                                  \
@@ -79,8 +82,8 @@ public:
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                 const Http2Settings& http2_settings, const uint32_t max_headers_kb,
-                 const uint32_t max_headers_count);
+                 const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                 const uint32_t max_headers_kb, const uint32_t max_headers_count);
 
   ~ConnectionImpl() override;
 
@@ -123,7 +126,7 @@ protected:
    */
   class Http2Options {
   public:
-    Http2Options(const Http2Settings& http2_settings);
+    Http2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options);
     ~Http2Options();
 
     const nghttp2_option* options() { return options_; }
@@ -134,7 +137,7 @@ protected:
 
   class ClientHttp2Options : public Http2Options {
   public:
-    ClientHttp2Options(const Http2Settings& http2_settings);
+    ClientHttp2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options);
   };
 
   /**
@@ -168,6 +171,7 @@ protected:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     Stream& getStream() override { return *this; }
     void encodeMetadata(const MetadataMapVector& metadata_map_vector) override;
+    Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
 
     // Http::Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
@@ -334,7 +338,23 @@ protected:
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
   void sendPendingFrames();
-  void sendSettings(const Http2Settings& http2_settings, bool disable_push);
+  void sendSettings(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                    bool disable_push);
+  // Callback triggered when the peer's SETTINGS frame is received.
+  // NOTE: This is only used for tests.
+  virtual void onSettingsForTest(const nghttp2_settings&) {}
+
+  /**
+   * Check if header name contains underscore character.
+   * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
+   * as a security measure due to systems that treat '_' and '-' as interchangeable.
+   * The ServerConnectionImpl may drop header or reject request based on the
+   * `common_http_protocol_options.headers_with_underscores_action` configuration option in the
+   * HttpConnectionManager.
+   */
+  virtual absl::optional<int> checkHeaderNameForUnderscores(absl::string_view /* header_name */) {
+    return absl::nullopt;
+  }
 
   static Http2Callbacks http2_callbacks_;
 
@@ -448,7 +468,8 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       Stats::Scope& stats, const Http2Settings& http2_settings,
+                       Stats::Scope& stats,
+                       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
                        const uint32_t max_response_headers_count);
 
@@ -481,9 +502,12 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Stats::Scope& scope, const Http2Settings& http2_settings,
+                       Stats::Scope& scope,
+                       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_request_headers_kb,
-                       const uint32_t max_request_headers_count);
+                       const uint32_t max_request_headers_count,
+                       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+                           headers_with_underscores_action);
 
 private:
   // ConnectionImpl
@@ -493,6 +517,7 @@ private:
   void checkOutboundQueueLimits() override;
   bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
   bool checkInboundFrameLimits() override;
+  absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when
@@ -508,6 +533,10 @@ private:
   // This flag indicates that downstream data is being dispatched and turns on flood mitigation
   // in the checkMaxOutbound*Framed methods.
   bool dispatching_downstream_data_{false};
+
+  // The action to take when a request header name contains underscore characters.
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_;
 };
 
 } // namespace Http2

@@ -192,6 +192,12 @@ public:
   virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
 
   /**
+   * @return the direct remote address of the socket. This is the address of the directly
+   *         connected peer, and cannot be modified by listener filters.
+   */
+  virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
+
+  /**
    * Restores the local address of the socket. On accepted sockets the local address defaults to the
    * one at which the connection was received at, which is the same as the listener's address, if
    * the listener is bound to a specific address. Call this to restore the address to a value

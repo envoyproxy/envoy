@@ -285,7 +285,7 @@ TEST_F(CodecClientTest, SSLConnectionInfo) {
 // Test the codec getting input from a real TCP connection.
 class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  CodecNetworkTest() : api_(Api::createApiForTest()) {
+  CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource()) {
     dispatcher_ = api_->allocateDispatcher();
     auto socket = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getAnyAddress(GetParam()), nullptr, true);
@@ -304,7 +304,7 @@ public:
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           upstream_connection_ = dispatcher_->createServerConnection(
-              std::move(socket), Network::Test::createRawBufferSocket());
+              std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
           upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
 
           expected_callbacks--;
@@ -365,6 +365,7 @@ protected:
   NiceMock<Network::MockConnectionCallbacks> client_callbacks_;
   NiceMock<MockRequestEncoder> inner_encoder_;
   NiceMock<MockResponseDecoder> outer_decoder_;
+  StreamInfo::StreamInfoImpl stream_info_;
 };
 
 // Send a block of data from upstream, and ensure it is received by the codec.

@@ -85,7 +85,8 @@ public:
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
-
+using TunnelingConfig =
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 /**
  * Filter configuration.
  *
@@ -103,6 +104,7 @@ public:
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
+    const absl::optional<TunnelingConfig> tunnelingConfig() { return tunneling_config_; }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
@@ -113,6 +115,7 @@ public:
 
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
+    absl::optional<TunnelingConfig> tunneling_config_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -136,6 +139,9 @@ public:
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
   const absl::optional<std::chrono::milliseconds>& idleTimeout() {
     return shared_config_->idleTimeout();
+  }
+  const absl::optional<TunnelingConfig> tunnelingConfig() {
+    return shared_config_->tunnelingConfig();
   }
   UpstreamDrainManager& drainManager();
   SharedConfigSharedPtr sharedConfig() { return shared_config_; }
@@ -227,6 +233,7 @@ private:
 class Filter : public Network::ReadFilter,
                public Upstream::LoadBalancerContextBase,
                Tcp::ConnectionPool::Callbacks,
+               public Http::ConnectionPool::Callbacks,
                protected Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
@@ -242,6 +249,18 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                    Upstream::HostDescriptionConstSharedPtr host) override;
+
+  // Http::ConnectionPool::Callbacks,
+  void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+                     absl::string_view transport_failure_reason,
+                     Upstream::HostDescriptionConstSharedPtr host) override;
+  void onPoolReady(Http::RequestEncoder& request_encoder,
+                   Upstream::HostDescriptionConstSharedPtr host,
+                   const StreamInfo::StreamInfo& info) override;
+
+  void onPoolReadyBase(Upstream::HostDescriptionConstSharedPtr& host,
+                       const Network::Address::InstanceConstSharedPtr& local_address,
+                       Ssl::ConnectionInfoConstSharedPtr ssl_info);
 
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {

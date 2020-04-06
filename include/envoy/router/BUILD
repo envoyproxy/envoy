@@ -93,7 +93,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "shadow_writer_interface",
     hdrs = ["shadow_writer.h"],
-    deps = ["//include/envoy/http:message_interface"],
+    deps = [
+        "//include/envoy/http:async_client_interface",
+        "//include/envoy/http:message_interface",
+    ],
 )
 
 envoy_cc_library(

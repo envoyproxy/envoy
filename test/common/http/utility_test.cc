@@ -254,33 +254,35 @@ TEST(HttpUtility, createSslRedirectPath) {
 
 namespace {
 
-Http2Settings parseHttp2SettingsFromV2Yaml(const std::string& yaml) {
-  envoy::config::core::v3::Http2ProtocolOptions http2_protocol_options;
-  TestUtility::loadFromYamlAndValidate(yaml, http2_protocol_options);
-  return Utility::parseHttp2Settings(http2_protocol_options);
+envoy::config::core::v3::Http2ProtocolOptions parseHttp2OptionsFromV2Yaml(const std::string& yaml) {
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  TestUtility::loadFromYamlAndValidate(yaml, http2_options);
+  return ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options);
 }
 
 } // namespace
 
 TEST(HttpUtility, parseHttp2Settings) {
   {
-    auto http2_settings = parseHttp2SettingsFromV2Yaml("{}");
-    EXPECT_EQ(Http2Settings::DEFAULT_HPACK_TABLE_SIZE, http2_settings.hpack_table_size_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
-              http2_settings.max_concurrent_streams_);
-    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE,
-              http2_settings.initial_stream_window_size_);
-    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
-              http2_settings.initial_connection_window_size_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES, http2_settings.max_outbound_frames_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES,
-              http2_settings.max_outbound_control_frames_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD,
-              http2_settings.max_consecutive_inbound_frames_with_empty_payload_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM,
-              http2_settings.max_inbound_priority_frames_per_stream_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT,
-              http2_settings.max_inbound_window_update_frames_per_data_frame_sent_);
+    using ::Envoy::Http2::Utility::OptionsLimits;
+    auto http2_options = parseHttp2OptionsFromV2Yaml("{}");
+    EXPECT_EQ(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE, http2_options.hpack_table_size().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS,
+              http2_options.max_concurrent_streams().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE,
+              http2_options.initial_stream_window_size().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
+              http2_options.initial_connection_window_size().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES,
+              http2_options.max_outbound_frames().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES,
+              http2_options.max_outbound_control_frames().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD,
+              http2_options.max_consecutive_inbound_frames_with_empty_payload().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM,
+              http2_options.max_inbound_priority_frames_per_stream().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT,
+              http2_options.max_inbound_window_update_frames_per_data_frame_sent().value());
   }
 
   {
@@ -290,11 +292,11 @@ max_concurrent_streams: 2
 initial_stream_window_size: 65535
 initial_connection_window_size: 65535
     )EOF";
-    auto http2_settings = parseHttp2SettingsFromV2Yaml(yaml);
-    EXPECT_EQ(1U, http2_settings.hpack_table_size_);
-    EXPECT_EQ(2U, http2_settings.max_concurrent_streams_);
-    EXPECT_EQ(65535U, http2_settings.initial_stream_window_size_);
-    EXPECT_EQ(65535U, http2_settings.initial_connection_window_size_);
+    auto http2_options = parseHttp2OptionsFromV2Yaml(yaml);
+    EXPECT_EQ(1U, http2_options.hpack_table_size().value());
+    EXPECT_EQ(2U, http2_options.max_concurrent_streams().value());
+    EXPECT_EQ(65535U, http2_options.initial_stream_window_size().value());
+    EXPECT_EQ(65535U, http2_options.initial_connection_window_size().value());
   }
 }
 

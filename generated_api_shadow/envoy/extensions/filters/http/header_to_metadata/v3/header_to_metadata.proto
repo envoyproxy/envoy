@@ -2,13 +2,14 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.header_to_metadata.v3;
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.header_to_metadata.v3";
 option java_outer_classname = "HeaderToMetadataProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Header-To-Metadata Filter]
 //
@@ -77,7 +78,8 @@ message Config {
         "envoy.config.filter.http.header_to_metadata.v2.Config.Rule";
 
     // The header that triggers this rule — required.
-    string header = 1 [(validate.rules).string = {min_bytes: 1}];
+    string header = 1
+        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     // If the header is present, apply this metadata KeyValuePair.
     //

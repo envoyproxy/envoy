@@ -158,6 +158,7 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         ":admin_interface",
+        ":drain_manager_interface",
         ":lifecycle_notifier_interface",
         ":process_context_interface",
         "//include/envoy/access_log:access_log_interface",
@@ -240,6 +241,16 @@ envoy_cc_library(
     hdrs = ["resource_monitor.h"],
     deps = [
         "//include/envoy/config:typed_config_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "request_id_extension_config_interface",
+    hdrs = ["request_id_extension_config.h"],
+    deps = [
+        ":filter_config_interface",
+        "//include/envoy/http:request_id_extension_interface",
         "//source/common/protobuf",
     ],
 )

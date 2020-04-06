@@ -40,10 +40,8 @@ bool MetadataDecoder::onMetadataFrameComplete(bool end_metadata) {
 }
 
 bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
-  // Computes how many slices are needed to get all the data out.
-  const int num_slices = payload_.getRawSlices(nullptr, 0);
-  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-  payload_.getRawSlices(slices.begin(), num_slices);
+  Buffer::RawSliceVector slices = payload_.getRawSlices();
+  const int num_slices = slices.size();
 
   // Data consumed by nghttp2 so far.
   ssize_t payload_size_consumed = 0;

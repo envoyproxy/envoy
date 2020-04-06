@@ -18,6 +18,7 @@ envoy_cc_test_library(
     ],
     deps = [
         "//source/common/config:resources_lib",
+        "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",

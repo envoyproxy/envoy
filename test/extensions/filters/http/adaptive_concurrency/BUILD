@@ -19,7 +19,7 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
-        "//source/extensions/filters/http/adaptive_concurrency/concurrency_controller:concurrency_controller_lib",
+        "//source/extensions/filters/http/adaptive_concurrency/controller:controller_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
