@@ -549,7 +549,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         // Maybe nothing is set?
         break;
       }
-      if (DebugMode) {
+      if (DebugMode && !should_close_connection) {
         client_server_buf_drain();
       }
     }
