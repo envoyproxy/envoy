@@ -1,5 +1,41 @@
+diff --git a/base/compiler_specific.h b/base/compiler_specific.h
+index 2962537..ebdac08 100644
+--- a/base/compiler_specific.h
++++ b/base/compiler_specific.h
+@@ -7,10 +7,6 @@
+
+ #include "build/build_config.h"
+
+-#if defined(COMPILER_MSVC) && !defined(__clang__)
+-#error "Only clang-cl is supported on Windows, see https://crbug.com/988071"
+-#endif
+-
+ // Annotate a variable indicating it's ok if the variable is not used.
+ // (Typically used to silence a compiler warning when the assignment
+ // is important for some other reason.)
+diff --git a/build_config.bzl b/build_config.bzl
+index d5fca65..b1bc3a4 100644
+--- a/build_config.bzl
++++ b/build_config.bzl
+@@ -1,7 +1,12 @@
+-_default_copts = [
+-    "-std=c++14",
+-    "-fno-strict-aliasing",
+-]
++_default_copts = select({
++    "@envoy//bazel:windows_x86_64": [
++        "/std:c++14"
++    ],
++    "//conditions:default": [
++        "-std=c++14",
++        "-fno-strict-aliasing",
++    ]
++})
+
+ build_config = struct(
+     default_copts = _default_copts,
 diff --git a/url/BUILD b/url/BUILD
-index 0126bdc..a11e973 100644
+index 0126bdc..3d1aeed 100644
 --- a/url/BUILD
 +++ b/url/BUILD
 @@ -43,11 +43,11 @@ cc_library(
@@ -12,6 +48,6 @@ index 0126bdc..a11e973 100644
          "//base",
          "//base/strings",
          "//polyfills",
-+        "@org_unicode_icuuc//:common"
++        "@org_unicode_icuuc//:common",
      ],
  )

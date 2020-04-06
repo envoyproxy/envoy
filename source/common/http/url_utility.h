@@ -20,13 +20,8 @@ public:
   uint64_t getPort() const { return port_; }
 
 private:
-#ifndef WIN32
   std::string scheme_;
   std::string host_and_port_;
-#else
-  absl::string_view scheme_;
-  absl::string_view host_and_port_;
-#endif
   std::string path_and_query_params_;
   uint16_t port_{0};
 };

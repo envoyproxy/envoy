@@ -367,10 +367,8 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
-    ] + select({
-        "//bazel:windows_x86_64": ["@com_github_nodejs_http_parser//:http_parser"],
-        "//conditions:default": ["@com_googlesource_googleurl//url:url"],
-    }),
+        "@com_googlesource_googleurl//url",
+    ],
 )
 
 envoy_cc_library(
