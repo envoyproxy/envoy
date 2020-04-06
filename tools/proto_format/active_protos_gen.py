@@ -20,8 +20,7 @@ proto_library(
     name = "active_protos",
     visibility = ["//visibility:public"],
     deps = [
-$active_pkgs
-    ],
+$active_pkgs    ],
 )
 
 # This tracks frozen versions of protos.
@@ -29,8 +28,7 @@ proto_library(
     name = "frozen_protos",
     visibility = ["//visibility:public"],
     deps = [
-$frozen_pkgs
-    ],
+$frozen_pkgs    ],
 )
 """)
 
@@ -41,8 +39,10 @@ def BuildOrderKey(key):
 
 
 def DepsFormat(pkgs):
+  if not pkgs:
+    return ''
   return '\n'.join(
-      '        "//%s:pkg",' % p.replace('.', '/') for p in sorted(pkgs, key=BuildOrderKey))
+      '        "//%s:pkg",' % p.replace('.', '/') for p in sorted(pkgs, key=BuildOrderKey)) + '\n'
 
 
 # Find packages with a given package version status in a given API tree root.

@@ -130,6 +130,5 @@ proto_library(
     name = "frozen_protos",
     visibility = ["//visibility:public"],
     deps = [
-
     ],
 )
