@@ -632,8 +632,9 @@ envoy_cc_test(
     srcs = [
         "echo_integration_test.cc",
     ],
-    # This test must be run in exclusive mode: see comments in AddRemoveListener
-    tags = ["exclusive"],
+    # Uncomment this line to run this test repeatedly in exclusive mode if not using docker-sandbox,
+    # or RBE, see comments in AddRemoveListener.
+    # tags = ["exclusive"],
     deps = [
         ":integration_lib",
         "//source/extensions/filters/network/echo:config",
