@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http/http1:codec_legacy_lib",
         "//source/common/http/http1:codec_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/buffer:buffer_mocks",

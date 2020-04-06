@@ -495,15 +495,14 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
     dispatchSlice(nullptr, 0);
   }
   ASSERT(buffered_body_.length() == 0);
+
+  ENVOY_CONN_LOG(trace, "parsed {} bytes", connection_, total_parsed);
+  data.drain(total_parsed);
+
+  // If an upgrade has been handled and there is body data or early upgrade
+  // payload to send on, send it on.
+  maybeDirectDispatch(data);
 }
-
-ENVOY_CONN_LOG(trace, "parsed {} bytes", connection_, total_parsed);
-data.drain(total_parsed);
-
-// If an upgrade has been handled and there is body data or early upgrade
-// payload to send on, send it on.
-maybeDirectDispatch(data);
-} // namespace Http1
 
 size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
   ssize_t rc = http_parser_execute(&parser_, &settings_, slice, len);
@@ -1092,7 +1091,7 @@ void ClientConnectionImpl::onBelowLowWatermark() {
   }
 }
 
+} // namespace Http1
 } // namespace Legacy
 } // namespace Http
-} // namespace Envoy
 } // namespace Envoy

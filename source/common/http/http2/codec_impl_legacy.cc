@@ -1188,6 +1188,7 @@ ServerConnectionImpl::ServerConnectionImpl(
                      max_request_headers_count),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action) {
   Http2Options h2_options(http2_options);
+
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                               h2_options.options());
   sendSettings(http2_options, false);

@@ -31,7 +31,8 @@ namespace Http1 {
 #define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
   COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(metadata_not_supported_error)                                                            \
-  COUNTER(requests_rejected_with_underscores_in_headers)
+  COUNTER(requests_rejected_with_underscores_in_headers)                                           \
+  COUNTER(response_flood)
 
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
@@ -221,6 +222,8 @@ protected:
   http_parser parser_;
   Http::Code error_code_{Http::Code::BadRequest};
   const Envoy::Http::Http1::HeaderKeyFormatterPtr header_key_formatter_;
+  HeaderString current_header_field_;
+  HeaderString current_header_value_;
   bool processing_trailers_ : 1;
   bool handling_upgrade_ : 1;
   bool reset_stream_called_ : 1;
@@ -324,7 +327,7 @@ private:
    * ConnectionImpl::dispatch call.
    * @param data supplies the body data
    */
-  virtual void onBody(const char* data, size_t length) PURE;
+  virtual void onBody(Buffer::Instance& data) PURE;
 
   /**
    * Called when the request/response is complete.

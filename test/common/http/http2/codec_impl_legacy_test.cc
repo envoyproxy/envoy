@@ -10,6 +10,7 @@
 
 #include "test/common/http/common.h"
 #include "test/common/http/http2/http2_frame.h"
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -17,6 +18,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "codec_impl_test_util.h"
@@ -78,7 +80,7 @@ public:
         max_request_headers_kb_, max_response_headers_count_);
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, stats_store_, server_http2_options_,
-        max_request_headers_kb_, max_request_headers_count_);
+        max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
 
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
@@ -158,7 +160,7 @@ public:
   const Http2SettingsTuple server_settings_;
   bool allow_metadata_ = false;
   bool stream_error_on_invalid_http_messaging_ = false;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   envoy::config::core::v3::Http2ProtocolOptions client_http2_options_;
   NiceMock<Network::MockConnection> client_connection_;
   MockConnectionCallbacks client_callbacks_;
@@ -995,7 +997,7 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
       max_request_headers_kb_, max_response_headers_count_);
   server_ = std::make_unique<TestServerConnectionImpl>(
       server_connection_, server_callbacks_, stats_store_, server_http2_options_,
-      max_request_headers_kb_, max_request_headers_count_);
+      max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
 
   for (int i = 0; i < 101; ++i) {
     request_encoder_ = &client_->newStream(response_decoder_);
@@ -1242,6 +1244,51 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersAccepted) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   request_encoder_->encodeHeaders(request_headers, false);
+}
+
+// Tests request headers with name containing underscore are dropped when the option is set to drop
+// header.
+TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreDropped) {
+  headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestRequestHeaderMapImpl expected_headers(request_headers);
+  request_headers.addCopy("bad_header", "something");
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), _));
+  request_encoder_->encodeHeaders(request_headers, false);
+  EXPECT_EQ(1, stats_store_.counter("http2.dropped_headers_with_underscores").value());
+}
+
+// Tests that request with header names containing underscore are rejected when the option is set to
+// reject request.
+TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejectedByDefault) {
+  headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.addCopy("bad_header", "something");
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(1);
+  request_encoder_->encodeHeaders(request_headers, false);
+  EXPECT_EQ(1, stats_store_.counter("http2.requests_rejected_with_underscores_in_headers").value());
+}
+
+// Tests request headers with name containing underscore are allowed when the option is set to
+// allow.
+TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAllowed) {
+  headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.addCopy("bad_header", "something");
+  TestRequestHeaderMapImpl expected_headers(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
+  request_encoder_->encodeHeaders(request_headers, false);
+  EXPECT_EQ(0, stats_store_.counter("http2.dropped_headers_with_underscores").value());
 }
 
 // This is the HTTP/2 variant of the HTTP/1 regression test for CVE-2019-18801.
