@@ -75,7 +75,7 @@ Status CodecClientError(absl::string_view message);
  * Returns Envoy::StatusCode of the given status object.
  * If the status object does not contain valid Envoy::Status value the function will RELEASE_ASSERT.
  */
-ABSL_MUST_USE_RESULT StatusCode GetStatusCode(const Status& status);
+StatusCode GetStatusCode(const Status& status);
 
 /**
  * Returns true if the given status matches error code implied by the name of the function.

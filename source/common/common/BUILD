@@ -441,3 +441,18 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "statusor_lib",
+    srcs = [
+        "statusor.cc",
+    ],
+    hdrs = [
+        "statusor.h",
+        "statusor_internals.h",
+    ],
+    external_deps = [
+        "abseil_status",
+    ],
+    deps = [":assert_lib"],
+)
