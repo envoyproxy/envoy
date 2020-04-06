@@ -223,11 +223,12 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
       Http::TestHeaderMapImpl{{"grpc-status", std::to_string(static_cast<uint32_t>(status))}});
 }
 
-FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connection,
-                                       Stats::Store& store, Type type,
-                                       Event::TestTimeSystem& time_system,
-                                       uint32_t max_request_headers_kb,
-                                       uint32_t max_request_headers_count)
+FakeHttpConnection::FakeHttpConnection(
+    SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
+    Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
+    uint32_t max_request_headers_count,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action)
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
     Http::Http1Settings http1_settings;
@@ -236,11 +237,11 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
       codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
           shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
-          max_request_headers_count);
+          max_request_headers_count, headers_with_underscores_action);
     } else {
       codec_ = std::make_unique<Http::Legacy::Http1::ServerConnectionImpl>(
           shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
-          max_request_headers_count);
+          max_request_headers_count, headers_with_underscores_action);
     }
   } else {
     envoy::config::core::v3::Http2ProtocolOptions http2_options =
@@ -251,11 +252,11 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
       codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
           shared_connection_.connection(), *this, store, http2_options, max_request_headers_kb,
-          max_request_headers_count);
+          max_request_headers_count, headers_with_underscores_action);
     } else {
       codec_ = std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
           shared_connection_.connection(), *this, store, http2_options, max_request_headers_kb,
-          max_request_headers_count);
+          max_request_headers_count, headers_with_underscores_action);
     }
     ASSERT(type == Type::HTTP2);
   }
@@ -487,11 +488,11 @@ void FakeUpstream::threadRoutine() {
   }
 }
 
-AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
-                                                    FakeHttpConnectionPtr& connection,
-                                                    milliseconds timeout,
-                                                    uint32_t max_request_headers_kb,
-                                                    uint32_t max_request_headers_count) {
+AssertionResult FakeUpstream::waitForHttpConnection(
+    Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection, milliseconds timeout,
+    uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action) {
   Event::TestTimeSystem& time_system = timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   {
@@ -510,9 +511,9 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
     if (new_connections_.empty()) {
       return AssertionFailure() << "Got a new connection event, but didn't create a connection.";
     }
-    connection = std::make_unique<FakeHttpConnection>(consumeConnection(), stats_store_, http_type_,
-                                                      time_system, max_request_headers_kb,
-                                                      max_request_headers_count);
+    connection = std::make_unique<FakeHttpConnection>(
+        consumeConnection(), stats_store_, http_type_, time_system, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   }
   VERIFY_ASSERTION(connection->initialize());
   VERIFY_ASSERTION(connection->readDisable(false));
@@ -543,7 +544,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         connection = std::make_unique<FakeHttpConnection>(
             upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_,
             upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-            Http::DEFAULT_MAX_HEADERS_COUNT);
+            Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
         lock.release();
         VERIFY_ASSERTION(connection->initialize());
         VERIFY_ASSERTION(connection->readDisable(false));
