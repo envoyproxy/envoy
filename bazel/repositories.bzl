@@ -229,16 +229,14 @@ def _com_github_cyan4973_xxhash():
     )
 
 def _org_unicode_icuuc():
-    location = REPOSITORY_LOCATIONS["org_unicode_icuuc"]
-    http_archive(
+    _repository_impl(
         name = "org_unicode_icuuc",
-        build_file_content = BUILD_ALL_CONTENT,
-        patches = ["@envoy//bazel/foreign_cc:icuuc.patch"],
-        **location
+        build_file = "@envoy//bazel/external:icuuc.BUILD",
+        # TODO(dio): Consider patching udata when we need to embed some data.
     )
     native.bind(
         name = "icuuc",
-        actual = "@envoy//bazel/foreign_cc:icuuc",
+        actual = "@org_unicode_icuuc//:common",
     )
 
 def _com_github_envoyproxy_sqlparser():

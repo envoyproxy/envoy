@@ -98,7 +98,7 @@ index d5fca65..fc0d7e5 100644
 +    strings_hdrs = _strings_hdrs,
  )
 diff --git a/url/BUILD b/url/BUILD
-index 0126bdc..860f000 100644
+index 0126bdc..5d1a171 100644
 --- a/url/BUILD
 +++ b/url/BUILD
 @@ -43,11 +43,11 @@ cc_library(
@@ -111,6 +111,6 @@ index 0126bdc..860f000 100644
          "//base",
          "//base/strings",
          "//polyfills",
-+        "@envoy//bazel/foreign_cc:icuuc"
++         "@org_unicode_icuuc//:common",
      ],
  )
