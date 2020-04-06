@@ -13,6 +13,18 @@ index 2962537..ebdac08 100644
  // Annotate a variable indicating it's ok if the variable is not used.
  // (Typically used to silence a compiler warning when the assignment
  // is important for some other reason.)
+diff --git a/base/strings/BUILD b/base/strings/BUILD
+index 7a06170..5aa84b4 100644
+--- a/base/strings/BUILD
++++ b/base/strings/BUILD
+@@ -20,6 +20,7 @@ cc_library(
+         "string_piece_forward.h",
+         "string_util.h",
+         "string_util_posix.h",
++        "string_util_win.h",
+         "utf_string_conversion_utils.h",
+         "utf_string_conversions.h",
+     ],
 diff --git a/build_config.bzl b/build_config.bzl
 index d5fca65..b1bc3a4 100644
 --- a/build_config.bzl
@@ -35,7 +47,7 @@ index d5fca65..b1bc3a4 100644
  build_config = struct(
      default_copts = _default_copts,
 diff --git a/url/BUILD b/url/BUILD
-index 0126bdc..3d1aeed 100644
+index 0126bdc..5d1a171 100644
 --- a/url/BUILD
 +++ b/url/BUILD
 @@ -43,11 +43,11 @@ cc_library(
@@ -48,6 +60,6 @@ index 0126bdc..3d1aeed 100644
          "//base",
          "//base/strings",
          "//polyfills",
-+        "@org_unicode_icuuc//:common",
++         "@org_unicode_icuuc//:common",
      ],
  )
