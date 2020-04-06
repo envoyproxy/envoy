@@ -37,12 +37,48 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "codec_impl_legacy_test",
+    srcs = ["codec_impl_legacy_test.cc"],
+    shard_count = 5,
+    deps = [
+        ":codec_impl_legacy_test_util",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/http:exception_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
+        "//source/common/http/http2:codec_legacy_lib",
+        "//source/common/stats:stats_lib",
+        "//test/common/http:common_lib",
+        "//test/common/http/http2:http2_frame",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "codec_impl_test_util",
     hdrs = ["codec_impl_test_util.h"],
     external_deps = ["abseil_optional"],
     deps = [
         "//source/common/http/http2:codec_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "codec_impl_legacy_test_util",
+    hdrs = ["codec_impl_legacy_test_util.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//source/common/http/http2:codec_legacy_lib",
     ],
 )
 

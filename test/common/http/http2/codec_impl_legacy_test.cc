@@ -6,7 +6,7 @@
 
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http2/codec_impl_legacy.h"
 
 #include "test/common/http/common.h"
 #include "test/common/http/http2/http2_frame.h"
@@ -21,7 +21,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#include "codec_impl_test_util.h"
+#include "codec_impl_legacy_test_util.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -191,6 +191,8 @@ public:
       CommonUtility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
   uint32_t max_inbound_window_update_frames_per_data_frame_sent_ =
       CommonUtility::OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,
@@ -254,7 +256,8 @@ protected:
 
     // HTTP/2 codec does not send empty DATA frames with no END_STREAM flag.
     // To make this work, send raw bytes representing empty DATA frames bypassing client codec.
-    Http2Frame emptyDataFrame = Http2Frame::makeEmptyDataFrame(0);
+    Envoy::Http::Http2::Http2Frame emptyDataFrame =
+        Envoy::Http::Http2::Http2Frame::makeEmptyDataFrame(0);
     constexpr uint32_t max_allowed =
         CommonUtility::OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
