@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
@@ -28,8 +29,9 @@ namespace Http1 {
  * All stats for the HTTP/1 codec. @see stats_macros.h
  */
 #define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
+  COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(metadata_not_supported_error)                                                            \
-  COUNTER(response_flood)
+  COUNTER(requests_rejected_with_underscores_in_headers)
 
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
@@ -245,11 +247,35 @@ private:
   void completeLastHeader();
 
   /**
+   * Check if header name contains underscore character.
+   * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
+   * as a security measure due to systems that treat '_' and '-' as interchangeable.
+   * The ServerConnectionImpl may drop header or reject request based on the
+   * `common_http_protocol_options.headers_with_underscores_action` configuration option in the
+   * HttpConnectionManager.
+   */
+  virtual bool shouldDropHeaderWithUnderscoresInNames(absl::string_view /* header_name */) const {
+    return false;
+  }
+
+  /**
    * Dispatch a memory span.
    * @param slice supplies the start address.
    * @len supplies the length of the span.
    */
   size_t dispatchSlice(const char* slice, size_t len);
+
+  /**
+   * Called by the http_parser when body data is received.
+   * @param data supplies the start address.
+   * @param length supplies the length.
+   */
+  void bufferBody(const char* data, size_t length);
+
+  /**
+   * Push the accumulated body through the filter pipeline.
+   */
+  void dispatchBufferedBody();
 
   /**
    * Called when a request/response is beginning. A base routine happens first then a virtual
@@ -289,9 +315,14 @@ private:
   virtual int onHeadersComplete() PURE;
 
   /**
-   * Called when body data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
+   * Called with body data is available for processing when either:
+   * - There is an accumulated partial body after the parser is done processing bytes read from the
+   * socket
+   * - The parser encounters the last byte of the body
+   * - The codec does a direct dispatch from the read buffer
+   * For performance reasons there is at most one call to onBody per call to HTTP/1
+   * ConnectionImpl::dispatch call.
+   * @param data supplies the body data
    */
   virtual void onBody(const char* data, size_t length) PURE;
 
@@ -300,6 +331,11 @@ private:
    */
   void onMessageCompleteBase();
   virtual void onMessageComplete() PURE;
+
+  /**
+   * Called when accepting a chunk header.
+   */
+  void onChunkHeader(bool is_final_chunk);
 
   /**
    * @see onResetStreamBase().
@@ -323,11 +359,19 @@ private:
    */
   virtual void onBelowLowWatermark() PURE;
 
+  /**
+   * Check if header name contains underscore character.
+   * The ServerConnectionImpl may drop header or reject request based on configuration.
+   */
+  virtual void checkHeaderNameForUnderscores() {}
+
   static http_parser_settings settings_;
 
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
-  HeaderString current_header_field_;
-  HeaderString current_header_value_;
+  // Used to accumulate the HTTP message body during the current dispatch call. The accumulated body
+  // is pushed through the filter pipeline either at the end of the current dispatch call, or when
+  // the last byte of the body is processed (whichever happens first).
+  Buffer::OwnedImpl buffered_body_;
   Buffer::WatermarkBuffer output_buffer_;
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
@@ -341,7 +385,9 @@ class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
-                       uint32_t max_request_headers_kb, const uint32_t max_request_headers_count);
+                       uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
+                       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+                           headers_with_underscores_action);
 
   bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
@@ -375,7 +421,7 @@ private:
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete() override;
-  void onBody(const char* data, size_t length) override;
+  void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;
@@ -405,6 +451,7 @@ private:
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
   void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
   void doFloodProtectionChecks() const;
+  void checkHeaderNameForUnderscores() override;
 
   ServerConnectionCallbacks& callbacks_;
   absl::optional<ActiveRequest> active_request_;
@@ -422,6 +469,9 @@ private:
   // trailers are enabled). The variant is reset to null headers on message complete for assertion
   // purposes.
   absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
+  // The action to take when a request header name contains underscore characters.
+  const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_;
 };
 
 /**
@@ -454,7 +504,7 @@ private:
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete() override;
-  void onBody(const char* data, size_t length) override;
+  void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;

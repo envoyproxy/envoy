@@ -50,9 +50,9 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
         headers_with_underscores_action) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-      return std::make_unique<Http2::ServerConnectionImpl>(connection, callbacks, scope,
-                                                           http2_options, max_request_headers_kb,
-                                                           max_request_headers_count, headers_with_underscores_action);
+      return std::make_unique<Http2::ServerConnectionImpl>(
+          connection, callbacks, scope, http2_options, max_request_headers_kb,
+          max_request_headers_count, headers_with_underscores_action);
     } else {
       return std::make_unique<Legacy::Http2::ServerConnectionImpl>(
           connection, callbacks, scope, http2_options, max_request_headers_kb,
@@ -60,9 +60,9 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     }
   } else {
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-      return std::make_unique<Http1::ServerConnectionImpl>(connection, scope, callbacks,
-                                                           http1_settings, max_request_headers_kb,
-                                                           max_request_headers_count, headers_with_underscores_action);
+      return std::make_unique<Http1::ServerConnectionImpl>(
+          connection, scope, callbacks, http1_settings, max_request_headers_kb,
+          max_request_headers_count, headers_with_underscores_action);
     } else {
       return std::make_unique<Legacy::Http1::ServerConnectionImpl>(
           connection, scope, callbacks, http1_settings, max_request_headers_kb,
