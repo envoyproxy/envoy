@@ -387,15 +387,23 @@ http_parser_settings ConnectionImpl::settings_{
       return static_cast<ConnectionImpl*>(parser->data)->onHeadersCompleteBase();
     },
     [](http_parser* parser, const char* at, size_t length) -> int {
-      static_cast<ConnectionImpl*>(parser->data)->onBody(at, length);
+      static_cast<ConnectionImpl*>(parser->data)->bufferBody(at, length);
       return 0;
     },
     [](http_parser* parser) -> int {
       static_cast<ConnectionImpl*>(parser->data)->onMessageCompleteBase();
       return 0;
     },
-    nullptr, // on_chunk_header
-    nullptr  // on_chunk_complete
+    [](http_parser* parser) -> int {
+      // A 0-byte chunk header is used to signal the end of the chunked body.
+      // When this function is called, http-parser holds the size of the chunk in
+      // parser->content_length. See
+      // https://github.com/nodejs/http-parser/blob/v2.9.3/http_parser.h#L336
+      const bool is_final_chunk = (parser->content_length == 0);
+      static_cast<ConnectionImpl*>(parser->data)->onChunkHeader(is_final_chunk);
+      return 0;
+    },
+    nullptr // on_chunk_complete
 };
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
@@ -424,6 +432,7 @@ void ConnectionImpl::completeLastHeader() {
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
 
+  checkHeaderNameForUnderscores();
   auto& headers_or_trailers = headersOrTrailers();
   if (!current_header_field_.empty()) {
     current_header_field_.inlineTransform([](char c) { return absl::ascii_tolower(c); });
@@ -451,18 +460,15 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
     return false;
   }
 
-  ssize_t total_parsed = 0;
-  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
-    total_parsed += slice.len_;
-    onBody(static_cast<const char*>(slice.mem_), slice.len_);
-  }
-  ENVOY_CONN_LOG(trace, "direct-dispatched {} bytes", connection_, total_parsed);
-  data.drain(total_parsed);
+  ENVOY_CONN_LOG(trace, "direct-dispatched {} bytes", connection_, data.length());
+  onBody(data);
+  data.drain(data.length());
   return true;
 }
 
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
+  ASSERT(buffered_body_.length() == 0);
 
   if (maybeDirectDispatch(data)) {
     return;
@@ -475,10 +481,18 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
   if (data.length() > 0) {
     for (const Buffer::RawSlice& slice : data.getRawSlices()) {
       total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
+      if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK) {
+        // Parse errors trigger an exception in dispatchSlice so we are guaranteed to be paused at
+        // this point.
+        ASSERT(HTTP_PARSER_ERRNO(&parser_) == HPE_PAUSED);
+        break;
+      }
     }
+    dispatchBufferedBody();
   } else {
     dispatchSlice(nullptr, 0);
   }
+  ASSERT(buffered_body_.length() == 0);
 
   ENVOY_CONN_LOG(trace, "parsed {} bytes", connection_, total_parsed);
   data.drain(total_parsed);
@@ -532,7 +546,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   const absl::string_view header_value = StringUtil::trim(absl::string_view(data, length));
 
   if (strict_header_validation_) {
-    if (!Http::HeaderUtility::headerIsValid(header_value)) {
+    if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
       ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
       error_code_ = Http::Code::BadRequest;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
@@ -611,8 +625,30 @@ int ConnectionImpl::onHeadersCompleteBase() {
   return handling_upgrade_ ? 2 : rc;
 }
 
+void ConnectionImpl::bufferBody(const char* data, size_t length) {
+  buffered_body_.add(data, length);
+}
+
+void ConnectionImpl::dispatchBufferedBody() {
+  ASSERT(HTTP_PARSER_ERRNO(&parser_) == HPE_OK || HTTP_PARSER_ERRNO(&parser_) == HPE_PAUSED);
+  if (buffered_body_.length() > 0) {
+    onBody(buffered_body_);
+    buffered_body_.drain(buffered_body_.length());
+  }
+}
+
+void ConnectionImpl::onChunkHeader(bool is_final_chunk) {
+  if (is_final_chunk) {
+    // Dispatch body before parsing trailers, so body ends up dispatched even if an error is found
+    // while processing trailers.
+    dispatchBufferedBody();
+  }
+}
+
 void ConnectionImpl::onMessageCompleteBase() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
+
+  dispatchBufferedBody();
 
   if (handling_upgrade_) {
     // If this is an upgrade request, swallow the onMessageComplete. The
@@ -650,11 +686,12 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
-ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                                           ServerConnectionCallbacks& callbacks,
-                                           const Http1Settings& settings,
-                                           uint32_t max_request_headers_kb,
-                                           const uint32_t max_request_headers_count)
+ServerConnectionImpl::ServerConnectionImpl(
+    Network::Connection& connection, Stats::Scope& stats, ServerConnectionCallbacks& callbacks,
+    const Http1Settings& settings, uint32_t max_request_headers_kb,
+    const uint32_t max_request_headers_count,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action)
     : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
                      max_request_headers_count, formatter(settings), settings.enable_trailers_),
       callbacks_(callbacks), codec_settings_(settings),
@@ -668,7 +705,8 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stat
       max_outbound_responses_(
           Runtime::getInteger("envoy.do_not_use_going_away_max_http2_outbound_responses", 2)),
       flood_protection_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_flood_protection")) {}
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_flood_protection")),
+      headers_with_underscores_action_(headers_with_underscores_action) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   if (active_request_.value().remote_complete_) {
@@ -807,12 +845,11 @@ void ServerConnectionImpl::onUrl(const char* data, size_t length) {
   }
 }
 
-void ServerConnectionImpl::onBody(const char* data, size_t length) {
+void ServerConnectionImpl::onBody(Buffer::Instance& data) {
   ASSERT(!deferred_end_stream_headers_);
   if (active_request_.has_value()) {
-    ENVOY_CONN_LOG(trace, "body size={}", connection_, length);
-    Buffer::OwnedImpl buffer(data, length);
-    active_request_.value().request_decoder_->decodeData(buffer, false);
+    ENVOY_CONN_LOG(trace, "body size={}", connection_, data.length());
+    active_request_.value().request_decoder_->decodeData(data, false);
   }
 }
 
@@ -883,6 +920,27 @@ void ServerConnectionImpl::releaseOutboundResponse(
   delete fragment;
 }
 
+void ServerConnectionImpl::checkHeaderNameForUnderscores() {
+  if (headers_with_underscores_action_ != envoy::config::core::v3::HttpProtocolOptions::ALLOW &&
+      Http::HeaderUtility::headerNameContainsUnderscore(current_header_field_.getStringView())) {
+    if (headers_with_underscores_action_ ==
+        envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
+      ENVOY_CONN_LOG(debug, "Dropping header with invalid characters in its name: {}", connection_,
+                     current_header_field_.getStringView());
+      stats_.dropped_headers_with_underscores_.inc();
+      current_header_field_.clear();
+      current_header_value_.clear();
+    } else {
+      ENVOY_CONN_LOG(debug, "Rejecting request due to header name with underscores: {}",
+                     connection_, current_header_field_.getStringView());
+      error_code_ = Http::Code::BadRequest;
+      sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
+      stats_.requests_rejected_with_underscores_in_headers_.inc();
+      throw CodecProtocolException("http/1.1 protocol error: header name contains underscores");
+    }
+  }
+}
+
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
@@ -893,6 +951,7 @@ bool ClientConnectionImpl::cannotHaveBody() {
   if ((pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) ||
       parser_.status_code == 204 || parser_.status_code == 304 ||
       (parser_.status_code >= 200 && parser_.content_length == 0)) {
+    ASSERT(!pending_response_done_);
     return true;
   } else {
     return false;
@@ -909,7 +968,9 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   ASSERT(connection_.readEnabled());
 
   ASSERT(!pending_response_.has_value());
+  ASSERT(pending_response_done_);
   pending_response_.emplace(*this, header_key_formatter_.get(), &response_decoder);
+  pending_response_done_ = false;
   return pending_response_.value().encoder_;
 }
 
@@ -920,6 +981,7 @@ int ClientConnectionImpl::onHeadersComplete() {
   if (!pending_response_.has_value() && !resetStreamCalled()) {
     throw PrematureResponseException(static_cast<Http::Code>(parser_.status_code));
   } else if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
     ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
     headers->setStatus(parser_.status_code);
@@ -945,12 +1007,11 @@ int ClientConnectionImpl::onHeadersComplete() {
   return cannotHaveBody() ? 1 : 0;
 }
 
-void ClientConnectionImpl::onBody(const char* data, size_t length) {
+void ClientConnectionImpl::onBody(Buffer::Instance& data) {
   ASSERT(!deferred_end_stream_headers_);
   if (pending_response_.has_value()) {
-    Buffer::OwnedImpl buffer;
-    buffer.add(data, length);
-    pending_response_.value().decoder_->decodeData(buffer, false);
+    ASSERT(!pending_response_done_);
+    pending_response_.value().decoder_->decodeData(data, false);
   }
 }
 
@@ -961,9 +1022,12 @@ void ClientConnectionImpl::onMessageComplete() {
     return;
   }
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     // After calling decodeData() with end stream set to true, we should no longer be able to reset.
-    PendingResponse response = std::move(pending_response_.value());
-    pending_response_.reset();
+    PendingResponse& response = pending_response_.value();
+    // Encoder is used as part of decode* calls later in this function so pending_response_ can not
+    // be reset just yet. Preserve the state in pending_response_done_ instead.
+    pending_response_done_ = true;
 
     // Streams are responsible for unwinding any outstanding readDisable(true)
     // calls done on the underlying connection as they are destroyed. As this is
@@ -989,20 +1053,23 @@ void ClientConnectionImpl::onMessageComplete() {
     }
 
     // Reset to ensure no information from one requests persists to the next.
+    pending_response_.reset();
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
   }
 }
 
 void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   // Only raise reset if we did not already dispatch a complete response.
-  if (pending_response_.has_value()) {
+  if (pending_response_.has_value() && !pending_response_done_) {
     pending_response_.value().encoder_.runResetCallbacks(reason);
+    pending_response_done_ = true;
     pending_response_.reset();
   }
 }
 
 void ClientConnectionImpl::sendProtocolError(absl::string_view details) {
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     pending_response_.value().encoder_.setDetails(details);
   }
 }
@@ -1017,6 +1084,7 @@ void ClientConnectionImpl::onBelowLowWatermark() {
   // such as sending multiple responses to the same request, causing us to close the connection, but
   // in doing so go below low watermark.
   if (pending_response_.has_value()) {
+    ASSERT(!pending_response_done_);
     pending_response_.value().encoder_.runLowWatermarkCallbacks();
   }
 }

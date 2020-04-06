@@ -24,6 +24,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_utility_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/upstream:cluster_update_tracker_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common/ot:opentracing_driver_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",

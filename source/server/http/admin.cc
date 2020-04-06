@@ -353,19 +353,19 @@ void AdminImpl::addOutlierInfo(const std::string& cluster_name,
                                Buffer::Instance& response) {
   if (outlier_detector) {
     response.add(fmt::format(
-        "{}::outlier::success_rate_average::{}\n", cluster_name,
+        "{}::outlier::success_rate_average::{:g}\n", cluster_name,
         outlier_detector->successRateAverage(
             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
     response.add(fmt::format(
-        "{}::outlier::success_rate_ejection_threshold::{}\n", cluster_name,
+        "{}::outlier::success_rate_ejection_threshold::{:g}\n", cluster_name,
         outlier_detector->successRateEjectionThreshold(
             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
     response.add(fmt::format(
-        "{}::outlier::local_origin_success_rate_average::{}\n", cluster_name,
+        "{}::outlier::local_origin_success_rate_average::{:g}\n", cluster_name,
         outlier_detector->successRateAverage(
             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
     response.add(fmt::format(
-        "{}::outlier::local_origin_success_rate_ejection_threshold::{}\n", cluster_name,
+        "{}::outlier::local_origin_success_rate_ejection_threshold::{:g}\n", cluster_name,
         outlier_detector->successRateEjectionThreshold(
             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
   }
@@ -1313,7 +1313,9 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
 }
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
-    : server_(server), profile_path_(profile_path),
+    : server_(server),
+      request_id_extension_(Http::RequestIDExtensionFactory::defaultInstance(server_.random())),
+      profile_path_(profile_path),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
@@ -1384,7 +1386,7 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
       connection, data, callbacks, server_.stats(), Http::Http1Settings(),
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions()),
-      maxRequestHeadersKb(), maxRequestHeadersCount());
+      maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,

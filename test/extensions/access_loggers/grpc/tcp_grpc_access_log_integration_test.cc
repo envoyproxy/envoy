@@ -28,7 +28,7 @@ class TcpGrpcAccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamT
                                         public BaseIntegrationTest {
 public:
   TcpGrpcAccessLogIntegrationTest()
-      : BaseIntegrationTest(ipVersion(), ConfigHelper::TCP_PROXY_CONFIG) {
+      : BaseIntegrationTest(ipVersion(), ConfigHelper::tcpProxyConfig()) {
     enable_half_close_ = true;
   }
 

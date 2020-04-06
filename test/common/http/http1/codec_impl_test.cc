@@ -11,6 +11,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/runtime/runtime_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -18,14 +19,13 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 
+#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -43,14 +43,22 @@ std::string createHeaderFragment(int num_headers) {
   }
   return headers;
 }
+
+Buffer::OwnedImpl createBufferWithOneByteSlices(absl::string_view input) {
+  Buffer::OwnedImpl buffer;
+  for (const char& c : input) {
+    buffer.appendSliceForTest(&c, 1);
+  }
+  return buffer;
+}
 } // namespace
 
 class Http1ServerConnectionImplTest : public testing::Test {
 public:
   void initialize() {
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_, max_request_headers_count_);
+    codec_ = std::make_unique<ServerConnectionImpl>(
+        connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, headers_with_underscores_action_);
   }
 
   NiceMock<Network::MockConnection> connection_;
@@ -89,7 +97,9 @@ public:
 protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
-  Stats::IsolatedStoreImpl store_;
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
+  Stats::TestUtil::TestStore store_;
 };
 
 void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,
@@ -102,9 +112,9 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
 
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_, max_request_headers_count_);
+    codec_ = std::make_unique<ServerConnectionImpl>(
+        connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   }
 
   MockRequestDecoder decoder;
@@ -131,14 +141,14 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
   // Make a new 'codec' with the right settings
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_, max_request_headers_count_);
+    codec_ = std::make_unique<ServerConnectionImpl>(
+        connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   }
 
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
@@ -151,27 +161,31 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
   // Make a new 'codec' with the right settings
   if (enable_trailers) {
     codec_settings_.enable_trailers_ = enable_trailers;
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_, max_request_headers_count_);
+    codec_ = std::make_unique<ServerConnectionImpl>(
+        connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   }
 
-  MockRequestDecoder decoder;
+  InSequence sequence;
+  StrictMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder&, bool) -> RequestDecoder& { return decoder; }));
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
 
+  Buffer::OwnedImpl expected_data("Hello World");
   if (enable_trailers) {
-    EXPECT_CALL(decoder, decodeData(_, false)).Times(AtLeast(1));
+    // Verify that body data is delivered before trailers.
+    EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
     EXPECT_CALL(decoder, decodeTrailers_);
   } else {
-    EXPECT_CALL(decoder, decodeData(_, false)).Times(AtLeast(1));
+    EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
     EXPECT_CALL(decoder, decodeData(_, true));
   }
-
-  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello "
-                           "World\r\n0\r\nhello: world\r\nsecond: header\r\n\r\n");
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\nhello: world\r\nsecond: header\r\n\r\n");
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
 }
@@ -181,9 +195,9 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   initialize();
   // Make a new 'codec' with the right settings
   codec_settings_.enable_trailers_ = enable_trailers;
-  codec_ =
-      std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_, codec_settings_,
-                                             max_request_headers_kb_, max_request_headers_count_);
+  codec_ = std::make_unique<ServerConnectionImpl>(
+      connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   std::string exception_reason;
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _))
@@ -191,9 +205,9 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
 
   if (enable_trailers) {
     EXPECT_CALL(decoder, decodeHeaders_(_, false));
-    EXPECT_CALL(decoder, decodeData(_, false)).Times(AtLeast(1));
+    EXPECT_CALL(decoder, decodeData(_, false));
   } else {
-    EXPECT_CALL(decoder, decodeData(_, false)).Times(AtLeast(1));
+    EXPECT_CALL(decoder, decodeData(_, false));
     EXPECT_CALL(decoder, decodeData(_, true));
   }
 
@@ -266,7 +280,7 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
       {":path", "/"},
       {":method", "GET"},
   };
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nTest:\r\nHello: World\r\n\r\n");
   codec_->dispatch(buffer);
@@ -301,6 +315,7 @@ TEST_F(Http1ServerConnectionImplTest, UnsupportedEncoding) {
                             "http/1.1 protocol error: unsupported transfer encoding");
 }
 
+// Verify that data in the two body chunks is merged before the call to decodeData.
 TEST_F(Http1ServerConnectionImplTest, ChunkedBody) {
   initialize();
 
@@ -314,13 +329,82 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBody) {
       {":method", "POST"},
       {"transfer-encoding", "chunked"},
   };
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   Buffer::OwnedImpl expected_data("Hello World");
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
-  EXPECT_CALL(decoder, decodeData(_, true)).Times(1);
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+  // Call to decodeData("", true) happens after.
+  Buffer::OwnedImpl empty("");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&empty), true));
 
-  Buffer::OwnedImpl buffer(
-      "POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+}
+
+// Verify dispatch behavior when dispatching an incomplete chunk, and resumption of the parse via a
+// second dispatch.
+TEST_F(Http1ServerConnectionImplTest, ChunkedBodySplitOverTwoDispatches) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "POST"},
+      {"transfer-encoding", "chunked"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  Buffer::OwnedImpl expected_data1("Hello Worl");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data1), false));
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6\r\nHello \r\n"
+                           "5\r\nWorl");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+
+  // Process the rest of the body and final chunk.
+  Buffer::OwnedImpl expected_data2("d");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), false));
+  EXPECT_CALL(decoder, decodeData(_, true));
+
+  Buffer::OwnedImpl buffer2("d\r\n"
+                            "0\r\n\r\n");
+  codec_->dispatch(buffer2);
+  EXPECT_EQ(0U, buffer2.length());
+}
+
+// Verify that headers and chunked body are processed correctly and data is merged before the
+// decodeData call even if delivered in a buffer that holds 1 byte per slice.
+TEST_F(Http1ServerConnectionImplTest, ChunkedBodyFragmentedBuffer) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "POST"},
+      {"transfer-encoding", "chunked"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  Buffer::OwnedImpl expected_data("Hello World");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+  EXPECT_CALL(decoder, decodeData(_, true));
+
+  Buffer::OwnedImpl buffer =
+      createBufferWithOneByteSlices("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                                    "6\r\nHello \r\n"
+                                    "5\r\nWorld\r\n"
+                                    "0\r\n\r\n");
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
 }
@@ -338,15 +422,41 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodyCase) {
       {":method", "POST"},
       {"transfer-encoding", "Chunked"},
   };
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   Buffer::OwnedImpl expected_data("Hello World");
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
-  EXPECT_CALL(decoder, decodeData(_, true)).Times(1);
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+  EXPECT_CALL(decoder, decodeData(_, true));
 
   Buffer::OwnedImpl buffer(
       "POST / HTTP/1.1\r\ntransfer-encoding: Chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
+}
+
+// Verify that body dispatch does not happen after detecting a parse error processing a chunk
+// header.
+TEST_F(Http1ServerConnectionImplTest, InvalidChunkHeader) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "POST"},
+      {"transfer-encoding", "chunked"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6\r\nHello \r\n"
+                           "invalid\r\nWorl");
+
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: HPE_INVALID_CHUNK_SIZE");
 }
 
 TEST_F(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
@@ -389,7 +499,7 @@ TEST_F(Http1ServerConnectionImplTest, Http10) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
   codec_->dispatch(buffer);
@@ -429,7 +539,7 @@ TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
           return decoder;
         }));
 
-    EXPECT_CALL(decoder, decodeHeaders_(_, true)).Times(1);
+    EXPECT_CALL(decoder, decodeHeaders_(_, true));
     codec_->dispatch(buffer);
 
     std::string output;
@@ -452,7 +562,7 @@ TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
           response_encoder = &encoder;
           return decoder;
         }));
-    EXPECT_CALL(decoder, decodeHeaders_(_, true)).Times(1);
+    EXPECT_CALL(decoder, decodeHeaders_(_, true));
     codec_->dispatch(buffer);
     EXPECT_EQ(Protocol::Http11, codec_->protocol());
   }
@@ -514,7 +624,10 @@ TEST_F(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
       .WillOnce(Invoke([&](ResponseEncoder&, bool) -> RequestDecoder& { return decoder; }));
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(decoder, decodeData(_, false)).Times(AtLeast(1));
+  // Verify that body is delivered as soon as the final chunk marker is found, even if an error is
+  // found while processing trailers.
+  Buffer::OwnedImpl expected_data("body");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
 
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\n"
                            "Host: host\r\n"
@@ -584,7 +697,7 @@ TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   codec_->dispatch(buffer);
@@ -657,7 +770,7 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
     // In most tests the write output is serialized to a buffer here it is
     // ignored to build up queued "end connection" sentinels.
     EXPECT_CALL(connection_, write(_, _))
-        .Times(1)
+
         .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void {
           // Move the response out of data while preserving the buffer fragment sentinels.
           local_buffer.move(data);
@@ -708,7 +821,7 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtectionOff) {
     // In most tests the write output is serialized to a buffer here it is
     // ignored to build up queued "end connection" sentinels.
     EXPECT_CALL(connection_, write(_, _))
-        .Times(1)
+
         .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void {
           // Move the response out of data while preserving the buffer fragment sentinels.
           local_buffer.move(data);
@@ -728,7 +841,7 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{":authority", "hello"}, {":path", "/"}, {":method", "GET"}};
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHOST: hello\r\n\r\n");
   codec_->dispatch(buffer);
@@ -777,6 +890,72 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
   EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
                             "http/1.1 protocol error: header value contains invalid chars");
   EXPECT_EQ("http1.invalid_characters", response_encoder->getStream().responseDetails());
+}
+
+// Ensures that request headers with names containing the underscore character are allowed
+// when the option is set to allow.
+TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAllowed) {
+  headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
+  initialize();
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "h.com"},
+      {":path", "/"},
+      {":method", "GET"},
+      {"foo_bar", "bar"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+
+  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(0, store_.counter("http1.dropped_headers_with_underscores").value());
+}
+
+// Ensures that request headers with names containing the underscore character are dropped
+// when the option is set to drop headers.
+TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAreDropped) {
+  headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER;
+  initialize();
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "h.com"},
+      {":path", "/"},
+      {":method", "GET"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+
+  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(1, store_.counter("http1.dropped_headers_with_underscores").value());
+}
+
+// Ensures that request with header names containing the underscore character are rejected
+// when the option is set to reject request.
+TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreCauseRequestRejected) {
+  headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST;
+  initialize();
+
+  MockRequestDecoder decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
+                            "http/1.1 protocol error: header name contains underscores");
+  EXPECT_EQ("http1.invalid_characters", response_encoder->getStream().responseDetails());
+  EXPECT_EQ(1, store_.counter("http1.requests_rejected_with_underscores_in_headers").value());
 }
 
 TEST_F(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
@@ -892,15 +1071,40 @@ TEST_F(Http1ServerConnectionImplTest, PostWithContentLength) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
 
   Buffer::OwnedImpl expected_data1("12345");
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data1), false)).Times(1);
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data1), false));
 
   Buffer::OwnedImpl expected_data2;
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), true)).Times(1);
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), true));
 
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ncontent-length: 5\r\n\r\n12345");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+}
+
+// Verify that headers and body with content length are processed correctly and data is merged
+// before the decodeData call even if delivered in a buffer that holds 1 byte per slice.
+TEST_F(Http1ServerConnectionImplTest, PostWithContentLengthFragmentedBuffer) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{{"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+
+  Buffer::OwnedImpl expected_data1("12345");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data1), false));
+
+  Buffer::OwnedImpl expected_data2;
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), true));
+
+  Buffer::OwnedImpl buffer =
+      createBufferWithOneByteSlices("POST / HTTP/1.1\r\ncontent-length: 5\r\n\r\n12345");
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
 }
@@ -1268,19 +1472,19 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequest) {
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl buffer(
       "POST / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: foo\r\ncontent-length:5\r\n\r\n");
   codec_->dispatch(buffer);
 
   Buffer::OwnedImpl expected_data1("12345");
   Buffer::OwnedImpl body("12345");
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data1), false)).Times(1);
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data1), false));
   codec_->dispatch(body);
 
   Buffer::OwnedImpl expected_data2("abcd");
   Buffer::OwnedImpl websocket_payload("abcd");
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), false)).Times(1);
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), false));
   codec_->dispatch(websocket_payload);
 }
 
@@ -1292,8 +1496,8 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithEarlyData) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl expected_data("12345abcd");
-  EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: "
                            "foo\r\ncontent-length:5\r\n\r\n12345abcd");
   codec_->dispatch(buffer);
@@ -1309,8 +1513,8 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithTEChunked) {
   // Even with T-E chunked, the data should neither be inspected for (the not
   // present in this unit test) chunks, but simply passed through.
   Buffer::OwnedImpl expected_data("12345abcd");
-  EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: "
                            "foo\r\ntransfer-encoding: chunked\r\n\r\n12345abcd");
   codec_->dispatch(buffer);
@@ -1326,15 +1530,15 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithNoBody) {
   // Make sure we avoid the deferred_end_stream_headers_ optimization for
   // requests-with-no-body.
   Buffer::OwnedImpl expected_data("abcd");
-  EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl buffer(
       "GET / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: foo\r\ncontent-length: 0\r\n\r\nabcd");
   codec_->dispatch(buffer);
 }
 
 TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
-  EXPECT_CALL(connection_, bufferLimit()).Times(1).WillOnce(Return(10));
+  EXPECT_CALL(connection_, bufferLimit()).WillOnce(Return(10));
   initialize();
 
   NiceMock<MockRequestDecoder> decoder;
@@ -1380,7 +1584,7 @@ public:
   std::unique_ptr<ClientConnectionImpl> codec_;
 
 protected:
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
 };
 
@@ -1630,13 +1834,13 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponse) {
   // Send body payload
   Buffer::OwnedImpl expected_data1("12345");
   Buffer::OwnedImpl body("12345");
-  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data1), false)).Times(1);
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data1), false));
   codec_->dispatch(body);
 
   // Send websocket payload
   Buffer::OwnedImpl expected_data2("abcd");
   Buffer::OwnedImpl websocket_payload("abcd");
-  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data2), false)).Times(1);
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data2), false));
   codec_->dispatch(websocket_payload);
 }
 
@@ -1655,14 +1859,14 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {
   // Send upgrade headers
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl expected_data("12345abcd");
-  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: "
                              "upgrade\r\nUpgrade: websocket\r\n\r\n12345abcd");
   codec_->dispatch(response);
 }
 
 TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {
-  EXPECT_CALL(connection_, bufferLimit()).Times(1).WillOnce(Return(10));
+  EXPECT_CALL(connection_, bufferLimit()).WillOnce(Return(10));
   initialize();
 
   InSequence s;

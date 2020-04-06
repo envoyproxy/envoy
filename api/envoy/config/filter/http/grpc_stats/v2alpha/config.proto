@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package envoy.config.filter.http.grpc_stats.v2alpha;
 
+import "envoy/api/v2/core/grpc_method_list.proto";
+
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -22,6 +26,33 @@ message FilterConfig {
   // If true, the filter maintains a filter state object with the request and response message
   // counts.
   bool emit_filter_state = 1;
+
+  oneof per_method_stat_specifier {
+    // If set, specifies an allowlist of service/methods that will have individual stats
+    // emitted for them. Any call that does not match the allowlist will be counted
+    // in a stat with no method specifier: `cluster.<name>.grpc.*`.
+    api.v2.core.GrpcMethodList individual_method_stats_allowlist = 2;
+
+    // If set to true, emit stats for all service/method names.
+    //
+    // If set to false, emit stats for all service/message types to the same stats without including
+    // the service/method in the name, with prefix `cluster.<name>.grpc`. This can be useful if
+    // service/method granularity is not needed, or if each cluster only receives a single method.
+    //
+    // .. attention::
+    //   This option is only safe if all clients are trusted. If this option is enabled
+    //   with untrusted clients, the clients could cause unbounded growth in the number of stats in
+    //   Envoy, using unbounded memory and potentially slowing down stats pipelines.
+    //
+    // .. attention::
+    //   If neither `individual_method_stats_allowlist` nor `stats_for_all_methods` is set, the
+    //   behavior will default to `stats_for_all_methods=true`. This default value is deprecated,
+    //   and in a future release, if neither field is set, it will default to
+    //   `stats_for_all_methods=false` in order to be safe by default. This behavior can be
+    //   controlled with runtime override
+    //   `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
+    google.protobuf.BoolValue stats_for_all_methods = 3;
+  }
 }
 
 // gRPC statistics filter state object in protobuf form.
