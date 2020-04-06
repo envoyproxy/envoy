@@ -28,9 +28,10 @@
 namespace Envoy {
 namespace Network {
 
-const std::string Utility::TCP_SCHEME = "tcp://";
-const std::string Utility::UDP_SCHEME = "udp://";
-const std::string Utility::UNIX_SCHEME = "unix://";
+// TODO(lambdai): Remove below re-declare in C++17.
+constexpr absl::string_view Utility::TCP_SCHEME;
+constexpr absl::string_view Utility::UDP_SCHEME;
+constexpr absl::string_view Utility::UNIX_SCHEME;
 
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   if (urlIsTcpScheme(url)) {

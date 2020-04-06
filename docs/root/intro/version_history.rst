@@ -27,6 +27,7 @@ Version history
 * datasource: added retry policy for remote async data source.
 * dns: the STRICT_DNS cluster now only resolves to 0 hosts if DNS resolution successfully returns 0 hosts.
 * dns: added support for :ref:`dns_failure_refresh_rate <envoy_api_field_config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig.dns_failure_refresh_rate>` for the :ref:`dns cache <envoy_api_msg_config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig>` to set the DNS refresh rate during failures.
+* http: added :ref:`headers_with_underscores_action setting <envoy_api_field_core.HttpProtocolOptions.headers_with_underscores_action>` to control how client requests with header names containing underscore characters are handled. The options are to allow such headers, reject request or drop headers. The default is to allow headers, preserving existing behavior.
 * http filters: http filter extensions use the "envoy.filters.http" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * eds: added :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` field for endpoints and :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field for endpoint's health check config. This enables auto host rewrite and customizing the host header during health checks for eds endpoints.
@@ -45,6 +46,7 @@ Version history
 * listeners: added :ref:`listener filter matcher api <envoy_api_field_listener.ListenerFilter.filter_disabled>` to disable individual listener filter on matching downstream connections.
 * listeners: fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` could have been bypassed by a client using only TLS 1.3.
 * loadbalancing: added support for using hostname for consistent hash loadbalancing via :ref:`consistent_hash_lb_config <envoy_api_field_Cluster.CommonLbConfig.consistent_hashing_lb_config>`.
+* loadbalancing: added support for :ref:`retry host predicates <envoy_api_field_route.RetryPolicy.retry_host_predicate>` in conjunction with consistent hashing load balancers (ring hash and maglev).
 * lua: added a parameter to `httpCall` that makes it possible to have the call be asynchronous.
 * lua: added moonjit support.
 * mongo: the stat emitted for queries without a max time set in the :ref:`MongoDB filter<config_network_filters_mongo_proxy>` was modified to emit correctly for Mongo v3.2+.
@@ -74,6 +76,7 @@ Version history
 * stat sinks: stat sink extensions use the "envoy.stat_sinks" name space. A mapping of extension
   names is available in the :ref:`deprecated <deprecated>` documentation.
 * thrift_proxy: add router filter stats to docs.
+* tls: added configuration to disable stateless TLS session resumption :ref:`disable_stateless_session_resumption <envoy_api_field_auth.DownstreamTlsContext.disable_stateless_session_resumption>`
 * tracers: tracer extensions use the "envoy.tracers" name space. A mapping of extension names is
   available in the :ref:`deprecated <deprecated>` documentation.
 * tracing: added gRPC service configuration to the OpenCensus Stackdriver and OpenCensus Agent tracers.
