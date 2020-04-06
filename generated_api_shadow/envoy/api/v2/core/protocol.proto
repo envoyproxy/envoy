@@ -57,7 +57,7 @@ message HttpProtocolOptions {
   }
 
   // The idle timeout for connections. The idle timeout is defined as the
-  // period in which there are no active requests. If not set, there is no idle timeout. When the
+  // period in which there are no active requests. When the
   // idle timeout is reached the connection will be closed. If the connection is an HTTP/2
   // downstream connection a drain sequence will occur prior to closing the connection, see
   // :ref:`drain_timeout
