@@ -195,5 +195,8 @@ MockUdpListenerFilterManager::~MockUdpListenerFilterManager() = default;
 MockConnectionBalancer::MockConnectionBalancer() = default;
 MockConnectionBalancer::~MockConnectionBalancer() = default;
 
+MockListenerFilterMatcher::MockListenerFilterMatcher() = default;
+MockListenerFilterMatcher::~MockListenerFilterMatcher() = default;
+
 } // namespace Network
 } // namespace Envoy
