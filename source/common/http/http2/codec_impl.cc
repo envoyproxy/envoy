@@ -17,8 +17,10 @@
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -847,6 +849,14 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
     stats_.headers_cb_no_stream_.inc();
     return 0;
   }
+
+  auto should_return = checkHeaderNameForUnderscores(name.getStringView());
+  if (should_return) {
+    name.clear();
+    value.clear();
+    return should_return.value();
+  }
+
   stream->saveHeader(std::move(name), std::move(value));
 
   if (stream->headers().byteSize() > max_headers_kb_ * 1024 ||
@@ -1170,11 +1180,14 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 ServerConnectionImpl::ServerConnectionImpl(
     Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks,
     Stats::Scope& scope, const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-    const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count)
+    const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action)
     : ConnectionImpl(connection, scope, http2_options, max_request_headers_kb,
                      max_request_headers_count),
-      callbacks_(callbacks) {
+      callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action) {
   Http2Options h2_options(http2_options);
+
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                               h2_options.options());
   sendSettings(http2_options, false);
@@ -1317,6 +1330,25 @@ void ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   checkOutboundQueueLimits();
 
   ConnectionImpl::dispatch(data);
+}
+
+absl::optional<int>
+ServerConnectionImpl::checkHeaderNameForUnderscores(absl::string_view header_name) {
+  if (headers_with_underscores_action_ != envoy::config::core::v3::HttpProtocolOptions::ALLOW &&
+      Http::HeaderUtility::headerNameContainsUnderscore(header_name)) {
+    if (headers_with_underscores_action_ ==
+        envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
+      ENVOY_CONN_LOG(debug, "Dropping header with invalid characters in its name: {}", connection_,
+                     header_name);
+      stats_.dropped_headers_with_underscores_.inc();
+      return 0;
+    }
+    ENVOY_CONN_LOG(debug, "Rejecting request due to header name with underscores: {}", connection_,
+                   header_name);
+    stats_.requests_rejected_with_underscores_in_headers_.inc();
+    return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+  }
+  return absl::nullopt;
 }
 
 } // namespace Http2

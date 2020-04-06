@@ -38,7 +38,9 @@ public:
                   ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
                   const Http1Settings& http1_settings,
                   const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                  uint32_t max_request_headers_kb, uint32_t max_request_headers_count);
+                  uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+                  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+                      headers_with_underscores_action);
 
   /**
    * Mutates request headers in various ways. This functionality is broken out because of its
