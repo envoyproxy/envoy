@@ -529,9 +529,6 @@ public:
     return common_lb_config_;
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
-  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
-    return max_stream_duration_;
-  }
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return idle_timeout_;
   }
@@ -542,6 +539,9 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const override {
     return http2_options_;
+  }
+  const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
+    return common_http_protocol_options_;
   }
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
@@ -619,7 +619,6 @@ private:
   const uint64_t max_requests_per_connection_;
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
-  const absl::optional<std::chrono::milliseconds> max_stream_duration_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
@@ -631,6 +630,7 @@ private:
   const uint64_t features_;
   const Http::Http1Settings http1_settings_;
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
+  const envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   const std::map<std::string, ProtocolOptionsConfigConstSharedPtr> extension_protocol_options_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;

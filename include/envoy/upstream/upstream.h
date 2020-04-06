@@ -701,11 +701,6 @@ public:
   virtual std::chrono::milliseconds connectTimeout() const PURE;
 
   /**
-   * @return maximum duration time to keep alive stream
-   */
-  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
-
-  /**
    * @return the idle timeout for upstream connection pool connections.
    */
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
@@ -732,6 +727,12 @@ public:
    *         @see envoy::config::core::v3::Http2ProtocolOptions.
    */
   virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::HttpProtocolOptions for all of HTTP versions.
+   */
+  virtual const envoy::config::core::v3::HttpProtocolOptions&
+  commonHttpProtocolOptions() const PURE;
 
   /**
    * @param name std::string containing the well-known name of the extension for which protocol

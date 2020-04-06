@@ -70,8 +70,6 @@ TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader();
 
 TEST_P(Http2IntegrationTest, LargeRequestTrailersRejected) { testLargeRequestTrailers(66, 60); }
 
-TEST_P(Http2IntegrationTest, BasicMaxStreamDuration) { testMaxStreamDuration(); }
-
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
 typed_config:

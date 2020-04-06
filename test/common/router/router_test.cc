@@ -3561,8 +3561,12 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
 TEST_F(RouterTest, MaxStreamDurationValidlyConfigured) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
-  ON_CALL(cm_.conn_pool_.host_->cluster_, maxStreamDuration())
-      .WillByDefault(Return(std::chrono::milliseconds(500)));
+  ON_CALL(cm_.conn_pool_.host_->cluster_, commonHttpProtocolOptions()).WillByDefault(Invoke([&]() {
+    auto common_http_protocol_options = envoy::config::core::v3::HttpProtocolOptions();
+    common_http_protocol_options.mutable_max_stream_duration()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(500));
+    return common_http_protocol_options;
+  }));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke(
           [&](Http::ResponseDecoder& decoder,
@@ -3585,8 +3589,13 @@ TEST_F(RouterTest, MaxStreamDurationValidlyConfigured) {
 TEST_F(RouterTest, MaxStreamDurationDisabledIfSetToZero) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
-  ON_CALL(cm_.conn_pool_.host_->cluster_, maxStreamDuration())
-      .WillByDefault(Return(std::chrono::milliseconds(0)));
+
+  ON_CALL(cm_.conn_pool_.host_->cluster_, commonHttpProtocolOptions()).WillByDefault(Invoke([&]() {
+    auto common_http_protocol_options = envoy::config::core::v3::HttpProtocolOptions();
+    common_http_protocol_options.mutable_max_stream_duration()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(0));
+    return common_http_protocol_options;
+  }));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke(
           [&](Http::ResponseDecoder& decoder,
@@ -3610,8 +3619,12 @@ TEST_F(RouterTest, MaxStreamDurationDisabledIfSetToZero) {
 TEST_F(RouterTest, MaxStreamDurationCallbackNotCalled) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
-  ON_CALL(cm_.conn_pool_.host_->cluster_, maxStreamDuration())
-      .WillByDefault(Return(std::chrono::milliseconds(5000)));
+  ON_CALL(cm_.conn_pool_.host_->cluster_, commonHttpProtocolOptions()).WillByDefault(Invoke([&]() {
+    auto common_http_protocol_options = envoy::config::core::v3::HttpProtocolOptions();
+    common_http_protocol_options.mutable_max_stream_duration()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(5000));
+    return common_http_protocol_options;
+  }));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke(
           [&](Http::ResponseDecoder& decoder,

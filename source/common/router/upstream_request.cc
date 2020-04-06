@@ -364,11 +364,14 @@ void UpstreamRequest::onPoolReady(
   // only happens when decoding headers filters return ContinueAndEndStream.
   const bool delay_headers_end_stream = end_stream && !downstream_metadata_map_vector_.empty();
 
-  const auto max_stream_duration = upstream_host_->cluster().maxStreamDuration();
-  if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
-    max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
-        [this]() -> void { onStreamMaxDurationReached(); });
-    max_stream_duration_timer_->enableTimer(upstream_host_->cluster().maxStreamDuration().value());
+  if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
+    const auto max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+        upstream_host_->cluster().commonHttpProtocolOptions().max_stream_duration()));
+    if (max_stream_duration.count()) {
+      max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
+          [this]() -> void { onStreamMaxDurationReached(); });
+      max_stream_duration_timer_->enableTimer(max_stream_duration);
+    }
   }
   upstream_->encodeHeaders(*parent_.downstreamHeaders(), end_stream && !delay_headers_end_stream);
 
@@ -415,6 +418,7 @@ void UpstreamRequest::onStreamMaxDurationReached() {
   max_stream_duration_timer_->disableTimer();
   max_stream_duration_timer_.reset();
   resetStream();
+  parent_.callbacks()->resetStream();
 }
 
 void UpstreamRequest::clearRequestEncoder() {

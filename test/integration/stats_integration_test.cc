@@ -269,6 +269,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   //                                          clusters and hosts.
   // 2020/03/16  9964     44085       44600   http2: support custom SETTINGS parameters.
   // 2020/03/24  10501    44261       44600   upstream: upstream_rq_retry_limit_exceeded.
+  // 2020/04/07  10531    44437       44600   http: max stream duration upstream support.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -282,7 +283,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 44261);
+  EXPECT_MEMORY_EQ(m_per_cluster, 44437);
   EXPECT_MEMORY_LE(m_per_cluster, 44600);
 }
 
@@ -325,6 +326,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   //                                          upgrading.
   // 2020/03/16  9964     36220       36800   http2: support custom SETTINGS parameters.
   // 2020/03/24  10501    36300       36800   upstream: upstream_rq_retry_limit_exceeded.
+  // 2020/04/07  10531    36380       36800   http: max stream duration upstream support.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -338,7 +340,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 36300);
+  EXPECT_MEMORY_EQ(m_per_cluster, 36380);
   EXPECT_MEMORY_LE(m_per_cluster, 36800);
 }
 
