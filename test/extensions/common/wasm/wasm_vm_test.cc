@@ -114,10 +114,10 @@ MockHostFunctions* g_host_functions;
 
 void pong(void*, Word value) { g_host_functions->pong(convertWordToUint32(value)); }
 
-Word random(void*) { return Word(g_host_functions->random()); }
+Word random(void*) { return {g_host_functions->random()}; }
 
 // pong() with wrong number of arguments.
-void bad_pong1(void*) { return; }
+void bad_pong1(void*) {}
 
 // pong() with wrong return type.
 Word bad_pong2(void*, Word) { return 2; }

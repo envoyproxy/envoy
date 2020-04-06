@@ -8,8 +8,8 @@
 #ifndef URL_URL_CANON_H_
 #define URL_URL_CANON_H_
 
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
 
 #include "common/chromium_url/envoy_shim.h"
 #include "common/chromium_url/url_parse.h"
@@ -28,7 +28,7 @@ namespace chromium_url {
 // manage.
 template <typename T> class CanonOutputT {
 public:
-  CanonOutputT() : buffer_(NULL), buffer_len_(0), cur_len_(0) {}
+  CanonOutputT() : buffer_(NULL) {}
   virtual ~CanonOutputT() = default;
 
   // Implemented to resize the buffer. This function should update the buffer
@@ -83,8 +83,9 @@ public:
 
     // Grow the buffer to hold at least one more item. Hopefully we won't have
     // to do this very often.
-    if (!Grow(1))
+    if (!Grow(1)) {
       return;
+    }
 
     // Actually do the insertion.
     buffer_[cur_len_] = ch;
@@ -94,18 +95,21 @@ public:
   // Appends the given string to the output.
   void Append(const T* str, int str_len) {
     if (cur_len_ + str_len > buffer_len_) {
-      if (!Grow(cur_len_ + str_len - buffer_len_))
+      if (!Grow(cur_len_ + str_len - buffer_len_)) {
         return;
+      }
     }
-    for (int i = 0; i < str_len; i++)
+    for (int i = 0; i < str_len; i++) {
       buffer_[cur_len_ + i] = str[i];
+    }
     cur_len_ += str_len;
   }
 
   void ReserveSizeIfNeeded(int estimated_size) {
     // Reserve a bit extra to account for escaped chars.
-    if (estimated_size > buffer_len_)
+    if (estimated_size > buffer_len_) {
       Resize(estimated_size + 8);
+    }
   }
 
 protected:
@@ -115,8 +119,9 @@ protected:
     static const int kMinBufferLen = 16;
     int new_len = (buffer_len_ == 0) ? kMinBufferLen : buffer_len_;
     do {
-      if (new_len >= (1 << 30)) // Prevent overflow below.
+      if (new_len >= (1 << 30)) { // Prevent overflow below.
         return false;
+      }
       new_len *= 2;
     } while (new_len < buffer_len_ + min_additional);
     Resize(new_len);
@@ -124,10 +129,10 @@ protected:
   }
 
   T* buffer_;
-  int buffer_len_;
+  int buffer_len_{0};
 
   // Used characters in the buffer.
-  int cur_len_;
+  int cur_len_{0};
 };
 
 // Simple implementation of the CanonOutput using new[]. This class
@@ -140,15 +145,17 @@ public:
     this->buffer_len_ = fixed_capacity;
   }
   ~RawCanonOutputT() override {
-    if (this->buffer_ != fixed_buffer_)
+    if (this->buffer_ != fixed_buffer_) {
       delete[] this->buffer_;
+    }
   }
 
   void Resize(int sz) override {
     T* new_buf = new T[sz];
     memcpy(new_buf, this->buffer_, sizeof(T) * (this->cur_len_ < sz ? this->cur_len_ : sz));
-    if (this->buffer_ != fixed_buffer_)
+    if (this->buffer_ != fixed_buffer_) {
       delete[] this->buffer_;
+    }
     this->buffer_ = new_buf;
     this->buffer_len_ = sz;
   }
