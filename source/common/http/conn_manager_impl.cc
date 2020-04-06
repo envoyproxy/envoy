@@ -353,6 +353,10 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     }
   } while (redispatch);
 
+  if (!read_callbacks_->connection().streamInfo().protocol()) {
+    read_callbacks_->connection().streamInfo().protocol(codec_->protocol());
+  }
+
   return Network::FilterStatus::StopIteration;
 }
 
