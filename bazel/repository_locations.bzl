@@ -303,7 +303,7 @@ REPOSITORY_LOCATIONS = dict(
     org_llvm_releases_compiler_rt = dict(
         sha256 = "56e4cd96dd1d8c346b07b4d6b255f976570c6f2389697347a6c3dcb9e820d10e",
         # Only allow peeking at fuzzer related files for now.
-        strip_prefix = "compiler-rt-9.0.0.src/lib/fuzzer",
+        strip_prefix = "compiler-rt-9.0.0.src/lib",
         urls = ["http://releases.llvm.org/9.0.0/compiler-rt-9.0.0.src.tar.xz"],
     ),
     fuzzit_linux = dict(

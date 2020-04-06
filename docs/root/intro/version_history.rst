@@ -4,7 +4,7 @@ Version history
 1.14.0 (Pending)
 ================
 * access log: added support for DOWNSTREAM_LOCAL_PORT :ref:`access log formatters <config_access_log_format>`.
-* access loggers: access logger extensions use the "envoy.access_loggers" name space. A mapping
+* access log: access logger extensions use the "envoy.access_loggers" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * access log: fix %DOWSTREAM_DIRECT_REMOTE_ADDRESS% when used with PROXY protocol listener filter
 * access log: introduce :ref:`connection-level access loggers<envoy_api_field_Listener.access_log>`.
@@ -17,18 +17,17 @@ Version history
 * aws_request_signing: a few fixes so that it works with S3.
 * buffer: force copy when appending small slices to OwnedImpl buffer to avoid fragmentation.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
-* grpc-json: added support for building HTTP request into
-  `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
-* grpc-stats: add options to limit which messages stats are created for.
 * config: added stat :ref:`update_time <config_cluster_manager_cds>`.
 * datasource: added retry policy for remote async data source.
 * dns: the STRICT_DNS cluster now only resolves to 0 hosts if DNS resolution successfully returns 0 hosts.
 * dns: added support for :ref:`dns_failure_refresh_rate <envoy_api_field_config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig.dns_failure_refresh_rate>` for the :ref:`dns cache <envoy_api_msg_config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig>` to set the DNS refresh rate during failures.
-* http filters: http filter extensions use the "envoy.filters.http" name space. A mapping
-  of extension names is available in the :ref:`deprecated <deprecated>` documentation.
+* eds: added :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` field for endpoints and :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field for endpoint's health check config. This enables auto host rewrite and customizing the host header during health checks for eds endpoints.
 * ext_authz: disabled the use of lowercase string matcher for headers matching in HTTP-based `ext_authz`.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher` to false.
 * fault: added support for controlling abort faults with :ref:`HTTP header fault configuration <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
+* grpc-json: added support for building HTTP request into
+  `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
+* grpc-stats: add options to limit which messages stats are created for.
 * http: added HTTP/1.1 flood protection. Can be temporarily disabled using the runtime feature `envoy.reloadable_features.http1_flood_protection`
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
 * http: fixed a bug that could send extra METADATA frames and underflow memory when encoding METADATA frames on a connection that was dispatching data.
@@ -36,10 +35,15 @@ Version history
 * http: added :ref:`max_stream_duration <envoy_api_field_core.HttpProtocolOptions.max_stream_duration>` to specify the duration of existing streams. See :ref:`connection and stream timeouts <faq_configuration_timeouts>`.
 * http: upgrade parser library, which removes support for "identity" transfer-encoding value.
 * http: the runtime feature `http.connection_manager.log_flood_exception` is removed and replaced with a connection access log response code.
+* http: added :ref:`headers_with_underscores_action setting <envoy_api_field_core.HttpProtocolOptions.headers_with_underscores_action>` to control how client requests with header names containing underscore characters are handled. The options are to allow such headers, reject request or drop headers. The default is to allow headers, preserving existing behavior.
+* http: http filter extensions use the "envoy.filters.http" name space. A mapping
+  of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * listener filters: listener filter extensions use the "envoy.filters.listener" name space. A
   mapping of extension names is available in the :ref:`deprecated <deprecated>` documentation.
+* listeners: added :ref:`listener filter matcher api <envoy_api_field_listener.ListenerFilter.filter_disabled>` to disable individual listener filter on matching downstream connections.
 * listeners: fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` could have been bypassed by a client using only TLS 1.3.
 * loadbalancing: added support for using hostname for consistent hash loadbalancing via :ref:`consistent_hash_lb_config <envoy_api_field_Cluster.CommonLbConfig.consistent_hashing_lb_config>`.
+* loadbalancing: added support for :ref:`retry host predicates <envoy_api_field_route.RetryPolicy.retry_host_predicate>` in conjunction with consistent hashing load balancers (ring hash and maglev).
 * lua: added a parameter to `httpCall` that makes it possible to have the call be asynchronous.
 * lua: added moonjit support.
 * mongo: the stat emitted for queries without a max time set in the :ref:`MongoDB filter<config_network_filters_mongo_proxy>` was modified to emit correctly for Mongo v3.2+.
@@ -64,11 +68,14 @@ Version history
   disables the use of deprecated extension names.
 * runtime: integer values may now be parsed as booleans.
 * sds: added :ref:`GenericSecret <envoy_api_msg_auth.GenericSecret>` to support secret of generic type.
+* sds: added :ref:`certificate rotation <xds_certificate_rotation>` support for certificates in static resources.
 * sds: fix the SDS vulnerability that TLS validation context (e.g., subject alt name or hash) cannot be effectively validated in some cases.
+* server: the SIGUSR1 access log reopen warning now is logged at info level.
 * stat sinks: stat sink extensions use the "envoy.stat_sinks" name space. A mapping of extension
   names is available in the :ref:`deprecated <deprecated>` documentation.
 * thrift_proxy: add router filter stats to docs.
-* tracers: tracer extensions use the "envoy.tracers" name space. A mapping of extension names is
+* tls: added configuration to disable stateless TLS session resumption :ref:`disable_stateless_session_resumption <envoy_api_field_auth.DownstreamTlsContext.disable_stateless_session_resumption>`
+* tracing: tracer extensions use the "envoy.tracers" name space. A mapping of extension names is
   available in the :ref:`deprecated <deprecated>` documentation.
 * tracing: added gRPC service configuration to the OpenCensus Stackdriver and OpenCensus Agent tracers.
 * upstream: added ``upstream_rq_retry_limit_exceeded`` to :ref:`cluster <config_cluster_manager_cluster_stats>`, and :ref:`virtual cluster <config_http_filters_router_vcluster_stats>` stats.
