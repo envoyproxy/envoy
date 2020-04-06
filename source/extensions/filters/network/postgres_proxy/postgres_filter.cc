@@ -106,7 +106,7 @@ void PostgresFilter::incNotices(NoticeType type) {
     config_->stats_.notices_debug_.inc();
     break;
   case DecoderCallbacks::NoticeType::Info:
-    config_->stats_.notices_debug_.inc();
+    config_->stats_.notices_info_.inc();
     break;
   case DecoderCallbacks::NoticeType::Log:
     config_->stats_.notices_log_.inc();

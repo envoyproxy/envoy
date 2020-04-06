@@ -107,8 +107,10 @@ public:
   void setDecoder(std::unique_ptr<Decoder> decoder) { decoder_ = std::move(decoder); }
   Decoder* getDecoder() const { return decoder_.get(); }
 
+  // Routines used during integration and unit tests
   uint32_t getFrontendBufLength() const { return frontend_buffer_.length(); }
   uint32_t getBackendBufLength() const { return backend_buffer_.length(); }
+  const PostgresProxyStats& getStats() const { return config_->stats_; }
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};

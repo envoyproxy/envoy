@@ -8,16 +8,16 @@ namespace NetworkFilters {
 namespace PostgresProxy {
 
 void DecoderImpl::initialize() {
-  // Special handler for first message of the transaction
+  // Special handler for first message of the transaction.
   first_ = Message{"Startup", {}};
 
-  // Frontend messages
+  // Frontend messages.
   std::get<0>(FE_messages_) = "Frontend";
 
-  // Setup handlers for known messages
+  // Setup handlers for known messages.
   absl::flat_hash_map<char, Message>& FE_known_msgs = std::get<1>(FE_messages_);
 
-  // Handler for know messages
+  // Handler for know messages.
   FE_known_msgs['B'] = Message{"Bind", {}};
   FE_known_msgs['C'] = Message{"Close", {}};
   FE_known_msgs['d'] = Message{"CopyData", {}};
@@ -33,16 +33,16 @@ void DecoderImpl::initialize() {
   FE_known_msgs['S'] = Message{"Sync", {}};
   FE_known_msgs['X'] = Message{"Terminate", {&DecoderImpl::decodeFrontendTerminate}};
 
-  // Handler for unknown messages
+  // Handler for unknown messages.
   std::get<2>(FE_messages_) = Message{"Other", {&DecoderImpl::incMessagesUnknown}};
 
-  // Backend messages
+  // Backend messages.
   std::get<0>(BE_messages_) = "Backend";
 
-  // Setup handlers for known messages
+  // Setup handlers for known messages.
   absl::flat_hash_map<char, Message>& BE_known_msgs = std::get<1>(BE_messages_);
 
-  // Handler for know messages
+  // Handler for know messages.
   BE_known_msgs['R'] = Message{"Authentication", {&DecoderImpl::decodeAuthentication}};
   BE_known_msgs['K'] = Message{"BackendKeyData", {}};
   BE_known_msgs['2'] = Message{"BindComplete", {}};
@@ -67,7 +67,7 @@ void DecoderImpl::initialize() {
   BE_known_msgs['Z'] = Message{"ReadyForQuery", {}};
   BE_known_msgs['T'] = Message{"RowDescription", {}};
 
-  // Handler for unknown messages
+  // Handler for unknown messages.
   std::get<2>(BE_messages_) = Message{"Other", {&DecoderImpl::incMessagesUnknown}};
 
   // Setup hash map for handling backend statements.
@@ -156,7 +156,7 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
 
   // The minimum size of the message sufficient for parsing is 5 bytes.
   if (data.length() < 5) {
-    // not enough data in the buffer
+    // not enough data in the buffer.
     return false;
   }
 
@@ -174,7 +174,7 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   if (data.length() < (length + (startup_ ? 0 : 1))) {
     ENVOY_LOG(trace, "postgres_proxy: cannot parse message. Need {} bytes in buffer",
               length + (startup_ ? 0 : 1));
-    // not enough data in the buffer
+    // Not enough data in the buffer.
     return false;
   }
 
@@ -198,7 +198,7 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
 
   setMessageLength(length);
 
-  data.drain(startup_ ? 4 : 5); // length plus optional 1st byte
+  data.drain(startup_ ? 4 : 5); // Length plus optional 1st byte.
 
   auto bytesToRead = length - 4;
   message.assign(std::string(static_cast<char*>(data.linearize(bytesToRead)), bytesToRead));
@@ -210,7 +210,7 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
 }
 
 bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
-  // If encrypted, just drain the traffic
+  // If encrypted, just drain the traffic.
   if (encrypted_) {
     ENVOY_LOG(trace, "postgres_proxy: ignoring {} bytes of encrypted data", data.length());
     data.drain(data.length());
@@ -260,7 +260,7 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 void DecoderImpl::decodeBackendStatements() {
   // The message_ contains the statement. Find space character
   // and the statement is the first word. If space cannot be found
-  // take the whole message
+  // take the whole message.
   std::string statement = message_.substr(0, message_.find(' '));
 
   auto it = BE_statements_.find(statement);
@@ -286,8 +286,8 @@ void DecoderImpl::decodeFrontendTerminate() {
 // It looks for 4 bytes of zeros, which means that login to
 // database was successful.
 void DecoderImpl::decodeAuthentication() {
-  // check if auth message indicates successful authentication
-  // Length must be 8 and payload must be 0
+  // Check if auth message indicates successful authentication.
+  // Length must be 8 and payload must be 0.
   if ((8 == message_len_) && (0 == message_.data()[0]) && (0 == message_.data()[1]) &&
       (0 == message_.data()[2]) && (0 == message_.data()[3])) {
     incSessionsUnencrypted();
@@ -298,7 +298,7 @@ void DecoderImpl::decodeAuthentication() {
 // use different keywords inside the message and statistics fields are different.
 void DecoderImpl::decodeErrorNotice(
     std::tuple<absl::flat_hash_map<std::string, MsgAction>, MsgAction>& types) {
-  // Error/Notice message should start with character "S"
+  // Error/Notice message should start with character "S".
   if (message_[0] != 'S') {
     std::get<1>(types)(this);
     return;
@@ -315,7 +315,7 @@ void DecoderImpl::decodeErrorNotice(
     }
   }
 
-  // keyword was not found in the message. Count is as Unknown.
+  // Keyword was not found in the message. Count is as Unknown.
   std::get<1>(types)(this);
 }
 

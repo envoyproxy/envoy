@@ -14,10 +14,6 @@ load(
 
 envoy_package()
 
-#load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
-
-#api_proto_package()
-
 envoy_cc_library(
     name = "filter",
     srcs = [

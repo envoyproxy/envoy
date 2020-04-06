@@ -5,6 +5,7 @@
 
 #include "extensions/filters/network/postgres_proxy/postgres_filter.h"
 
+#include "test/extensions/filters/network/postgres_proxy/postgres_test_utils.h"
 #include "test/mocks/network/mocks.h"
 
 namespace Envoy {
@@ -14,12 +15,14 @@ namespace PostgresProxy {
 
 using ::testing::WithArgs;
 
+// Decoder mock.
 class DecoderTest : public Decoder {
 public:
   MOCK_METHOD(bool, onData, (Buffer::Instance&, bool), (override));
   MOCK_METHOD(PostgresSession&, getSession, (), (override));
 };
 
+// Fixture class.
 class PostgresFilterTest
     : public ::testing::TestWithParam<
           std::tuple<std::function<void(PostgresFilter*, Buffer::Instance&, bool)>,
@@ -29,7 +32,6 @@ public:
     config_ = std::make_shared<PostgresFilterConfig>(stat_prefix_, scope_);
     filter_ = std::make_unique<PostgresFilter>(config_);
 
-    filter_->setDecoder(std::make_unique<DecoderTest>());
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -39,7 +41,7 @@ public:
   PostgresFilterConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
 
-  // These variables are used internally in tests
+  // These variables are used internally in tests.
   Buffer::OwnedImpl data_;
   char buf_[256];
 };
@@ -52,6 +54,7 @@ TEST_F(PostgresFilterTest, NewConnection) {
 // or decoder indicates that there is not enough data in a buffer
 // to process a message.
 TEST_P(PostgresFilterTest, ReadData) {
+  filter_->setDecoder(std::make_unique<DecoderTest>());
   data_.add(buf_, 256);
 
   // Simulate reading entire buffer.
@@ -63,7 +66,7 @@ TEST_P(PostgresFilterTest, ReadData) {
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 0);
 
-  // Simulate reading entire data in two steps
+  // Simulate reading entire data in two steps.
   EXPECT_CALL(*(reinterpret_cast<DecoderTest*>(filter_->getDecoder())), onData)
       .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> bool {
         data.drain(100);
@@ -104,6 +107,134 @@ INSTANTIATE_TEST_SUITE_P(ProcessDataTests, PostgresFilterTest,
                                                            &PostgresFilter::getFrontendBufLength),
                                            std::make_tuple(&PostgresFilter::onWrite,
                                                            &PostgresFilter::getBackendBufLength)));
+
+// Test generates various postgres payloads and feeds them into filter.
+// It expects that certain statistics are updated.
+TEST_F(PostgresFilterTest, BackendMsgsStats) {
+  // pretend that startup message has been received.
+  static_cast<DecoderImpl*>(filter_->getDecoder())->setStartup(false);
+
+  // unknown message
+  createPostgresMsg(data_, "=", "blah blah blah");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().messages_unknown_.value(), 1);
+
+  filter_->getDecoder()->getSession().setInTransaction(true);
+  createPostgresMsg(data_, "C", "COMMIT");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 1);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 0);
+  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 1);
+
+  createPostgresMsg(data_, "C", "ROLLBACK 234");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 0);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 2);
+  ASSERT_THAT(filter_->getStats().statements_other_.value(), 0);
+  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 1);
+
+  createPostgresMsg(data_, "C", "SELECT blah");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 3);
+  ASSERT_THAT(filter_->getStats().statements_select_.value(), 1);
+
+  createPostgresMsg(data_, "C", "INSERT 123");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 4);
+  ASSERT_THAT(filter_->getStats().statements_insert_.value(), 1);
+
+  createPostgresMsg(data_, "C", "DELETE 123");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 5);
+  ASSERT_THAT(filter_->getStats().statements_delete_.value(), 1);
+
+  createPostgresMsg(data_, "C", "UPDATE 123");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 6);
+  ASSERT_THAT(filter_->getStats().statements_update_.value(), 1);
+
+  createPostgresMsg(data_, "C", "BEGIN 123");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 7);
+  ASSERT_THAT(filter_->getStats().statements_other_.value(), 1);
+}
+
+// Test sends series of E type error messages to the filter and
+// verifies that statistic counters are increased.
+TEST_F(PostgresFilterTest, ErrorMsgsStats) {
+  // Pretend that startup message has been received.
+  static_cast<DecoderImpl*>(filter_->getDecoder())->setStartup(false);
+
+  createPostgresMsg(data_, "E", "SERRORVERRORC22012");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().errors_.value(), 1);
+  ASSERT_THAT(filter_->getStats().errors_error_.value(), 1);
+
+  createPostgresMsg(data_, "E", "SFATALVFATALC22012");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().errors_.value(), 2);
+  ASSERT_THAT(filter_->getStats().errors_fatal_.value(), 1);
+
+  createPostgresMsg(data_, "E", "SPANICVPANICC22012");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().errors_.value(), 3);
+  ASSERT_THAT(filter_->getStats().errors_panic_.value(), 1);
+
+  createPostgresMsg(data_, "E", "SBLAHBLAHC22012");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().errors_.value(), 4);
+  ASSERT_THAT(filter_->getStats().errors_unknown_.value(), 1);
+}
+
+// Test sends series of N type messages to the filter and verifies
+// that corresponding stats counters are updated.
+TEST_F(PostgresFilterTest, NoticeMsgsStats) {
+  // Pretend that startup message has been received.
+  static_cast<DecoderImpl*>(filter_->getDecoder())->setStartup(false);
+
+  createPostgresMsg(data_, "N", "SblalalaC2345");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().notices_.value(), 1);
+  ASSERT_THAT(filter_->getStats().notices_unknown_.value(), 1);
+
+  createPostgresMsg(data_, "N", "SblahVWARNING23345");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().notices_.value(), 2);
+  ASSERT_THAT(filter_->getStats().notices_warning_.value(), 1);
+
+  createPostgresMsg(data_, "N", "SNOTICEERRORbbal4");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().notices_.value(), 3);
+  ASSERT_THAT(filter_->getStats().notices_notice_.value(), 1);
+
+  createPostgresMsg(data_, "N", "SINFOVblabla");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().notices_.value(), 4);
+  ASSERT_THAT(filter_->getStats().notices_info_.value(), 1);
+
+  createPostgresMsg(data_, "N", "SDEBUGDEBUG");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().notices_.value(), 5);
+  ASSERT_THAT(filter_->getStats().notices_debug_.value(), 1);
+
+  createPostgresMsg(data_, "N", "SLOGGGGINFO");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().notices_.value(), 6);
+  ASSERT_THAT(filter_->getStats().notices_log_.value(), 1);
+}
+
+// Encrypted sessions are detected based on the first received message.
+TEST_F(PostgresFilterTest, EncryptedSessionStats) {
+  uint32_t length = htonl(8);
+
+  data_.add(&length, 4);
+  // 1234 in the most significant 16 bits and some code in the least significant 16 bits.
+  uint32_t code = htonl(80877103); // SSL code.
+  data_.add(&code, sizeof(code));
+  filter_->onData(data_, false);
+  ASSERT_THAT(filter_->getStats().sessions_.value(), 1);
+  ASSERT_THAT(filter_->getStats().sessions_encrypted_.value(), 1);
+}
 
 } // namespace PostgresProxy
 } // namespace NetworkFilters

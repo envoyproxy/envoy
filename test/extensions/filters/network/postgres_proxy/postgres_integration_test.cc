@@ -49,7 +49,7 @@ TEST_P(PostgresIntegrationTest, Login) {
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
-  // send the startup message
+  // Send the startup message.
   Buffer::OwnedImpl data;
   uint32_t length = htonl(12);
   std::string rcvd;
@@ -57,13 +57,13 @@ TEST_P(PostgresIntegrationTest, Login) {
 
   memset(buf, 0, sizeof(buf));
   data.add(&length, sizeof(length));
-  // add 8 bytes of some data
+  // Add 8 bytes of some data.
   data.add(buf, 8);
   tcp_client->write(data.toString());
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.toString().length(), &rcvd));
   data.drain(data.length());
 
-  // TCP session is up. Just send the AuthenticationOK downstream
+  // TCP session is up. Just send the AuthenticationOK downstream.
   data.add("R");
   length = htonl(8);
   data.add(&length, sizeof(length));
