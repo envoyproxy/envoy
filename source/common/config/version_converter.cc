@@ -4,6 +4,7 @@
 
 #include "common/common/assert.h"
 #include "common/config/api_type_oracle.h"
+#include "common/protobuf/visitor.h"
 #include "common/protobuf/well_known.h"
 
 #include "absl/strings/match.h"
@@ -30,30 +31,6 @@ public:
   // Invoked when a message is visited, with the message and a context.
   virtual void onMessage(Protobuf::Message&, const void*){};
 };
-
-// TODO(htuch): refactor these message visitor patterns into utility.cc and share with
-// MessageUtil::checkForUnexpectedFields.
-void traverseMutableMessage(ProtoVisitor& visitor, Protobuf::Message& message, const void* ctxt) {
-  visitor.onMessage(message, ctxt);
-  const Protobuf::Descriptor* descriptor = message.GetDescriptor();
-  const Protobuf::Reflection* reflection = message.GetReflection();
-  for (int i = 0; i < descriptor->field_count(); ++i) {
-    const Protobuf::FieldDescriptor* field = descriptor->field(i);
-    const void* field_ctxt = visitor.onField(message, *field, ctxt);
-    // If this is a message, recurse to scrub deprecated fields in the sub-message.
-    if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
-      if (field->is_repeated()) {
-        const int size = reflection->FieldSize(message, field);
-        for (int j = 0; j < size; ++j) {
-          traverseMutableMessage(visitor, *reflection->MutableRepeatedMessage(&message, field, j),
-                                 field_ctxt);
-        }
-      } else if (reflection->HasField(message, field)) {
-        traverseMutableMessage(visitor, *reflection->MutableMessage(&message, field), field_ctxt);
-      }
-    }
-  }
-}
 
 // Reinterpret a Protobuf message as another Protobuf message by converting to wire format and back.
 // This only works for messages that can be effectively duck typed this way, e.g. with a subtype
@@ -88,7 +65,7 @@ DynamicMessagePtr createForDescriptorWithCast(const Protobuf::Message& message,
 // internally, we later want to recover their original types.
 void annotateWithOriginalType(const Protobuf::Descriptor& prev_descriptor,
                               Protobuf::Message& next_message) {
-  class TypeAnnotatingProtoVisitor : public ProtoVisitor {
+  class TypeAnnotatingProtoVisitor : public ProtobufMessage::ProtoVisitor {
   public:
     void onMessage(Protobuf::Message& message, const void* ctxt) override {
       const Protobuf::Descriptor* descriptor = message.GetDescriptor();
@@ -127,7 +104,7 @@ void annotateWithOriginalType(const Protobuf::Descriptor& prev_descriptor,
     }
   };
   TypeAnnotatingProtoVisitor proto_visitor;
-  traverseMutableMessage(proto_visitor, next_message, &prev_descriptor);
+  ProtobufMessage::traverseMutableMessage(proto_visitor, next_message, &prev_descriptor);
 }
 
 } // namespace
@@ -140,7 +117,7 @@ void VersionConverter::upgrade(const Protobuf::Message& prev_message,
 }
 
 void VersionConverter::eraseOriginalTypeInformation(Protobuf::Message& message) {
-  class TypeErasingProtoVisitor : public ProtoVisitor {
+  class TypeErasingProtoVisitor : public ProtobufMessage::ProtoVisitor {
   public:
     void onMessage(Protobuf::Message& message, const void*) override {
       const Protobuf::Reflection* reflection = message.GetReflection();
@@ -149,7 +126,7 @@ void VersionConverter::eraseOriginalTypeInformation(Protobuf::Message& message) 
     }
   };
   TypeErasingProtoVisitor proto_visitor;
-  traverseMutableMessage(proto_visitor, message, nullptr);
+  ProtobufMessage::traverseMutableMessage(proto_visitor, message, nullptr);
 }
 
 DynamicMessagePtr VersionConverter::recoverOriginal(const Protobuf::Message& upgraded_message) {
@@ -226,7 +203,7 @@ void VersionConverter::prepareMessageForGrpcWire(Protobuf::Message& message,
 }
 
 void VersionUtil::scrubHiddenEnvoyDeprecated(Protobuf::Message& message) {
-  class HiddenFieldScrubbingProtoVisitor : public ProtoVisitor {
+  class HiddenFieldScrubbingProtoVisitor : public ProtobufMessage::ProtoVisitor {
   public:
     const void* onField(Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
                         const void*) override {
@@ -238,7 +215,7 @@ void VersionUtil::scrubHiddenEnvoyDeprecated(Protobuf::Message& message) {
     }
   };
   HiddenFieldScrubbingProtoVisitor proto_visitor;
-  traverseMutableMessage(proto_visitor, message, nullptr);
+  ProtobufMessage::traverseMutableMessage(proto_visitor, message, nullptr);
 }
 
 } // namespace Config

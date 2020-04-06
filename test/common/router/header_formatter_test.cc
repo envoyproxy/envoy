@@ -74,6 +74,26 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressVariab
   testFormatting("DOWNSTREAM_LOCAL_ADDRESS", "127.0.0.2:0");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalPortVariable) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  // Validate for IPv4 address
+  auto address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.1.2.3", 8443)};
+  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+  testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "8443");
+
+  // Validate for IPv6 address
+  address =
+      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
+  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+  testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "9443");
+
+  // Validate for Pipe
+  address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+  testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressWithoutPortVariable) {
   testFormatting("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "127.0.0.2");
 }
@@ -716,6 +736,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%DOWNSTREAM_REMOTE_ADDRESS%", {"127.0.0.1:0"}, {}},
       {"%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", {"127.0.0.1"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS%", {"127.0.0.2:0"}, {}},
+      {"%DOWNSTREAM_LOCAL_PORT%", {"0"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%", {"127.0.0.2"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"value"}, {}},
       {"[%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"[value"}, {}},

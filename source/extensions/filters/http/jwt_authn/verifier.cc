@@ -25,6 +25,8 @@ struct CompletionState {
   bool is_completed_{false};
   // number of completed inner verifier for an any/all verifier.
   std::size_t number_completed_children_{0};
+  // A valid error for a RequireAny
+  Status any_valid_error_{Status::Ok};
 };
 
 class ContextImpl : public Verifier::Context {
@@ -297,10 +299,20 @@ public:
     if (completion_state.is_completed_) {
       return;
     }
+    // For RequireAny: usually it returns the error from the last provider.
+    // But if a Jwt is not for a provider, its auth returns JwtMissed or JwtUnknownIssuer.
+    // Such error should not be used as the final error if there are other valid errors.
+    if (status != Status::Ok && status != Status::JwtMissed && status != Status::JwtUnknownIssuer) {
+      completion_state.any_valid_error_ = status;
+    }
     if (++completion_state.number_completed_children_ == verifiers_.size() ||
         Status::Ok == status) {
       completion_state.is_completed_ = true;
-      completeWithStatus(status, context);
+      Status final_status = status;
+      if (status != Status::Ok && completion_state.any_valid_error_ != Status::Ok) {
+        final_status = completion_state.any_valid_error_;
+      }
+      completeWithStatus(final_status, context);
     }
   }
 };

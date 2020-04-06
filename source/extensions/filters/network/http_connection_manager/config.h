@@ -11,7 +11,9 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/tracing/http_tracer_manager.h"
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
@@ -19,6 +21,7 @@
 #include "common/json/json_loader.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
+#include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -81,7 +84,8 @@ public:
           config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
-      Config::ConfigProviderManager& scoped_routes_config_provider_manager);
+      Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+      Tracing::HttpTracerManager& http_tracer_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -95,6 +99,7 @@ public:
                                 Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
+  Http::RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
@@ -113,6 +118,9 @@ public:
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+    return max_stream_duration_;
+  }
   Router::RouteConfigProvider* routeConfigProvider() override {
     return route_config_provider_.get();
   }
@@ -137,6 +145,7 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
+  Tracing::HttpTracerSharedPtr tracer() override { return http_tracer_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override {
     return tracing_config_.get();
   }
@@ -147,6 +156,10 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+  headersWithUnderscoresAction() const override {
+    return headers_with_underscores_action_;
+  }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
 private:
@@ -155,8 +168,17 @@ private:
   processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                     proto_config,
                 int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
-                bool& is_terminal);
+                const char* filter_chain_type, bool last_filter_in_current_config);
 
+  /**
+   * Determines what tracing provider to use for a given
+   * "envoy.filters.network.http_connection_manager" filter instance.
+   */
+  const envoy::config::trace::v3::Tracing_Http* getPerFilterTracerConfig(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          filter_config);
+
+  Http::RequestIDExtensionSharedPtr request_id_extension_;
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
@@ -174,17 +196,19 @@ private:
   Router::RouteConfigProviderManager& route_config_provider_manager_;
   Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
   CodecType codec_type_;
-  const Http::Http2Settings http2_settings_;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const Http::Http1Settings http1_settings_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
+  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<Tracing::HttpNullTracer>()};
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
   const uint32_t max_request_headers_kb_;
   const uint32_t max_request_headers_count_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  absl::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_;
   std::chrono::milliseconds request_timeout_;
   Router::RouteConfigProviderSharedPtr route_config_provider_;
@@ -198,6 +222,8 @@ private:
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
   const bool merge_slashes_;
+  const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_;
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
@@ -226,6 +252,7 @@ public:
     std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager_;
     std::shared_ptr<Router::ScopedRoutesConfigProviderManager>
         scoped_routes_config_provider_manager_;
+    Tracing::HttpTracerManagerSharedPtr http_tracer_manager_;
   };
 
   /**
@@ -251,7 +278,8 @@ public:
           proto_config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
-      Config::ConfigProviderManager& scoped_routes_config_provider_manager);
+      Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+      Tracing::HttpTracerManager& http_tracer_manager);
 };
 
 } // namespace HttpConnectionManager

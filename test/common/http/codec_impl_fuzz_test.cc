@@ -32,6 +32,8 @@ using testing::InvokeWithoutArgs;
 namespace Envoy {
 namespace Http {
 
+namespace Http2Utility = ::Envoy::Http2::Utility;
+
 // Force drain on each action, useful for figuring out what is going on when
 // debugging.
 constexpr bool DebugMode = false;
@@ -51,27 +53,31 @@ Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& s
   return h1_settings;
 }
 
-// Convert from test proto Http2Settings to Http2Settings.
-Http2Settings fromHttp2Settings(const test::common::http::Http2Settings& settings) {
-  Http2Settings h2_settings;
+envoy::config::core::v3::Http2ProtocolOptions
+fromHttp2Settings(const test::common::http::Http2Settings& settings) {
+  envoy::config::core::v3::Http2ProtocolOptions options(
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions()));
   // We apply an offset and modulo interpretation to settings to ensure that
   // they are valid. Rejecting invalid settings is orthogonal to the fuzzed
   // code.
-  h2_settings.hpack_table_size_ = settings.hpack_table_size();
-  h2_settings.max_concurrent_streams_ =
-      Http2Settings::MIN_MAX_CONCURRENT_STREAMS +
-      settings.max_concurrent_streams() % (1 + Http2Settings::MAX_MAX_CONCURRENT_STREAMS -
-                                           Http2Settings::MIN_MAX_CONCURRENT_STREAMS);
-  h2_settings.initial_stream_window_size_ =
-      Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE +
-      settings.initial_stream_window_size() % (1 + Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE -
-                                               Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
-  h2_settings.initial_connection_window_size_ =
-      Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE +
+  options.mutable_hpack_table_size()->set_value(settings.hpack_table_size());
+  options.mutable_max_concurrent_streams()->set_value(
+      Http2Utility::OptionsLimits::MIN_MAX_CONCURRENT_STREAMS +
+      settings.max_concurrent_streams() %
+          (1 + Http2Utility::OptionsLimits::MAX_MAX_CONCURRENT_STREAMS -
+           Http2Utility::OptionsLimits::MIN_MAX_CONCURRENT_STREAMS));
+  options.mutable_initial_stream_window_size()->set_value(
+      Http2Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE +
+      settings.initial_stream_window_size() %
+          (1 + Http2Utility::OptionsLimits::MAX_INITIAL_STREAM_WINDOW_SIZE -
+           Http2Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE));
+  options.mutable_initial_connection_window_size()->set_value(
+      Http2Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE +
       settings.initial_connection_window_size() %
-          (1 + Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE -
-           Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE);
-  return h2_settings;
+          (1 + Http2Utility::OptionsLimits::MAX_INITIAL_CONNECTION_WINDOW_SIZE -
+           Http2Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE));
+  return options;
 }
 
 // Internal representation of stream state. Encapsulates the stream state, mocks
@@ -126,6 +132,11 @@ public:
     ON_CALL(response_.stream_callbacks_, onResetStream(_, _))
         .WillByDefault(InvokeWithoutArgs([this] {
           ENVOY_LOG_MISC(trace, "reset response for stream index {}", stream_index_);
+          // Reset the client stream when we know the server stream has been reset. This ensures
+          // that the internal book keeping resetStream() below is consistent with the state of the
+          // client codec state, which is necessary to prevent multiple simultaneous streams for the
+          // HTTP/1 codec.
+          request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
           resetStream();
         }));
     ON_CALL(request_.request_decoder_, decodeHeaders_(_, true))
@@ -380,19 +391,22 @@ enum class HttpVersion { Http1, Http2 };
 void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersion http_version) {
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Network::MockConnection> client_connection;
-  const Http2Settings client_http2settings{fromHttp2Settings(input.h2_settings().client())};
+  const envoy::config::core::v3::Http2ProtocolOptions client_http2_options{
+      fromHttp2Settings(input.h2_settings().client())};
   const Http1Settings client_http1settings;
   NiceMock<MockConnectionCallbacks> client_callbacks;
   uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
   uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
+  const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   ClientConnectionPtr client;
   ServerConnectionPtr server;
   const bool http2 = http_version == HttpVersion::Http2;
 
   if (http2) {
     client = std::make_unique<Http2::TestClientConnectionImpl>(
-        client_connection, client_callbacks, stats_store, client_http2settings,
+        client_connection, client_callbacks, stats_store, client_http2_options,
         max_request_headers_kb, max_response_headers_count);
   } else {
     client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, stats_store,
@@ -403,15 +417,16 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   NiceMock<Network::MockConnection> server_connection;
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
   if (http2) {
-    const Http2Settings server_http2settings{fromHttp2Settings(input.h2_settings().server())};
+    const envoy::config::core::v3::Http2ProtocolOptions server_http2_options{
+        fromHttp2Settings(input.h2_settings().server())};
     server = std::make_unique<Http2::TestServerConnectionImpl>(
-        server_connection, server_callbacks, stats_store, server_http2settings,
-        max_request_headers_kb, max_request_headers_count);
+        server_connection, server_callbacks, stats_store, server_http2_options,
+        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
     server = std::make_unique<Http1::ServerConnectionImpl>(
         server_connection, stats_store, server_callbacks, server_http1settings,
-        max_request_headers_kb, max_request_headers_count);
+        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   }
 
   ReorderBuffer client_write_buf{*server};

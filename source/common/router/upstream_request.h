@@ -8,8 +8,10 @@
 
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
+#include "envoy/http/conn_pool.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tcp/conn_pool.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/cleanup.h"
@@ -18,21 +20,55 @@
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
-#include "common/router/router.h"
 #include "common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Router {
 
-class Filter;
+class GenericUpstream;
+class GenericConnectionPoolCallbacks;
+class RouterFilterInterface;
+class UpstreamRequest;
 
+// An API for wrapping either an HTTP or a TCP connection pool.
+class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
+public:
+  virtual ~GenericConnPool() = default;
+
+  // Called to create a new HTTP stream or TCP connection. The implementation
+  // is then responsible for calling either onPoolReady or onPoolFailure on the
+  // supplied GenericConnectionPoolCallbacks.
+  virtual void newStream(GenericConnectionPoolCallbacks* callbacks) PURE;
+  // Called to cancel a call to newStream. Returns true if a newStream request
+  // was canceled, false otherwise.
+  virtual bool cancelAnyPendingRequest() PURE;
+  // Optionally returns the protocol for the connection pool.
+  virtual absl::optional<Http::Protocol> protocol() const PURE;
+};
+
+// An API for the UpstreamRequest to get callbacks from either an HTTP or TCP
+// connection pool.
+class GenericConnectionPoolCallbacks {
+public:
+  virtual ~GenericConnectionPoolCallbacks() = default;
+
+  virtual void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+                             absl::string_view transport_failure_reason,
+                             Upstream::HostDescriptionConstSharedPtr host) PURE;
+  virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
+                           Upstream::HostDescriptionConstSharedPtr host,
+                           const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+                           const StreamInfo::StreamInfo& info) PURE;
+  virtual UpstreamRequest* upstreamRequest() PURE;
+};
+
+// The base request for Upstream.
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public Http::ResponseDecoder,
-                        public Http::StreamCallbacks,
-                        public Http::ConnectionPool::Callbacks,
-                        public LinkedObject<UpstreamRequest> {
+                        public LinkedObject<UpstreamRequest>,
+                        public GenericConnectionPoolCallbacks {
 public:
-  UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool);
+  UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
   ~UpstreamRequest() override;
 
   void encodeHeaders(bool end_stream);
@@ -55,24 +91,21 @@ public:
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
 
-  // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason,
-                     absl::string_view transport_failure_reason) override;
-  void onAboveWriteBufferHighWatermark() override { disableDataFromDownstreamForFlowControl(); }
-  void onBelowWriteBufferLowWatermark() override { enableDataFromDownstreamForFlowControl(); }
+  void onResetStream(Http::StreamResetReason reason, absl::string_view transport_failure_reason);
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
 
-  // Http::ConnectionPool::Callbacks
+  // GenericConnPool
   void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(Http::RequestEncoder& request_encoder,
+  void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                    Upstream::HostDescriptionConstSharedPtr host,
+                   const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                    const StreamInfo::StreamInfo& info) override;
+  UpstreamRequest* upstreamRequest() override { return this; }
 
-  void setRequestEncoder(Http::RequestEncoder& request_encoder);
   void clearRequestEncoder();
 
   struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks {
@@ -107,12 +140,11 @@ public:
   }
 
 private:
-  Filter& parent_;
-  Http::ConnectionPool::Instance& conn_pool_;
+  RouterFilterInterface& parent_;
+  std::unique_ptr<GenericConnPool> conn_pool_;
   bool grpc_rq_success_deferred_;
   Event::TimerPtr per_try_timeout_;
-  Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
-  Http::RequestEncoder* request_encoder_{};
+  std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
   Buffer::WatermarkBufferPtr buffered_request_body_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
@@ -142,6 +174,89 @@ private:
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
   // and if so, if the per-try histogram should record a value.
   bool record_timeout_budget_ : 1;
+};
+
+class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
+public:
+  HttpConnPool(Http::ConnectionPool::Instance& conn_pool) : conn_pool_(conn_pool) {}
+
+  // GenericConnPool
+  void newStream(GenericConnectionPoolCallbacks* callbacks) override;
+  bool cancelAnyPendingRequest() override;
+  absl::optional<Http::Protocol> protocol() const override;
+
+  // Http::ConnectionPool::Callbacks
+  void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+                     absl::string_view transport_failure_reason,
+                     Upstream::HostDescriptionConstSharedPtr host) override;
+  void onPoolReady(Http::RequestEncoder& callbacks_encoder,
+                   Upstream::HostDescriptionConstSharedPtr host,
+                   const StreamInfo::StreamInfo& info) override;
+
+private:
+  // Points to the actual connection pool to create streams from.
+  Http::ConnectionPool::Instance& conn_pool_;
+  Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
+  GenericConnectionPoolCallbacks* callbacks_{};
+};
+
+// A generic API which covers common functionality between HTTP and TCP upstreams.
+class GenericUpstream {
+public:
+  virtual ~GenericUpstream() = default;
+  virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
+  virtual void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) PURE;
+  virtual void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
+  virtual void encodeTrailers(const Http::RequestTrailerMap& trailers) PURE;
+  virtual void readDisable(bool disable) PURE;
+  virtual void resetStream() PURE;
+};
+
+class HttpUpstream : public GenericUpstream, public Http::StreamCallbacks {
+public:
+  HttpUpstream(UpstreamRequest& upstream_request, Http::RequestEncoder* encoder)
+      : upstream_request_(upstream_request), request_encoder_(encoder) {
+    request_encoder_->getStream().addCallbacks(*this);
+  }
+
+  // GenericUpstream
+  void encodeData(Buffer::Instance& data, bool end_stream) override {
+    request_encoder_->encodeData(data, end_stream);
+  }
+  void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) override {
+    request_encoder_->encodeMetadata(metadata_map_vector);
+  }
+  void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) override {
+    request_encoder_->encodeHeaders(headers, end_stream);
+  }
+  void encodeTrailers(const Http::RequestTrailerMap& trailers) override {
+    request_encoder_->encodeTrailers(trailers);
+  }
+
+  void readDisable(bool disable) override { request_encoder_->getStream().readDisable(disable); }
+
+  void resetStream() override {
+    request_encoder_->getStream().removeCallbacks(*this);
+    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+  }
+
+  // Http::StreamCallbacks
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override {
+    upstream_request_.onResetStream(reason, transport_failure_reason);
+  }
+
+  void onAboveWriteBufferHighWatermark() override {
+    upstream_request_.disableDataFromDownstreamForFlowControl();
+  }
+
+  void onBelowWriteBufferLowWatermark() override {
+    upstream_request_.enableDataFromDownstreamForFlowControl();
+  }
+
+private:
+  UpstreamRequest& upstream_request_;
+  Http::RequestEncoder* request_encoder_{};
 };
 
 } // namespace Router

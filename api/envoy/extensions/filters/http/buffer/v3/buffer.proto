@@ -4,13 +4,14 @@ package envoy.extensions.filters.http.buffer.v3;
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.buffer.v3";
 option java_outer_classname = "BufferProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Buffer]
 // Buffer :ref:`configuration overview <config_http_filters_buffer>`.

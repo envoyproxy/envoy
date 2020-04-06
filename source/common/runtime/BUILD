@@ -47,6 +47,7 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:api_version_lib",
+        "//source/common/config:subscription_base_interface",
         "//source/common/filesystem:directory_lib",
         "//source/common/grpc:common_lib",
         "//source/common/init:target_lib",
@@ -58,15 +59,5 @@ envoy_cc_library(
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "uuid_util_lib",
-    srcs = ["uuid_util.cc"],
-    hdrs = ["uuid_util.h"],
-    deps = [
-        ":runtime_lib",
-        "//source/common/common:utility_lib",
     ],
 )

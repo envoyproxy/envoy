@@ -51,14 +51,16 @@ public:
   EnvoyGoogleAsyncClientImplTest()
       : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),
         dispatcher_(api_->allocateDispatcher()), scope_(stats_store_),
-        method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
+        method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
+        stat_names_(scope_->symbolTable()) {
+
     envoy::config::core::v3::GrpcService config;
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");
     tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *tls_, stub_factory_,
-                                                           scope_, config, *api_);
+                                                           scope_, config, *api_, stat_names_);
   }
 
   DangerousDeprecatedTestTime test_time_;
@@ -69,6 +71,7 @@ public:
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;
   const Protobuf::MethodDescriptor* method_descriptor_;
+  StatNames stat_names_;
   AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
 };
 

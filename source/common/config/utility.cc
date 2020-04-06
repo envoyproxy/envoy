@@ -16,7 +16,6 @@
 #include "common/common/hex.h"
 #include "common/common/utility.h"
 #include "common/config/api_type_oracle.h"
-#include "common/config/resources.h"
 #include "common/config/version_converter.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
@@ -60,13 +59,13 @@ void Utility::translateApiConfigSource(
 }
 
 void Utility::checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
-                           Upstream::ClusterManager& cm) {
+                           Upstream::ClusterManager& cm, bool allow_added_via_api) {
   Upstream::ThreadLocalCluster* cluster = cm.get(cluster_name);
   if (cluster == nullptr) {
     throw EnvoyException(fmt::format("{}: unknown cluster '{}'", error_prefix, cluster_name));
   }
 
-  if (cluster->info()->addedViaApi()) {
+  if (!allow_added_via_api && cluster->info()->addedViaApi()) {
     throw EnvoyException(fmt::format("{}: invalid cluster '{}': currently only "
                                      "static (non-CDS) clusters are supported",
                                      error_prefix, cluster_name));

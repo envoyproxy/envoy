@@ -198,13 +198,13 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoder) {
 
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
-  const MethodDescriptor* method_descriptor;
+  MethodInfoSharedPtr method_info;
   const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
-  EXPECT_EQ("bookstore.Bookstore.ListShelves", method_descriptor->full_name());
+  EXPECT_EQ("bookstore.Bookstore.ListShelves", method_info->descriptor_->full_name());
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoderAutoMap) {
@@ -219,13 +219,13 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoderAutoMap) {
 
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
-  const MethodDescriptor* method_descriptor;
+  MethodInfoSharedPtr method_info;
   const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
-  EXPECT_EQ("bookstore.Bookstore.DeleteShelf", method_descriptor->full_name());
+  EXPECT_EQ("bookstore.Bookstore.DeleteShelf", method_info->descriptor_->full_name());
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
@@ -238,9 +238,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
 
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
-  const MethodDescriptor* method_descriptor;
+  MethodInfoSharedPtr method_info;
   const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
   EXPECT_EQ(Code::INVALID_ARGUMENT, status.error_code());
   EXPECT_EQ("Could not find field \"foo\" in the type \"google.protobuf.Empty\".",
@@ -258,9 +258,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsIgnored) {
 
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
-  const MethodDescriptor* method_descriptor;
+  MethodInfoSharedPtr method_info;
   const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
@@ -277,13 +277,13 @@ TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
 
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
-  const MethodDescriptor* method_descriptor;
+  MethodInfoSharedPtr method_info;
   const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
-  EXPECT_EQ("bookstore.Bookstore.ListShelves", method_descriptor->full_name());
+  EXPECT_EQ("bookstore.Bookstore.ListShelves", method_info->descriptor_->full_name());
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
@@ -299,9 +299,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
 
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
-  const MethodDescriptor* method_descriptor;
+  MethodInfoSharedPtr method_info;
   const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
   EXPECT_EQ(Code::INVALID_ARGUMENT, status.error_code());
   EXPECT_EQ("Could not find field \"b\" in the type \"bookstore.GetBookRequest\".",
@@ -744,6 +744,109 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutputAndSpli
 
   Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/postBody?arg=hi"}, {"content-type", "text/plain"}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/postBody?arg=hi", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("/bookstore.Bookstore/PostBody", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(testing::Invoke([&decoder, &frames](Buffer::Instance& data, bool end_stream) {
+        EXPECT_TRUE(end_stream);
+        decoder.decode(data, frames);
+      }));
+
+  Buffer::OwnedImpl buffer;
+  buffer.add("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(buffer, false));
+  EXPECT_EQ(buffer.length(), 0);
+  EXPECT_EQ(frames.size(), 0);
+  buffer.add(" ");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(buffer, false));
+  EXPECT_EQ(buffer.length(), 0);
+  EXPECT_EQ(frames.size(), 0);
+  buffer.add("world!");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, true));
+  EXPECT_EQ(buffer.length(), 0);
+  ASSERT_EQ(frames.size(), 1);
+
+  bookstore::EchoBodyRequest expected_request;
+  expected_request.set_arg("hi");
+  expected_request.mutable_nested()->mutable_content()->set_content_type("text/plain");
+  expected_request.mutable_nested()->mutable_content()->set_data("hello world!");
+
+  bookstore::EchoBodyRequest request;
+  request.ParseFromString(frames[0].data_->toString());
+
+  EXPECT_THAT(request, ProtoEq(expected_request));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/streamBody?arg=hi"}, {"content-type", "text/plain"}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/streamBody?arg=hi", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("/bookstore.Bookstore/StreamBody", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .Times(testing::AtLeast(2))
+      .WillRepeatedly(testing::Invoke([&decoder, &frames](Buffer::Instance& data, bool end_stream) {
+        EXPECT_TRUE(end_stream);
+        decoder.decode(data, frames);
+      }));
+
+  Buffer::OwnedImpl buffer;
+  buffer.add("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, false));
+  EXPECT_EQ(buffer.length(), 0);
+  EXPECT_EQ(frames.size(), 1);
+  buffer.add(" ");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, false));
+  EXPECT_EQ(buffer.length(), 0);
+  EXPECT_EQ(frames.size(), 2);
+  buffer.add("world!");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, true));
+  EXPECT_EQ(buffer.length(), 0);
+  ASSERT_EQ(frames.size(), 3);
+
+  bookstore::EchoBodyRequest expected_request;
+  bookstore::EchoBodyRequest request;
+
+  expected_request.set_arg("hi");
+  expected_request.mutable_nested()->mutable_content()->set_content_type("text/plain");
+  expected_request.mutable_nested()->mutable_content()->set_data("hello");
+  request.ParseFromString(frames[0].data_->toString());
+  EXPECT_THAT(request, ProtoEq(expected_request));
+
+  expected_request.Clear();
+  expected_request.mutable_nested()->mutable_content()->set_data(" ");
+  request.ParseFromString(frames[1].data_->toString());
+  EXPECT_THAT(request, ProtoEq(expected_request));
+
+  expected_request.Clear();
+  expected_request.mutable_nested()->mutable_content()->set_data("world!");
+  request.ParseFromString(frames[2].data_->toString());
+  EXPECT_THAT(request, ProtoEq(expected_request));
 }
 
 class GrpcJsonTranscoderFilterGrpcStatusTest : public GrpcJsonTranscoderFilterTest {

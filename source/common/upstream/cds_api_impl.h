@@ -13,6 +13,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
+#include "common/config/subscription_base.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -21,7 +22,7 @@ namespace Upstream {
  * CDS API implementation that fetches via Subscription.
  */
 class CdsApiImpl : public CdsApi,
-                   Config::SubscriptionCallbacks,
+                   Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
   static CdsApiPtr create(const envoy::config::core::v3::ConfigSource& cds_config,
@@ -48,7 +49,6 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::config::cluster::v3::Cluster>(resource).name();
   }
-  static std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
   CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm,
              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
   void runInitializeCallbackIfAny();

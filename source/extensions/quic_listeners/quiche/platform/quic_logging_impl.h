@@ -146,6 +146,8 @@ private:
 
 class NullLogStream : public std::ostream {
 public:
+  NullLogStream() : std::ostream(NULL) {}
+
   NullLogStream& stream() { return *this; }
 };
 

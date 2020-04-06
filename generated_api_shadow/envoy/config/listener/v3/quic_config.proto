@@ -4,14 +4,18 @@ package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/base.proto";
 
+import "envoy/config/core/v3/base.proto";
+
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "QuicConfigProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: QUIC listener Config]
 
@@ -32,6 +36,13 @@ message QuicProtocolOptions {
   // Connection timeout in milliseconds before the crypto handshake is finished.
   // 20000ms if not specified.
   google.protobuf.Duration crypto_handshake_timeout = 3;
+
+  // Runtime flag that controls whether the listener is enabled or not. If not specified, defaults
+  // to enabled.
+  core.v3.RuntimeFeatureFlag enabled = 4;
+import "udpa/annotations/status.proto";
+  option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+  // Next id: 5
 
   // Runtime flag that controls whether the listener is enabled or not. If not specified, defaults
   // to enabled.

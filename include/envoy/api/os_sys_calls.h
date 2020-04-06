@@ -52,6 +52,17 @@ public:
   virtual SysCallSizeResult recvmsg(os_fd_t sockfd, msghdr* msg, int flags) PURE;
 
   /**
+   * @see recvmmsg (man 2 recvmmsg)
+   */
+  virtual SysCallIntResult recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen,
+                                    int flags, struct timespec* timeout) PURE;
+
+  /**
+   * return true if the OS supports recvmmsg() and sendmmsg().
+   */
+  virtual bool supportsMmsg() const PURE;
+
+  /**
    * Release all resources allocated for fd.
    * @return zero on success, -1 returned otherwise.
    */

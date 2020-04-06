@@ -67,7 +67,7 @@ uint64_t ConnPoolImpl::maxRequestsPerConnection() {
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : ConnPoolImplBase::ActiveClient(
           parent, parent.maxRequestsPerConnection(),
-          parent.host_->cluster().http2Settings().max_concurrent_streams_) {
+          parent.host_->cluster().http2Options().max_concurrent_streams().value()) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
 

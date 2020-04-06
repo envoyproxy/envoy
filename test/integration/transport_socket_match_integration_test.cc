@@ -20,7 +20,7 @@ public:
   TransportSockeMatchIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
-                            ConfigHelper::HTTP_PROXY_CONFIG),
+                            ConfigHelper::httpProxyConfig()),
         num_hosts_{2} {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);

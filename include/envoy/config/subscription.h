@@ -103,6 +103,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
   COUNTER(update_failure)                                                                          \
   COUNTER(update_rejected)                                                                         \
   COUNTER(update_success)                                                                          \
+  GAUGE(update_time, NeverImport)                                                                  \
   GAUGE(version, NeverImport)
 
 /**

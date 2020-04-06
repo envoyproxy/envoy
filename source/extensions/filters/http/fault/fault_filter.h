@@ -52,8 +52,9 @@ public:
   const std::vector<Http::HeaderUtility::HeaderDataPtr>& filterHeaders() const {
     return fault_filter_headers_;
   }
-  envoy::type::v3::FractionalPercent abortPercentage() const { return abort_percentage_; }
-  uint64_t abortCode() const { return http_status_; }
+  const Filters::Common::Fault::FaultAbortConfig* requestAbort() const {
+    return request_abort_config_.get();
+  }
   const Filters::Common::Fault::FaultDelayConfig* requestDelay() const {
     return request_delay_config_.get();
   }
@@ -86,8 +87,8 @@ private:
   using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
 
   envoy::type::v3::FractionalPercent abort_percentage_;
-  uint64_t http_status_{}; // HTTP or gRPC return codes
   Filters::Common::Fault::FaultDelayConfigPtr request_delay_config_;
+  Filters::Common::Fault::FaultAbortConfigPtr request_abort_config_;
   std::string upstream_cluster_; // restrict faults to specific upstream cluster
   const std::vector<Http::HeaderUtility::HeaderDataPtr> fault_filter_headers_;
   absl::flat_hash_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
@@ -243,15 +244,15 @@ private:
   void recordAbortsInjectedStats();
   void recordDelaysInjectedStats();
   void resetTimerState();
-  void postDelayInjection();
-  void abortWithHTTPStatus();
+  void postDelayInjection(const Http::RequestHeaderMap& request_headers);
+  void abortWithHTTPStatus(Http::Code abort_code);
   bool matchesTargetUpstreamCluster();
   bool matchesDownstreamNodes(const Http::RequestHeaderMap& headers);
   bool isAbortEnabled();
   bool isDelayEnabled();
   absl::optional<std::chrono::milliseconds>
   delayDuration(const Http::RequestHeaderMap& request_headers);
-  uint64_t abortHttpStatus();
+  absl::optional<Http::Code> abortHttpStatus(const Http::RequestHeaderMap& request_headers);
   void maybeIncActiveFaults();
   void maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers);
 

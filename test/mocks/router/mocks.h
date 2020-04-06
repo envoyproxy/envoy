@@ -24,6 +24,7 @@
 #include "envoy/router/scopes.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -189,16 +190,19 @@ public:
 class TestShadowPolicy : public ShadowPolicy {
 public:
   TestShadowPolicy(absl::string_view cluster = "", absl::string_view runtime_key = "",
-                   envoy::type::v3::FractionalPercent default_value = {})
-      : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value) {}
+                   envoy::type::v3::FractionalPercent default_value = {}, bool trace_sampled = true)
+      : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value),
+        trace_sampled_(trace_sampled) {}
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
+  bool traceSampled() const override { return trace_sampled_; }
 
   std::string cluster_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
+  bool trace_sampled_;
 };
 
 class MockShadowWriter : public ShadowWriter {
@@ -208,22 +212,25 @@ public:
 
   // Router::ShadowWriter
   void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
-              std::chrono::milliseconds timeout) override {
-    shadow_(cluster, request, timeout);
+              const Http::AsyncClient::RequestOptions& options) override {
+    shadow_(cluster, request, options);
   }
 
   MOCK_METHOD(void, shadow_,
               (const std::string& cluster, Http::RequestMessagePtr& request,
-               std::chrono::milliseconds timeout));
+               const Http::AsyncClient::RequestOptions& options));
 };
 
 class TestVirtualCluster : public VirtualCluster {
 public:
   // Router::VirtualCluster
   Stats::StatName statName() const override { return stat_name_.statName(); }
+  VirtualClusterStats& stats() const override { return stats_; }
 
   Stats::TestSymbolTable symbol_table_;
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
+  Stats::IsolatedStoreImpl stats_store_;
+  mutable VirtualClusterStats stats_{generateStats(stats_store_)};
 };
 
 class MockVirtualHost : public VirtualHost {
@@ -237,7 +244,8 @@ public:
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
   MOCK_METHOD(const Config&, routeConfig, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
-  MOCK_METHOD(bool, includeAttemptCount, (), (const));
+  MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
+  MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
   MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, ());
   MOCK_METHOD(Upstream::RetryHostPredicateSharedPtr, retryHostPredicate, ());
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
@@ -262,7 +270,8 @@ public:
   // Http::HashPolicy
   MOCK_METHOD(absl::optional<uint64_t>, generateHash,
               (const Network::Address::Instance* downstream_address,
-               const Http::RequestHeaderMap& headers, const AddCookieCallback add_cookie),
+               const Http::RequestHeaderMap& headers, const AddCookieCallback add_cookie,
+               const StreamInfo::FilterStateSharedPtr filter_state),
               (const));
 };
 
@@ -342,7 +351,8 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(const PathMatchCriterion&, pathMatchCriterion, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
-  MOCK_METHOD(bool, includeAttemptCount, (), (const));
+  MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
+  MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(InternalRedirectAction, internalRedirectAction, (), (const));
   MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));

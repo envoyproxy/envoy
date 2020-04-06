@@ -41,6 +41,32 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
     Http::Utility::extractHostPathFromUri(input.extract_host_path_from_uri(), host, path);
     break;
   }
+  case test::common::http::UtilityTestCase::kPercentEncodingString: {
+    Http::Utility::PercentEncoding::encode(input.percent_encoding_string());
+    break;
+  }
+  case test::common::http::UtilityTestCase::kPercentDecodingString: {
+    Http::Utility::PercentEncoding::decode(input.percent_decoding_string());
+    break;
+  }
+  case test::common::http::UtilityTestCase::kParseParameters: {
+    const auto& parse_parameters = input.parse_parameters();
+    Http::Utility::parseParameters(parse_parameters.data(), parse_parameters.start());
+    break;
+  }
+  case test::common::http::UtilityTestCase::kFindQueryString: {
+    Http::HeaderString path(input.find_query_string());
+    Http::Utility::findQueryStringStart(path);
+    break;
+  }
+  case test::common::http::UtilityTestCase::kMakeSetCookieValue: {
+    const auto& cookie_value = input.make_set_cookie_value();
+    std::chrono::seconds max_age(cookie_value.max_age());
+    Http::Utility::makeSetCookieValue(cookie_value.key(), cookie_value.value(), cookie_value.path(),
+                                      max_age, cookie_value.httponly());
+    break;
+  }
+
   default:
     // Nothing to do.
     break;

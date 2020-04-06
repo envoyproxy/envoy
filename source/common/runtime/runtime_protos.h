@@ -28,6 +28,21 @@ private:
   Runtime::Loader& runtime_;
 };
 
+// Helper class for runtime-derived doubles.
+class Double {
+public:
+  Double(const envoy::config::core::v3::RuntimeDouble& double_proto, Runtime::Loader& runtime)
+      : runtime_key_(double_proto.runtime_key()), default_value_(double_proto.default_value()),
+        runtime_(runtime) {}
+
+  double value() const { return runtime_.snapshot().getDouble(runtime_key_, default_value_); }
+
+private:
+  const std::string runtime_key_;
+  const double default_value_;
+  Runtime::Loader& runtime_;
+};
+
 // Helper class for runtime-derived fractional percent flags.
 class FractionalPercent {
 public:

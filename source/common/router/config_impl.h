@@ -157,7 +157,7 @@ class VirtualHostImpl : public VirtualHost {
 public:
   VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                   const ConfigImpl& global_route_config,
-                  Server::Configuration::ServerFactoryContext& factory_context,
+                  Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
                   ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
   RouteConstSharedPtr getRouteFromEntries(const Http::RequestHeaderMap& headers,
@@ -174,7 +174,8 @@ public:
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
-  bool includeAttemptCount() const override { return include_attempt_count_; }
+  bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
+  bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
   const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() const {
     return retry_policy_;
   }
@@ -186,32 +187,38 @@ public:
 private:
   enum class SslRequirements { None, ExternalOnly, All };
 
-  struct VirtualClusterEntry : public VirtualCluster {
-    VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
-                        Stats::StatNamePool& pool);
-
-    // Router::VirtualCluster
-    Stats::StatName statName() const override { return stat_name_; }
-
-    const Stats::StatName stat_name_;
-    std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
-  };
-
-  class CatchAllVirtualCluster : public VirtualCluster {
+  struct VirtualClusterBase : public VirtualCluster {
   public:
-    explicit CatchAllVirtualCluster(Stats::StatNamePool& pool) : stat_name_(pool.add("other")) {}
+    VirtualClusterBase(Stats::StatName stat_name, Stats::ScopePtr&& scope)
+        : stat_name_(stat_name), scope_(std::move(scope)), stats_(generateStats(*scope_)) {}
 
     // Router::VirtualCluster
     Stats::StatName statName() const override { return stat_name_; }
+    VirtualClusterStats& stats() const override { return stats_; }
 
   private:
     const Stats::StatName stat_name_;
+    Stats::ScopePtr scope_;
+    mutable VirtualClusterStats stats_;
+  };
+
+  struct VirtualClusterEntry : public VirtualClusterBase {
+    VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
+                        Stats::StatNamePool& pool, Stats::Scope& scope);
+
+    std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
+  };
+
+  struct CatchAllVirtualCluster : public VirtualClusterBase {
+    explicit CatchAllVirtualCluster(Stats::StatNamePool& pool, Stats::Scope& scope)
+        : VirtualClusterBase(pool.add("other"), scope.createScope("other")) {}
   };
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
   Stats::StatNamePool stat_name_pool_;
   const Stats::StatName stat_name_;
+  Stats::ScopePtr vcluster_scope_;
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;
@@ -223,7 +230,8 @@ private:
   HeaderParserPtr response_headers_parser_;
   PerFilterConfigs per_filter_configs_;
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
-  const bool include_attempt_count_;
+  const bool include_attempt_count_in_request_;
+  const bool include_attempt_count_in_response_;
   absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
   absl::optional<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   const CatchAllVirtualCluster virtual_cluster_catch_all_;
@@ -296,11 +304,13 @@ public:
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
+  bool traceSampled() const override { return trace_sampled_; }
 
 private:
   std::string cluster_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
+  bool trace_sampled_;
 };
 
 /**
@@ -449,7 +459,12 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
-  bool includeAttemptCount() const override { return vhost_.includeAttemptCount(); }
+  bool includeAttemptCountInRequest() const override {
+    return vhost_.includeAttemptCountInRequest();
+  }
+  bool includeAttemptCountInResponse() const override {
+    return vhost_.includeAttemptCountInResponse();
+  }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
   InternalRedirectAction internalRedirectAction() const override {
     return internal_redirect_action_;
@@ -570,7 +585,12 @@ private:
       return parent_->pathMatchCriterion();
     }
 
-    bool includeAttemptCount() const override { return parent_->includeAttemptCount(); }
+    bool includeAttemptCountInRequest() const override {
+      return parent_->includeAttemptCountInRequest();
+    }
+    bool includeAttemptCountInResponse() const override {
+      return parent_->includeAttemptCountInResponse();
+    }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
     InternalRedirectAction internalRedirectAction() const override {
       return parent_->internalRedirectAction();
@@ -828,6 +848,7 @@ private:
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
 
+  Stats::ScopePtr vhost_scope_;
   std::unordered_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
   //

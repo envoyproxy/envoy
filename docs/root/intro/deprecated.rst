@@ -87,7 +87,18 @@ Deprecated items below are listed in chronological order.
 * The `header_fields`, `custom_header_fields`, and `additional_headers` fields for the route checker
   tool have been deprecated in favor of `request_header_fields`, `response_header_fields`,
   `additional_request_headers`, and `additional_response_headers`.
-
+* The `content_length`, `content_type`, `disable_on_etag_header` and `remove_accept_encoding_header`
+  fields in :ref:`HTTP Gzip filter config <envoy_api_msg_config.filter.http.gzip.v2.Gzip>` have
+  been deprecated in favor of `compressor`.
+* The statistics counter `header_gzip` in :ref:`HTTP Gzip filter <config_http_filters_gzip>`
+  has been deprecated in favor of `header_compressor_used`.
+* Support for the undocumented HTTP/1.1 `:no-chunks` pseudo-header has been removed. If an extension
+  was using this it can achieve the same behavior via the new `http1StreamEncoderOptions()` API.
+* The grpc_stats filter behavior of by default creating a new stat for every message type seen is deprecated.
+  The default will switch to only creating a fixed set of stats. The previous behavior can be enabled by enabling
+  :ref:`stats_for_all_methods <envoy_api_field_config.filter.http.grpc_stats.v2alpha.FilterConfig.stats_for_all_methods>`,
+  and the previous default can be enabled until the end of the deprecation period by enabling runtime feature
+  `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
 
 1.13.0 (January 20, 2020)
 =========================

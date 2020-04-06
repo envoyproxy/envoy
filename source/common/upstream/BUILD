@@ -19,7 +19,7 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/config:resources_lib",
+        "//source/common/config:subscription_base_interface",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
@@ -71,6 +71,15 @@ envoy_cc_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "cluster_update_tracker_lib",
+    srcs = ["cluster_update_tracker.cc"],
+    hdrs = ["cluster_update_tracker.h"],
+    deps = [
+        "//include/envoy/upstream:cluster_manager_interface",
     ],
 )
 
@@ -330,6 +339,9 @@ envoy_cc_library(
     name = "ring_hash_lb_lib",
     srcs = ["ring_hash_lb.cc"],
     hdrs = ["ring_hash_lb.h"],
+    external_deps = [
+        "abseil_inlined_vector",
+    ],
     deps = [
         ":thread_aware_lb_lib",
         "//source/common/common:minimal_logger_lib",
@@ -353,6 +365,7 @@ envoy_cc_library(
         "//include/envoy/upstream:locality_lib",
         "//source/common/config:api_version_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/config:subscription_base_interface",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:version_converter_lib",

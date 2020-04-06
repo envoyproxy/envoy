@@ -797,7 +797,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 }
 
 // Basic HTTP request flow. Asynchronous flag set to false.
@@ -860,7 +860,7 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 }
 
 // Basic asynchronous, fire-and-forget HTTP request flow.
@@ -990,14 +990,14 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
             callbacks = &cb;
             return &request;
           }));
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 
   response_message = std::make_unique<Http::ResponseMessageImpl>(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "403"}}});
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 403")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no body")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
@@ -1061,7 +1061,7 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no body")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 }
 
 // HTTP call followed by immediate response.
@@ -1114,7 +1114,7 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
                                            {"set-cookie", "flavor=chocolate; Path=/"},
                                            {"set-cookie", "variant=chewy; Path=/"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 }
 
 // HTTP call with script error after resume.
@@ -1162,7 +1162,7 @@ TEST_F(LuaHttpFilterTest, HttpCallErrorAfterResumeSuccess) {
               scriptLog(spdlog::level::err,
                         StrEq("[string \"...\"]:14: attempt to index local 'foo' (a nil value)")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 }
 
 // HTTP call failure.
@@ -1207,7 +1207,7 @@ TEST_F(LuaHttpFilterTest, HttpCallFailure) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 503")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("upstream failure")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onFailure(Http::AsyncClient::FailureReason::Reset);
+  callbacks->onFailure(request, Http::AsyncClient::FailureReason::Reset);
 }
 
 // HTTP call reset.
@@ -1283,7 +1283,9 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateFailure) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            cb.onFailure(Http::AsyncClient::FailureReason::Reset);
+            cb.onFailure(request, Http::AsyncClient::FailureReason::Reset);
+            // Intentionally return nullptr (instead of request handle) to trigger a particular
+            // code path.
             return nullptr;
           }));
 

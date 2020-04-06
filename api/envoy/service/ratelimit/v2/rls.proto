@@ -6,12 +6,14 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/ratelimit/ratelimit.proto";
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.ratelimit.v2";
 option java_outer_classname = "RlsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Rate Limit Service (RLS)]
 

@@ -26,7 +26,8 @@ public:
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const RequestHeaderMap& headers,
-                                    const HashPolicy::AddCookieCallback) const override {
+                                    const HashPolicy::AddCookieCallback,
+                                    const StreamInfo::FilterStateSharedPtr) const override {
     absl::optional<uint64_t> hash;
 
     const HeaderEntry* header = headers.get(header_name_);
@@ -48,7 +49,8 @@ public:
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const RequestHeaderMap& headers,
-                                    const HashPolicy::AddCookieCallback add_cookie) const override {
+                                    const HashPolicy::AddCookieCallback add_cookie,
+                                    const StreamInfo::FilterStateSharedPtr) const override {
     absl::optional<uint64_t> hash;
     std::string value = Utility::parseCookieValue(headers, key_);
     if (value.empty() && ttl_.has_value()) {
@@ -72,8 +74,8 @@ public:
   IpHashMethod(bool terminal) : HashMethodImplBase(terminal) {}
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
-                                    const RequestHeaderMap&,
-                                    const HashPolicy::AddCookieCallback) const override {
+                                    const RequestHeaderMap&, const HashPolicy::AddCookieCallback,
+                                    const StreamInfo::FilterStateSharedPtr) const override {
     if (downstream_addr == nullptr) {
       return absl::nullopt;
     }
@@ -96,7 +98,8 @@ public:
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const RequestHeaderMap& headers,
-                                    const HashPolicy::AddCookieCallback) const override {
+                                    const HashPolicy::AddCookieCallback,
+                                    const StreamInfo::FilterStateSharedPtr) const override {
     absl::optional<uint64_t> hash;
 
     const HeaderEntry* header = headers.Path();
@@ -113,6 +116,25 @@ public:
 
 private:
   const std::string parameter_name_;
+};
+
+class FilterStateHashMethod : public HashMethodImplBase {
+public:
+  FilterStateHashMethod(const std::string& key, bool terminal)
+      : HashMethodImplBase(terminal), key_(key) {}
+
+  absl::optional<uint64_t>
+  evaluate(const Network::Address::Instance*, const RequestHeaderMap&,
+           const HashPolicy::AddCookieCallback,
+           const StreamInfo::FilterStateSharedPtr filter_state) const override {
+    if (filter_state->hasData<Hashable>(key_)) {
+      return filter_state->getDataReadOnly<Hashable>(key_).hash();
+    }
+    return absl::nullopt;
+  }
+
+private:
+  const std::string key_;
 };
 
 HashPolicyImpl::HashPolicyImpl(
@@ -145,6 +167,10 @@ HashPolicyImpl::HashPolicyImpl(
       hash_impls_.emplace_back(new QueryParameterHashMethod(hash_policy->query_parameter().name(),
                                                             hash_policy->terminal()));
       break;
+    case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kFilterState:
+      hash_impls_.emplace_back(
+          new FilterStateHashMethod(hash_policy->filter_state().key(), hash_policy->terminal()));
+      break;
     default:
       throw EnvoyException(
           absl::StrCat("Unsupported hash policy ", hash_policy->policy_specifier_case()));
@@ -154,12 +180,12 @@ HashPolicyImpl::HashPolicyImpl(
 
 absl::optional<uint64_t>
 HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
-                             const RequestHeaderMap& headers,
-                             const AddCookieCallback add_cookie) const {
+                             const RequestHeaderMap& headers, const AddCookieCallback add_cookie,
+                             const StreamInfo::FilterStateSharedPtr filter_state) const {
   absl::optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
     const absl::optional<uint64_t> new_hash =
-        hash_impl->evaluate(downstream_addr, headers, add_cookie);
+        hash_impl->evaluate(downstream_addr, headers, add_cookie, filter_state);
     if (new_hash) {
       // Rotating the old value prevents duplicate hash rules from cancelling each other out
       // and preserves all of the entropy

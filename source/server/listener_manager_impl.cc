@@ -7,6 +7,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -16,6 +18,7 @@
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/network/filter_matcher.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
@@ -104,7 +107,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
         Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
             proto_config);
 
-    Config::Utility::validateTerminalFilters(filters[i].name(), "network",
+    Config::Utility::validateTerminalFilters(filters[i].name(), factory.name(), "network",
                                              factory.isTerminalFilter(), i == filters.size() - 1);
 
     auto message = Config::Utility::translateToFactoryConfig(
@@ -139,7 +142,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
             proto_config);
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
-    ret.push_back(factory.createFilterFactoryFromProto(*message, context));
+    ret.push_back(factory.createListenerFilterFactoryFromProto(
+        *message, createListenerFilterMatcher(proto_config), context));
   }
   return ret;
 }
@@ -173,6 +177,16 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
   return ret;
 }
 
+Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createListenerFilterMatcher(
+    const envoy::config::listener::v3::ListenerFilter& listener_filter) {
+  if (!listener_filter.has_filter_disabled()) {
+    return nullptr;
+  }
+  return std::shared_ptr<Network::ListenerFilterMatcher>(
+      Network::ListenerFilterMatcherBuilder::buildListenerFilterMatcher(
+          listener_filter.filter_disabled()));
+}
+
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
     const Network::Socket::OptionsSharedPtr& options, const ListenSocketCreationParams& params) {
@@ -184,10 +198,6 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   // For each listener config we share a single socket among all threaded listeners.
   // First we try to get the socket from our parent if applicable.
   if (address->type() == Network::Address::Type::Pipe) {
-// No such thing as AF_UNIX on Windows
-#ifdef WIN32
-    throw EnvoyException("network type pipe not supported on Windows");
-#else
     if (socket_type != Network::Address::SocketType::Stream) {
       // This could be implemented in the future, since Unix domain sockets
       // support SOCK_DGRAM, but there would need to be a way to specify it in
@@ -203,12 +213,11 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
       return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
     return std::make_shared<Network::UdsListenSocket>(address);
-#endif
   }
 
   const std::string scheme = (socket_type == Network::Address::SocketType::Stream)
-                                 ? Network::Utility::TCP_SCHEME
-                                 : Network::Utility::UDP_SCHEME;
+                                 ? std::string(Network::Utility::TCP_SCHEME)
+                                 : std::string(Network::Utility::UDP_SCHEME);
   const std::string addr = absl::StrCat(scheme, address->asString());
 
   if (params.bind_to_port && params.duplicate_parent_socket) {
@@ -563,6 +572,17 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
         // main thread to avoid locking. This makes sure that we don't destroy the listener
         // while filters might still be using its context (stats, etc.).
         server_.dispatcher().post([this, draining_it]() -> void {
+          // TODO(lambdai): Resolve race condition below.
+          // Consider the below events in global sequence order
+          // master thread: calling drainListener
+          // work thread: deferred delete the active connection
+          // work thread: post to master that the drain is done
+          // master thread: erase the listener
+          // worker thread: execute destroying connection when the shared listener config is
+          // destroyed at step 4 (could be worse such as access the connection because connection is
+          // not yet started to deleted). The race condition is introduced because 3 occurs too
+          // early. My solution is to defer schedule the callback posting to master thread, by
+          // introducing DeferTaskUtil. So that 5 should always happen before 3.
           if (--draining_it->workers_pending_removal_ == 0) {
             draining_it->listener_->debugLog("draining listener removal complete");
             draining_listeners_.erase(draining_it);
@@ -633,7 +653,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   // The warmed listener should be added first so that the worker will accept new connections
   // when it stops listening on the old listener.
   for (const auto& worker : workers_) {
-    addListenerToWorker(*worker, listener, nullptr);
+    addListenerToWorker(*worker, listener, /* callback */ nullptr);
   }
 
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
@@ -795,8 +815,8 @@ void ListenerManagerImpl::endListenerUpdate(FailureStates&& failure_states) {
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
-    : ListenerFilterChainFactoryBuilder(listener.messageValidationVisitor(),
-                                        listener.parent_.factory_, factory_context) {}
+    : ListenerFilterChainFactoryBuilder(listener.validation_visitor_, listener.parent_.factory_,
+                                        factory_context) {}
 
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ProtobufMessage::ValidationVisitor& validator,
@@ -805,16 +825,18 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     : validator_(validator), listener_component_factory_(listener_component_factory),
       factory_context_(factory_context) {}
 
-std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
+std::shared_ptr<Network::DrainableFilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain,
     FilterChainFactoryContextCreator& context_creator) const {
   return buildFilterChainInternal(filter_chain,
                                   context_creator.createFilterChainFactoryContext(&filter_chain));
 }
 
-std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
+std::shared_ptr<Network::DrainableFilterChain>
+ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
     const envoy::config::listener::v3::FilterChain& filter_chain,
-    Configuration::FilterChainFactoryContext& filter_chain_factory_context) const {
+    std::unique_ptr<Configuration::FilterChainFactoryContext>&& filter_chain_factory_context)
+    const {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.
@@ -837,11 +859,14 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
 
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
-  return std::make_unique<FilterChainImpl>(
-      config_factory.createTransportSocketFactory(*message, factory_context_,
-                                                  std::move(server_names)),
-      listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
-                                                                 filter_chain_factory_context));
+
+  auto filter_chain_res =
+      std::make_unique<FilterChainImpl>(config_factory.createTransportSocketFactory(
+                                            *message, factory_context_, std::move(server_names)),
+                                        listener_component_factory_.createNetworkFilterFactoryList(
+                                            filter_chain.filters(), *filter_chain_factory_context));
+  filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
+  return filter_chain_res;
 }
 
 Network::ListenSocketFactorySharedPtr ListenerManagerImpl::createListenSocketFactory(

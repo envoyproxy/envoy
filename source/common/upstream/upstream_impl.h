@@ -120,6 +120,7 @@ public:
     }
   }
   HostStats& stats() const override { return stats_; }
+  const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
@@ -140,6 +141,7 @@ private:
 protected:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
+  const std::string health_checks_hostname_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
@@ -535,7 +537,9 @@ public:
   }
   uint64_t features() const override { return features_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
-  const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
+  const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const override {
+    return http2_options_;
+  }
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
@@ -622,7 +626,7 @@ private:
   const absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
   const uint64_t features_;
   const Http::Http1Settings http1_settings_;
-  const Http::Http2Settings http2_settings_;
+  const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const std::map<std::string, ProtocolOptionsConfigConstSharedPtr> extension_protocol_options_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;

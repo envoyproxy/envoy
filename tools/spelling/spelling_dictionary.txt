@@ -11,6 +11,7 @@ ALS
 AMZ
 APC
 API
+ARN
 ASAN
 ASCII
 ASSERTs
@@ -119,6 +120,7 @@ GRPC
 GTEST
 GURL
 Grabbit
+Hashable
 HC
 HCM
 HDS
@@ -193,6 +195,7 @@ NOSORT
 NS
 NUL
 Nilsson
+Nonhashable
 OCSP
 OK
 OOM
@@ -318,6 +321,7 @@ VH
 VHDS
 VLOG
 VM
+WAITFORONE
 WASM
 WAVM
 WIP
@@ -350,6 +354,7 @@ alignof
 alloc
 alloca
 allocator
+allowlist
 alls
 alphanumerics
 amongst
@@ -382,6 +387,8 @@ backgrounded
 backoff
 backpressure
 backticks
+backtraces
+backtracing
 balancer
 balancers
 barbaz
@@ -522,6 +529,7 @@ dirname
 djb
 downcasted
 downstreams
+drainable
 dtor
 dubbo
 dup
@@ -619,6 +627,7 @@ hermeticity
 highp
 hoc
 hostname
+hostnames
 hostset
 hrefs
 huffman
@@ -631,6 +640,7 @@ ified
 impl
 implementors
 impls
+indices
 inflater
 inflight
 -ing
@@ -725,6 +735,8 @@ misconfigured
 mixin
 mkdir
 mmap
+mmsg
+mmsghdr
 mongo
 moveable
 msec
@@ -746,6 +758,7 @@ namespaces
 namespacing
 nan
 natively
+ndk
 netblock
 netblocks
 netfilter
@@ -936,6 +949,7 @@ sched
 schemas
 scopekey
 sendmsg
+sendmmsg
 sendto
 serializable
 serializer
