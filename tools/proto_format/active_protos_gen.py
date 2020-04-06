@@ -48,10 +48,11 @@ def DepsFormat(pkgs):
 # Find packages with a given package version status in a given API tree root.
 def FindPkgs(package_version_status, api_root):
   try:
-    api_protos = subprocess.check_output(
+    active_files = subprocess.check_output(
         ['grep', '-l', '-r',
          'package_version_status = %s;' % package_version_status,
          api_root]).decode().strip().split('\n')
+    api_protos = [f for f in active_files if f.endswith('.proto')]
   except subprocess.CalledProcessError:
     api_protos = []
   return set([os.path.dirname(p)[len(api_root) + 1:] for p in api_protos])
