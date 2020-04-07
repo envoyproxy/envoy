@@ -192,4 +192,9 @@ message ConfigSource {
   // will request for resources and the resource type that the client will in
   // turn expect to be delivered.
   ApiVersion resource_api_version = 6 [(validate.rules).enum = {defined_only: true}];
+
+  // Identifies the resource namespace used on any subscription from this
+  // *ConfigSource*. See the xDS protocol specification for further details on
+  // :ref:`resource namespaces <xds_protocol_resource_names>`.
+  string namespace = 7;
 }

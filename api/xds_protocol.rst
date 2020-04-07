@@ -220,6 +220,61 @@ the ADS server, which will be used for all resources. The :ref:`ConfigSource
 The xDS transport Protocol
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. _xds_protocol_resource_names:
+
+Resource names
+^^^^^^^^^^^^^^
+
+The xDS protocol is designed to provide a transport mechanism for opaque resources. Every resource
+has a name. This name may be opaque in simple or legacy configurations, the control plane may
+determine it and set this value in delivered configuration, e.g. RDS resource `Foo` may be a
+dependency of LDS resource `Bar`.
+
+For more advanced use cases, xDS has the concept of resource namespaces. With namespaces, resource
+names take the form of `<namespace>/<resource name>`. In this scheme, the `resource name` remains
+opaque, while the `namespace` is expected to have the form `<authority>/<qualifier>`.
+
+The `authority` field is distinguished. It is expected to be reverse DNS of the authority originating
+the resource. The rationale for the use of reverse DNS is to allow prefix namespace subscriptions
+with the ability of more specific sub-authorities to be delegated override capability. In future
+xDS extensions, the ability to sign resources may be added, this authority field will be the basis
+for validation.
+
+The `qualifier` field is opaque and may be used to further distinguish the resource namespace by
+the control plane.
+
+Resource namespaces are intended to support a number of use cases:
+
+* Delegating authority over some particular part of the global namespace, e.g. with CDS to allow
+  server X to serve up the `com.acme.foo` hierarchy.
+
+* Partitioning resource types into different classes, e.g. for distinct tenants. E.g. LDS
+  can use the namespace to determine which subset of the universe of known listeners to
+  deliver.
+
+* Support split-horizon naming of resources. Allow `com.acme.foo.bar` to override `com.acme.foo`
+  for a given resource namespace.
+
+* Avoiding the dependence on :ref:`per-node <envoy_api_msg_Core.Node>` identifiers and metadata
+  as a means of selecting resources at a management server. The use of node data is coarse
+  grained and does not scale as the number of resource types increases.
+
+
+The resource namespace is specified in a subscription's :ref:`ConfigSource
+<envoy_v3_api_field_config.core.v3.ConfigSource.namespace>` and will then appear in
+discovery requests for the subscription. Resources delivered on this subscription are said
+to match the namespace if the namespace is a prefix of the resource name. Non-matching
+resources are ignored by the client.
+
+Typically, resource names are opaque, however there are some resource types in which the name is
+significant:
+
+* :ref:`VHDS <config_http_conn_man_vhds>` has a fixed naming convention in which the route configuration
+  and host is expressed in the resource name.
+
+We expect that in the future, custom resource name formats will not be accepted in the API, instead
+`qualifier` suffixes will be used where there is a need.
+
 Transport API version
 ^^^^^^^^^^^^^^^^^^^^^
 

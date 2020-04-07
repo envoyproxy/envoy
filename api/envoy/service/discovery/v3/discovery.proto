@@ -43,6 +43,14 @@ message DiscoveryRequest {
   // which will be explicitly enumerated in resource_names.
   repeated string resource_names = 3;
 
+  // The resource namespace for this subscription. When *resource_names* is
+  // empty, this will be used by the management server to determine the set of
+  // resources to deliver. If *resource_names* is non-empty, all named resources
+  // must be prefixed with *namespace*. See the xDS protocol specification for
+  // further details on :ref:`resource namespaces
+  // <xds_protocol_resource_names>`.
+  string namespace = 7;
+
   // Type of the resource that is being requested, e.g.
   // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment". This is implicit
   // in requests made via singleton xDS APIs such as CDS, LDS, etc. but is
@@ -176,6 +184,15 @@ message DeltaDiscoveryRequest {
 
   // A list of Resource names to remove from the list of tracked resources.
   repeated string resource_names_unsubscribe = 4;
+
+  // The resource namespace for this subscription. This will be used by the
+  // management server to determine the set of resources to deliver where there
+  // is no explicit resource subscription from the client. If
+  // *resource_names_subscribe* or *resource_name_unsubscribe* are non-empty,
+  // all named resources must be prefixed with *namespace*. See the xDS protocol
+  // specification for further details on :ref:`resource namespaces
+  // <xds_protocol_resource_names>`.
+  string namespace = 8;
 
   // Informs the server of the versions of the resources the xDS client knows of, to enable the
   // client to continue the same logical xDS session even in the face of gRPC stream reconnection.
