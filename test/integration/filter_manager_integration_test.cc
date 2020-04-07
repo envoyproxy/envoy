@@ -474,11 +474,11 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, FilterChainMismatch) {
 
   auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write("hello");
-  tcp_client->close();
 
   std::string access_log =
       absl::StrCat("NR ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr(access_log));
+  tcp_client->close();
 }
 
 /**
