@@ -6,6 +6,7 @@
 
 #include "common/network/utility.h"
 
+#include "extensions/filters/common/expr/evaluator.h"
 #include "extensions/filters/common/rbac/matchers.h"
 
 #include "test/mocks/network/mocks.h"
@@ -360,8 +361,9 @@ TEST(PolicyMatcher, PolicyMatcher) {
   policy.add_permissions()->set_destination_port(456);
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("foo");
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
+  Expr::BuilderPtr builder = Expr::createBuilder(nullptr);
 
-  RBAC::PolicyMatcher matcher(policy, nullptr);
+  RBAC::PolicyMatcher matcher(policy, builder.get());
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::RequestHeaderMapImpl headers;
