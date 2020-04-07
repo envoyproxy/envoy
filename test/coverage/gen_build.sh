@@ -31,13 +31,16 @@ else
   COVERAGE_TARGETS=//test/...
 fi
 
-for target in ${COVERAGE_TARGETS}; do
-  TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${REPOSITORY}${target})" | grep "^//")"
-done
+# This setting allows consuming projects to only run coverage over private extensions.
+if [[ -z "${ONLY_EXTRA_QUERY_PATHS}" ]]; then
+  for target in ${COVERAGE_TARGETS}; do
+    TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${REPOSITORY}${target})" | grep "^//")"
+  done
 
-# Run the QUICHE platform api tests for coverage.
-if [[ "${COVERAGE_TARGETS}" == "//test/..." ]]; then
-  TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', '@com_googlesource_quiche//:all')" | grep "^@com_googlesource_quiche")"
+  # Run the QUICHE platform api tests for coverage.
+  if [[ "${COVERAGE_TARGETS}" == "//test/..." ]]; then
+    TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', '@com_googlesource_quiche//:all')" | grep "^@com_googlesource_quiche")"
+  fi
 fi
 
 if [ -n "${EXTRA_QUERY_PATHS}" ]; then
