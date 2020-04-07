@@ -228,10 +228,8 @@ private:
   void enterMinRTTSamplingWindow();
   bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
   void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
-  void updateConcurrencyLimit(const uint32_t new_limit) {
-    concurrency_limit_.store(new_limit);
-    stats_.concurrency_limit_.set(concurrency_limit_.load());
-  }
+  void updateConcurrencyLimit(const uint32_t new_limit)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   std::chrono::milliseconds applyJitter(std::chrono::milliseconds interval,
                                         double jitter_pct) const;
 
@@ -270,6 +268,11 @@ private:
   // calculate a new concurrency limit.
   std::unique_ptr<histogram_t, decltype(&hist_free)>
       latency_sample_hist_ ABSL_GUARDED_BY(sample_mutation_mtx_);
+
+  // Tracks the number of consecutive times that the concurrency limit is set to the minimum. This
+  // is used to determine whether the controller should trigger an additional minRTT measurement
+  // after remaining at the minimum limit for too long.
+  uint32_t consecutive_min_concurrency_set_ ABSL_GUARDED_BY(sample_mutation_mtx_);
 
   Event::TimerPtr min_rtt_calc_timer_;
   Event::TimerPtr sample_reset_timer_;

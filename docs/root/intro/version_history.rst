@@ -10,6 +10,8 @@ Version history
 * access log: introduce :ref:`connection-level access loggers<envoy_api_field_Listener.access_log>`.
 * adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
   minimum.
+* adaptive concurrency: minRTT is now triggered when the minimum concurrency is maintained for 5
+  consecutive sampling intervals
 * admin: added support for displaying ip address subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * admin: added :http:post:`/reopen_logs` endpoint to control log rotation.
 * api: froze v2 xDS API. New feature development in the API should occur in v3 xDS. While the v2 xDS API has
