@@ -13,7 +13,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "AddressProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Network addresses]
 
@@ -54,29 +54,29 @@ message SocketAddress {
   // via :ref:`resolver_name <envoy_api_field_config.core.v3.SocketAddress.resolver_name>`.
   string address = 2 [(validate.rules).string = {min_bytes: 1}];
 
+  string resolver_name = 5;
+
+  // This is only valid if :ref:`resolver_name
+  // <envoy_api_field_config.core.v3.SocketAddress.resolver_name>` is specified below and the
+  // named resolver is capable of named port resolution.
+  bool ipv4_compat = 6;
+
   oneof port_specifier {
     option (validate.required) = true;
 
+    // The name of the custom resolver. This must have been registered with Envoy. If
+    // this is empty, a context dependent default applies. If the address is a concrete
+    // IP address, no resolution will occur. If address is a hostname this
+    // should be set for resolution other than DNS. Specifying a custom resolver with
+    // *STRICT_DNS* or *LOGICAL_DNS* will generate an error at runtime.
     uint32 port_value = 3 [(validate.rules).uint32 = {lte: 65535}];
 
-    // This is only valid if :ref:`resolver_name
-    // <envoy_api_field_config.core.v3.SocketAddress.resolver_name>` is specified below and the
-    // named resolver is capable of named port resolution.
+    // When binding to an IPv6 address above, this enables `IPv4 compatibility
+    // <https://tools.ietf.org/html/rfc3493#page-11>`_. Binding to ``::`` will
+    // allow both IPv4 and IPv6 connections, with peer IPv4 addresses mapped into
+    // IPv6 space as ``::FFFF:<IPv4-address>``.
     string named_port = 4;
   }
-
-  // The name of the custom resolver. This must have been registered with Envoy. If
-  // this is empty, a context dependent default applies. If the address is a concrete
-  // IP address, no resolution will occur. If address is a hostname this
-  // should be set for resolution other than DNS. Specifying a custom resolver with
-  // *STRICT_DNS* or *LOGICAL_DNS* will generate an error at runtime.
-  string resolver_name = 5;
-
-  // When binding to an IPv6 address above, this enables `IPv4 compatibility
-  // <https://tools.ietf.org/html/rfc3493#page-11>`_. Binding to ``::`` will
-  // allow both IPv4 and IPv6 connections, with peer IPv4 addresses mapped into
-  // IPv6 space as ``::FFFF:<IPv4-address>``.
-  bool ipv4_compat = 6;
 }
 
 message TcpKeepalive {

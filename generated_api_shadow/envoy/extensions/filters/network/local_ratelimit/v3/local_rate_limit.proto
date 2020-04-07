@@ -12,7 +12,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.local_ratelimit.v3";
 option java_outer_classname = "LocalRateLimitProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Local rate limit]
 // Local rate limit :ref:`configuration overview <config_network_filters_local_rate_limit>`.

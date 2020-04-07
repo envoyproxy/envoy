@@ -16,7 +16,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.data.accesslog.v2";
 option java_outer_classname = "AccesslogProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: gRPC access logs]
 // Envoy access logs describe incoming interaction with Envoy over a fixed

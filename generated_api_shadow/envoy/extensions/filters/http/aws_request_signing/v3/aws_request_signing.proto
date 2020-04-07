@@ -9,7 +9,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.aws_request_signing.v3";
 option java_outer_classname = "AwsRequestSigningProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: AwsRequestSigning]
 // AwsRequestSigning :ref:`configuration overview <config_http_filters_aws_request_signing>`.

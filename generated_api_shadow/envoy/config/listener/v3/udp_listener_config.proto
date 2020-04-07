@@ -11,7 +11,7 @@ import "udpa/annotations/versioning.proto";
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "UdpListenerConfigProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: UDP Listener Config]
 // Listener :ref:`configuration overview <config_listeners>`
@@ -28,9 +28,9 @@ message UdpListenerConfig {
   // Used to create a specific listener factory. To some factory, e.g.
   // "raw_udp_listener", config is not needed.
   oneof config_type {
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
-
     google.protobuf.Any typed_config = 3;
+
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
   }
 }
 

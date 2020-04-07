@@ -15,7 +15,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filter.udp.dns_filter.v3alpha";
 option (udpa.annotations.file_status).work_in_progress = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: DNS Filter]
 // DNS Filter :ref:`configuration overview <config_udp_listener_filters_dns_filter>`.

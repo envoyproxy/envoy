@@ -14,7 +14,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.thrift_proxy.v3";
 option java_outer_classname = "ThriftProxyProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Thrift Proxy]
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
@@ -100,9 +100,9 @@ message ThriftFilter {
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
-
     google.protobuf.Any typed_config = 3;
+
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
   }
 }
 
