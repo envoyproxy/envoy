@@ -1169,12 +1169,14 @@ TEST(PercentEncoding, EncodeDecode) {
                                             "     \"message\": \"Unauthorized\"%0A    }%0A}%0A  ");
   validatePercentEncodingEncodeDecode("too large", "too large");
   validatePercentEncodingEncodeDecode("_-ok-_", "_-ok-_");
+  validatePercentEncodingEncodeDecode("~-ok-~", "%7E-ok-%7E");
 }
 
 TEST(PercentEncoding, Trailing) {
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20lar%20"), "too lar ");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20larg%e"), "too larg%e");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20large%"), "too large%");
+  EXPECT_EQ(Utility::PercentEncoding::decode("%ok"), "\x94");
 }
 
 } // namespace Http
