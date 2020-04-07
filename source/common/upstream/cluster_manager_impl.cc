@@ -268,7 +268,11 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v2.AggregatedDiscoveryService.DeltaAggregatedResources"),
+              dyn_resources.ads_config().transport_api_version() ==
+                      envoy::config::core::v3::ApiVersion::V3
+                  ? "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"
+                  : "envoy.service.discovery.v2.AggregatedDiscoveryService."
+                    "DeltaAggregatedResources"),
           dyn_resources.ads_config().transport_api_version(), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
