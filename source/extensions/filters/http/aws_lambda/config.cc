@@ -23,6 +23,21 @@ std::string extractRegionFromArn(absl::string_view arn) {
   }
   throw EnvoyException(fmt::format("Invalid ARN: {}", arn));
 }
+
+InvocationMode
+getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config) {
+  using namespace envoy::extensions::filters::http::aws_lambda::v3;
+  switch (proto_config.invocation_mode()) {
+  case Config_InvocationMode_ASYNCHRONOUS:
+    return InvocationMode::Asynchronous;
+    break;
+  case Config_InvocationMode_SYNCHRONOUS:
+    return InvocationMode::Synchronous;
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
 } // namespace
 
 Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
@@ -37,7 +52,8 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
   auto signer = std::make_shared<Extensions::Common::Aws::SignerImpl>(
       service_name, region, std::move(credentials_provider), context.dispatcher().timeSource());
 
-  FilterSettings filter_settings{proto_config.arn(), proto_config.payload_passthrough()};
+  FilterSettings filter_settings{proto_config.arn(), getInvocationMode(proto_config),
+                                 proto_config.payload_passthrough()};
 
   return [signer, filter_settings](Http::FilterChainFactoryCallbacks& cb) {
     auto filter = std::make_shared<Filter>(filter_settings, signer);
@@ -50,7 +66,8 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig& proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const FilterSettings>(FilterSettings{
-      proto_config.invoke_config().arn(), proto_config.invoke_config().payload_passthrough()});
+      proto_config.invoke_config().arn(), getInvocationMode(proto_config.invoke_config()),
+      proto_config.invoke_config().payload_passthrough()});
 }
 /*
  * Static registration for the AWS Lambda filter. @see RegisterFactory.

@@ -14,6 +14,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/drain_manager.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/process_context.h"
@@ -116,6 +117,11 @@ public:
    * @return the server-wide grpc context.
    */
   virtual Grpc::Context& grpcContext() PURE;
+
+  /**
+   * @return DrainManager& the server-wide drain manager.
+   */
+  virtual Envoy::Server::DrainManager& drainManager() PURE;
 };
 
 /**
@@ -218,7 +224,15 @@ public:
  * The life time is no longer than the owning listener. It should be used to create
  * NetworkFilterChain.
  */
-class FilterChainFactoryContext : public virtual FactoryContext {};
+class FilterChainFactoryContext : public virtual FactoryContext {
+public:
+  /**
+   * Set the flag that all attached filter chains will be destroyed.
+   */
+  virtual void startDraining() PURE;
+};
+
+using FilterChainFactoryContextPtr = std::unique_ptr<FilterChainFactoryContext>;
 
 /**
  * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
@@ -237,7 +251,7 @@ public:
  */
 class ListenerFilterConfigFactoryBase : public Config::TypedFactory {
 public:
-  virtual ~ListenerFilterConfigFactoryBase() = default;
+  ~ListenerFilterConfigFactoryBase() override = default;
 };
 
 /**
@@ -295,7 +309,7 @@ public:
  */
 class ProtocolOptionsFactory : public Config::TypedFactory {
 public:
-  virtual ~ProtocolOptionsFactory() = default;
+  ~ProtocolOptionsFactory() override = default;
 
   /**
    * Create a particular filter's protocol specific options implementation. If the factory

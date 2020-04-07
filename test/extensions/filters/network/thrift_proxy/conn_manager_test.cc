@@ -97,7 +97,7 @@ public:
 
     proto_config_.set_stat_prefix("test");
 
-    decoder_filter_.reset(new NiceMock<ThriftFilters::MockDecoderFilter>());
+    decoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockDecoderFilter>>();
 
     config_ = std::make_unique<TestConfigImpl>(proto_config_, context_, decoder_filter_, stats_);
     if (custom_transport_) {

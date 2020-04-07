@@ -433,7 +433,7 @@ protected:
  */
 class InjectDataWithEchoFilterIntegrationTest : public InjectDataToFilterChainIntegrationTest {
 public:
-  static std::string echo_config() {
+  static std::string echoConfig() {
     return absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
@@ -442,7 +442,7 @@ public:
   }
 
   InjectDataWithEchoFilterIntegrationTest()
-      : InjectDataToFilterChainIntegrationTest(echo_config()) {}
+      : InjectDataToFilterChainIntegrationTest(echoConfig()) {}
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -474,11 +474,11 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, FilterChainMismatch) {
 
   auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write("hello");
-  tcp_client->close();
 
   std::string access_log =
       absl::StrCat("NR ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr(access_log));
+  tcp_client->close();
 }
 
 /**

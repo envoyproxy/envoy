@@ -13,7 +13,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.squash.v2";
 option java_outer_classname = "SquashProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.squash.v3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Squash]
 // Squash :ref:`configuration overview <config_http_filters_squash>`.

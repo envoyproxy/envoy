@@ -43,7 +43,7 @@ public:
 class MockMirrorPolicy : public MirrorPolicy {
 public:
   MockMirrorPolicy(ConnPool::InstanceSharedPtr);
-  ~MockMirrorPolicy() = default;
+  ~MockMirrorPolicy() override = default;
 
   MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (), (const));
   MOCK_METHOD(bool, shouldMirror, (const std::string&), (const));

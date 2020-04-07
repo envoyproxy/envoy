@@ -60,7 +60,6 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::Matcher;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
@@ -348,6 +347,10 @@ public:
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
   RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+  headersWithUnderscoresAction() const override {
+    return headers_with_underscores_action_;
+  }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -404,6 +407,8 @@ public:
   Http::Http1Settings http1_settings_;
   bool normalize_path_ = false;
   bool merge_slashes_ = false;
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
@@ -4138,6 +4143,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol(Envoy::Http::Protocol::Http11));
   conn_manager_->onData(fake_input, false);
 }
 
@@ -4613,6 +4619,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol(Envoy::Http::Protocol::Http11));
   conn_manager_->onData(fake_input, false);
 
   Buffer::OwnedImpl decoded_data_to_forward;
@@ -4791,6 +4798,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol(Envoy::Http::Protocol::Http11));
   conn_manager_->onData(fake_input, false);
 
   // Mimic a decoder filter that trapped data and now sends it on, since the data was buffered

@@ -37,7 +37,8 @@ public:
     if (caching) {
       cache_timer_ = new Event::MockTimer(&dispatcher_);
       EXPECT_CALL(*cache_timer_, enableTimer(_, _));
-      cache_manager_.reset(new HealthCheckCacheManager(dispatcher_, std::chrono::milliseconds(1)));
+      cache_manager_ =
+          std::make_shared<HealthCheckCacheManager>(dispatcher_, std::chrono::milliseconds(1));
     }
 
     prepareFilter(pass_through);
