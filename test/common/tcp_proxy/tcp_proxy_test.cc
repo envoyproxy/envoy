@@ -39,7 +39,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::MatchesRegex;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -840,7 +839,7 @@ public:
   }
 
   void configure(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
-    config_.reset(new Config(config, factory_context_));
+    config_ = std::make_shared<Config>(config, factory_context_);
   }
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy defaultConfig() {
@@ -1304,7 +1303,7 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
         k0: v0
 )EOF";
 
-  config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+  config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
 
   ProtobufWkt::Value v0, v1, v2;
   v0.set_string_value("v0");
@@ -1759,7 +1758,7 @@ public:
         cluster: fake_cluster
     )EOF";
 
-    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+    config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 
   void initializeFilter() {
@@ -1910,7 +1909,7 @@ public:
     cluster: fake_cluster
     )EOF";
 
-    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+    config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 };
 
@@ -1951,7 +1950,7 @@ public:
     - source_ip: {}
     )EOF";
 
-    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+    config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 
   void initializeFilter() {

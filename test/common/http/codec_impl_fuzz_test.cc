@@ -80,6 +80,8 @@ fromHttp2Settings(const test::common::http::Http2Settings& settings) {
   return options;
 }
 
+using StreamResetCallbackFn = std::function<void()>;
+
 // Internal representation of stream state. Encapsulates the stream state, mocks
 // and encoders for both the request/response.
 class HttpStream : public LinkedObject<HttpStream> {
@@ -122,12 +124,14 @@ public:
   } request_, response_;
 
   HttpStream(ClientConnection& client, const TestRequestHeaderMapImpl& request_headers,
-             bool end_stream) {
+             bool end_stream, StreamResetCallbackFn stream_reset_callback)
+      : stream_reset_callback_(stream_reset_callback) {
     request_.request_encoder_ = &client.newStream(response_.response_decoder_);
     ON_CALL(request_.stream_callbacks_, onResetStream(_, _))
         .WillByDefault(InvokeWithoutArgs([this] {
           ENVOY_LOG_MISC(trace, "reset request for stream index {}", stream_index_);
           resetStream();
+          stream_reset_callback_();
         }));
     ON_CALL(response_.stream_callbacks_, onResetStream(_, _))
         .WillByDefault(InvokeWithoutArgs([this] {
@@ -138,6 +142,7 @@ public:
           // HTTP/1 codec.
           request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
           resetStream();
+          stream_reset_callback_();
         }));
     ON_CALL(request_.request_decoder_, decodeHeaders_(_, true))
         .WillByDefault(InvokeWithoutArgs([this] {
@@ -325,6 +330,7 @@ public:
   }
 
   int32_t stream_index_{-1};
+  StreamResetCallbackFn stream_reset_callback_;
 };
 
 // Buffer between client and server H1/H2 codecs. This models each write operation
@@ -472,9 +478,14 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     }
   };
 
+  // We track whether the connection should be closed for HTTP/1, since stream resets imply
+  // connection closes.
+  bool should_close_connection = false;
+
   constexpr auto max_actions = 1024;
   try {
-    for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
+    for (int i = 0; i < std::min(max_actions, input.actions().size()) && !should_close_connection;
+         ++i) {
       const auto& action = input.actions(i);
       ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
       switch (action.action_selector_case()) {
@@ -492,7 +503,12 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         HttpStreamPtr stream = std::make_unique<HttpStream>(
             *client,
             fromSanitizedHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
-            action.new_stream().end_stream());
+            action.new_stream().end_stream(), [&should_close_connection, http2]() {
+              // HTTP/1 codec has stream reset implying connection close.
+              if (!http2) {
+                should_close_connection = true;
+              }
+            });
         stream->moveIntoListBack(std::move(stream), pending_streams);
         break;
       }
@@ -535,11 +551,14 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         // Maybe nothing is set?
         break;
       }
-      if (DebugMode) {
+      if (DebugMode && !should_close_connection) {
         client_server_buf_drain();
       }
     }
-    client_server_buf_drain();
+    // Drain all remaining buffers, unless the connection is effectively closed.
+    if (!should_close_connection) {
+      client_server_buf_drain();
+    }
     if (http2) {
       dynamic_cast<Http2::TestClientConnectionImpl&>(*client).goAway();
       dynamic_cast<Http2::TestServerConnectionImpl&>(*server).goAway();

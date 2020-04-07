@@ -386,7 +386,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
 
 class TcpProxyMetadataMatchIntegrationTest : public TcpProxyIntegrationTest {
 public:
-  void initialize();
+  void initialize() override;
 
   void expectEndpointToMatchRoute();
   void expectEndpointNotToMatchRoute();
@@ -677,7 +677,7 @@ void TcpProxySslIntegrationTest::initialize() {
 
   context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
-  payload_reader_.reset(new WaitForPayloadReader(*dispatcher_));
+  payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 }
 
 void TcpProxySslIntegrationTest::setupConnections() {

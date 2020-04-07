@@ -531,11 +531,11 @@ class RoundRobinLoadBalancerTest : public LoadBalancerTestBase {
 public:
   void init(bool need_local_cluster) {
     if (need_local_cluster) {
-      local_priority_set_.reset(new PrioritySetImpl());
+      local_priority_set_ = std::make_shared<PrioritySetImpl>();
       local_priority_set_->getOrCreateHostSet(0);
     }
-    lb_.reset(new RoundRobinLoadBalancer(priority_set_, local_priority_set_.get(), stats_, runtime_,
-                                         random_, common_config_));
+    lb_ = std::make_shared<RoundRobinLoadBalancer>(priority_set_, local_priority_set_.get(), stats_,
+                                                   runtime_, random_, common_config_);
   }
 
   // Updates priority 0 with the given hosts and hosts_per_locality.
@@ -1562,8 +1562,8 @@ INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, LeastRequestLoadBalancerTest,
 class RandomLoadBalancerTest : public LoadBalancerTestBase {
 public:
   void init() {
-    lb_.reset(
-        new RandomLoadBalancer(priority_set_, nullptr, stats_, runtime_, random_, common_config_));
+    lb_ = std::make_shared<RandomLoadBalancer>(priority_set_, nullptr, stats_, runtime_, random_,
+                                               common_config_);
   }
   std::shared_ptr<LoadBalancer> lb_;
 };
