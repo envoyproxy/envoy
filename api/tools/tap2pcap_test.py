@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
   tap2pcap.Tap2Pcap(tap_path, pcap_path)
   actual_output = sp.check_output(['tshark', '-r', pcap_path, '-d', 'tcp.port==10000,http2', '-P'])
-  with open(expected_path, 'r') as f:
+  with open(expected_path, 'rb') as f:
     expected_output = f.read()
   if actual_output != expected_output:
     print('Mismatch')
