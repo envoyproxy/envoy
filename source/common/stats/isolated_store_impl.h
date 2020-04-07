@@ -29,8 +29,7 @@ public:
   using CounterAllocator = std::function<RefcountPtr<Base>(StatName name)>;
   using GaugeAllocator = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
   using HistogramAllocator = std::function<RefcountPtr<Base>(StatName, Histogram::Unit)>;
-  using TextReadoutAllocator =
-      std::function<RefcountPtr<Base>(StatName name, bool /* lowercase */)>;
+  using TextReadoutAllocator = std::function<RefcountPtr<Base>(StatName name, TextReadout::Type)>;
   using BaseOptConstRef = absl::optional<std::reference_wrapper<const Base>>;
 
   IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
@@ -71,13 +70,13 @@ public:
     return *new_stat;
   }
 
-  Base& get(StatName name, bool b) {
+  Base& get(StatName name, TextReadout::Type type) {
     auto stat = stats_.find(name);
     if (stat != stats_.end()) {
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = text_readout_alloc_(name, b);
+    RefcountPtr<Base> new_stat = text_readout_alloc_(name, type);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
@@ -142,7 +141,8 @@ public:
   TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                StatNameTagVectorOptConstRef tags) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    TextReadout& text_readout = text_readouts_.get(joiner.nameWithTags(), false);
+    TextReadout& text_readout =
+        text_readouts_.get(joiner.nameWithTags(), TextReadout::Type::Default);
     return text_readout;
   }
   CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }

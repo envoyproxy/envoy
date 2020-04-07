@@ -32,7 +32,7 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       histograms_([this](StatName name, Histogram::Unit unit) -> HistogramSharedPtr {
         return HistogramSharedPtr(new HistogramImpl(name, unit, *this, name, StatNameTagVector{}));
       }),
-      text_readouts_([this](StatName name, bool) -> TextReadoutSharedPtr {
+      text_readouts_([this](StatName name, TextReadout::Type) -> TextReadoutSharedPtr {
         return alloc_.makeTextReadout(name, name, StatNameTagVector{});
       }),
       null_counter_(new NullCounterImpl(symbol_table)),
