@@ -529,6 +529,11 @@ private:
   }
 
   absl::optional<PendingResponse> pending_response_;
+  // TODO(mattklein123): The following bool tracks whether a pending response is complete before
+  // dispatching callbacks. This is needed so that pending_response_ stays valid during callbacks
+  // in order to access the stream, but to avoid invoking callbacks that shouldn't be called once
+  // the response is complete. The existence of this variable is hard to reason about and it should
+  // be combined with pending_response_ somehow in a follow up cleanup.
   bool pending_response_done_{true};
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};

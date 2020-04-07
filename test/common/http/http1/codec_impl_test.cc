@@ -1931,6 +1931,37 @@ TEST_F(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
       ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/10655. Make sure we correctly
+// handle going below low watermark when closing the connection during a completion callback.
+TEST_F(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
+  initialize();
+
+  InSequence s;
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  Http::MockStreamCallbacks stream_callbacks;
+  request_encoder.getStream().addCallbacks(stream_callbacks);
+
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  // Fake a call from the underlying Network::Connection and verify the stream is notified.
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
+  static_cast<ClientConnection*>(codec_.get())
+      ->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, true))
+      .WillOnce(Invoke([&](ResponseHeaderMapPtr&, bool) {
+        // Fake a call for going below the low watermark. Make sure no stream callbacks get called.
+        EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark()).Times(0);
+        static_cast<ClientConnection*>(codec_.get())
+            ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+      }));
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+  codec_->dispatch(response);
+}
+
 TEST_F(Http1ServerConnectionImplTest, LargeTrailersRejected) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
