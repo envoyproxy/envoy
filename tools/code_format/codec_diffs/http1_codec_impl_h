@@ -8,7 +8,7 @@
  namespace Http1 {
  
  /**
-@@ -73,7 +74,8 @@
+@@ -75,7 +76,8 @@
    void setDetails(absl::string_view details) { details_ = details; }
  
  protected:
@@ -18,7 +18,7 @@
    void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
    void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, bool end_stream);
    void encodeTrailersBase(const HeaderMap& headers);
-@@ -112,7 +114,7 @@
+@@ -114,7 +116,7 @@
  
    void encodeFormattedHeader(absl::string_view key, absl::string_view value);
  
@@ -27,7 +27,7 @@
    absl::string_view details_;
  };
  
-@@ -121,7 +123,8 @@
+@@ -123,7 +125,8 @@
   */
  class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
  public:
@@ -37,7 +37,7 @@
        : StreamEncoderImpl(connection, header_key_formatter) {}
  
    bool startedResponse() { return started_response_; }
-@@ -140,7 +143,8 @@
+@@ -142,7 +145,8 @@
   */
  class RequestEncoderImpl : public StreamEncoderImpl, public RequestEncoder {
  public:
@@ -47,7 +47,7 @@
        : StreamEncoderImpl(connection, header_key_formatter) {}
    bool headRequest() { return head_request_; }
  
-@@ -208,7 +212,8 @@
+@@ -210,7 +214,8 @@
  protected:
    ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
                   uint32_t max_headers_kb, const uint32_t max_headers_count,
@@ -57,7 +57,7 @@
  
    bool resetStreamCalled() { return reset_stream_called_; }
  
-@@ -216,7 +221,7 @@
+@@ -218,7 +223,7 @@
    CodecStats stats_;
    http_parser parser_;
    Http::Code error_code_{Http::Code::BadRequest};
@@ -66,7 +66,7 @@
    HeaderString current_header_field_;
    HeaderString current_header_value_;
    bool processing_trailers_ : 1;
-@@ -394,7 +399,8 @@
+@@ -396,7 +401,8 @@
     * An active HTTP/1.1 request.
     */
    struct ActiveRequest {
@@ -76,7 +76,7 @@
          : response_encoder_(connection, header_key_formatter) {}
  
      HeaderString request_url_;
-@@ -485,7 +491,8 @@
+@@ -487,7 +493,8 @@
  
  private:
    struct PendingResponse {
@@ -86,7 +86,7 @@
                      ResponseDecoder* decoder)
          : encoder_(connection, header_key_formatter), decoder_(decoder) {}
  
-@@ -544,5 +551,6 @@
+@@ -551,5 +558,6 @@
  };
  
  } // namespace Http1

@@ -1980,7 +1980,7 @@ TEST_P(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10655. Make sure we correctly
 // handle going below low watermark when closing the connection during a completion callback.
-TEST_F(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
+TEST_P(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
   initialize();
 
   InSequence s;
@@ -2009,8 +2009,7 @@ TEST_F(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
   codec_->dispatch(response);
 }
 
-TEST_F(Http1ServerConnectionImplTest, LargeTrailersRejected) {
->>>>>>> upstream/master
+TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejected) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
   testTrailersExceedLimit(long_string, true);
