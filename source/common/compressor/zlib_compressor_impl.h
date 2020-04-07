@@ -33,6 +33,15 @@ public:
    */
   enum class CompressionLevel : int64_t {
     Best = 9,
+    Level1 = 1,
+    Level2 = 2,
+    Level3 = 3,
+    Level4 = 4,
+    Level5 = 5,
+    Level6 = 6,
+    Level7 = 7,
+    Level8 = 8,
+    Level9 = 9,
     Speed = 1,
     Standard = -1,
   };
@@ -46,6 +55,7 @@ public:
    */
   enum class CompressionStrategy : uint64_t {
     Filtered = 1,
+    Fixed = 4,
     Huffman = 2,
     Rle = 3,
     Standard = 0,

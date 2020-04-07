@@ -60,16 +60,43 @@ TEST_F(GzipTest, DefaultConfigValues) {
 TEST_F(GzipTest, AvailableCombinationCompressionStrategyAndLevelConfig) {
   expectValidCompressionStrategyAndLevel(
       Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered, "FILTERED",
-      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST_COMPRESSION");
   expectValidCompressionStrategyAndLevel(
-      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman, "HUFFMAN",
-      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
+      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman, "HUFFMAN_ONLY",
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST_COMPRESSION");
   expectValidCompressionStrategyAndLevel(
       Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Rle, "RLE",
-      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Speed, "SPEED");
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Speed, "BEST_SPEED");
   expectValidCompressionStrategyAndLevel(
-      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, "DEFAULT",
-      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard, "DEFAULT");
+      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, "DEFAULT_STRATEGY",
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard, "DEFAULT_COMPRESSION");
+  expectValidCompressionStrategyAndLevel(
+      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Fixed, "FIXED",
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level1, "COMPRESSION_LEVEL_1");
+  expectValidCompressionStrategyAndLevel(
+      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Fixed, "FIXED",
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level2, "COMPRESSION_LEVEL_2");
+  expectValidCompressionStrategyAndLevel(
+      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Fixed, "FIXED",
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level3, "COMPRESSION_LEVEL_3");
+  expectValidCompressionStrategyAndLevel(
+      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Fixed, "FIXED",
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level4, "COMPRESSION_LEVEL_4");
+  expectValidCompressionStrategyAndLevel(
+      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Fixed, "FIXED",
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level5, "COMPRESSION_LEVEL_5");
+  expectValidCompressionStrategyAndLevel(
+      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Fixed, "FIXED",
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level6, "COMPRESSION_LEVEL_6");
+  expectValidCompressionStrategyAndLevel(
+      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Fixed, "FIXED",
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level7, "COMPRESSION_LEVEL_7");
+  expectValidCompressionStrategyAndLevel(
+      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Fixed, "FIXED",
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level8, "COMPRESSION_LEVEL_8");
+  expectValidCompressionStrategyAndLevel(
+      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Fixed, "FIXED",
+      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level9, "COMPRESSION_LEVEL_9");
 }
 
 } // namespace Gzip

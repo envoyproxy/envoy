@@ -38,7 +38,7 @@ private:
   friend class GzipTest;
 
   static Envoy::Compressor::ZlibCompressorImpl::CompressionLevel compressionLevelEnum(
-      envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionLevel::Enum
+      envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionLevel
           compression_level);
   static Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
       envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionStrategy

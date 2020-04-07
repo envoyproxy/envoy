@@ -80,7 +80,7 @@ public:
             "@type": type.googleapis.com/envoy.config.filter.http.compressor.gzip.v2.Gzip
             memory_level: 3
             window_bits: 10
-            compression_level: best
+            compression_level: best_compression
             compression_strategy: rle
     )EOF"};
 
@@ -99,7 +99,7 @@ public:
             "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip
             memory_level: 3
             window_bits: 10
-            compression_level: best
+            compression_level: best_compression
             compression_strategy: rle
     )EOF"};
 

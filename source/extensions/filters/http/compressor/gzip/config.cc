@@ -26,13 +26,27 @@ GzipCompressorFactory::GzipCompressorFactory(
       window_bits_(windowBitsUint(gzip.window_bits().value())) {}
 
 Envoy::Compressor::ZlibCompressorImpl::CompressionLevel GzipCompressorFactory::compressionLevelEnum(
-    envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionLevel::Enum
+    envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionLevel
         compression_level) {
   switch (compression_level) {
-  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionLevel::BEST:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best;
-  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionLevel::SPEED:
+  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::BEST_SPEED:
     return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Speed;
+  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::COMPRESSION_LEVEL_2:
+    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level2;
+  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::COMPRESSION_LEVEL_3:
+    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level3;
+  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::COMPRESSION_LEVEL_4:
+    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level4;
+  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::COMPRESSION_LEVEL_5:
+    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level5;
+  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::COMPRESSION_LEVEL_6:
+    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level6;
+  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::COMPRESSION_LEVEL_7:
+    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level7;
+  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::COMPRESSION_LEVEL_8:
+    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level8;
+  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::BEST_COMPRESSION:
+    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best;
   default:
     return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard;
   }
@@ -43,12 +57,14 @@ GzipCompressorFactory::compressionStrategyEnum(
     envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionStrategy
         compression_strategy) {
   switch (compression_strategy) {
-  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::RLE:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
   case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::FILTERED:
     return Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered;
-  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::HUFFMAN:
+  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::FIXED:
+    return Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Fixed;
+  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::HUFFMAN_ONLY:
     return Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
+  case envoy::extensions::filters::http::compressor::gzip::v3::Gzip::RLE:
+    return Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
   default:
     return Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
   }
