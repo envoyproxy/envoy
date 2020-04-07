@@ -6,7 +6,7 @@ It is recommended to use [Bazelisk](https://github.com/bazelbuild/bazelisk) inst
 On Linux, run the following commands:
 
 ```
-sudo wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.3.0/bazelisk-linux-amd64
+sudo wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
 sudo chmod +x /usr/local/bin/bazel
 ```
 
