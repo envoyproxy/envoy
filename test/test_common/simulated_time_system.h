@@ -26,8 +26,8 @@ public:
   SchedulerPtr createScheduler(Scheduler& base_scheduler) override;
 
   // TestTimeSystem
-  void sleep(const Duration& duration) override;
-  void advanceTime(const Duration& duration) override;
+  void advanceTimeWait(const Duration& duration) override;
+  void advanceTimeAsync(const Duration& duration) override;
   Thread::CondVar::WaitStatus
   waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
           const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;

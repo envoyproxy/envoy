@@ -35,7 +35,7 @@ protected:
   }
 
   void advanceMsAndLoop(int64_t delay_ms) {
-    time_system_.advanceTime(std::chrono::milliseconds(delay_ms));
+    time_system_.advanceTimeAsync(std::chrono::milliseconds(delay_ms));
     base_scheduler_.run(Dispatcher::RunType::NonBlock);
   }
 
@@ -54,7 +54,7 @@ protected:
   SystemTime start_system_time_;
 };
 
-TEST_F(SimulatedTimeSystemTest, Sleep) {
+TEST_F(SimulatedTimeSystemTest, AvanceTimeAsync) {
   EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_, time_system_.systemTime());
   advanceMsAndLoop(5);

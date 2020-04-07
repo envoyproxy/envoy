@@ -36,7 +36,7 @@ class UdpListenerImplTest : public ListenerImplTestBase {
 public:
   UdpListenerImplTest()
       : server_socket_(createServerSocket(true)), send_to_addr_(getServerLoopbackAddress()) {
-    time_system_.sleep(std::chrono::milliseconds(100));
+    time_system_.advanceTimeWait(std::chrono::milliseconds(100));
   }
 
   void SetUp() override {
@@ -92,7 +92,7 @@ protected:
                   std::chrono::milliseconds(
                       (num_packets_received_by_listener_ % num_packet_per_recv) * 100));
     // Advance time so that next onData() should have different received time.
-    time_system_.sleep(std::chrono::milliseconds(100));
+    time_system_.advanceTimeWait(std::chrono::milliseconds(100));
     ++num_packets_received_by_listener_;
   }
 

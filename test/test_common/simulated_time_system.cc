@@ -202,7 +202,7 @@ static int instance_count = 0;
 
 // When we initialize our simulated time, we'll start the current time based on
 // the real current time. But thereafter, real-time will not be used, and time
-// will march forward only by calling sleep().
+// will march forward only by calling.advanceTimeAsync().
 SimulatedTimeSystemHelper::SimulatedTimeSystemHelper()
     : monotonic_time_(MonotonicTime(std::chrono::seconds(0))),
       system_time_(real_time_source_.systemTime()), index_(0), pending_alarms_(0) {
@@ -224,7 +224,15 @@ MonotonicTime SimulatedTimeSystemHelper::monotonicTime() {
   return monotonic_time_;
 }
 
-void SimulatedTimeSystemHelper::sleep(const Duration& duration) {
+void SimulatedTimeSystemHelper::advanceTimeAsync(const Duration& duration) {
+  only_one_thread_.checkOneThread();
+  absl::MutexLock lock(&mutex_);
+  MonotonicTime monotonic_time =
+      monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
+  setMonotonicTimeLockHeld(monotonic_time);
+}
+
+void SimulatedTimeSystemHelper::advanceTimeWait(const Duration& duration) {
   only_one_thread_.checkOneThread();
   absl::MutexLock lock(&mutex_);
   MonotonicTime monotonic_time =
@@ -237,11 +245,6 @@ void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const EXCLUSIVE_LOCKS
   mutex_.Await(absl::Condition(
       +[](const uint32_t* pending_alarms) -> bool { return *pending_alarms == 0; },
       &pending_alarms_));
-}
-
-void SimulatedTimeSystemHelper::advanceTime(const Duration& duration) {
-  only_one_thread_.checkOneThread();
-  setMonotonicTime(duration + monotonicTime());
 }
 
 Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(

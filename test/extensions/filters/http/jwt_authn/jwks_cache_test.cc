@@ -58,7 +58,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
   EXPECT_FALSE(jwks->isExpired());
 
   // cache duration is 1 second, sleep two seconds to expire it
-  time_system_.sleep(std::chrono::seconds(2));
+  time_system_.advanceTimeWait(std::chrono::seconds(2));
   EXPECT_TRUE(jwks->isExpired());
 }
 
