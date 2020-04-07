@@ -18,7 +18,6 @@ namespace Quic {
 
 using testing::_;
 using testing::Invoke;
-using testing::Return;
 
 class EnvoyQuicClientStreamTest : public testing::TestWithParam<bool> {
 public:

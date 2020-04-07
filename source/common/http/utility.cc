@@ -43,7 +43,7 @@ void validateCustomSettingsParameters(
   std::unordered_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals>
       custom_parameters;
   // User defined and named parameters with the same SETTINGS identifier can not both be set.
-  for (const auto it : options.custom_settings_parameters()) {
+  for (const auto& it : options.custom_settings_parameters()) {
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
     // Check for custom parameter inconsistencies.
     const auto result = custom_parameters.insert(
@@ -552,7 +552,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
     bool keep_header = false;
 
     // Determine whether the nominated header contains invalid values
-    const HeaderEntry* nominated_header = NULL;
+    const HeaderEntry* nominated_header = nullptr;
 
     if (lcs_header_to_remove == Http::Headers::get().Connection) {
       // Remove the connection header from the nominated tokens if it's self nominated

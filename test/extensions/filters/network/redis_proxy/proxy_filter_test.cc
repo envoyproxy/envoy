@@ -107,7 +107,8 @@ public:
   RedisProxyFilterTest(const std::string& yaml_string) {
     envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
         parseProtoFromYaml(yaml_string);
-    config_.reset(new ProxyFilterConfig(proto_config, store_, drain_decision_, runtime_, api_));
+    config_ =
+        std::make_shared<ProxyFilterConfig>(proto_config, store_, drain_decision_, runtime_, api_);
     filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,
                                             config_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);

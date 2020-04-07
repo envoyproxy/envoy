@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/tcp_proxy/upstream.h"
 
 #include "test/mocks/buffer/mocks.h"
@@ -19,7 +21,7 @@ public:
   HttpUpstreamTest() {
     EXPECT_CALL(encoder_, getStream()).Times(AnyNumber());
     EXPECT_CALL(encoder_, encodeHeaders(_, false));
-    upstream_.reset(new HttpUpstream(callbacks_, hostname_));
+    upstream_ = std::make_unique<HttpUpstream>(callbacks_, hostname_);
     upstream_->setRequestEncoder(encoder_, true);
   }
 
@@ -39,7 +41,7 @@ TEST_F(HttpUpstreamTest, WriteUpstream) {
   upstream_->encodeData(buffer2, true);
 
   // New upstream with no encoder
-  upstream_.reset(new HttpUpstream(callbacks_, hostname_));
+  upstream_ = std::make_unique<HttpUpstream>(callbacks_, hostname_);
   upstream_->encodeData(buffer2, true);
 }
 
@@ -73,7 +75,7 @@ TEST_F(HttpUpstreamTest, ReadDisable) {
   EXPECT_TRUE(upstream_->readDisable(false));
 
   // New upstream with no encoder
-  upstream_.reset(new HttpUpstream(callbacks_, hostname_));
+  upstream_ = std::make_unique<HttpUpstream>(callbacks_, hostname_);
   EXPECT_FALSE(upstream_->readDisable(true));
 }
 

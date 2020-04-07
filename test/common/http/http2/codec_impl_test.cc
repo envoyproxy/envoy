@@ -1130,7 +1130,7 @@ public:
       : Http2CodecImplTestFixture(client_settings, server_settings),
         validate_client_(validate_client) {}
 
-  virtual ~Http2CustomSettingsTestBase() = default;
+  ~Http2CustomSettingsTestBase() override = default;
 
   // Sets the custom settings parameters specified by |parameters| in the |options| proto.
   void setHttp2CustomSettingsParameters(envoy::config::core::v3::Http2ProtocolOptions& options,

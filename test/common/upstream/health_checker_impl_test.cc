@@ -145,9 +145,9 @@ public:
       codec_client_type: Http2
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -169,9 +169,9 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -192,9 +192,9 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -215,9 +215,9 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -238,9 +238,9 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -262,9 +262,9 @@ public:
     always_log_health_check_failures: true
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -283,9 +283,9 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -309,9 +309,9 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -331,9 +331,9 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -354,9 +354,9 @@ public:
     )EOF",
                                    prefix);
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -376,9 +376,9 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -398,9 +398,9 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -422,9 +422,9 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -446,9 +446,9 @@ public:
     )EOF",
                                    host);
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -521,9 +521,9 @@ public:
             value: "%START_TIME(%s.%9f)%"
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -546,9 +546,9 @@ public:
       request_headers_to_remove: ["user-agent"]
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -1026,9 +1026,9 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
       path: /healthcheck
     )EOF";
 
-  health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                      dispatcher_, runtime_, random_,
-                                                      HealthCheckEventLoggerPtr(event_logger_)));
+  health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      HealthCheckEventLoggerPtr(event_logger_));
   health_checker_->addHostCheckCompleteCb(
       [this](HostSharedPtr host, HealthTransition changed_state) -> void {
         onHostStatus(host, changed_state);
@@ -1096,9 +1096,9 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
 
   EXPECT_CALL(*socket_factory, createTransportSocket(ApplicationProtocolListEq("http1")));
 
-  health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                      dispatcher_, runtime_, random_,
-                                                      HealthCheckEventLoggerPtr(event_logger_)));
+  health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      HealthCheckEventLoggerPtr(event_logger_));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -2497,9 +2497,9 @@ public:
       codec_client_type: Http2
     )EOF";
 
-    health_checker_.reset(new TestProdHttpHealthChecker(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestProdHttpHealthChecker>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -2520,9 +2520,9 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestProdHttpHealthChecker(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestProdHttpHealthChecker>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -2555,9 +2555,9 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http1CodecClient)) {
       use_http2: false
     )EOF";
 
-  health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                      dispatcher_, runtime_, random_,
-                                                      HealthCheckEventLoggerPtr(event_logger_)));
+  health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      HealthCheckEventLoggerPtr(event_logger_));
   health_checker_->addHostCheckCompleteCb(
       [this](HostSharedPtr host, HealthTransition changed_state) -> void {
         onHostStatus(host, changed_state);
@@ -2580,9 +2580,9 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http2CodecClient)) {
       use_http2: true
     )EOF";
 
-  health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                      dispatcher_, runtime_, random_,
-                                                      HealthCheckEventLoggerPtr(event_logger_)));
+  health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      HealthCheckEventLoggerPtr(event_logger_));
   health_checker_->addHostCheckCompleteCb(
       [this](HostSharedPtr host, HealthTransition changed_state) -> void {
         onHostStatus(host, changed_state);
@@ -2927,9 +2927,9 @@ public:
       - text: "02"
     )EOF";
 
-    health_checker_.reset(
-        new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml.str()), dispatcher_,
-                                 runtime_, random_, HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml.str()), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
   }
 
   void setupNoData() {
@@ -2941,9 +2941,9 @@ public:
     tcp_health_check: {}
     )EOF";
 
-    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                   dispatcher_, runtime_, random_,
-                                                   HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
   }
 
   void setupDataDontReuseConnection() {
@@ -2960,9 +2960,9 @@ public:
       - text: "02"
     )EOF";
 
-    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                   dispatcher_, runtime_, random_,
-                                                   HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
   }
 
   void expectSessionCreate() {
@@ -3532,9 +3532,9 @@ public:
 
   void setupHC() {
     const auto config = createGrpcHealthCheckConfig();
-    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_,
-                                                        random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
+        *cluster_, config, dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -3544,9 +3544,9 @@ public:
   void setupHCWithUnhealthyThreshold(int value) {
     auto config = createGrpcHealthCheckConfig();
     config.mutable_unhealthy_threshold()->set_value(value);
-    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_,
-                                                        random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
+        *cluster_, config, dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -3559,9 +3559,9 @@ public:
     if (authority.has_value()) {
       config.mutable_grpc_health_check()->set_authority(authority.value());
     }
-    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_,
-                                                        random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
+        *cluster_, config, dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -3571,9 +3571,9 @@ public:
   void setupNoReuseConnectionHC() {
     auto config = createGrpcHealthCheckConfig();
     config.mutable_reuse_connection()->set_value(false);
-    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_,
-                                                        random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
+        *cluster_, config, dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -3590,9 +3590,9 @@ public:
     config.mutable_interval_jitter()->set_seconds(0);
     config.mutable_unhealthy_threshold()->set_value(3);
     config.mutable_healthy_threshold()->set_value(3);
-    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_,
-                                                        random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
+        *cluster_, config, dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);

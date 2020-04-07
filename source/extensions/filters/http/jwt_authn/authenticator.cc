@@ -101,12 +101,15 @@ private:
 };
 
 std::string AuthenticatorImpl::name() const {
-  if (provider_)
+  if (provider_) {
     return provider_.value() + (is_allow_missing_ ? "-OPTIONAL" : "");
-  if (is_allow_failed_)
+  }
+  if (is_allow_failed_) {
     return "_IS_ALLOW_FALED_";
-  if (is_allow_missing_)
+  }
+  if (is_allow_missing_) {
     return "_IS_ALLOW_MISSING_";
+  }
   return "_UNKNOWN_";
 }
 

@@ -55,7 +55,6 @@ using testing::MockFunction;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
-using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::StartsWith;
 

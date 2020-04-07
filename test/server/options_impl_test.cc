@@ -486,7 +486,7 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
 
 class TestFactory : public Config::TypedFactory {
 public:
-  virtual ~TestFactory() = default;
+  ~TestFactory() override = default;
   std::string category() const override { return "test"; }
   std::string configType() override { return "google.protobuf.StringValue"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -501,7 +501,7 @@ public:
 
 class TestingFactory : public Config::TypedFactory {
 public:
-  virtual ~TestingFactory() = default;
+  ~TestingFactory() override = default;
   std::string category() const override { return "testing"; }
   std::string configType() override { return "google.protobuf.StringValue"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

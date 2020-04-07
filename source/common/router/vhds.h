@@ -53,7 +53,7 @@ public:
     return route_config_name + "/" + domain;
   }
   static std::string aliasToDomainName(const std::string& alias) {
-    const auto pos = alias.find_last_of("/");
+    const auto pos = alias.find_last_of('/');
     return pos == std::string::npos ? alias : alias.substr(pos + 1);
   }
 

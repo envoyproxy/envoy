@@ -17,7 +17,7 @@ namespace Grpc {
  */
 class GoogleGrpcCredentialsFactory : public Config::UntypedFactory {
 public:
-  virtual ~GoogleGrpcCredentialsFactory() = default;
+  ~GoogleGrpcCredentialsFactory() override = default;
 
   /**
    * Get a ChannelCredentials to be used for authentication of a gRPC channel.

@@ -35,7 +35,7 @@ public:
   /**
    * The type this deserializer is deserializing.
    */
-  typedef T result_type;
+  using result_type = T;
 
   virtual ~Deserializer() = default;
 

@@ -117,7 +117,7 @@ protected:
   void connect() {
     int expected_callbacks = 2;
     client_connection_->connect();
-    read_filter_.reset(new NiceMock<MockReadFilter>());
+    read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection_ = dispatcher_->createServerConnection(
@@ -258,7 +258,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
       }));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
 
-  read_filter_.reset(new NiceMock<MockReadFilter>());
+  read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
 
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -283,9 +283,9 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
                                                        nullptr, true);
   if (socket_->localAddress()->ip()->version() == Address::IpVersion::v4) {
-    broadcast_address.reset(new Address::Ipv4Instance("224.0.0.1", 0));
+    broadcast_address = std::make_shared<Address::Ipv4Instance>("224.0.0.1", 0);
   } else {
-    broadcast_address.reset(new Address::Ipv6Instance("ff02::1", 0));
+    broadcast_address = std::make_shared<Address::Ipv6Instance>("ff02::1", 0);
   }
 
   client_connection_ = dispatcher_->createClientConnection(
@@ -315,7 +315,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
       }));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
 
-  read_filter_.reset(new NiceMock<MockReadFilter>());
+  read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
 
   auto option = std::make_shared<MockSocketOption>();
 
@@ -364,7 +364,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
       }));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
 
-  read_filter_.reset(new NiceMock<MockReadFilter>());
+  read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
 
   auto option = std::make_shared<MockSocketOption>();
 
@@ -444,7 +444,7 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected)).InSequence(s1);
   EXPECT_CALL(client_connection_stats.tx_total_, add(4)).InSequence(s1);
 
-  read_filter_.reset(new NiceMock<MockReadFilter>());
+  read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
   MockConnectionStats server_connection_stats;
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -2003,7 +2003,7 @@ public:
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
 
-    read_filter_.reset(new NiceMock<MockReadFilter>());
+    read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection_ = dispatcher_->createServerConnection(

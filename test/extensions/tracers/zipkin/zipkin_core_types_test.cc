@@ -71,7 +71,7 @@ TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep1(std::string("my_service"), addr);
-  Endpoint ep2(ep1);
+  const Endpoint& ep2(ep1);
 
   EXPECT_EQ("my_service", ep1.serviceName());
   EXPECT_TRUE(TestUtility::protoEqual(
@@ -86,7 +86,7 @@ TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep1(std::string("my_service"), addr);
-  Endpoint ep2 = ep1;
+  const Endpoint& ep2 = ep1;
 
   EXPECT_EQ("my_service", ep1.serviceName());
   EXPECT_TRUE(TestUtility::protoEqual(
@@ -194,7 +194,7 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
                            test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, CLIENT_SEND, ep);
-  Annotation ann2(ann);
+  const Annotation& ann2(ann);
 
   EXPECT_EQ(ann.value(), ann2.value());
   EXPECT_EQ(ann.timestamp(), ann2.timestamp());
@@ -212,7 +212,7 @@ TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
                            test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, CLIENT_SEND, ep);
-  Annotation ann2 = ann;
+  const Annotation& ann2 = ann;
 
   EXPECT_EQ(ann.value(), ann2.value());
   EXPECT_EQ(ann.timestamp(), ann2.timestamp());
@@ -288,7 +288,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, customConstructor) {
 
 TEST(ZipkinCoreTypesBinaryAnnotationTest, copyConstructor) {
   BinaryAnnotation ann("key", "value");
-  BinaryAnnotation ann2(ann);
+  const BinaryAnnotation& ann2(ann);
 
   EXPECT_EQ(ann.value(), ann2.value());
   EXPECT_EQ(ann.key(), ann2.key());
@@ -299,7 +299,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, copyConstructor) {
 
 TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
   BinaryAnnotation ann("key", "value");
-  BinaryAnnotation ann2 = ann;
+  const BinaryAnnotation& ann2 = ann;
 
   EXPECT_EQ(ann.value(), ann2.value());
   EXPECT_EQ(ann.key(), ann2.key());

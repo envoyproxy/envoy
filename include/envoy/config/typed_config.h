@@ -39,7 +39,7 @@ public:
  */
 class TypedFactory : public UntypedFactory {
 public:
-  virtual ~TypedFactory() = default;
+  ~TypedFactory() override = default;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The config, which

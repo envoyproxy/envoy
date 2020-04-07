@@ -169,8 +169,8 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
     HostPredicate predicate = std::bind(&SubsetLoadBalancer::hostMatches, this,
                                         default_subset_metadata_, std::placeholders::_1);
     selector_fallback_subset_default_ = std::make_shared<LbSubsetEntry>();
-    selector_fallback_subset_default_->priority_subset_.reset(
-        new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
+    selector_fallback_subset_default_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
+        *this, predicate, locality_weight_aware_, scale_locality_weight_);
   }
 }
 

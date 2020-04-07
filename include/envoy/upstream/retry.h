@@ -78,7 +78,7 @@ using RetryHostPredicateSharedPtr = std::shared_ptr<RetryHostPredicate>;
  */
 class RetryPriorityFactory : public Config::TypedFactory {
 public:
-  virtual ~RetryPriorityFactory() = default;
+  ~RetryPriorityFactory() override = default;
 
   virtual RetryPrioritySharedPtr
   createRetryPriority(const Protobuf::Message& config,
@@ -93,7 +93,7 @@ public:
  */
 class RetryHostPredicateFactory : public Config::TypedFactory {
 public:
-  virtual ~RetryHostPredicateFactory() = default;
+  ~RetryHostPredicateFactory() override = default;
 
   virtual RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message& config,
                                                           uint32_t retry_count) PURE;

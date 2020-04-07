@@ -90,7 +90,7 @@ private:
 // and symbol strings as production.
 class TestStore : public IsolatedStoreImpl {
 public:
-  TestStore() {}
+  TestStore() = default;
 
   // Constructs a store using a symbol table, allowing for explicit sharing.
   explicit TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}

@@ -141,7 +141,7 @@ TEST_P(GrpcFileBasedMetadataClientIntegrationTest, ExtraConfigFileBasedMetadataG
 
 class MockAuthContext : public ::grpc::AuthContext {
 public:
-  ~MockAuthContext() override {}
+  ~MockAuthContext() override = default;
   MOCK_METHOD(bool, IsPeerAuthenticated, (), (const, override));
   MOCK_METHOD(std::vector<grpc::string_ref>, GetPeerIdentity, (), (const, override));
   MOCK_METHOD(std::string, GetPeerIdentityPropertyName, (), (const, override));

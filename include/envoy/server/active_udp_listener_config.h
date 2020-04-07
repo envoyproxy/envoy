@@ -14,7 +14,7 @@ namespace Server {
  */
 class ActiveUdpListenerConfigFactory : public Config::UntypedFactory {
 public:
-  virtual ~ActiveUdpListenerConfigFactory() = default;
+  ~ActiveUdpListenerConfigFactory() override = default;
 
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 

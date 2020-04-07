@@ -20,7 +20,7 @@ namespace ThriftFilters {
  */
 class NamedThriftFilterConfigFactory : public Envoy::Config::TypedFactory {
 public:
-  virtual ~NamedThriftFilterConfigFactory() = default;
+  ~NamedThriftFilterConfigFactory() override = default;
 
   /**
    * Create a particular thrift filter factory implementation. If the implementation is unable to

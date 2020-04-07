@@ -244,7 +244,7 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
   std::string any_field_name;
   for (int i = 0; i < field_mask.paths().size(); ++i) {
     const std::string& path = field_mask.paths(i);
-    std::vector<std::string> frags = absl::StrSplit(path, ".");
+    std::vector<std::string> frags = absl::StrSplit(path, '.');
     if (frags.empty()) {
       continue;
     }

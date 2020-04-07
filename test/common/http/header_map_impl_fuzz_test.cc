@@ -103,7 +103,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       // Randomly (using fuzzer data) set the header_field to either be of type Reference or Inline
       const auto& str = lower_case_strings.back();
       Http::HeaderString header_field; // By default it's Inline
-      if ((str->get().size() > 0) && (str->get().at(0) & 0x1)) {
+      if ((!str->get().empty()) && (str->get().at(0) & 0x1)) {
         // Keeping header_field as Inline
         header_field.setCopy(str->get());
         // inlineTransform can only be applied to Inline type!

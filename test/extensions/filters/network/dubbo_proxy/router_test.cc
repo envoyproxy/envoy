@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "extensions/filters/network/dubbo_proxy/app_exception.h"
 #include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
 #include "extensions/filters/network/dubbo_proxy/message_impl.h"
@@ -93,7 +95,7 @@ public:
   void initializeMetadata(MessageType msg_type) {
     msg_type_ = msg_type;
 
-    metadata_.reset(new MessageMetadata());
+    metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMessageType(msg_type_);
     metadata_->setRequestId(1);
 

@@ -29,7 +29,7 @@ public:
     recorder_ = recorder;
     options.recorder.reset(recorder);
     options.propagation_options = propagation_options;
-    tracer_.reset(new opentracing::mocktracer::MockTracer{std::move(options)});
+    tracer_ = std::make_shared<opentracing::mocktracer::MockTracer>(std::move(options));
   }
 
   const opentracing::mocktracer::InMemoryRecorder& recorder() const { return *recorder_; }

@@ -11,7 +11,7 @@ namespace Network {
 class MockIoHandle : public IoHandle {
 public:
   MockIoHandle();
-  ~MockIoHandle();
+  ~MockIoHandle() override;
 
   MOCK_METHOD(int, fd, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, close, ());

@@ -40,10 +40,10 @@ TEST_F(CredsUtilityTest, GetChannelCredentials) {
   const std::string var_name = "GOOGLE_APPLICATION_CREDENTIALS";
   EXPECT_EQ(nullptr, ::getenv(var_name.c_str()));
   const std::string creds_path = TestEnvironment::runfilesPath("test/common/grpc/service_key.json");
-  TestEnvironment::setEnvVar(var_name.c_str(), creds_path.c_str(), 0);
+  TestEnvironment::setEnvVar(var_name, creds_path, 0);
   creds->mutable_google_default();
   EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config, *api_));
-  TestEnvironment::unsetEnvVar(var_name.c_str());
+  TestEnvironment::unsetEnvVar(var_name);
 }
 
 TEST_F(CredsUtilityTest, DefaultSslChannelCredentials) {

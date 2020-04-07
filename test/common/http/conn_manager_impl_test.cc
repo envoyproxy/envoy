@@ -60,7 +60,6 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::Matcher;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;

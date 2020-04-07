@@ -71,7 +71,7 @@ public:
   ~LuaHttpFilterTest() override { filter_->onDestroy(); }
 
   void setup(const std::string& lua_code) {
-    config_.reset(new FilterConfig(lua_code, tls_, cluster_manager_));
+    config_ = std::make_shared<FilterConfig>(lua_code, tls_, cluster_manager_);
     setupFilter();
   }
 

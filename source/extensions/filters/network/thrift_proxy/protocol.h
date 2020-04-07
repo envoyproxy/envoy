@@ -501,7 +501,7 @@ public:
  */
 class NamedProtocolConfigFactory : public Config::UntypedFactory {
 public:
-  virtual ~NamedProtocolConfigFactory() = default;
+  ~NamedProtocolConfigFactory() override = default;
 
   /**
    * Create a particular Thrift protocol

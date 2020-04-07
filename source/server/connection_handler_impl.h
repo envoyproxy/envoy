@@ -162,7 +162,7 @@ private:
   class ActiveConnections : public Event::DeferredDeletable {
   public:
     ActiveConnections(ActiveTcpListener& listener, const Network::FilterChain& filter_chain);
-    ~ActiveConnections();
+    ~ActiveConnections() override;
 
     // listener filter chain pair is the owner of the connections
     ActiveTcpListener& listener_;

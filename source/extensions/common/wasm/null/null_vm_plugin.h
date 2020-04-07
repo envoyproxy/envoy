@@ -30,7 +30,7 @@ public:
  */
 class NullVmPluginFactory : public Config::UntypedFactory {
 public:
-  virtual ~NullVmPluginFactory() = default;
+  ~NullVmPluginFactory() override = default;
 
   std::string category() const override { return "envoy.wasm.null_vms"; }
 

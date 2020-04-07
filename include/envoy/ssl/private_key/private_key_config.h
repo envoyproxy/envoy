@@ -12,7 +12,7 @@ namespace Ssl {
 
 class PrivateKeyMethodProviderInstanceFactory : public Config::UntypedFactory {
 public:
-  virtual ~PrivateKeyMethodProviderInstanceFactory() = default;
+  ~PrivateKeyMethodProviderInstanceFactory() override = default;
 
   /**
    * Create a particular PrivateKeyMethodProvider implementation. If the implementation is

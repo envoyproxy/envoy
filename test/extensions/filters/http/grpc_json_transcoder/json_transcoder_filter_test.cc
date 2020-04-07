@@ -25,8 +25,6 @@ using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 
-using Envoy::Protobuf::MethodDescriptor;
-
 using Envoy::Protobuf::FileDescriptorProto;
 using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::util::MessageDifferencer;

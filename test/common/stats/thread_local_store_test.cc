@@ -1300,7 +1300,7 @@ public:
     }
   }
 
-  ~ClusterShutdownCleanupStarvationTest() {
+  ~ClusterShutdownCleanupStarvationTest() override {
     {
       BlockingBarrier blocking_barrier(1);
       main_dispatcher_->post(blocking_barrier.run([this]() {

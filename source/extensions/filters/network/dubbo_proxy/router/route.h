@@ -69,7 +69,7 @@ using RouteMatcherConstSharedPtr = std::shared_ptr<const RouteMatcher>;
  */
 class NamedRouteMatcherConfigFactory : public Envoy::Config::UntypedFactory {
 public:
-  virtual ~NamedRouteMatcherConfigFactory() = default;
+  ~NamedRouteMatcherConfigFactory() override = default;
 
   /**
    * Create a particular Dubbo protocol.

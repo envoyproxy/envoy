@@ -95,7 +95,7 @@ public:
   void initializeMetadata(MessageType msg_type, std::string method = "method") {
     msg_type_ = msg_type;
 
-    metadata_.reset(new MessageMetadata());
+    metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMethodName(method);
     metadata_->setMessageType(msg_type_);
     metadata_->setSequenceId(1);

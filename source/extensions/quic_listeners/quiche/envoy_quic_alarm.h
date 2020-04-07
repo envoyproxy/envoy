@@ -21,7 +21,7 @@ public:
                  quic::QuicArenaScopedPtr<quic::QuicAlarm::Delegate> delegate);
 
   // TimerImpl destruction deletes in-flight alarm firing event.
-  ~EnvoyQuicAlarm() override {}
+  ~EnvoyQuicAlarm() override = default;
 
   // quic::QuicAlarm
   void CancelImpl() override;

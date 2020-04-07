@@ -21,7 +21,7 @@ public:
 class MockRequestDecoder : public MockStreamDecoder, public RequestDecoder {
 public:
   MockRequestDecoder();
-  ~MockRequestDecoder();
+  ~MockRequestDecoder() override;
 
   void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override {
     decodeHeaders_(headers, end_stream);
@@ -36,7 +36,7 @@ public:
 class MockResponseDecoder : public MockStreamDecoder, public ResponseDecoder {
 public:
   MockResponseDecoder();
-  ~MockResponseDecoder();
+  ~MockResponseDecoder() override;
 
   void decode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     decode100ContinueHeaders_(headers);

@@ -1,7 +1,6 @@
 #include "common/access_log/access_log_formatter.h"
 
-#include <limits.h>
-
+#include <climits>
 #include <cstdint>
 #include <regex>
 #include <string>

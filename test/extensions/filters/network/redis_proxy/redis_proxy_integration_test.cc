@@ -7,8 +7,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::Return;
-
 namespace RedisCmdSplitter = Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitter;
 
 namespace Envoy {

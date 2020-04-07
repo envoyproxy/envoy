@@ -76,7 +76,7 @@ private:
     WatchImpl(const std::string& type_url, Watch* watch, NewGrpcMuxImpl& parent)
         : type_url_(type_url), watch_(watch), parent_(parent) {}
 
-    ~WatchImpl() { remove(); }
+    ~WatchImpl() override { remove(); }
 
     void remove() {
       if (watch_) {

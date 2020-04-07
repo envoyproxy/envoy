@@ -174,8 +174,8 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
                                              "seventh", "eighth", "ninth", "tenth", "eleventh",
                                              "twelveth", "thirteenth", "fourteenth", "fifteenth",
                                              "sixteenth", "seventeenth"});
-  for (size_t i = 0; i < client_data.size(); ++i) {
-    client_.write(client_data[i], *send_to_addr_);
+  for (const auto& i : client_data) {
+    client_.write(i, *send_to_addr_);
   }
 
   // For unit test purposes, we assume that the data was received in order.
@@ -337,25 +337,25 @@ TEST_P(UdpListenerImplTest, SendData) {
   Address::InstanceConstSharedPtr send_from_addr;
   if (version_ == Address::IpVersion::v4) {
     // Linux kernel regards any 127.x.x.x as local address. But Mac OS doesn't.
-    send_from_addr.reset(new Address::Ipv4Instance(
+    send_from_addr = std::make_shared<Address::Ipv4Instance>(
 #ifndef __APPLE__
         "127.1.2.3",
 #else
         "127.0.0.1",
 #endif
-        server_socket_->localAddress()->ip()->port()));
+        server_socket_->localAddress()->ip()->port());
   } else {
     // Only use non-local v6 address if IP_FREEBIND is supported. Otherwise use
     // ::1 to avoid EINVAL error. Unfortunately this can't verify that sendmsg with
     // customized source address is doing the work because kernel also picks ::1
     // if it's not specified in cmsghdr.
-    send_from_addr.reset(new Address::Ipv6Instance(
+    send_from_addr = std::make_shared<Address::Ipv6Instance>(
 #ifdef IP_FREEBIND
         "::9",
 #else
         "::1",
 #endif
-        server_socket_->localAddress()->ip()->port()));
+        server_socket_->localAddress()->ip()->port());
   }
 
   UdpSendData send_data{send_from_addr->ip(), *client_.localAddress(), *buffer};

@@ -53,7 +53,7 @@ protected:
  */
 class TypedMetadataFactory : public UntypedFactory {
 public:
-  virtual ~TypedMetadataFactory() = default;
+  ~TypedMetadataFactory() override = default;
 
   /**
    * Convert the google.protobuf.Struct into an instance of TypedMetadata::Object.

@@ -1,5 +1,7 @@
 #include "common/upstream/health_checker_impl.h"
 
+#include <memory>
+
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/server/health_checker_config.h"
@@ -505,7 +507,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
     client_ =
         host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions())
             .connection_;
-    session_callbacks_.reset(new TcpSessionCallbacks(*this));
+    session_callbacks_ = std::make_shared<TcpSessionCallbacks>(*this);
     client_->addConnectionCallbacks(*session_callbacks_);
     client_->addReadFilter(session_callbacks_);
 

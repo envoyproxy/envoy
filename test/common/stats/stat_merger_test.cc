@@ -38,7 +38,7 @@ public:
     StatNamePool symbolic_pool(symbol_table);
     StatNameDynamicPool dynamic_pool(symbol_table);
 
-    for (absl::string_view segment : absl::StrSplit(input_name, ".")) {
+    for (absl::string_view segment : absl::StrSplit(input_name, '.')) {
       if (absl::StartsWith(segment, "D:")) {
         std::string hacked = absl::StrReplaceAll(segment.substr(2), {{",", "."}});
         components.push_back(dynamic_pool.add(hacked));
@@ -237,7 +237,7 @@ public:
     StatNamePool symbolic_pool(*symbol_table_);
     StatNameDynamicPool dynamic_pool(*symbol_table_);
 
-    for (absl::string_view segment : absl::StrSplit(input_descriptor, ".")) {
+    for (absl::string_view segment : absl::StrSplit(input_descriptor, '.')) {
       if (absl::StartsWith(segment, "D:")) {
         std::string hacked = absl::StrReplaceAll(segment.substr(2), {{",", "."}});
         components.push_back(dynamic_pool.add(hacked));

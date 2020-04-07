@@ -1,5 +1,7 @@
 #include "extensions/filters/network/mongo_proxy/config.h"
 
+#include <memory>
+
 #include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
 #include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
@@ -23,8 +25,8 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
   const std::string stat_prefix = fmt::format("mongo.{}", proto_config.stat_prefix());
   AccessLogSharedPtr access_log;
   if (!proto_config.access_log().empty()) {
-    access_log.reset(new AccessLog(proto_config.access_log(), context.accessLogManager(),
-                                   context.dispatcher().timeSource()));
+    access_log = std::make_shared<AccessLog>(proto_config.access_log(), context.accessLogManager(),
+                                             context.dispatcher().timeSource());
   }
 
   Filters::Common::Fault::FaultDelayConfigSharedPtr fault_config;

@@ -301,7 +301,7 @@ private:
 class StatNameStorageBase {
 public:
   StatNameStorageBase(SymbolTable::StoragePtr&& bytes) : bytes_(std::move(bytes)) {}
-  StatNameStorageBase() {}
+  StatNameStorageBase() = default;
 
   /**
    * @return a reference to the owned storage.

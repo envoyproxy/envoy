@@ -17,7 +17,7 @@ namespace {
 
 class InternalFactory : public Config::UntypedFactory {
 public:
-  virtual ~InternalFactory() = default;
+  ~InternalFactory() override = default;
   std::string category() const override { return ""; }
 };
 
@@ -50,7 +50,7 @@ TEST(RegistryTest, InternalFactoryNotPublished) {
 
 class PublishedFactory : public Config::UntypedFactory {
 public:
-  virtual ~PublishedFactory() = default;
+  ~PublishedFactory() override = default;
   std::string category() const override { return "testing.published"; }
 };
 

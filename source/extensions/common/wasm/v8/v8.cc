@@ -415,7 +415,7 @@ void V8::link(absl::string_view debug_name) {
         throw WasmVmException(
             fmt::format("Failed to load WASM module due to a missing import: {}.{}", module, name));
       }
-      auto func = it->second.get()->callback_.get();
+      auto func = it->second->callback_.get();
       if (!equalValTypes(import_type->func()->params(), func->type()->params()) ||
           !equalValTypes(import_type->func()->results(), func->type()->results())) {
         throw WasmVmException(fmt::format(

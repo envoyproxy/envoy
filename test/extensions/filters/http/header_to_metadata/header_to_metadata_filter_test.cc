@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 
 #include "common/common/base64.h"
@@ -41,8 +43,8 @@ request_rules:
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::header_to_metadata::v3::Config config;
     TestUtility::loadFromYaml(yaml, config);
-    config_.reset(new Config(config));
-    filter_.reset(new HeaderToMetadataFilter(config_));
+    config_ = std::make_shared<Config>(config);
+    filter_ = std::make_shared<HeaderToMetadataFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }

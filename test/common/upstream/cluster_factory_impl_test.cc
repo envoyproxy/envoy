@@ -1,5 +1,6 @@
 #include <chrono>
 #include <list>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -50,8 +51,8 @@ public:
 class ClusterFactoryTestBase {
 protected:
   ClusterFactoryTestBase() : api_(Api::createApiForTest(stats_)) {
-    outlier_event_logger_.reset(new Outlier::MockEventLogger());
-    dns_resolver_.reset(new Network::MockDnsResolver());
+    outlier_event_logger_ = std::make_shared<Outlier::MockEventLogger>();
+    dns_resolver_ = std::make_shared<Network::MockDnsResolver>();
   }
 
   NiceMock<Server::MockAdmin> admin_;

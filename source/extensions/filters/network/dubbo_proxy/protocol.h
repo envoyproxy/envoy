@@ -100,7 +100,7 @@ using ProtocolPtr = std::unique_ptr<Protocol>;
  */
 class NamedProtocolConfigFactory : public Config::UntypedFactory {
 public:
-  virtual ~NamedProtocolConfigFactory() = default;
+  ~NamedProtocolConfigFactory() override = default;
 
   /**
    * Create a particular Dubbo protocol.

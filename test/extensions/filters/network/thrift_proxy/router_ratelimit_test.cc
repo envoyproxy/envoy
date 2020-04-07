@@ -38,7 +38,7 @@ public:
   }
 
   MessageMetadata& genMetadata(const std::string& method_name) {
-    metadata_.reset(new MessageMetadata());
+    metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMethodName(method_name);
     return *metadata_;
   }
