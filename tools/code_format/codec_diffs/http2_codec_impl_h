@@ -31,10 +31,11 @@
      absl::optional<StreamResetReason> deferred_reset_;
      HeaderString cookies_;
      bool local_end_stream_sent_ : 1;
-@@ -540,5 +541,6 @@
+@@ -540,6 +541,7 @@
  };
  
  } // namespace Http2
 +} // namespace Legacy
  } // namespace Http
  } // namespace Envoy
+ 

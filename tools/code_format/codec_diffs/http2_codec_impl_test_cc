@@ -36,10 +36,11 @@
      constexpr uint32_t max_allowed =
          CommonUtility::OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
      for (uint32_t i = 0; i < max_allowed + 1; ++i) {
-@@ -1780,5 +1782,6 @@
+@@ -1780,6 +1782,7 @@
  }
  
  } // namespace Http2
 +} // namespace Legacy
  } // namespace Http
  } // namespace Envoy
+ 

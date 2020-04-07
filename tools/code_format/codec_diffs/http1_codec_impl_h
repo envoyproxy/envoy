@@ -86,10 +86,11 @@
                      ResponseDecoder* decoder)
          : encoder_(connection, header_key_formatter), decoder_(decoder) {}
  
-@@ -551,5 +558,6 @@
+@@ -551,6 +558,7 @@
  };
  
  } // namespace Http1
 +} // namespace Legacy
  } // namespace Http
  } // namespace Envoy
+ 

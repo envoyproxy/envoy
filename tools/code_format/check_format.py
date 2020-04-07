@@ -483,20 +483,22 @@ def fixSourceLine(line, line_number):
 
   return line
 
-
 def codecDiffHelper(file1, file2, diff):
-  f1 = open(file1).readlines()
-  f2 = open(file2).readlines()
+  f1 = readLines(file1)
+  f2 = readLines(file2)
 
   # Create diff between two files
-  code_diff = difflib.unified_diff(f1, f2)
+  code_diff = list(difflib.unified_diff(f1, f2, lineterm=""))
   # Compare with golden diff.
-  golden_diff = [line for line in open(diff).readlines()]
+  golden_diff = readLines(diff)
   # It is fairly ugly to diff a diff, so return a warning to sync codec changes
   # and/or update golden_diff.
-  if list(code_diff) != golden_diff:
-    error_message = "Codecs are not synced: %s does not match %s. Update codec implementations to sync and/or update the diff %s" % (
+  if code_diff != golden_diff:
+    error_message = "Codecs are not synced: %s does not match %s. Update codec implementations to sync and/or update the diff %s manually" % (
         file1, file2, diff)
+    # The following line will update the diff if it does not match.
+    # Do not uncomment unless you know the change is safe!
+    # pathlib.Path(diff).write_text('\n'.join(code_diff), encoding='utf-8', mode='w')
     return error_message
 
 

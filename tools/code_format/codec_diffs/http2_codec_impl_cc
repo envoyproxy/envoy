@@ -56,10 +56,11 @@
    return encoder.packNextFramePayload(buf, len);
  }
  
-@@ -1352,5 +1353,6 @@
+@@ -1352,6 +1353,7 @@
  }
  
  } // namespace Http2
 +} // namespace Legacy
  } // namespace Http
  } // namespace Envoy
+ 
