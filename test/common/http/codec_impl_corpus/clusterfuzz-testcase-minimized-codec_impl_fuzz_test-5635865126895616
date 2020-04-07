@@ -1,0 +1,184 @@
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 2097152
+    response {
+      continue_headers {
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "GET"
+        value: "/ddddddddddddd"
+      }
+      headers {
+        key: ":path"
+        value: "/ddddddddddddd"
+      }
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: "0"
+        value: "GET"
+      }
+      headers {
+        key: "GET"
+      }
+      headers {
+        key: "GET"
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "connection"
+        value: ",,,,,,,,[,(,5,,,,,,up,,,,upg1ade"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+        headers {
+          key: "connection"
+          value: ",,,,,,,,[,(,5,,,,,,up,,,,upg1ade"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+        headers {
+          key: "connection"
+          value: ",,,,,,,,[,(,5,,,,,,up,,,,upg1ade"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+        headers {
+          key: "connection"
+          value: ",,,,,,,,[,(,5,,,,,,up,,,,upg1ade"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 64512
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+        headers {
+          key: "connection"
+          value: ",,,,,,,,[,(,5,,,,,,up,,,,upg1ade"
+        }
+      }
+      end_stream: true
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+        headers {
+          key: "connection"
+          value: ",,,,,,,,[,(,5,,,,,,up,,,,upg1ade"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+        headers {
+          key: "connection"
+          value: ",,,,,,,,[,(,5,,,,,,up,,,,upg1ade"
+        }
+      }
+      end_stream: true
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1024
+    response {
+      continue_headers {
+        headers {
+          key: "connection"
+          value: ",,,,,,,,[,(,5,,,,,,up,,,,upg1ade"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+        headers {
+          key: "connection"
+          value: ",,,,,,,,[,(,5,,,,pg1ade"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      reset_stream: 2097152
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+        headers {
+          key: "connection"
+          value: ",,,,,,X,,[,(,5.,,,,,up,,,,upgeta1ade"
+        }
+      }
+    }
+  }
+}
