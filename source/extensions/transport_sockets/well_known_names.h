@@ -15,8 +15,8 @@ namespace TransportSockets {
 class TransportSocketNameValues {
 public:
   const std::string Alts = "envoy.transport_sockets.alts";
-  const std::string Quic = "envoy.transport_sockets.quic";
   const std::string ProxyProtocol = "envoy.transport_sockets.proxy_protocol";
+  const std::string Quic = "envoy.transport_sockets.quic";
   const std::string RawBuffer = "envoy.transport_sockets.raw_buffer";
   const std::string Tap = "envoy.transport_sockets.tap";
   const std::string Tls = "envoy.transport_sockets.tls";
