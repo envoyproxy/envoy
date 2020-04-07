@@ -363,8 +363,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     // just pass-through the request to upstream.
     return Http::FilterHeadersStatus::Continue;
   }
-  has_http_body_response_ =
-      !method_->descriptor_->server_streaming() && method_->response_type_is_http_body_;
+
   if (method_->request_type_is_http_body_) {
     if (headers.ContentType() != nullptr) {
       absl::string_view content_type = headers.ContentType()->value().getStringView();
@@ -504,11 +503,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
   }
 
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  if (!method_->descriptor_->server_streaming()) {
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-
-  return Http::FilterHeadersStatus::Continue;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -518,10 +513,12 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
 
   has_body_ = true;
 
-  // TODO(dio): Add support for streaming case.
-  if (has_http_body_response_) {
+  if (method_->response_type_is_http_body_) {
     buildResponseFromHttpBodyOutput(*response_headers_, data);
-    return Http::FilterDataStatus::StopIterationAndBuffer;
+    if (!method_->descriptor_->server_streaming()) {
+      return Http::FilterDataStatus::StopIterationAndBuffer;
+    }
+    return Http::FilterDataStatus::Continue;
   }
 
   response_in_.move(data);
@@ -669,8 +666,15 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
 
       data.add(body);
 
-      response_headers.setContentType(http_body.content_type());
-      response_headers.setContentLength(body.size());
+      if (!method_->descriptor_->server_streaming()) {
+        // Non streaming case: single message with content type / length
+        response_headers.setContentType(http_body.content_type());
+        response_headers.setContentLength(body.size());
+      } else if (!http_body_response_headers_set_) {
+        // Streaming case: set content type only once from first HttpBody message
+        response_headers.setContentType(http_body.content_type());
+        http_body_response_headers_set_ = true;
+      }
       return;
     }
   }

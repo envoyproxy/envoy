@@ -189,8 +189,8 @@ private:
   std::string content_type_;
 
   bool error_{false};
-  bool has_http_body_response_{false};
   bool has_body_{false};
+  bool http_body_response_headers_set_{false};
 };
 
 } // namespace GrpcJsonTranscoder
