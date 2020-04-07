@@ -13,8 +13,8 @@ public:
   EchoIntegrationTest() : BaseIntegrationTest(GetParam(), echo_config) {}
 
   // Called once by the gtest framework before any EchoIntegrationTests are run.
-  static void SetUpTestSuite() {
-    echo_config = ConfigHelper::BASE_CONFIG + R"EOF(
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    echo_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
         name: ratelimit
@@ -25,7 +25,7 @@ public:
           descriptors: [{"key": "foo", "value": "bar"}]
       filters:
         name: envoy.filters.network.echo
-      )EOF";
+      )EOF");
   }
 
   /**

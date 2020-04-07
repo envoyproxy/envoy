@@ -53,16 +53,25 @@ private:
  */
 absl::optional<Arn> parseArn(absl::string_view arn);
 
+/**
+ * Lambda invocation mode.
+ * Synchronous mode is analogous to a blocking call; Lambda responds when it's completed processing.
+ * In the Asynchronous mode, Lambda responds immediately acknowledging it received the request.
+ */
+enum class InvocationMode { Synchronous, Asynchronous };
+
 class FilterSettings : public Router::RouteSpecificFilterConfig {
 public:
-  FilterSettings(const std::string& arn, bool payload_passthrough)
-      : arn_(arn), payload_passthrough_(payload_passthrough) {}
+  FilterSettings(const std::string& arn, InvocationMode mode, bool payload_passthrough)
+      : arn_(arn), invocation_mode_(mode), payload_passthrough_(payload_passthrough) {}
 
   const std::string& arn() const { return arn_; }
   bool payloadPassthrough() const { return payload_passthrough_; }
+  InvocationMode invocationMode() const { return invocation_mode_; }
 
 private:
   std::string arn_;
+  InvocationMode invocation_mode_;
   bool payload_passthrough_;
 };
 
@@ -85,6 +94,11 @@ public:
    */
   std::string resolveSettings();
 
+  /**
+   * Used for unit testing only
+   */
+  const FilterSettings& settingsForTest() const { return settings_; }
+
 private:
   absl::optional<FilterSettings> getRouteSpecificSettings() const;
   // Convert the HTTP request to JSON request.
@@ -98,6 +112,7 @@ private:
   Http::ResponseHeaderMap* response_headers_ = nullptr;
   std::shared_ptr<Extensions::Common::Aws::Signer> sigv4_signer_;
   absl::optional<Arn> arn_;
+  InvocationMode invocation_mode_ = InvocationMode::Synchronous;
   bool payload_passthrough_ = false;
   bool skip_ = false;
 };

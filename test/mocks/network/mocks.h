@@ -165,19 +165,24 @@ public:
   MockListenerFilterManager();
   ~MockListenerFilterManager() override;
 
-  void addAcceptFilter(ListenerFilterPtr&& filter) override { addAcceptFilter_(filter); }
+  void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+                       ListenerFilterPtr&& filter) override {
+    addAcceptFilter_(listener_filter_matcher, filter);
+  }
 
-  MOCK_METHOD(void, addAcceptFilter_, (Network::ListenerFilterPtr&));
+  MOCK_METHOD(void, addAcceptFilter_,
+              (const Network::ListenerFilterMatcherSharedPtr&, Network::ListenerFilterPtr&));
 };
 
-class MockFilterChain : public FilterChain {
+class MockFilterChain : public DrainableFilterChain {
 public:
   MockFilterChain();
   ~MockFilterChain() override;
 
-  // Network::FilterChain
+  // Network::DrainableFilterChain
   MOCK_METHOD(const TransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
+  MOCK_METHOD(void, startDraining, ());
 };
 
 class MockFilterChainManager : public FilterChainManager {
@@ -469,5 +474,11 @@ public:
               (BalancedConnectionHandler & current_handler));
 };
 
+class MockListenerFilterMatcher : public ListenerFilterMatcher {
+public:
+  MockListenerFilterMatcher();
+  ~MockListenerFilterMatcher() override;
+  MOCK_METHOD(bool, matches, (Network::ListenerFilterCallbacks & cb), (const));
+};
 } // namespace Network
 } // namespace Envoy

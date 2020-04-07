@@ -13,12 +13,25 @@ namespace {
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
-  TestLoadBalancerContext(uint64_t hash_key) : hash_key_(hash_key) {}
+  using HostPredicate = std::function<bool(const Host&)>;
+
+  TestLoadBalancerContext(uint64_t hash_key)
+      : TestLoadBalancerContext(hash_key, 0, [](const Host&) { return false; }) {}
+  TestLoadBalancerContext(uint64_t hash_key, uint32_t retry_count,
+                          HostPredicate should_select_another_host)
+      : hash_key_(hash_key), retry_count_(retry_count),
+        should_select_another_host_(should_select_another_host) {}
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+  uint32_t hostSelectionRetryCount() const override { return retry_count_; };
+  bool shouldSelectAnotherHost(const Host& host) override {
+    return should_select_another_host_(host);
+  }
 
   absl::optional<uint64_t> hash_key_;
+  uint32_t retry_count_;
+  HostPredicate should_select_another_host_;
 };
 
 // Note: ThreadAwareLoadBalancer base is heavily tested by RingHashLoadBalancerTest. Only basic
@@ -116,6 +129,52 @@ TEST_F(MaglevLoadBalancerTest, BasicWithHostName) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
               lb->chooseHost(&context));
+  }
+}
+
+// Same ring as the Basic test, but exercise retry host predicate behavior.
+TEST_F(MaglevLoadBalancerTest, BasicWithRetryHostPredicate) {
+  host_set_.hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
+      makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  init(7);
+
+  EXPECT_EQ("maglev_lb.min_entries_per_host", lb_->stats().min_entries_per_host_.name());
+  EXPECT_EQ("maglev_lb.max_entries_per_host", lb_->stats().max_entries_per_host_.name());
+  EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(2, lb_->stats().max_entries_per_host_.value());
+
+  // maglev: i=0 host=127.0.0.1:92
+  // maglev: i=1 host=127.0.0.1:94
+  // maglev: i=2 host=127.0.0.1:90
+  // maglev: i=3 host=127.0.0.1:91
+  // maglev: i=4 host=127.0.0.1:95
+  // maglev: i=5 host=127.0.0.1:90
+  // maglev: i=6 host=127.0.0.1:93
+  LoadBalancerPtr lb = lb_->factory()->create();
+  {
+    // Confirm that i=3 is selected by the hash.
+    TestLoadBalancerContext context(10);
+    EXPECT_EQ(host_set_.hosts_[1], lb->chooseHost(&context));
+  }
+  {
+    // First attempt succeeds even when retry count is > 0.
+    TestLoadBalancerContext context(10, 2, [](const Host&) { return false; });
+    EXPECT_EQ(host_set_.hosts_[1], lb->chooseHost(&context));
+  }
+  {
+    // Second attempt chooses a different host in the ring.
+    TestLoadBalancerContext context(
+        10, 2, [&](const Host& host) { return &host == host_set_.hosts_[1].get(); });
+    EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(&context));
+  }
+  {
+    // Exhausted retries return the last checked host.
+    TestLoadBalancerContext context(10, 2, [](const Host&) { return true; });
+    EXPECT_EQ(host_set_.hosts_[5], lb->chooseHost(&context));
   }
 }
 
