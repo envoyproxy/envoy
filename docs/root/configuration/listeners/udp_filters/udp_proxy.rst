@@ -7,7 +7,7 @@ UDP proxy
 
   UDP proxy support should be considered alpha and not production ready.
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig>`
+* :ref:`v3 API reference <envoy_api_msg_config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig>`
 * This filter should be configured with the name *envoy.filters.udp_listener.udp_proxy*
 
 Overview

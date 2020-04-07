@@ -7,7 +7,7 @@ DNS Filter
 
   DNS Filter is under active development and should be considered alpha and not production ready.
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.udp.dns_filter.v2alpha.DnsFilterConfig>`
+* :ref:`v3 API reference <envoy_api_msg_extensions.filter.udp.dns_filter.v3alpha.DnsFilterConfig>`
 * This filter should be configured with the name *envoy.filters.udp_listener.dns_filter*
 
 Overview
@@ -18,7 +18,7 @@ domains. The filter's configuration specifies the names and addresses for which 
 as well as the configuration needed to send queries externally for unknown domains.
 
 The filter supports :ref:`per-filter configuration
-<envoy_api_msg_config.filter.udp.dns_filter.v2alpha.DnsFilterConfig>`.
+<envoy_api_msg_extensions.filter.udp.dns_filter.v3alpha.DnsFilterConfig>`.
 An Example configuration follows that illustrates how the filter can be used.
 
 Example Configuration
@@ -29,7 +29,7 @@ Example Configuration
   listener_filters:
     name: "envoy.filters.udp.dns_filter"
     typed_config:
-      "@type": "type.googleapis.com/envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig"
+      "@type": "type.googleapis.com/envoy.extensions.filter.udp.dns_filter.v3alpha.DnsFilterConfig"
       stat_prefix: "dns_filter_prefix"
       server_config:
         inline_dns_table:
