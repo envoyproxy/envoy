@@ -748,7 +748,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
     }
     i++;
   }
-  if (active_listeners_.size() == 0) {
+  if (active_listeners_.empty()) {
     stats_.workers_started_.set(1);
   }
 }

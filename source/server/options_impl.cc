@@ -24,6 +24,8 @@ namespace Envoy {
 namespace {
 std::vector<std::string> toArgsVector(int argc, const char* const* argv) {
   std::vector<std::string> args;
+  args.reserve(argc);
+
   for (int i = 0; i < argc; ++i) {
     args.emplace_back(argv[i]);
   }
@@ -232,7 +234,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 
   if (!disable_extensions.getValue().empty()) {
-    disabled_extensions_ = absl::StrSplit(disable_extensions.getValue(), ",");
+    disabled_extensions_ = absl::StrSplit(disable_extensions.getValue(), ',');
   }
 }
 
@@ -353,7 +355,7 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {
-    const std::vector<absl::string_view> parts = absl::StrSplit(name, absl::MaxSplits("/", 1));
+    const std::vector<absl::string_view> parts = absl::StrSplit(name, absl::MaxSplits('/', 1));
 
     if (parts.size() != 2) {
       ENVOY_LOG_MISC(warn, "failed to disable invalid extension name '{}'", name);
