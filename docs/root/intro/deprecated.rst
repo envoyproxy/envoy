@@ -100,7 +100,7 @@ Deprecated items below are listed in chronological order.
   and the previous default can be enabled until the end of the deprecation period by enabling runtime feature
   `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
 * The :ref:`source_ip <envoy_api_field_config.rbac.v2.Principal.source_ip>` field in
-  `rbac.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2/rbac.proto>`_ has been deprecated
+  `RBAC <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2/rbac.proto>`_ has been deprecated
   in favor of :ref:`direct_remote_ip <envoy_api_field_config.rbac.v2.Principal.direct_remote_ip>` and
   :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>`.
 

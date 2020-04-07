@@ -26,15 +26,9 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
             "remoteIP: {}, localAddress: {}, ssl: {}, dynamicMetadata: {}",
             callbacks_->connection().requestedServerName(),
             callbacks_->connection().remoteAddress()->asString(),
-            callbacks_->connection().streamInfo().downstreamDirectRemoteAddress()
-                ? callbacks_->connection().streamInfo().downstreamDirectRemoteAddress()->asString()
-                : "",
-            callbacks_->connection().streamInfo().downstreamRemoteAddress()
-                ? callbacks_->connection().streamInfo().downstreamRemoteAddress()->asString()
-                : "",
-            callbacks_->connection().streamInfo().downstreamLocalAddress()
-                ? callbacks_->connection().streamInfo().downstreamLocalAddress()->asString()
-                : "",
+            callbacks_->connection().streamInfo().downstreamDirectRemoteAddress()->asString(),
+            callbacks_->connection().streamInfo().downstreamRemoteAddress()->asString(),
+            callbacks_->connection().streamInfo().downstreamLocalAddress()->asString(),
             callbacks_->connection().ssl()
                 ? "uriSanPeerCertificate: " +
                       absl::StrJoin(callbacks_->connection().ssl()->uriSanPeerCertificate(), ",") +

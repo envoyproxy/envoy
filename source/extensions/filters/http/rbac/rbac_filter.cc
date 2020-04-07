@@ -60,15 +60,9 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       "localAddress: {}, ssl: {}, headers: {}, dynamicMetadata: {}",
       callbacks_->connection()->requestedServerName(),
       callbacks_->connection()->remoteAddress()->asString(),
-      callbacks_->streamInfo().downstreamDirectRemoteAddress()
-          ? callbacks_->streamInfo().downstreamDirectRemoteAddress()->asString()
-          : "",
-      callbacks_->streamInfo().downstreamRemoteAddress()
-          ? callbacks_->streamInfo().downstreamRemoteAddress()->asString()
-          : "",
-      callbacks_->streamInfo().downstreamLocalAddress()
-          ? callbacks_->streamInfo().downstreamLocalAddress()->asString()
-          : "",
+      callbacks_->streamInfo().downstreamDirectRemoteAddress()->asString(),
+      callbacks_->streamInfo().downstreamRemoteAddress()->asString(),
+      callbacks_->streamInfo().downstreamLocalAddress()->asString(),
       callbacks_->connection()->ssl()
           ? "uriSanPeerCertificate: " +
                 absl::StrJoin(callbacks_->connection()->ssl()->uriSanPeerCertificate(), ",") +
