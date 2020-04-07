@@ -96,7 +96,7 @@ void GradientController::enterMinRTTSamplingWindow() {
   // Set the minRTT flag to indicate we're gathering samples to update the value. This will
   // prevent the sample window from resetting until enough requests are gathered to complete the
   // recalculation.
-  deferred_limit_value_.store(concurrencyLimit());
+  deferred_limit_value_.store(GradientController::concurrencyLimit());
   updateConcurrencyLimit(config_.minConcurrency());
 
   // Throw away any latency samples from before the recalculation window as it may not represent
