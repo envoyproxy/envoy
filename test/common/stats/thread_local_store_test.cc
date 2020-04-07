@@ -811,7 +811,6 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
 
   Histogram& valid_histogram =
       store_->histogramFromString("valid_histogram", Stats::Histogram::Unit::Unspecified);
-
   EXPECT_EQ(valid_histogram.name(), "valid_histogram");
 
   Histogram& invalid_histogram_1 =
@@ -986,15 +985,15 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   Gauge& gauge = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   Histogram& histogram = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   TextReadout& textReadout = store_->textReadoutFromString("t1");
-  ASSERT_EQ(1, store_->counters().size()); // "stats.overflow" and "c1".
+  ASSERT_EQ(1, store_->counters().size()); // "c1".
   EXPECT_TRUE(&counter == store_->counters()[0].get() ||
               &counter == store_->counters()[1].get()); // counters() order is non-deterministic.
   ASSERT_EQ(1, store_->gauges().size());
   EXPECT_EQ("g1", store_->gauges()[0]->name());
-  ASSERT_EQ(1, store_->textReadouts().size());
-  EXPECT_EQ("t1", store_->textReadouts()[0]->name());
   ASSERT_EQ(1, store_->histograms().size());
   EXPECT_EQ("h1", store_->histograms()[0]->name());
+  ASSERT_EQ(1, store_->textReadouts().size());
+  EXPECT_EQ("t1", store_->textReadouts()[0]->name());
 
   // Will effectively block all stats, and remove all the non-matching stats.
   envoy::config::metrics::v3::StatsConfig stats_config;
@@ -1005,15 +1004,15 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   // They can no longer be found.
   EXPECT_EQ(0, store_->counters().size());
   EXPECT_EQ(0, store_->gauges().size());
-  EXPECT_EQ(0, store_->textReadouts().size());
   EXPECT_EQ(0, store_->histograms().size());
+  EXPECT_EQ(0, store_->textReadouts().size());
 
   // However, referencing the previously allocated stats will not crash.
   counter.inc();
   gauge.inc();
-  textReadout.set("fortytwo");
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 42));
   histogram.recordValue(42);
+  textReadout.set("fortytwo");
   store_->shutdownThreading();
   tls_.shutdownThread();
 }

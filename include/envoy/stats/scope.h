@@ -17,9 +17,9 @@ namespace Stats {
 class Counter;
 class Gauge;
 class Histogram;
-class TextReadout;
-class Scope;
 class NullGaugeImpl;
+class Scope;
+class TextReadout;
 
 using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>;
 using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;

@@ -241,16 +241,16 @@ public:
 
   // Stats::TextReadout
   void set(const std::string& value) override {
-    Thread::LockGuard lock(mutex_);
+    absl::MutexLock lock(&mutex_);
     value_ = value;
   }
   std::string value() const override {
-    Thread::LockGuard lock(mutex_);
+    absl::MutexLock lock(&mutex_);
     return value_;
   }
 
 private:
-  mutable Thread::MutexBasicLockable mutex_;
+  mutable absl::Mutex mutex_;
   std::string value_;
 };
 
@@ -258,6 +258,7 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracte
                                             const StatNameTagVector& stat_name_tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
+  ASSERT(text_readouts_.find(name) == text_readouts_.end());
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
     return CounterSharedPtr(*iter);
@@ -272,6 +273,7 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
                                         Gauge::ImportMode import_mode) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
+  ASSERT(text_readouts_.find(name) == text_readouts_.end());
   auto iter = gauges_.find(name);
   if (iter != gauges_.end()) {
     return GaugeSharedPtr(*iter);
@@ -285,6 +287,7 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
 TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_extracted_name,
                                                     const StatNameTagVector& stat_name_tags) {
   Thread::LockGuard lock(mutex_);
+  ASSERT(counters_.find(name) == counters_.end());
   ASSERT(gauges_.find(name) == gauges_.end());
   auto iter = text_readouts_.find(name);
   if (iter != text_readouts_.end()) {
@@ -295,6 +298,7 @@ TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_
   text_readouts_.insert(text_readout.get());
   return text_readout;
 }
+
 bool AllocatorImpl::isMutexLockedForTest() {
   bool locked = mutex_.tryLock();
   if (locked) {

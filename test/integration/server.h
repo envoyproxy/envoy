@@ -230,13 +230,13 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauges();
   }
-  std::vector<TextReadoutSharedPtr> textReadouts() const override {
-    Thread::LockGuard lock(lock_);
-    return store_.textReadouts();
-  }
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     Thread::LockGuard lock(lock_);
     return store_.histograms();
+  }
+  std::vector<TextReadoutSharedPtr> textReadouts() const override {
+    Thread::LockGuard lock(lock_);
+    return store_.textReadouts();
   }
 
   // Stats::StoreRoot

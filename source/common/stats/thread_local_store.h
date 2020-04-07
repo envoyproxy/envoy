@@ -240,16 +240,7 @@ public:
     }
     return absl::nullopt;
   }
-#if 0
-  Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
-  TextReadout& textReadout(const std::string& name) override {
-    return default_scope_->textReadout(name);
-  }
-  Histogram& histogram(const std::string& name) override {
-    return default_scope_->histogram(name);
-  };
 
-#endif // >>>>>>> pr5844
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;

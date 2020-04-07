@@ -283,7 +283,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
   EXPECT_MEMORY_EQ(m_per_cluster, 44261);
-  EXPECT_MEMORY_LE(m_per_cluster, 44600);
+  EXPECT_MEMORY_LE(m_per_cluster, 45000);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
@@ -339,7 +339,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
   EXPECT_MEMORY_EQ(m_per_cluster, 36300);
-  EXPECT_MEMORY_LE(m_per_cluster, 36800);
+  EXPECT_MEMORY_LE(m_per_cluster, 37000);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
