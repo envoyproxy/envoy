@@ -54,10 +54,32 @@ protected:
   SystemTime start_system_time_;
 };
 
-TEST_F(SimulatedTimeSystemTest, AvanceTimeAsync) {
+TEST_F(SimulatedTimeSystemTest, AdvanceTimeAsync) {
   EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_, time_system_.systemTime());
   advanceMsAndLoop(5);
+  EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), time_system_.monotonicTime());
+  EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), time_system_.systemTime());
+}
+
+TEST_F(SimulatedTimeSystemTest, AdvanceTimeWait) {
+  EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
+  EXPECT_EQ(start_system_time_, time_system_.systemTime());
+
+  addTask(4, 'Z');
+  addTask(2, 'X');
+  addTask(3, 'Y');
+  addTask(6, 'A'); // This timer will never be run, so "A" will not be appended.
+  std::atomic<bool> done(false);
+  auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
+    while (!done) {
+      base_scheduler_.run(Dispatcher::RunType::Block);
+    }
+  });
+  time_system_.advanceTimeWait(std::chrono::milliseconds(5));
+  EXPECT_EQ("XYZ", output_);
+  done = true;
+  thread->join();
   EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), time_system_.systemTime());
 }
