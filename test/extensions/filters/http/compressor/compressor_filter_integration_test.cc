@@ -75,7 +75,6 @@ public:
           - text/html
           - application/json
         compressor_library:
-          name: envoy.filters.http.compressor.gzip
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.http.compressor.gzip.v2.Gzip
             memory_level: 3
@@ -94,7 +93,6 @@ public:
           - text/html
           - application/json
         compressor_library:
-          name: gzip
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip
             memory_level: 3
@@ -108,7 +106,6 @@ public:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
         compressor_library:
-          name: envoy.filters.http.compressor.gzip
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip
     )EOF"};

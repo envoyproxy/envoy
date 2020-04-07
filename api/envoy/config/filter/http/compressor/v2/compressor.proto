@@ -56,14 +56,11 @@ message Compressor {
   //
   // This field is ignored when used in the context of the deprecated "envoy.filters.http.gzip"
   // filter.
-  CompressorLibrary compressor_library = 6;
+  CompressorLibrary compressor_library = 6 [(validate.rules).message = {required: true}];
 }
 
 message CompressorLibrary {
-  // The name of the compressor library to instantiate for the filter.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
-
   // Compressor library specific configuration. See the supported libraries for further
   // documentation.
-  google.protobuf.Any typed_config = 2;
+  google.protobuf.Any typed_config = 1;
 }

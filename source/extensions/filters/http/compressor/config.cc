@@ -14,13 +14,19 @@ namespace Compressor {
 Http::FilterFactoryCb CompressorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  auto& config_factory = Config::Utility::getAndCheckFactory<NamedCompressorLibraryConfigFactory>(
-      proto_config.compressor_library());
+  const std::string type{TypeUtil::typeUrlToDescriptorFullName(
+      proto_config.compressor_library().typed_config().type_url())};
+  NamedCompressorLibraryConfigFactory* const config_factory =
+      Registry::FactoryRegistry<NamedCompressorLibraryConfigFactory>::getFactoryByType(type);
+  if (config_factory == nullptr) {
+    throw EnvoyException(
+        fmt::format("Didn't find a registered implementation for type: '{}'", type));
+  }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.compressor_library().typed_config(), context.messageValidationVisitor(),
-      config_factory);
+      *config_factory);
   CompressorFactoryPtr compressor_factory =
-      config_factory.createCompressorLibraryFromProto(*message, context);
+      config_factory->createCompressorLibraryFromProto(*message, context);
   Common::Compressors::CompressorFilterConfigSharedPtr config =
       std::make_shared<CompressorFilterConfig>(proto_config, stats_prefix, context.scope(),
                                                context.runtime(), std::move(compressor_factory));
