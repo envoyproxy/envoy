@@ -50,7 +50,7 @@ public:
     Filtered = 1,
     Huffman = 2,
     Rle = 3,
-    Standard = 4,
+    Standard = 0,
   };
 
   /**
