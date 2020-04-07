@@ -233,6 +233,11 @@ void GradientController::updateConcurrencyLimit(const uint32_t new_limit) {
   // window while not in the middle of a minRTT measurement, this might be indicative of an
   // inaccurate minRTT measurement. Since the limit is already where it needs to be for a minRTT
   // measurement, we should measure it again.
+  //
+  // There is a possibility that the minRTT measurement begins before we are able to
+  // cancel/re-enable the timer below and triggers overlapping minRTT windows. To protect against
+  // this, there is an explicit check when entering the minRTT measurement that ensures there is
+  // only a single minRTT measurement active at a time.
   if (consecutive_min_concurrency_set_ >= 5) {
     min_rtt_calc_timer_->enableTimer(std::chrono::milliseconds(0));
   }
