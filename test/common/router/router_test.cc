@@ -324,6 +324,13 @@ public:
         .WillByDefault(Return(include));
   }
 
+  void setUpstreamMaxStreamDuration(uint32_t seconds) {
+    common_http_protocol_options_.mutable_max_stream_duration()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(seconds));
+    ON_CALL(cm_.conn_pool_.host_->cluster_, commonHttpProtocolOptions())
+        .WillByDefault(ReturnRef(common_http_protocol_options_));
+  }
+
   void enableHedgeOnPerTryTimeout() {
     callbacks_.route_->route_entry_.hedge_policy_.hedge_on_per_try_timeout_ = true;
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_ =
@@ -341,6 +348,7 @@ public:
   Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};
   envoy::config::core::v3::Locality upstream_locality_;
+  envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -3561,12 +3569,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
 TEST_F(RouterTest, MaxStreamDurationValidlyConfigured) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
-  ON_CALL(cm_.conn_pool_.host_->cluster_, commonHttpProtocolOptions()).WillByDefault(Invoke([&]() {
-    auto common_http_protocol_options = envoy::config::core::v3::HttpProtocolOptions();
-    common_http_protocol_options.mutable_max_stream_duration()->MergeFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(500));
-    return common_http_protocol_options;
-  }));
+  setUpstreamMaxStreamDuration(500);
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke(
           [&](Http::ResponseDecoder& decoder,
@@ -3589,13 +3592,7 @@ TEST_F(RouterTest, MaxStreamDurationValidlyConfigured) {
 TEST_F(RouterTest, MaxStreamDurationDisabledIfSetToZero) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
-
-  ON_CALL(cm_.conn_pool_.host_->cluster_, commonHttpProtocolOptions()).WillByDefault(Invoke([&]() {
-    auto common_http_protocol_options = envoy::config::core::v3::HttpProtocolOptions();
-    common_http_protocol_options.mutable_max_stream_duration()->MergeFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(0));
-    return common_http_protocol_options;
-  }));
+  setUpstreamMaxStreamDuration(0);
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke(
           [&](Http::ResponseDecoder& decoder,
@@ -3619,12 +3616,7 @@ TEST_F(RouterTest, MaxStreamDurationDisabledIfSetToZero) {
 TEST_F(RouterTest, MaxStreamDurationCallbackNotCalled) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
-  ON_CALL(cm_.conn_pool_.host_->cluster_, commonHttpProtocolOptions()).WillByDefault(Invoke([&]() {
-    auto common_http_protocol_options = envoy::config::core::v3::HttpProtocolOptions();
-    common_http_protocol_options.mutable_max_stream_duration()->MergeFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(5000));
-    return common_http_protocol_options;
-  }));
+  setUpstreamMaxStreamDuration(5000);
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke(
           [&](Http::ResponseDecoder& decoder,
