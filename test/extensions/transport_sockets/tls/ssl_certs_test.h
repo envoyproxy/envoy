@@ -11,7 +11,7 @@ using testing::ReturnRef;
 namespace Envoy {
 class SslCertsTest : public testing::Test {
 public:
-  static void SetUpTestSuite() {
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     TestEnvironment::exec({TestEnvironment::runfilesPath(
         "test/extensions/transport_sockets/tls/gen_unittest_certs.sh")});
   }

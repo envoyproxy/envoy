@@ -20,8 +20,8 @@ TODO(htuch):
 from __future__ import print_function
 
 import datetime
+import io
 import socket
-import StringIO
 import subprocess as sp
 import sys
 import time
@@ -32,14 +32,14 @@ from envoy.data.tap.v2alpha import wrapper_pb2
 
 
 def DumpEvent(direction, timestamp, data):
-  dump = StringIO.StringIO()
+  dump = io.StringIO()
   dump.write('%s\n' % direction)
   # Adjust to local timezone
   adjusted_dt = timestamp.ToDatetime() - datetime.timedelta(seconds=time.altzone)
   dump.write('%s\n' % adjusted_dt)
   od = sp.Popen(['od', '-Ax', '-tx1', '-v'], stdout=sp.PIPE, stdin=sp.PIPE, stderr=sp.PIPE)
   packet_dump = od.communicate(data)[0]
-  dump.write(packet_dump)
+  dump.write(packet_dump.decode())
   return dump.getvalue()
 
 
@@ -78,7 +78,7 @@ def Tap2Pcap(tap_path, pcap_path):
       '%d,%d' % (remote_port, local_port), '-', pcap_path
   ]
   text2pcap = sp.Popen(text2pcap_args, stdout=sp.PIPE, stdin=sp.PIPE)
-  text2pcap.communicate('\n'.join(dumps))
+  text2pcap.communicate('\n'.join(dumps).encode())
 
 
 if __name__ == '__main__':

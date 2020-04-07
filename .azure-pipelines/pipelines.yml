@@ -40,6 +40,7 @@ jobs:
     dependsOn: ["format"]
     # For master builds, continue even if format fails
     condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
+    timeoutInMinutes: 360
     pool:
       vmImage: "ubuntu-16.04"
     steps:
