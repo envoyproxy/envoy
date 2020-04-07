@@ -43,6 +43,8 @@ FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::
                                                              RuntimeKeys::get().DelayDurationKey)),
       abort_http_status_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(
           fault, abort_http_status_runtime, RuntimeKeys::get().AbortHttpStatusKey)),
+      abort_grpc_status_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(
+          fault, abort_grpc_status_runtime, RuntimeKeys::get().AbortGrpcStatusKey)),
       max_active_faults_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(
           fault, max_active_faults_runtime, RuntimeKeys::get().MaxActiveFaultsKey)),
       response_rate_limit_percent_runtime_(
@@ -307,6 +309,22 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
   return code;
 }
 
+absl::optional<Grpc::Status::GrpcStatus>
+FaultFilter::abortGrpcStatus() {
+  auto grpc_status_code = fault_settings_->requestAbort()->grpcStatusCode().has_value() 
+                            ? static_cast<uint64_t>(fault_settings_->requestAbort()->grpcStatusCode().value())
+                            : std::numeric_limits<uint64_t>::max();
+
+  grpc_status_code = config_->runtime().snapshot().getInteger(
+    fault_settings_->abortGrpcStatusRuntime(), grpc_status_code);
+
+  if(grpc_status_code == std::numeric_limits<uint64_t>::max()) {
+    return absl::nullopt;
+  }
+
+  return static_cast<Grpc::Status::GrpcStatus>(grpc_status_code);
+}
+
 void FaultFilter::recordDelaysInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty()) {
@@ -384,7 +402,8 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
 
 void FaultFilter::abortWithHTTPStatus(Http::Code abort_code) {
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
-  decoder_callbacks_->sendLocalReply(abort_code, "fault filter abort", nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(abort_code, "fault filter abort", nullptr,
+                                     abortGrpcStatus(),
                                      RcDetails::get().FaultAbort);
   recordAbortsInjectedStats();
 }

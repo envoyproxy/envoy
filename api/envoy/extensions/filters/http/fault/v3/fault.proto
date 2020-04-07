@@ -21,6 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Fault Injection :ref:`configuration overview <config_http_filters_fault_injection>`.
 // [#extension: envoy.filters.http.fault]
 
+// [#next-free-field: 6]
 message FaultAbort {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.fault.v2.FaultAbort";
@@ -31,6 +32,15 @@ message FaultAbort {
   message HeaderAbort {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.fault.v2.FaultAbort.HeaderAbort";
+  }
+
+  // [#next-free-field: 6]
+  message GrpcError {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.http.fault.v2.FaultAbort.GrpcError";
+
+    // gRPC status code to use to abort the gRPC request.
+    uint32 grpc_status = 5 [(validate.rules).uint32 = {lte: 16}];
   }
 
   reserved 1;
@@ -45,12 +55,14 @@ message FaultAbort {
     HeaderAbort header_abort = 4;
   }
 
+  GrpcError grpc_error = 5;
+
   // The percentage of requests/operations/connections that will be aborted with the error code
   // provided.
   type.v3.FractionalPercent percentage = 3;
 }
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message HTTPFault {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.fault.v2.HTTPFault";
@@ -133,4 +145,8 @@ message HTTPFault {
   // The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
   // runtime. The default is: fault.http.rate_limit.response_percent
   string response_rate_limit_percent_runtime = 13;
+
+  // The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  // runtime. The default is: fault.http.abort.grpc_status
+  string abort_grpc_status_runtime = 14;
 }

@@ -24,6 +24,15 @@ FaultAbortConfig::FaultAbortConfig(
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::ERROR_TYPE_NOT_SET:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+
+  if (abort_config.has_grpc_error())
+  {
+    grpc_status_code_ = static_cast<Grpc::Status::GrpcStatus>(abort_config.grpc_error().grpc_status());
+  }
+  else
+  {
+    grpc_status_code_ = absl::nullopt;
+  }
 }
 
 absl::optional<Http::Code>

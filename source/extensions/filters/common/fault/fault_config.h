@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/filters/common/fault/v3/fault.pb.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/header_map.h"
 #include "envoy/type/v3/percent.pb.h"
 
@@ -35,6 +36,7 @@ public:
   absl::optional<Http::Code> statusCode(const Http::HeaderEntry* header) const {
     return provider_->statusCode(header);
   }
+  absl::optional<Grpc::Status::GrpcStatus> grpcStatusCode() const { return grpc_status_code_; }
 
 private:
   // Abstract abort provider.
@@ -72,6 +74,7 @@ private:
 
   AbortProviderPtr provider_;
   const envoy::type::v3::FractionalPercent percentage_;
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status_code_;
 };
 
 using FaultAbortConfigPtr = std::unique_ptr<FaultAbortConfig>;

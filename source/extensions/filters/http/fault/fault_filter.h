@@ -67,6 +67,7 @@ public:
   const std::string& abortPercentRuntime() const { return abort_percent_runtime_; }
   const std::string& delayPercentRuntime() const { return delay_percent_runtime_; }
   const std::string& abortHttpStatusRuntime() const { return abort_http_status_runtime_; }
+  const std::string& abortGrpcStatusRuntime() const { return abort_grpc_status_runtime_; }
   const std::string& delayDurationRuntime() const { return delay_duration_runtime_; }
   const std::string& maxActiveFaultsRuntime() const { return max_active_faults_runtime_; }
   const std::string& responseRateLimitPercentRuntime() const {
@@ -80,6 +81,7 @@ private:
     const std::string AbortPercentKey = "fault.http.abort.abort_percent";
     const std::string DelayDurationKey = "fault.http.delay.fixed_duration_ms";
     const std::string AbortHttpStatusKey = "fault.http.abort.http_status";
+    const std::string AbortGrpcStatusKey = "fault.http.abort.grpc_status";
     const std::string MaxActiveFaultsKey = "fault.http.max_active_faults";
     const std::string ResponseRateLimitPercentKey = "fault.http.rate_limit.response_percent";
   };
@@ -98,6 +100,7 @@ private:
   const std::string abort_percent_runtime_;
   const std::string delay_duration_runtime_;
   const std::string abort_http_status_runtime_;
+  const std::string abort_grpc_status_runtime_;
   const std::string max_active_faults_runtime_;
   const std::string response_rate_limit_percent_runtime_;
 };
@@ -253,6 +256,7 @@ private:
   absl::optional<std::chrono::milliseconds>
   delayDuration(const Http::RequestHeaderMap& request_headers);
   absl::optional<Http::Code> abortHttpStatus(const Http::RequestHeaderMap& request_headers);
+  absl::optional<Grpc::Status::GrpcStatus> abortGrpcStatus();
   void maybeIncActiveFaults();
   void maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers);
 
