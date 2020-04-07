@@ -1080,11 +1080,9 @@ void ClientConnectionImpl::onAboveHighWatermark() {
 }
 
 void ClientConnectionImpl::onBelowLowWatermark() {
-  // This can get called without an active stream/request when upstream decides to do bad things
-  // such as sending multiple responses to the same request, causing us to close the connection, but
-  // in doing so go below low watermark.
-  if (pending_response_.has_value()) {
-    ASSERT(!pending_response_done_);
+  // This can get called without an active stream/request when the response completion causes us to
+  // close the connection, but in doing so go below low watermark.
+  if (pending_response_.has_value() && !pending_response_done_) {
     pending_response_.value().encoder_.runLowWatermarkCallbacks();
   }
 }

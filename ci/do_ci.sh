@@ -58,6 +58,10 @@ function cp_binary_for_image_build() {
 
   # Copy for azp which doesn't preserve permissions, creating a tar archive
   tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_SRCDIR}" build_"$1" build_"$1"_stripped
+
+  # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
+  [[ -z "${BUILD_REASON}" ]] || \
+    rm -rf "${ENVOY_SRCDIR}"/build_"$1" "${ENVOY_SRCDIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy
 }
 
 function bazel_binary_build() {
