@@ -27,7 +27,7 @@ static_resources:
       - filters:
           - name: postgres
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.network.postgres_proxy.v2alpha.PostgresProxy
+              "@type": type.googleapis.com/envoy.extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy
               stat_prefix: postgres_stats
           - name: tcp
             typed_config:

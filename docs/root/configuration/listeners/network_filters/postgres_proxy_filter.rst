@@ -10,7 +10,6 @@ add more statistics and more advanced capabilities. When the Postgres filter det
 place. More information:
 
 * Postgres :ref:`architecture overview <arch_overview_postgres>`
-* :ref:`v2 API reference <envoy_api_field_listener.Filter.name>`
 
 .. attention::
 
@@ -41,7 +40,7 @@ example below:
     - filters:
       - name: envoy.filters.network.postgres_proxy
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.postgres_proxy.v2alpha.PostgresProxy
+          "@type": type.googleapis.com/envoy.config.filter.network.postgres_proxy.v3alpha.PostgresProxy
           stat_prefix: postgres
       - name: envoy.tcp_proxy
         typed_config:
