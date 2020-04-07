@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "extensions/filters/http/admission_control/response_evaluator.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"

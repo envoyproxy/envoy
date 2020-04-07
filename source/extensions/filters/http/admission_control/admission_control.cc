@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
+#include "extensions/filters/http/admission_control/default_evaluator.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"
@@ -53,59 +54,6 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
 
 double AdmissionControlFilterConfig::aggression() const {
   return std::max<double>(1.0, aggression_ ? aggression_->value() : defaultAggression);
-}
-
-DefaultResponseEvaluator::DefaultResponseEvaluator(
-    AdmissionControlProto::DefaultSuccessCriteria success_criteria) {
-  // HTTP status.
-  if (success_criteria.http_status_size() != 0) {
-    for (const auto& range : success_criteria.http_status()) {
-      switch (range) {
-      case AdmissionControlProto::Http1xx:
-        http_success_fns_.emplace_back(Http::CodeUtility::is1xx);
-        break;
-      case AdmissionControlProto::Http2xx:
-        http_success_fns_.emplace_back(Http::CodeUtility::is2xx);
-        break;
-      case AdmissionControlProto::Http3xx:
-        http_success_fns_.emplace_back(Http::CodeUtility::is3xx);
-        break;
-      case AdmissionControlProto::Http4xx:
-        http_success_fns_.emplace_back(Http::CodeUtility::is4xx);
-        break;
-      case AdmissionControlProto::Http5xx:
-        http_success_fns_.emplace_back(Http::CodeUtility::is5xx);
-        break;
-      default:
-        NOT_REACHED_GCOVR_EXCL_LINE;
-      }
-    }
-  } else {
-    // We default to 2xx indicating success if unspecified.
-    http_success_fns_.emplace_back(Http::CodeUtility::is2xx);
-  }
-
-  // GRPC status.
-  if (success_criteria.grpc_status_size() > 0) {
-    for (const auto& status : success_criteria.grpc_status()) {
-      grpc_success_codes_.emplace(enumToSignedInt(status.status()));
-    }
-  } else {
-    grpc_success_codes_.emplace(enumToSignedInt(Grpc::Status::WellKnownGrpcStatus::Ok));
-  }
-}
-bool DefaultResponseEvaluator::isGrpcSuccess(Grpc::Status::GrpcStatus status) const {
-  // The HTTP status code is meaningless if the request has a GRPC content type.
-  return grpc_success_codes_.count(enumToSignedInt(status)) > 0;
-}
-
-bool DefaultResponseEvaluator::isHttpSuccess(uint64_t code) const {
-  for (const auto& fn : http_success_fns_) {
-    if (fn(code)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
