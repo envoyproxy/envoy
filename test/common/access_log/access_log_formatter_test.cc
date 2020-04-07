@@ -368,6 +368,39 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_PORT");
+
+    // Validate for IPv4 address
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.1.2.3", 8443)};
+    EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+    EXPECT_EQ("8443", upstream_format.format(request_headers, response_headers, response_trailers,
+                                             stream_info));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info),
+                ProtoEq(ValueUtil::stringValue("8443")));
+
+    // Validate for IPv6 address
+    address =
+        Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
+    EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+    EXPECT_EQ("9443", upstream_format.format(request_headers, response_headers, response_trailers,
+                                             stream_info));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info),
+                ProtoEq(ValueUtil::stringValue("9443")));
+
+    // Validate for Pipe
+    address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+    EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+    EXPECT_EQ("", upstream_format.format(request_headers, response_headers, response_trailers,
+                                         stream_info));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info),
+                ProtoEq(ValueUtil::stringValue("")));
+  }
+
+  {
     StreamInfoFormatter upstream_format("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT");
     EXPECT_EQ("127.0.0.1", upstream_format.format(request_headers, response_headers,
                                                   response_trailers, stream_info));

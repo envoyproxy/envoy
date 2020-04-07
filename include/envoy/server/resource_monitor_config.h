@@ -41,7 +41,7 @@ public:
  */
 class ResourceMonitorFactory : public Config::TypedFactory {
 public:
-  virtual ~ResourceMonitorFactory() = default;
+  ~ResourceMonitorFactory() override = default;
 
   /**
    * Create a particular resource monitor implementation.

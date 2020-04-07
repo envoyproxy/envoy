@@ -52,9 +52,13 @@ public:
         .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
   }
 
-  void expectSuccess(uint64_t code) {
-    EXPECT_CALL(callbacks_, onSuccess_(_))
-        .WillOnce(Invoke([code](ResponseMessage* response) -> void {
+  void expectSuccess(AsyncClient::Request* sent_request, uint64_t code) {
+    EXPECT_CALL(callbacks_, onSuccess_(_, _))
+        .WillOnce(Invoke([sent_request, code](const AsyncClient::Request& request,
+                                              ResponseMessage* response) -> void {
+          // Verify that callback is called with the same request handle as returned by
+          // AsyncClient::send().
+          EXPECT_EQ(sent_request, &request);
           EXPECT_EQ(code, Utility::getResponseStatus(response->headers()));
         }));
   }
@@ -152,9 +156,11 @@ TEST_F(AsyncClientImplTest, Basic) {
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
-  expectSuccess(200);
 
-  client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 200);
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
@@ -188,12 +194,15 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
 
   EXPECT_CALL(parent_span_, spawnChild_(_, "async fake_cluster egress", _))
       .WillOnce(Return(child_span));
-  expectSuccess(200);
 
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
   EXPECT_CALL(*child_span, setSampled(true));
   EXPECT_CALL(*child_span, injectContext(_));
-  client_.send(std::move(message_), callbacks_, options);
+
+  auto* request = client_.send(std::move(message_), callbacks_, options);
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 200);
 
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
@@ -228,7 +237,6 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
   copy.addCopy(":scheme", "http");
 
   EXPECT_CALL(parent_span_, spawnChild_(_, child_span_name_, _)).WillOnce(Return(child_span));
-  expectSuccess(200);
 
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions()
                                             .setParentSpan(parent_span_)
@@ -236,7 +244,11 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
                                             .setSampled(false);
   EXPECT_CALL(*child_span, setSampled(false));
   EXPECT_CALL(*child_span, injectContext(_));
-  client_.send(std::move(message_), callbacks_, options);
+
+  auto* request = client_.send(std::move(message_), callbacks_, options);
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 200);
 
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
@@ -279,13 +291,16 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
-  expectSuccess(200);
 
   AsyncClient::RequestOptions options;
   Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(":path");
   options.setHashPolicy(hash_policy);
-  client_.send(std::move(message_), callbacks_, options);
+
+  auto* request = client_.send(std::move(message_), callbacks_, options);
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 200);
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
@@ -312,7 +327,9 @@ TEST_F(AsyncClientImplTest, Retry) {
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
 
   message_->headers().setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
-  client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+
+  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
 
   // Expect retry and retry timer create.
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
@@ -333,7 +350,7 @@ TEST_F(AsyncClientImplTest, Retry) {
   timer_->invokeCallback();
 
   // Normal response.
-  expectSuccess(200);
+  expectSuccess(request, 200);
   ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers2), true);
 }
@@ -462,7 +479,8 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
 
-  client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  auto* request1 = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request1, nullptr);
 
   // Send request 2.
   RequestMessagePtr message2{new RequestMessageImpl()};
@@ -478,18 +496,57 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
         return nullptr;
       }));
   EXPECT_CALL(stream_encoder2, encodeHeaders(HeaderMapEqualRef(&message2->headers()), true));
-  client_.send(std::move(message2), callbacks2, AsyncClient::RequestOptions());
+
+  auto* request2 = client_.send(std::move(message2), callbacks2, AsyncClient::RequestOptions());
+  EXPECT_NE(request2, nullptr);
+
+  // Send request 3.
+  RequestMessagePtr message3{new RequestMessageImpl()};
+  HttpTestUtility::addDefaultHeaders(message3->headers());
+  NiceMock<MockRequestEncoder> stream_encoder3;
+  ResponseDecoder* response_decoder3{};
+  MockAsyncClientCallbacks callbacks3;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder3, cm_.conn_pool_.host_, stream_info_);
+        response_decoder3 = &decoder;
+        return nullptr;
+      }));
+  EXPECT_CALL(stream_encoder3, encodeHeaders(HeaderMapEqualRef(&message3->headers()), true));
+
+  auto* request3 = client_.send(std::move(message3), callbacks3, AsyncClient::RequestOptions());
+  EXPECT_NE(request3, nullptr);
 
   // Finish request 2.
   ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "503"}});
-  EXPECT_CALL(callbacks2, onSuccess_(_));
+  EXPECT_CALL(callbacks2, onSuccess_(_, _))
+      .WillOnce(Invoke(
+          [request2](const AsyncClient::Request& request, ResponseMessage* response) -> void {
+            // Verify that callback is called with the same request handle as returned by
+            // AsyncClient::send().
+            EXPECT_EQ(request2, &request);
+            EXPECT_EQ(503, Utility::getResponseStatus(response->headers()));
+          }));
   response_decoder2->decodeHeaders(std::move(response_headers2), true);
 
   // Finish request 1.
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
-  expectSuccess(200);
+  expectSuccess(request1, 200);
   response_decoder_->decodeData(data, true);
+
+  // Finish request 3.
+  ResponseHeaderMapPtr response_headers3(new TestResponseHeaderMapImpl{{":status", "500"}});
+  EXPECT_CALL(callbacks3, onSuccess_(_, _))
+      .WillOnce(Invoke(
+          [request3](const AsyncClient::Request& request, ResponseMessage* response) -> void {
+            // Verify that callback is called with the same request handle as returned by
+            // AsyncClient::send().
+            EXPECT_EQ(request3, &request);
+            EXPECT_EQ(500, Utility::getResponseStatus(response->headers()));
+          }));
+  response_decoder3->decodeHeaders(std::move(response_headers3), true);
 }
 
 TEST_F(AsyncClientImplTest, StreamAndRequest) {
@@ -508,7 +565,8 @@ TEST_F(AsyncClientImplTest, StreamAndRequest) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
 
-  client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
 
   // Start stream
   Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
@@ -544,7 +602,7 @@ TEST_F(AsyncClientImplTest, StreamAndRequest) {
   // Finish request.
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
-  expectSuccess(200);
+  expectSuccess(request, 200);
   response_decoder_->decodeData(data, true);
 }
 
@@ -598,9 +656,11 @@ TEST_F(AsyncClientImplTest, Trailers) {
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
-  expectSuccess(200);
 
-  client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 200);
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, false);
@@ -617,9 +677,11 @@ TEST_F(AsyncClientImplTest, ImmediateReset) {
       }));
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
-  expectSuccess(503);
 
-  client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 503);
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 
   EXPECT_EQ(
@@ -818,11 +880,20 @@ TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {
         response_decoder_ = &decoder;
         return nullptr;
       }));
-
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
-  EXPECT_CALL(callbacks_, onFailure(_));
 
-  client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
+  EXPECT_CALL(callbacks_, onFailure(_, _))
+      .WillOnce(Invoke([sent_request = request](const AsyncClient::Request& request,
+                                                AsyncClient::FailureReason reason) {
+        // Verify that callback is called with the same request handle as returned by
+        // AsyncClient::send().
+        EXPECT_EQ(&request, sent_request);
+        EXPECT_EQ(reason, AsyncClient::FailureReason::Reset);
+      }));
+
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
@@ -915,11 +986,20 @@ TEST_F(AsyncClientImplTest, DestroyWithActiveRequest) {
         callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_, stream_info_);
         return nullptr;
       }));
-
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
+
+  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
-  EXPECT_CALL(callbacks_, onFailure(_));
-  client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_CALL(callbacks_, onFailure(_, _))
+      .WillOnce(Invoke([sent_request = request](const AsyncClient::Request& request,
+                                                AsyncClient::FailureReason reason) {
+        // Verify that callback is called with the same request handle as returned by
+        // AsyncClient::send().
+        EXPECT_EQ(&request, sent_request);
+        EXPECT_EQ(reason, AsyncClient::FailureReason::Reset);
+      }));
 }
 
 TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
@@ -937,9 +1017,18 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
   EXPECT_CALL(*child_span, setSampled(true));
   EXPECT_CALL(*child_span, injectContext(_));
-  client_.send(std::move(message_), callbacks_, options);
 
-  EXPECT_CALL(callbacks_, onFailure(_));
+  auto* request = client_.send(std::move(message_), callbacks_, options);
+  EXPECT_NE(request, nullptr);
+
+  EXPECT_CALL(callbacks_, onFailure(_, _))
+      .WillOnce(Invoke([sent_request = request](const AsyncClient::Request& request,
+                                                AsyncClient::FailureReason reason) {
+        // Verify that callback is called with the same request handle as returned by
+        // AsyncClient::send().
+        EXPECT_EQ(&request, sent_request);
+        EXPECT_EQ(reason, AsyncClient::FailureReason::Reset);
+      }));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
@@ -962,7 +1051,14 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
         return nullptr;
       }));
 
-  expectSuccess(503);
+  EXPECT_CALL(callbacks_, onSuccess_(_, _))
+      .WillOnce(Invoke([](const AsyncClient::Request& request, ResponseMessage* response) -> void {
+        // The callback gets called before AsyncClient::send() completes, which means that we don't
+        // have a request handle to compare to.
+        EXPECT_NE(nullptr, &request);
+        EXPECT_EQ(503, Utility::getResponseStatus(response->headers()));
+      }));
+
   EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions()));
 
   EXPECT_EQ(
@@ -979,7 +1075,13 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
         return nullptr;
       }));
 
-  expectSuccess(503);
+  EXPECT_CALL(callbacks_, onSuccess_(_, _))
+      .WillOnce(Invoke([](const AsyncClient::Request& request, ResponseMessage* response) -> void {
+        // The callback gets called before AsyncClient::send() completes, which means that we don't
+        // have a request handle to compare to.
+        EXPECT_NE(nullptr, &request);
+        EXPECT_EQ(503, Utility::getResponseStatus(response->headers()));
+      }));
   message_->body() = std::make_unique<Buffer::OwnedImpl>("hello");
   EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions()));
 
@@ -1056,12 +1158,16 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
       }));
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
-  expectSuccess(504);
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
-  client_.send(std::move(message_), callbacks_,
-               AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(40)));
+
+  auto* request =
+      client_.send(std::move(message_), callbacks_,
+                   AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(40)));
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 504);
   timer_->invokeCallback();
 
   EXPECT_EQ(1UL,
@@ -1083,7 +1189,6 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
       }));
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
-  expectSuccess(504);
 
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
@@ -1096,7 +1201,11 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
                                             .setTimeout(std::chrono::milliseconds(40));
   EXPECT_CALL(*child_span, setSampled(true));
   EXPECT_CALL(*child_span, injectContext(_));
-  client_.send(std::move(message_), callbacks_, options);
+
+  auto* request = client_.send(std::move(message_), callbacks_, options);
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 504);
 
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));

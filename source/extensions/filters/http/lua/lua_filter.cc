@@ -295,7 +295,8 @@ int StreamHandleWrapper::luaHttpCallAsynchronous(lua_State* state) {
   return 0;
 }
 
-void StreamHandleWrapper::onSuccess(Http::ResponseMessagePtr&& response) {
+void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
+                                    Http::ResponseMessagePtr&& response) {
   ASSERT(state_ == State::HttpCall || state_ == State::Running);
   ENVOY_LOG(debug, "async HTTP response complete");
   http_request_ = nullptr;
@@ -341,7 +342,8 @@ void StreamHandleWrapper::onSuccess(Http::ResponseMessagePtr&& response) {
   }
 }
 
-void StreamHandleWrapper::onFailure(Http::AsyncClient::FailureReason) {
+void StreamHandleWrapper::onFailure(const Http::AsyncClient::Request& request,
+                                    Http::AsyncClient::FailureReason) {
   ASSERT(state_ == State::HttpCall || state_ == State::Running);
   ENVOY_LOG(debug, "async HTTP failure");
 
@@ -351,7 +353,7 @@ void StreamHandleWrapper::onFailure(Http::AsyncClient::FailureReason) {
           {{Http::Headers::get().Status,
             std::to_string(enumToInt(Http::Code::ServiceUnavailable))}})));
   response_message->body() = std::make_unique<Buffer::OwnedImpl>("upstream failure");
-  onSuccess(std::move(response_message));
+  onSuccess(request, std::move(response_message));
 }
 
 int StreamHandleWrapper::luaHeaders(lua_State* state) {

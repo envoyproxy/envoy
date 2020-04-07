@@ -346,7 +346,6 @@ private:
   HEADER_FUNC(EnvoyAttemptCount)                                                                   \
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(KeepAlive)                                                                           \
-  HEADER_FUNC(NoChunks)                                                                            \
   HEADER_FUNC(ProxyConnection)                                                                     \
   HEADER_FUNC(RequestId)                                                                           \
   HEADER_FUNC(TransferEncoding)                                                                    \

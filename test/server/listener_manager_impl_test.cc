@@ -440,7 +440,7 @@ public:
 
 private:
   Network::FilterFactoryCb commonFilterFactory(Configuration::FactoryContext& context) {
-    context.scope().counter("bar").inc();
+    context.scope().counterFromString("bar").inc();
     return [](Network::FilterManager&) -> void {};
   }
 };
@@ -464,10 +464,10 @@ filter_chains:
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {false}));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
-  manager_->listeners().front().get().listenerScope().counter("foo").inc();
+  manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
 
-  EXPECT_EQ(1UL, server_.stats_store_.counter("bar").value());
-  EXPECT_EQ(1UL, server_.stats_store_.counter("listener.127.0.0.1_1234.foo").value());
+  EXPECT_EQ(1UL, server_.stats_store_.counterFromString("bar").value());
+  EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.127.0.0.1_1234.foo").value());
 }
 
 TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
@@ -1569,7 +1569,7 @@ filter_chains:
   EXPECT_CALL(*worker_, stopListener(_, _)).Times(1);
   EXPECT_CALL(*listener_factory_.socket_, close()).Times(1);
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
-  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
+  EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 
   // Validate that listener creation in outbound direction is allowed.
   const std::string listener_bar_outbound_yaml = R"EOF(
@@ -1641,7 +1641,7 @@ filter_chains:
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::All);
-  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
+  EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 
   // Validate that adding a listener is not allowed after all listeners are stopped.
   const std::string listener_bar_yaml = R"EOF(
@@ -1712,7 +1712,7 @@ filter_chains:
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
-  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
+  EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 }
 
 TEST_F(ListenerManagerImplTest, AddListenerFailure) {
@@ -1747,7 +1747,9 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
 
-  EXPECT_EQ(1UL, server_.stats_store_.counter("listener_manager.listener_create_failure").value());
+  EXPECT_EQ(
+      1UL,
+      server_.stats_store_.counterFromString("listener_manager.listener_create_failure").value());
 }
 
 TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
@@ -1761,9 +1763,9 @@ filter_chains:
   )EOF";
 
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
-  manager_->listeners().front().get().listenerScope().counter("foo").inc();
+  manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
 
-  EXPECT_EQ(1UL, server_.stats_store_.counter("listener.[__1]_10000.foo").value());
+  EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.[__1]_10000.foo").value());
 }
 
 TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
@@ -2964,8 +2966,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector
   Network::ListenerConfig& listener = manager_->listeners().back().get();
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
-  EXPECT_CALL(manager, addAcceptFilter_(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterPtr&) -> void {}));
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
+                           Network::ListenerFilterPtr&) -> void {}));
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 }
 
@@ -2996,8 +2999,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
   Network::ListenerConfig& listener = manager_->listeners().back().get();
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
-  EXPECT_CALL(manager, addAcceptFilter_(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterPtr&) -> void {}));
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
+                           Network::ListenerFilterPtr&) -> void {}));
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 }
 
@@ -3023,8 +3027,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniFilterChainWithoutTlsInspector
   Network::ListenerConfig& listener = manager_->listeners().back().get();
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
-  EXPECT_CALL(manager, addAcceptFilter_(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterPtr&) -> void {}));
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
+                           Network::ListenerFilterPtr&) -> void {}));
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 }
 
@@ -3050,8 +3055,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, AlpnFilterChainWithoutTlsInspecto
   Network::ListenerConfig& listener = manager_->listeners().back().get();
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
-  EXPECT_CALL(manager, addAcceptFilter_(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterPtr&) -> void {}));
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
+                           Network::ListenerFilterPtr&) -> void {}));
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 }
 
@@ -3077,7 +3083,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CustomTransportProtocolWithSniWit
   Network::ListenerConfig& listener = manager_->listeners().back().get();
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
-  EXPECT_CALL(manager, addAcceptFilter_(_)).Times(0);
+  EXPECT_CALL(manager, addAcceptFilter_(_, _)).Times(0);
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 }
 
@@ -3269,15 +3275,29 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
               routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
+    listener_filters:
+    - name: "envoy.filters.listener.original_dst"
+      config: {}            
   )EOF",
                                                        Network::Address::IpVersion::v4);
+  Configuration::ListenerFactoryContext* listener_factory_context = nullptr;
+  // Extract listener_factory_context avoid accessing private member.
+  ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
+      .WillByDefault(
+          Invoke([&listener_factory_context](
+                     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                         filters,
+                     Configuration::ListenerFactoryContext& context)
+                     -> std::vector<Network::ListenerFilterFactoryCb> {
+            listener_factory_context = &context;
+            return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
+          }));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
-  auto context = dynamic_cast<Configuration::FactoryContext*>(&manager_->listeners().front().get());
-  ASSERT_NE(nullptr, context);
-  EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(&context->listenerMetadata(), "com.bar.foo", "baz")
-                .string_value());
-  EXPECT_EQ(envoy::config::core::v3::INBOUND, context->direction());
+  ASSERT_NE(nullptr, listener_factory_context);
+  EXPECT_EQ("test_value", Config::Metadata::metadataValue(
+                              &listener_factory_context->listenerMetadata(), "com.bar.foo", "baz")
+                              .string_value());
+  EXPECT_EQ(envoy::config::core::v3::INBOUND, listener_factory_context->direction());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
@@ -3312,8 +3332,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
     return socket;
   }));
 
-  EXPECT_CALL(manager, addAcceptFilter_(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterPtr& filter) -> void {
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
+                           Network::ListenerFilterPtr& filter) -> void {
         EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
       }));
 
@@ -3332,10 +3353,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   public:
     // NamedListenerFilterConfigFactory
     Network::ListenerFilterFactoryCb
-    createFilterFactoryFromProto(const Protobuf::Message&,
-                                 Configuration::ListenerFactoryContext&) override {
+    createListenerFilterFactoryFromProto(const Protobuf::Message&,
+                                         const Network::ListenerFilterMatcherSharedPtr&,
+                                         Configuration::ListenerFactoryContext&) override {
       return [](Network::ListenerFilterManager& filter_manager) -> void {
-        filter_manager.addAcceptFilter(std::make_unique<OriginalDstTestFilter>());
+        filter_manager.addAcceptFilter(nullptr, std::make_unique<OriginalDstTestFilter>());
       };
     }
 
@@ -3385,8 +3407,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     return socket;
   }));
 
-  EXPECT_CALL(manager, addAcceptFilter_(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterPtr& filter) -> void {
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
+                           Network::ListenerFilterPtr& filter) -> void {
         EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
       }));
 
@@ -3408,10 +3431,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
   public:
     // NamedListenerFilterConfigFactory
     Network::ListenerFilterFactoryCb
-    createFilterFactoryFromProto(const Protobuf::Message&,
-                                 Configuration::ListenerFactoryContext&) override {
+    createListenerFilterFactoryFromProto(const Protobuf::Message&,
+                                         const Network::ListenerFilterMatcherSharedPtr&,
+                                         Configuration::ListenerFactoryContext&) override {
       return [](Network::ListenerFilterManager& filter_manager) -> void {
-        filter_manager.addAcceptFilter(std::make_unique<OriginalDstTestFilterIPv6>());
+        filter_manager.addAcceptFilter(nullptr, std::make_unique<OriginalDstTestFilterIPv6>());
       };
     }
 
@@ -3461,8 +3485,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     return socket;
   }));
 
-  EXPECT_CALL(manager, addAcceptFilter_(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterPtr& filter) -> void {
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
+                           Network::ListenerFilterPtr& filter) -> void {
         EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
       }));
 
@@ -3634,8 +3659,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
 
   NiceMock<Network::MockAddressResolver> mock_resolver;
   EXPECT_CALL(mock_resolver, resolve(_))
-      .WillOnce(Return(Network::Utility::parseInternetAddress("127.0.0.1", 1111, false)));
-
+      .Times(2)
+      .WillRepeatedly(Return(Network::Utility::parseInternetAddress("127.0.0.1", 1111, false)));
   Registry::InjectFactory<Network::Address::Resolver> register_resolver(mock_resolver);
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));

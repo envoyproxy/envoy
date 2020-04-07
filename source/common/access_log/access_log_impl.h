@@ -233,7 +233,7 @@ private:
  */
 class ExtensionFilterFactory : public Config::TypedFactory {
 public:
-  virtual ~ExtensionFilterFactory() = default;
+  ~ExtensionFilterFactory() override = default;
 
   /**
    * Create a particular extension filter implementation from a config proto. If the

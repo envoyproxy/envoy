@@ -4,7 +4,6 @@
 
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/event/dispatcher.h"
@@ -21,6 +20,7 @@
 
 #include "common/common/callback_impl.h"
 #include "common/common/cleanup.h"
+#include "common/config/subscription_base.h"
 #include "common/config/utility.h"
 #include "common/init/target_impl.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
@@ -44,7 +44,8 @@ public:
   SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_view sds_config_name,
          Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
          ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-         Init::Manager& init_manager, std::function<void()> destructor_cb);
+         Init::Manager& init_manager, std::function<void()> destructor_cb,
+         Event::Dispatcher& dispatcher, Api::Api& api);
 
   SecretData secretData();
 
@@ -65,10 +66,13 @@ protected:
     return MessageUtil::anyConvert<envoy::extensions::transport_sockets::tls::v3::Secret>(resource)
         .name();
   }
+  virtual std::vector<std::string> getDataSourceFilenames() PURE;
 
 private:
   void validateUpdateSize(int num_resources);
   void initialize();
+  uint64_t getHashForFiles();
+
   Init::TargetImpl init_target_;
   Stats::Store& stats_;
 
@@ -77,11 +81,15 @@ private:
   const std::string sds_config_name_;
 
   uint64_t secret_hash_;
+  uint64_t files_hash_;
   Cleanup clean_up_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Config::SubscriptionFactory& subscription_factory_;
   TimeSource& time_source_;
   SecretData secret_data_;
+  Event::Dispatcher& dispatcher_;
+  Api::Api& api_;
+  std::unique_ptr<Filesystem::Watcher> watcher_;
 };
 
 class TlsCertificateSdsApi;
@@ -110,16 +118,18 @@ public:
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        *secret_provider_context.initManager(), destructor_cb);
+        *secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
+        secret_provider_context.api());
   }
 
   TlsCertificateSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                        const std::string& sds_config_name,
                        Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-                       Init::Manager& init_manager, std::function<void()> destructor_cb)
+                       Init::Manager& init_manager, std::function<void()> destructor_cb,
+                       Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, init_manager, std::move(destructor_cb)) {}
+               stats, init_manager, std::move(destructor_cb), dispatcher, api) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::TlsCertificate* secret() const override {
@@ -144,6 +154,7 @@ protected:
             secret.tls_certificate());
   }
   void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) override {}
+  std::vector<std::string> getDataSourceFilenames() override;
 
 private:
   TlsCertificatePtr tls_certificate_secrets_;
@@ -168,7 +179,8 @@ public:
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        *secret_provider_context.initManager(), destructor_cb);
+        *secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
+        secret_provider_context.api());
   }
   CertificateValidationContextSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                                      const std::string& sds_config_name,
@@ -176,9 +188,10 @@ public:
                                      TimeSource& time_source,
                                      ProtobufMessage::ValidationVisitor& validation_visitor,
                                      Stats::Store& stats, Init::Manager& init_manager,
-                                     std::function<void()> destructor_cb)
+                                     std::function<void()> destructor_cb,
+                                     Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, init_manager, std::move(destructor_cb)) {}
+               stats, init_manager, std::move(destructor_cb), dispatcher, api) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext*
@@ -210,6 +223,7 @@ protected:
   validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
     validation_callback_manager_.runCallbacks(secret.validation_context());
   }
+  std::vector<std::string> getDataSourceFilenames() override;
 
 private:
   CertificateValidationContextPtr certificate_validation_context_secrets_;
@@ -236,7 +250,8 @@ public:
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        *secret_provider_context.initManager(), destructor_cb);
+        *secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
+        secret_provider_context.api());
   }
 
   TlsSessionTicketKeysSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
@@ -245,9 +260,10 @@ public:
                              TimeSource& time_source,
                              ProtobufMessage::ValidationVisitor& validation_visitor,
                              Stats::Store& stats, Init::Manager& init_manager,
-                             std::function<void()> destructor_cb)
+                             std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
+                             Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, init_manager, std::move(destructor_cb)) {}
+               stats, init_manager, std::move(destructor_cb), dispatcher, api) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys*
@@ -280,6 +296,7 @@ protected:
   validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
     validation_callback_manager_.runCallbacks(secret.session_ticket_keys());
   }
+  std::vector<std::string> getDataSourceFilenames() override;
 
 private:
   Secret::TlsSessionTicketKeysPtr tls_session_ticket_keys_;
@@ -304,16 +321,18 @@ public:
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        *secret_provider_context.initManager(), destructor_cb);
+        *secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
+        secret_provider_context.api());
   }
 
   GenericSecretSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                       const std::string& sds_config_name,
                       Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-                      Init::Manager& init_manager, std::function<void()> destructor_cb)
+                      Init::Manager& init_manager, std::function<void()> destructor_cb,
+                      Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, init_manager, std::move(destructor_cb)) {}
+               stats, init_manager, std::move(destructor_cb), dispatcher, api) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret() const override {
@@ -337,6 +356,7 @@ protected:
   validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
     validation_callback_manager_.runCallbacks(secret.generic_secret());
   }
+  std::vector<std::string> getDataSourceFilenames() override;
 
 private:
   GenericSecretPtr generic_secret;

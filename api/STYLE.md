@@ -85,19 +85,7 @@ In addition, the following conventions should be followed:
 
 ## Package organization
 
-API definitions are layered hierarchically in packages from top-to-bottom in v2 as following:
-
-- `envoy.service` contains gRPC definitions of supporting services;
-- `envoy.config` contains definitions for service configuration, filter
-configuration, and bootstrap;
-- `envoy.api.v2` contains definitions for EDS, CDS, RDS, LDS, and top-level
-resources such as `Cluster`;
-- `envoy.api.v2.endpoint`, `envoy.api.v2.cluster`, `envoy.api.v2.route`,
-`envoy.api.v2.listener`, `envoy.api.v2.ratelimit` define sub-messages of the top-level resources;
-- `envoy.api.v2.core` and `envoy.api.v2.auth` hold core definitions consumed
-throughout the API.
-
-In Envoy API v3, API definitions are layered hierarchically in packages from top-to-bottom as following:
+API definitions are layered hierarchically in packages from top-to-bottom as following:
 - `envoy.extensions` contains all definitions for the extensions, the package should match the structure of the `source` directory.
 - `envoy.service` contains gRPC definitions of supporting services and top-level messages for the services.
 e.g. `envoy.service.route.v3` contains RDS, `envoy.service.listener.v3` contains LDS.
@@ -105,27 +93,21 @@ e.g. `envoy.service.route.v3` contains RDS, `envoy.service.listener.v3` contains
 - `envoy.data` contains data format declaration for data types that Envoy produces.
 - `envoy.type` contains common protobuf types such as percent, range and matchers.
 
-Dependencies are enforced from top-to-bottom using visibility constraints in
-the build system to prevent circular dependency formation. Package group
-`//envoy/api/v2:friends` selects consumers of the core API package (services and configs)
-and is the default visibility for the core API packages. The default visibility
-for services and configs should be `//docs` (proto documentation tool).
-
 Extensions should use the regular hierarchy. For example, configuration for network filters belongs
-in a package under `envoy.config.filter.network`.
+in a package under `envoy.extensions.filter.network`.
 
 ## Adding an extension configuration to the API
 
-Extensions must currently be added as v2 APIs following the [package
+Extensions must currently be added as v3 APIs following the [package
 organization](#package-organization) above.
 To add an extension config to the API, the steps below should be followed:
 
 1. If this is still WiP and subject to breaking changes, use `vNalpha` instead of `vN` in steps
-   below. Refer to the [Cache filter config](envoy/config/filter/http/cache/v2alpha/cache.proto)
-   as an example of `v2alpha`, and the
-   [Buffer filter config](envoy/config/filter/http/buffer/v2/buffer.proto) as an example of `v2`.
-1. Place the v2 extension configuration `.proto` in `api/envoy/config`, e.g.
-   `api/envoy/config/filter/http/foobar/v2/foobar.proto` together with an initial BUILD file:
+   below. Refer to the [Cache filter config](envoy/extensions/filter/http/cache/v3alpha/cache.proto)
+   as an example of `v3alpha`, and the
+   [Buffer filter config](envoy/extensions/filter/http/buffer/v3/buffer.proto) as an example of `v3`.
+1. Place the v3 extension configuration `.proto` in `api/envoy/extensions`, e.g.
+   `api/envoy/extensions/filter/http/foobar/v3/foobar.proto` together with an initial BUILD file:
    ```bazel
    load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 
@@ -135,14 +117,16 @@ To add an extension config to the API, the steps below should be followed:
        deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
    )
    ```
-1. Add to the v2 extension config proto `import "udpa/annotations/migrate.proto";`
-1. Add to the v2 extension config proto a file level `option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.foobar.v3";`.
-   This places the filter in the correct [v3 package hierarchy](#package-organization).
-1. If this is still WiP and subject to breaking changes, import
-   `udpa/annotations/status.proto` and set `option (udpa.annotations.file_status).work_in_progress = true;`.
-1. Add a reference to the v2 extension config in (1) in [api/docs/BUILD](docs/BUILD).
+1. Add to the v3 extension config proto `import "udpa/annotations/migrate.proto";`
+   and `import "udpa/annotations/status.proto";`
+1. If this is still WiP and subject to breaking changes, set
+   `option (udpa.annotations.file_status).work_in_progress = true;`.
+1. Add to the v3 extension config proto a file level
+   `option (udpa.annotations.file_status).package_version_status = ACTIVE;`.
+   This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD).
+1. Add a reference to the v3 extension config in (1) in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
 1. Run `./tools/proto_format/proto_format.sh fix`. This should regenerate the `BUILD` file,
-   reformat `foobar.proto` as needed and also generate the v3 extension config,
+   reformat `foobar.proto` as needed and also generate the v4alpha extension config (if needed),
    together with shadow API protos.
 1. `git add api/ generated_api_shadow/` to add any new files to your Git index.
 

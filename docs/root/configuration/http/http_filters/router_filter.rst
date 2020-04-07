@@ -390,6 +390,11 @@ owning HTTP connection manager.
   rq_reset_after_downstream_response_started, Counter, Total requests that were reset after downstream response had started
   rq_retry_skipped_request_not_complete, Counter, Total retries that were skipped as the request is not yet complete
 
+.. _config_http_filters_router_vcluster_stats:
+
+Virtual Clusters
+^^^^^^^^^^^^^^^^
+
 Virtual cluster statistics are output in the
 *vhost.<virtual host name>.vcluster.<virtual cluster name>.* namespace and include the following
 statistics:
@@ -400,7 +405,13 @@ statistics:
 
   upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
   upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
+  upstream_rq_retry, Counter, Total request retries
+  upstream_rq_retry_limit_exceeded, Counter, Total requests not retried due to exceeding :ref:`the configured number of maximum retries <config_http_filters_router_x-envoy-max-retries>`
+  upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the :ref:`retry budgets <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>`
+  upstream_rq_retry_success, Counter, Total request retry successes
   upstream_rq_time, Histogram, Request time milliseconds
+  upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
+  upstream_rq_total, Counter, Total requests initiated by the router to the upstream
 
 Runtime
 -------

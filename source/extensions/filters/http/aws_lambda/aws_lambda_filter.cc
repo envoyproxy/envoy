@@ -17,6 +17,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/singleton/const_singleton.h"
 
 #include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
 
@@ -30,15 +31,28 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AwsLambdaFilter {
 
+class LambdaFilterNameValues {
+public:
+  Http::LowerCaseString InvocationTypeHeader{std::string{"x-amz-invocation-type"}};
+  Http::LowerCaseString FunctionErrorHeader{std::string{"x-amz-function-error"}};
+};
+
+using LambdaFilterNames = ConstSingleton<LambdaFilterNameValues>;
+
 namespace {
 
 constexpr auto filter_metadata_key = "com.amazonaws.lambda";
 constexpr auto egress_gateway_metadata_key = "egress_gateway";
 
-void setLambdaHeaders(Http::RequestHeaderMap& headers, absl::string_view function_name) {
+void setLambdaHeaders(Http::RequestHeaderMap& headers, absl::string_view function_name,
+                      InvocationMode mode) {
   headers.setMethod(Http::Headers::get().MethodValues.Post);
   headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", function_name));
-  headers.setCopy(Http::LowerCaseString{"x-amz-invocation-type"}, "RequestResponse");
+  if (mode == InvocationMode::Synchronous) {
+    headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "RequestResponse");
+  } else {
+    headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "Event");
+  }
 }
 
 /**
@@ -125,6 +139,7 @@ std::string Filter::resolveSettings() {
     if (auto route_arn = parseArn(route_settings->arn())) {
       arn_.swap(route_arn);
       payload_passthrough_ = route_settings->payloadPassthrough();
+      invocation_mode_ = route_settings->invocationMode();
     } else {
       // TODO(marcomagdy): add stats for this error
       ENVOY_LOG(debug, "Found route specific configuration but failed to parse Lambda ARN {}.",
@@ -133,6 +148,7 @@ std::string Filter::resolveSettings() {
     }
   } else {
     payload_passthrough_ = settings_.payloadPassthrough();
+    invocation_mode_ = settings_.invocationMode();
   }
   return {};
 }
@@ -172,7 +188,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   if (payload_passthrough_) {
-    setLambdaHeaders(headers, arn_->functionName());
+    setLambdaHeaders(headers, arn_->functionName(), invocation_mode_);
     sigv4_signer_->sign(headers);
     return Http::FilterHeadersStatus::Continue;
   }
@@ -181,7 +197,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   jsonizeRequest(headers, nullptr, json_buf);
   // We must call setLambdaHeaders *after* the JSON transformation of the request. That way we
   // reflect the actual incoming request headers instead of the overwritten ones.
-  setLambdaHeaders(headers, arn_->functionName());
+  setLambdaHeaders(headers, arn_->functionName(), invocation_mode_);
   headers.setContentLength(json_buf.length());
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
@@ -206,7 +222,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   // Just the existence of this header means we have an error, so skip.
-  if (headers.get(Http::LowerCaseString("x-amz-function-error"))) {
+  if (headers.get(LambdaFilterNames::get().FunctionErrorHeader)) {
     skip_ = true;
     return Http::FilterHeadersStatus::Continue;
   }
@@ -225,9 +241,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   }
 
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  if (!decoder_callbacks_->decodingBuffer()) {
-    decoder_callbacks_->addDecodedData(data, false);
-  }
+  decoder_callbacks_->addDecodedData(data, false);
 
   const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
 
@@ -243,14 +257,14 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     request_headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   }
 
-  setLambdaHeaders(*request_headers_, arn_->functionName());
+  setLambdaHeaders(*request_headers_, arn_->functionName(), invocation_mode_);
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
   sigv4_signer_->sign(*request_headers_, hash);
   return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (skip_ || payload_passthrough_) {
+  if (skip_ || payload_passthrough_ || invocation_mode_ == InvocationMode::Asynchronous) {
     return Http::FilterDataStatus::Continue;
   }
 
