@@ -23,7 +23,8 @@ GzipCompressorFactory::GzipCompressorFactory(
     : compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
       memory_level_(memoryLevelUint(gzip.memory_level().value())),
-      window_bits_(windowBitsUint(gzip.window_bits().value())) {}
+      window_bits_(windowBitsUint(gzip.window_bits().value())),
+      chunk_size_(gzip.chunk_size().value() > 0 ? gzip.chunk_size().value() : 4096) {}
 
 Envoy::Compressor::ZlibCompressorImpl::CompressionLevel GzipCompressorFactory::compressionLevelEnum(
     envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionLevel
@@ -79,7 +80,7 @@ uint64_t GzipCompressorFactory::windowBitsUint(Protobuf::uint32 window_bits) {
 }
 
 std::unique_ptr<Envoy::Compressor::Compressor> GzipCompressorFactory::createCompressor() {
-  auto compressor = std::make_unique<Envoy::Compressor::ZlibCompressorImpl>();
+  auto compressor = std::make_unique<Envoy::Compressor::ZlibCompressorImpl>(chunk_size_);
   compressor->init(compression_level_, compression_strategy_, window_bits_, memory_level_);
   return compressor;
 }

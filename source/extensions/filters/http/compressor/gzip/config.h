@@ -50,8 +50,9 @@ private:
   Envoy::Compressor::ZlibCompressorImpl::CompressionLevel compression_level_;
   Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy compression_strategy_;
 
-  int32_t memory_level_;
-  int32_t window_bits_;
+  const int32_t memory_level_;
+  const int32_t window_bits_;
+  const uint32_t chunk_size_;
 };
 
 class GzipCompressorLibraryFactory

@@ -31,18 +31,20 @@ protected:
 
   int32_t memoryLevel() const { return factory_->memory_level_; }
   int32_t windowBits() const { return factory_->window_bits_; }
+  int32_t chunkSize() const { return factory_->chunk_size_; }
 
   void expectValidCompressionStrategyAndLevel(
       Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy strategy,
       absl::string_view strategy_name,
       Envoy::Compressor::ZlibCompressorImpl::CompressionLevel level, absl::string_view level_name) {
     setUpGzip(fmt::format(
-        R"EOF({{"compression_strategy": "{}", "compression_level": "{}", "memory_level": 6, "window_bits": 27}})EOF",
+        R"EOF({{"compression_strategy": "{}", "compression_level": "{}", "memory_level": 6, "window_bits": 27, "chunk_size": 10000}})EOF",
         strategy_name, level_name));
     EXPECT_EQ(strategy, compressionStrategy());
     EXPECT_EQ(level, compressionLevel());
     EXPECT_EQ(6, memoryLevel());
     EXPECT_EQ(27, windowBits());
+    EXPECT_EQ(10000, chunkSize());
   }
 
   std::unique_ptr<GzipCompressorFactory> factory_;
@@ -52,6 +54,7 @@ protected:
 TEST_F(GzipTest, DefaultConfigValues) {
   EXPECT_EQ(5, memoryLevel());
   EXPECT_EQ(28, windowBits());
+  EXPECT_EQ(4096, chunkSize());
   EXPECT_EQ(Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
             compressionStrategy());
   EXPECT_EQ(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard, compressionLevel());
