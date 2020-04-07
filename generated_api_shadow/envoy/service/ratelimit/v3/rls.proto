@@ -86,6 +86,9 @@ message RateLimitResponse {
       DAY = 4;
     }
 
+    // A name or description of this limit.
+    string name = 3;
+
     // The number of requests per unit of time.
     uint32 requests_per_unit = 1;
 

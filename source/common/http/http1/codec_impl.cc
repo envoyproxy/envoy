@@ -432,6 +432,7 @@ void ConnectionImpl::completeLastHeader() {
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
 
+  checkHeaderNameForUnderscores();
   auto& headers_or_trailers = headersOrTrailers();
   if (!current_header_field_.empty()) {
     current_header_field_.inlineTransform([](char c) { return absl::ascii_tolower(c); });
@@ -545,7 +546,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   const absl::string_view header_value = StringUtil::trim(absl::string_view(data, length));
 
   if (strict_header_validation_) {
-    if (!Http::HeaderUtility::headerIsValid(header_value)) {
+    if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
       ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
       error_code_ = Http::Code::BadRequest;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
@@ -685,11 +686,12 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
-ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                                           ServerConnectionCallbacks& callbacks,
-                                           const Http1Settings& settings,
-                                           uint32_t max_request_headers_kb,
-                                           const uint32_t max_request_headers_count)
+ServerConnectionImpl::ServerConnectionImpl(
+    Network::Connection& connection, Stats::Scope& stats, ServerConnectionCallbacks& callbacks,
+    const Http1Settings& settings, uint32_t max_request_headers_kb,
+    const uint32_t max_request_headers_count,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action)
     : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
                      max_request_headers_count, formatter(settings), settings.enable_trailers_),
       callbacks_(callbacks), codec_settings_(settings),
@@ -703,7 +705,8 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stat
       max_outbound_responses_(
           Runtime::getInteger("envoy.do_not_use_going_away_max_http2_outbound_responses", 2)),
       flood_protection_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_flood_protection")) {}
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_flood_protection")),
+      headers_with_underscores_action_(headers_with_underscores_action) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   if (active_request_.value().remote_complete_) {
@@ -917,6 +920,27 @@ void ServerConnectionImpl::releaseOutboundResponse(
   delete fragment;
 }
 
+void ServerConnectionImpl::checkHeaderNameForUnderscores() {
+  if (headers_with_underscores_action_ != envoy::config::core::v3::HttpProtocolOptions::ALLOW &&
+      Http::HeaderUtility::headerNameContainsUnderscore(current_header_field_.getStringView())) {
+    if (headers_with_underscores_action_ ==
+        envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
+      ENVOY_CONN_LOG(debug, "Dropping header with invalid characters in its name: {}", connection_,
+                     current_header_field_.getStringView());
+      stats_.dropped_headers_with_underscores_.inc();
+      current_header_field_.clear();
+      current_header_value_.clear();
+    } else {
+      ENVOY_CONN_LOG(debug, "Rejecting request due to header name with underscores: {}",
+                     connection_, current_header_field_.getStringView());
+      error_code_ = Http::Code::BadRequest;
+      sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
+      stats_.requests_rejected_with_underscores_in_headers_.inc();
+      throw CodecProtocolException("http/1.1 protocol error: header name contains underscores");
+    }
+  }
+}
+
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
@@ -1056,11 +1080,9 @@ void ClientConnectionImpl::onAboveHighWatermark() {
 }
 
 void ClientConnectionImpl::onBelowLowWatermark() {
-  // This can get called without an active stream/request when upstream decides to do bad things
-  // such as sending multiple responses to the same request, causing us to close the connection, but
-  // in doing so go below low watermark.
-  if (pending_response_.has_value()) {
-    ASSERT(!pending_response_done_);
+  // This can get called without an active stream/request when the response completion causes us to
+  // close the connection, but in doing so go below low watermark.
+  if (pending_response_.has_value() && !pending_response_done_) {
     pending_response_.value().encoder_.runLowWatermarkCallbacks();
   }
 }

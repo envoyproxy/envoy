@@ -10,6 +10,7 @@ from tools.protoxform import utils
 
 from envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
+from udpa.annotations import status_pb2
 from google.api import annotations_pb2
 
 ENVOY_API_TYPE_REGEX_STR = 'envoy_api_(msg|enum_value|field|enum)_([\w\.]+)'
@@ -23,10 +24,11 @@ class UpgradeVisitor(visitor.Visitor):
   See visitor.Visitor for visitor method docs comments.
   """
 
-  def __init__(self, n, typedb, envoy_internal_shadow):
+  def __init__(self, n, typedb, envoy_internal_shadow, package_version_status):
     self._base_version = n
     self._typedb = typedb
     self._envoy_internal_shadow = envoy_internal_shadow
+    self._package_version_status = package_version_status
 
   def _UpgradedComment(self, c):
 
@@ -213,6 +215,8 @@ class UpgradeVisitor(visitor.Visitor):
     upgraded_proto.package = self._typedb.next_version_protos[upgraded_proto.name].qualified_package
     upgraded_proto.name = self._typedb.next_version_protos[upgraded_proto.name].proto_path
     upgraded_proto.options.ClearExtension(migrate_pb2.file_migrate)
+    upgraded_proto.options.Extensions[
+        status_pb2.file_status].package_version_status = self._package_version_status
     # Upgrade comments.
     for location in upgraded_proto.source_code_info.location:
       location.leading_comments = self._UpgradedComment(location.leading_comments)
@@ -232,13 +236,14 @@ class UpgradeVisitor(visitor.Visitor):
     return upgraded_proto
 
 
-def VersionUpgradeXform(n, envoy_internal_shadow, file_proto):
+def VersionUpgradeXform(n, envoy_internal_shadow, file_proto, params):
   """Transform a FileDescriptorProto from vN[alpha\d] to v(N+1).
 
   Args:
     n: version N to upgrade from.
     envoy_internal_shadow: generate a shadow for Envoy internal use containing deprecated fields.
     file_proto: vN[alpha\d] FileDescriptorProto message.
+    params: plugin parameters.
 
   Returns:
     v(N+1) FileDescriptorProto message.
@@ -250,4 +255,15 @@ def VersionUpgradeXform(n, envoy_internal_shadow, file_proto):
       file_proto.name]:
     return None
   # Otherwise, this .proto needs upgrading, do it.
-  return traverse.TraverseFile(file_proto, UpgradeVisitor(n, typedb, envoy_internal_shadow))
+  freeze = 'extra_args' in params and params['extra_args'] == 'freeze'
+  existing_pkg_version_status = file_proto.options.Extensions[
+      status_pb2.file_status].package_version_status
+  # Normally, we are generating the NEXT_MAJOR_VERSION_CANDIDATE. However, if
+  # freezing and previously this was the active major version, the migrated
+  # version is now the ACTIVE version.
+  if freeze and existing_pkg_version_status == status_pb2.ACTIVE:
+    package_version_status = status_pb2.ACTIVE
+  else:
+    package_version_status = status_pb2.NEXT_MAJOR_VERSION_CANDIDATE
+  return traverse.TraverseFile(
+      file_proto, UpgradeVisitor(n, typedb, envoy_internal_shadow, package_version_status))
