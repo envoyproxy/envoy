@@ -30,7 +30,7 @@ protected:
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
-  virtual ~ConnPoolImplBase();
+  ~ConnPoolImplBase() override;
 
   // Closes and destroys all connections. This must be called in the destructor of
   // derived classes because the derived ActiveClient will downcast parent_ to a more
@@ -46,7 +46,7 @@ protected:
   public:
     ActiveClient(ConnPoolImplBase& parent, uint64_t lifetime_request_limit,
                  uint64_t concurrent_request_limit);
-    virtual ~ActiveClient();
+    ~ActiveClient() override;
 
     void releaseResources();
 

@@ -1,5 +1,7 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 
+#include <memory>
+
 #include "common/protobuf/protobuf.h"
 
 #include "gtest/gtest.h"
@@ -81,7 +83,7 @@ MockDecoderFilter::MockDecoderFilter() {
 MockDecoderFilter::~MockDecoderFilter() = default;
 
 MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
-  route_.reset(new NiceMock<Router::MockRoute>());
+  route_ = std::make_shared<NiceMock<Router::MockRoute>>();
 
   ON_CALL(*this, streamId()).WillByDefault(Return(stream_id_));
   ON_CALL(*this, connection()).WillByDefault(Return(&connection_));
@@ -92,7 +94,7 @@ MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() = default;
 
 MockFilterConfigFactory::MockFilterConfigFactory()
     : FactoryBase("envoy.filters.thrift.mock_filter") {
-  mock_filter_.reset(new NiceMock<MockDecoderFilter>());
+  mock_filter_ = std::make_shared<NiceMock<MockDecoderFilter>>();
 }
 
 MockFilterConfigFactory::~MockFilterConfigFactory() = default;

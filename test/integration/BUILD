@@ -91,7 +91,6 @@ py_binary(
     name = "capture_fuzz_gen",
     srcs = ["capture_fuzz_gen.py"],
     licenses = ["notice"],  # Apache 2
-    python_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         ":capture_fuzz_proto_py_proto",
@@ -633,8 +632,9 @@ envoy_cc_test(
     srcs = [
         "echo_integration_test.cc",
     ],
-    # This test must be run in exclusive mode: see comments in AddRemoveListener
-    tags = ["exclusive"],
+    # Uncomment this line to run this test repeatedly in exclusive mode if not using docker-sandbox,
+    # or RBE, see comments in AddRemoveListener.
+    # tags = ["exclusive"],
     deps = [
         ":integration_lib",
         "//source/extensions/filters/network/echo:config",
