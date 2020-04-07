@@ -4,7 +4,8 @@ build --action_env=PATH
 build --action_env=TMPDIR
 
 # see top-level .bazelrc for explanation
-startup --host_jvm_args=-Xmx2g
+# Using only 2 cores, therefore 512m seems to be sufficient for 2 tasks
+startup --host_jvm_args=-Xmx512m
 
 build --define signal_trace=disabled
 build --define hot_restart=disabled
