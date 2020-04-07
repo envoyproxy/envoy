@@ -156,7 +156,7 @@ MockConnectionSocket::MockConnectionSocket()
 
 MockConnectionSocket::~MockConnectionSocket() = default;
 
-MockListener::MockListener() {}
+MockListener::MockListener() = default;
 
 MockListener::~MockListener() { onDestroy(); }
 

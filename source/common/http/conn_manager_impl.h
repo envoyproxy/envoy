@@ -614,7 +614,7 @@ private:
           : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
             saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
             is_internally_created_(false), decorated_propagate_(true), has_continue_headers_(false),
-            is_head_request_(false), decoding_headers_only_(false), encoding_headers_only_(false) {}
+            is_head_request_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -644,10 +644,10 @@ private:
       bool is_head_request_ : 1;
       // Whether a filter has indicated that the request should be treated as a headers only
       // request.
-      bool decoding_headers_only_;
+      bool decoding_headers_only_{false};
       // Whether a filter has indicated that the response should be treated as a headers only
       // response.
-      bool encoding_headers_only_;
+      bool encoding_headers_only_{false};
 
       // Used to track which filter is the latest filter that has received data.
       ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
