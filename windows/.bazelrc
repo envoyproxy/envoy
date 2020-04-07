@@ -4,7 +4,9 @@ build --action_env=PATH
 build --action_env=TMPDIR
 
 # see top-level .bazelrc for explanation
-startup --host_jvm_args=-Xmx2g
+startup --host_jvm_args=-Xmx512m
+
+build --experimental_local_memory_estimate
 
 build --define signal_trace=disabled
 build --define hot_restart=disabled
