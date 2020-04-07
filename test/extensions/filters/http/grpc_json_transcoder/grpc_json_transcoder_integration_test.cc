@@ -337,11 +337,9 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBody) {
       "", {""},
       {R"(content_type: "text/html" data: "<h1>Hello!</h1>")",
        R"(content_type: "text/plain" data: "Hello!")"},
-      Status(),
-      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}},
+      Status(), Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}},
       R"(<h1>Hello!</h1>)"
-      R"(Hello!)"
-  );
+      R"(Hello!)");
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryEchoHttpBody) {

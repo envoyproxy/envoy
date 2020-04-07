@@ -862,7 +862,8 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamWithHttpBodyAsOutput) {
 
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                                    {":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
 
   // "Send" 1st gRPC message
   google::api::HttpBody response;
