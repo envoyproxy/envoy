@@ -12,7 +12,7 @@ const std::string ADMISSION_CONTROL_CONFIG =
     R"EOF(
 name: envoy.filters.http.admission_control
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.admission_control.v2alpha.AdmissionControl
+  "@type": type.googleapis.com/envoy.config.filter.http.admission_control.v3alpha.AdmissionControl
   default_success_criteria:
     http_status:
     grpc_status:
