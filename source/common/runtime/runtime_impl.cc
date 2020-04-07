@@ -542,7 +542,9 @@ void LoaderImpl::initialize(Upstream::ClusterManager& cm) { cm_ = &cm; }
 RtdsSubscription::RtdsSubscription(
     LoaderImpl& parent, const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
     Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
+    : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(
+          rtds_layer.rtds_config().resource_api_version()),
+      parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }),
       validation_visitor_(validation_visitor) {}
@@ -583,7 +585,7 @@ void RtdsSubscription::start() {
   // We have to delay the subscription creation until init-time, since the
   // cluster manager resources are not available in the constructor when
   // instantiated in the server instance.
-  const auto resource_name = getResourceName(config_source_.resource_api_version());
+  const auto resource_name = getResourceName();
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
       config_source_, Grpc::Common::typeUrl(resource_name), store_, *this);
   subscription_->start({resource_name_});

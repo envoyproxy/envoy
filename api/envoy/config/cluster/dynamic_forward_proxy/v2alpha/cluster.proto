@@ -13,7 +13,7 @@ option java_outer_classname = "ClusterProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.clusters.dynamic_forward_proxy.v3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Dynamic forward proxy cluster configuration]
 

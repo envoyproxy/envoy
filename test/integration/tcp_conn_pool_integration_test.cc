@@ -112,7 +112,7 @@ public:
       : BaseIntegrationTest(GetParam(), tcp_conn_pool_config), filter_resolver_(config_factory_) {}
 
   // Called once by the gtest framework before any tests are run.
-  static void SetUpTestSuite() {
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     tcp_conn_pool_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       - filters:

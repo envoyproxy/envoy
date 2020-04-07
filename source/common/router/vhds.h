@@ -7,7 +7,6 @@
 #include <unordered_set>
 
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
@@ -21,6 +20,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
+#include "common/config/subscription_base.h"
 #include "common/init/target_impl.h"
 #include "common/protobuf/utility.h"
 
