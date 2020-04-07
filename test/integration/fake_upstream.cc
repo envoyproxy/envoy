@@ -143,12 +143,8 @@ void FakeStream::onResetStream(Http::StreamResetReason, absl::string_view) {
 
 AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  auto end_time = time_system_.monotonicTime() + timeout;
-  while (!headers_) {
-    if (time_system_.monotonicTime() >= end_time) {
-      return AssertionFailure() << "Timed out waiting for headers.";
-    }
-    time_system_.waitFor(lock_, decoder_event_, 5ms);
+  if (time_system.awaitWithTimeout(headers_, lock_, timeout)) {
+    return AssertionFailure() << "Timed out waiting for headers.";
   }
   return AssertionSuccess();
 }
@@ -156,16 +152,14 @@ AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length,
                                         milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  auto start_time = time_system_.monotonicTime();
-  while (bodyLength() < body_length) {
-    if (time_system_.monotonicTime() >= start_time + timeout) {
-      return AssertionFailure() << "Timed out waiting for data.";
-    }
-    time_system_.waitFor(lock_, decoder_event_, 5ms);
-    if (bodyLength() < body_length) {
-      // Run the client dispatcher since we may need to process window updates, etc.
-      client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-    }
+  if (time_system_.awaitWithTimeout(
+          [this, body_length, &client_dispatcher] -> bool {
+            // Run the client dispatcher since we may need to process window updates, etc.
+            client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+            return bodyLength() >= body_length;
+          },
+          lock_, timeout)) {
+    return AssertionFailure() << "Timed out waiting for data.";
   }
   return AssertionSuccess();
 }

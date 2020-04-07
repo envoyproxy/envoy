@@ -17,6 +17,11 @@ class TestTimeSystem : public Event::TimeSystem {
 public:
   ~TestTimeSystem() override = default;
 
+  // Returns true if the condition was unsatisfied prior to the timeout.
+  virtual bool awaitWithTimeout(const bool& cond, absl::Mutex& mutex, const Duration& duration);
+  virtual bool awaitWithTimeout(std::function<bool()> cond, absl::Mutex& mutex,
+                                const Duration& duration);
+
   /**
    * Advances time forward by the specified duration, running any timers
    * along the way that have been scheduled to fire.
