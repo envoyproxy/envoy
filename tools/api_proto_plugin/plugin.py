@@ -23,14 +23,18 @@ OutputDescriptor = namedtuple(
         # FileDescriptorProto transformer; this is applied to the input
         # before any output generation.
         'xform',
+        # Supply --//tools/api_proto_plugin CLI args as a parameters dictionary
+        # to visitor_factory constructor and xform function?
+        'want_params',
     ])
 
 
-def DirectOutputDescriptor(output_suffix, visitor):
-  return OutputDescriptor(output_suffix, visitor, lambda x: x)
+def DirectOutputDescriptor(output_suffix, visitor, want_params=False):
+  return OutputDescriptor(output_suffix, visitor, (lambda x, _: x) if want_params else lambda x: x,
+                          want_params)
 
 
-def Plugin(output_descriptors, parameter_callback=None):
+def Plugin(output_descriptors):
   """Protoc plugin entry point.
 
   This defines protoc plugin and manages the stdin -> stdout flow. An
@@ -48,9 +52,6 @@ def Plugin(output_descriptors, parameter_callback=None):
   response = plugin_pb2.CodeGeneratorResponse()
   cprofile_enabled = os.getenv('CPROFILE_ENABLED')
 
-  if request.HasField("parameter") and parameter_callback:
-    parameter_callback(request.parameter)
-
   # We use request.file_to_generate rather than request.file_proto here since we
   # are invoked inside a Bazel aspect, each node in the DAG will be visited once
   # by the aspect and we only want to generate docs for the current node.
@@ -63,9 +64,17 @@ def Plugin(output_descriptors, parameter_callback=None):
     for od in output_descriptors:
       f = response.file.add()
       f.name = file_proto.name + od.output_suffix
-      xformed_proto = od.xform(file_proto)
-      f.content = traverse.TraverseFile(xformed_proto,
-                                        od.visitor_factory()) if xformed_proto else ''
+      # Don't run API proto plugins on things like WKT types etc.
+      if not file_proto.package.startswith('envoy.'):
+        continue
+      if request.HasField("parameter") and od.want_params:
+        params = dict(param.split('=') for param in request.parameter.split(','))
+        xformed_proto = od.xform(file_proto, params)
+        visitor_factory = od.visitor_factory(params)
+      else:
+        xformed_proto = od.xform(file_proto)
+        visitor_factory = od.visitor_factory()
+      f.content = traverse.TraverseFile(xformed_proto, visitor_factory) if xformed_proto else ''
     if cprofile_enabled:
       pr.disable()
       stats_stream = io.StringIO()

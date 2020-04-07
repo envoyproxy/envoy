@@ -40,7 +40,7 @@ def GoldenProtoFile(path, filename, version):
     version: api version to specify target golden proto filename
 
   Returns:
-    actual golden proto absolute path 
+    actual golden proto absolute path
   """
   base = "./"
   base += path + "/" + filename + "." + version + ".gold"
@@ -54,17 +54,18 @@ def ProtoPrint(src, dst):
     src: source path for FileDescriptorProto.
     dst: destination path for formatted proto.
   """
-  print('ProtoPrint %s' % dst)
+  print('ProtoPrint %s -> %s' % (src, dst))
   subprocess.check_call([
       'bazel-bin/tools/protoxform/protoprint', src, dst,
       './bazel-bin/tools/protoxform/protoprint.runfiles/envoy/tools/type_whisperer/api_type_db.pb_text'
   ])
 
 
-def ResultProtoFile(path, tmp, filename, version):
+def ResultProtoFile(cmd, path, tmp, filename, version):
   """Retrieve result proto file path. In general, those are placed in bazel artifacts.
 
   Args:
+    cmd: fix or freeze?
     path: target proto path
     tmp: temporary directory.
     filename: target proto filename
@@ -74,7 +75,7 @@ def ResultProtoFile(path, tmp, filename, version):
     actual result proto absolute path
   """
   base = "./bazel-bin"
-  base += os.path.join(path, "protos")
+  base += os.path.join(path, "%s_protos" % cmd)
   base += os.path.join(base, path)
   base += "/{0}.{1}.proto".format(filename, version)
   dst = os.path.join(tmp, filename)
@@ -99,10 +100,11 @@ def Diff(result_file, golden_file):
   return [status, stdout, stderr]
 
 
-def Run(path, filename, version):
+def Run(cmd, path, filename, version):
   """Run main execution for protoxform test
 
   Args:
+    cmd: fix or freeze?
     path: target proto path
     filename: target proto filename
     version: api version to specify target result proto filename
@@ -113,7 +115,9 @@ def Run(path, filename, version):
   message = ""
   with tempfile.TemporaryDirectory() as tmp:
     golden_path = GoldenProtoFile(path, filename, version)
-    test_path = ResultProtoFile(path, tmp, filename, version)
+    test_path = ResultProtoFile(cmd, path, tmp, filename, version)
+    if os.stat(golden_path).st_size == 0 and not os.path.exists(test_path):
+      return message
 
     status, stdout, stderr = Diff(golden_path, test_path)
 
@@ -126,12 +130,13 @@ def Run(path, filename, version):
 if __name__ == "__main__":
   messages = ""
   logging.basicConfig(format='%(message)s')
-  for target in sys.argv[1:]:
+  cmd = sys.argv[1]
+  for target in sys.argv[2:]:
     path, filename = PathAndFilename(target)
-    messages += Run(path, filename, 'active')
-    messages += Run(path, filename, 'next_major_version_candidate')
-    messages += Run(path, filename, 'next_major_version_candidate')
-    messages += Run(path, filename, 'next_major_version_candidate.envoy_internal')
+    messages += Run(cmd, path, filename, 'active_or_frozen')
+    messages += Run(cmd, path, filename, 'next_major_version_candidate')
+    messages += Run(cmd, path, filename, 'next_major_version_candidate')
+    messages += Run(cmd, path, filename, 'next_major_version_candidate.envoy_internal')
 
   if len(messages) == 0:
     logging.warning("PASS")

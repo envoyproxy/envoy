@@ -19,6 +19,15 @@ message TypeDescription {
 
   // The package of the type in next version
   string next_version_package = 6;
+
+  // Is this a type in an active package?
+  bool active = 7;
+
+  // Is this type a synthesized map entry?
+  bool map_entry = 8;
+
+  // Is this type deprecated?
+  bool deprecated_type = 9;
 }
 
 message Types {

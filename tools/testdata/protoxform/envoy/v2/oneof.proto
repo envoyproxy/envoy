@@ -3,6 +3,9 @@ syntax = "proto3";
 package envoy.v2;
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message OneofExample {
   string foo = 1 [(udpa.annotations.field_migrate).oneof_promotion = "baz_specifier"];

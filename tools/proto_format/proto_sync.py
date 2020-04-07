@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 
-# Diff or copy protoxform artifacts from Bazel cache back to the source tree.
+# 1. Take protoxform artifacts from Bazel cache and pretty-print with protoprint.py.
+# 2. In the case where we are generating an Envoy internal shadow, it may be
+#    necessary to combine the current active proto, subject to hand editing, with
+#    shadow artifacts from the previous verion; this is done via
+#    merge_active_shadow.py.
+# 3. Diff or copy resulting artifacts to the source tree.
 
 import argparse
+from collections import defaultdict
 import functools
 import multiprocessing as mp
 import os
@@ -119,14 +125,59 @@ def ProtoPrint(src, dst):
   ])
 
 
-def SyncProtoFile(src_dst_pair):
-  """Diff or in-place update a single proto file from protoxform.py Bazel cache artifacts."
+def MergeActiveShadow(active_src, shadow_src, dst):
+  """Merge active/shadow FileDescriptorProto to a destination file.
 
   Args:
-    src_dst_pair: source/destination path tuple.
+    active_src: source path for active FileDescriptorProto.
+    shadow_src: source path for active FileDescriptorProto.
+    dst: destination path for FileDescriptorProto.
   """
-  rel_dst_path = GetDestinationPath(src_dst_pair[0])
-  ProtoPrint(*src_dst_pair)
+  print('MergeActiveShadow %s' % dst)
+  subprocess.check_output([
+      'bazel-bin/tools/protoxform/merge_active_shadow',
+      active_src,
+      shadow_src,
+      dst,
+  ])
+
+
+def SyncProtoFile(dst_srcs):
+  """Pretty-print a proto descriptor from protoxform.py Bazel cache artifacts."
+
+  In the case where we are generating an Envoy internal shadow, it may be
+  necessary to combine the current active proto, subject to hand editing, with
+  shadow artifacts from the previous verion; this is done via
+  MergeActiveShadow().
+
+  Args:
+    dst_srcs: destination/sources path tuple.
+  """
+  dst, srcs = dst_srcs
+  assert (len(srcs) > 0)
+  # If we only have one candidate source for a destination, just pretty-print.
+  if len(srcs) == 1:
+    src = srcs[0]
+    ProtoPrint(src, dst)
+  else:
+    # We should only see an active and next major version candidate from
+    # previous version today.
+    assert (len(srcs) == 2)
+    shadow_srcs = [
+        s for s in srcs if s.endswith('.next_major_version_candidate.envoy_internal.proto')
+    ]
+    active_src = [s for s in srcs if s.endswith('active_or_frozen.proto')][0]
+    # If we're building the shadow, we need to combine the next major version
+    # candidate shadow with the potentially hand edited active version.
+    if len(shadow_srcs) > 0:
+      assert (len(shadow_srcs) == 1)
+      with tempfile.NamedTemporaryFile() as f:
+        MergeActiveShadow(active_src, shadow_srcs[0], f.name)
+        ProtoPrint(f.name, dst)
+    else:
+      ProtoPrint(active_src, dst)
+    src = active_src
+  rel_dst_path = GetDestinationPath(src)
   return ['//%s:pkg' % str(rel_dst_path.parent)]
 
 
@@ -280,16 +331,17 @@ def Sync(api_root, mode, labels, shadow):
     dst_dir = pathlib.Path(tmp).joinpath("b")
     paths = []
     for label in labels:
-      paths.append(utils.BazelBinPathForOutputArtifact(label, '.active.proto'))
+      paths.append(utils.BazelBinPathForOutputArtifact(label, '.active_or_frozen.proto'))
       paths.append(
           utils.BazelBinPathForOutputArtifact(
               label, '.next_major_version_candidate.envoy_internal.proto'
               if shadow else '.next_major_version_candidate.proto'))
-    src_dst_paths = [
-        (path, GetAbsDestinationPath(dst_dir, path)) for path in paths if os.stat(path).st_size > 0
-    ]
+    dst_src_paths = defaultdict(list)
+    for path in paths:
+      if os.stat(path).st_size > 0:
+        dst_src_paths[GetAbsDestinationPath(dst_dir, path)].append(path)
     with mp.Pool() as p:
-      pkg_deps = p.map(SyncProtoFile, src_dst_paths)
+      pkg_deps = p.map(SyncProtoFile, dst_src_paths.items())
     SyncBuildFiles(mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")

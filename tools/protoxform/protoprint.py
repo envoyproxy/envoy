@@ -8,6 +8,7 @@
 # Usage: protoprint.py <source file path> <type database path>
 
 from collections import deque
+import copy
 import functools
 import io
 import os
@@ -41,8 +42,8 @@ from udpa.annotations import status_pb2
 NEXT_FREE_FIELD_MIN = 5
 
 
-class ProtoXformError(Exception):
-  """Base error class for the protoxform module."""
+class ProtoPrintError(Exception):
+  """Base error class for the protoprint module."""
 
 
 def ExtractClangProtoStyle(clang_format_text):
@@ -169,12 +170,13 @@ def FormatTypeContextComments(type_context, annotation_xforms=None):
   return leading, trailing
 
 
-def FormatHeaderFromFile(source_code_info, file_proto):
+def FormatHeaderFromFile(source_code_info, file_proto, empty_file):
   """Format proto header.
 
   Args:
     source_code_info: SourceCodeInfo object.
     file_proto: FileDescriptorProto for file.
+    empty_file: are there no message/enum/service defs in file?
 
   Returns:
     Formatted proto header as a string.
@@ -226,8 +228,10 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     options.Extensions[status_pb2.file_status].CopyFrom(
         file_proto.options.Extensions[status_pb2.file_status])
 
-  options.Extensions[status_pb2.file_status].package_version_status = file_proto.options.Extensions[
-      status_pb2.file_status].package_version_status
+  if not empty_file:
+    options.Extensions[
+        status_pb2.file_status].package_version_status = file_proto.options.Extensions[
+            status_pb2.file_status].package_version_status
 
   options_block = FormatOptions(options)
 
@@ -385,7 +389,7 @@ def FormatFieldType(type_context, field):
   }
   if field.type in pretty_type_names:
     return label + pretty_type_names[field.type]
-  raise ProtoXformError('Unknown field type ' + str(field.type))
+  raise ProtoPrintError('Unknown field type ' + str(field.type))
 
 
 def FormatServiceMethod(type_context, method):
@@ -504,9 +508,15 @@ def FormatReserved(enum_or_msg_proto):
   Returns:
     Formatted enum_or_msg_proto as a string.
   """
-  reserved_fields = FormatBlock('reserved %s;\n' % ','.join(
-      map(str, sum([list(range(rr.start, rr.end)) for rr in enum_or_msg_proto.reserved_range],
-                   [])))) if enum_or_msg_proto.reserved_range else ''
+  rrs = copy.deepcopy(enum_or_msg_proto.reserved_range)
+  # Fixups for singletons that don't seem to always have [inclusive, exclusive)
+  # format when parsed by protoc.
+  for rr in rrs:
+    if rr.start == rr.end:
+      rr.end += 1
+  reserved_fields = FormatBlock(
+      'reserved %s;\n' %
+      ','.join(map(str, sum([list(range(rr.start, rr.end)) for rr in rrs], [])))) if rrs else ''
   if enum_or_msg_proto.reserved_name:
     reserved_fields += FormatBlock('reserved %s;\n' %
                                    ', '.join('"%s"' % n for n in enum_or_msg_proto.reserved_name))
@@ -566,6 +576,7 @@ class ProtoFormatVisitor(visitor.Visitor):
           oneof_index = None
       if oneof_index is None and field.HasField('oneof_index'):
         oneof_index = field.oneof_index
+        assert (oneof_index < len(msg_proto.oneof_decl))
         oneof_proto = msg_proto.oneof_decl[oneof_index]
         oneof_leading_comment, oneof_trailing_comment = FormatTypeContextComments(
             type_context.ExtendOneof(oneof_index, field.name))
@@ -580,7 +591,8 @@ class ProtoFormatVisitor(visitor.Visitor):
                                                   formatted_msgs, reserved_fields, fields)
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
-    header = FormatHeaderFromFile(type_context.source_code_info, file_proto)
+    empty_file = len(services) == 0 and len(enums) == 0 and len(msgs) == 0
+    header = FormatHeaderFromFile(type_context.source_code_info, file_proto, empty_file)
     formatted_services = FormatBlock('\n'.join(services))
     formatted_enums = FormatBlock('\n'.join(enums))
     formatted_msgs = FormatBlock('\n'.join(msgs))
@@ -590,7 +602,10 @@ class ProtoFormatVisitor(visitor.Visitor):
 if __name__ == '__main__':
   proto_desc_path = sys.argv[1]
   file_proto = descriptor_pb2.FileDescriptorProto()
-  text_format.Merge(pathlib.Path(proto_desc_path).read_text(), file_proto)
+  input_text = pathlib.Path(proto_desc_path).read_text()
+  if not input_text:
+    sys.exit(0)
+  text_format.Merge(input_text, file_proto)
   dst_path = pathlib.Path(sys.argv[2])
   utils.LoadTypeDb(sys.argv[3])
   dst_path.write_bytes(traverse.TraverseFile(file_proto, ProtoFormatVisitor()))
