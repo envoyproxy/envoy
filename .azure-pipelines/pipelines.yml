@@ -139,7 +139,7 @@ jobs:
         env:
           TOOLS_BIN_DIR: $(Pipeline.Workspace)\bin
           VC_CMAKE_PATH: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake"
-          VC_TOOLS_BIN_X64: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\VC\\Tools\\MSVC\\14.24.28314\\bin\\HostX64\\x64"
+          VC_TOOLS_BIN_X64: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\VC\\Tools\\MSVC\\14.25.28610\\bin\\HostX64\\x64"
 
       - bash: ci/windows_ci_steps.sh
         displayName: "Run Windows CI"
