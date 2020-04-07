@@ -30,9 +30,11 @@ CdsApiPtr CdsApiImpl::create(const envoy::config::core::v3::ConfigSource& cds_co
 
 CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm,
                        Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
+    : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(
+          cds_config.resource_api_version()),
+      cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
-  const auto resource_name = getResourceName(cds_config.resource_api_version());
+  const auto resource_name = getResourceName();
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
       cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this);
 }
