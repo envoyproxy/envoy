@@ -270,6 +270,8 @@ ClusterManagerImpl::ClusterManagerImpl(
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               dyn_resources.ads_config().transport_api_version() ==
                       envoy::config::core::v3::ApiVersion::V3
+                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
+                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
                   ? "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "DeltaAggregatedResources"),
@@ -285,6 +287,8 @@ ClusterManagerImpl::ClusterManagerImpl(
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               dyn_resources.ads_config().transport_api_version() ==
                       envoy::config::core::v3::ApiVersion::V3
+                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
+                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
                   ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
                     "StreamAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
