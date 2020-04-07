@@ -15,7 +15,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.fault.v3";
 option java_outer_classname = "FaultProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Fault Injection]
 // Fault Injection :ref:`configuration overview <config_http_filters_fault_injection>`.
@@ -35,19 +35,19 @@ message FaultAbort {
 
   reserved 1;
 
+  // HTTP status code to use to abort the HTTP request.
+  type.v3.FractionalPercent percentage = 3;
+
   oneof error_type {
     option (validate.required) = true;
 
-    // HTTP status code to use to abort the HTTP request.
+    // Fault aborts are controlled via an HTTP header (if applicable).
     uint32 http_status = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
-    // Fault aborts are controlled via an HTTP header (if applicable).
+    // The percentage of requests/operations/connections that will be aborted with the error code
+    // provided.
     HeaderAbort header_abort = 4;
   }
-
-  // The percentage of requests/operations/connections that will be aborted with the error code
-  // provided.
-  type.v3.FractionalPercent percentage = 3;
 }
 
 // [#next-free-field: 14]

@@ -26,9 +26,10 @@ public:
 
 class SampleTracerFactory : public Server::Configuration::TracerFactory {
 public:
-  Tracing::HttpTracerPtr createHttpTracer(const Protobuf::Message&,
-                                          Server::Configuration::TracerFactoryContext&) override {
-    return std::make_unique<SampleTracer>();
+  Tracing::HttpTracerSharedPtr
+  createHttpTracer(const Protobuf::Message&,
+                   Server::Configuration::TracerFactoryContext&) override {
+    return std::make_shared<SampleTracer>();
   }
 
   std::string name() const override { return "envoy.tracers.sample"; }

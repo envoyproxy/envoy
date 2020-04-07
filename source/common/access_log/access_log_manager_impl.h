@@ -11,6 +11,7 @@
 #include "envoy/stats/store.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/logger.h"
 #include "common/common/thread.h"
 
 namespace Envoy {
@@ -29,7 +30,7 @@ struct AccessLogFileStats {
 
 namespace AccessLog {
 
-class AccessLogManagerImpl : public AccessLogManager {
+class AccessLogManagerImpl : public AccessLogManager, Logger::Loggable<Logger::Id::main> {
 public:
   AccessLogManagerImpl(std::chrono::milliseconds file_flush_interval_msec, Api::Api& api,
                        Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
@@ -38,6 +39,7 @@ public:
         lock_(lock), file_stats_{
                          ACCESS_LOG_FILE_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
                                                POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
+  ~AccessLogManagerImpl() override;
 
   // AccessLog::AccessLogManager
   void reopen() override;

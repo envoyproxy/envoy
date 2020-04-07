@@ -281,10 +281,15 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
           version, config) {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
+  return makeClientConnectionWithOptions(port, nullptr);
+}
+
+Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOptions(
+    uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
 
   connection->enableHalfClose(enable_half_close_);
   return connection;
@@ -410,9 +415,20 @@ void BaseIntegrationTest::setUpstreamAddress(
 }
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
-  auto port_it = port_names.cbegin();
-  auto listeners = test_server_->server().listenerManager().listeners();
+  bool listeners_ready = false;
+  absl::Mutex l;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  test_server_->server().dispatcher().post([this, &listeners, &listeners_ready, &l]() {
+    listeners = test_server_->server().listenerManager().listeners();
+    l.Lock();
+    listeners_ready = true;
+    l.Unlock();
+  });
+  l.LockWhen(absl::Condition(&listeners_ready));
+  l.Unlock();
+
   auto listener_it = listeners.cbegin();
+  auto port_it = port_names.cbegin();
   for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
     const auto listen_addr = listener_it->get().listenSocketFactory().localAddress();
     if (listen_addr->type() == Network::Address::Type::Ip) {

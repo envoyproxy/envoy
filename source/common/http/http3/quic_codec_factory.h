@@ -12,7 +12,7 @@ namespace Http {
 // A factory to create Http::ServerConnection instance for QUIC.
 class QuicHttpServerConnectionFactory : public Config::UntypedFactory {
 public:
-  virtual ~QuicHttpServerConnectionFactory() {}
+  ~QuicHttpServerConnectionFactory() override = default;
 
   virtual std::unique_ptr<ServerConnection>
   createQuicServerConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;
@@ -23,7 +23,7 @@ public:
 // A factory to create Http::ClientConnection instance for QUIC.
 class QuicHttpClientConnectionFactory : public Config::UntypedFactory {
 public:
-  virtual ~QuicHttpClientConnectionFactory() {}
+  ~QuicHttpClientConnectionFactory() override = default;
 
   virtual std::unique_ptr<ClientConnection>
   createQuicClientConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;

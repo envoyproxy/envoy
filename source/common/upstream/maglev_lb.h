@@ -38,7 +38,7 @@ public:
               MaglevLoadBalancerStats& stats);
 
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
-  HostConstSharedPtr chooseHost(uint64_t hash) const override;
+  HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
 
   // Recommended table size in section 5.3 of the paper.
   static const uint64_t DefaultTableSize = 65537;
