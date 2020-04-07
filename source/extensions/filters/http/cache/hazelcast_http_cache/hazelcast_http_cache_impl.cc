@@ -1,5 +1,6 @@
-#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_context.h"
 #include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_http_cache_impl.h"
+
+#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_context.h"
 #include "extensions/filters/http/cache/hazelcast_http_cache/util.h"
 
 namespace Envoy {
@@ -30,10 +31,9 @@ void HazelcastHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   // TODO(enozcan): Enable when implemented on the filter side.
   //  Depending on the filter's implementation, the cached entry's
-  //  variant_key_ must be updated as well.
-  //  Also, if vary headers change then the hash key of the response
-  //  will change and updating only header map will not be enough in
-  //  this case.
+  //  variant_key_ must be updated as well. Also, if vary headers
+  //  change then the hash key of the response will change and
+  //  updating only header map will not be enough in this case.
   ASSERT(lookup_context);
   ASSERT(response_headers);
   try {
@@ -54,7 +54,7 @@ void HazelcastHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
 constexpr absl::string_view HazelcastCacheName = "envoy.extensions.http.cache.hazelcast";
 
 // Cluster wide cache statistics should be observed on Hazelcast Management Center.
-// Hence they are not stored locally.
+// They are not stored locally.
 CacheInfo HazelcastHttpCache::cacheInfo() const {
   CacheInfo cache_info;
   cache_info.name_ = HazelcastCacheName;
@@ -62,20 +62,20 @@ CacheInfo HazelcastHttpCache::cacheInfo() const {
   return cache_info;
 }
 
-void HazelcastHttpCache::putHeader(const uint64_t& key, const HazelcastHeaderEntry& entry) {
+void HazelcastHttpCache::putHeader(const uint64_t key, const HazelcastHeaderEntry& entry) {
   getHeaderMap().set(mapKey(key), entry);
 }
 
-void HazelcastHttpCache::putBody(const uint64_t& key, const uint64_t& order,
+void HazelcastHttpCache::putBody(const uint64_t key, const uint64_t order,
                                  const HazelcastBodyEntry& entry) {
   getBodyMap().set(orderedMapKey(key, order), entry);
 }
 
-HazelcastHeaderPtr HazelcastHttpCache::getHeader(const uint64_t& key) {
+HazelcastHeaderPtr HazelcastHttpCache::getHeader(const uint64_t key) {
   return getHeaderMap().get(mapKey(key));
 }
 
-HazelcastBodyPtr HazelcastHttpCache::getBody(const uint64_t& key, const uint64_t& order) {
+HazelcastBodyPtr HazelcastHttpCache::getBody(const uint64_t key, const uint64_t order) {
   return getBodyMap().get(orderedMapKey(key, order));
 }
 
@@ -101,7 +101,7 @@ void HazelcastHttpCache::onMissingBody(uint64_t key, int32_t version, uint64_t b
     getHeaderMap().remove(mapKey(key));
     unlock(key);
   } catch (HazelcastClientOfflineException e) {
-    // see DividedInsertContext#flushHeader() for left over locks on a connection failure.
+    // see DividedInsertContext#insertHeader() for left over locks on a connection failure.
     ENVOY_LOG(warn, "Hazelcast Connection is offline!");
   } catch (OperationTimeoutException e) {
     ENVOY_LOG(warn, "Clean up for missing body has timed out.");
@@ -114,25 +114,27 @@ void HazelcastHttpCache::onVersionMismatch(uint64_t key, int32_t version, uint64
   onMissingBody(key, version, body_size);
 }
 
-void HazelcastHttpCache::putResponseIfAbsent(const uint64_t& key,
+void HazelcastHttpCache::putResponseIfAbsent(const uint64_t key,
                                              const HazelcastResponseEntry& entry) {
   getResponseMap().putIfAbsent(mapKey(key), entry);
 }
 
-HazelcastResponsePtr HazelcastHttpCache::getResponse(const uint64_t& key) {
+HazelcastResponsePtr HazelcastHttpCache::getResponse(const uint64_t key) {
   return getResponseMap().get(mapKey(key));
 }
 
-bool HazelcastHttpCache::tryLock(const uint64_t& key) {
+bool HazelcastHttpCache::tryLock(const uint64_t key) {
   // Internal lock mechanism of Hazelcast specific to map and key pair is
   // used to make exactly one lookup context responsible for insertions and
   // secure consistency during updateHeaders(). These locks prevent possible
   // race for multiple cache filters from multiple proxies when they connect
   // to the same Hazelcast cluster.
+  // The locks used here are re-entrant. A locked key can be acquired by
+  // the same thread again and again based on its pid.
   return unified_ ? getResponseMap().tryLock(mapKey(key)) : getHeaderMap().tryLock(mapKey(key));
 }
 
-void HazelcastHttpCache::unlock(const uint64_t& key) {
+void HazelcastHttpCache::unlock(const uint64_t key) {
   // Hazelcast does not allow a thread to unlock a key unless it's the key
   // owner. To handle this, forceUnlock is called.
   if (unified_) {
@@ -194,32 +196,16 @@ HazelcastHttpCache::~HazelcastHttpCache() { shutdown(true); }
 
 void HazelcastHttpCache::updateUnifiedHeaders(LookupContextPtr&& lookup_context,
                                               Http::ResponseHeaderMapPtr&& response_headers) {
-  const uint64_t& key = static_cast<UnifiedLookupContext*>(lookup_context.get())->variantHashKey();
-  HazelcastResponsePtr response = getResponse(key);
-  if (!response) {
-    // Might be evicted in meantime
-    ENVOY_LOG(debug, "Updating unified headers ({}) is aborted due to lookup miss.", key);
-    return;
-  }
-  HazelcastResponseEntry updated = *response;
-  updated.header().headerMap(std::move(response_headers));
-  // Update headers if no other update is performed in meantime.
-  getResponseMap().replace(key, updated, *response);
+  // TODO(enozcan): Implement when ready on the filter side.
+  ASSERT(!lookup_context);
+  ASSERT(!response_headers);
 }
 
 void HazelcastHttpCache::updateDividedHeaders(LookupContextPtr&& lookup_context,
                                               Http::ResponseHeaderMapPtr&& response_headers) {
-  const uint64_t& key = static_cast<UnifiedLookupContext*>(lookup_context.get())->variantHashKey();
-  HazelcastHeaderPtr stale = getHeader(key);
-  if (!stale) {
-    // Might be evicted in meantime
-    ENVOY_LOG(debug, "Updating divided headers ({}) is aborted due to lookup miss.", key);
-    return;
-  }
-  HazelcastHeaderEntry updated = *stale;
-  updated.headerMap(std::move(response_headers));
-  // Update headers if no other update is performed in meantime.
-  getHeaderMap().replace(key, updated, *stale);
+  // TODO(enozcan): Implement when ready on the filter side.
+  ASSERT(!lookup_context);
+  ASSERT(!response_headers);
 }
 
 std::string HazelcastHttpCache::constructMapName(const std::string& postfix) {
@@ -240,8 +226,8 @@ HazelcastHttpCache::HazelcastHttpCache(HazelcastHttpCacheConfig config)
                      ConfigUtil::validMaxBodySize(config.max_body_size(), config.unified())),
       cache_config_(config) {
   body_map_name_ = constructMapName("body");
-  header_map_name_ = constructMapName("div-cache");
-  response_map_name_ = constructMapName("uni-cache");
+  header_map_name_ = constructMapName("div");
+  response_map_name_ = constructMapName("uni");
 }
 
 std::string HazelcastHttpCacheFactory::name() const { return std::string(HazelcastCacheName); }

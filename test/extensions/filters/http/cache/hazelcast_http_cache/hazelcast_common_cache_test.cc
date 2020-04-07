@@ -30,9 +30,10 @@ protected:
 INSTANTIATE_TEST_SUITE_P(CommonCacheTests, HazelcastHttpCacheTest, ::testing::Bool());
 
 TEST_P(HazelcastHttpCacheTest, MissPutAndGetEntries) {
-  const std::string RequestPath1("/size/plus/one");
-  const std::string RequestPath2("/exactly/size");
-  const std::string RequestPath3("/size/minus/one");
+  // To test divided body behavior as well, bodies having sizes near the limit are preferred.
+  const std::string RequestPath1("/body/with/limit/size/plus/one");
+  const std::string RequestPath2("/body/with/exactly/limit/size");
+  const std::string RequestPath3("/body/with/limit/size/minus/one");
 
   LookupContextPtr lookup_context1 = lookup(RequestPath1);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
@@ -50,9 +51,9 @@ TEST_P(HazelcastHttpCacheTest, MissPutAndGetEntries) {
   insert(move(lookup_context2), getResponseHeaders(), Body2);
   insert(move(lookup_context3), getResponseHeaders(), Body3);
 
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath1).get(), Body1));
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath2).get(), Body2));
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath3).get(), Body3));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath1).get(), Body1));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath2).get(), Body2));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath3).get(), Body3));
 }
 
 TEST_P(HazelcastHttpCacheTest, HandleRangedResponses) {
@@ -99,7 +100,7 @@ TEST_P(HazelcastHttpCacheTest, SimplePutGet) {
 
   const std::string Body1("hazelcast");
   insert(move(name_lookup_context), getResponseHeaders(), Body1);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath1).get(), Body1));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath1).get(), Body1));
 
   const std::string RequestPath2("/simple/put/second");
   name_lookup_context = lookup(RequestPath2);
@@ -107,7 +108,7 @@ TEST_P(HazelcastHttpCacheTest, SimplePutGet) {
 
   const std::string Body2("hazelcast.http.cache");
   insert(move(name_lookup_context), getResponseHeaders(), Body2);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath2).get(), Body2));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath2).get(), Body2));
 }
 
 TEST_P(HazelcastHttpCacheTest, PrivateResponse) {
@@ -119,7 +120,7 @@ TEST_P(HazelcastHttpCacheTest, PrivateResponse) {
   const std::string Body("Value");
 
   insert(move(name_lookup_context), getResponseHeaders(), Body);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path).get(), Body));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(request_path).get(), Body));
 }
 
 TEST_P(HazelcastHttpCacheTest, Miss) {
@@ -157,7 +158,7 @@ TEST_P(HazelcastHttpCacheTest, RequestSmallMinFresh) {
                                                    {"cache-control", "public, max-age=9000"}};
   const std::string Body("content");
   insert(move(name_lookup_context), response_headers, Body);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path).get(), Body));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(request_path).get(), Body));
 }
 
 TEST_P(HazelcastHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
@@ -173,7 +174,7 @@ TEST_P(HazelcastHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
 
   const std::string Body("content");
   insert(move(name_lookup_context), response_headers, Body);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path).get(), Body));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(request_path).get(), Body));
 }
 
 TEST_P(HazelcastHttpCacheTest, StreamingPutAndRangeGet) {

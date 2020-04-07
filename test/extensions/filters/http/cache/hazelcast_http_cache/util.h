@@ -123,8 +123,13 @@ protected:
     return LookupRequest(request_headers_, current_time_);
   }
 
-  AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context,
-                                              absl::string_view body) {
+  AssertionResult expectLookupSuccessWithFullBody(LookupContext* lookup_context,
+                                                  absl::string_view body) {
+    if (lookup_result_.content_length_ != body.size()) {
+      return AssertionFailure() << "Expected: lookup_result_.content_length_"
+                                   " == "
+                                << body.size() << "\n  Actual: " << lookup_result_.content_length_;
+    }
     // From SimpleHttpCacheTest
     if (lookup_result_.cache_entry_status_ != CacheEntryStatus::Ok) {
       return AssertionFailure() << "Expected: lookup_result_.cache_entry_status"

@@ -51,8 +51,8 @@ public:
   void readUnifiedData(ObjectDataInput& reader);
 
   const Key& variantKey() const { return variant_key_; }
-  const uint64_t& bodySize() const { return body_size_; }
-  const int32_t& version() const { return version_; }
+  uint64_t bodySize() const { return body_size_; }
+  int32_t version() const { return version_; }
   Http::ResponseHeaderMapPtr& headerMap() { return header_map_; }
 
   void variantKey(Key&& key) { variant_key_ = std::move(key); }
@@ -83,7 +83,7 @@ private:
  *
  * @note In DIVIDED cache mode, response headers and corresponding bodies will be stored in
  * different distributed maps. For a response HeaderEntry with 64 bit hash key <H>, bodies
- * will be stored with keys <H>"0", <H>"1", <H>"2".. and so on in a contiguous manner.
+ * will be stored with keys <H>"#0", <H>"#1", <H>"#2".. and so on in a contiguous manner.
  * Body partition size is fixed and configurable via cache config. On a range request, only
  * necessary partitions according to the request will be fetched from distributed map,
  * not the whole response.
@@ -106,7 +106,7 @@ public:
 
   size_t length() const { return body_buffer_.size(); }
   hazelcast::byte* begin() { return body_buffer_.data(); }
-  const int32_t& version() const { return version_; }
+  int32_t version() const { return version_; }
 
   void bodyBuffer(std::vector<hazelcast::byte>&& buffer) { body_buffer_ = std::move(buffer); }
   void headerKey(int64_t key) { header_key_ = key; }
@@ -122,7 +122,7 @@ private:
 
   /** The same hash key with the corresponding header. */
   // Not stored in distributed map but used to store related bodies in the same
-  // node in Hazelcast cluster. Hence (possible) extra networking calls are prevented.
+  // partition in Hazelcast cluster.
   int64_t header_key_;
 
   /** Derived from header. */

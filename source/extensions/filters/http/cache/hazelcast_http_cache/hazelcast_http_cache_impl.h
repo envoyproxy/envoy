@@ -21,35 +21,34 @@ namespace HazelcastHttpCache {
 using envoy::source::extensions::filters::http::cache::HazelcastHttpCacheConfig;
 using hazelcast::client::IMap;
 
-// TODO: Consider putting responses into cache with TTL derived from `age` header.
-//  instead of using a common TTL for all.
+// TODO(enozcan): Consider putting responses into cache with TTL derived from `max-age` header
+//  instead of using a common TTL for all. This is possible during insertion by passing TTL
+//  amount regardless of the configured TTL on Hazelcast server side.
+//  i.e: IMap::put(const K &key, const V &value, int64_t ttlInMilliseconds);
 
-// TODO: Mention about max.lease.time option on readme doc.
-
-class HazelcastHttpCache : /*public HttpCache,*/ public HazelcastCache,
+class HazelcastHttpCache : public HazelcastCache,
                            public Logger::Loggable<Logger::Id::hazelcast_http_cache> {
 public:
   HazelcastHttpCache(HazelcastHttpCacheConfig config);
 
-  // Cache::HttpCache
+  // from Cache::HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& request) override;
   InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) override;
   void updateHeaders(LookupContextPtr&& lookup_context,
                      Http::ResponseHeaderMapPtr&& response_headers) override;
   CacheInfo cacheInfo() const override;
 
-  // HazelcastCache
-  void putHeader(const uint64_t& key, const HazelcastHeaderEntry& entry) override;
-  void putBody(const uint64_t& key, const uint64_t& order,
-               const HazelcastBodyEntry& entry) override;
-  HazelcastHeaderPtr getHeader(const uint64_t& key) override;
-  HazelcastBodyPtr getBody(const uint64_t& key, const uint64_t& order) override;
+  // from HazelcastCache
+  void putHeader(const uint64_t key, const HazelcastHeaderEntry& entry) override;
+  void putBody(const uint64_t key, const uint64_t order, const HazelcastBodyEntry& entry) override;
+  HazelcastHeaderPtr getHeader(const uint64_t key) override;
+  HazelcastBodyPtr getBody(const uint64_t key, const uint64_t order) override;
   void onMissingBody(uint64_t key, int32_t version, uint64_t body_size) override;
   void onVersionMismatch(uint64_t key, int32_t version, uint64_t body_size) override;
-  void putResponseIfAbsent(const uint64_t& key, const HazelcastResponseEntry& entry) override;
-  HazelcastResponsePtr getResponse(const uint64_t& key) override;
-  bool tryLock(const uint64_t& key) override;
-  void unlock(const uint64_t& key) override;
+  void putResponseIfAbsent(const uint64_t key, const HazelcastResponseEntry& entry) override;
+  HazelcastResponsePtr getResponse(const uint64_t key) override;
+  bool tryLock(const uint64_t key) override;
+  void unlock(const uint64_t key) override;
   uint64_t random() override;
 
   void connect();

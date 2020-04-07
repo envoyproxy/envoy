@@ -9,14 +9,14 @@ package envoy.source.extensions.filters.http.cache;
 // Hazelcast Http Cache configuration
 message HazelcastHttpCacheConfig {
 
-  // Address for Hazelcast cluster member.
+  // Address for Hazelcast cluster member to be connected.
   message MemberAddress {
     string ip = 1;
     int32 port = 2;
   }
 
   // Group name of Hazelcast cluster to be connected. Not only the address of a member
-  // but its group name must match.
+  // but its group name and password must match.
   string group_name = 1;
   // Group password of Hazelcast cluster to be connected.
   string group_password = 2;
@@ -44,13 +44,13 @@ message HazelcastHttpCacheConfig {
   uint32 invocation_timeout = 6;
 
   // Only one member address is enough to connect to the cluster but
-  // providing more than one is recommended.
-  // By default, 127.0.0.1:5701 will be tried.
+  // providing more than one is recommended. By default, 127.0.0.1:5701 will
+  // be tried.
   repeated MemberAddress addresses = 7;
 
   // Application specific name for the cache. Different deployments should
-  // use the same prefix if they want to share the same cache and connect
-  // to the same Hazelcast cluster. Empty string by default.
+  // use the same prefix and connect to the same Hazelcast cluster if they want
+  // to share the same cache. Empty string by default.
   string app_prefix = 8;
 
   // In unified mode, cached responses will be stored as a single entry.
@@ -67,12 +67,15 @@ message HazelcastHttpCacheConfig {
   bool unified = 9;
 
   // Body partition size for divided cache. Ignored in unified mode.
-  // At most 64 KB allowed. 2 KB by default.
+  // At most 32 KB is allowed. 16 KB by default.
   uint64 body_partition_size = 10;
 
   // Maximum allowed body size per response. If insertion for a larger
   // value than the limit is attempted, the first max_body_size bytes
   // of the response will be cached and the remaining will be ignored.
-  // At most 64 KB for UNIFIED mode, 2 MB for DIVIDED mode.
+  // At most 32 KB is allowed for UNIFIED mode. In DIVIDED mode, there
+  // is no such an upper limit but keeping (max_body_size / body_partition_size)
+  // below 20 is recommended since each partition causes an extra
+  // network call made to the distributed map.
   uint64 max_body_size = 11;
 }

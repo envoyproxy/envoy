@@ -14,17 +14,16 @@ namespace HazelcastHttpCache {
  *
  * In UNIFIED mode, an HTTP response is wrapped by a HazelcastResponseEntry
  * with its all fields (headers, body, trailers, request key) and stored in
- * distributed map. On a range Http request, regardless of the requested
+ * distributed map. On a range HTTP request, regardless of the requested
  * range, the whole response body is fetched from the cache.
  *
  * In DIVIDED mode, an HTTP response's fields except for its body are wrapped
- * by a HazelcastHeaderEntry. It's body is divided into chunks with a certain
- * size and then stored in another distributed map as HazelcastBodyEntry. On
+ * by a HazelcastHeaderEntry. Its body is divided into chunks with certain
+ * sizes and then stored in another distributed map as HazelcastBodyEntry. On
  * a range request, not the whole body for the response but only the necessary
  * partitions are fetched from the cache. A header and its bodies have a common
- * number named <version> to interrelate multiple entries.
+ * number named <version> to interrelate multiple entries belong to the same response.
  *
- * @note    Lookup and Insert contexts should use this base, not HttpCache.
  */
 class HazelcastCache : public HttpCache {
 public:
@@ -42,7 +41,7 @@ public:
    *                same Hazelcast cluster might store the same response with different
    *                keys.
    */
-  virtual void putHeader(const uint64_t& key, const HazelcastHeaderEntry& entry) PURE;
+  virtual void putHeader(const uint64_t key, const HazelcastHeaderEntry& entry) PURE;
 
   /**
    * Puts a body entry into body cache.
@@ -51,7 +50,7 @@ public:
    * @param order   Order of the body chunk among other partitions
    * @param entry   Entry to be inserted
    */
-  virtual void putBody(const uint64_t& key, const uint64_t& order,
+  virtual void putBody(const uint64_t key, const uint64_t order,
                        const HazelcastBodyEntry& entry) PURE;
 
   /**
@@ -59,7 +58,7 @@ public:
    * @param key     Hash key for the entry
    * @return        HazelcastHeaderPtr to cached entry if found, nullptr otherwise
    */
-  virtual HazelcastHeaderPtr getHeader(const uint64_t& key) PURE;
+  virtual HazelcastHeaderPtr getHeader(const uint64_t key) PURE;
 
   /**
    * Performs a lookup to body cache for the given key and order pair.
@@ -67,12 +66,13 @@ public:
    * @param order   Order of the body chunk among other partitions
    * @return        HazelcastBodyPtr to cached entry if found, nullptr otherwise.
    */
-  virtual HazelcastBodyPtr getBody(const uint64_t& key, const uint64_t& order) PURE;
+  virtual HazelcastBodyPtr getBody(const uint64_t key, const uint64_t order) PURE;
 
   /**
    * Cleans up a malformed response when at least one of the body chunks are missed
-   * during lookup. All bodies and the header for the response are removed to make
-   * a new insertion available by an insert context.
+   * during lookup. The header for the response is removed to make a new insertion
+   * available by an insert context and the remaining body partitions are removed
+   * to prevent orphan body entries stay in the cache.
    * @param key         Header key for the response
    * @param version     Version for the key and body
    * @param body_size   Total body size for the response
@@ -94,42 +94,42 @@ public:
    * Puts a unified entry into unified cache if no other entry associated with the key
    * is found.
    * @note          IfAbsent is to prevent race between multiple filters. Overriding
-   *                an existing entry is forbidden. HttpCache::updateHeaders() might
-   *                be used when necessary.
+   *                an existing entry is forbidden. HttpCache::updateHeaders() should
+   *                be used if changing the header content is necessary.
    * @param key     Hash key for the entry
    * @param entry   Entry to be inserted
    */
-  virtual void putResponseIfAbsent(const uint64_t& key, const HazelcastResponseEntry& entry) PURE;
+  virtual void putResponseIfAbsent(const uint64_t key, const HazelcastResponseEntry& entry) PURE;
 
   /**
    * Performs a lookup to unified cache for the given key.
    * @param key     Hash key for the entry.
    * @return        HazelcastResponsePtr to cached entry if found, nullptr otherwise.
    */
-  virtual HazelcastResponsePtr getResponse(const uint64_t& key) PURE;
+  virtual HazelcastResponsePtr getResponse(const uint64_t key) PURE;
 
   /// Common
 
   /**
    * Attempts to lock the given key in the cache. When a key is locked, a lookup
    * can be performed but an insertion or update for the key must be prevented.
-   * @note          Used to prevent multiple insertions or updates from different
-   *                filters at a time.
+   * @note          Used to prevent multiple insertions or updates by different
+   *                contexts at a time.
    * @param key     Key to be locked.
    * @return        True if acquired, false otherwise.
    */
-  virtual bool tryLock(const uint64_t& key) PURE;
+  virtual bool tryLock(const uint64_t key) PURE;
 
   /**
    * Releases the lock for the key.
    * @param     Key to be unlocked
    */
-  virtual void unlock(const uint64_t& key) PURE;
+  virtual void unlock(const uint64_t key) PURE;
 
   /**
-   * Produces a random number which is not necessarily perfect uniform or random.
+   * Produces a random number.
    * @return    Random unsigned long.
-   * @note      Primary use cases for the random number is to generate version
+   * @note      The primary use case for the random number is to generate version
    *            for header and body entries.
    */
   virtual uint64_t random() PURE;
@@ -138,7 +138,7 @@ public:
    * @note      Ignored in UNIFIED mode.
    * @return    Size in bytes for a single body entry configured for the cache
    */
-  const uint64_t& bodySizePerEntry() { return body_partition_size_; };
+  uint64_t bodySizePerEntry() { return body_partition_size_; };
 
   /**
    * @return    Allowed max size in bytes for a response configured for the cache
@@ -146,7 +146,7 @@ public:
    *            than this limit, the first max_body_size_ bytes of the response
    *            will be cached only.
    */
-  const uint64_t& maxBodySize() { return max_body_size_; };
+  uint64_t maxBodySize() { return max_body_size_; };
 
   /**
    * Generates a unique signed key for an unsigned one.
@@ -154,7 +154,7 @@ public:
    * @return                Signed unique key
    * @note                  Hazelcast client accepts signed keys only.
    */
-  inline int64_t mapKey(const uint64_t& unsigned_key) {
+  inline int64_t mapKey(const uint64_t unsigned_key) {
     // The reason for not static casting directly is a possible overflow
     // for int64 on intermediate step for -2^63.
     int64_t signed_key;
@@ -174,7 +174,7 @@ public:
    *                body for key 1 and the 1st order body for key 11 will have
    *                the same map key "111".
    */
-  inline std::string orderedMapKey(const uint64_t& key, const uint64_t& order) {
+  inline std::string orderedMapKey(const uint64_t key, const uint64_t order) {
     return std::to_string(key).append("#").append(std::to_string(order));
   }
 

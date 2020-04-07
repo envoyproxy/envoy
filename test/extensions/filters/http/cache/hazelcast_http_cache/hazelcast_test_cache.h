@@ -63,17 +63,16 @@ public:
   CacheInfo cacheInfo() const override;
 
   // HazelcastCache
-  void putHeader(const uint64_t& key, const HazelcastHeaderEntry& entry) override;
-  void putBody(const uint64_t& key, const uint64_t& order,
-               const HazelcastBodyEntry& entry) override;
-  HazelcastHeaderPtr getHeader(const uint64_t& key) override;
-  HazelcastBodyPtr getBody(const uint64_t& key, const uint64_t& order) override;
+  void putHeader(const uint64_t key, const HazelcastHeaderEntry& entry) override;
+  void putBody(const uint64_t key, const uint64_t order, const HazelcastBodyEntry& entry) override;
+  HazelcastHeaderPtr getHeader(const uint64_t key) override;
+  HazelcastBodyPtr getBody(const uint64_t key, const uint64_t order) override;
   void onMissingBody(uint64_t key, int32_t version, uint64_t body_size) override;
   void onVersionMismatch(uint64_t key, int32_t version, uint64_t body_size) override;
-  void putResponseIfAbsent(const uint64_t& key, const HazelcastResponseEntry& entry) override;
-  HazelcastResponsePtr getResponse(const uint64_t& key) override;
-  bool tryLock(const uint64_t& key) override;
-  void unlock(const uint64_t& key) override;
+  void putResponseIfAbsent(const uint64_t key, const HazelcastResponseEntry& entry) override;
+  HazelcastResponsePtr getResponse(const uint64_t key) override;
+  bool tryLock(const uint64_t key) override;
+  void unlock(const uint64_t key) override;
   uint64_t random() override;
 
 private:
@@ -91,6 +90,7 @@ private:
   std::vector<uint64_t> responseLocks;
 
   bool connected_ = false;
+  uint32_t random_counter_ = 0;
 };
 
 /**

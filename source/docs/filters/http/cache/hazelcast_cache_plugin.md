@@ -1,4 +1,6 @@
-# Hazelcast Http Cache Plugin
+### Hazelcast Http Cache Plugin
+Work in Progress--Cache filter has not implemented features. The corresponding ones are not ready for the plugin too.
+
 Hazelcast Http Cache provides a pluggable storage implementation backed by Hazelcast In Memory Data Grid for the http
 cache filter. Using Hazelcast C++ client, the plugin does not store any http response locally but in a distributed map
 provided by Hazelcast cluster. To enable the cache plugin, the network configuration belongs to a cluster to be
@@ -35,49 +37,137 @@ Hazelcast version 3.12.x is recommended for the server-side.
 
 Before starting the cache plugin, there must be a running Hazelcast cluster. Hazelcast instances might be started
 as a sidecar to Envoy, form up a cluster using Hazelcast Kubernetes plugin, etc. The only information the plugin needs
-will be the addresses and ports of the cluster members and the group name of the cluster. Providing the address of only
-one member in the cluster will be enough for the connection but using more than one is recommended.
+will be the addresses and ports of the cluster members and the group information of the cluster. Providing the address
+of only one member in the cluster will be enough for the connection but using more than one is recommended.
 
-Related links: [Hazelcast Docker](https://hub.docker.com/r/hazelcast/hazelcast/), [Hazelcast Kubernetes Plugin]
+Related links: [Hazelcast Docker Hub](https://hub.docker.com/r/hazelcast/hazelcast/), [Hazelcast Kubernetes Plugin]
 (https://github.com/hazelcast/hazelcast-kubernetes)
 
 ## Configuring Hazelcast cluster for the cache
-Eviction, maximum size, and other related properties for the cache must be configured on the server-side. That is,
-in `hazelcast.xml` before starting the cluster:
-```xml
-<!-- use wildcard for the map name to configure the cache -->
-<map name="<app_prefix>*">
+Eviction, maximum size, and other related properties for the cache must be configured on the server-side
+via programmatic configuration or `hazelcast.xml`.
 
-    <!-- Customizable cache configurations -->
-    <max-size policy="PER_NODE">1000</max-size>
-    <eviction-policy>LFU</eviction-policy>
-    <eviction-percentage>25</eviction-percentage>
-    <time-to-live-seconds>180</time-to-live-seconds>
+ - **Unified Mode**
+
+```xml
+<!-- use wildcard for the map name to configure the cache since the full name is determined by the plugin -->
+<map name="<app_prefix>*uni">
 
     <!--
 
-    NOTE: The plugin is not optimized for max-idle-seconds based
-    eviction hence prefer to use TTL.
+    Customizable http cache configurations.
+    For instance, for the configuration below:
 
-    for more configuration options, see Hazelcast doc:
+    - 25% of the http responses will be evicted according to LRU policy when the map size hits 1000.
+    - Each http responses will live at most 180 seconds in the cache.
+    - If an http responses is not called for the last 90 seconds, it will be evicted immediately regardless of the TTL.
+
+     -->
+    <max-size policy="PER_NODE">1000</max-size>
+    <eviction-percentage>25</eviction-percentage>
+    <eviction-policy>LRU</eviction-policy>
+    <time-to-live-seconds>180</time-to-live-seconds>
+    <max-idle-seconds>90</max-idle-seconds>
+
+    <!--
+
+    For more configuration options, see Hazelcast doc:
 
     https://docs.hazelcast.org/docs/3.12.6/manual/html-single/index.html#map
 
     OBJECT in-memory format will not have any advantage but extra serialization cost here. Setting it to
-    BINARY is the best fit for
-    the plugin.
+    BINARY is the best fit for the plugin. The two configurations below are also the default values.
 
     -->
     <in-memory-format>BINARY</in-memory-format>
     <statistics-enabled>true</statistics-enabled>
 </map>
 ```
+
+ - **Divided Mode**
+
+```xml
+<!-- use wildcard for the map name to configure the cache since the full name is determined by the plugin.default -->
+<map name="<app_prefix>*div">
+
+    <!--
+
+    Customizable http cache configurations for header map. The properties below will determine the
+    characteristics of the http cache, not only response headers cache.
+
+    For instance, for the configuration below:
+
+    - 25% of the http responses will be evicted according to LRU policy when the map size hits 100.
+    - Each http responses will live at most 180 seconds in the cache.
+
+    NOTE: Although works fine, divided mode is not optimized for idle-time based eviction.
+
+     -->
+    <max-size policy="PER_NODE">100</max-size>
+    <eviction-percentage>25</eviction-percentage>
+    <eviction-policy>LRU</eviction-policy>
+    <time-to-live-seconds>180</time-to-live-seconds>
+
+    <!--
+
+    For more configuration options, see Hazelcast doc:
+
+    https://docs.hazelcast.org/docs/3.12.6/manual/html-single/index.html#map
+
+    OBJECT in-memory format will not have any advantage but extra serialization cost here. Setting it to
+    BINARY is the best fit for the plugin. The two configurations below are also the default values.
+
+    -->
+    <in-memory-format>BINARY</in-memory-format>
+    <statistics-enabled>true</statistics-enabled>
+</map>
+
+<map name="<app_prefix>*body">
+
+    <!--
+
+    Customizable http cache configurations for body map.
+
+    Do not set the cache configuration here. Instead, configure `<app_prefix>*div` first and set
+    the properties here accordingly.
+
+    - Do not use max-size configuration here. They will be evicted according to TTL when their header is evicted.
+      Instead, the max size is (indirectly) ensured with max allowed body size configuration along with the partition
+      size.
+    - Use the same eviction configuration with the header map.
+    - Keep TTL slightly longer than the header map (i.e. 15 seconds).
+
+    NOTE: Although works fine, divided mode is not optimized for idle-time based eviction.
+
+     -->
+    <max-size policy="PER_NODE">0</max-size>
+    <eviction-percentage>25</eviction-percentage>
+    <eviction-policy>LRU</eviction-policy>
+    <time-to-live-seconds>195</time-to-live-seconds>
+
+    <!--
+
+    OBJECT in-memory format will not have any advantage but extra serialization cost here. Setting it to
+    BINARY is the best fit for the plugin. The two configurations below are also the default values.
+
+    Statistics of this map will not have meaningful information about the cache and can be disabled if not needed.
+    However, it might be useful to observe how the configured `partition_size` fits for the cached responses.
+
+    -->
+    <in-memory-format>BINARY</in-memory-format>
+    <statistics-enabled>false</statistics-enabled>
+</map>
+```
+
 When one of the clients connected to the cluster loses its connection, if the client has acquired the lock for a
 key, this will cause this key to be unusable. To prevent such a scenario in a possible connection failure, the
-maximum time limit for the locks should be set on the server-side (not necessarily to be 60 seconds):
+maximum time limit for the locks should be set on the server-side (not necessarily to be 60 seconds). The default
+value for this property is `Long.MAX`. Hence, if it is not set, on a connection failure a locked key will
+be unusable permanently:
 ```xml
 <properties>
     ...
+    <!-- required for both of the cache modes -->
     <property name="hazelcast.lock.max.lease.time.seconds">60</property>
     ...
 </properties>

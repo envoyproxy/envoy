@@ -13,9 +13,9 @@ using envoy::source::extensions::filters::http::cache::HazelcastHttpCacheConfig;
 class ConfigUtilsTest : public testing::Test {
 protected:
   uint64_t defaultPartitionSize() { return ConfigUtil::DEFAULT_PARTITION_SIZE; }
-  uint64_t maxPartitionSize() { return ConfigUtil::MAX_PARTITION_SIZE; }
-  uint64_t maxUnifiedBodySize() { return ConfigUtil::MAX_UNIFIED_BODY_SIZE; }
-  uint64_t maxDividedBodySize() { return ConfigUtil::MAX_DIVIDED_BODY_SIZE; }
+  uint64_t maxPartitionSize() { return ConfigUtil::MAX_ALLOWED_PARTITION_SIZE; }
+  uint64_t maxUnifiedBodySize() { return ConfigUtil::MAX_ALLOWED_UNIFIED_BODY_SIZE; }
+  uint64_t defaultMaxDividedBodySize() { return ConfigUtil::DEFAULT_MAX_DIVIDED_BODY_SIZE; }
   uint32_t defaultConnectionTimeoutMs() { return ConfigUtil::DEFAULT_CONNECTION_TIMEOUT_MS; }
   uint32_t defaultConnectionAttemptLimit() { return ConfigUtil::DEFAULT_CONNECTION_ATTEMPT_LIMIT; }
   uint32_t defaultConnectionAttemptPeriodMs() {
@@ -35,17 +35,27 @@ TEST_F(ConfigUtilsTest, ValidPartitionSizeTest) {
 }
 
 TEST_F(ConfigUtilsTest, ValidMaxBodySizeTest) {
-  auto validateBodySizeTest = [this](bool unified) {
-    uint64_t max_size = unified ? maxUnifiedBodySize() : maxDividedBodySize();
-    uint64_t valid_value = ConfigUtil::validMaxBodySize(0, unified);
+  {
+    // unified
+    uint64_t max_size = maxUnifiedBodySize();
+    uint64_t valid_value = ConfigUtil::validMaxBodySize(0, true);
     EXPECT_EQ(max_size, valid_value);
-    valid_value = ConfigUtil::validMaxBodySize(max_size + 1, unified);
+    valid_value = ConfigUtil::validMaxBodySize(max_size + 1, true);
     EXPECT_EQ(max_size, valid_value);
-    valid_value = ConfigUtil::validMaxBodySize(max_size - 1, unified);
+    valid_value = ConfigUtil::validMaxBodySize(max_size - 1, true);
     EXPECT_EQ(max_size - 1, valid_value);
-  };
-  validateBodySizeTest(true);
-  validateBodySizeTest(false);
+  }
+  {
+    // divided
+    uint64_t default_max_size = defaultMaxDividedBodySize();
+    uint64_t valid_value = ConfigUtil::validMaxBodySize(0, false);
+    EXPECT_EQ(default_max_size, valid_value);
+    valid_value = ConfigUtil::validMaxBodySize(default_max_size + 1, false);
+    // there is no upper limit for the configured max body size in divided mode.
+    EXPECT_EQ(default_max_size + 1, valid_value);
+    valid_value = ConfigUtil::validMaxBodySize(default_max_size - 1, false);
+    EXPECT_EQ(default_max_size - 1, valid_value);
+  }
 }
 
 TEST_F(ConfigUtilsTest, ClientConfigTest) {
@@ -63,6 +73,8 @@ TEST_F(ConfigUtilsTest, ClientConfigTest) {
 
   hazelcast::client::ClientConfig config = ConfigUtil::getClientConfig(default_cache_config);
 
+  // Defaults below are not defined by Hazelcast but the cache plugin. So, the below statements
+  // test if plugin sets the Hazelcast client configuration properly.
   EXPECT_EQ(defaultConnectionTimeoutMs(), config.getNetworkConfig().getConnectionTimeout());
   EXPECT_EQ(defaultConnectionAttemptLimit(), config.getNetworkConfig().getConnectionAttemptLimit());
   EXPECT_EQ(defaultConnectionAttemptPeriodMs(),

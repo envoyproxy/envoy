@@ -1,6 +1,6 @@
-#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_context.h"
-
 #include "test/extensions/filters/http/cache/hazelcast_http_cache/hazelcast_test_cache.h"
+
+#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -74,19 +74,18 @@ void HazelcastTestableLocalCache::updateHeaders(LookupContextPtr&& lookup_contex
 
 CacheInfo HazelcastTestableLocalCache::cacheInfo() const { return CacheInfo(); }
 
-void HazelcastTestableLocalCache::putHeader(const uint64_t& key,
-                                            const HazelcastHeaderEntry& entry) {
+void HazelcastTestableLocalCache::putHeader(const uint64_t key, const HazelcastHeaderEntry& entry) {
   checkConnection();
   headerMap[mapKey(key)] = HazelcastHeaderPtr(new HazelcastHeaderEntry(entry));
 }
 
-void HazelcastTestableLocalCache::putBody(const uint64_t& key, const uint64_t& order,
+void HazelcastTestableLocalCache::putBody(const uint64_t key, const uint64_t order,
                                           const HazelcastBodyEntry& entry) {
   checkConnection();
   bodyMap[orderedMapKey(key, order)] = HazelcastBodyPtr(new HazelcastBodyEntry(entry));
 }
 
-HazelcastHeaderPtr HazelcastTestableLocalCache::getHeader(const uint64_t& key) {
+HazelcastHeaderPtr HazelcastTestableLocalCache::getHeader(const uint64_t key) {
   checkConnection();
   auto result = headerMap.find(mapKey(key));
   if (result != headerMap.end()) {
@@ -97,7 +96,7 @@ HazelcastHeaderPtr HazelcastTestableLocalCache::getHeader(const uint64_t& key) {
   }
 }
 
-HazelcastBodyPtr HazelcastTestableLocalCache::getBody(const uint64_t& key, const uint64_t& order) {
+HazelcastBodyPtr HazelcastTestableLocalCache::getBody(const uint64_t key, const uint64_t order) {
   checkConnection();
   auto result = bodyMap.find(orderedMapKey(key, order));
   if (result != bodyMap.end()) {
@@ -128,7 +127,7 @@ void HazelcastTestableLocalCache::onVersionMismatch(uint64_t key, int32_t versio
   onMissingBody(key, version, body_size);
 }
 
-void HazelcastTestableLocalCache::putResponseIfAbsent(const uint64_t& key,
+void HazelcastTestableLocalCache::putResponseIfAbsent(const uint64_t key,
                                                       const HazelcastResponseEntry& entry) {
   checkConnection();
   if (responseMap.find(mapKey(key)) != responseMap.end()) {
@@ -137,7 +136,7 @@ void HazelcastTestableLocalCache::putResponseIfAbsent(const uint64_t& key,
   responseMap[mapKey(key)] = HazelcastResponsePtr(new HazelcastResponseEntry(entry));
 }
 
-HazelcastResponsePtr HazelcastTestableLocalCache::getResponse(const uint64_t& key) {
+HazelcastResponsePtr HazelcastTestableLocalCache::getResponse(const uint64_t key) {
   checkConnection();
   auto result = responseMap.find(mapKey(key));
   if (result != responseMap.end()) {
@@ -147,7 +146,7 @@ HazelcastResponsePtr HazelcastTestableLocalCache::getResponse(const uint64_t& ke
   }
 }
 
-bool HazelcastTestableLocalCache::tryLock(const uint64_t& key) {
+bool HazelcastTestableLocalCache::tryLock(const uint64_t key) {
   checkConnection();
   if (unified_) {
     bool locked = std::find(responseLocks.begin(), responseLocks.end(), key) != responseLocks.end();
@@ -168,7 +167,7 @@ bool HazelcastTestableLocalCache::tryLock(const uint64_t& key) {
   }
 }
 
-void HazelcastTestableLocalCache::unlock(const uint64_t& key) {
+void HazelcastTestableLocalCache::unlock(const uint64_t key) {
   checkConnection();
   if (unified_) {
     responseLocks.erase(std::remove(responseLocks.begin(), responseLocks.end(), key),
@@ -178,7 +177,7 @@ void HazelcastTestableLocalCache::unlock(const uint64_t& key) {
   }
 }
 
-uint64_t HazelcastTestableLocalCache::random() { return std::rand(); }
+uint64_t HazelcastTestableLocalCache::random() { return ++random_counter_; }
 
 } // namespace HazelcastHttpCache
 } // namespace Cache

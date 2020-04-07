@@ -36,7 +36,7 @@ TEST_F(HazelcastUnifiedCacheTest, AbortUnifiedInsertionWhenMaxSizeReached) {
         [&](bool ready) { ready_for_next = ready; }, false);
   }
 
-  EXPECT_TRUE(expectLookupSuccessWithBody(
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(
       lookup(RequestPath).get(), std::string(HazelcastTestUtil::TEST_MAX_BODY_SIZE, 'h')));
 }
 
@@ -54,12 +54,12 @@ TEST_F(HazelcastUnifiedCacheTest, PutResponseOnlyWhenAbsent) {
 
   // The second context should insert if the cache is empty for this request.
   insert(move(lookup_context1), getResponseHeaders(), Body1);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath).get(), Body1));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath).get(), Body1));
 
   // The first context should not do the insertion/override the existing value.
   insert(move(lookup_context2), getResponseHeaders(), Body2);
   // Response body must remain as Body1
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath).get(), Body1));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath).get(), Body1));
 }
 
 TEST_F(HazelcastUnifiedCacheTest, DoNotOverrideExistingResponse) {
@@ -77,7 +77,7 @@ TEST_F(HazelcastUnifiedCacheTest, DoNotOverrideExistingResponse) {
   insert(move(lookup_context2), getResponseHeaders(), Body2);
 
   lookup_context1 = lookup(RequestPath1);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup_context1.get(), Body1));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context1.get(), Body1));
 }
 
 TEST_F(HazelcastUnifiedCacheTest, UnifiedHeaderOnlyResponse) {
@@ -101,7 +101,7 @@ TEST_F(HazelcastUnifiedCacheTest, MissUnifiedLookupOnDifferentKey) {
   const std::string Body("hazelcast");
   insert(move(lookup_context), getResponseHeaders(), Body);
   lookup_context = lookup(RequestPath);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup_context.get(), Body));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context.get(), Body));
 
   // Manipulate the cache entry directly. Cache is not aware of that.
   // The cached key will not be the same with the created one by filter.
@@ -132,7 +132,7 @@ TEST_F(HazelcastUnifiedCacheTest, AbortUnifiedOperationsWhenOffline) {
   const std::string Body("s", HazelcastTestUtil::TEST_PARTITION_SIZE);
   insert(move(lookup_context1), getResponseHeaders(), Body);
   lookup_context1 = lookup(RequestPath1);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup_context1.get(), Body));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context1.get(), Body));
 
   cache_->dropTestConnection();
 
@@ -143,7 +143,7 @@ TEST_F(HazelcastUnifiedCacheTest, AbortUnifiedOperationsWhenOffline) {
   cache_->restoreTestConnection();
 
   lookup_context1 = lookup(RequestPath1);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup_context1.get(), Body));
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context1.get(), Body));
 }
 
 } // namespace HazelcastHttpCache

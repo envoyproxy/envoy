@@ -119,8 +119,8 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "3c43c81135e415ce708486564dc125bde93c2c9f8965d5af4b603ec91ff52f6e",
         strip_prefix = "hazelcast-cpp-client-3.12.1",
         # Using non official tarball due to missing submodule files in the official release.
-        # TODO(enozcan): Official tar can be used with a solution to init&update submodules
-        urls = ["https://github.com/enozcan/envoy/raw/hazelcast_tarball/hazelcast-cpp-client-3.12.1.zip"],
+        # TODO(enozcan): Use official release with init & updating submodules
+        urls = ["https://github.com/enozcan/envoy-hazelcast-cpp-client/raw/master/hazelcast-cpp-client-3.12.1.zip"],
     ),
     com_github_luajit_luajit = dict(
         sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
