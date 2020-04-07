@@ -4,7 +4,7 @@ licenses(["notice"])  # Apache 2
 
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
-# This track active development versions of protos.
+# This tracks active development versions of protos.
 proto_library(
     name = "active_protos",
     visibility = ["//visibility:public"],
@@ -122,5 +122,13 @@ proto_library(
         "//envoy/type/matcher:pkg",
         "//envoy/type/metadata/v2:pkg",
         "//envoy/type/tracing/v2:pkg",
+    ],
+)
+
+# This tracks frozen versions of protos.
+proto_library(
+    name = "frozen_protos",
+    visibility = ["//visibility:public"],
+    deps = [
     ],
 )
