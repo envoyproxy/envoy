@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Compressor {
 
 /**
- * Compressor state whether to not flush, flush or to finish the compression stream.
+ * Compressor state whether to flush, no flush or to finish the compression stream.
  */
 enum class State { Flush, Finish, NoFlush };
 
