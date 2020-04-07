@@ -237,6 +237,16 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
   EXPECT_EQ(&headers, stream_info.getRequestHeaders());
 }
 
+TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
+  StreamInfoImpl stream_info(test_time_.timeSystem());
+  EXPECT_TRUE(stream_info.getRequestIDExtension());
+
+  Http::RequestHeaderMapImpl headers;
+  uint64_t out = 123;
+  EXPECT_FALSE(stream_info.getRequestIDExtension()->modBy(headers, out, 10000));
+  EXPECT_EQ(out, 123);
+}
+
 } // namespace
 } // namespace StreamInfo
 } // namespace Envoy
