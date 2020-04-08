@@ -61,6 +61,8 @@ def _python_deps():
     _repository_impl(
         name = "com_github_twitter_common_rpc",
         build_file = "@envoy//bazel/external:twitter_common_rpc.BUILD",
+        patch_args = ["-p2"],
+        patches = ["@envoy//bazel:twitter_common_rpc.patch"],
     )
     _repository_impl(
         name = "com_github_twitter_common_finagle_thrift",

@@ -1,0 +1,33 @@
+diff -Naur twitter.common.rpc-0.3.9/src/twitter/common/rpc/address.py twitter.common.rpc-0.3.9-new/src/twitter/common/rpc/address.py
+--- a/src/twitter/common/rpc/address.py	2015-12-08 04:58:41.000000000 +0000
++++ b/src/twitter/common/rpc/address.py	2020-04-08 16:16:56.000000000 +0000
+@@ -8,7 +8,7 @@
+   def sanity_check(host, port):
+     if not isinstance(host, Compatibility.string):
+       raise Address.InvalidFormat('Host must be a string, got %s' % host)
+-    if not isinstance(port, (int, long)):
++    if not isinstance(port, int):
+       raise Address.InvalidFormat('Port must be an integer, got %s' % port)
+     if port <= 0:
+       raise Address.InvalidFormat('Port must be a positive integer, got %s' % port)
+@@ -29,7 +29,7 @@
+   @staticmethod
+   def from_pair(*args, **kw):
+     if (kw or len(args) != 2 or not isinstance(args[0], Compatibility.string)
+-        or not isinstance(args[1], (int, long))):
++        or not isinstance(args[1], int)):
+       raise Address.InvalidFormat('from_pair expects host, port as input!')
+     Address.sanity_check(args[0], args[1])
+     return Address(args[0], args[1])
+diff -Naur twitter.common.rpc-0.3.9/src/twitter/common/rpc/finagle/trace.py twitter.common.rpc-0.3.9-new/src/twitter/common/rpc/finagle/trace.py
+--- a/src/twitter/common/rpc/finagle/trace.py	2015-12-08 04:58:41.000000000 +0000
++++ b/src/twitter/common/rpc/finagle/trace.py	2020-04-08 16:17:11.000000000 +0000
+@@ -33,7 +33,7 @@
+     if isinstance(value, str):
+       if SpanId.HEX_REGEX.match(value):
+         return SpanId(int(value, 16))
+-    elif isinstance(value, (int, long)):
++    elif isinstance(value, int):
+       return SpanId(value)
+     elif isinstance(value, SpanId):
+       return SpanId(value.value)

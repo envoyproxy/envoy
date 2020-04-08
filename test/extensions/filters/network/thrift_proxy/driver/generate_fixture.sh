@@ -6,6 +6,9 @@
 
 set -e
 
+# enable utf-8 in python
+export LANG=en_US.UTF-8
+
 function usage() {
     echo "Usage: $0 <mode> <transport> <protocol> -s [multiplex-service] -H [headers] method [param...]"
     echo "where mode is success, exception, or idl-exception"
