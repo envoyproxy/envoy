@@ -462,8 +462,8 @@ Dispatcher::DirectStreamSharedPtr Dispatcher::getStream(envoy_stream_t stream) {
 }
 
 void Dispatcher::cleanup(envoy_stream_t stream_handle) {
-  ASSERT(TS_UNCHECKED_READ(event_dispatcher_)->isThreadSafe(),
-         "stream cleanup must be performed on the event_dispatcher_'s thread.");
+  RELEASE_ASSERT(TS_UNCHECKED_READ(event_dispatcher_)->isThreadSafe(),
+                 "stream cleanup must be performed on the event_dispatcher_'s thread.");
   Dispatcher::DirectStreamSharedPtr direct_stream = getStream(stream_handle);
   RELEASE_ASSERT(direct_stream,
                  "cleanup is a private method that is only called with stream ids that exist");
