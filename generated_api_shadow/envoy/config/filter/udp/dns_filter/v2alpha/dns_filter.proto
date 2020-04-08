@@ -5,6 +5,8 @@ package envoy.config.filter.udp.dns_filter.v2alpha;
 import "envoy/api/v2/core/base.proto";
 import "envoy/data/dns/v2alpha/dns_table.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -40,9 +42,32 @@ message DnsFilterConfig {
     }
   }
 
+  // This message contains the configuration for the Dns Filter operating
+  // in a client context. This message will contain the timeouts, retry,
+  // and forwarding configuration for Envoy to make DNS requests to other
+  // resolvers
+  message ClientContextConfig {
+    // Enable forwarding of the query to an upstream DNS server
+    bool forward_query = 1;
+
+    // Sets the maximum time we will wait for the upstream query to complete
+    // We allow 5 ms for the upstream resolution to complete, so the minimum
+    // value here is 5
+    google.protobuf.Duration resolver_timeout = 2 [(validate.rules).duration = {gt {}}];
+
+    // A list of DNS servers to which we can forward queries
+    repeated string upstream_resolvers = 3 [(validate.rules).repeated = {
+      min_items: 1
+      items {string {min_len: 3}}
+    }];
+  }
+
   // The stat prefix used when emitting DNS filter statistics
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // Server context configuration
   ServerContextConfig server_config = 2;
+
+  // Client context configuration
+  ClientContextConfig client_config = 3;
 }
