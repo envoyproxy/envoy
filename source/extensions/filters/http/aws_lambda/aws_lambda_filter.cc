@@ -182,7 +182,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   sigv4_signer_->sign(headers, hash);
   decoder_callbacks_->addDecodedData(json_buf, false);
   return Http::FilterHeadersStatus::Continue;
-} // namespace AwsLambdaFilter
+}
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
   if (skip_ || end_stream) {
