@@ -406,6 +406,7 @@ def checkCurrentReleaseNotes(file_path, error_messages):
   first_word_of_prior_line = ''
   next_word_to_check = ''  # first word after :
   for line_number, line in enumerate(readLines(file_path)):
+
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
@@ -424,16 +425,18 @@ def checkCurrentReleaseNotes(file_path, error_messages):
         reportError("Version history line malformed. "
                     "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" % line)
       else:
-        first_word = match.groups()[0];
-        next_word = match.groups()[1];
+        first_word = match.groups()[0]
+        next_word = match.groups()[1]
         if first_word_of_prior_line and first_word_of_prior_line > first_word:
-          reportError("Version history not in alphabetical order (%s vs %s): please check placement of line\n %s. "
-                      % (first_word_of_prior_line, first_word, line))
+          reportError(
+              "Version history not in alphabetical order (%s vs %s): please check placement of line\n %s. "
+              % (first_word_of_prior_line, first_word, line))
         if first_word_of_prior_line == first_word and next_word_to_check and next_word_to_check > next_word:
-          reportError("Version history not in alphabetical order (%s vs %s): please check placement of line\n %s. "
-                      % (next_word_to_check, next_word, line))
-        first_word_of_prior_line = first_word;
-        next_word_to_check = next_word;
+          reportError(
+              "Version history not in alphabetical order (%s vs %s): please check placement of line\n %s. "
+              % (next_word_to_check, next_word, line))
+        first_word_of_prior_line = first_word
+        next_word_to_check = next_word
 
 
 def checkFileContents(file_path, checker):
