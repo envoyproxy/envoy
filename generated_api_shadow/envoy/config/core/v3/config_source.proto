@@ -136,7 +136,7 @@ message RateLimitSettings {
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.ConfigSource";
 
@@ -158,12 +158,12 @@ message ConfigSource {
   // API configuration source.
   ApiVersion resource_api_version = 6 [(validate.rules).enum = {defined_only: true}];
 
+  // When set, ADS will be used to fetch resources. The ADS API configuration
+  // source in the bootstrap configuration is used.
+  string namespace = 7;
+
   oneof config_source_specifier {
     option (validate.required) = true;
-
-    // When set, ADS will be used to fetch resources. The ADS API configuration
-    // source in the bootstrap configuration is used.
-    string path = 1;
 
     // [#not-implemented-hide:]
     // When set, the client will access the resources from the same server it got the
@@ -176,7 +176,7 @@ message ConfigSource {
     // [#next-major-version: In xDS v3, consider replacing the ads field with this one, since
     // this field can implicitly mean to use the same stream in the case where the ConfigSource
     // is provided via ADS and the specified data can also be obtained via ADS.]
-    ApiConfigSource api_config_source = 2;
+    string path = 1;
 
     // When this timeout is specified, Envoy will wait no longer than the specified time for first
     // config response on this xDS subscription during the :ref:`initialization process
@@ -185,11 +185,16 @@ message ConfigSource {
     // when the xDS API subscription starts, and is disarmed on first config update or on error. 0
     // means no timeout - Envoy will wait indefinitely for the first xDS config (unless another
     // timeout applies). The default is 15s.
-    AggregatedConfigSource ads = 3;
+    ApiConfigSource api_config_source = 2;
 
     // API version for xDS resources. This implies the type URLs that the client
     // will request for resources and the resource type that the client will in
     // turn expect to be delivered.
+    AggregatedConfigSource ads = 3;
+
+    // Identifies the resource namespace used on any subscription from this
+    // *ConfigSource*. See the xDS protocol specification for further details on
+    // :ref:`resource namespaces <xds_protocol_resource_names>`.
     SelfConfigSource self = 5;
   }
 }

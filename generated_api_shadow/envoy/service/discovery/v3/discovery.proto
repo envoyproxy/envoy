@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // A DiscoveryRequest requests a set of versioned resources of the same type for
 // a given Envoy node on some API.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DiscoveryRequest";
 
@@ -42,6 +42,14 @@ message DiscoveryRequest {
   // will then imply a number of resources that need to be fetched via EDS/RDS,
   // which will be explicitly enumerated in resource_names.
   repeated string resource_names = 3;
+
+  // The resource namespace for this subscription. When *resource_names* is
+  // empty, this will be used by the management server to determine the set of
+  // resources to deliver. If *resource_names* is non-empty, all named resources
+  // must be prefixed with *namespace*. See the xDS protocol specification for
+  // further details on :ref:`resource namespaces
+  // <xds_protocol_resource_names>`.
+  string namespace = 7;
 
   // Type of the resource that is being requested, e.g.
   // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment". This is implicit
@@ -140,7 +148,7 @@ message DiscoveryResponse {
 // In particular, initial_resource_versions being sent at the "start" of every
 // gRPC stream actually entails a message for each type_url, each with its own
 // initial_resource_versions.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message DeltaDiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DeltaDiscoveryRequest";
 
@@ -176,6 +184,15 @@ message DeltaDiscoveryRequest {
 
   // A list of Resource names to remove from the list of tracked resources.
   repeated string resource_names_unsubscribe = 4;
+
+  // The resource namespace for this subscription. This will be used by the
+  // management server to determine the set of resources to deliver where there
+  // is no explicit resource subscription from the client. If
+  // *resource_names_subscribe* or *resource_name_unsubscribe* are non-empty,
+  // all named resources must be prefixed with *namespace*. See the xDS protocol
+  // specification for further details on :ref:`resource namespaces
+  // <xds_protocol_resource_names>`.
+  string namespace = 8;
 
   // Informs the server of the versions of the resources the xDS client knows of, to enable the
   // client to continue the same logical xDS session even in the face of gRPC stream reconnection.

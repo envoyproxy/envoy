@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // A DiscoveryRequest requests a set of versioned resources of the same type for
 // a given Envoy node on some API.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DiscoveryRequest";
 
@@ -148,7 +148,7 @@ message DiscoveryResponse {
 // In particular, initial_resource_versions being sent at the "start" of every
 // gRPC stream actually entails a message for each type_url, each with its own
 // initial_resource_versions.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message DeltaDiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DeltaDiscoveryRequest";
 

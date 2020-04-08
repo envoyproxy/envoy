@@ -138,7 +138,7 @@ message RateLimitSettings {
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.ConfigSource";
 
@@ -194,4 +194,9 @@ message ConfigSource {
   // will request for resources and the resource type that the client will in
   // turn expect to be delivered.
   ApiVersion resource_api_version = 6 [(validate.rules).enum = {defined_only: true}];
+
+  // Identifies the resource namespace used on any subscription from this
+  // *ConfigSource*. See the xDS protocol specification for further details on
+  // :ref:`resource namespaces <xds_protocol_resource_names>`.
+  string namespace = 7;
 }
