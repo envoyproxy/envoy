@@ -81,15 +81,16 @@ enum class InvocationMode { Synchronous, Asynchronous };
 
 class FilterSettings : public Router::RouteSpecificFilterConfig {
 public:
-  FilterSettings(const std::string& arn, InvocationMode mode, bool payload_passthrough)
+  FilterSettings(const Arn& arn, InvocationMode mode, bool payload_passthrough)
       : arn_(arn), invocation_mode_(mode), payload_passthrough_(payload_passthrough) {}
 
-  const std::string& arn() const { return arn_; }
+  const Arn& arn() const& { return arn_; }
+  Arn&& arn() && { return std::move(arn_); }
   bool payloadPassthrough() const { return payload_passthrough_; }
   InvocationMode invocationMode() const { return invocation_mode_; }
 
 private:
-  std::string arn_;
+  Arn arn_;
   InvocationMode invocation_mode_;
   bool payload_passthrough_;
 };
@@ -111,7 +112,7 @@ public:
    * and general filter configuration. Ultimately, the most specific configuration wins.
    * @return error message if settings are invalid. Otherwise, empty string.
    */
-  std::string resolveSettings();
+  void resolveSettings();
   FilterStats& stats() { return stats_; }
 
   /**

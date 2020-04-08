@@ -134,20 +134,15 @@ absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
   return *settings;
 }
 
-std::string Filter::resolveSettings() {
+void Filter::resolveSettings() {
   if (auto route_settings = getRouteSpecificSettings()) {
-    auto route_arn = parseArn(route_settings->arn());
-    // The ARN should always be valid. If the ARN is invalid, the filter factory throws an
-    // exception (effectively NACK-ing the configuration when coming from xDS).
-    RELEASE_ASSERT(route_arn.has_value(), "aws_lambda_filter: Invalid route-specific Lambda ARN");
-    arn_.swap(route_arn);
     payload_passthrough_ = route_settings->payloadPassthrough();
     invocation_mode_ = route_settings->invocationMode();
+    arn_ = std::move(route_settings)->arn();
   } else {
     payload_passthrough_ = settings_.payloadPassthrough();
     invocation_mode_ = settings_.invocationMode();
   }
-  return {};
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
@@ -158,20 +153,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::Continue;
   }
 
-  const auto err = resolveSettings();
-
-  if (!err.empty()) {
-    skip_ = true;
-    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, err, nullptr /*modify_headers*/,
-                                       absl::nullopt /*grpc_status*/, "" /*details*/);
-    return Http::FilterHeadersStatus::StopIteration;
-  }
+  resolveSettings();
 
   if (!arn_) {
-    arn_ = parseArn(settings_.arn());
-    // The ARN should always be valid. If the ARN is invalid, the filter factory throws an exception
-    // (effectively NACK-ing the configuration when coming from xDS).
-    RELEASE_ASSERT(arn_.has_value(), "aws_lambda_filter: Invalid Lambda ARN");
+    arn_ = settings_.arn();
   }
 
   if (!end_stream) {
