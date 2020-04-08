@@ -90,7 +90,6 @@ envoy_cc_test(
 py_binary(
     name = "capture_fuzz_gen",
     srcs = ["capture_fuzz_gen.py"],
-    licenses = ["notice"],  # Apache 2
     visibility = ["//visibility:public"],
     deps = [
         ":capture_fuzz_proto_py_proto",
