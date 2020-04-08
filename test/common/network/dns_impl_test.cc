@@ -482,13 +482,13 @@ public:
             EXPECT_EQ(expected_results, address_as_string_list);
           }
 
-          for (auto expected_absent_result : expected_absent_results) {
+          for (const auto& expected_absent_result : expected_absent_results) {
             EXPECT_THAT(address_as_string_list, Not(Contains(expected_absent_result)));
           }
 
           if (expected_ttl) {
             std::list<Address::InstanceConstSharedPtr> address_list = getAddressList(results);
-            for (auto address : results) {
+            for (const auto& address : results) {
               EXPECT_EQ(address.ttl_, expected_ttl.value());
             }
           }
