@@ -3,6 +3,9 @@ Version history
 
 1.15.0 (Pending)
 ================
+* tracing: tracing provider configuration as part of :ref:`bootstrap config <envoy_api_field_config.bootstrap.v3.Bootstrap.tracing>`
+  has been deprecated in favor of configuration as part of :ref:`HTTP connection manager
+  <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
 
 1.14.0 (April 8, 2020)
 ======================

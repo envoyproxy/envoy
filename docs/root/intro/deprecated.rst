@@ -12,6 +12,9 @@ Deprecated items below are listed in chronological order.
 
 1.15.0 (Pending)
 ================
+* Tracing provider configuration as part of :ref:`bootstrap config <envoy_api_field_config.bootstrap.v3.Bootstrap.tracing>`
+  has been deprecated in favor of configuration as part of :ref:`HTTP connection manager
+  <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
 
 1.14.0 (April 8, 2020)
 ======================
@@ -106,9 +109,6 @@ Deprecated items below are listed in chronological order.
   `RBAC <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2/rbac.proto>`_ has been deprecated
   in favor of :ref:`direct_remote_ip <envoy_api_field_config.rbac.v2.Principal.direct_remote_ip>` and
   :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>`.
-* Tracing provider configuration as part of :ref:`bootstrap config <envoy_api_field_config.bootstrap.v2.Bootstrap.tracing>`
-  has been deprecated in favor of configuration as part of :ref:`HTTP connection manager
-  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing.provider>`.
 
 1.13.0 (January 20, 2020)
 =========================
