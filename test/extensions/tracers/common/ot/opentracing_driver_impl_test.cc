@@ -61,7 +61,7 @@ public:
   SystemTime start_time_;
 
   std::unique_ptr<TestDriver> driver_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
 
   NiceMock<Tracing::MockConfig> config_;
 };

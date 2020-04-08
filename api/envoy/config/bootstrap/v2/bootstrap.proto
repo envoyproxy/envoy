@@ -25,7 +25,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.bootstrap.v2";
 option java_outer_classname = "BootstrapProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Bootstrap]
 // This proto is supplied via the :option:`-c` CLI flag and acts as the root

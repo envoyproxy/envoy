@@ -23,7 +23,7 @@ option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "BaseProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Common types]
 
@@ -230,6 +230,15 @@ message RuntimeUInt32 {
 
   // Runtime key to get value for comparison. This value is used if defined.
   string runtime_key = 3 [(validate.rules).string = {min_bytes: 1}];
+}
+
+// Runtime derived double with a default when not specified.
+message RuntimeDouble {
+  // Default value if runtime value is not available.
+  double default_value = 1;
+
+  // Runtime key to get value for comparison. This value is used if defined.
+  string runtime_key = 2 [(validate.rules).string = {min_bytes: 1}];
 }
 
 // Runtime derived bool with a default when not specified.
