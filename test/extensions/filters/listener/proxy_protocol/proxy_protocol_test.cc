@@ -77,9 +77,7 @@ public:
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
-  std::chrono::milliseconds listenerFiltersTimeout() const override {
-    return std::chrono::milliseconds();
-  }
+  std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
   bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
@@ -116,7 +114,7 @@ public:
         }));
     conn_->connect();
     if (read) {
-      read_filter_.reset(new NiceMock<Network::MockReadFilter>());
+      read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
       EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
           .WillOnce(Invoke([&](Network::Connection& connection,
                                const std::vector<Network::FilterFactoryCb>&) -> bool {
@@ -1026,9 +1024,7 @@ public:
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
-  std::chrono::milliseconds listenerFiltersTimeout() const override {
-    return std::chrono::milliseconds();
-  }
+  std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
   bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
@@ -1049,7 +1045,7 @@ public:
 
   void connect() {
     conn_->connect();
-    read_filter_.reset(new NiceMock<Network::MockReadFilter>());
+    read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
     EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
         .WillOnce(Invoke([&](Network::Connection& connection,
                              const std::vector<Network::FilterFactoryCb>&) -> bool {
