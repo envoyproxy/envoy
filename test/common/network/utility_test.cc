@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -179,52 +180,52 @@ TEST(NetworkUtility, LocalConnection) {
   EXPECT_CALL(socket, localAddress()).WillRepeatedly(testing::ReturnRef(local_addr));
   EXPECT_CALL(socket, remoteAddress()).WillRepeatedly(testing::ReturnRef(remote_addr));
 
-  local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
-  remote_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
+  local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  remote_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
-  remote_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
+  local_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
+  remote_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
-  remote_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
+  local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  remote_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.2"));
+  local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2");
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4"));
-  remote_addr.reset(new Network::Address::Ipv4Instance("8.8.8.8"));
+  local_addr = std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4");
+  remote_addr = std::make_shared<Network::Address::Ipv4Instance>("8.8.8.8");
   EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4"));
-  remote_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4"));
+  local_addr = std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4");
+  remote_addr = std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4");
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4", 1234));
-  remote_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4", 4321));
+  local_addr = std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4", 1234);
+  remote_addr = std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4", 4321);
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv6Instance("::1"));
-  remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
+  local_addr = std::make_shared<Network::Address::Ipv6Instance>("::1");
+  remote_addr = std::make_shared<Network::Address::Ipv6Instance>("::1");
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv6Instance("::2"));
-  remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
+  local_addr = std::make_shared<Network::Address::Ipv6Instance>("::2");
+  remote_addr = std::make_shared<Network::Address::Ipv6Instance>("::1");
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  remote_addr.reset(new Network::Address::Ipv6Instance("::3"));
+  remote_addr = std::make_shared<Network::Address::Ipv6Instance>("::3");
   EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
 
-  remote_addr.reset(new Network::Address::Ipv6Instance("::2"));
+  remote_addr = std::make_shared<Network::Address::Ipv6Instance>("::2");
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  remote_addr.reset(new Network::Address::Ipv6Instance("::2", 4321));
-  local_addr.reset(new Network::Address::Ipv6Instance("::2", 1234));
+  remote_addr = std::make_shared<Network::Address::Ipv6Instance>("::2", 4321);
+  local_addr = std::make_shared<Network::Address::Ipv6Instance>("::2", 1234);
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  remote_addr.reset(new Network::Address::Ipv6Instance("fd00::"));
+  remote_addr = std::make_shared<Network::Address::Ipv6Instance>("fd00::");
   EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
 }
 

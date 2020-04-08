@@ -255,6 +255,12 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
         "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
         "sent=%BYTES_SENT% received=%BYTES_RECEIVED%\n");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
+    auto* runtime_filter = access_log->mutable_filter()->mutable_runtime_filter();
+    runtime_filter->set_runtime_key("unused-key");
+    auto* percent_sampled = runtime_filter->mutable_percent_sampled();
+    percent_sampled->set_numerator(100);
+    percent_sampled->set_denominator(
+        envoy::type::FractionalPercent::DenominatorType::FractionalPercent_DenominatorType_HUNDRED);
     config_blob->PackFrom(tcp_proxy_config);
   });
   initialize();
@@ -386,7 +392,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
 
 class TcpProxyMetadataMatchIntegrationTest : public TcpProxyIntegrationTest {
 public:
-  void initialize();
+  void initialize() override;
 
   void expectEndpointToMatchRoute();
   void expectEndpointNotToMatchRoute();
@@ -677,7 +683,7 @@ void TcpProxySslIntegrationTest::initialize() {
 
   context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
-  payload_reader_.reset(new WaitForPayloadReader(*dispatcher_));
+  payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 }
 
 void TcpProxySslIntegrationTest::setupConnections() {

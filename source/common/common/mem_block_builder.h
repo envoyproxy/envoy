@@ -27,7 +27,7 @@ public:
   // Constructs a MemBlockBuilder allowing for 'capacity' instances of T.
   explicit MemBlockBuilder(uint64_t capacity)
       : data_(std::make_unique<T[]>(capacity)), write_span_(data_.get(), capacity) {}
-  MemBlockBuilder() {}
+  MemBlockBuilder() = default;
 
   /**
    * Allocates (or reallocates) memory for the MemBlockBuilder to make it the
