@@ -503,7 +503,16 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
   }
 
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  return Http::FilterHeadersStatus::StopIteration;
+
+  if (!method_->descriptor_->server_streaming()) {
+    return Http::FilterHeadersStatus::StopIteration;
+  } else if (method_->response_type_is_http_body_) {
+    // Streaming + HttpBody msg: let encodeHeaders() add ContentType based
+    // on HttpBody.content_type
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
