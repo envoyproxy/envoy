@@ -93,10 +93,10 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
   [VERSION](VERSION).**
 * Create a branch from the tagged release, e.g. "release/v1.6". It will be used for the
   [stable releases](RELEASES.md#stable-releases).
-* Monitor the CircleCI tag build to make sure that the final docker images get pushed along with
+* Monitor the AZP tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
   [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
-* Contact rdl@ on Slack so that the website can be updated for the new release.
+* Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the
   Envoy account post).

@@ -10,6 +10,9 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 Deprecated items below are listed in chronological order.
 
+1.15.0 (Pending)
+================
+
 1.14.0 (April 8, 2020)
 ======================
 * The previous behavior for upstream connection pool circuit breaking described
