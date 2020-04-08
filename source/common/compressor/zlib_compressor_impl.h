@@ -34,9 +34,9 @@ public:
    * manual.
    */
   enum class CompressionLevel : int64_t {
-    Best = 9,
-    Speed = 1,
-    Standard = -1,
+    Best = Z_BEST_COMPRESSION,
+    Speed = Z_BEST_SPEED,
+    Standard = Z_DEFAULT_COMPRESSION,
   };
 
   /**
@@ -47,10 +47,10 @@ public:
    * standard: used for normal data. (default) @see Z_DEFAULT_STRATEGY in zlib manual.
    */
   enum class CompressionStrategy : uint64_t {
-    Filtered = 1,
-    Huffman = 2,
-    Rle = 3,
-    Standard = 4,
+    Filtered = Z_FILTERED,
+    Huffman = Z_HUFFMAN_ONLY,
+    Rle = Z_RLE,
+    Standard = Z_DEFAULT_STRATEGY,
   };
 
   /**

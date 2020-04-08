@@ -95,6 +95,9 @@ Version history
   restart Envoy. The behavior will not switch until the connection pools are recreated. The new
   circuit breaker behavior is described :ref:`here <arch_overview_circuit_break>`.
 * upstream: changed load distribution algorithm when all priorities enter :ref:`panic mode<arch_overview_load_balancing_panic_threshold>`.
+* zlib: by default zlib is initialized to use its default strategy (Z_DEFAULT_STRATEGY)
+  instead of the fixed one (Z_FIXED). The difference is that the use of dynammic
+  Huffman codes is enabled now resulting in better compression ratio for normal data.
 
 1.13.1 (March 3, 2020)
 ======================
