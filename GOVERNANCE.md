@@ -79,13 +79,15 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
 * Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
   particularly risky PRs until after the release is tagged. This is because we aim for master to be
   at release candidate quality at all times.
-* Do a final check of the [release notes](docs/root/intro/version_history.rst) and make any needed
-  corrections.
-* Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
-  "1.6.0". Also remove the "Pending" tags and add dates to the top of the [release notes](docs/root/intro/version_history.rst)
-  and [deprecated log](docs/root/intro/deprecated.rst). Get a review and merge.
-* **Wait for tests to pass on
-  [master](https://circleci.com/gh/envoyproxy/envoy/tree/master).**
+* Do a final check of the [release notes](docs/root/intro/version_history.rst):
+  * Make any needed corrections (grammar, punctuation, formatting, etc.).
+  * Check to see if any security/stable version release notes are duplicated in
+    the major version release notes. These should not be duplicated.
+  * Remove the "Pending" tags and add dates to the top of the [release notes](docs/root/intro/version_history.rst)
+    and [deprecated log](docs/root/intro/deprecated.rst).
+  * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
+    "1.6.0".
+  * Get a review and merge.
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
   start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
   [VERSION](VERSION).**
