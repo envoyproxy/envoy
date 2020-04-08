@@ -396,8 +396,9 @@ def hasInvalidAngleBracketDirectory(line):
   return subdir in SUBDIR_SET
 
 
-VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]*): ([a-z:`]+)")
+VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile("^====[=]+$")
+RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
 
 
 def checkCurrentReleaseNotes(file_path, error_messages):
@@ -405,6 +406,7 @@ def checkCurrentReleaseNotes(file_path, error_messages):
 
   first_word_of_prior_line = ''
   next_word_to_check = ''  # first word after :
+  prior_line = ''
   for line_number, line in enumerate(readLines(file_path)):
 
     def reportError(message):
@@ -417,9 +419,19 @@ def checkCurrentReleaseNotes(file_path, error_messages):
       # If we see a version marker we are now in the section for the current release.
       in_current_release = True
 
-    # Do basic alphabetization checks of the first word on the line and the
-    # first word after the :
+    # make sure flags are surrounded by ``s
+    flag_match = RELOADABLE_FLAG_REGEX.match(line)
+    if flag_match:
+      if not flag_match.groups()[0].startswith('`'):
+        reportError("Flag `%s` should be enclosed in back ticks" % flag_match.groups()[1])
+
     if line.startswith("*"):
+      if prior_line and not prior_line.startswith('=') and not prior_line.endswith('.'):
+        if prior_line.endswith('>`'):
+          break
+          # We don't punctuation-check sentences ending in :ref yet.
+        reportError("The following release note does not end with a '.'\n %s" % prior_line)
+
       match = VERSION_HISTORY_NEW_LINE_REGEX.match(line)
       if not match:
         reportError("Version history line malformed. "
@@ -427,6 +439,8 @@ def checkCurrentReleaseNotes(file_path, error_messages):
       else:
         first_word = match.groups()[0]
         next_word = match.groups()[1]
+        # Do basic alphabetization checks of the first word on the line and the
+        # first word after the :
         if first_word_of_prior_line and first_word_of_prior_line > first_word:
           reportError(
               "Version history not in alphabetical order (%s vs %s): please check placement of line\n %s. "
@@ -437,6 +451,10 @@ def checkCurrentReleaseNotes(file_path, error_messages):
               % (next_word_to_check, next_word, line))
         first_word_of_prior_line = first_word
         next_word_to_check = next_word
+
+        prior_line = line
+    elif prior_line:
+      prior_line += line
 
 
 def checkFileContents(file_path, checker):
