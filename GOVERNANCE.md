@@ -88,8 +88,6 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
   * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
     "1.6.0".
   * Get a review and merge.
-* **Wait for tests to pass on
-  [master](https://circleci.com/gh/envoyproxy/envoy/tree/master).**
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
   start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
   [VERSION](VERSION).**
