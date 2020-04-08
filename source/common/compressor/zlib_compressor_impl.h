@@ -49,6 +49,7 @@ public:
   /**
    * Enum values are used for setting the compression algorithm strategy.
    * filtered: used for data produced by a filter. (or predictor) @see Z_FILTERED (zlib manual)
+   * fixed: disable dynamic Huffman codes. @see Z_FIXED (zlib manual)
    * huffman: used to enforce Huffman encoding. @see RFC 1951
    * rle: used to limit match distances to one. (Run-length encoding)
    * standard: used for normal data. (default) @see Z_DEFAULT_STRATEGY in zlib manual.
