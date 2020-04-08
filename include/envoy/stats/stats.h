@@ -163,7 +163,7 @@ class TextReadout : public virtual Metric {
 public:
   // Text readout type is used internally to disambiguate isolated store
   // constructors. In the future we can extend it to specify text encoding or
-  // somesuch.
+  // some such.
   enum class Type {
     Default, // No particular meaning.
   };

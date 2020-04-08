@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -228,9 +229,9 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   // If the local address is not found above, then return the loopback address by default.
   if (ret == nullptr) {
     if (version == Address::IpVersion::v4) {
-      ret.reset(new Address::Ipv4Instance("127.0.0.1"));
+      ret = std::make_shared<Address::Ipv4Instance>("127.0.0.1");
     } else if (version == Address::IpVersion::v6) {
-      ret.reset(new Address::Ipv6Instance("::1"));
+      ret = std::make_shared<Address::Ipv6Instance>("::1");
     }
   }
   return ret;
