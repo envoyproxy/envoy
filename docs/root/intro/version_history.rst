@@ -10,6 +10,8 @@ Version history
 * access log: introduce :ref:`connection-level access loggers<envoy_api_field_Listener.access_log>`.
 * adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
   minimum.
+* adaptive concurrency: minRTT is now triggered when the minimum concurrency is maintained for 5
+  consecutive sampling intervals
 * admin: added support for displaying ip address subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * admin: added :http:post:`/reopen_logs` endpoint to control log rotation.
 * api: froze v2 xDS API. New feature development in the API should occur in v3 xDS. While the v2 xDS API has
@@ -54,6 +56,8 @@ Version history
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * network filters: added a :ref:`direct response filter <config_network_filters_direct_response>`.
 * rbac: added :ref:`url_path <envoy_api_field_config.rbac.v2.Permission.url_path>` for matching URL path without the query and fragment string.
+* rbac: added :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>` and :ref:`direct_remote_ip <envoy_api_field_config.rbac.v2.Principal.direct_remote_ip>` for matching downstream remote IP address.
+* rbac: deprecated :ref:`source_ip <envoy_api_field_config.rbac.v2.Principal.source_ip>` with :ref:`direct_remote_ip <envoy_api_field_config.rbac.v2.Principal.direct_remote_ip>` and :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>`.
 * request_id_extension: add an ability to extend request ID handling at :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_id_extension>`.
 * retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
 * router: added additional stats for :ref:`virtual clusters <config_http_filters_router_vcluster_stats>`.
