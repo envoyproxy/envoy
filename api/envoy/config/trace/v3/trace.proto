@@ -25,23 +25,17 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // The tracing configuration specifies settings for an HTTP tracer provider used by Envoy.
 //
-// The configuration should preferably be defined as part of
-// the :ref:`HttpConnectionManager.Tracing <envoy_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing>`
-// :ref:`provider <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`
-// field.
-//
-// Alternatively, for the sake of short-term backwards compatibility, it is also possible to define
-// tracing configuration as part of the :ref:`Bootstrap.tracing <envoy_api_msg_config.bootstrap.v3.Bootstrap>`
-// field.
-//
-// [#comment:TODO(yskopets): Restore the link to the Bootstrap.tracing field after the switch to
-// v3/v4alpha api cycle: :ref:`tracing <envoy_api_field_config.bootstrap.v3.Bootstrap.tracing>`]
-//
 // Envoy may support other tracers in the future, but right now the HTTP tracer is the only one
 // supported.
 message Tracing {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v2.Tracing";
 
+  // Configuration for an HTTP tracer provider used by Envoy.
+  //
+  // The configuration is defined by the
+  // :ref:`HttpConnectionManager.Tracing <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing>`
+  // :ref:`provider <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing.provider>`
+  // field.
   message Http {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.trace.v2.Tracing.Http";
