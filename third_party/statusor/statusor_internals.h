@@ -27,9 +27,9 @@
 #include "absl/meta/type_traits.h"
 #include "absl/status/status.h"
 
-namespace Envoy {
+namespace absl {
 
-namespace StatusOr_Internal {
+namespace internal_statusor {
 
 class Helper {
 public:
@@ -201,13 +201,13 @@ protected:
   // Construct the value (i.e. data_) through placement new with the passed
   // argument.
   template <typename Arg> void MakeValue(Arg&& arg) {
-    StatusOr_Internal::PlacementNew<T>(&dummy_, std::forward<Arg>(arg));
+    internal_statusor::PlacementNew<T>(&dummy_, std::forward<Arg>(arg));
   }
 
   // Construct the status (i.e. status_) through placement new with the passed
   // argument.
   template <typename... Args> void MakeStatus(Args&&... args) {
-    StatusOr_Internal::PlacementNew<absl::Status>(&status_, std::forward<Args>(args)...);
+    internal_statusor::PlacementNew<absl::Status>(&status_, std::forward<Args>(args)...);
   }
 };
 
@@ -239,6 +239,6 @@ template <> struct TraitsBase<false, false> {
   TraitsBase& operator=(TraitsBase&&) = delete;
 };
 
-} // namespace StatusOr_Internal
+} // namespace internal_statusor
 
-} // namespace Envoy
+} // namespace absl

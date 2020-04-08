@@ -1,3 +1,8 @@
+/**
+ * IMPORTANT: this file is a fork of the soon to be open-source absl::StatusOr class.
+ * When the absl::StatusOr lands this file will be removed.
+ */
+
 /*
  * Copyright 2019 Google LLC
  *
@@ -14,15 +19,15 @@
  * limitations under the License.
  */
 
-#include "common/common/statusor.h"
+#include "third_party/statusor/statusor.h"
 
 #include <ostream>
 
 #include "common/common/assert.h"
 
-namespace Envoy {
+namespace absl {
 
-namespace StatusOr_Internal {
+namespace internal_statusor {
 
 void Helper::HandleInvalidStatusCtorArg(absl::Status* status) {
   const char* kMessage = "An OK status is not a valid constructor argument to StatusOr<T>";
@@ -33,6 +38,6 @@ void Helper::HandleInvalidStatusCtorArg(absl::Status* status) {
 
 void Helper::Crash(const absl::Status&) { abort(); }
 
-} // namespace StatusOr_Internal
+} // namespace internal_statusor
 
 } // namespace Envoy

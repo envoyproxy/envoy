@@ -1,32 +1,6 @@
 /**
  * IMPORTANT: this file is a fork of the soon to be open-source absl::StatusOr class.
- * When the absl::StatusOr lands this file will just define Envoy::StatusOr as an alias
- * of absl::StatusOr.
- *
- * IMPORTANT: StatusOr default constructor must not be used as it does not fit intro any
- * Envoy's use cases. The error extracting functions in the common/common/status.h will
- * RELEASE_ASSERT on default initialized StatusOr.
- * Usage example:
- *
- *  Envoy::StatusOr<int> Foo() {
- *    ...
- *    if (codec_error) {
- *      return CodecProtocolError("Invalid protocol");
- *    }
- *    return 123456;
- *  }
- *
- *  void Bar() {
- *    auto status_or = Foo();
- *    if (status_or.ok()) {
- *      int result = status_or.ValueOrDie();
- *      ...
- *    } else {
- *      ASSERT(IsCodecProtocolError(status_or.status()));
- *      ENVOY_LOG(debug, "Codec error encountered: {}", status_or.status().message());
- *    }
- *  }
-
+ * When the absl::StatusOr lands this file will be removed.
  */
 
 /*
@@ -66,7 +40,7 @@
 // Example that is guaranteed crash if the result holds no value:
 //
 //  StatusOr<Foo> result = DoBigCalculationThatCouldFail();
-//  const Foo& foo = result.ValueOrDie();
+//  const Foo& foo = result.value();
 //  foo.DoSomethingCool();
 //
 // Example usage of a StatusOr<std::unique_ptr<T>>:
@@ -96,23 +70,23 @@
 #include <type_traits>
 #include <utility>
 
-#include "common/common/statusor_internals.h"
+#include "third_party/statusor/statusor_internals.h"
 
 #include "absl/base/attributes.h"
 #include "absl/base/macros.h"
 
-namespace Envoy {
+namespace absl {
 
 // Returned StatusOr objects may not be ignored.
 template <typename T> class ABSL_MUST_USE_RESULT StatusOr;
 
 template <typename T>
-class StatusOr : private StatusOr_Internal::StatusOrData<T>,
-                 private StatusOr_Internal::TraitsBase<std::is_copy_constructible<T>::value,
+class StatusOr : private internal_statusor::StatusOrData<T>,
+                 private internal_statusor::TraitsBase<std::is_copy_constructible<T>::value,
                                                        std::is_move_constructible<T>::value> {
   template <typename U> friend class StatusOr;
 
-  typedef StatusOr_Internal::StatusOrData<T> Base;
+  typedef internal_statusor::StatusOrData<T> Base;
 
 public:
   using element_type = T;
@@ -145,7 +119,7 @@ public:
 
   // Constructs a new StatusOr with the given value. After calling this
   // constructor, this->ok() will be true and the contained value may be
-  // retrieved with ValueOrDie(), operator*(), or operator->().
+  // retrieved with value(), operator*(), or operator->().
   //
   // NOTE: Not explicit - we want to use StatusOr<T> as a return type
   // so it is convenient and sensible to be able to do 'return T()'
@@ -155,7 +129,7 @@ public:
   StatusOr(const T& value);
 
   // Constructs a new StatusOr with the given non-ok status. After calling this
-  // constructor, this->ok() will be false and calls to ValueOrDie() will
+  // constructor, this->ok() will be false and calls to value() will
   // CHECK-fail.
   //
   // NOTE: Not explicit - we want to use StatusOr<T> as a return
@@ -191,36 +165,36 @@ public:
   // Returns a reference to our current value, or ASSERT-fails if !this->ok(). If
   // you have already checked the status using this->ok() or operator bool(),
   // then you probably want to use operator*() or operator->() to access the
-  // current value instead of ValueOrDie().
+  // current value instead of value().
   //
   // Note: for value types that are cheap to copy, prefer simple code:
   //
-  //   T value = status_or.ValueOrDie();
+  //   T value = status_or.value();
   //
   // Otherwise, if the value type is expensive to copy, but can be left
   // in the StatusOr, simply assign to a reference:
   //
-  //   T& value = status_or.ValueOrDie();  // or `const T&`
+  //   T& value = status_or.value();  // or `const T&`
   //
   // Otherwise, if the value type supports an efficient move, it can be
   // used as follows:
   //
-  //   T value = std::move(status_or).ValueOrDie();
+  //   T value = std::move(status_or).value();
   //
   // The std::move on status_or instead of on the whole expression enables
   // warnings about possible uses of the status_or object after the move.
 
-  const T& ValueOrDie() const&;
-  T& ValueOrDie() &;
-  const T&& ValueOrDie() const&&;
-  T&& ValueOrDie() &&;
+  const T& value() const&;
+  T& value() &;
+  const T&& value() const&&;
+  T&& value() &&;
 
   // Returns a reference to the current value.
   //
   // REQUIRES: this->ok() == true, otherwise the behavior is undefined.
   //
   // Use this->ok() or `operator bool()` to verify that there is a current
-  // value. Alternatively, see ValueOrDie() for a similar API that guarantees
+  // value. Alternatively, see value() for a similar API that guarantees
   // ASSERT-failing if there is no current value.
   const T& operator*() const&;
   T& operator*() &;
@@ -280,7 +254,7 @@ template <typename T>
 template <typename U>
 inline StatusOr<T>& StatusOr<T>::operator=(const StatusOr<U>& other) {
   if (other.ok())
-    this->Assign(other.ValueOrDie());
+    this->Assign(other.value());
   else
     this->Assign(other.status());
   return *this;
@@ -295,7 +269,7 @@ template <typename T>
 template <typename U>
 inline StatusOr<T>& StatusOr<T>::operator=(StatusOr<U>&& other) {
   if (other.ok()) {
-    this->Assign(std::move(other).ValueOrDie());
+    this->Assign(std::move(other).value());
   } else {
     this->Assign(std::move(other).status());
   }
@@ -307,22 +281,22 @@ template <typename T> absl::Status StatusOr<T>::status() && {
   return ok() ? absl::OkStatus() : std::move(this->status_);
 }
 
-template <typename T> const T& StatusOr<T>::ValueOrDie() const& {
+template <typename T> const T& StatusOr<T>::value() const& {
   this->EnsureOk();
   return this->data_;
 }
 
-template <typename T> T& StatusOr<T>::ValueOrDie() & {
+template <typename T> T& StatusOr<T>::value() & {
   this->EnsureOk();
   return this->data_;
 }
 
-template <typename T> const T&& StatusOr<T>::ValueOrDie() const&& {
+template <typename T> const T&& StatusOr<T>::value() const&& {
   this->EnsureOk();
   return std::move(this->data_);
 }
 
-template <typename T> T&& StatusOr<T>::ValueOrDie() && {
+template <typename T> T&& StatusOr<T>::value() && {
   this->EnsureOk();
   return std::move(this->data_);
 }
@@ -375,4 +349,4 @@ template <typename T> void StatusOr<T>::IgnoreError() const {
   // no-op
 }
 
-} // namespace Envoy
+} // namespace absl

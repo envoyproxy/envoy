@@ -1,6 +1,6 @@
 /**
  * IMPORTANT: this file is a fork of the soon to be open-source absl::StatusOr class.
- * When the absl::StatusOr lands this file will be trimmed to just Envoy specific use case.
+ * When the absl::StatusOr lands this file will be removed.
  */
 
 /* Copyright 2017 The TensorFlow Authors. All Rights Reserved.
@@ -23,45 +23,45 @@ limitations under the License.
 #include <memory>
 #include <type_traits>
 
-#include "common/common/status.h"
-#include "common/common/statusor.h"
+#include "third_party/statusor/statusor.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
+namespace absl {
 namespace {
 
+
 class Base1 {
-public:
+ public:
   virtual ~Base1() {}
   int pad_;
 };
 
 class Base2 {
-public:
+ public:
   virtual ~Base2() {}
   int yetotherpad_;
 };
 
 class Derived : public Base1, public Base2 {
-public:
+ public:
   ~Derived() override {}
   int evenmorepad_;
 };
 
 class CopyNoAssign {
-public:
+ public:
   explicit CopyNoAssign(int value) : foo_(value) {}
   CopyNoAssign(const CopyNoAssign& other) : foo_(other.foo_) {}
   int foo_;
 
-private:
+ private:
   const CopyNoAssign& operator=(const CopyNoAssign&);
 };
 
 class NoDefaultConstructor {
-public:
+ public:
   explicit NoDefaultConstructor(int foo);
 };
 
@@ -83,60 +83,60 @@ TEST(StatusOr, NullPointerStatusOr) {
   // error. Test that it no longer is.
   StatusOr<int*> null_status(nullptr);
   EXPECT_TRUE(null_status.ok());
-  EXPECT_EQ(null_status.ValueOrDie(), nullptr);
+  EXPECT_EQ(null_status.value(), nullptr);
 }
 
 TEST(StatusOr, TestNoDefaultConstructorInitialization) {
   // Explicitly initialize it with an error code.
-  StatusOr<NoDefaultConstructor> statusor(CodecProtocolError(""));
+  StatusOr<NoDefaultConstructor> statusor(absl::CancelledError(""));
   EXPECT_FALSE(statusor.ok());
-  EXPECT_TRUE(IsCodecProtocolError(statusor.status()));
+  EXPECT_EQ(statusor.status().code(), absl::StatusCode::kCancelled);
 
   // Default construction of StatusOr initializes it with an UNKNOWN error code.
   StatusOr<NoDefaultConstructor> statusor2;
   EXPECT_FALSE(statusor2.ok());
-  EXPECT_DEATH(GetStatusCode(statusor2.status()), "");
+  EXPECT_EQ(statusor2.status().code(), absl::StatusCode::kUnknown);
 }
 
 TEST(StatusOr, TestMoveOnlyInitialization) {
   StatusOr<std::unique_ptr<int>> thing(ReturnUniquePtr());
   ASSERT_TRUE(thing.ok());
-  EXPECT_EQ(0, *thing.ValueOrDie());
-  int* previous = thing.ValueOrDie().get();
+  EXPECT_EQ(0, *thing.value());
+  int* previous = thing.value().get();
 
   thing = ReturnUniquePtr();
   EXPECT_TRUE(thing.ok());
-  EXPECT_EQ(0, *thing.ValueOrDie());
-  EXPECT_NE(previous, thing.ValueOrDie().get());
+  EXPECT_EQ(0, *thing.value());
+  EXPECT_NE(previous, thing.value().get());
 }
 
 TEST(StatusOr, TestMoveOnlyStatusCtr) {
-  StatusOr<std::unique_ptr<int>> thing(CodecProtocolError(""));
+  StatusOr<std::unique_ptr<int>> thing(absl::CancelledError(""));
   ASSERT_FALSE(thing.ok());
 }
 
 TEST(StatusOr, TestMoveOnlyValueExtraction) {
   StatusOr<std::unique_ptr<int>> thing(ReturnUniquePtr());
   ASSERT_TRUE(thing.ok());
-  std::unique_ptr<int> ptr = std::move(thing).ValueOrDie();
+  std::unique_ptr<int> ptr = std::move(thing).value();
   EXPECT_EQ(0, *ptr);
 
   thing = std::move(ptr);
-  ptr = std::move(thing.ValueOrDie());
+  ptr = std::move(thing.value());
   EXPECT_EQ(0, *ptr);
 }
 
 TEST(StatusOr, TestMoveOnlyConversion) {
   StatusOr<std::unique_ptr<const int>> const_thing(ReturnUniquePtr());
   EXPECT_TRUE(const_thing.ok());
-  EXPECT_EQ(0, *const_thing.ValueOrDie());
+  EXPECT_EQ(0, *const_thing.value());
 
-  // Test r-value converting assignment
-  const int* const_previous = const_thing.ValueOrDie().get();
+  // Test rvalue converting assignment
+  const int* const_previous = const_thing.value().get();
   const_thing = ReturnUniquePtr();
   EXPECT_TRUE(const_thing.ok());
-  EXPECT_EQ(0, *const_thing.ValueOrDie());
-  EXPECT_NE(const_previous, const_thing.ValueOrDie().get());
+  EXPECT_EQ(0, *const_thing.value());
+  EXPECT_NE(const_previous, const_thing.value().get());
 }
 
 TEST(StatusOr, TestMoveOnlyVector) {
@@ -145,24 +145,24 @@ TEST(StatusOr, TestMoveOnlyVector) {
   vec.push_back(ReturnUniquePtr());
   vec.resize(2);
   auto another_vec = std::move(vec);
-  EXPECT_EQ(0, *another_vec[0].ValueOrDie());
-  EXPECT_DEATH(GetStatusCode(another_vec[1].status()), "");
+  EXPECT_EQ(0, *another_vec[0].value());
+  EXPECT_EQ(absl::StatusCode::kUnknown, another_vec[1].status().code());
 }
 
 TEST(StatusOr, TestMoveWithValuesAndErrors) {
   StatusOr<std::string> status_or(std::string(1000, '0'));
   StatusOr<std::string> value1(std::string(1000, '1'));
   StatusOr<std::string> value2(std::string(1000, '2'));
-  StatusOr<std::string> error1(CodecProtocolError("error1"));
-  StatusOr<std::string> error2(CodecProtocolError("error2"));
+  StatusOr<std::string> error1(Status(absl::StatusCode::kUnknown, "error1"));
+  StatusOr<std::string> error2(Status(absl::StatusCode::kUnknown, "error2"));
 
   ASSERT_TRUE(status_or.ok());
-  EXPECT_EQ(std::string(1000, '0'), status_or.ValueOrDie());
+  EXPECT_EQ(std::string(1000, '0'), status_or.value());
 
   // Overwrite the value in status_or with another value.
   status_or = std::move(value1);
   ASSERT_TRUE(status_or.ok());
-  EXPECT_EQ(std::string(1000, '1'), status_or.ValueOrDie());
+  EXPECT_EQ(std::string(1000, '1'), status_or.value());
 
   // Overwrite the value in status_or with an error.
   status_or = std::move(error1);
@@ -177,23 +177,23 @@ TEST(StatusOr, TestMoveWithValuesAndErrors) {
   // Overwrite the error with a value.
   status_or = std::move(value2);
   ASSERT_TRUE(status_or.ok());
-  EXPECT_EQ(std::string(1000, '2'), status_or.ValueOrDie());
+  EXPECT_EQ(std::string(1000, '2'), status_or.value());
 }
 
 TEST(StatusOr, TestCopyWithValuesAndErrors) {
   StatusOr<std::string> status_or(std::string(1000, '0'));
   StatusOr<std::string> value1(std::string(1000, '1'));
   StatusOr<std::string> value2(std::string(1000, '2'));
-  StatusOr<std::string> error1(CodecProtocolError("error1"));
-  StatusOr<std::string> error2(CodecProtocolError("error2"));
+  StatusOr<std::string> error1(Status(absl::StatusCode::kUnknown, "error1"));
+  StatusOr<std::string> error2(Status(absl::StatusCode::kUnknown, "error2"));
 
   ASSERT_TRUE(status_or.ok());
-  EXPECT_EQ(std::string(1000, '0'), status_or.ValueOrDie());
+  EXPECT_EQ(std::string(1000, '0'), status_or.value());
 
   // Overwrite the value in status_or with another value.
   status_or = value1;
   ASSERT_TRUE(status_or.ok());
-  EXPECT_EQ(std::string(1000, '1'), status_or.ValueOrDie());
+  EXPECT_EQ(std::string(1000, '1'), status_or.value());
 
   // Overwrite the value in status_or with an error.
   status_or = error1;
@@ -208,40 +208,40 @@ TEST(StatusOr, TestCopyWithValuesAndErrors) {
   // Overwrite the error with a value.
   status_or = value2;
   ASSERT_TRUE(status_or.ok());
-  EXPECT_EQ(std::string(1000, '2'), status_or.ValueOrDie());
+  EXPECT_EQ(std::string(1000, '2'), status_or.value());
 
   // Verify original values unchanged.
-  EXPECT_EQ(std::string(1000, '1'), value1.ValueOrDie());
+  EXPECT_EQ(std::string(1000, '1'), value1.value());
   EXPECT_EQ("error1", error1.status().message());
   EXPECT_EQ("error2", error2.status().message());
-  EXPECT_EQ(std::string(1000, '2'), value2.ValueOrDie());
+  EXPECT_EQ(std::string(1000, '2'), value2.value());
 }
 
 TEST(StatusOr, TestDefaultCtor) {
   StatusOr<int> thing;
   EXPECT_FALSE(thing.ok());
-  EXPECT_DEATH(GetStatusCode(thing.status()), "");
+  EXPECT_EQ(thing.status().code(), absl::StatusCode::kUnknown);
 }
 
 TEST(StatusOrDeathTest, TestDefaultCtorValue) {
   StatusOr<int> thing;
-  EXPECT_DEATH(thing.ValueOrDie(), "");
+  EXPECT_DEATH(thing.value(), "");
 
   const StatusOr<int> thing2;
-  EXPECT_DEATH(thing.ValueOrDie(), "");
+  EXPECT_DEATH(thing.value(), "");
 }
 
 TEST(StatusOr, TestStatusCtor) {
-  StatusOr<int> thing(CodecProtocolError(""));
+  StatusOr<int> thing(Status(absl::StatusCode::kCancelled, ""));
   EXPECT_FALSE(thing.ok());
-  EXPECT_TRUE(IsCodecProtocolError(thing.status()));
+  EXPECT_EQ(thing.status().code(), absl::StatusCode::kCancelled);
 }
 
 TEST(StatusOr, TestValueCtor) {
   const int kI = 4;
   const StatusOr<int> thing(kI);
   EXPECT_TRUE(thing.ok());
-  EXPECT_EQ(kI, thing.ValueOrDie());
+  EXPECT_EQ(kI, thing.value());
 }
 
 TEST(StatusOr, TestCopyCtorStatusOk) {
@@ -249,11 +249,11 @@ TEST(StatusOr, TestCopyCtorStatusOk) {
   const StatusOr<int> original(kI);
   const StatusOr<int> copy(original);
   EXPECT_EQ(copy.status(), original.status());
-  EXPECT_EQ(original.ValueOrDie(), copy.ValueOrDie());
+  EXPECT_EQ(original.value(), copy.value());
 }
 
 TEST(StatusOr, TestCopyCtorStatusNotOk) {
-  StatusOr<int> original(CodecProtocolError(""));
+  StatusOr<int> original(Status(absl::StatusCode::kCancelled, ""));
   StatusOr<int> copy(original);
   EXPECT_EQ(copy.status(), original.status());
 }
@@ -264,7 +264,7 @@ TEST(StatusOr, TestCopyCtorNonAssignable) {
   StatusOr<CopyNoAssign> original(value);
   StatusOr<CopyNoAssign> copy(original);
   EXPECT_EQ(copy.status(), original.status());
-  EXPECT_EQ(original.ValueOrDie().foo_, copy.ValueOrDie().foo_);
+  EXPECT_EQ(original.value().foo_, copy.value().foo_);
 }
 
 TEST(StatusOr, TestCopyCtorStatusOKConverting) {
@@ -272,11 +272,11 @@ TEST(StatusOr, TestCopyCtorStatusOKConverting) {
   StatusOr<int> original(kI);
   StatusOr<double> copy(original);
   EXPECT_EQ(copy.status(), original.status());
-  EXPECT_DOUBLE_EQ(original.ValueOrDie(), copy.ValueOrDie());
+  EXPECT_DOUBLE_EQ(original.value(), copy.value());
 }
 
 TEST(StatusOr, TestCopyCtorStatusNotOkConverting) {
-  StatusOr<int> original(CodecProtocolError(""));
+  StatusOr<int> original(Status(absl::StatusCode::kCancelled, ""));
   StatusOr<double> copy(original);
   EXPECT_EQ(copy.status(), original.status());
 }
@@ -287,11 +287,11 @@ TEST(StatusOr, TestAssignmentStatusOk) {
   StatusOr<int> target;
   target = source;
   EXPECT_EQ(target.status(), source.status());
-  EXPECT_EQ(source.ValueOrDie(), target.ValueOrDie());
+  EXPECT_EQ(source.value(), target.value());
 }
 
 TEST(StatusOr, TestAssignmentStatusNotOk) {
-  StatusOr<int> source(CodecProtocolError(""));
+  StatusOr<int> source(Status(absl::StatusCode::kCancelled, ""));
   StatusOr<int> target;
   target = source;
   EXPECT_EQ(target.status(), source.status());
@@ -300,55 +300,55 @@ TEST(StatusOr, TestAssignmentStatusNotOk) {
 TEST(StatusOr, TestStatus) {
   StatusOr<int> good(4);
   EXPECT_TRUE(good.ok());
-  StatusOr<int> bad(CodecProtocolError(""));
+  StatusOr<int> bad(Status(absl::StatusCode::kCancelled, ""));
   EXPECT_FALSE(bad.ok());
-  EXPECT_EQ(bad.status(), CodecProtocolError(""));
+  EXPECT_EQ(bad.status(), Status(absl::StatusCode::kCancelled, ""));
 }
 
 TEST(StatusOr, TestValue) {
   const int kI = 4;
   StatusOr<int> thing(kI);
-  EXPECT_EQ(kI, thing.ValueOrDie());
+  EXPECT_EQ(kI, thing.value());
 }
 
 TEST(StatusOr, TestValueConst) {
   const int kI = 4;
   const StatusOr<int> thing(kI);
-  EXPECT_EQ(kI, thing.ValueOrDie());
+  EXPECT_EQ(kI, thing.value());
 }
 
 TEST(StatusOrDeathTest, TestValueNotOk) {
-  StatusOr<int> thing(CodecProtocolError("cancelled"));
-  EXPECT_DEATH(thing.ValueOrDie(), "");
+  StatusOr<int> thing(Status(absl::StatusCode::kCancelled, "cancelled"));
+  EXPECT_DEATH(thing.value(), "");
 }
 
 TEST(StatusOrDeathTest, TestValueNotOkConst) {
-  const StatusOr<int> thing(CodecProtocolError(""));
-  EXPECT_DEATH(thing.ValueOrDie(), "");
+  const StatusOr<int> thing(Status(absl::StatusCode::kUnknown, ""));
+  EXPECT_DEATH(thing.value(), "");
 }
 
 TEST(StatusOr, TestPointerDefaultCtor) {
   StatusOr<int*> thing;
   EXPECT_FALSE(thing.ok());
-  EXPECT_DEATH(GetStatusCode(thing.status()), "");
+  EXPECT_EQ(thing.status().code(), absl::StatusCode::kUnknown);
 }
 
 TEST(StatusOrDeathTest, TestPointerDefaultCtorValue) {
   StatusOr<int*> thing;
-  EXPECT_DEATH(thing.ValueOrDie(), "");
+  EXPECT_DEATH(thing.value(), "");
 }
 
 TEST(StatusOr, TestPointerStatusCtor) {
-  StatusOr<int*> thing(CodecProtocolError(""));
+  StatusOr<int*> thing(Status(absl::StatusCode::kCancelled, ""));
   EXPECT_FALSE(thing.ok());
-  EXPECT_EQ(thing.status(), CodecProtocolError(""));
+  EXPECT_EQ(thing.status(), Status(absl::StatusCode::kCancelled, ""));
 }
 
 TEST(StatusOr, TestPointerValueCtor) {
   const int kI = 4;
   StatusOr<const int*> thing(&kI);
   EXPECT_TRUE(thing.ok());
-  EXPECT_EQ(&kI, thing.ValueOrDie());
+  EXPECT_EQ(&kI, thing.value());
 }
 
 TEST(StatusOr, TestPointerCopyCtorStatusOk) {
@@ -356,11 +356,11 @@ TEST(StatusOr, TestPointerCopyCtorStatusOk) {
   StatusOr<const int*> original(&kI);
   StatusOr<const int*> copy(original);
   EXPECT_EQ(copy.status(), original.status());
-  EXPECT_EQ(original.ValueOrDie(), copy.ValueOrDie());
+  EXPECT_EQ(original.value(), copy.value());
 }
 
 TEST(StatusOr, TestPointerCopyCtorStatusNotOk) {
-  StatusOr<int*> original(CodecProtocolError(""));
+  StatusOr<int*> original(Status(absl::StatusCode::kCancelled, ""));
   StatusOr<int*> copy(original);
   EXPECT_EQ(copy.status(), original.status());
 }
@@ -370,11 +370,12 @@ TEST(StatusOr, TestPointerCopyCtorStatusOKConverting) {
   StatusOr<Derived*> original(&derived);
   StatusOr<Base2*> copy(original);
   EXPECT_EQ(copy.status(), original.status());
-  EXPECT_EQ(static_cast<const Base2*>(original.ValueOrDie()), copy.ValueOrDie());
+  EXPECT_EQ(static_cast<const Base2*>(original.value()),
+            copy.value());
 }
 
 TEST(StatusOr, TestPointerCopyCtorStatusNotOkConverting) {
-  StatusOr<Derived*> original(CodecProtocolError(""));
+  StatusOr<Derived*> original(Status(absl::StatusCode::kCancelled, ""));
   StatusOr<Base2*> copy(original);
   EXPECT_EQ(copy.status(), original.status());
 }
@@ -385,11 +386,11 @@ TEST(StatusOr, TestPointerAssignmentStatusOk) {
   StatusOr<const int*> target;
   target = source;
   EXPECT_EQ(target.status(), source.status());
-  EXPECT_EQ(source.ValueOrDie(), target.ValueOrDie());
+  EXPECT_EQ(source.value(), target.value());
 }
 
 TEST(StatusOr, TestPointerAssignmentStatusNotOk) {
-  StatusOr<int*> source(CodecProtocolError(""));
+  StatusOr<int*> source(Status(absl::StatusCode::kCancelled, ""));
   StatusOr<int*> target;
   target = source;
   EXPECT_EQ(target.status(), source.status());
@@ -399,20 +400,20 @@ TEST(StatusOr, TestPointerStatus) {
   const int kI = 0;
   StatusOr<const int*> good(&kI);
   EXPECT_TRUE(good.ok());
-  StatusOr<const int*> bad(CodecProtocolError(""));
-  EXPECT_EQ(bad.status(), CodecProtocolError(""));
+  StatusOr<const int*> bad(Status(absl::StatusCode::kCancelled, ""));
+  EXPECT_EQ(bad.status(), Status(absl::StatusCode::kCancelled, ""));
 }
 
 TEST(StatusOr, TestPointerValue) {
   const int kI = 0;
   StatusOr<const int*> thing(&kI);
-  EXPECT_EQ(&kI, thing.ValueOrDie());
+  EXPECT_EQ(&kI, thing.value());
 }
 
 TEST(StatusOr, TestPointerValueConst) {
   const int kI = 0;
   const StatusOr<const int*> thing(&kI);
-  EXPECT_EQ(&kI, thing.ValueOrDie());
+  EXPECT_EQ(&kI, thing.value());
 }
 
 // NOTE(tucker): StatusOr does not support this kind
@@ -425,16 +426,16 @@ TEST(StatusOr, TestPointerValueConst) {
 // }
 
 TEST(StatusOrDeathTest, TestPointerValueNotOk) {
-  StatusOr<int*> thing(CodecProtocolError("cancelled"));
-  EXPECT_DEATH(thing.ValueOrDie(), "");
+  StatusOr<int*> thing(Status(absl::StatusCode::kCancelled, "cancelled"));
+  EXPECT_DEATH(thing.value(), "");
 }
 
 TEST(StatusOrDeathTest, TestPointerValueNotOkConst) {
-  const StatusOr<int*> thing(CodecProtocolError("cancelled"));
-  EXPECT_DEATH(thing.ValueOrDie(), "");
+  const StatusOr<int*> thing(Status(absl::StatusCode::kCancelled, "cancelled"));
+  EXPECT_DEATH(thing.value(), "");
 }
 
 // Benchmarks were removed as we not intend to change forked code.
 
 } // namespace
-} // namespace Envoy
+} // namespace absl
