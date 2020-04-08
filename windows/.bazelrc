@@ -3,9 +3,7 @@
 build --action_env=PATH
 build --action_env=TMPDIR
 
-# see top-level .bazelrc for explanation
-# Smaller on windows (512k vs 2g) due to fewer parallel built tasks
-startup --host_jvm_args=-Xmx512m
+build --experimental_local_memory_estimate
 
 build --define signal_trace=disabled
 build --define hot_restart=disabled

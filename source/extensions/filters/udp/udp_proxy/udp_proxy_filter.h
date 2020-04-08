@@ -113,7 +113,7 @@ private:
   public:
     ActiveSession(ClusterInfo& parent, Network::UdpRecvData::LocalPeerAddresses&& addresses,
                   const Upstream::HostConstSharedPtr& host);
-    ~ActiveSession();
+    ~ActiveSession() override;
     const Network::UdpRecvData::LocalPeerAddresses& addresses() const { return addresses_; }
     const Upstream::Host& host() const { return *host_; }
     void write(const Buffer::Instance& buffer);

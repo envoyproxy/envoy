@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -84,8 +86,8 @@ protected:
       return listener_tag_++;
     }));
 
-    local_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
-    remote_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
+    local_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
+    remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
     EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
     EXPECT_CALL(os_sys_calls_, getsockname)
         .WillRepeatedly(Invoke([this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
@@ -137,7 +139,7 @@ protected:
                   const std::vector<std::string>& application_protocols,
                   const std::string& source_address, uint16_t source_port) {
     if (absl::StartsWith(destination_address, "/")) {
-      local_address_.reset(new Network::Address::PipeInstance(destination_address));
+      local_address_ = std::make_shared<Network::Address::PipeInstance>(destination_address);
     } else {
       local_address_ =
           Network::Utility::parseInternetAddress(destination_address, destination_port);
@@ -151,7 +153,7 @@ protected:
         .WillByDefault(ReturnRef(application_protocols));
 
     if (absl::StartsWith(source_address, "/")) {
-      remote_address_.reset(new Network::Address::PipeInstance(source_address));
+      remote_address_ = std::make_shared<Network::Address::PipeInstance>(source_address);
     } else {
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
