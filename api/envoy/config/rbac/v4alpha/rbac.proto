@@ -1,9 +1,9 @@
 syntax = "proto3";
 
-package envoy.config.rbac.v3;
+package envoy.config.rbac.v4alpha;
 
-import "envoy/config/core/v3/address.proto";
-import "envoy/config/route/v3/route_components.proto";
+import "envoy/config/core/v4alpha/address.proto";
+import "envoy/config/route/v4alpha/route_components.proto";
 import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/path.proto";
 import "envoy/type/matcher/v3/string.proto";
@@ -14,10 +14,10 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.rbac.v3";
+option java_package = "io.envoyproxy.envoy.config.rbac.v4alpha";
 option java_outer_classname = "RbacProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Role Based Access Control (RBAC)]
 
@@ -62,7 +62,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //         - any: true
 //
 message RBAC {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.RBAC";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v3.RBAC";
 
   // Should we do safe-list or block-list style access control?
   enum Action {
@@ -89,7 +89,7 @@ message RBAC {
 // and only if at least one of its permissions match the action taking place AND at least one of its
 // principals match the downstream AND the condition is true if specified.
 message Policy {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Policy";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v3.Policy";
 
   // Required. The set of permissions that define a role. Each permission is matched with OR
   // semantics. To match all actions for this policy, a single Permission with the `any` field set
@@ -110,13 +110,13 @@ message Policy {
 // Permission defines an action (or actions) that a principal can take.
 // [#next-free-field: 11]
 message Permission {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Permission";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v3.Permission";
 
   // Used in the `and_rules` and `or_rules` fields in the `rule` oneof. Depending on the context,
   // each are applied with the associated behavior.
   message Set {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.rbac.v2.Permission.Set";
+        "envoy.config.rbac.v3.Permission.Set";
 
     repeated Permission rules = 1 [(validate.rules).repeated = {min_items: 1}];
   }
@@ -137,13 +137,13 @@ message Permission {
     // available for HTTP request.
     // Note: the pseudo-header :path includes the query and fragment string. Use the `url_path`
     // field if you want to match the URL path without the query and fragment string.
-    route.v3.HeaderMatcher header = 4;
+    route.v4alpha.HeaderMatcher header = 4;
 
     // A URL path on the incoming HTTP request. Only available for HTTP.
     type.matcher.v3.PathMatcher url_path = 10;
 
     // A CIDR block that describes the destination IP.
-    core.v3.CidrRange destination_ip = 5;
+    core.v4alpha.CidrRange destination_ip = 5;
 
     // A port number that describes the destination port connecting to.
     uint32 destination_port = 6 [(validate.rules).uint32 = {lte: 65535}];
@@ -182,13 +182,13 @@ message Permission {
 // Principal defines an identity or a group of identities for a downstream subject.
 // [#next-free-field: 12]
 message Principal {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Principal";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v3.Principal";
 
   // Used in the `and_ids` and `or_ids` fields in the `identifier` oneof. Depending on the context,
   // each are applied with the associated behavior.
   message Set {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.rbac.v2.Principal.Set";
+        "envoy.config.rbac.v3.Principal.Set";
 
     repeated Principal ids = 1 [(validate.rules).repeated = {min_items: 1}];
   }
@@ -196,7 +196,7 @@ message Principal {
   // Authentication attributes for a downstream.
   message Authenticated {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.rbac.v2.Principal.Authenticated";
+        "envoy.config.rbac.v3.Principal.Authenticated";
 
     reserved 1;
 
@@ -205,6 +205,10 @@ message Principal {
     // authenticated.
     type.matcher.v3.StringMatcher principal_name = 2;
   }
+
+  reserved 5;
+
+  reserved "source_ip";
 
   oneof identifier {
     option (validate.required) = true;
@@ -221,28 +225,24 @@ message Principal {
     // Authenticated attributes that identify the downstream.
     Authenticated authenticated = 4;
 
-    // A CIDR block that describes the downstream IP.
-    // This address will honor proxy protocol, but will not honor XFF.
-    core.v3.CidrRange source_ip = 5 [deprecated = true];
-
     // A CIDR block that describes the downstream remote/origin address.
     // Note: This is always the physical peer even if the
-    // :ref:`remote_ip <envoy_api_field_config.rbac.v3.Principal.remote_ip>` is inferred
+    // :ref:`remote_ip <envoy_api_field_config.rbac.v4alpha.Principal.remote_ip>` is inferred
     // from for example the x-forwarder-for header, proxy protocol, etc.
-    core.v3.CidrRange direct_remote_ip = 10;
+    core.v4alpha.CidrRange direct_remote_ip = 10;
 
     // A CIDR block that describes the downstream remote/origin address.
     // Note: This may not be the physical peer and could be different from the
-    // :ref:`direct_remote_ip <envoy_api_field_config.rbac.v3.Principal.direct_remote_ip>`.
+    // :ref:`direct_remote_ip <envoy_api_field_config.rbac.v4alpha.Principal.direct_remote_ip>`.
     // E.g, if the remote ip is inferred from for example the x-forwarder-for header,
     // proxy protocol, etc.
-    core.v3.CidrRange remote_ip = 11;
+    core.v4alpha.CidrRange remote_ip = 11;
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
     // Note: the pseudo-header :path includes the query and fragment string. Use the `url_path`
     // field if you want to match the URL path without the query and fragment string.
-    route.v3.HeaderMatcher header = 6;
+    route.v4alpha.HeaderMatcher header = 6;
 
     // A URL path on the incoming HTTP request. Only available for HTTP.
     type.matcher.v3.PathMatcher url_path = 9;
