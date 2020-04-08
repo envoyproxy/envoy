@@ -120,7 +120,8 @@ int TestRunner::RunTests(int argc, char** argv) {
   Thread::MutexBasicLockable lock;
 
   Server::Options& options = TestEnvironment::getOptions();
-  Logger::Context logging_state(options.logLevel(), options.logFormat(), lock, false);
+  Logger::Context logging_state(options.logLevel(), options.logFormat(), lock,
+                                options.logFormatEscaped(), options.logFormatPrefixWithLocation());
 
   // Allocate fake log access manager.
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;

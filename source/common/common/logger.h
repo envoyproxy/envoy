@@ -145,6 +145,9 @@ public:
   }
   void set_formatter(std::unique_ptr<spdlog::formatter> formatter) override;
   void set_should_escape(bool should_escape) { should_escape_ = should_escape; }
+  void set_prefix_with_location(bool prefix_with_location) {
+    prefix_with_location_ = prefix_with_location;
+  }
 
   /**
    * @return bool whether a lock has been established.
@@ -186,6 +189,7 @@ private:
   std::unique_ptr<spdlog::formatter> formatter_ ABSL_GUARDED_BY(format_mutex_);
   absl::Mutex format_mutex_; // direct absl reference to break build cycle.
   bool should_escape_{false};
+  bool prefix_with_location_{false};
 };
 
 /**
@@ -202,7 +206,7 @@ private:
 class Context {
 public:
   Context(spdlog::level::level_enum log_level, const std::string& log_format,
-          Thread::BasicLockable& lock, bool should_escape);
+          Thread::BasicLockable& lock, bool should_escape, bool prefix_with_location = true);
   ~Context();
 
 private:
@@ -212,6 +216,7 @@ private:
   const std::string log_format_;
   Thread::BasicLockable& lock_;
   bool should_escape_;
+  bool prefix_with_location_;
   Context* const save_context_;
 };
 

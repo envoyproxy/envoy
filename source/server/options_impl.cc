@@ -92,9 +92,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg log_format_escaped("", "log-format-escaped",
                                       "Escape c-style escape sequences in the application logs",
                                       cmd, false);
-  TCLAP::SwitchArg log_format_prefix_with_location(
+  TCLAP::ValueArg<bool> log_format_prefix_with_location(
       "", "log-format-prefix-with-location",
-      "Prefix all logged messages with '[path/to/file.cc:99] '.", cmd, true);
+      "Prefix all logged messages with '[path/to/file.cc:99] '.", false, true, "bool", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
