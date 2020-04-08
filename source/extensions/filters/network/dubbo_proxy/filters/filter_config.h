@@ -23,7 +23,7 @@ namespace DubboFilters {
  */
 class NamedDubboFilterConfigFactory : public Envoy::Config::TypedFactory {
 public:
-  virtual ~NamedDubboFilterConfigFactory() = default;
+  ~NamedDubboFilterConfigFactory() override = default;
 
   /**
    * Create a particular dubbo filter factory implementation. If the implementation is unable to

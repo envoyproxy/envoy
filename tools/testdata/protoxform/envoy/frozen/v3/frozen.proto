@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package envoy.frozen.v3;
+
+import "udpa/annotations/status.proto";
+
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+message Frozen {
+  int32 foo = 1;
+  reserved 2;
+}

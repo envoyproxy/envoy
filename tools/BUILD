@@ -30,7 +30,6 @@ py_library(
     srcs = [
         "run_command.py",
     ],
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
 )
 
