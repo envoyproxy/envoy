@@ -84,7 +84,7 @@ The following is a YAML example of the above recommendation.
             use_remote_address: true
             common_http_protocol_options:
               idle_timeout: 3600s # 1 hour
-	      headers_with_underscores_action: REJECT_REQUEST
+              headers_with_underscores_action: REJECT_REQUEST
             http2_protocol_options:
               max_concurrent_streams: 100
               initial_stream_window_size: 65536 # 64 KiB
