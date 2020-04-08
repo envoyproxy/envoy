@@ -148,3 +148,25 @@ index 5fa5543b1..484bc41a7 100644
                  executable = ctx.executable.protoc,
                  mnemonic = "ProtoCompile",
                  use_default_shell_env = True,
+
+diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
+index 1f9003753..4764afc51 100644
+--- a/src/google/protobuf/port_def.inc
++++ b/src/google/protobuf/port_def.inc
+@@ -138,12 +138,14 @@
+ #endif
+
+
+-#define PROTOBUF_NAMESPACE "google::protobuf"
+-#define PROTOBUF_NAMESPACE_ID google::protobuf
++#define PROTOBUF_NAMESPACE "envoy::google::protobuf"
++#define PROTOBUF_NAMESPACE_ID envoy::google::protobuf
+ #define PROTOBUF_NAMESPACE_OPEN \
++  namespace envoy {             \
+   namespace google {            \
+   namespace protobuf {
+ #define PROTOBUF_NAMESPACE_CLOSE \
++  } /* namespace envoy    */     \
+   } /* namespace protobuf */     \
+   } /* namespace google */
+ #define PROTOBUF_DEPRECATED

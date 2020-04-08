@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
   }
   )EOF";
   envoy::config::bootstrap::v2::Bootstrap valid_bootstrap;
-  if (!google::protobuf::TextFormat::ParseFromString(valid_bootstrap_text, &valid_bootstrap)) {
+  if (!envoy::google::protobuf::TextFormat::ParseFromString(valid_bootstrap_text, &valid_bootstrap)) {
     std::cerr << "Unable to parse text proto: " << valid_bootstrap_text << std::endl;
     exit(EXIT_FAILURE);
   }

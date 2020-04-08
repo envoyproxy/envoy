@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
   };
 
   for (const auto& method : methods) {
-    if (google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) == nullptr) {
+    if (envoy::google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) == nullptr) {
       std::cout << "Unable to find method descriptor for " << method << std::endl;
       exit(EXIT_FAILURE);
     }
