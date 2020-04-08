@@ -504,11 +504,8 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
 
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
-  if (!method_->descriptor_->server_streaming()) {
-    return Http::FilterHeadersStatus::StopIteration;
-  } else if (method_->response_type_is_http_body_) {
-    // Streaming + HttpBody msg: let encodeHeaders() add ContentType based
-    // on HttpBody.content_type
+  if (!method_->descriptor_->server_streaming() ||
+      (method_->descriptor_->server_streaming() && method_->response_type_is_http_body_)) {
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -563,6 +560,12 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
       Grpc::Common::getGrpcStatus(headers_or_trailers, true);
   if (grpc_status && maybeConvertGrpcStatus(*grpc_status, headers_or_trailers)) {
+    return;
+  }
+
+  if (method_->response_type_is_http_body_ && method_->descriptor_->server_streaming()) {
+    // Do not add empty json when HttpBody + streaming
+    // Also, headers already sent, just continue.
     return;
   }
 
