@@ -11,6 +11,8 @@
 
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
+#include "common/stats/symbol_table_impl.h"
+#include "common/stats/thread_local_store.h"
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 
@@ -19,6 +21,8 @@
 #include "test/extensions/quic_listeners/quiche/platform/quic_epoll_clock.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
@@ -70,18 +74,29 @@
 
 using testing::_;
 using testing::HasSubstr;
+using testing::NiceMock;
+using testing::Ref;
 using testing::Return;
 
 namespace quic {
 namespace {
-
 class QuicPlatformTest : public testing::Test {
 protected:
   QuicPlatformTest()
-      : log_level_(GetLogger().level()), verbosity_log_threshold_(GetVerbosityLogThreshold()) {
+      : log_level_(GetLogger().level()), verbosity_log_threshold_(GetVerbosityLogThreshold()),
+        symbol_table_(Envoy::Stats::SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_),
+        store_(std::make_unique<Envoy::Stats::ThreadLocalStoreImpl>(alloc_)) {
     SetVerbosityLogThreshold(0);
     GetLogger().set_level(ERROR);
+    store_->addSink(sink_);
   }
+
+  void SetUp() override {
+    QuicStatsImpl& stats = getQuicheStats();
+    stats.initializeStats(*store_);
+  }
+
+  void TearDown() override { getQuicheStats().resetForTest(); }
 
   ~QuicPlatformTest() override {
     SetVerbosityLogThreshold(verbosity_log_threshold_);
@@ -90,6 +105,12 @@ protected:
 
   const QuicLogLevel log_level_;
   const int verbosity_log_threshold_;
+  Envoy::Stats::SymbolTablePtr symbol_table_;
+  NiceMock<Envoy::Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<Envoy::ThreadLocal::MockInstance> tls_;
+  Envoy::Stats::AllocatorImpl alloc_;
+  Envoy::Stats::MockSink sink_;
+  std::unique_ptr<Envoy::Stats::ThreadLocalStoreImpl> store_;
 };
 
 TEST_F(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
@@ -133,13 +154,14 @@ TEST_F(QuicPlatformTest, QuicExpectBug) {
 }
 
 TEST_F(QuicPlatformTest, QuicExportedStats) {
-  // Just make sure they compile.
+  /*
   QUIC_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
   QUIC_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
   QUIC_HISTOGRAM_TIMES("my.timing.histogram", QuicTime::Delta::FromSeconds(5),
                        QuicTime::Delta::FromSeconds(1), QuicTime::Delta::FromSecond(3600), 100,
                        "doc");
   QUIC_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
+  */
 }
 
 TEST_F(QuicPlatformTest, QuicHostnameUtils) {
@@ -229,13 +251,53 @@ TEST_F(QuicPlatformTest, QuicMockLog) {
 }
 
 TEST_F(QuicPlatformTest, QuicServerStats) {
-  // Just make sure they compile.
-  QUIC_SERVER_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
-  QUIC_SERVER_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
-  QUIC_SERVER_HISTOGRAM_TIMES("my.timing.histogram", QuicTime::Delta::FromSeconds(5),
-                              QuicTime::Delta::FromSeconds(1), QuicTime::Delta::FromSecond(3600),
-                              100, "doc");
-  QUIC_SERVER_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
+  Envoy::Stats::Histogram& h1 =
+      store_->histogram("quiche.test_latency", Envoy::Stats::Histogram::Unit::Milliseconds);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+  QUIC_SERVER_HISTOGRAM_TIMES(test_latency, 100, 0, 500, 10, "bbb");
+
+  Envoy::Stats::Histogram& h2 =
+      store_->histogram("quiche.test_trial.success", Envoy::Stats::Histogram::Unit::Unspecified);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 0));
+  QUIC_SERVER_HISTOGRAM_BOOL(test_trial.success, false, "just for test");
+
+  enum FailureReason {
+    Reason1 = 0,
+    Reason2,
+  };
+  size_t num_counters = store_->counters().size();
+  QUIC_SERVER_HISTOGRAM_ENUM(test_trial.failure.reason, Reason1, 2, "doc");
+  EXPECT_EQ(num_counters + 1, store_->counters().size());
+  Envoy::Stats::Counter& c1 =
+      store_->counter(absl::StrCat("quiche.test_trial.failure.reason.", Reason1));
+  EXPECT_EQ(1u, c1.value());
+
+  Envoy::Stats::Histogram& h3 =
+      store_->histogram("quiche.test_trial.cancel", Envoy::Stats::Histogram::Unit::Unspecified);
+  EXPECT_FALSE(h3.used());
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h3), 5));
+  QUIC_SERVER_HISTOGRAM_COUNTS(test_trial.cancel, 5, 0, 10, 10, "aaaa");
+
+  Envoy::Stats::Histogram& h4 =
+      store_->histogram("quiche.test_session.a.b.c.d", Envoy::Stats::Histogram::Unit::Unspecified);
+  EXPECT_FALSE(h4.used());
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h4), 16));
+  QUIC_SERVER_HISTOGRAM_COUNTS(test_session.a.b.c.d, 16, 0, 100, 10, "bbbb");
+
+  /*
+  Envoy::Stats::Histogram& h1 =
+  store_->histogram("quiche.quic_server_num_written_packets_per_write",
+  Envoy::Stats::Histogram::Unit::Unspecified); EXPECT_FALSE(h1.used()); EXPECT_CALL(sink_,
+  onHistogramComplete(Ref(h1), 16));
+  QUIC_SERVER_HISTOGRAM_COUNTS(quic_server_num_written_packets_per_write, 16, 0, 100, 10, "aaaa");
+
+  size_t num_counters = store_->counters().size();
+  QUIC_SERVER_HISTOGRAM_ENUM(quic_server_connection_close_errors, QUIC_INTERNAL_ERROR,
+  QUIC_LAST_ERROR, "doc"); EXPECT_EQ(num_counters + 1, store_->counters().size());
+  Envoy::Stats::Counter&  c1 =
+  store_->counter(absl::StrCat("quiche.quic_server_connection_close_errors.", QUIC_INTERNAL_ERROR));
+  EXPECT_EQ(1u, c1.value());
+  */
 }
 
 TEST_F(QuicPlatformTest, QuicStackTraceTest) {
