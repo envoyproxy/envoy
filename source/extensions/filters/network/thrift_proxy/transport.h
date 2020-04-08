@@ -85,7 +85,7 @@ using TransportPtr = std::unique_ptr<Transport>;
  */
 class NamedTransportConfigFactory : public Envoy::Config::UntypedFactory {
 public:
-  virtual ~NamedTransportConfigFactory() = default;
+  ~NamedTransportConfigFactory() override = default;
 
   /**
    * Create a particular Thrift transport.

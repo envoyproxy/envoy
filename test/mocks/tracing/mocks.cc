@@ -4,7 +4,6 @@
 #include "gtest/gtest.h"
 
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Tracing {
