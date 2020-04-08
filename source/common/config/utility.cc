@@ -66,9 +66,9 @@ void Utility::checkCluster(absl::string_view error_prefix, absl::string_view clu
   }
 
   if (!allow_added_via_api && cluster->info()->addedViaApi()) {
-    throw EnvoyException(fmt::format("{}: invalid cluster '{}': currently only "
-                                     "static (non-CDS) clusters are supported",
-                                     error_prefix, cluster_name));
+    throw EnvoyException(fmt::format(
+        "{}: invalid cluster '{}': currently only static (non-CDS) clusters are supported",
+        error_prefix, cluster_name));
   }
 }
 
@@ -113,23 +113,20 @@ void Utility::checkApiConfigSourceNames(
 
   if (is_grpc) {
     if (!api_config_source.cluster_names().empty()) {
-      throw EnvoyException(fmt::format("{}::(DELTA_)GRPC "
-                                       "must not have a cluster name specified: {}",
-                                       api_config_source.GetTypeName(),
-                                       api_config_source.DebugString()));
+      throw EnvoyException(
+          fmt::format("{}::(DELTA_)GRPC must not have a cluster name specified: {}",
+                      api_config_source.GetTypeName(), api_config_source.DebugString()));
     }
     if (api_config_source.grpc_services().size() > 1) {
-      throw EnvoyException(fmt::format("{}::(DELTA_)GRPC "
-                                       "must have a single gRPC service specified: {}",
-                                       api_config_source.GetTypeName(),
-                                       api_config_source.DebugString()));
+      throw EnvoyException(
+          fmt::format("{}::(DELTA_)GRPC must have a single gRPC service specified: {}",
+                      api_config_source.GetTypeName(), api_config_source.DebugString()));
     }
   } else {
     if (!api_config_source.grpc_services().empty()) {
-      throw EnvoyException(fmt::format("{}, if not a gRPC type, must not have "
-                                       "a gRPC service specified: {}",
-                                       api_config_source.GetTypeName(),
-                                       api_config_source.DebugString()));
+      throw EnvoyException(
+          fmt::format("{}, if not a gRPC type, must not have a gRPC service specified: {}",
+                      api_config_source.GetTypeName(), api_config_source.DebugString()));
     }
     if (api_config_source.cluster_names().size() != 1) {
       throw EnvoyException(fmt::format("{} must have a singleton cluster name specified: {}",
@@ -146,10 +143,9 @@ void Utility::validateClusterName(const Upstream::ClusterManager::ClusterInfoMap
 
   if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
       it->second.get().info()->type() == envoy::config::cluster::v3::Cluster::EDS) {
-    throw EnvoyException(fmt::format(
-        "{} must have a statically "
-        "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
-        config_source, cluster_name));
+    throw EnvoyException(fmt::format("{} must have a statically defined non-EDS cluster: '{}' does "
+                                     "not exist, was added via api, or is an EDS cluster",
+                                     config_source, cluster_name));
   }
 }
 
