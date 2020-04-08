@@ -11,6 +11,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 namespace Envoy {
@@ -20,12 +21,14 @@ struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(TimeSource& time_source)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()),
-        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
+        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)),
+        request_id_extension_(Http::RequestIDExtensionFactory::noopInstance()) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
-        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
+        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)),
+        request_id_extension_(Http::RequestIDExtensionFactory::noopInstance()) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
                  std::shared_ptr<FilterState>& parent_filter_state)
@@ -34,7 +37,8 @@ struct StreamInfoImpl : public StreamInfo {
         filter_state_(std::make_shared<FilterStateImpl>(
             FilterStateImpl::LazyCreateAncestor(parent_filter_state,
                                                 FilterState::LifeSpan::DownstreamConnection),
-            FilterState::LifeSpan::FilterChain)) {}
+            FilterState::LifeSpan::FilterChain)),
+        request_id_extension_(Http::RequestIDExtensionFactory::noopInstance()) {}
 
   SystemTime startTime() const override { return start_time_; }
 

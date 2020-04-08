@@ -19,6 +19,11 @@ public:
   static RequestIDExtensionSharedPtr defaultInstance(Envoy::Runtime::RandomGenerator& random);
 
   /**
+   * Return a globally shared instance of the noop RequestIDExtension implementation.
+   */
+  static RequestIDExtensionSharedPtr noopInstance();
+
+  /**
    * Read a RequestIDExtension definition from proto and create it.
    */
   static RequestIDExtensionSharedPtr fromProto(
