@@ -7,7 +7,11 @@
 set -e
 
 # enable utf-8 in python
-export LANG=en_US.UTF-8
+LANG=$(locale -a | grep -i -E "^(en_US|C)\.(utf-?8)$" | sort -r | head -n 1)
+if [[ -z "$LANG" ]]; then
+    LANG="C.UTF-8"
+fi
+export LANG
 
 function usage() {
     echo "Usage: $0 <mode> <transport> <protocol> -s [multiplex-service] -H [headers] method [param...]"
