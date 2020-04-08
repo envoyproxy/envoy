@@ -84,6 +84,7 @@ public:
               componentLogLevels, (), (const));
   MOCK_METHOD(const std::string&, logFormat, (), (const));
   MOCK_METHOD(bool, logFormatEscaped, (), (const));
+  MOCK_METHOD(bool, logFormatPrefixWithLocation, (), (const));
   MOCK_METHOD(const std::string&, logPath, (), (const));
   MOCK_METHOD(std::chrono::seconds, parentShutdownTime, (), (const));
   MOCK_METHOD(uint64_t, restartEpoch, (), (const));
