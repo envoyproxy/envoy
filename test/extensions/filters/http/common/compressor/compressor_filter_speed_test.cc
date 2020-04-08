@@ -67,7 +67,9 @@ static std::vector<Buffer::OwnedImpl> generateChunks(const uint64_t chunk_count,
 }
 
 static void compressWith(std::vector<Buffer::OwnedImpl>&& chunks, CompressionParams params,
-                         NiceMock<Http::MockStreamDecoderFilterCallbacks>& decoder_callbacks) {
+                         NiceMock<Http::MockStreamDecoderFilterCallbacks>& decoder_callbacks,
+                         benchmark::State& state) {
+  auto start = std::chrono::high_resolution_clock::now();
   Stats::IsolatedStoreImpl stats;
   testing::NiceMock<Runtime::MockLoader> runtime;
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
@@ -115,6 +117,9 @@ static void compressWith(std::vector<Buffer::OwnedImpl>&& chunks, CompressionPar
   EXPECT_EQ(total_compressed_bytes,
             stats.counterFromString("test.gzip.total_compressed_bytes").value());
   EXPECT_EQ(1U, stats.counterFromString("test.gzip.compressed").value());
+  auto end = std::chrono::high_resolution_clock::now();
+  const auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+  state.SetIterationTime(elapsed.count());
 }
 
 // SPELLCHECKER(off)
@@ -182,6 +187,18 @@ static std::vector<CompressionParams> compression_params = {
     {Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best,
      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 15, 9}};
 
+static void compressFull(benchmark::State& state) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  const auto idx = state.range(0);
+  const auto& params = compression_params[idx];
+
+  for (auto _ : state) {
+    std::vector<Buffer::OwnedImpl> chunks = generateChunks(1, 122880);
+    compressWith(std::move(chunks), params, decoder_callbacks, state);
+  }
+}
+BENCHMARK(compressFull)->DenseRange(0, 8, 1)->UseManualTime()->Unit(benchmark::kMillisecond);
+
 static void compressChunks16384(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
@@ -189,10 +206,10 @@ static void compressChunks16384(benchmark::State& state) {
 
   for (auto _ : state) {
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(7, 16384);
-    compressWith(std::move(chunks), params, decoder_callbacks);
+    compressWith(std::move(chunks), params, decoder_callbacks, state);
   }
 }
-BENCHMARK(compressChunks16384)->DenseRange(0, 8, 1);
+BENCHMARK(compressChunks16384)->DenseRange(0, 8, 1)->UseManualTime()->Unit(benchmark::kMillisecond);
 
 static void compressChunks8192(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -201,10 +218,10 @@ static void compressChunks8192(benchmark::State& state) {
 
   for (auto _ : state) {
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(15, 8192);
-    compressWith(std::move(chunks), params, decoder_callbacks);
+    compressWith(std::move(chunks), params, decoder_callbacks, state);
   }
 }
-BENCHMARK(compressChunks8192)->DenseRange(0, 8, 1);
+BENCHMARK(compressChunks8192)->DenseRange(0, 8, 1)->UseManualTime()->Unit(benchmark::kMillisecond);
 
 static void compressChunks4096(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -213,10 +230,10 @@ static void compressChunks4096(benchmark::State& state) {
 
   for (auto _ : state) {
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(30, 4096);
-    compressWith(std::move(chunks), params, decoder_callbacks);
+    compressWith(std::move(chunks), params, decoder_callbacks, state);
   }
 }
-BENCHMARK(compressChunks4096)->DenseRange(0, 8, 1);
+BENCHMARK(compressChunks4096)->DenseRange(0, 8, 1)->UseManualTime()->Unit(benchmark::kMillisecond);
 
 static void compressChunks1024(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -225,22 +242,10 @@ static void compressChunks1024(benchmark::State& state) {
 
   for (auto _ : state) {
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(120, 1024);
-    compressWith(std::move(chunks), params, decoder_callbacks);
+    compressWith(std::move(chunks), params, decoder_callbacks, state);
   }
 }
-BENCHMARK(compressChunks1024)->DenseRange(0, 8, 1);
-
-static void compressFull(benchmark::State& state) {
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  const auto idx = state.range(0);
-  const auto& params = compression_params[idx];
-
-  for (auto _ : state) {
-    std::vector<Buffer::OwnedImpl> chunks = generateChunks(1, 122880);
-    compressWith(std::move(chunks), params, decoder_callbacks);
-  }
-}
-BENCHMARK(compressFull)->DenseRange(0, 8, 1);
+BENCHMARK(compressChunks1024)->DenseRange(0, 8, 1)->UseManualTime()->Unit(benchmark::kMillisecond);
 
 } // namespace Compressors
 } // namespace Common
