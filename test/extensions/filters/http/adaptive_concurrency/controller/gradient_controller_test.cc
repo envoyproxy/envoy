@@ -650,7 +650,7 @@ min_rtt_calc_params:
 
   // Ensure that the concurrency window increases on its own due to the headroom calculation with
   // the max gradient.
-  time_system_.sleep(std::chrono::milliseconds(101));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(101));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_GE(controller->concurrencyLimit(), 7);
   EXPECT_LE(controller->concurrencyLimit() / 7.0, 2.0);
@@ -663,7 +663,7 @@ min_rtt_calc_params:
       tryForward(controller, true);
       controller->recordLatencySample(elevated_latency);
     }
-    time_system_.sleep(std::chrono::milliseconds(101));
+    time_system_.advanceTimeAsync(std::chrono::milliseconds(101));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
@@ -674,7 +674,7 @@ min_rtt_calc_params:
       tryForward(controller, true);
       controller->recordLatencySample(elevated_latency);
     }
-    time_system_.sleep(std::chrono::milliseconds(101));
+    time_system_.advanceTimeAsync(std::chrono::milliseconds(101));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_GE(controller->concurrencyLimit(), last_concurrency);
   }
