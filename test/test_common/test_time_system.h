@@ -20,6 +20,10 @@ public:
    * scheduled to fire, and blocking until the timer callbacks are complete.
    * See also advanceTimeAsync(), which does not block.
    *
+   * This function should be used in multi-threaded tests, where other
+   * threads are running dispatcher loops. Integration tests should usually
+   * use this variant.
+   *
    * @param duration The amount of time to sleep.
    */
   virtual void advanceTimeWait(const Duration& duration) PURE;
@@ -31,6 +35,10 @@ public:
    * Advances time forward by the specified duration. Timers may be triggered on
    * their threads, but unlike advanceTimeWait(), this method does not block
    * waiting for them to complete.
+   *
+   * This function should be used in single-threaded tests, in scenarios where
+   * after time is advanced, the main test thread will run a dispatcher
+   * loop. Unit tests will often use this variant.
    *
    * @param duration The amount of time to sleep.
    */

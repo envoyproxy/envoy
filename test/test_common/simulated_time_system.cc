@@ -252,8 +252,8 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
     const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
   only_one_thread_.checkOneThread();
 
-  // This real-time polling delay should not be necessary. But without it,
-  // /test/extensions/filters/http/cache:cache_filter_integration_test fails
+  // TODO(#10568): This real-time polling delay should not be necessary. Without
+  // it, test/extensions/filters/http/cache:cache_filter_integration_test fails
   // about 40% of the time.
   const Duration real_time_poll_delay(
       std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(50)), duration));
