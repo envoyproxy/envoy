@@ -4,7 +4,7 @@ Version history
 1.15.0 (Pending)
 ================
 
-* http: fixing a bug where the upgrade header was not cleared on responses to non-upgrade requests.
+* http: fixed a bug where the upgrade header was not cleared on responses to non-upgrade requests.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
 
 1.14.0 (April 8, 2020)
