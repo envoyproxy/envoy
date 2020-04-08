@@ -13,7 +13,7 @@ namespace DirectResponse {
 Network::FilterStatus DirectResponseFilter::onNewConnection() {
   auto& connection = read_callbacks_->connection();
   ENVOY_CONN_LOG(trace, "direct_response: new connection", connection);
-  if (response_.size() > 0) {
+  if (!response_.empty()) {
     Buffer::OwnedImpl data(response_);
     connection.write(data, false);
     ASSERT(0 == data.length());

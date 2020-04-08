@@ -19,9 +19,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::AllOf;
-using testing::Ge;
-using testing::Le;
 using testing::NiceMock;
 using testing::Return;
 
@@ -621,6 +618,65 @@ min_rtt_calc_params:
   for (int i = 0; i < 6; ++i) {
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(5));
+  }
+}
+
+// Test that consecutively setting the concurrency limit to the minimum triggers a minRTT
+// recalculation.
+TEST_F(GradientControllerTest, ConsecutiveMinConcurrencyReset) {
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  max_concurrency_limit:
+  concurrency_update_interval: 0.1s
+min_rtt_calc_params:
+  jitter:
+    value: 0.0
+  interval: 3600s
+  request_count: 5
+  buffer:
+    value: 0
+  min_concurrency: 7
+)EOF";
+
+  auto controller = makeController(yaml);
+  EXPECT_EQ(controller->concurrencyLimit(), 7);
+
+  // Force a minRTT of 5ms.
+  advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
+  EXPECT_EQ(
+      5, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());
+
+  // Ensure that the concurrency window increases on its own due to the headroom calculation with
+  // the max gradient.
+  time_system_.sleep(std::chrono::milliseconds(101));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_GE(controller->concurrencyLimit(), 7);
+  EXPECT_LE(controller->concurrencyLimit() / 7.0, 2.0);
+
+  // Make it seem as if the recorded latencies are consistently higher than the measured minRTT to
+  // induce a minRTT recalculation after 5 iterations.
+  const auto elevated_latency = std::chrono::milliseconds(10);
+  for (int recalcs = 0; recalcs < 5; ++recalcs) {
+    for (int i = 1; i <= 5; ++i) {
+      tryForward(controller, true);
+      controller->recordLatencySample(elevated_latency);
+    }
+    time_system_.sleep(std::chrono::milliseconds(101));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+
+  // Verify that the concurrency limit starts growing with newly measured minRTT.
+  for (int recalcs = 0; recalcs < 10; ++recalcs) {
+    const auto last_concurrency = controller->concurrencyLimit();
+    for (int i = 1; i <= 5; ++i) {
+      tryForward(controller, true);
+      controller->recordLatencySample(elevated_latency);
+    }
+    time_system_.sleep(std::chrono::milliseconds(101));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+    EXPECT_GE(controller->concurrencyLimit(), last_concurrency);
   }
 }
 

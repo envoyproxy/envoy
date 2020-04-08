@@ -11,7 +11,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.cluster.v3";
 option java_outer_classname = "FilterProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Upstream filters]
 // Upstream filters apply to the connections to the upstream cluster hosts.

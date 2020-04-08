@@ -10,8 +10,13 @@ Version history
 * access log: introduce :ref:`connection-level access loggers<envoy_api_field_Listener.access_log>`.
 * adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
   minimum.
+* adaptive concurrency: minRTT is now triggered when the minimum concurrency is maintained for 5
+  consecutive sampling intervals
 * admin: added support for displaying ip address subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * admin: added :http:post:`/reopen_logs` endpoint to control log rotation.
+* api: froze v2 xDS API. New feature development in the API should occur in v3 xDS. While the v2 xDS API has
+  been deprecated since 1.13.0, it will continue to be supported by Envoy until EOY 2020. See
+  :ref:`api_supported_versions`.
 * aws_lambda: added :ref:`AWS Lambda filter <config_http_filters_aws_lambda>` that converts HTTP requests to Lambda
   invokes. This effectively makes Envoy act as an egress gateway to AWS Lambda.
 * aws_request_signing: a few fixes so that it works with S3.
@@ -51,6 +56,8 @@ Version history
 * network filters: network filter extensions use the "envoy.filters.network" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * rbac: added :ref:`url_path <envoy_api_field_config.rbac.v2.Permission.url_path>` for matching URL path without the query and fragment string.
+* rbac: added :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>` and :ref:`direct_remote_ip <envoy_api_field_config.rbac.v2.Principal.direct_remote_ip>` for matching downstream remote IP address.
+* rbac: deprecated :ref:`source_ip <envoy_api_field_config.rbac.v2.Principal.source_ip>` with :ref:`direct_remote_ip <envoy_api_field_config.rbac.v2.Principal.direct_remote_ip>` and :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>`.
 * request_id_extension: add an ability to extend request ID handling at :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_id_extension>`.
 * retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
 * router: added ability to set attempt count in downstream response, see :ref:`virtual host's include response

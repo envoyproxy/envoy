@@ -38,7 +38,7 @@ using TracerFactoryContextPtr = std::unique_ptr<TracerFactoryContext>;
  */
 class TracerFactory : public Config::TypedFactory {
 public:
-  virtual ~TracerFactory() = default;
+  ~TracerFactory() override = default;
 
   /**
    * Create a particular HttpTracer implementation. If the implementation is unable to produce an

@@ -311,7 +311,7 @@ public:
   // as the calling CacheFilter).
   virtual HttpCache&
   getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) PURE;
-  virtual ~HttpCacheFactory() = default;
+  ~HttpCacheFactory() override = default;
 
 private:
   const std::string name_;
