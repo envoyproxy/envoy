@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Eq;
 using testing::NiceMock;
 using testing::Throw;
 using testing::UnorderedElementsAre;

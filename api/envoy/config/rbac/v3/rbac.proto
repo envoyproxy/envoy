@@ -17,7 +17,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.rbac.v3";
 option java_outer_classname = "RbacProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Role Based Access Control (RBAC)]
 
@@ -180,7 +180,7 @@ message Permission {
 }
 
 // Principal defines an identity or a group of identities for a downstream subject.
-// [#next-free-field: 10]
+// [#next-free-field: 12]
 message Principal {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Principal";
 
@@ -222,7 +222,21 @@ message Principal {
     Authenticated authenticated = 4;
 
     // A CIDR block that describes the downstream IP.
-    core.v3.CidrRange source_ip = 5;
+    // This address will honor proxy protocol, but will not honor XFF.
+    core.v3.CidrRange source_ip = 5 [deprecated = true];
+
+    // A CIDR block that describes the downstream remote/origin address.
+    // Note: This is always the physical peer even if the
+    // :ref:`remote_ip <envoy_api_field_config.rbac.v3.Principal.remote_ip>` is inferred
+    // from for example the x-forwarder-for header, proxy protocol, etc.
+    core.v3.CidrRange direct_remote_ip = 10;
+
+    // A CIDR block that describes the downstream remote/origin address.
+    // Note: This may not be the physical peer and could be different from the
+    // :ref:`direct_remote_ip <envoy_api_field_config.rbac.v3.Principal.direct_remote_ip>`.
+    // E.g, if the remote ip is inferred from for example the x-forwarder-for header,
+    // proxy protocol, etc.
+    core.v3.CidrRange remote_ip = 11;
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
