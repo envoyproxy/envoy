@@ -1,4 +1,5 @@
 #include "test/common/http/common.h"
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/integration.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
@@ -150,13 +151,26 @@ TEST_P(DispatcherIntegrationTest, Basic) {
   };
 
   // Build a set of request headers.
-  Http::TestRequestHeaderMapImpl headers;
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  Http::TestRequestHeaderMapImpl headers{
+      {AutonomousStream::EXPECT_REQUEST_SIZE_BYTES, std::to_string(request_data.length())}};
+
   HttpTestUtility::addDefaultHeaders(headers);
   envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
 
+  // Build body data
+  envoy_data c_data = Buffer::Utility::toBridgeData(request_data);
+
+  // Build a set of request trailers.
+  // TODO: update the autonomous upstream to assert on trailers, or to send trailers back.
+  Http::TestRequestTrailerMapImpl trailers;
+  envoy_headers c_trailers = Http::Utility::toBridgeHeaders(trailers);
+
   // Create a stream.
   EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
-  http_dispatcher_.sendHeaders(stream, c_headers, true);
+  http_dispatcher_.sendHeaders(stream, c_headers, false);
+  http_dispatcher_.sendData(stream, c_data, false);
+  http_dispatcher_.sendTrailers(stream, c_trailers);
 
   terminal_callback.waitReady();
 
@@ -228,6 +242,10 @@ TEST_P(DispatcherIntegrationTest, RaceDoesNotCauseDoubleDeletion) {
 
   http_dispatcher_.synchronizer().signal("dispatch_encode_final_data");
 }
+
+// TODO(junr03): test with envoy local reply with local stream not closed, which causes a reset
+// fired from the Http:ConnectionManager rather than the Http::Dispatcher. This cannot be done in
+// unit tests because the Http::ConnectionManager is mocked using a mock response encoder.
 
 } // namespace
 } // namespace Envoy

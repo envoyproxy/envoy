@@ -113,8 +113,10 @@ private:
     Stream& getStream() override;
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
     // TODO: implement
-    void encode100ContinueHeaders(const ResponseHeaderMap&) override {}
-    void encodeMetadata(const MetadataMapVector&) override {}
+    void encode100ContinueHeaders(const ResponseHeaderMap&) override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
+    void encodeMetadata(const MetadataMapVector&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   private:
     DirectStream& direct_stream_;
@@ -145,7 +147,7 @@ private:
       return parent_.address_;
     }
     // TODO: stream watermark control.
-    void readDisable(bool) override {}
+    void readDisable(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
     uint32_t bufferLimit() override { return 65000; }
 
     void closeLocal(bool end_stream);

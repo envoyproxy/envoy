@@ -47,7 +47,7 @@ public:
 
   Type type() const {
     // TODO(junr03): consider adding another type of address.
-    return Address::Type::Ip;
+    return Type::Ip;
   }
 
 private:
