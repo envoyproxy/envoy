@@ -39,7 +39,6 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           tracing:
-            # Notice that tracing provider configuration is now part of "envoy.filters.network.http_connection_manager" config.
             provider:
               name: envoy.tracers.dynamic_ot
               typed_config:

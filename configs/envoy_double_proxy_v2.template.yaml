@@ -60,7 +60,6 @@
           typed_config: {}
         tracing:
           operation_name: INGRESS
-          # Notice that tracing provider configuration is now part of "envoy.filters.network.http_connection_manager" config.
           provider:
             name: envoy.tracers.lightstep
             typed_config:

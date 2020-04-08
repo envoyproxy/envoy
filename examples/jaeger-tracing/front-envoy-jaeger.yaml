@@ -12,7 +12,6 @@ static_resources:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           generate_request_id: true
           tracing:
-            # Notice that tracing provider configuration is now part of "envoy.filters.network.http_connection_manager" config.
             provider:
               name: envoy.tracers.zipkin
               typed_config:
