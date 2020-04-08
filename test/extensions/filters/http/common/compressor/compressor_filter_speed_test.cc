@@ -66,9 +66,14 @@ static std::vector<Buffer::OwnedImpl> generateChunks(const uint64_t chunk_count,
   return vec;
 }
 
-static void compressWith(std::vector<Buffer::OwnedImpl>&& chunks, CompressionParams params,
-                         NiceMock<Http::MockStreamDecoderFilterCallbacks>& decoder_callbacks,
-                         benchmark::State& state) {
+struct Result {
+  uint64_t total_uncompressed_bytes = 0;
+  uint64_t total_compressed_bytes = 0;
+};
+
+static Result compressWith(std::vector<Buffer::OwnedImpl>&& chunks, CompressionParams params,
+                           NiceMock<Http::MockStreamDecoderFilterCallbacks>& decoder_callbacks,
+                           benchmark::State& state) {
   auto start = std::chrono::high_resolution_clock::now();
   Stats::IsolatedStoreImpl stats;
   testing::NiceMock<Runtime::MockLoader> runtime;
@@ -97,10 +102,9 @@ static void compressWith(std::vector<Buffer::OwnedImpl>&& chunks, CompressionPar
   filter->encodeHeaders(response_headers, false);
 
   uint64_t idx = 0;
-  uint64_t total_uncompressed_bytes = 0;
-  uint64_t total_compressed_bytes = 0;
+  Result res;
   for (auto& data : chunks) {
-    total_uncompressed_bytes += data.length();
+    res.total_uncompressed_bytes += data.length();
 
     if (idx == (chunks.size() - 1)) {
       filter->encodeData(data, true);
@@ -108,18 +112,21 @@ static void compressWith(std::vector<Buffer::OwnedImpl>&& chunks, CompressionPar
       filter->encodeData(data, false);
     }
 
-    total_compressed_bytes += data.length();
+    res.total_compressed_bytes += data.length();
     ++idx;
   }
 
-  EXPECT_EQ(total_uncompressed_bytes,
+  EXPECT_EQ(res.total_uncompressed_bytes,
             stats.counterFromString("test.gzip.total_uncompressed_bytes").value());
-  EXPECT_EQ(total_compressed_bytes,
+  EXPECT_EQ(res.total_compressed_bytes,
             stats.counterFromString("test.gzip.total_compressed_bytes").value());
+
   EXPECT_EQ(1U, stats.counterFromString("test.gzip.compressed").value());
   auto end = std::chrono::high_resolution_clock::now();
   const auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   state.SetIterationTime(elapsed.count());
+
+  return res;
 }
 
 // SPELLCHECKER(off)
