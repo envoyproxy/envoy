@@ -23,8 +23,11 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/router/rds_impl.h"
+#include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_config_impl.h"
 #include "common/tracing/http_tracer_manager_impl.h"
@@ -211,7 +214,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
                                                       0))),
 #endif
-      merge_slashes_(config.merge_slashes()) {
+      merge_slashes_(config.merge_slashes()),
+      headers_with_underscores_action_(
+          config.common_http_protocol_options().headers_with_underscores_action()) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
@@ -222,6 +227,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
     idle_timeout_ = absl::nullopt;
+  }
+
+  // If we are provided a different request_id_extension implementation to use try and create a new
+  // instance of it, otherwise use default one.
+  if (config.request_id_extension().has_typed_config()) {
+    request_id_extension_ =
+        Http::RequestIDExtensionFactory::fromProto(config.request_id_extension(), context_);
+  } else {
+    request_id_extension_ = Http::RequestIDExtensionFactory::defaultInstance(context_.random());
   }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
@@ -461,11 +475,11 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb(),
-        maxRequestHeadersCount());
+        maxRequestHeadersCount(), headersWithUnderscoresAction());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount());
+        maxRequestHeadersCount(), headersWithUnderscoresAction());
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
     // TODO(danzh) Add support to get the factory name from config, possibly
@@ -478,7 +492,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount());
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

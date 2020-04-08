@@ -16,6 +16,52 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
+TEST(OpenCensusTracerConfigTest, InvalidStackdriverConfiguration) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  OpenCensusTracerFactory factory;
+
+  const std::string yaml_string = R"EOF(
+  http:
+    name: envoy.tracers.opencensus
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      stackdriver_exporter_enabled: true
+      stackdriver_grpc_service:
+        envoy_grpc:
+          cluster_name: stackdriver
+  )EOF";
+  envoy::config::trace::v3::Tracing configuration;
+  TestUtility::loadFromYaml(yaml_string, configuration);
+
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message, context)), EnvoyException,
+                            "Opencensus stackdriver tracer only support GoogleGrpc.");
+}
+
+TEST(OpenCensusTracerConfigTest, InvalidOcagentConfiguration) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  OpenCensusTracerFactory factory;
+
+  const std::string yaml_string = R"EOF(
+  http:
+    name: envoy.tracers.opencensus
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      ocagent_exporter_enabled: true
+      ocagent_grpc_service:
+        envoy_grpc:
+          cluster_name: opencensus
+  )EOF";
+  envoy::config::trace::v3::Tracing configuration;
+  TestUtility::loadFromYaml(yaml_string, configuration);
+
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message, context)), EnvoyException,
+                            "Opencensus ocagent tracer only supports GoogleGrpc.");
+}
+
 TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracer) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(

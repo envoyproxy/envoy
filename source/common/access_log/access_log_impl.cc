@@ -20,7 +20,6 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/uuid_util.h"
 #include "common/stream_info/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -123,15 +122,14 @@ RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& 
       percent_(config.percent_sampled()),
       use_independent_randomness_(config.use_independent_randomness()) {}
 
-bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo&,
+bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
                              const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
-  const Http::HeaderEntry* uuid = request_headers.RequestId();
+  auto rid_extension = stream_info.getRequestIDExtension();
   uint64_t random_value;
-  // TODO(dnoe): Migrate uuidModBy to take string_view (#6580)
-  if (use_independent_randomness_ || uuid == nullptr ||
-      !UuidUtils::uuidModBy(
-          std::string(uuid->value().getStringView()), random_value,
+  if (use_independent_randomness_ ||
+      !rid_extension->modBy(
+          request_headers, random_value,
           ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator()))) {
     random_value = random_.random();
   }

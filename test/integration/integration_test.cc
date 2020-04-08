@@ -8,6 +8,7 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -140,7 +141,7 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
 }
 
 TEST_P(IntegrationTest, ConnectionClose) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -157,12 +158,39 @@ TEST_P(IntegrationTest, ConnectionClose) {
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(1024, 512, false);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false);
+}
+
+TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
 }
 
 TEST_P(IntegrationTest, FlowControlOnAndGiantBody) {
   config_helper_.setBufferLimits(1024, 1024);
-  testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
+}
+
+TEST_P(IntegrationTest, LargeFlowControlOnAndGiantBody) {
+  config_helper_.setBufferLimits(128 * 1024, 128 * 1024);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
+}
+
+TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyAndContentLengthNoBuffer) {
+  testRouterRequestAndResponseWithBody(1024, 512, false, true);
+}
+
+TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyAndContentLengthNoBuffer) {
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
+}
+
+TEST_P(IntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
+  config_helper_.setBufferLimits(1024, 1024);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
+}
+
+TEST_P(IntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
+  config_helper_.setBufferLimits(128 * 1024, 128 * 1024);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
@@ -1166,6 +1194,49 @@ TEST_P(IntegrationTest, TestFlood) {
   EXPECT_EQ(1, test_server_->counter("http1.response_flood")->value());
 }
 
+TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Set an Upstream reply with an invalid content-length, which will be rejected by the Envoy.
+  auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "invalid"}}));
+  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+      ->setResponseHeaders(std::move(response_headers));
+
+  // Set up a raw connection to easily send requests without reading responses. Also, set a small
+  // TCP receive buffer to speed up connection backup while proxying the response flood.
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
+  Network::ClientConnectionPtr raw_connection =
+      makeClientConnectionWithOptions(lookupPort("http"), options);
+  raw_connection->connect();
+
+  // Read disable so responses will queue up.
+  uint32_t bytes_to_send = 0;
+  raw_connection->readDisable(true);
+  // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
+  raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
+
+  // Keep sending requests until flood protection kicks in and kills the connection.
+  while (raw_connection->state() == Network::Connection::State::Open) {
+    // The upstream response is invalid, and will trigger an internally generated error response
+    // from Envoy.
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nhost: foo.com\r\n\r\n");
+    bytes_to_send += buffer.length();
+    raw_connection->write(buffer, false);
+    // Loop until all bytes are sent.
+    while (bytes_to_send > 0 && raw_connection->state() == Network::Connection::State::Open) {
+      raw_connection->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+    }
+  }
+
+  // Verify the connection was closed due to flood protection.
+  EXPECT_EQ(1, test_server_->counter("http1.response_flood")->value());
+}
+
 // Make sure flood protection doesn't kick in with many requests sent serially.
 TEST_P(IntegrationTest, TestManyBadRequests) {
   initialize();
@@ -1174,7 +1245,7 @@ TEST_P(IntegrationTest, TestManyBadRequests) {
   Http::TestRequestHeaderMapImpl bad_request{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}};
 
-  for (int i = 0; i < 1; ++i) {
+  for (int i = 0; i < 1000; ++i) {
     IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(bad_request);
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());

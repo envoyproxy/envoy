@@ -20,7 +20,6 @@
 
 using testing::_;
 using testing::Invoke;
-using testing::Return;
 
 namespace Envoy {
 namespace Quic {

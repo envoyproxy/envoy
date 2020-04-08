@@ -6760,6 +6760,10 @@ public:
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
     }
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      // Override this to guarantee that we have a different factory mapping by-type.
+      return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
+    }
     Router::RouteSpecificFilterConfigConstSharedPtr
     createRouteSpecificFilterConfig(const Protobuf::Message& message,
                                     Server::Configuration::ServerFactoryContext&,
@@ -6778,7 +6782,7 @@ public:
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
-      return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
+      return ProtobufTypes::MessagePtr{new ProtobufWkt::Struct()};
     }
   };
 
@@ -6930,7 +6934,7 @@ virtual_hosts:
         route: { cluster: baz }
     typed_per_filter_config:
       test.default.filter:
-        "@type": type.googleapis.com/google.protobuf.Timestamp
+        "@type": type.googleapis.com/google.protobuf.Struct
         value:
           seconds: 123
 )EOF";

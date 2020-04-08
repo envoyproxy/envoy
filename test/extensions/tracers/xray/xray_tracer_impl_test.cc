@@ -13,8 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::testing::ReturnRef;
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -90,21 +88,6 @@ TEST_F(XRayDriverTest, NoXRayTracerHeader) {
   // b) there are no sampling rules passed, so the default rules apply (1 req/sec and 5% after that
   // within that second)
   ASSERT_NE(span, nullptr);
-}
-
-TEST_F(XRayDriverTest, EmptySegmentNameDefaultToClusterName) {
-  const std::string cluster_name = "FooBar";
-  EXPECT_CALL(context_.server_factory_context_.local_info_, clusterName())
-      .WillRepeatedly(ReturnRef(cluster_name));
-  XRayConfiguration config{"" /*daemon_endpoint*/, "", "" /*sampling_rules*/};
-  Driver driver(config, context_);
-
-  Tracing::Decision tracing_decision{Tracing::Reason::Sampling, true /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
-                               tracing_decision);
-  auto* xray_span = static_cast<XRay::Span*>(span.get());
-  ASSERT_STREQ(xray_span->name().c_str(), cluster_name.c_str());
 }
 
 } // namespace
