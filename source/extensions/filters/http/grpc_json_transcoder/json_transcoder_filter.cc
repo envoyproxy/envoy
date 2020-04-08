@@ -544,10 +544,11 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-    doTrailers(trailers);
+Http::FilterTrailersStatus
+JsonTranscoderFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  doTrailers(trailers);
 
-    return Http::FilterTrailersStatus::Continue;
+  return Http::FilterTrailersStatus::Continue;
 }
 
 void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers) {
