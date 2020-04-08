@@ -117,9 +117,12 @@ message Bootstrap {
   // Optional watchdog configuration.
   Watchdog watchdog = 8;
 
-  // Configuration for an external tracing provider. If not specified, no
-  // tracing will be performed.
-  trace.v2.Tracing tracing = 9;
+  // Configuration for an external tracing provider.
+  //
+  // .. attention::
+  //  This field has been deprecated in favor of :ref:`HttpConnectionManager.Tracing.provider
+  //  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing.provider>`.
+  trace.v2.Tracing tracing = 9 [deprecated = true];
 
   // Configuration for the runtime configuration provider (deprecated). If not
   // specified, a “null” provider will be used which will result in all defaults

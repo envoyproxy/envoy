@@ -63,7 +63,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   // however, it's become mandatory to process it prior to static Listeners.
   // Otherwise, static Listeners will be configured in assumption that
   // tracing configuration is missing from the bootstrap config.
-  initializeTracers(bootstrap.hidden_envoy_deprecated_tracing(), server);
+  initializeTracers(bootstrap.tracing(), server);
 
   const auto& secrets = bootstrap.static_resources().secrets();
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());

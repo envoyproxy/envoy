@@ -33,8 +33,8 @@ message Tracing {
   // Configuration for an HTTP tracer provider used by Envoy.
   //
   // The configuration is defined by the
-  // :ref:`HttpConnectionManager.Tracing <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing>`
-  // :ref:`provider <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing.provider>`
+  // :ref:`HttpConnectionManager.Tracing <envoy_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing>`
+  // :ref:`provider <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`
   // field.
   message Http {
     option (udpa.annotations.versioning).previous_message_type =
