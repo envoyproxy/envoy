@@ -3,6 +3,9 @@ Version history
 
 1.15.0 (Pending)
 ================
+
+1.14.1 (April 8, 2020)
+======================
 * request_id_extension: fixed static initialization for noop request id extension.
 
 1.14.0 (April 8, 2020)
