@@ -10,8 +10,8 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 Deprecated items below are listed in chronological order.
 
-1.14.0 (Pending)
-================
+1.14.0 (April 8, 2020)
+======================
 * The previous behavior for upstream connection pool circuit breaking described
   `here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>`_ has
   been deprecated in favor of the new behavior described :ref:`here <arch_overview_circuit_break>`.
