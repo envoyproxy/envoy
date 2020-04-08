@@ -328,7 +328,7 @@ public:
       resource->set_name(TestUtility::xdsResourceName(temp_any));
       resource->set_version(version);
       resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
-      for (const auto alias : aliases) {
+      for (const auto& alias : aliases) {
         resource->add_aliases(alias);
       }
     }

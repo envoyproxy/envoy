@@ -214,7 +214,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
                                                       0))),
 #endif
-      merge_slashes_(config.merge_slashes()) {
+      merge_slashes_(config.merge_slashes()),
+      headers_with_underscores_action_(
+          config.common_http_protocol_options().headers_with_underscores_action()) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
@@ -473,11 +475,11 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb(),
-        maxRequestHeadersCount());
+        maxRequestHeadersCount(), headersWithUnderscoresAction());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount());
+        maxRequestHeadersCount(), headersWithUnderscoresAction());
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
     // TODO(danzh) Add support to get the factory name from config, possibly
@@ -490,7 +492,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount());
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

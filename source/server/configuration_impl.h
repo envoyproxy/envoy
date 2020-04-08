@@ -33,7 +33,7 @@ namespace Configuration {
  */
 class StatsSinkFactory : public Config::TypedFactory {
 public:
-  virtual ~StatsSinkFactory() = default;
+  ~StatsSinkFactory() override = default;
 
   /**
    * Create a particular Stats::Sink implementation. If the implementation is unable to produce a
