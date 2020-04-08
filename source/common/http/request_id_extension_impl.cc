@@ -45,8 +45,8 @@ RequestIDExtensionFactory::defaultInstance(Envoy::Runtime::RandomGenerator& rand
 }
 
 RequestIDExtensionSharedPtr RequestIDExtensionFactory::noopInstance() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(
-      std::shared_ptr<RequestIDExtension>, std::make_shared<NoopRequestIDExtension>());
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(std::shared_ptr<RequestIDExtension>,
+                                 std::make_shared<NoopRequestIDExtension>());
 }
 
 } // namespace Http
