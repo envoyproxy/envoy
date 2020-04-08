@@ -8,26 +8,26 @@ Dynamic forward proxy
   HTTP dynamic forward proxy support should be considered alpha and not production ready.
 
 * HTTP dynamic forward proxy :ref:`architecture overview <arch_overview_http_dynamic_forward_proxy>`
-* :ref:`v3 API reference <envoy_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
 * This filter should be configured with the name *envoy.filters.http.dynamic_forward_proxy*
 
 The following is a complete configuration that configures both the
 :ref:`dynamic forward proxy HTTP filter
-<envoy_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
+<envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
 as well as the :ref:`dynamic forward proxy cluster
-<envoy_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>`. Both filter and cluster
+<envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>`. Both filter and cluster
 must be configured together and point to the same DNS cache parameters for Envoy to operate as an
 HTTP dynamic forward proxy.
 
-This filter supports :ref:`host rewrite <envoy_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
-via the :ref:`virtual host's per_filter_config <envoy_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or the
-:ref:`route's per_filter_config <envoy_api_field_config.route.v3.Route.typed_per_filter_config>`. This can be used to rewrite
+This filter supports :ref:`host rewrite <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
+via the :ref:`virtual host's per_filter_config <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or the
+:ref:`route's per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`. This can be used to rewrite
 the host header with the provided value before DNS lookup, thus allowing to route traffic to the rewritten
 host when forwarding. See the example below within the configured routes.
 
 .. note::
 
-  Configuring a :ref:`transport_socket with name envoy.transport_sockets.tls <envoy_api_field_config.cluster.v3.Cluster.transport_socket>` on the cluster with
+  Configuring a :ref:`transport_socket with name envoy.transport_sockets.tls <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>` on the cluster with
   *trusted_ca* certificates instructs Envoy to use TLS when connecting to upstream hosts and verify
   the certificate chain. Additionally, Envoy will automatically perform SAN verification for the
   resolved host name as well as specify the host name via SNI.

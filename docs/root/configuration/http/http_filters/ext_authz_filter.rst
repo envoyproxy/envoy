@@ -3,23 +3,23 @@
 External Authorization
 ======================
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
-* :ref:`HTTP filter v3 API reference <envoy_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`
+* :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`
 * This filter should be configured with the name *envoy.filters.http.ext_authz*.
 
 The external authorization filter calls an external gRPC or HTTP service to check whether an incoming
 HTTP request is authorized or not.
 If the request is deemed unauthorized, then the request will be denied normally with 403 (Forbidden) response.
 Note that sending additional custom metadata from the authorization service to the upstream, to the downstream or to the authorization service is
-also possible. This is explained in more details at :ref:`HTTP filter <envoy_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`.
+also possible. This is explained in more details at :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`.
 
 The content of the requests that are passed to an authorization service is specified by
-:ref:`CheckRequest <envoy_api_msg_service.auth.v3.CheckRequest>`.
+:ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
 
 .. _config_http_filters_ext_authz_http_configuration:
 
 The HTTP filter, using a gRPC/HTTP service, can be configured as follows. You can see all the
 configuration options at
-:ref:`HTTP filter <envoy_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`.
+:ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`.
 
 Configuration Examples
 -----------------------------
@@ -139,5 +139,5 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
 Runtime
 -------
 The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
-<envoy_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
-<envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_enabled>` field.
+<envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
+<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_enabled>` field.

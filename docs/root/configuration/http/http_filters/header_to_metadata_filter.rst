@@ -2,7 +2,7 @@
 
 Envoy Header-To-Metadata Filter
 ===============================
-* :ref:`v3 API reference <envoy_api_msg_extensions.filters.http.header_to_metadata.v3.Config>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.header_to_metadata.v3.Config>`
 * This filter should be configured with the name *envoy.filters.http.header_to_metadata*.
 
 This filter is configured with rules that will be matched against requests and responses.

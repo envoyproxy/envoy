@@ -3,7 +3,7 @@
 Original Source
 ===============
 
-* :ref:`HTTP filter v3 API reference <envoy_api_msg_extensions.filters.http.original_src.v3.OriginalSrc>`
+* :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.original_src.v3.OriginalSrc>`
 * This filter should be configured with the name *envoy.filters.http.original_src*.
 
 The original source http filter replicates the downstream remote address of the connection on
@@ -32,10 +32,10 @@ to forcefully route any traffic whose IP was replicated by Envoy back through th
 If Envoy and the upstream are on the same host -- e.g. in an sidecar deployment --, then iptables
 and routing rules can be used to ensure correct behaviour. The filter has an unsigned integer
 configuration,
-:ref:`mark <envoy_api_field_extensions.filters.http.original_src.v3.OriginalSrc.mark>`. Setting
+:ref:`mark <envoy_v3_api_field_extensions.filters.http.original_src.v3.OriginalSrc.mark>`. Setting
 this to *X* causes Envoy to *mark* all upstream packets originating from this http with value
 *X*. Note that if
-:ref:`mark <envoy_api_field_extensions.filters.http.original_src.v3.OriginalSrc.mark>` is set
+:ref:`mark <envoy_v3_api_field_extensions.filters.http.original_src.v3.OriginalSrc.mark>` is set
 to 0, Envoy will not mark upstream packets.
 
 We can use the following set of commands to ensure that all ipv4 and ipv6 traffic marked with *X*

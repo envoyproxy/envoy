@@ -4,7 +4,7 @@ gRPC-Web
 ========
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
-* :ref:`v2 API reference <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`
+* :ref:`v2 API reference <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`
 * This filter should be configured with the name *envoy.filters.http.grpc_web*.
 
 This is a filter which enables the bridging of a gRPC-Web client to a compliant gRPC server by

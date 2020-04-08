@@ -4,7 +4,7 @@
 AWS Lambda
 ==========
 
-* :ref:`v3 API reference <envoy_api_msg_extensions.filters.http.aws_lambda.v3.Config>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.Config>`
 * This filter should be configured with the name *envoy.filters.http.aws_lambda*.
 
 .. attention::
@@ -15,11 +15,11 @@ The HTTP AWS Lambda filter is used to trigger an AWS Lambda function from a stan
 It supports a few options to control whether to pass through the HTTP request payload as is or to wrap it in a JSON
 schema.
 
-If :ref:`payload_passthrough <envoy_api_msg_extensions.filters.http.aws_lambda.v3.Configi.payload_passthrough>` is set to
+If :ref:`payload_passthrough <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.Configi.payload_passthrough>` is set to
 ``true``, then the payload is sent to Lambda without any transformations.
 *Note*: This means you lose access to all the HTTP headers in the Lambda function.
 
-However, if :ref:`payload_passthrough <envoy_api_msg_extensions.filters.http.aws_lambda.v3.Configi.payload_passthrough>`
+However, if :ref:`payload_passthrough <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.Configi.payload_passthrough>`
 is set to ``false``, then the HTTP request is transformed to a JSON payload with the following schema:
 
 .. code-block::
@@ -81,7 +81,7 @@ On the other end, the response of the Lambda function must conform to the follow
 .. _regional Lambda endpoint: https://docs.aws.amazon.com/general/latest/gr/lambda-service.html
 
 The filter supports :ref:`per-filter configuration
-<envoy_api_msg_extensions.filters.http.aws_lambda.v3.PerRouteConfig>`.
+<envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.PerRouteConfig>`.
 
 If you use the per-filter configuration, the target cluster _must_ have the following metadata:
 
