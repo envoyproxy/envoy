@@ -97,7 +97,8 @@ message LbEndpoint {
   // percentage of traffic for the endpoint. This percentage is then further
   // weighted by the endpoint's locality's load balancing weight from
   // LocalityLbEndpoints. If unspecified, each host is presumed to have equal
-  // weight in a locality.
+  // weight in a locality. The sum of the weights of all endpoints in the
+  // endpoint's locality must not exceed uint32_t maximal value (4294967295).
   google.protobuf.UInt32Value load_balancing_weight = 4 [(validate.rules).uint32 = {gte: 1}];
 }
 
@@ -116,7 +117,8 @@ message LocalityLbEndpoints {
   // Optional: Per priority/region/zone/sub_zone weight; at least 1. The load
   // balancing weight for a locality is divided by the sum of the weights of all
   // localities  at the same priority level to produce the effective percentage
-  // of traffic for the locality.
+  // of traffic for the locality. The sum of the weights of all localities at
+  // the same priority level must not exceed uint32_t maximal value (4294967295).
   //
   // Locality weights are only considered when :ref:`locality weighted load
   // balancing <arch_overview_load_balancing_locality_weighted_lb>` is

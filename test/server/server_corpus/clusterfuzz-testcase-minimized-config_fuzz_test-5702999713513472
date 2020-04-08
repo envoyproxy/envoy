@@ -1,0 +1,249 @@
+static_resources {
+  listeners {
+    address {
+      pipe {
+        path: "@"
+      }
+    }
+  }
+  clusters {
+    name: "&"
+    connect_timeout {
+      seconds: 2304
+    }
+    lb_policy: RING_HASH
+    alt_stat_name: "t"
+    close_connections_on_host_health_failure: true
+    track_timeout_budgets: true
+  }
+  clusters {
+    name: "servi|e_gogole"
+    connect_timeout {
+      seconds: 3
+    }
+    lb_policy: RING_HASH
+    load_assignment {
+      cluster_name: "domains"
+      endpoints {
+        priority: 93
+      }
+      endpoints {
+        locality {
+          zone: "t"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: ";"
+              }
+            }
+          }
+          health_status: TIMEOUT
+          load_balancing_weight {
+            value: 4294967295
+          }
+        }
+        load_balancing_weight {
+          value: 122
+        }
+      }
+      endpoints {
+        locality {
+          region: "domains"
+          sub_zone: "|"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: ";"
+              }
+            }
+          }
+          health_status: TIMEOUT
+        }
+        priority: 122
+      }
+      endpoints {
+        locality {
+          zone: "\t"
+        }
+        load_balancing_weight {
+          value: 122
+        }
+        priority: 122
+      }
+      endpoints {
+        locality {
+          sub_zone: "|"
+        }
+        priority: 122
+      }
+      endpoints {
+        locality {
+          zone: "\t"
+        }
+        load_balancing_weight {
+          value: 285212672
+        }
+        priority: 122
+      }
+      endpoints {
+        locality {
+        }
+        load_balancing_weight {
+          value: 122
+        }
+        priority: 122
+      }
+      endpoints {
+        locality {
+          zone: "\t"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              socket_address {
+                address: "0.0.0.0"
+                port_value: 47
+              }
+            }
+          }
+          health_status: TIMEOUT
+        }
+        load_balancing_weight {
+          value: 122
+        }
+      }
+      endpoints {
+        locality {
+          zone: "\t"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "@"
+              }
+            }
+          }
+          health_status: UNHEALTHY
+        }
+        load_balancing_weight {
+          value: 122
+        }
+        priority: 122
+      }
+      endpoints {
+        load_balancing_weight {
+          value: 122
+        }
+        priority: 122
+      }
+      policy {
+      }
+    }
+  }
+}
+flags_path: "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV(VVVVVVVVVVVVVVV"
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  typed_config {
+    type_url: "type.googleapis.com/e"
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  typed_config {
+    type_url: "type.googleapis.com/envoy.api.v2.route.Route"
+    value: "B\004\n\000\022\000R\000"
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  hidden_envoy_deprecated_config {
+    fields {
+      key: ""
+      value {
+        null_value: NULL_VALUE
+      }
+    }
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+}
+stats_sinks {
+  typed_config {
+    type_url: "\000\000\000\000"
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  typed_config {
+    type_url: "type.googleapis.com/e"
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "ffff]f$fffff"
+}
+stats_sinks {
+  name: "\000\035eut_c"
+}
+stats_sinks {
+  name: "]"
+}
+admin {
+  profile_path: "\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'"
+}

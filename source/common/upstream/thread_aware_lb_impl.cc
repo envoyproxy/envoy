@@ -12,9 +12,16 @@ namespace {
 void normalizeHostWeights(const HostVector& hosts, double normalized_locality_weight,
                           NormalizedHostWeightVector& normalized_host_weights,
                           double& min_normalized_weight, double& max_normalized_weight) {
-  uint32_t sum = 0;
+  // sum should be at most uint32_t max value, so we can validate it by accumulating into unit64_t
+  // and making sure there was no overflow
+  uint64_t sum = 0;
   for (const auto& host : hosts) {
     sum += host->weight();
+    if (sum > std::numeric_limits<uint32_t>::max()) {
+      throw EnvoyException(
+          fmt::format("The sum of weights of all upstream hosts in a locality exceeds {}",
+                      std::numeric_limits<uint32_t>::max()));
+    }
   }
 
   for (const auto& host : hosts) {
@@ -31,9 +38,16 @@ void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
                               double& min_normalized_weight, double& max_normalized_weight) {
   ASSERT(locality_weights.size() == hosts_per_locality.get().size());
 
-  uint32_t sum = 0;
+  // sum should be at most uint32_t max value, so we can validate it by accumulating into unit64_t
+  // and making sure there was no overflow
+  uint64_t sum = 0;
   for (const auto weight : locality_weights) {
     sum += weight;
+    if (sum > std::numeric_limits<uint32_t>::max()) {
+      throw EnvoyException(
+          fmt::format("The sum of weights of all localities at the same priority exceeds {}",
+                      std::numeric_limits<uint32_t>::max()));
+    }
   }
 
   // Locality weights (unlike host weights) may be 0. If _all_ locality weights were 0, bail out.
