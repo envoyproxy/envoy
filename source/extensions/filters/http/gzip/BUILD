@@ -21,6 +21,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/http/common/compressor:compressor_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/gzip/v3:pkg_cc_proto",
     ],
 )

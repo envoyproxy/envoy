@@ -65,24 +65,6 @@ public:
     EXPECT_EQ(response->body(), std::string(content_length, 'a'));
   }
 
-  const std::string deprecated_full_config{R"EOF(
-      name: envoy.filters.http.compressor
-      typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.http.compressor.v2.Compressor
-        disable_on_etag_header: true
-        content_length: 100
-        content_type:
-          - text/html
-          - application/json
-        compressor_library:
-          typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.http.compressor.gzip.v2.Gzip
-            memory_level: 3
-            window_bits: 10
-            compression_level: best_compression
-            compression_strategy: rle
-    )EOF"};
-
   const std::string full_config{R"EOF(
       name: compressor
       typed_config:
@@ -132,21 +114,6 @@ TEST_P(CompressorIntegrationTest, AcceptanceDefaultConfigTest) {
                           Http::TestResponseHeaderMapImpl{{":status", "200"},
                                                           {"content-length", "4400"},
                                                           {"content-type", "text/xml"}});
-}
-
-/**
- * Exercises gzip compression with deprecated full configuration.
- */
-TEST_P(CompressorIntegrationTest, AcceptanceDeprecatedFullConfigTest) {
-  initializeFilter(deprecated_full_config);
-  doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                         {":path", "/test/long/url"},
-                                                         {":scheme", "http"},
-                                                         {":authority", "host"},
-                                                         {"accept-encoding", "deflate, gzip"}},
-                          Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                          {"content-length", "4400"},
-                                                          {"content-type", "application/json"}});
 }
 
 /**

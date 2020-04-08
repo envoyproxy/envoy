@@ -47,7 +47,17 @@ protected:
         .WillByDefault(Return(true));
   }
 
-  void SetUp() override { setUpFilter("{}"); }
+  void SetUp() override {
+    setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF");
+  }
 
   // CompressorFilter private member functions
   void sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
@@ -174,6 +184,11 @@ TEST_F(CompressorFilterTest, DecodeHeadersWithRuntimeDisabled) {
   "runtime_enabled": {
     "default_value": true,
     "runtime_key": "foo_key"
+  },
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
   }
 }
 )EOF");
@@ -351,7 +366,16 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
     Stats::TestUtil::TestStore stats;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
-    TestUtility::loadFromJson("{}", compressor);
+    TestUtility::loadFromJson(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF",
+                              compressor);
     CompressorFilterConfigSharedPtr config2;
     config2 =
         std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test2");
@@ -375,7 +399,16 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
     ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
-    TestUtility::loadFromJson("{}", compressor);
+    TestUtility::loadFromJson(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF",
+                              compressor);
     CompressorFilterConfigSharedPtr config2;
     config2 =
         std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "gzip");
@@ -395,7 +428,16 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
     ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
-    TestUtility::loadFromJson("{}", compressor);
+    TestUtility::loadFromJson(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF",
+                              compressor);
     CompressorFilterConfigSharedPtr config2;
     config2 =
         std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test");
@@ -415,7 +457,16 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
     ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
-    TestUtility::loadFromJson("{}", compressor);
+    TestUtility::loadFromJson(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF",
+                              compressor);
     CompressorFilterConfigSharedPtr config2;
     config2 =
         std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test");
@@ -435,7 +486,16 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
     ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
-    TestUtility::loadFromJson("{}", compressor);
+    TestUtility::loadFromJson(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF",
+                              compressor);
     CompressorFilterConfigSharedPtr config1;
     config1 =
         std::make_shared<MockCompressorFilterConfig>(compressor, "test1.", stats, runtime, "test1");
@@ -465,7 +525,16 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
     ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
-    TestUtility::loadFromJson("{}", compressor);
+    TestUtility::loadFromJson(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF",
+                              compressor);
     CompressorFilterConfigSharedPtr config1;
     config1 =
         std::make_shared<MockCompressorFilterConfig>(compressor, "test1.", stats, runtime, "test1");
@@ -517,7 +586,16 @@ TEST_F(CompressorFilterTest, IsMinimumContentLength) {
     EXPECT_TRUE(isMinimumContentLength(headers));
   }
 
-  setUpFilter(R"EOF({"content_length": 500})EOF");
+  setUpFilter(R"EOF(
+{
+  "content_length": 500,
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF");
   {
     Http::TestResponseHeaderMapImpl headers = {{"content-length", "501"}};
     EXPECT_TRUE(isMinimumContentLength(headers));
@@ -540,7 +618,16 @@ TEST_F(CompressorFilterTest, ContentLengthNoCompression) {
 
 // Verifies that compression is NOT skipped when content-length header is allowed.
 TEST_F(CompressorFilterTest, ContentLengthCompression) {
-  setUpFilter(R"EOF({"content_length": 500})EOF");
+  setUpFilter(R"EOF(
+{
+  "content_length": 500,
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "test"}}, true);
   doResponseCompression({{":method", "get"}, {"content-length", "1000"}}, false);
 }
@@ -603,7 +690,12 @@ TEST_F(CompressorFilterTest, IsContentTypeAllowed) {
         "text/html",
         "xyz/svg+xml",
         "Test/INSENSITIVE"
-      ]
+      ],
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
     }
   )EOF");
 
@@ -641,7 +733,12 @@ TEST_F(CompressorFilterTest, ContentTypeNoCompression) {
         "application/json",
         "font/eot",
         "image/svg+xml"
-      ]
+      ],
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
     }
   )EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "test"}}, true);
@@ -698,7 +795,16 @@ TEST_F(CompressorFilterTest, IsEtagAllowed) {
     EXPECT_EQ(0, stats_.counter("test.test.not_compressed_etag").value());
   }
 
-  setUpFilter(R"EOF({ "disable_on_etag_header": true })EOF");
+  setUpFilter(R"EOF(
+{
+  "disable_on_etag_header": true,
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF");
   {
     Http::TestResponseHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
     EXPECT_FALSE(isEtagAllowed(headers));
@@ -718,7 +824,16 @@ TEST_F(CompressorFilterTest, IsEtagAllowed) {
 
 // Verifies that compression is skipped when etag header is NOT allowed.
 TEST_F(CompressorFilterTest, EtagNoCompression) {
-  setUpFilter(R"EOF({ "disable_on_etag_header": true })EOF");
+  setUpFilter(R"EOF(
+{
+  "disable_on_etag_header": true,
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "test"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"etag", R"EOF(W/"686897696a7c876b7e")EOF"}});
@@ -886,13 +1001,30 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
   filter_->setDecoderFilterCallbacks(decoder_callbacks);
   {
     Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
-    setUpFilter(R"EOF({"remove_accept_encoding_header": true})EOF");
+    setUpFilter(R"EOF(
+{
+  "remove_accept_encoding_header": true,
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF");
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_FALSE(headers.has("accept-encoding"));
   }
   {
     Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
-    setUpFilter("{}");
+    setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+     }
+  }
+}
+)EOF");
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_TRUE(headers.has("accept-encoding"));
     EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));

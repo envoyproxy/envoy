@@ -32,7 +32,6 @@ proto_library(
         "//envoy/config/filter/http/aws_request_signing/v2alpha:pkg",
         "//envoy/config/filter/http/buffer/v2:pkg",
         "//envoy/config/filter/http/cache/v2alpha:pkg",
-        "//envoy/config/filter/http/compressor/gzip/v2:pkg",
         "//envoy/config/filter/http/compressor/v2:pkg",
         "//envoy/config/filter/http/cors/v2:pkg",
         "//envoy/config/filter/http/csrf/v2:pkg",

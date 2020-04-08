@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.gzip.v3;
+package envoy.extensions.filters.http.gzip.v4alpha;
 
-import "envoy/config/filter/http/compressor/v2/compressor.proto";
+import "envoy/extensions/filters/http/compressor/v3/compressor.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -10,10 +10,10 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.gzip.v3";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.gzip.v4alpha";
 option java_outer_classname = "GzipProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Gzip]
 // Gzip :ref:`configuration overview <config_http_filters_gzip>`.
@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 11]
 message Gzip {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.http.gzip.v2.Gzip";
+      "envoy.extensions.filters.http.gzip.v3.Gzip";
 
   enum CompressionStrategy {
     DEFAULT = 0;
@@ -33,7 +33,7 @@ message Gzip {
 
   message CompressionLevel {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.filter.http.gzip.v2.Gzip.CompressionLevel";
+        "envoy.extensions.filters.http.gzip.v3.Gzip.CompressionLevel";
 
     enum Enum {
       DEFAULT = 0;
@@ -75,5 +75,5 @@ message Gzip {
   // Set of configuration parameters common for all compression filters. If this field is set then
   // the fields `content_length`, `content_type`, `disable_on_etag_header` and
   // `remove_accept_encoding_header` are ignored.
-  config.filter.http.compressor.v2.Compressor compressor = 10;
+  compressor.v3.Compressor compressor = 10;
 }

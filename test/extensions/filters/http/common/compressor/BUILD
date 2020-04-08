@@ -14,6 +14,7 @@ envoy_cc_test(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common/compressor:compressor_lib",
+        "//source/extensions/filters/http/compressor/gzip:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",

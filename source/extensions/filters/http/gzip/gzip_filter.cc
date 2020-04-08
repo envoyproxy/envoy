@@ -1,5 +1,7 @@
 #include "extensions/filters/http/gzip/gzip_filter.h"
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/http/headers.h"
 #include "common/protobuf/protobuf.h"
 
@@ -72,10 +74,28 @@ uint64_t GzipFilterConfig::windowBitsUint(Protobuf::uint32 window_bits) {
 
 const envoy::extensions::filters::http::compressor::v3::Compressor
 GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip) {
-  if (gzip.has_compressor()) {
-    return gzip.compressor();
-  }
   envoy::extensions::filters::http::compressor::v3::Compressor compressor = {};
+
+  // The deprecated gzip filter is using v2 Compressor field to avoid setting the
+  // compressor_library field which is mandatory in v3. Here we convert v2 Compressor to v3.
+  if (gzip.has_compressor()) {
+    compressor.set_allocated_content_length(
+        new Protobuf::UInt32Value(gzip.compressor().content_length()));
+    for (const std::string& ctype : gzip.compressor().content_type()) {
+      compressor.add_content_type(ctype);
+    }
+    compressor.set_disable_on_etag_header(gzip.compressor().disable_on_etag_header());
+    compressor.set_remove_accept_encoding_header(gzip.compressor().remove_accept_encoding_header());
+    if (gzip.compressor().has_runtime_enabled()) {
+      auto feature_flag(new envoy::config::core::v3::RuntimeFeatureFlag());
+      feature_flag->set_runtime_key(gzip.compressor().runtime_enabled().runtime_key());
+      feature_flag->set_allocated_default_value(
+          new Protobuf::BoolValue(gzip.compressor().runtime_enabled().default_value()));
+      compressor.set_allocated_runtime_enabled(feature_flag);
+    }
+    return compressor;
+  }
+
   if (gzip.has_hidden_envoy_deprecated_content_length()) {
     compressor.set_allocated_content_length(
         new Protobuf::UInt32Value(gzip.hidden_envoy_deprecated_content_length()));

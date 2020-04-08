@@ -11,16 +11,13 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.compressor.gzip.v3";
 option java_outer_classname = "GzipProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Gzip]
 // [#extension: envoy.filters.http.compressor.gzip]
 
 // [#next-free-field: 6]
 message Gzip {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.http.compressor.gzip.v2.Gzip";
-
   // All the values of this enumeration translate directly to zlib's compression strategies.
   // For more information about each strategy, please refer to zlib manual.
   enum CompressionStrategy {

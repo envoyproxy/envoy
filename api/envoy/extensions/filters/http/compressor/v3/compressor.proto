@@ -61,9 +61,6 @@ message Compressor {
 }
 
 message CompressorLibrary {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.http.compressor.v2.CompressorLibrary";
-
   // Compressor library specific configuration. See the supported libraries for further
   // documentation.
   google.protobuf.Any typed_config = 1;
