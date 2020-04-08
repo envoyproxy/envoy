@@ -15,11 +15,11 @@ The HTTP AWS Lambda filter is used to trigger an AWS Lambda function from a stan
 It supports a few options to control whether to pass through the HTTP request payload as is or to wrap it in a JSON
 schema.
 
-If :ref:`payload_passthrough <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.Configi.payload_passthrough>` is set to
+If :ref:`payload_passthrough <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.payload_passthrough>` is set to
 ``true``, then the payload is sent to Lambda without any transformations.
 *Note*: This means you lose access to all the HTTP headers in the Lambda function.
 
-However, if :ref:`payload_passthrough <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.Configi.payload_passthrough>`
+However, if :ref:`payload_passthrough <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.payload_passthrough>`
 is set to ``false``, then the HTTP request is transformed to a JSON payload with the following schema:
 
 .. code-block::

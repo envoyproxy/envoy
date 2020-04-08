@@ -130,7 +130,7 @@ in the `tcp_keepalive` block. This will help detect TCP half open connections to
 server and re-establish a full connection.
 
 In the above example, the EDS management server could then return a proto encoding of a
-:ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryRespons>`:
+:ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`:
 
 .. code-block:: yaml
 

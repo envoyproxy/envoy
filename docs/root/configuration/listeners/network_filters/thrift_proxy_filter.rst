@@ -10,7 +10,7 @@ Cluster Protocol Options
 ------------------------
 
 Thrift connections to upstream hosts can be configured by adding an entry to the appropriate
-Cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_option>`
+Cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`
 keyed by `envoy.filters.network.thrift_proxy`. The
 :ref:`ThriftProtocolOptions<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProtocolOptions>`
 message describes the available options.
