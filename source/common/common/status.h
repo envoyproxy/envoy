@@ -55,40 +55,40 @@ enum class StatusCode : int {
 
 using Status = absl::Status;
 
-inline Status OkStatus() { return absl::OkStatus(); }
+inline Status okStatus() { return absl::OkStatus(); }
 
 /**
  * Returns the combination of the error code name, message and any additional error attributes.
  */
-std::string ToString(const Status& status);
+std::string toString(const Status& status);
 
 /**
  * Functions for creating error values. The error code of the returned status object matches the
  * name of the function.
  */
-Status CodecProtocolError(absl::string_view message);
-Status BufferFloodError(absl::string_view message);
-Status PrematureResponseError(absl::string_view message, Http::Code http_code);
-Status CodecClientError(absl::string_view message);
+Status codecProtocolError(absl::string_view message);
+Status bufferFloodError(absl::string_view message);
+Status prematureResponseError(absl::string_view message, Http::Code http_code);
+Status codecClientError(absl::string_view message);
 
 /**
  * Returns Envoy::StatusCode of the given status object.
  * If the status object does not contain valid Envoy::Status value the function will RELEASE_ASSERT.
  */
-StatusCode GetStatusCode(const Status& status);
+StatusCode getStatusCode(const Status& status);
 
 /**
  * Returns true if the given status matches error code implied by the name of the function.
  */
-ABSL_MUST_USE_RESULT bool IsCodecProtocolError(const Status& status);
-ABSL_MUST_USE_RESULT bool IsBufferFloodError(const Status& status);
-ABSL_MUST_USE_RESULT bool IsPrematureResponseError(const Status& status);
-ABSL_MUST_USE_RESULT bool IsCodecClientError(const Status& status);
+ABSL_MUST_USE_RESULT bool isCodecProtocolError(const Status& status);
+ABSL_MUST_USE_RESULT bool isBufferFloodError(const Status& status);
+ABSL_MUST_USE_RESULT bool isPrematureResponseError(const Status& status);
+ABSL_MUST_USE_RESULT bool isCodecClientError(const Status& status);
 
 /**
  * Returns Http::Code value of the PrematureResponseError status.
  * IsPrematureResponseError(status) must be true which is checked by RELEASE_ASSERT.
  */
-ABSL_MUST_USE_RESULT Http::Code GetPrematureResponseHttpCode(const Status& status);
+Http::Code getPrematureResponseHttpCode(const Status& status);
 
 } // namespace Envoy

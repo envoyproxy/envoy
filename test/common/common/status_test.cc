@@ -6,64 +6,69 @@
 namespace Envoy {
 
 TEST(Status, Ok) {
-  auto status = OkStatus();
+  auto status = okStatus();
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(status.message().empty());
-  EXPECT_EQ("OK", ToString(status));
-  EXPECT_EQ(StatusCode::Ok, GetStatusCode(status));
-  EXPECT_FALSE(IsCodecProtocolError(status));
-  EXPECT_FALSE(IsBufferFloodError(status));
-  EXPECT_FALSE(IsPrematureResponseError(status));
-  EXPECT_FALSE(IsCodecClientError(status));
+  EXPECT_EQ("OK", toString(status));
+  EXPECT_EQ(StatusCode::Ok, getStatusCode(status));
+  EXPECT_FALSE(isCodecProtocolError(status));
+  EXPECT_FALSE(isBufferFloodError(status));
+  EXPECT_FALSE(isPrematureResponseError(status));
+  EXPECT_FALSE(isCodecClientError(status));
 }
 
 TEST(Status, CodecProtocolError) {
-  auto status = CodecProtocolError("foobar");
+  auto status = codecProtocolError("foobar");
   EXPECT_FALSE(status.ok());
   EXPECT_EQ("foobar", status.message());
-  EXPECT_EQ("CodecProtocolError: foobar", ToString(status));
-  EXPECT_EQ(StatusCode::CodecProtocolError, GetStatusCode(status));
-  EXPECT_TRUE(IsCodecProtocolError(status));
-  EXPECT_FALSE(IsBufferFloodError(status));
-  EXPECT_FALSE(IsPrematureResponseError(status));
-  EXPECT_FALSE(IsCodecClientError(status));
+  EXPECT_EQ("CodecProtocolError: foobar", toString(status));
+  EXPECT_EQ(StatusCode::CodecProtocolError, getStatusCode(status));
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_FALSE(isBufferFloodError(status));
+  EXPECT_FALSE(isPrematureResponseError(status));
+  EXPECT_FALSE(isCodecClientError(status));
 }
 
 TEST(Status, BufferFloodError) {
-  auto status = BufferFloodError("foobar");
+  auto status = bufferFloodError("foobar");
   EXPECT_FALSE(status.ok());
   EXPECT_EQ("foobar", status.message());
-  EXPECT_EQ("BufferFloodError: foobar", ToString(status));
-  EXPECT_EQ(StatusCode::BufferFloodError, GetStatusCode(status));
-  EXPECT_FALSE(IsCodecProtocolError(status));
-  EXPECT_TRUE(IsBufferFloodError(status));
-  EXPECT_FALSE(IsPrematureResponseError(status));
-  EXPECT_FALSE(IsCodecClientError(status));
+  EXPECT_EQ("BufferFloodError: foobar", toString(status));
+  EXPECT_EQ(StatusCode::BufferFloodError, getStatusCode(status));
+  EXPECT_FALSE(isCodecProtocolError(status));
+  EXPECT_TRUE(isBufferFloodError(status));
+  EXPECT_FALSE(isPrematureResponseError(status));
+  EXPECT_FALSE(isCodecClientError(status));
 }
 
 TEST(Status, PrematureResponseError) {
-  auto status = PrematureResponseError("foobar", Http::Code::ProxyAuthenticationRequired);
+  auto status = prematureResponseError("foobar", Http::Code::ProxyAuthenticationRequired);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ("foobar", status.message());
-  EXPECT_EQ("PrematureResponseError: HTTP code: 407: foobar", ToString(status));
-  EXPECT_EQ(StatusCode::PrematureResponseError, GetStatusCode(status));
-  EXPECT_FALSE(IsCodecProtocolError(status));
-  EXPECT_FALSE(IsBufferFloodError(status));
-  EXPECT_TRUE(IsPrematureResponseError(status));
-  EXPECT_EQ(Http::Code::ProxyAuthenticationRequired, GetPrematureResponseHttpCode(status));
-  EXPECT_FALSE(IsCodecClientError(status));
+  EXPECT_EQ("PrematureResponseError: HTTP code: 407: foobar", toString(status));
+  EXPECT_EQ(StatusCode::PrematureResponseError, getStatusCode(status));
+  EXPECT_FALSE(isCodecProtocolError(status));
+  EXPECT_FALSE(isBufferFloodError(status));
+  EXPECT_TRUE(isPrematureResponseError(status));
+  EXPECT_EQ(Http::Code::ProxyAuthenticationRequired, getPrematureResponseHttpCode(status));
+  EXPECT_FALSE(isCodecClientError(status));
+}
+
+TEST(Status, getPrematureResponseHttpCodeWithWrongStatus) {
+  auto status = codecClientError("foobar");
+  EXPECT_DEATH(getPrematureResponseHttpCode(status), "");
 }
 
 TEST(Status, CodecClientError) {
-  auto status = CodecClientError("foobar");
+  auto status = codecClientError("foobar");
   EXPECT_FALSE(status.ok());
   EXPECT_EQ("foobar", status.message());
-  EXPECT_EQ("CodecClientError: foobar", ToString(status));
-  EXPECT_EQ(StatusCode::CodecClientError, GetStatusCode(status));
-  EXPECT_FALSE(IsCodecProtocolError(status));
-  EXPECT_FALSE(IsBufferFloodError(status));
-  EXPECT_FALSE(IsPrematureResponseError(status));
-  EXPECT_TRUE(IsCodecClientError(status));
+  EXPECT_EQ("CodecClientError: foobar", toString(status));
+  EXPECT_EQ(StatusCode::CodecClientError, getStatusCode(status));
+  EXPECT_FALSE(isCodecProtocolError(status));
+  EXPECT_FALSE(isBufferFloodError(status));
+  EXPECT_FALSE(isPrematureResponseError(status));
+  EXPECT_TRUE(isCodecClientError(status));
 }
 
 } // namespace Envoy

@@ -8,10 +8,10 @@ namespace {
 
 const char EnvoyPayloadUrl[] = {"Envoy"};
 
-absl::string_view StatusCodeToString(StatusCode code) {
+absl::string_view statusCodeToString(StatusCode code) {
   switch (code) {
-  default:
-    RELEASE_ASSERT(false, "Unknown status code");
+  case StatusCode::Ok:
+    return absl::OkStatus().ToString();
   case StatusCode::CodecProtocolError:
     return "CodecProtocolError";
   case StatusCode::BufferFloodError:
@@ -23,104 +23,99 @@ absl::string_view StatusCodeToString(StatusCode code) {
   }
 }
 
-absl::StatusCode ToAbslStatusCode(StatusCode code) {
-  switch (code) {
-  default:
-    RELEASE_ASSERT(false, "Unknown status code");
-  case StatusCode::Ok:
-    return absl::StatusCode::kOk;
-  case StatusCode::CodecProtocolError:
-    return absl::StatusCode::kFailedPrecondition;
-  case StatusCode::BufferFloodError:
-    return absl::StatusCode::kResourceExhausted;
-  case StatusCode::PrematureResponseError:
-    return absl::StatusCode::kInternal;
-  case StatusCode::CodecClientError:
-    return absl::StatusCode::kUnimplemented;
-  }
+struct EnvoyStatusPayload {
+  EnvoyStatusPayload(StatusCode status_code) : status_code_(status_code) {}
+  StatusCode status_code_;
+};
+
+struct PrematureResponsePayload : public EnvoyStatusPayload {
+  PrematureResponsePayload(Http::Code http_code)
+      : EnvoyStatusPayload(StatusCode::PrematureResponseError), http_code_(http_code) {}
+  Http::Code http_code_;
+};
+
+template <typename T> void storePayload(absl::Status& status, const T& payload) {
+  status.SetPayload(
+      EnvoyPayloadUrl,
+      absl::Cord(absl::string_view(reinterpret_cast<const char*>(&payload), sizeof(payload))));
 }
 
-StatusCode ToEnvoyStatusCode(absl::StatusCode code) {
-  switch (code) {
-  default:
-    RELEASE_ASSERT(false, "Unknown status code");
-  case absl::StatusCode::kOk:
-    return StatusCode::Ok;
-  case absl::StatusCode::kFailedPrecondition:
-    return StatusCode::CodecProtocolError;
-  case absl::StatusCode::kResourceExhausted:
-    return StatusCode::BufferFloodError;
-  case absl::StatusCode::kInternal:
-    return StatusCode::PrematureResponseError;
-  case absl::StatusCode::kUnimplemented:
-    return StatusCode::CodecClientError;
-  }
+template <typename T = EnvoyStatusPayload> const T* getPayload(const absl::Status& status) {
+  auto payload = status.GetPayload(EnvoyPayloadUrl);
+  RELEASE_ASSERT(payload.has_value(), "Must have payload");
+  auto data = payload.value().Flatten();
+  RELEASE_ASSERT(data.length() >= sizeof(T), "Invalid payload length");
+  return reinterpret_cast<const T*>(data.data());
 }
 
 } // namespace
 
-std::string ToString(const Status& status) {
+std::string toString(const Status& status) {
   if (status.ok()) {
     return status.ToString();
   }
   std::string text;
-  if (!IsPrematureResponseError(status)) {
-    absl::StrAppend(&text, StatusCodeToString(ToEnvoyStatusCode(status.code())), ": ",
-                    status.message());
+  auto status_code = getStatusCode(status);
+  if (status_code != StatusCode::PrematureResponseError) {
+    absl::StrAppend(&text, statusCodeToString(status_code), ": ", status.message());
   } else {
-    auto http_code = GetPrematureResponseHttpCode(status);
+    auto http_code = getPrematureResponseHttpCode(status);
     absl::StrAppend(&text, "PrematureResponseError: HTTP code: ", http_code, ": ",
                     status.message());
   }
   return text;
 }
 
-Status CodecProtocolError(absl::string_view message) {
-  return absl::Status(ToAbslStatusCode(StatusCode::CodecProtocolError), message);
-}
-
-Status BufferFloodError(absl::string_view message) {
-  return absl::Status(ToAbslStatusCode(StatusCode::BufferFloodError), message);
-}
-
-Status PrematureResponseError(absl::string_view message, Http::Code http_code) {
-  absl::Status status(ToAbslStatusCode(StatusCode::PrematureResponseError), message);
-  status.SetPayload(
-      EnvoyPayloadUrl,
-      absl::Cord(absl::string_view(reinterpret_cast<const char*>(&http_code), sizeof(http_code))));
+Status codecProtocolError(absl::string_view message) {
+  absl::Status status(absl::StatusCode::kInternal, message);
+  storePayload(status, EnvoyStatusPayload(StatusCode::CodecProtocolError));
   return status;
 }
 
-Status CodecClientError(absl::string_view message) {
-  return absl::Status(ToAbslStatusCode(StatusCode::CodecClientError), message);
+Status bufferFloodError(absl::string_view message) {
+  absl::Status status(absl::StatusCode::kInternal, message);
+  storePayload(status, EnvoyStatusPayload(StatusCode::BufferFloodError));
+  return status;
+}
+
+Status prematureResponseError(absl::string_view message, Http::Code http_code) {
+  absl::Status status(absl::StatusCode::kInternal, message);
+  storePayload(status, PrematureResponsePayload(http_code));
+  return status;
+}
+
+Status codecClientError(absl::string_view message) {
+  absl::Status status(absl::StatusCode::kInternal, message);
+  storePayload(status, EnvoyStatusPayload(StatusCode::CodecClientError));
+  return status;
 }
 
 // Methods for checking and extracting error information
-StatusCode GetStatusCode(const Status& status) { return ToEnvoyStatusCode(status.code()); }
-
-bool IsCodecProtocolError(const Status& status) {
-  return ToEnvoyStatusCode(status.code()) == StatusCode::CodecProtocolError;
+StatusCode getStatusCode(const Status& status) {
+  return status.ok() ? StatusCode::Ok : getPayload(status)->status_code_;
 }
 
-bool IsBufferFloodError(const Status& status) {
-  return ToEnvoyStatusCode(status.code()) == StatusCode::BufferFloodError;
+bool isCodecProtocolError(const Status& status) {
+  return getStatusCode(status) == StatusCode::CodecProtocolError;
 }
 
-bool IsPrematureResponseError(const Status& status) {
-  return ToEnvoyStatusCode(status.code()) == StatusCode::PrematureResponseError;
+bool isBufferFloodError(const Status& status) {
+  return getStatusCode(status) == StatusCode::BufferFloodError;
 }
 
-Http::Code GetPrematureResponseHttpCode(const Status& status) {
-  RELEASE_ASSERT(IsPrematureResponseError(status), "Must be PrematureResponseError");
-  auto payload = status.GetPayload(EnvoyPayloadUrl);
-  RELEASE_ASSERT(payload.has_value(), "Must have payload");
-  auto data = payload.value().Flatten();
-  RELEASE_ASSERT(data.length() == sizeof(Http::Code), "Invalid payload length");
-  return *reinterpret_cast<const Http::Code*>(data.data());
+bool isPrematureResponseError(const Status& status) {
+  return getStatusCode(status) == StatusCode::PrematureResponseError;
 }
 
-bool IsCodecClientError(const Status& status) {
-  return ToEnvoyStatusCode(status.code()) == StatusCode::CodecClientError;
+Http::Code getPrematureResponseHttpCode(const Status& status) {
+  const auto* payload = getPayload<PrematureResponsePayload>(status);
+  RELEASE_ASSERT(payload->status_code_ == StatusCode::PrematureResponseError,
+                 "Must be PrematureResponseError");
+  return payload->http_code_;
+}
+
+bool isCodecClientError(const Status& status) {
+  return getStatusCode(status) == StatusCode::CodecClientError;
 }
 
 } // namespace Envoy
