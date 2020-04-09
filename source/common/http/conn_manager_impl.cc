@@ -859,8 +859,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   // For CONNECT requests there may not be a path. Add a placeholder path just so filters don't have
   // to special case.
-  // TODO(alyssawilk, mattklein123) do we want to require path?  It'd probably cause interop
-  // problems.
+  // TODO(alyssawilk, mattklein123) do we want to require path? Alyssa guesses it would cause
+  // problems for non-Envoy uses to do so but we could launch and iterate
   // TODO(alyssawilk, mattklein123) do we need to strip outbound or is adding one OK?
   if (Http::Headers::get().MethodValues.Connect ==
           request_headers_->Method()->value().getStringView() &&

@@ -72,8 +72,8 @@ public:
   bool enable_timeout_{};
 };
 
-// FIXME make sure that if data is sent with the connect it does not go upstream
-// until the 200 headers are sent.
+// TODO(alyssawilk) make sure that if data is sent with the connect it does not go upstream
+// until the 200 headers are sent before unhiding ANY config.
 TEST_P(ConnectTerminationIntegrationTest, DISABLED_Basic) {
   initialize();
 
