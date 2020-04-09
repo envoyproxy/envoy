@@ -142,7 +142,7 @@ public:
   DnsQueryRecordPtr parseDnsQueryRecord(const Buffer::InstancePtr& buffer, uint64_t* offset);
 
   /**
-   * @return a reference to a list of queries parsed from a client request
+   * @return a reference to the map of queries parsed from a client request
    */
   const DnsQueryMap& getActiveQueryRecords() { return queries_; }
 
