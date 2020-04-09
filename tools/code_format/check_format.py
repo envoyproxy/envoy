@@ -440,7 +440,7 @@ def checkCurrentReleaseNotes(file_path, error_messages):
 
 with open('VERSION') as f:
   VERSION_FILE_CONTENTS = f.readlines()[0]
-CURRENT_VERSION = re.match("([0-9]+\.[0-9]+\.[0-9]+)(-[a-z]+)", VERSION_FILE_CONTENTS)[1]
+CURRENT_VERSION = re.match("([0-9]+\.[0-9]+\.[0-9]+)(-[a-z]+)", VERSION_FILE_CONTENTS).groups()[1]
 VERSION_HISTORY_FILENAME_SUFFIX = "/version_history/v{}.rst".format(CURRENT_VERSION)
 
 def checkFileContents(file_path, checker):
