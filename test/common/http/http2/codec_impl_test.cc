@@ -67,11 +67,12 @@ public:
     InitialConnectionWindowSize
   };
 
+  Http2CodecImplTestFixture() = default;
   Http2CodecImplTestFixture(Http2SettingsTuple client_settings, Http2SettingsTuple server_settings)
       : client_settings_(client_settings), server_settings_(server_settings) {}
   virtual ~Http2CodecImplTestFixture() = default;
 
-  virtual void initialize() {
+  virtual void initialize(bool expect_server_stream = true) {
     Http2OptionsFromTuple(client_http2_options_, client_settings_);
     Http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
@@ -81,15 +82,17 @@ public:
         server_connection_, server_callbacks_, stats_store_, server_http2_options_,
         max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
 
-    request_encoder_ = &client_->newStream(response_decoder_);
-    setupDefaultConnectionMocks();
+    // request_encoder_ = &client_->newStream(response_decoder_);
+    // setupDefaultConnectionMocks();
 
-    EXPECT_CALL(server_callbacks_, newStream(_, _))
-        .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-          response_encoder_ = &encoder;
-          encoder.getStream().addCallbacks(server_stream_callbacks_);
-          return request_decoder_;
-        }));
+    if (expect_server_stream) {
+      EXPECT_CALL(server_callbacks_, newStream(_, _))
+          .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+            response_encoder_ = &encoder;
+            encoder.getStream().addCallbacks(server_stream_callbacks_);
+            return request_decoder_;
+          }));
+    }
   }
 
   void setupDefaultConnectionMocks() {
@@ -107,15 +110,19 @@ public:
   }
 
   void Http2OptionsFromTuple(envoy::config::core::v3::Http2ProtocolOptions& options,
-                             const Http2SettingsTuple& tp) {
+                             const absl::optional<const Http2SettingsTuple>& tp) {
     options.mutable_hpack_table_size()->set_value(
-        ::testing::get<SettingsTupleIndex::HpackTableSize>(tp));
+        (tp.has_value()) ? ::testing::get<SettingsTupleIndex::HpackTableSize>(*tp)
+                         : CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
     options.mutable_max_concurrent_streams()->set_value(
-        ::testing::get<SettingsTupleIndex::MaxConcurrentStreams>(tp));
+        (tp.has_value()) ? ::testing::get<SettingsTupleIndex::MaxConcurrentStreams>(*tp)
+                         : CommonUtility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
     options.mutable_initial_stream_window_size()->set_value(
-        ::testing::get<SettingsTupleIndex::InitialStreamWindowSize>(tp));
+        (tp.has_value()) ? ::testing::get<SettingsTupleIndex::InitialStreamWindowSize>(*tp)
+                         : CommonUtility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
     options.mutable_initial_connection_window_size()->set_value(
-        ::testing::get<SettingsTupleIndex::InitialConnectionWindowSize>(tp));
+        (tp.has_value()) ? ::testing::get<SettingsTupleIndex::InitialConnectionWindowSize>(*tp)
+                         : CommonUtility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
     options.set_allow_metadata(allow_metadata_);
     options.set_stream_error_on_invalid_http_messaging(stream_error_on_invalid_http_messaging_);
     options.mutable_max_outbound_frames()->set_value(max_outbound_frames_);
@@ -155,8 +162,8 @@ public:
     EXPECT_EQ(details, response_encoder_->getStream().responseDetails());
   }
 
-  const Http2SettingsTuple client_settings_;
-  const Http2SettingsTuple server_settings_;
+  absl::optional<const Http2SettingsTuple> client_settings_;
+  absl::optional<const Http2SettingsTuple> server_settings_;
   bool allow_metadata_ = false;
   bool stream_error_on_invalid_http_messaging_ = false;
   Stats::TestUtil::TestStore stats_store_;
@@ -1160,7 +1167,8 @@ public:
   // Returns the settings tuple which specifies a subset of the settings parameters to be sent to
   // the endpoint being validated.
   const Http2SettingsTuple& getSettingsTuple() {
-    return validate_client_ ? server_settings_ : client_settings_;
+    ASSERT(client_settings_.has_value() && server_settings_.has_value());
+    return validate_client_ ? *server_settings_ : *client_settings_;
   }
 
 protected:
@@ -1777,6 +1785,95 @@ TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
           CommonUtility::OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD +
           1);
   EXPECT_NO_THROW(server_wrapper_.dispatch(data, *server_));
+}
+
+class MetadataTestClientConnectionImpl : public TestClientConnectionImpl {
+public:
+  MetadataTestClientConnectionImpl(
+      Network::Connection& connection, Http::ConnectionCallbacks& callbacks, Stats::Scope& scope,
+      const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+      uint32_t max_request_headers_kb, uint32_t max_request_headers_count)
+      : TestClientConnectionImpl(connection, callbacks, scope, http2_options,
+                                 max_request_headers_kb, max_request_headers_count,
+                                 /*test_only_session=*/true) {
+    nghttp2_session_callbacks_new(&metadata_callbacks_);
+    nghttp2_session_callbacks_set_pack_extension_callback(
+        metadata_callbacks_,
+        [](nghttp2_session*, uint8_t* data, size_t length, const nghttp2_frame*,
+           void* user_data) -> ssize_t {
+          return static_cast<MetadataTestClientConnectionImpl*>(user_data)
+              ->encoder_.packNextFramePayload(data, length);
+        });
+    nghttp2_session_callbacks_set_send_callback(
+        metadata_callbacks_,
+        [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
+          return static_cast<MetadataTestClientConnectionImpl*>(user_data)->onSend(data, length);
+        });
+    nghttp2_option_new(&options_);
+    nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
+    nghttp2_session_client_new2(&metadata_session_, metadata_callbacks_, this, options_);
+    ASSERT(metadata_session_ != nullptr);
+    session_ = metadata_session_;
+  }
+
+  bool submitMetadata(const MetadataMapVector& metadata_map_vector, int32_t stream_id) {
+    // Creates metadata payload.
+    encoder_.createPayload(metadata_map_vector);
+    for (uint8_t flags : encoder_.payloadFrameFlagBytes()) {
+      int result = nghttp2_submit_extension(metadata_session_, ::Envoy::Http::METADATA_FRAME_TYPE,
+                                            flags, stream_id, nullptr);
+      if (result != 0) {
+        return false;
+      }
+    }
+    // Triggers nghttp2 to populate the payloads of the METADATA frames.
+    int result = nghttp2_session_send(metadata_session_);
+    return result == 0;
+  }
+
+protected:
+  MetadataEncoder encoder_;
+  nghttp2_option* options_{};
+  nghttp2_session_callbacks* metadata_callbacks_{};
+  nghttp2_session* metadata_session_{};
+};
+
+class Http2CodecMetadataTest : public Http2CodecImplTestFixture, public ::testing::Test {
+public:
+  Http2CodecMetadataTest() : Http2CodecImplTestFixture() {}
+
+protected:
+  void initialize(bool expect_server_stream = true) {
+    allow_metadata_ = true;
+    Http2CodecImplTestFixture::initialize(expect_server_stream);
+    metadata_client_ = std::make_unique<MetadataTestClientConnectionImpl>(
+        metadata_client_connection_, metadata_client_callbacks_, stats_store_,
+        client_http2_options_, max_request_headers_kb_, max_response_headers_count_);
+    server_ = std::make_unique<TestServerConnectionImpl>(
+        server_connection_, server_callbacks_, stats_store_, server_http2_options_,
+        max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
+    ON_CALL(metadata_client_connection_, write(_, _))
+        .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
+          server_wrapper_.dispatch(data, *server_);
+        }));
+    ON_CALL(server_connection_, write(_, _))
+        .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
+          client_wrapper_.dispatch(data, *metadata_client_);
+        }));
+  }
+
+  MockConnectionCallbacks metadata_client_callbacks_;
+  NiceMock<Network::MockConnection> metadata_client_connection_;
+  std::unique_ptr<MetadataTestClientConnectionImpl> metadata_client_;
+};
+
+TEST_F(Http2CodecMetadataTest, UnknownStreamId) {
+  initialize(/*expect_server_stream=*/false);
+  MetadataMap metadata_map = {{"key", "value"}};
+  MetadataMapVector metadata_vector;
+  metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+  ASSERT_EQ(nghttp2_submit_settings(metadata_client_->session(), NGHTTP2_FLAG_NONE, nullptr, 0), 0);
+  EXPECT_TRUE(metadata_client_->submitMetadata(metadata_vector, 0));
 }
 
 } // namespace Http2

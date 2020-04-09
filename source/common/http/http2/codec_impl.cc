@@ -821,6 +821,11 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
 
   StreamImpl* stream = getStream(stream_id);
   ASSERT(stream != nullptr);
+#if 0
+  if (stream == nullptr) {
+    return 0;
+  }
+#endif
 
   bool result = stream->getMetadataDecoder().onMetadataFrameComplete(end_metadata);
   return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
@@ -1131,14 +1136,17 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
 ClientConnectionImpl::ClientConnectionImpl(
     Network::Connection& connection, Http::ConnectionCallbacks& callbacks, Stats::Scope& stats,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-    const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count)
+    const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count,
+    bool test_only_session)
     : ConnectionImpl(connection, stats, http2_options, max_response_headers_kb,
                      max_response_headers_count),
       callbacks_(callbacks) {
   ClientHttp2Options client_http2_options(http2_options);
-  nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
-                              client_http2_options.options());
-  sendSettings(http2_options, true);
+  if (!test_only_session) {
+    nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
+                                client_http2_options.options());
+    sendSettings(http2_options, true);
+  }
   allow_metadata_ = http2_options.allow_metadata();
 }
 
