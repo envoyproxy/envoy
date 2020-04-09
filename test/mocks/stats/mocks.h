@@ -303,6 +303,7 @@ public:
   MOCK_METHOD(std::vector<GaugeSharedPtr>, gauges, (), (const));
   MOCK_METHOD(Histogram&, histogram, (const std::string&, Histogram::Unit));
   MOCK_METHOD(std::vector<ParentHistogramSharedPtr>, histograms, (), (const));
+  MOCK_METHOD(Histogram&, histogramFromString, (const std::string& name, Histogram::Unit unit));
   MOCK_METHOD(TextReadout&, textReadout, (const std::string&));
   MOCK_METHOD(std::vector<TextReadoutSharedPtr>, text_readouts, (), (const));
 
