@@ -259,13 +259,18 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
       std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(50)), duration));
   const MonotonicTime end_time = monotonicTime() + duration;
 
-  bool cont = true;
-  while (cont) {
+  bool timeout_not_reached = true;
+  while (timeout_not_reached) {
     // First check to see if the condition is already satisfied without advancing sim time.
     if (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::NoTimeout) {
       return Thread::CondVar::WaitStatus::NoTimeout;
     }
 
+    // This function runs with the caller-provided mutex held. We need to
+    // hold this->mutex_ while accessing the timer-queue and blocking on
+    // callbacks completing. To avoid potential deadlock we must drop
+    // the caller's mutex before taking ours. We also must care to avoid
+    // break/continue/return/throw during this non-RAII lock operation.
     mutex.unlock();
     {
       absl::MutexLock lock(&mutex_);
@@ -282,7 +287,7 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
         // If we reached our end_time, break the loop and return timeout. We
         // don't break immediately as we have to drop mutex_ and re-take mutex,
         // and it's cleaner to have a linear flow to the end of the loop.
-        cont = false;
+        timeout_not_reached = false;
       }
     }
     mutex.lock();
