@@ -38,7 +38,7 @@ class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<L
 public:
   ConnectionHandlerTest()
       : socket_factory_(std::make_shared<Network::MockListenSocketFactory>()),
-        handler_(new ConnectionHandlerImpl(dispatcher_, "test")),
+        handler_(new ConnectionHandlerImpl(dispatcher_)),
         filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         listener_filter_matcher_(std::make_shared<NiceMock<Network::MockListenerFilterMatcher>>()) {
     ON_CALL(*listener_filter_matcher_, matches(_)).WillByDefault(Return(false));

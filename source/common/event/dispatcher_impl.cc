@@ -32,12 +32,13 @@
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system)
-    : DispatcherImpl(std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
-
-DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
+DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                Event::TimeSystem& time_system)
-    : api_(api), buffer_factory_(std::move(factory)),
+    : DispatcherImpl(name, std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
+
+DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory,
+                               Api::Api& api, Event::TimeSystem& time_system)
+    : name_(name), api_(api), buffer_factory_(std::move(factory)),
       scheduler_(time_system.createScheduler(base_scheduler_)),
       deferred_delete_timer_(createTimerInternal([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimerInternal([this]() -> void { runPostCallbacks(); })),
@@ -56,10 +57,12 @@ DispatcherImpl::~DispatcherImpl() {
 #endif
 }
 
-void DispatcherImpl::initializeStats(Stats::Scope& scope, const std::string& prefix) {
+void DispatcherImpl::initializeStats(Stats::Scope& scope,
+                                     const absl::optional<std::string>& prefix) {
+  std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
   // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
-  post([this, &scope, prefix] {
-    stats_prefix_ = prefix + "dispatcher";
+  post([this, &scope, effective_prefix] {
+    stats_prefix_ = effective_prefix + "dispatcher";
     stats_ = std::make_unique<DispatcherStats>(
         DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
     base_scheduler_.initializeStats(stats_.get());

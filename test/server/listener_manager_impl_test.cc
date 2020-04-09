@@ -3842,7 +3842,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
 // Validate that dispatcher stats prefix is set correctly when enabled.
 TEST_F(ListenerManagerImplWithDispatcherStatsTest, DispatherStatsWithCorrectPrefix) {
   EXPECT_CALL(*worker_, start(_));
-  EXPECT_CALL(*worker_, initializeStats(_, "worker_0."));
+  EXPECT_CALL(*worker_, initializeStats(_));
   manager_->startWorkers(guard_dog_);
 }
 

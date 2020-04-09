@@ -252,7 +252,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
                                          const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
-      dispatcher_(api_->allocateDispatcher(Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
+      dispatcher_(api_->allocateDispatcher("test_thread",
+                                           Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       version_(version), upstream_address_fn_(upstream_address_fn),
       config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
