@@ -24,7 +24,7 @@ if [ ! -e "/$drive/$drive" ]; then
   /c/windows/system32/cmd.exe /c "mklink /d $drive:\\$drive $drive:\\"
 fi
 
-BAZEL_STARTUP_OPTIONS="--noworkspace_rc --bazelrc=windows/.bazelrc --output_base=c:/_eb"
+BAZEL_STARTUP_OPTIONS="--output_base=c:/_eb"
 BAZEL_BUILD_OPTIONS="-c opt --config=msvc-cl --show_task_finish --verbose_failures \
   --test_output=all ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
