@@ -157,7 +157,7 @@ public:
   std::shared_ptr<Network::MockListenSocketFactory> socket_factory_;
   Network::Address::InstanceConstSharedPtr local_address_{
       new Network::Address::Ipv4Instance("127.0.0.1", 10001)};
-  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Event::MockDispatcher> dispatcher_{"test"};
   std::list<TestListenerPtr> listeners_;
   Network::ConnectionHandlerPtr handler_;
   NiceMock<Network::MockFilterChainManager> manager_;
