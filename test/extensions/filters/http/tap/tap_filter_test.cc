@@ -148,9 +148,6 @@ TEST(TapFilterConfigTest, InvalidProto) {
   EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
                             EnvoyException,
                             "Error: Specifying admin streaming output without configuring admin.");
-  // Http::MockFilterChainFactoryCallbacks filter_callbacks;
-  // EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
-  // cb(filter_callbacks);
 }
 
 } // namespace
