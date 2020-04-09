@@ -15,7 +15,8 @@ FaultAbortConfig::FaultAbortConfig(
     const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config) {
   switch (abort_config.error_type_case()) {
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
-    provider_ = std::make_unique<FixedAbortProvider>(abort_config.http_status(), abort_config.percentage());
+    provider_ =
+        std::make_unique<FixedAbortProvider>(abort_config.http_status(), abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHeaderAbort:
     provider_ = std::make_unique<HeaderAbortProvider>(abort_config.percentage());

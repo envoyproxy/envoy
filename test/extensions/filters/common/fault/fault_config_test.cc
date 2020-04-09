@@ -54,19 +54,22 @@ TEST(FaultConfigTest, FaultAbortPercentageHeaderConfig) {
 
   // Header with bad data.
   Http::TestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request-percentage", "abc"}};
-  const auto bad_headers_percentage = config.percentage(bad_headers.get(HeaderNames::get().AbortRequestPercentage));
+  const auto bad_headers_percentage =
+      config.percentage(bad_headers.get(HeaderNames::get().AbortRequestPercentage));
   EXPECT_EQ(proto_config.percentage().numerator(), bad_headers_percentage.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, bad_headers_percentage.denominator());
 
   // Out of range header - value too low.
   Http::TestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-request-percentage", "-1"}};
-  const auto too_low_headers_percentage = config.percentage(too_low_headers.get(HeaderNames::get().AbortRequestPercentage));
+  const auto too_low_headers_percentage =
+      config.percentage(too_low_headers.get(HeaderNames::get().AbortRequestPercentage));
   EXPECT_EQ(proto_config.percentage().numerator(), too_low_headers_percentage.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, too_low_headers_percentage.denominator());
 
   // Out of range header - value too high.
   Http::TestHeaderMapImpl too_high_headers{{"x-envoy-fault-abort-request-percentage", "101"}};
-  const auto too_high_headers_percentage = config.percentage(too_high_headers.get(HeaderNames::get().AbortRequestPercentage));
+  const auto too_high_headers_percentage =
+      config.percentage(too_high_headers.get(HeaderNames::get().AbortRequestPercentage));
   EXPECT_EQ(proto_config.percentage().numerator(), too_high_headers_percentage.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, too_high_headers_percentage.denominator());
 
@@ -74,7 +77,8 @@ TEST(FaultConfigTest, FaultAbortPercentageHeaderConfig) {
   Http::TestHeaderMapImpl good_headers{{"x-envoy-fault-abort-request-percentage", "60"}};
   envoy::type::v3::FractionalPercent expected_percent;
   expected_percent.set_numerator(60);
-  const auto good_headers_percentage = config.percentage(good_headers.get(HeaderNames::get().AbortRequestPercentage));
+  const auto good_headers_percentage =
+      config.percentage(good_headers.get(HeaderNames::get().AbortRequestPercentage));
   EXPECT_EQ(expected_percent.numerator(), good_headers_percentage.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, good_headers_percentage.denominator());
 }

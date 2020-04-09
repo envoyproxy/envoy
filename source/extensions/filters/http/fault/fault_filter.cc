@@ -241,10 +241,11 @@ bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) 
     return false;
   }
 
-  const auto percentage_header = request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortRequestPercentage);
+  const auto percentage_header =
+      request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortRequestPercentage);
   if (!downstream_cluster_abort_percent_key_.empty()) {
-    return config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
-                                                        request_abort->percentage(percentage_header));
+    return config_->runtime().snapshot().featureEnabled(
+        downstream_cluster_abort_percent_key_, request_abort->percentage(percentage_header));
   }
   return config_->runtime().snapshot().featureEnabled(fault_settings_->abortPercentRuntime(),
                                                       request_abort->percentage(percentage_header));

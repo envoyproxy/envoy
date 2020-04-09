@@ -38,7 +38,7 @@ public:
   }
 
   envoy::type::v3::FractionalPercent percentage(const Http::HeaderEntry* header) const {
-      return provider_->percentage(header);
+    return provider_->percentage(header);
   }
 
 private:
@@ -50,15 +50,17 @@ private:
     // Return the HTTP status code to use. Optionally passed an HTTP header that may contain the
     // HTTP status code depending on the provider implementation.
     virtual absl::optional<Http::Code> statusCode(const Http::HeaderEntry* header) const PURE;
-    // Return the percentage of requests faults should be applied to. Optionally passed an HTTP 
+    // Return the percentage of requests faults should be applied to. Optionally passed an HTTP
     // header depending on the provider implementantion.
-    virtual envoy::type::v3::FractionalPercent percentage(const Http::HeaderEntry* header) const PURE;
+    virtual envoy::type::v3::FractionalPercent
+    percentage(const Http::HeaderEntry* header) const PURE;
   };
 
   // Delay provider that uses a fixed abort status code.
   class FixedAbortProvider : public AbortProvider {
   public:
-    FixedAbortProvider(uint64_t status_code, const envoy::type::v3::FractionalPercent percentage) : status_code_(status_code), percentage_(percentage) {}
+    FixedAbortProvider(uint64_t status_code, const envoy::type::v3::FractionalPercent percentage)
+        : status_code_(status_code), percentage_(percentage) {}
 
     // AbortProvider
     absl::optional<Http::Code> statusCode(const Http::HeaderEntry*) const override {
@@ -77,7 +79,8 @@ private:
   // Abort provider the reads a status code from an HTTP header.
   class HeaderAbortProvider : public AbortProvider {
   public:
-    HeaderAbortProvider(const envoy::type::v3::FractionalPercent percentage) : percentage_(percentage) {}
+    HeaderAbortProvider(const envoy::type::v3::FractionalPercent percentage)
+        : percentage_(percentage) {}
     // AbortProvider
     absl::optional<Http::Code> statusCode(const Http::HeaderEntry* header) const override;
     envoy::type::v3::FractionalPercent percentage(const Http::HeaderEntry* header) const override;
