@@ -91,8 +91,9 @@ bool ClusterRefreshManagerImpl::onEvent(const std::string& cluster_name, EventTy
         });
         return true;
       } else if (info->last_callback_time_ms_.load() != last_callback_time_ms) {
-        // If someone else updated the last callback time, then they will trigger the callback.  During this time
-        // we don't want to continue to increment the count, so we enforce the count is 0
+        // If someone else updated the last callback time, then they will trigger the callback.
+        // During this time we don't want to continue to increment the count, so we enforce the
+        // count is 0
         *count = 0;
       }
     }
