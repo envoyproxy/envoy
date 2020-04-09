@@ -67,12 +67,7 @@ size_t getResponseQueryCount(DnsMessageParser& parser) {
   const uint16_t id = parser.getCurrentQueryId();
   const auto& queries = parser.getActiveQueryRecords();
 
-  const auto& current_queries = queries.find(id);
-  if (current_queries == queries.end()) {
-    return 0;
-  }
-
-  return current_queries->second.size();
+  return queries.count(id);
 }
 
 } // namespace Utils

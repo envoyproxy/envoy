@@ -53,16 +53,13 @@ public:
       : id_(id), name_(rec_name), type_(rec_type), class_(rec_class){};
 
   virtual ~BaseDnsRecord() = default;
-  void serializeName();
+  void serializeName(Buffer::OwnedImpl& output);
   virtual void serialize(Buffer::OwnedImpl& output) PURE;
 
   const uint16_t id_;
   const std::string name_;
   const uint16_t type_;
   const uint16_t class_;
-
-protected:
-  Buffer::OwnedImpl buffer_;
 };
 
 /**
@@ -81,7 +78,7 @@ public:
 };
 
 using DnsQueryRecordPtr = std::shared_ptr<DnsQueryRecord>;
-using DnsQueryMap = absl::flat_hash_map<uint16_t, std::list<DnsQueryRecordPtr>>;
+using DnsQueryMap = std::unordered_multimap<uint16_t, DnsQueryRecordPtr>;
 
 using AddressConstPtrVec = std::vector<Network::Address::InstanceConstSharedPtr>;
 using AnswerCallback = std::function<void(DnsQueryRecordPtr& query, AddressConstPtrVec& ipaddr)>;
@@ -170,13 +167,6 @@ public:
 private:
   const std::string parseDnsNameRecord(const Buffer::InstancePtr& buffer, uint64_t* available_bytes,
                                        uint64_t* name_offset);
-
-  /**
-   * @brief updates a map associating a query id with a list of DnsQueryRecord pointers
-   *
-   * @param rec the answer record that is to be added to the answer list
-   */
-  void storeQueryRecord(DnsQueryRecordPtr rec);
 
   struct DnsHeader incoming_;
   std::deque<uint16_t> active_transactions_;

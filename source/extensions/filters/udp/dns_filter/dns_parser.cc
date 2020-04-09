@@ -14,7 +14,7 @@ namespace Extensions {
 namespace UdpFilters {
 namespace DnsFilter {
 
-inline void BaseDnsRecord::serializeName() {
+inline void BaseDnsRecord::serializeName(Buffer::OwnedImpl& output) {
 
   // Iterate over a name e.g. "www.domain.com" once and produce a buffer containing each name
   // segment prefixed by its length
@@ -28,9 +28,9 @@ inline void BaseDnsRecord::serializeName() {
   while (count != std::string::npos) {
 
     count -= last;
-    buffer_.writeBEInt<uint8_t>(count);
+    output.writeBEInt<uint8_t>(count);
     for (size_t i = 0; i < count; i++) {
-      buffer_.writeByte(*iter);
+      output.writeByte(*iter);
       ++iter;
     }
 
@@ -48,25 +48,22 @@ inline void BaseDnsRecord::serializeName() {
 
   // Write the remaining segment prepended by its length
   count = name_.size() - last;
-  buffer_.writeBEInt<uint8_t>(count);
+  output.writeBEInt<uint8_t>(count);
   for (size_t i = 0; i < count; i++) {
-    buffer_.writeByte(*iter);
+    output.writeByte(*iter);
     ++iter;
   }
 
   // Terminate the name record with a null byte
-  buffer_.writeByte(0x00);
+  output.writeByte(0x00);
 }
 
 // Serialize a DNS Query Record
 void DnsQueryRecord::serialize(Buffer::OwnedImpl& output) {
-  buffer_.drain(buffer_.length());
 
-  serializeName();
-  buffer_.writeBEInt<uint16_t>(type_);
-  buffer_.writeBEInt<uint16_t>(class_);
-
-  output.add(buffer_);
+  serializeName(output);
+  output.writeBEInt<uint16_t>(type_);
+  output.writeBEInt<uint16_t>(class_);
 }
 
 bool DnsMessageParser::parseDnsObject(const Buffer::InstancePtr& buffer) {
@@ -176,7 +173,7 @@ bool DnsMessageParser::parseDnsObject(const Buffer::InstancePtr& buffer) {
       ENVOY_LOG(error, "Couldn't parse query record from buffer");
       return false;
     }
-    storeQueryRecord(std::move(rec));
+    queries_.emplace(id, std::move(rec));
   }
 
   return true;
@@ -281,22 +278,6 @@ DnsQueryRecordPtr DnsMessageParser::parseDnsQueryRecord(const Buffer::InstancePt
   *offset = name_offset;
 
   return rec;
-}
-
-void DnsMessageParser::storeQueryRecord(DnsQueryRecordPtr rec) {
-
-  const uint16_t id = rec->id_;
-  const auto& query_iter = queries_.find(id);
-
-  if (query_iter == queries_.end()) {
-    std::list<DnsQueryRecordPtr> query_list{};
-    query_list.push_back(std::move(rec));
-    queries_.emplace(id, std::move(query_list));
-  } else {
-    // There should really be only one record here, but allow adding others since the
-    // protocol allows it.
-    query_iter->second.push_back(std::move(rec));
-  }
 }
 
 } // namespace DnsFilter
