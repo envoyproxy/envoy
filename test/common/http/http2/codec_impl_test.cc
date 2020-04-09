@@ -1883,7 +1883,10 @@ TEST_F(Http2CodecMetadataTest, UnknownStreamId) {
   MetadataMap metadata_map = {{"key", "value"}};
   MetadataMapVector metadata_vector;
   metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+  // SETTINGS are required as part of the preface.
   ASSERT_EQ(nghttp2_submit_settings(client_->session(), NGHTTP2_FLAG_NONE, nullptr, 0), 0);
+  // Submit a METADATA frame with stream_id 0. Note that any other stream ID not already bound to a
+  // stream can be used as well.
   EXPECT_TRUE(client_->submitMetadata(metadata_vector, 0));
 }
 
