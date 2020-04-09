@@ -300,12 +300,16 @@ public:
     EXPECT_EQ(response_size_, response_->body().size());
   }
 
-  void requestLoadStatsResponse(const std::vector<std::string>& clusters) {
+  void requestLoadStatsResponse(const std::vector<std::string>& clusters,
+                                bool send_all_clusters = false) {
     envoy::service::load_stats::v3::LoadStatsResponse loadstats_response;
     loadstats_response.mutable_load_reporting_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(load_report_interval_ms_));
     for (const auto& cluster : clusters) {
       loadstats_response.add_clusters(cluster);
+    }
+    if (send_all_clusters) {
+      loadstats_response.set_send_all_clusters(true);
     }
     loadstats_stream_->sendGrpcMessage(loadstats_response);
     // Wait until the request has been received by Envoy.
@@ -395,7 +399,8 @@ TEST_P(LoadStatsIntegrationTest, Success) {
 
   // 33%/67% split between dragon/winter primary localities.
   updateClusterLoadAssignment({{0}}, {{1, 2}}, {}, {{4}});
-  requestLoadStatsResponse({"cluster_0"});
+  // Verify that send_all_clusters works.
+  requestLoadStatsResponse({}, true);
 
   for (uint32_t i = 0; i < 6; ++i) {
     sendAndReceiveUpstream((4 + i) % 3);
