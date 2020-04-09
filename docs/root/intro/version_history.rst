@@ -6,6 +6,9 @@ Version history
 
 * http: fixed a bug where the upgrade header was not cleared on responses to non-upgrade requests.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
+1.14.1 (April 8, 2020)
+======================
+* request_id_extension: fixed static initialization for noop request id extension.
 
 1.14.0 (April 8, 2020)
 ======================
