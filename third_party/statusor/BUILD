@@ -28,6 +28,6 @@ envoy_cc_test(
     name = "statusor_test",
     srcs = ["statusor_test.cc"],
     deps = [
-        "//third_party/statusor:statusor_lib",
+        ":statusor_lib",
     ],
 )
