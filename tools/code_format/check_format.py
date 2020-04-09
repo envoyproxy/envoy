@@ -426,7 +426,7 @@ def checkCurrentReleaseNotes(file_path, error_messages):
         reportError("Flag `%s` should be enclosed in back ticks" % flag_match.groups()[1])
 
     if line.startswith("*"):
-      if prior_line and not prior_line.startswith('=') and not prior_line.endswith('.'):
+      if prior_line and not prior_line.endswith('.'):
         if prior_line.endswith('>`'):
           break
           # We don't punctuation-check sentences ending in :ref yet.
