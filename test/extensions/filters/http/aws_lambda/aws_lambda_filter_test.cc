@@ -40,10 +40,12 @@ public:
     filter_ = std::make_unique<Filter>(settings, stats_, signer_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-    const std::string metadata_yaml = "egress_gateway: true";
+    setupClusterMetadata();
+  }
 
+  void setupClusterMetadata() {
     ProtobufWkt::Struct cluster_metadata;
-    TestUtility::loadFromYaml(metadata_yaml, cluster_metadata);
+    TestUtility::loadFromYaml(metadata_yaml_, cluster_metadata);
     metadata_.mutable_filter_metadata()->insert({"com.amazonaws.lambda", cluster_metadata});
     ON_CALL(*decoder_callbacks_.cluster_info_, metadata()).WillByDefault(ReturnRef(metadata_));
   }
@@ -56,6 +58,7 @@ public:
   Arn arn_;
   Stats::IsolatedStoreImpl stats_store_;
   FilterStats stats_ = generateStats("test", stats_store_);
+  const std::string metadata_yaml_ = "egress_gateway: true";
 };
 
 /**
@@ -131,6 +134,33 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectClusterMetadata) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, result);
 }
 
+TEST_F(AwsLambdaFilterTest, DecodeDataRecordsPayloadSize) {
+  FilterSettings settings{arn_, InvocationMode::Synchronous, true /*passthrough*/};
+  NiceMock<Stats::MockStore> store;
+  NiceMock<Stats::MockHistogram> histogram;
+  EXPECT_CALL(store, histogramFromString(_, _)).WillOnce(ReturnRef(histogram));
+
+  setupClusterMetadata();
+
+  FilterStats stats(generateStats("test", store));
+  signer_ = std::make_shared<NiceMock<MockSigner>>();
+  filter_ = std::make_unique<Filter>(settings, stats, signer_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  // Payload
+  Buffer::OwnedImpl buffer;
+  const std::string data(100, 'Z');
+  buffer.add(data);
+
+  Http::TestRequestHeaderMapImpl headers;
+  const auto header_result = filter_->decodeHeaders(headers, false /*end_stream*/);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, header_result);
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
+  EXPECT_CALL(histogram, recordValue(100));
+
+  filter_->decodeData(buffer, true);
+}
+
 TEST_F(AwsLambdaFilterTest, DecodeDataShouldBuffer) {
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
   Http::TestRequestHeaderMapImpl headers;
@@ -149,9 +179,9 @@ TEST_F(AwsLambdaFilterTest, DecodeDataShouldSign) {
   Buffer::OwnedImpl buffer;
 
   InSequence seq;
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false)).Times(1);
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
-  EXPECT_CALL(*signer_, sign(An<Http::RequestHeaderMap&>(), An<const std::string&>())).Times(1);
+  EXPECT_CALL(*signer_, sign(An<Http::RequestHeaderMap&>(), An<const std::string&>()));
 
   const auto data_result = filter_->decodeData(buffer, true /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, data_result);
