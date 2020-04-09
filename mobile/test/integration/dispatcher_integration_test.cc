@@ -68,7 +68,7 @@ public:
 
   static std::string bootstrap_config() {
     // At least one empty filter chain needs to be specified.
-    return ConfigHelper::BASE_CONFIG + R"EOF(
+    return ConfigHelper::baseConfig() + R"EOF(
     filter_chains:
       filters:
     )EOF";

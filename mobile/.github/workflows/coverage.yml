@@ -1,0 +1,28 @@
+name: coverage
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    paths:
+      - 'library/common/**'
+      - 'test/**'
+
+jobs:
+  coverage:
+    name: coverage
+    runs-on: ubuntu-18.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Install dependencies'
+        run: ./ci/linux_ci_setup.sh
+      - name: 'Run coverage'
+        run: |
+          export PATH=/usr/lib/llvm-8/bin:$PATH
+          export CC=clang
+          export CXX=clang++
+          ./test/coverage/run_coverage.sh
