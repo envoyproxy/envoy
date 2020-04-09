@@ -35,7 +35,7 @@ public:
         clock_(*dispatcher_), alarm_factory_(*dispatcher_, clock_) {}
 
   void advanceMsAndLoop(int64_t delay_ms) {
-    time_system_.sleep(std::chrono::milliseconds(delay_ms));
+    time_system_.advanceTimeAsync(std::chrono::milliseconds(delay_ms));
     dispatcher_->run(Dispatcher::RunType::NonBlock);
   }
 

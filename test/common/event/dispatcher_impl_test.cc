@@ -325,7 +325,7 @@ public:
     while (true) {
       dispatcher.run(Dispatcher::RunType::NonBlock);
       if (timer.enabled()) {
-        time_system.sleep(std::chrono::microseconds(1));
+        time_system.advanceTimeAsync(std::chrono::microseconds(1));
       } else {
         break;
       }

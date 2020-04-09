@@ -24,17 +24,17 @@ TEST(EnvoyQuicClockTest, TestNow) {
                           time_system.systemTime().time_since_epoch())
                           .count();
   // Advance time by 1000000us.
-  time_system.sleep(std::chrono::microseconds(1000000));
+  time_system.advanceTimeWait(std::chrono::microseconds(1000000));
   EXPECT_EQ(mono_time + 1000000, (clock.Now() - quic::QuicTime::Zero()).ToMicroseconds());
   EXPECT_EQ(sys_time + 1000000, clock.WallNow().ToUNIXMicroseconds());
 
   // Advance time by 10us.
-  time_system.sleep(std::chrono::microseconds(10));
+  time_system.advanceTimeWait(std::chrono::microseconds(10));
   EXPECT_EQ(mono_time + 1000000 + 10, (clock.Now() - quic::QuicTime::Zero()).ToMicroseconds());
   EXPECT_EQ(sys_time + 1000000 + 10, clock.WallNow().ToUNIXMicroseconds());
 
   // Advance time by 2ms.
-  time_system.sleep(std::chrono::milliseconds(2));
+  time_system.advanceTimeWait(std::chrono::milliseconds(2));
   EXPECT_EQ(mono_time + 1000000 + 10 + 2 * 1000,
             (clock.Now() - quic::QuicTime::Zero()).ToMicroseconds());
   EXPECT_EQ(sys_time + 1000000 + 10 + 2 * 1000, clock.WallNow().ToUNIXMicroseconds());
@@ -63,7 +63,7 @@ TEST(EnvoyQuicClockTest, ApproximateNow) {
   // ApproximateTime() is cached, it not change only because time passes.
   const int kDeltaMicroseconds = 10;
   quic::QuicTime approximate_now1 = clock.ApproximateNow();
-  time_system.sleep(std::chrono::microseconds(kDeltaMicroseconds));
+  time_system.advanceTimeWait(std::chrono::microseconds(kDeltaMicroseconds));
   quic::QuicTime approximate_now2 = clock.ApproximateNow();
   EXPECT_EQ(approximate_now1, approximate_now2);
 

@@ -89,7 +89,7 @@ TEST_P(FaultIntegrationTestAllProtocols, ResponseRateLimitNoTrailers) {
   decoder->waitForBodyData(64);
 
   // Wait for a tick worth of data and end stream.
-  simTime().sleep(std::chrono::milliseconds(63));
+  simTime().advanceTimeWait(std::chrono::milliseconds(63));
   decoder->waitForBodyData(127);
   decoder->waitForEndStream();
 
@@ -124,7 +124,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
   decoder->waitForBodyData(64);
 
   // Wait for a tick worth of data and end stream.
-  simTime().sleep(std::chrono::milliseconds(63));
+  simTime().advanceTimeWait(std::chrono::milliseconds(63));
   decoder->waitForBodyData(128);
   decoder->waitForEndStream();
 
@@ -188,7 +188,7 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
   decoder->waitForBodyData(64);
 
   // Advance time and wait for a tick worth of data.
-  simTime().sleep(std::chrono::milliseconds(63));
+  simTime().advanceTimeWait(std::chrono::milliseconds(63));
   decoder->waitForBodyData(127);
 
   // Send trailers and wait for end stream.
@@ -219,7 +219,7 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyNotFlushed) {
   decoder->waitForBodyData(64);
 
   // Advance time and wait for a tick worth of data, trailers, and end stream.
-  simTime().sleep(std::chrono::milliseconds(63));
+  simTime().advanceTimeWait(std::chrono::milliseconds(63));
   decoder->waitForBodyData(128);
   decoder->waitForEndStream();
   EXPECT_NE(nullptr, decoder->trailers());

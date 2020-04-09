@@ -80,7 +80,7 @@ public:
 
   void SetUp() override {
     // Advance time a bit because QuicTime regards 0 as uninitialized timestamp.
-    time_system_.sleep(std::chrono::milliseconds(100));
+    time_system_.advanceTimeWait(std::chrono::milliseconds(100));
     EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes())
         .WillRepeatedly(Return(1024 * 1024));
   }

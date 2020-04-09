@@ -133,7 +133,7 @@ filter_chains:
         [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
     while (connection2.connecting()) {
       // Don't busy loop, but macOS often needs a moment to decide this connection isn't happening.
-      timeSystem().sleep(std::chrono::milliseconds(10));
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
 
       connection2.run(Event::Dispatcher::RunType::NonBlock);
     }

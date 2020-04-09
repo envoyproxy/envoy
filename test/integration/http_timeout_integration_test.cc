@@ -32,7 +32,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Trigger global timeout.
-  timeSystem().sleep(std::chrono::milliseconds(501));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(501));
 
   // Ensure we got a timeout downstream and canceled the upstream request.
   response->waitForHeaders();
@@ -73,7 +73,7 @@ TEST_P(HttpTimeoutIntegrationTest, UseTimeoutSetByEgressEnvoy) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Trigger global timeout, populated from `x-envoy-expected-rq-timeout-ms` header.
-  timeSystem().sleep(std::chrono::milliseconds(301));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(301));
 
   // Ensure we got a timeout downstream and canceled the upstream request.
   response->waitForHeaders();
@@ -114,7 +114,7 @@ TEST_P(HttpTimeoutIntegrationTest, DeriveTimeoutInIngressEnvoy) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Trigger global timeout, populated from `x-envoy-expected-rq-timeout-ms` header.
-  timeSystem().sleep(std::chrono::milliseconds(501));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(501));
 
   // Ensure we got a timeout downstream and canceled the upstream request.
   response->waitForHeaders();
@@ -156,7 +156,7 @@ TEST_P(HttpTimeoutIntegrationTest, IgnoreTimeoutSetByEgressEnvoy) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Trigger global timeout, populated from `x-envoy-expected-rq-timeout-ms` header.
-  timeSystem().sleep(std::chrono::milliseconds(501));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(501));
 
   // Ensure we got a timeout downstream and canceled the upstream request.
   response->waitForHeaders();
@@ -205,7 +205,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeoutAfterHeadersBeforeBodyResetsUpst
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 
   // Trigger global timeout.
-  timeSystem().sleep(std::chrono::milliseconds(200));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
 
   ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::seconds(15)));
 
@@ -244,7 +244,7 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeout) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Trigger per try timeout (but not global timeout).
-  timeSystem().sleep(std::chrono::milliseconds(400));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(400));
 
   // Wait for a second request to be sent upstream
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -252,7 +252,7 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeout) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Trigger global timeout.
-  timeSystem().sleep(std::chrono::milliseconds(100));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
   response->waitForHeaders();
 
   codec_client_->close();
@@ -291,7 +291,7 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Trigger per try timeout.
-  timeSystem().sleep(std::chrono::milliseconds(5));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(5));
 
   // Wait for a second request to be sent upstream
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -342,10 +342,10 @@ TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeout) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Trigger per try timeout (but not global timeout).
-  timeSystem().sleep(std::chrono::milliseconds(400));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(400));
 
   // Trigger retry (there's a 25ms backoff before it's issued).
-  timeSystem().sleep(std::chrono::milliseconds(26));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(26));
 
   // Wait for a second request to be sent upstream
   FakeStreamPtr upstream_request2;
@@ -439,11 +439,11 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Trigger per try timeout (but not global timeout).
-  timeSystem().sleep(std::chrono::milliseconds(400));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(400));
 
   FakeStreamPtr upstream_request2;
   // Trigger retry (there's a 25ms backoff before it's issued).
-  timeSystem().sleep(std::chrono::milliseconds(26));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(26));
 
   // Wait for a second request to be sent upstream
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));

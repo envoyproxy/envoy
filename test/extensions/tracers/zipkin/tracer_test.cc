@@ -56,7 +56,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
   // Test the creation of a root span --> CS
   // ==============
   ON_CALL(random_generator, random()).WillByDefault(Return(1000));
-  time_system_.sleep(std::chrono::milliseconds(1));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(1));
   SpanPtr root_span = tracer.startSpan(config, "my_span", timestamp);
 
   EXPECT_EQ("my_span", root_span->name());
