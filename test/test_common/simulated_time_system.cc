@@ -232,6 +232,27 @@ void SimulatedTimeSystemHelper::sleep(const Duration& duration) {
   setMonotonicTimeAndUnlock(monotonic_time);
 }
 
+bool SimulatedTimeSystem::await(absl::Mutex mutex, const bool& condition, const Duration& timeout) {
+  mutex.AwaitWithTimeout(absl::Condition(&condition), duration);
+  return !condition;
+}
+
+bool SimulatedTimeSystem::await(absl::Mutex mutex, BoolFn check_condition, const Duration& timeout) {
+  using Condition = std::pair<BoolFn, bool>;
+  auto cond = Condition(check_condition, false);
+  mutex_.AwaitWithTimeout(absl::Condition(
+      +[](const Condition* cond) -> bool {
+         if (cond->first()) {
+           cond->second = true;
+           return true;
+         }
+         return false;
+       },
+      &cond));
+  mutex.AwaitWithTimeout(absl::Condition(&condition), duration);
+  return !cond.second;
+}
+
 void SimulatedTimeSystemHelper::waitFor(
     Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
     const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
