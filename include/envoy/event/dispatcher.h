@@ -53,8 +53,8 @@ public:
   virtual ~Dispatcher() = default;
 
   /**
-   * Returns the name associated with this dispatcher, such as "worker_2" or "main_thread".
-   * @return const std::string& the name associated with this dispatcher.
+   * Returns the name that identifies this dispatcher, such as "worker_2" or "main_thread".
+   * @return const std::string& the name that identifies this dispatcher.
    */
   virtual const std::string& name() PURE;
 

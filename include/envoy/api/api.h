@@ -22,8 +22,8 @@ public:
 
   /**
    * Allocate a dispatcher.
-   * @param name the name for a dispatcher, such as "worker_2" or "main_thread".
-   *             This name will appear in per-handler/worker statistics, e.g.
+   * @param name the identity name for a dispatcher, e.g. "worker_2" or "main_thread".
+   *             This name will appear in per-handler/worker statistics, such as
    *             "server.worker_2.watchdog_miss".
    * @return Event::DispatcherPtr which is owned by the caller.
    */
@@ -31,8 +31,8 @@ public:
 
   /**
    * Allocate a dispatcher.
-   * @param name the name for a dispatcher, such as "worker_2" or "main_thread".
-   *             This name will appear in per-handler/worker statistics, e.g.
+   * @param name the identity name for a dispatcher, e.g. "worker_2" or "main_thread".
+   *             This name will appear in per-handler/worker statistics, such as
    *             "server.worker_2.watchdog_miss".
    * @param watermark_factory the watermark factory, ownership is transferred to the dispatcher.
    * @return Event::DispatcherPtr which is owned by the caller.
