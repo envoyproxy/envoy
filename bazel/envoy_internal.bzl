@@ -79,8 +79,7 @@ def envoy_copts(repository, test = False):
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            _envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
            envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
-           _envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository) + \
-           _envoy_select_legacy_codecs_in_test(["-DENVOY_USE_LEGACY_CODECS_IN_TEST"], repository)
+           _envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
@@ -119,13 +118,6 @@ def tcmalloc_external_dep(repository):
 def _envoy_select_path_normalization_by_default(xs, repository = ""):
     return select({
         repository + "//bazel:enable_path_normalization_by_default": xs,
-        "//conditions:default": [],
-    })
-
-# Select the given values if use legacy codecs in test is on in the current build.
-def _envoy_select_legacy_codecs_in_test(xs, repository = ""):
-    return select({
-        repository + "//bazel:enable_legacy_codecs_in_test": xs,
         "//conditions:default": [],
     })
 

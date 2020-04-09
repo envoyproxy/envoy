@@ -3,6 +3,7 @@ Version history
 
 1.15.0 (Pending)
 ================
+* http: introduce new HTTP/1 and HTTP/2 codec implementations that will remove the use of exceptions for control flow due to high risk factors and instead use error statuses. The old behavior is deprecated, but can be used during the removal period by disabling the runtime feature "envoy.reloadable_features.new_codec_behavior". The removal period will be one month.
 
 1.14.1 (April 8, 2020)
 ======================
@@ -47,7 +48,6 @@ Version history
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
 * http: http filter extensions use the "envoy.filters.http" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
-* http: introduce new HTTP/1 and HTTP/2 codec implementations that will remove the use of exceptions for control flow and instead use error statuses. The legacy codecs can be used by disabled the runtime feature "envoy.reloadable_features.new_codec_behavior". 
 * http: the runtime feature `http.connection_manager.log_flood_exception` is removed and replaced with a connection access log response code.
 * http: upgrade parser library, which removes support for "identity" transfer-encoding value.
 * listener filters: listener filter extensions use the "envoy.filters.listener" name space. A

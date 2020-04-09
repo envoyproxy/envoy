@@ -40,7 +40,7 @@
      : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
        processing_100_continue_(false), is_response_to_head_request_(false),
        is_content_length_allowed_(true), header_key_formatter_(header_key_formatter) {
-@@ -1088,6 +1090,7 @@
+@@ -1089,6 +1091,7 @@
  }
  
  } // namespace Http1

@@ -518,7 +518,9 @@ def codecDiffHelper(file1, file2, diff):
         file1, file2, '\n'.join(code_diff))
     # The following line will write the diff to the file diff if it does not match.
     # Do not uncomment unless you know the change is safe!
-    # pathlib.Path(diff).write_text('\n'.join(code_diff), encoding='utf-8', mode='w')
+    # new_diff = pathlib.Path(diff)
+    #new_diff.open('w')
+    # new_diff.write_text('\n'.join(code_diff), encoding='utf-8')
     return error_message
 
 
