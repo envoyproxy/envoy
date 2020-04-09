@@ -103,7 +103,7 @@ public:
 
 class TransportSocketConfigFactory : public Config::TypedFactory {
 public:
-  virtual ~TransportSocketConfigFactory() = default;
+  ~TransportSocketConfigFactory() override = default;
 };
 
 /**

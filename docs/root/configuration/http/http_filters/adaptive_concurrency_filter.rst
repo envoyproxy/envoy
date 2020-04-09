@@ -34,9 +34,11 @@ Calculating the minRTT
 ^^^^^^^^^^^^^^^^^^^^^^
 
 The minRTT is periodically measured by only allowing a very low outstanding request count to an
-upstream cluster and measuring the latency under these ideal conditions. The length of this minRTT
-calculation window is variable depending on the number of requests the filter is configured to
-aggregate to represent the expected latency of an upstream.
+upstream cluster and measuring the latency under these ideal conditions. The calculation is also
+triggered in scenarios where the concurrency limit is determined to be the minimum possible value
+for 5 consecutive sampling windows. The length of this minRTT calculation window is variable
+depending on the number of requests the filter is configured to aggregate to represent the expected
+latency of an upstream.
 
 A configurable *jitter* value is used to randomly delay the start of the minRTT calculation window
 by some amount of time. This is not necessary and can be disabled; however, it is recommended to

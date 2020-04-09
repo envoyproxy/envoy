@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -81,9 +82,18 @@ protected:
               client_.localAddress()->ip()->addressAsString());
 
     EXPECT_EQ(*data.addresses_.local_, *send_to_addr_);
-    EXPECT_EQ(time_system_.monotonicTime(), data.receive_time_);
+
+    size_t num_packet_per_recv = 1u;
+    if (Api::OsSysCallsSingleton::get().supportsMmsg()) {
+      num_packet_per_recv = 16u;
+    }
+    EXPECT_EQ(time_system_.monotonicTime(),
+              data.receive_time_ +
+                  std::chrono::milliseconds(
+                      (num_packets_received_by_listener_ % num_packet_per_recv) * 100));
     // Advance time so that next onData() should have different received time.
     time_system_.sleep(std::chrono::milliseconds(100));
+    ++num_packets_received_by_listener_;
   }
 
   SocketSharedPtr server_socket_;
@@ -91,6 +101,7 @@ protected:
   Address::InstanceConstSharedPtr send_to_addr_;
   MockUdpListenerCallbacks listener_callbacks_;
   std::unique_ptr<UdpListenerImpl> listener_;
+  size_t num_packets_received_by_listener_{0};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
@@ -158,11 +169,14 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
  * Tests UDP listener for read and write callbacks with actual data.
  */
 TEST_P(UdpListenerImplTest, UdpEcho) {
-  // We send 2 packets and expect it to echo.
-  const std::string first("first");
-  client_.write(first, *send_to_addr_);
-  const std::string second("second");
-  client_.write(second, *send_to_addr_);
+  // We send 17 packets and expect it to echo.
+  absl::FixedArray<std::string> client_data({"first", "second", "third", "forth", "fifth", "sixth",
+                                             "seventh", "eighth", "ninth", "tenth", "eleventh",
+                                             "twelveth", "thirteenth", "fourteenth", "fifteenth",
+                                             "sixteenth", "seventeenth"});
+  for (const auto& i : client_data) {
+    client_.write(i, *send_to_addr_);
+  }
 
   // For unit test purposes, we assume that the data was received in order.
   Address::InstanceConstSharedPtr test_peer_address;
@@ -177,15 +191,15 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
         test_peer_address = data.addresses_.peer_;
 
         const std::string data_str = data.buffer_->toString();
-        EXPECT_EQ(data_str, first);
+        EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
 
         server_received_data.push_back(data_str);
       }))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+      .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data);
 
         const std::string data_str = data.buffer_->toString();
-        EXPECT_EQ(data_str, second);
+        EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
 
         server_received_data.push_back(data_str);
       }));
@@ -301,6 +315,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   // Inject mocked OsSysCalls implementation to mock a read failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, supportsMmsg());
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, ENOTSUP}));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -317,30 +332,30 @@ TEST_P(UdpListenerImplTest, SendData) {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
   // Use a self address that is unlikely to be picked by source address discovery
-  // algorithm if not specified in recvmsg. Port is not taken into
+  // algorithm if not specified in recvmsg/recvmmsg. Port is not taken into
   // consideration.
   Address::InstanceConstSharedPtr send_from_addr;
   if (version_ == Address::IpVersion::v4) {
     // Linux kernel regards any 127.x.x.x as local address. But Mac OS doesn't.
-    send_from_addr.reset(new Address::Ipv4Instance(
+    send_from_addr = std::make_shared<Address::Ipv4Instance>(
 #ifndef __APPLE__
         "127.1.2.3",
 #else
         "127.0.0.1",
 #endif
-        server_socket_->localAddress()->ip()->port()));
+        server_socket_->localAddress()->ip()->port());
   } else {
     // Only use non-local v6 address if IP_FREEBIND is supported. Otherwise use
     // ::1 to avoid EINVAL error. Unfortunately this can't verify that sendmsg with
     // customized source address is doing the work because kernel also picks ::1
     // if it's not specified in cmsghdr.
-    send_from_addr.reset(new Address::Ipv6Instance(
+    send_from_addr = std::make_shared<Address::Ipv6Instance>(
 #ifdef IP_FREEBIND
         "::9",
 #else
         "::1",
 #endif
-        server_socket_->localAddress()->ip()->port()));
+        server_socket_->localAddress()->ip()->port());
   }
 
   UdpSendData send_data{send_from_addr->ip(), *client_.localAddress(), *buffer};

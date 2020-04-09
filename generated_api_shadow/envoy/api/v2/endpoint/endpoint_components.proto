@@ -16,7 +16,7 @@ option java_package = "io.envoyproxy.envoy.api.v2.endpoint";
 option java_outer_classname = "EndpointComponentsProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.endpoint.v3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Endpoints]
 
@@ -31,6 +31,13 @@ message Endpoint {
     // check port. Setting this with a non-zero value allows an upstream host
     // to have different health check address port.
     uint32 port_value = 1 [(validate.rules).uint32 = {lte: 65535}];
+
+    // By default, the host header for L7 health checks is controlled by cluster level configuration
+    // (see: :ref:`host <envoy_api_field_core.HealthCheck.HttpHealthCheck.host>` and
+    // :ref:`authority <envoy_api_field_core.HealthCheck.GrpcHealthCheck.authority>`). Setting this
+    // to a non-empty value allows overriding the cluster level configuration for a specific
+    // endpoint.
+    string hostname = 2;
   }
 
   // The upstream host address.
@@ -52,6 +59,12 @@ message Endpoint {
   //   This takes into effect only for upstream clusters with
   //   :ref:`active health checking <arch_overview_health_checking>` enabled.
   HealthCheckConfig health_check_config = 2;
+
+  // The hostname associated with this endpoint. This hostname is not used for routing or address
+  // resolution. If provided, it will be associated with the endpoint, and can be used for features
+  // that require a hostname, like
+  // :ref:`auto_host_rewrite <envoy_api_field_route.RouteAction.auto_host_rewrite>`.
+  string hostname = 3;
 }
 
 // An Endpoint that Envoy can route traffic to.
@@ -84,7 +97,8 @@ message LbEndpoint {
   // percentage of traffic for the endpoint. This percentage is then further
   // weighted by the endpoint's locality's load balancing weight from
   // LocalityLbEndpoints. If unspecified, each host is presumed to have equal
-  // weight in a locality.
+  // weight in a locality. The sum of the weights of all endpoints in the
+  // endpoint's locality must not exceed uint32_t maximal value (4294967295).
   google.protobuf.UInt32Value load_balancing_weight = 4 [(validate.rules).uint32 = {gte: 1}];
 }
 
@@ -103,7 +117,8 @@ message LocalityLbEndpoints {
   // Optional: Per priority/region/zone/sub_zone weight; at least 1. The load
   // balancing weight for a locality is divided by the sum of the weights of all
   // localities  at the same priority level to produce the effective percentage
-  // of traffic for the locality.
+  // of traffic for the locality. The sum of the weights of all localities at
+  // the same priority level must not exceed uint32_t maximal value (4294967295).
   //
   // Locality weights are only considered when :ref:`locality weighted load
   // balancing <arch_overview_load_balancing_locality_weighted_lb>` is

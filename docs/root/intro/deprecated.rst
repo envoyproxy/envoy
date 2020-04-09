@@ -10,8 +10,11 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 Deprecated items below are listed in chronological order.
 
-1.14.0 (Pending)
+1.15.0 (Pending)
 ================
+
+1.14.0 (April 8, 2020)
+======================
 * The previous behavior for upstream connection pool circuit breaking described
   `here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>`_ has
   been deprecated in favor of the new behavior described :ref:`here <arch_overview_circuit_break>`.
@@ -92,6 +95,17 @@ Deprecated items below are listed in chronological order.
   been deprecated in favor of `compressor`.
 * The statistics counter `header_gzip` in :ref:`HTTP Gzip filter <config_http_filters_gzip>`
   has been deprecated in favor of `header_compressor_used`.
+* Support for the undocumented HTTP/1.1 `:no-chunks` pseudo-header has been removed. If an extension
+  was using this it can achieve the same behavior via the new `http1StreamEncoderOptions()` API.
+* The grpc_stats filter behavior of by default creating a new stat for every message type seen is deprecated.
+  The default will switch to only creating a fixed set of stats. The previous behavior can be enabled by enabling
+  :ref:`stats_for_all_methods <envoy_api_field_config.filter.http.grpc_stats.v2alpha.FilterConfig.stats_for_all_methods>`,
+  and the previous default can be enabled until the end of the deprecation period by enabling runtime feature
+  `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
+* The :ref:`source_ip <envoy_api_field_config.rbac.v2.Principal.source_ip>` field in
+  `RBAC <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2/rbac.proto>`_ has been deprecated
+  in favor of :ref:`direct_remote_ip <envoy_api_field_config.rbac.v2.Principal.direct_remote_ip>` and
+  :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>`.
 
 1.13.0 (January 20, 2020)
 =========================

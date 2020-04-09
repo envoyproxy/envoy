@@ -25,7 +25,6 @@ using testing::Invoke;
 using testing::Property;
 using testing::Ref;
 using testing::Return;
-using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {

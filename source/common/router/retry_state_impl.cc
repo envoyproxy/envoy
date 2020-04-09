@@ -224,7 +224,13 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
     return RetryStatus::No;
   }
 
+  // The request has exhausted the number of retries allotted to it by the retry policy configured
+  // (or the x-envoy-max-retries header).
   if (retries_remaining_ == 0) {
+    cluster_.stats().upstream_rq_retry_limit_exceeded_.inc();
+    if (vcluster_) {
+      vcluster_->stats().upstream_rq_retry_limit_exceeded_.inc();
+    }
     return RetryStatus::NoRetryLimitExceeded;
   }
 
@@ -232,6 +238,9 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 
   if (!cluster_.resourceManager(priority_).retries().canCreate()) {
     cluster_.stats().upstream_rq_retry_overflow_.inc();
+    if (vcluster_) {
+      vcluster_->stats().upstream_rq_retry_overflow_.inc();
+    }
     return RetryStatus::NoOverflow;
   }
 

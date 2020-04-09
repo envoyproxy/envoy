@@ -398,7 +398,7 @@ void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_si
 }
 
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
-    uint64_t request_size, uint64_t response_size, bool big_header,
+    uint64_t request_size, uint64_t response_size, bool big_header, bool set_content_length_header,
     ConnectionCreationFunction* create_connection) {
   initialize();
   codec_client_ = makeHttpConnection(
@@ -406,11 +406,16 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  if (set_content_length_header) {
+    request_headers.setContentLength(request_size);
+    response_headers.setContentLength(response_size);
+  }
   if (big_header) {
     request_headers.addCopy("big", std::string(4096, 'a'));
   }
-  auto response = sendRequestAndWaitForResponse(request_headers, request_size,
-                                                default_response_headers_, response_size);
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, request_size, response_headers, response_size);
   checkSimpleRequestSuccess(request_size, response_size, response.get());
 }
 

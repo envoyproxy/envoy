@@ -19,11 +19,12 @@
 #include "common/http/context_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/symbol_table_creator.h"
 
-#include "test/common/http/conn_manager_impl_fuzz.pb.h"
+#include "test/common/http/conn_manager_impl_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/access_log/mocks.h"
@@ -71,10 +72,13 @@ public:
     ON_CALL(scoped_route_config_provider_, lastUpdated())
         .WillByDefault(Return(time_system_.systemTime()));
     access_logs_.emplace_back(std::make_shared<NiceMock<AccessLog::MockInstance>>());
+    request_id_extension_ = RequestIDExtensionFactory::defaultInstance(random_);
   }
 
   void newStream() {
-    codec_ = new NiceMock<MockServerConnection>();
+    if (!codec_) {
+      codec_ = new NiceMock<MockServerConnection>();
+    }
     decoder_filter_ = new NiceMock<MockStreamDecoderFilter>();
     encoder_filter_ = new NiceMock<MockStreamEncoderFilter>();
     EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -87,6 +91,8 @@ public:
   }
 
   // Http::ConnectionManagerConfig
+
+  RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
                                   ServerConnectionCallbacks&) override {
@@ -149,9 +155,15 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+  headersWithUnderscoresAction() const override {
+    return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
+  }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
+  RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   MockServerConnection* codec_{};
   MockStreamDecoderFilter* decoder_filter_{};
@@ -207,6 +219,8 @@ public:
              const HeaderMap& request_headers, bool end_stream)
       : conn_manager_(conn_manager), config_(config) {
     config_.newStream();
+    request_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
+    response_state_ = StreamState::PendingHeaders;
     EXPECT_CALL(*config_.codec_, dispatch(_))
         .WillOnce(InvokeWithoutArgs([this, &request_headers, end_stream] {
           decoder_ = &conn_manager_.newStream(encoder_);
@@ -221,13 +235,18 @@ public:
             headers->setHost(
                 Fuzz::replaceInvalidHostCharacters(headers->Host()->value().getStringView()));
           }
+          // If sendLocalReply is called:
+          ON_CALL(encoder_, encodeHeaders(_, true))
+              .WillByDefault(Invoke([this](const ResponseHeaderMap&, bool end_stream) -> void {
+                response_state_ =
+                    end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
+              }));
           decoder_->decodeHeaders(std::move(headers), end_stream);
         }));
     fakeOnData();
     decoder_filter_ = config.decoder_filter_;
     encoder_filter_ = config.encoder_filter_;
-    request_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
-    response_state_ = StreamState::PendingHeaders;
+    FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
   }
 
   void fakeOnData() {
@@ -307,6 +326,7 @@ public:
           decoder_->decodeData(buf, data_action.end_stream());
         }));
         fakeOnData();
+        FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = data_action.end_stream() ? StreamState::Closed : StreamState::PendingDataOrTrailers;
       }
       break;
@@ -328,6 +348,7 @@ public:
                   Fuzz::fromHeaders<TestRequestTrailerMapImpl>(trailers_action.headers())));
             }));
         fakeOnData();
+        FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = StreamState::Closed;
       }
       break;
@@ -342,6 +363,7 @@ public:
           throw CodecProtocolException("blah");
         }));
         fakeOnData();
+        FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = StreamState::Closed;
       }
       break;
@@ -432,6 +454,13 @@ public:
 using FuzzStreamPtr = std::unique_ptr<FuzzStream>;
 
 DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (const ProtoValidationException& e) {
+    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+    return;
+  }
+
   FuzzConfig config;
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Runtime::MockRandomGenerator> random;
