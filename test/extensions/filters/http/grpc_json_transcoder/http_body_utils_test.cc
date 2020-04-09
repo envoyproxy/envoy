@@ -16,7 +16,7 @@ namespace {
 
 class HttpBodyUtilsTest : public testing::Test {
 public:
-  HttpBodyUtilsTest() {}
+  HttpBodyUtilsTest() = default;
 
   template <typename Message>
   void basicTest(const std::string& content, const std::string& content_type,

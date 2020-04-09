@@ -937,7 +937,7 @@ void ConnectionImpl::sendSettings(
         {static_cast<int32_t>(NGHTTP2_SETTINGS_ENABLE_PUSH), disable_push ? 0U : 1U});
   }
 
-  for (const auto it : http2_options.custom_settings_parameters()) {
+  for (const auto& it : http2_options.custom_settings_parameters()) {
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
     const bool result =
         insertParameter({static_cast<int32_t>(it.identifier().value()), it.value().value()});
