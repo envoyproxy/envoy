@@ -56,7 +56,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           std::make_shared<Config::GrpcMuxImpl>(
               local_info_,
               Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                     api_config_source, scope)
+                                                     api_config_source, scope, true)
                   ->create(),
               dispatcher_, sotwGrpcMethod(type_url), api_config_source.transport_api_version(),
               random_, scope, Utility::parseRateLimitSettings(api_config_source),
@@ -64,11 +64,10 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           callbacks, stats, type_url, dispatcher_, Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated*/ false);
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.clusters(), api_config_source);
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<Config::NewGrpcMuxImpl>(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                             api_config_source, scope)
+                                                             api_config_source, scope, true)
                   ->create(),
               dispatcher_, deltaGrpcMethod(type_url), api_config_source.transport_api_version(),
               random_, scope, Utility::parseRateLimitSettings(api_config_source), local_info_),
