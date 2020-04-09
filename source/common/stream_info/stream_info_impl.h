@@ -11,6 +11,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 namespace Envoy {
@@ -294,7 +295,8 @@ private:
                  FilterStateSharedPtr filter_state)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
-        filter_state_(std::move(filter_state)) {}
+        filter_state_(std::move(filter_state)),
+        request_id_extension_(Http::RequestIDExtensionFactory::noopInstance()) {}
 
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
