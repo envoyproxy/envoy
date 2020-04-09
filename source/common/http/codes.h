@@ -59,7 +59,6 @@ private:
   void recordHistogram(Stats::Scope& scope, const Stats::StatNameVec& names,
                        Stats::Histogram::Unit unit, uint64_t count) const;
 
-  static absl::string_view stripTrailingDot(absl::string_view prefix);
   Stats::StatName upstreamRqGroup(Code response_code) const;
   Stats::StatName upstreamRqStatName(Code response_code) const;
 
@@ -109,7 +108,7 @@ private:
 
   static constexpr uint32_t NumHttpCodes = 500;
   static constexpr uint32_t HttpCodeOffset = 100; // code 100 is at index 0.
-  mutable std::atomic<uint8_t*> rc_stat_names_[NumHttpCodes];
+  mutable std::atomic<const uint8_t*> rc_stat_names_[NumHttpCodes];
 };
 
 /**

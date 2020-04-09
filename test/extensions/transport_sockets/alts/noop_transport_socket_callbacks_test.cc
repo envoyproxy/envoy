@@ -26,13 +26,16 @@ public:
   bool shouldDrainReadBuffer() override { return false; }
   void setReadBufferReady() override { set_read_buffer_ready_ = true; }
   void raiseEvent(Network::ConnectionEvent) override { event_raised_ = true; }
+  void flushWriteBuffer() override { write_buffer_flushed_ = true; }
 
   bool event_raised() const { return event_raised_; }
   bool set_read_buffer_ready() const { return set_read_buffer_ready_; }
+  bool write_buffer_flushed() const { return write_buffer_flushed_; }
 
 private:
   bool event_raised_{false};
   bool set_read_buffer_ready_{false};
+  bool write_buffer_flushed_{false};
   Network::IoHandlePtr io_handle_;
   Network::Connection& connection_;
 };
@@ -56,6 +59,8 @@ TEST_F(NoOpTransportSocketCallbacksTest, TestAllCallbacks) {
   EXPECT_FALSE(wrapper_callbacks_.set_read_buffer_ready());
   wrapped_callbacks_.raiseEvent(Network::ConnectionEvent::Connected);
   EXPECT_FALSE(wrapper_callbacks_.event_raised());
+  wrapped_callbacks_.flushWriteBuffer();
+  EXPECT_FALSE(wrapper_callbacks_.write_buffer_flushed());
 }
 
 } // namespace

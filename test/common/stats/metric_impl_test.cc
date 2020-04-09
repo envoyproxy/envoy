@@ -33,14 +33,14 @@ protected:
 
 // No truncation occurs in the implementation of HeapStatData.
 TEST_F(MetricImplTest, NoTags) {
-  CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter"), "", {});
+  CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter"), StatName(), {});
   EXPECT_EQ(0, counter->tags().size());
 }
 
 TEST_F(MetricImplTest, OneTag) {
-  CounterSharedPtr counter =
-      alloc_.makeCounter(makeStat("counter.name.value"), "counter", {{"name", "value"}});
-  std::vector<Tag> tags = counter->tags();
+  CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter.name.value"), makeStat("counter"),
+                                                {{makeStat("name"), makeStat("value")}});
+  TagVector tags = counter->tags();
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("name", tags[0].name_);
   EXPECT_EQ("value", tags[0].value_);
@@ -50,8 +50,9 @@ TEST_F(MetricImplTest, OneTag) {
 }
 
 TEST_F(MetricImplTest, TwoTagsIterOnce) {
-  CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter.name.value"), "counter",
-                                                {{"name1", "value1"}, {"name2", "value2"}});
+  CounterSharedPtr counter = alloc_.makeCounter(
+      makeStat("counter.name.value"), makeStat("counter"),
+      {{makeStat("name1"), makeStat("value1")}, {makeStat("name2"), makeStat("value2")}});
   StatName name1 = makeStat("name1");
   StatName value1 = makeStat("value1");
   int count = 0;
@@ -65,8 +66,9 @@ TEST_F(MetricImplTest, TwoTagsIterOnce) {
 }
 
 TEST_F(MetricImplTest, FindTag) {
-  CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter.name.value"), "counter",
-                                                {{"name1", "value1"}, {"name2", "value2"}});
+  CounterSharedPtr counter = alloc_.makeCounter(
+      makeStat("counter.name.value"), makeStat("counter"),
+      {{makeStat("name1"), makeStat("value1")}, {makeStat("name2"), makeStat("value2")}});
   EXPECT_EQ(makeStat("value1"), Utility::findTag(*counter, makeStat("name1")));
   EXPECT_EQ(makeStat("value2"), Utility::findTag(*counter, makeStat("name2")));
   EXPECT_FALSE(Utility::findTag(*counter, makeStat("name3")));

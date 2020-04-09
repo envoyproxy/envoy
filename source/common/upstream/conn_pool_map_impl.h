@@ -20,7 +20,7 @@ template <typename KEY_TYPE, typename POOL_TYPE> ConnPoolMap<KEY_TYPE, POOL_TYPE
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-typename ConnPoolMap<KEY_TYPE, POOL_TYPE>::OptPoolRef
+typename ConnPoolMap<KEY_TYPE, POOL_TYPE>::PoolOptRef
 ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& factory) {
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   // TODO(klarose): Consider how we will change the connection pool's configuration in the future.

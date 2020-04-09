@@ -1,3 +1,9 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.validate.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
 #include "test/integration/http_integration.h"
 
 #include "absl/strings/str_replace.h"
@@ -5,26 +11,27 @@
 
 namespace Envoy {
 
-class HttpSubsetLbIntegrationTest : public testing::TestWithParam<envoy::api::v2::Cluster_LbPolicy>,
-                                    public HttpIntegrationTest {
+class HttpSubsetLbIntegrationTest
+    : public testing::TestWithParam<envoy::config::cluster::v3::Cluster::LbPolicy>,
+      public HttpIntegrationTest {
 public:
   // Returns all load balancer types except ORIGINAL_DST_LB and CLUSTER_PROVIDED.
-  static std::vector<envoy::api::v2::Cluster_LbPolicy> getSubsetLbTestParams() {
-    int first = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MIN);
-    int last = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MAX);
+  static std::vector<envoy::config::cluster::v3::Cluster::LbPolicy> getSubsetLbTestParams() {
+    int first = static_cast<int>(envoy::config::cluster::v3::Cluster::LbPolicy_MIN);
+    int last = static_cast<int>(envoy::config::cluster::v3::Cluster::LbPolicy_MAX);
     ASSERT(first < last);
 
-    std::vector<envoy::api::v2::Cluster_LbPolicy> ret;
+    std::vector<envoy::config::cluster::v3::Cluster::LbPolicy> ret;
     for (int i = first; i <= last; i++) {
-      if (!envoy::api::v2::Cluster_LbPolicy_IsValid(i)) {
+      if (!envoy::config::cluster::v3::Cluster::LbPolicy_IsValid(i)) {
         continue;
       }
 
-      auto policy = static_cast<envoy::api::v2::Cluster_LbPolicy>(i);
+      auto policy = static_cast<envoy::config::cluster::v3::Cluster::LbPolicy>(i);
 
-      if (policy == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB ||
-          policy == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED ||
-          policy == envoy::api::v2::Cluster_LbPolicy_LOAD_BALANCING_POLICY_CONFIG) {
+      if (policy == envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB ||
+          policy == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED ||
+          policy == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
         continue;
       }
 
@@ -35,22 +42,22 @@ public:
   }
 
   // Converts an LbPolicy to strings suitable for test names.
-  static std::string
-  subsetLbTestParamsToString(const testing::TestParamInfo<envoy::api::v2::Cluster_LbPolicy>& p) {
-    const std::string& policy_name = envoy::api::v2::Cluster_LbPolicy_Name(p.param);
+  static std::string subsetLbTestParamsToString(
+      const testing::TestParamInfo<envoy::config::cluster::v3::Cluster::LbPolicy>& p) {
+    const std::string& policy_name = envoy::config::cluster::v3::Cluster::LbPolicy_Name(p.param);
     return absl::StrReplaceAll(policy_name, {{"_", ""}});
   }
 
   HttpSubsetLbIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
-                            ConfigHelper::HTTP_PROXY_CONFIG),
-        num_hosts_{4}, is_hash_lb_(GetParam() == envoy::api::v2::Cluster_LbPolicy_RING_HASH ||
-                                   GetParam() == envoy::api::v2::Cluster_LbPolicy_MAGLEV) {
+                            ConfigHelper::httpProxyConfig()),
+        num_hosts_{4}, is_hash_lb_(GetParam() == envoy::config::cluster::v3::Cluster::RING_HASH ||
+                                   GetParam() == envoy::config::cluster::v3::Cluster::MAGLEV) {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
 
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters(0);
 
@@ -59,7 +66,7 @@ public:
       // Create subsets based on type value of the "type" metadata.
       cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
 
-      cluster->clear_hosts();
+      cluster->clear_load_assignment();
 
       // Create a load assignment with num_hosts_ entries with metadata split evenly between
       // type=a and type=b.
@@ -84,7 +91,7 @@ public:
     });
 
     config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
 
@@ -107,7 +114,7 @@ public:
         });
   }
 
-  void configureRoute(envoy::api::v2::route::Route* route, const std::string& host_type) {
+  void configureRoute(envoy::config::route::v3::Route* route, const std::string& host_type) {
     auto* match = route->mutable_match();
     match->set_prefix("/");
 
@@ -138,13 +145,13 @@ public:
   // the given type ("a" or "b"). If is_hash_lb_, verifies that a single host is selected over n
   // iterations (e.g. for maglev/hash-ring policies). Otherwise, expected more than one host to be
   // selected over at least n iterations and at most m.
-  void runTest(Http::TestHeaderMapImpl& request_headers, const std::string expected_host_type,
-               const int n = 100, const int m = 1000) {
+  void runTest(Http::TestRequestHeaderMapImpl& request_headers,
+               const std::string expected_host_type, const int n = 100, const int m = 1000) {
     ASSERT_LT(n, m);
 
     std::set<std::string> hosts;
     for (int i = 0; i < m; i++) {
-      Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+      Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
       // Send header only request.
       IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -172,10 +179,10 @@ public:
 
     if (is_hash_lb_) {
       EXPECT_EQ(hosts.size(), 1) << "Expected a single unique host to be selected for "
-                                 << envoy::api::v2::Cluster_LbPolicy_Name(GetParam());
+                                 << envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam());
     } else {
       EXPECT_GT(hosts.size(), 1) << "Expected multiple hosts to be selected for "
-                                 << envoy::api::v2::Cluster_LbPolicy_Name(GetParam());
+                                 << envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam());
     }
   }
 
@@ -188,12 +195,12 @@ public:
   const std::string type_header_{"x-type"};
   const std::string type_key_{"type"};
 
-  Http::TestHeaderMapImpl type_a_request_headers_{{":method", "GET"},  {":path", "/test"},
-                                                  {":scheme", "http"}, {":authority", "host"},
-                                                  {"x-type", "a"},     {"x-hash", "hash-a"}};
-  Http::TestHeaderMapImpl type_b_request_headers_{{":method", "GET"},  {":path", "/test"},
-                                                  {":scheme", "http"}, {":authority", "host"},
-                                                  {"x-type", "b"},     {"x-hash", "hash-b"}};
+  Http::TestRequestHeaderMapImpl type_a_request_headers_{
+      {":method", "GET"},     {":path", "/test"}, {":scheme", "http"},
+      {":authority", "host"}, {"x-type", "a"},    {"x-hash", "hash-a"}};
+  Http::TestRequestHeaderMapImpl type_b_request_headers_{
+      {":method", "GET"},     {":path", "/test"}, {":scheme", "http"},
+      {":authority", "host"}, {"x-type", "b"},    {"x-hash", "hash-b"}};
 };
 
 INSTANTIATE_TEST_SUITE_P(SubsetCompatibleLoadBalancers, HttpSubsetLbIntegrationTest,

@@ -52,12 +52,16 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 
 IntegrationTestServerPtr IntegrationTestServer::create(
     const std::string& config_path, const Network::Address::IpVersion version,
+    std::function<void(IntegrationTestServer&)> server_ready_function,
     std::function<void()> on_server_init_function, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
-    absl::optional<std::reference_wrapper<ProcessObject>> process_object,
-    bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
+    ProcessObjectOptRef process_object, bool allow_unknown_static_fields,
+    bool reject_unknown_dynamic_fields, uint32_t concurrency) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
+  if (server_ready_function != nullptr) {
+    server->setOnServerReadyCb(server_ready_function);
+  }
   server->start(version, on_server_init_function, deterministic, defer_listener_finalization,
                 process_object, allow_unknown_static_fields, reject_unknown_dynamic_fields,
                 concurrency);
@@ -74,11 +78,12 @@ void IntegrationTestServer::waitUntilListenersReady() {
   ENVOY_LOG(info, "listener wait complete");
 }
 
-void IntegrationTestServer::start(
-    const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
-    bool deterministic, bool defer_listener_finalization,
-    absl::optional<std::reference_wrapper<ProcessObject>> process_object,
-    bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
+void IntegrationTestServer::start(const Network::Address::IpVersion version,
+                                  std::function<void()> on_server_init_function, bool deterministic,
+                                  bool defer_listener_finalization,
+                                  ProcessObjectOptRef process_object,
+                                  bool allow_unknown_static_fields,
+                                  bool reject_unknown_dynamic_fields, uint32_t concurrency) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_ = api_.threadFactory().createThread(
@@ -111,7 +116,7 @@ void IntegrationTestServer::start(
   if (tap_path) {
     std::vector<uint32_t> ports;
     for (auto listener : server().listenerManager().listeners()) {
-      const auto listen_addr = listener.get().socket().localAddress();
+      const auto listen_addr = listener.get().listenSocketFactory().localAddress();
       if (listen_addr->type() == Network::Address::Type::Ip) {
         ports.push_back(listen_addr->ip()->port());
       }
@@ -152,13 +157,17 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 
 void IntegrationTestServer::serverReady() {
   pending_listeners_ = server().listenerManager().listeners().size();
+  if (on_server_ready_cb_ != nullptr) {
+    on_server_ready_cb_(*this);
+  }
   server_set_.setReady();
 }
 
-void IntegrationTestServer::threadRoutine(
-    const Network::Address::IpVersion version, bool deterministic,
-    absl::optional<std::reference_wrapper<ProcessObject>> process_object,
-    bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
+void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
+                                          bool deterministic, ProcessObjectOptRef process_object,
+                                          bool allow_unknown_static_fields,
+                                          bool reject_unknown_dynamic_fields,
+                                          uint32_t concurrency) {
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version,
                                                     allow_unknown_static_fields,
                                                     reject_unknown_dynamic_fields, concurrency));
@@ -174,22 +183,11 @@ void IntegrationTestServer::threadRoutine(
                           lock, *this, std::move(random_generator), process_object);
 }
 
-void IntegrationTestServer::onRuntimeCreated() {
-  // Override runtime values to by default allow all disallowed features.
-  //
-  // Per #6288 we explicitly want to allow end to end testing of disallowed features until the code
-  // is removed from Envoy.
-  //
-  // This will revert as the runtime is torn down with the test Envoy server.
-  Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed();
-}
-
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
-    Runtime::RandomGeneratorPtr&& random_generator,
-    absl::optional<std::reference_wrapper<ProcessObject>> process_object) {
+    Runtime::RandomGeneratorPtr&& random_generator, ProcessObjectOptRef process_object) {
   {
     Init::ManagerImpl init_manager{"Server"};
     Stats::SymbolTablePtr symbol_table = Stats::SymbolTableCreator::makeSymbolTable();

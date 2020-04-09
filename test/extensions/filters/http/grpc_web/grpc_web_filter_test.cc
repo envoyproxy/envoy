@@ -85,7 +85,7 @@ public:
 
   void expectErrorResponse(const Http::Code& expected_code, const std::string& expected_message) {
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-        .WillOnce(Invoke([=](Http::HeaderMap& headers, bool) {
+        .WillOnce(Invoke([=](Http::ResponseHeaderMap& headers, bool) {
           uint64_t code;
           ASSERT_TRUE(absl::SimpleAtoi(headers.Status()->value().getStringView(), &code));
           EXPECT_EQ(static_cast<uint64_t>(expected_code), code);
@@ -95,7 +95,7 @@ public:
             [=](Buffer::Instance& data, bool) { EXPECT_EQ(expected_message, data.toString()); }));
   }
 
-  void expectRequiredGrpcUpstreamHeaders(const Http::HeaderMap& request_headers) {
+  void expectRequiredGrpcUpstreamHeaders(const Http::RequestHeaderMap& request_headers) {
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
               request_headers.ContentType()->value().getStringView());
     // Ensure we never send content-length upstream
@@ -111,6 +111,9 @@ public:
   GrpcWebFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  Http::TestRequestTrailerMapImpl request_trailers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
+  Http::TestResponseTrailerMapImpl response_trailers_;
 };
 
 TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
@@ -120,7 +123,7 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
       Http::Headers::get().ContentTypeValues.GrpcWebText,
       Http::Headers::get().ContentTypeValues.GrpcWebTextProto};
   for (auto& content_type : supported_content_types) {
-    Http::TestHeaderMapImpl request_headers;
+    Http::TestRequestHeaderMapImpl request_headers;
     request_headers.addCopy(Http::Headers::get().ContentType, content_type);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
     Http::MetadataMap metadata_map{{"metadata", "metadata"}};
@@ -132,31 +135,31 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
 
 TEST_F(GrpcWebFilterTest, UnsupportedContentType) {
   Buffer::OwnedImpl data;
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::Headers::get().ContentType, "unsupported");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
 }
 
 TEST_F(GrpcWebFilterTest, NoContentType) {
   Buffer::OwnedImpl data;
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
 }
 
 TEST_F(GrpcWebFilterTest, InvalidBase64) {
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::Headers::get().ContentType,
                           Http::Headers::get().ContentTypeValues.GrpcWebText);
   expectErrorResponse(Http::Code::BadRequest, "Bad gRPC-web request, invalid base64 data.");
@@ -172,7 +175,7 @@ TEST_F(GrpcWebFilterTest, InvalidBase64) {
 }
 
 TEST_F(GrpcWebFilterTest, Base64NoPadding) {
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::Headers::get().ContentType,
                           Http::Headers::get().ContentTypeValues.GrpcWebText);
   expectErrorResponse(Http::Code::BadRequest, "Bad gRPC-web request, invalid base64 data.");
@@ -188,8 +191,9 @@ TEST_F(GrpcWebFilterTest, Base64NoPadding) {
 }
 
 TEST_P(GrpcWebFilterTest, StatsNoCluster) {
-  Http::TestHeaderMapImpl request_headers{{"content-type", request_content_type()},
-                                          {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", request_content_type()},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
   EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
@@ -197,56 +201,60 @@ TEST_P(GrpcWebFilterTest, StatsNoCluster) {
 }
 
 TEST_P(GrpcWebFilterTest, StatsNormalResponse) {
-  Http::TestHeaderMapImpl request_headers{{"content-type", request_content_type()},
-                                          {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", request_content_type()},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
 
-  Http::TestHeaderMapImpl continue_headers{{":status", "100"}};
+  Http::TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_.encode100ContinueHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
 
-  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
-  Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(1UL,
+            decoder_callbacks_.clusterInfo()
+                ->statsScope()
+                .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.success")
+                .value());
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.success")
-                     .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
 }
 
 TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
-  Http::TestHeaderMapImpl request_headers{{"content-type", request_content_type()},
-                                          {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", request_content_type()},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
-  Http::TestHeaderMapImpl response_trailers{{"grpc-status", "1"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "1"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(1UL,
+            decoder_callbacks_.clusterInfo()
+                ->statsScope()
+                .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.failure")
+                .value());
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.failure")
-                     .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
 }
 
 TEST_P(GrpcWebFilterTest, Unary) {
   // Tests request headers.
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::Headers::get().ContentType, request_content_type());
   request_headers.addCopy(Http::Headers::get().Accept, request_accept());
   request_headers.addCopy(Http::Headers::get().ContentLength, uint64_t(8));
@@ -288,15 +296,15 @@ TEST_P(GrpcWebFilterTest, Unary) {
   }
 
   // Tests request trailers, they are passed through.
-  Http::TestHeaderMapImpl request_trailers;
+  Http::TestRequestTrailerMapImpl request_trailers;
   request_trailers.addCopy(Http::Headers::get().GrpcStatus, "0");
   request_trailers.addCopy(Http::Headers::get().GrpcMessage, "ok");
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
-  EXPECT_EQ("0", request_trailers.GrpcStatus()->value().getStringView());
-  EXPECT_EQ("ok", request_trailers.GrpcMessage()->value().getStringView());
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
+  EXPECT_EQ("0", request_trailers.get_("grpc-status"));
+  EXPECT_EQ("ok", request_trailers.get_("grpc-message"));
 
   // Tests response headers.
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   response_headers.addCopy(Http::Headers::get().Status, "200");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("200", response_headers.get_(Http::Headers::get().Status.get()));
@@ -343,7 +351,7 @@ TEST_P(GrpcWebFilterTest, Unary) {
   Buffer::OwnedImpl trailers_buffer;
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) { trailers_buffer.move(data); }));
-  Http::TestHeaderMapImpl response_trailers;
+  Http::TestResponseTrailerMapImpl response_trailers;
   response_trailers.addCopy(Http::Headers::get().GrpcStatus, "0");
   response_trailers.addCopy(Http::Headers::get().GrpcMessage, "ok");
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
@@ -355,6 +363,7 @@ TEST_P(GrpcWebFilterTest, Unary) {
     FAIL() << "Unsupported gRPC-Web response content-type: "
            << response_headers.ContentType()->value().getStringView();
   }
+  EXPECT_EQ(0, response_trailers.size());
 }
 
 INSTANTIATE_TEST_SUITE_P(Unary, GrpcWebFilterTest,

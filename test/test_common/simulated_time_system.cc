@@ -61,7 +61,11 @@ public:
   // Timer
   void disableTimer() override;
   void enableTimer(const std::chrono::milliseconds& duration,
-                   const ScopeTrackedObject* scope) override;
+                   const ScopeTrackedObject* scope) override {
+    enableHRTimer(duration, scope);
+  };
+  void enableHRTimer(const std::chrono::microseconds& duration,
+                     const ScopeTrackedObject* scope) override;
   bool enabled() override {
     Thread::LockGuard lock(time_system_.mutex_);
     return armed_ || base_timer_->enabled();
@@ -177,8 +181,8 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimerLockHeld() {
   }
 }
 
-void SimulatedTimeSystemHelper::Alarm::Alarm::enableTimer(const std::chrono::milliseconds& duration,
-                                                          const ScopeTrackedObject* scope) {
+void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
+    const std::chrono::microseconds& duration, const ScopeTrackedObject* scope) {
   Thread::LockGuard lock(time_system_.mutex_);
   disableTimerLockHeld();
   armed_ = true;
@@ -287,7 +291,7 @@ int64_t SimulatedTimeSystemHelper::nextIndex() {
 }
 
 void SimulatedTimeSystemHelper::addAlarmLockHeld(
-    Alarm* alarm, const std::chrono::milliseconds& duration) NO_THREAD_SAFETY_ANALYSIS {
+    Alarm* alarm, const std::chrono::microseconds& duration) NO_THREAD_SAFETY_ANALYSIS {
   ASSERT(&(alarm->timeSystem()) == this);
   alarm->setTimeLockHeld(monotonic_time_ + duration);
   alarms_.insert(alarm);

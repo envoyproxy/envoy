@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/server/admin.h"
 #include "envoy/singleton/manager.h"
 
@@ -60,7 +61,7 @@ private:
 
     // Extensions::Common::Tap::PerTapSinkHandle
     void submitTrace(TraceWrapperPtr&& trace,
-                     envoy::service::tap::v2alpha::OutputSink::Format format) override;
+                     envoy::config::tap::v3::OutputSink::Format format) override;
 
     AdminHandler& parent_;
   };

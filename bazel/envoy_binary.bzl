@@ -67,12 +67,18 @@ def _envoy_linkopts():
             "-pthread",
             "-lrt",
             "-ldl",
+            "-Wl,-z,relro,-z,now",
             "-Wl,--hash-style=gnu",
         ],
+    }) + select({
+        "@envoy//bazel:boringssl_fips": [],
+        "@envoy//bazel:windows_x86_64": [],
+        "//conditions:default": ["-pie"],
     }) + _envoy_select_exported_symbols(["-Wl,-E"])
 
 def _envoy_stamped_deps():
     return select({
+        "@envoy//bazel:windows_x86_64": [],
         "@envoy//bazel:apple": [
             "@envoy//bazel:raw_build_id.ldscript",
         ],

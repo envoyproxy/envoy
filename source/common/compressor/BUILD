@@ -17,6 +17,6 @@ envoy_cc_library(
         "//include/envoy/compressor:compressor_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:stack_array",
+        "//source/common/common:zlib_base_lib",
     ],
 )

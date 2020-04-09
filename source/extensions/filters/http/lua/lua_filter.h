@@ -5,7 +5,7 @@
 
 #include "common/crypto/utility.h"
 
-#include "extensions/common/crypto/crypto_impl.h"
+#include "extensions/common/utility.h"
 #include "extensions/filters/common/lua/wrappers.h"
 #include "extensions/filters/http/lua/wrappers.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -14,20 +14,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
-
-namespace {
-const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
-  if (callbacks->route() == nullptr || callbacks->route()->routeEntry() == nullptr) {
-    return ProtobufWkt::Struct::default_instance();
-  }
-  const auto& metadata = callbacks->route()->routeEntry()->metadata();
-  const auto& filter_it = metadata.filter_metadata().find(HttpFilterNames::get().Lua);
-  if (filter_it == metadata.filter_metadata().end()) {
-    return ProtobufWkt::Struct::default_instance();
-  }
-  return filter_it->second;
-}
-} // namespace
 
 /**
  * Callbacks used by a stream handler to access the filter.
@@ -64,7 +50,8 @@ public:
    * @param body supplies the optional response body.
    * @param state supplies the active Lua state.
    */
-  virtual void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) PURE;
+  virtual void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
+                       lua_State* state) PURE;
 
   /**
    * @return const ProtobufWkt::Struct& the value of metadata inside the lua filter scope of current
@@ -156,6 +143,8 @@ private:
    * @param 2 (table): A table of HTTP headers. :method, :path, and :authority must be defined.
    * @param 3 (string): Body. Can be nil.
    * @param 4 (int): Timeout in milliseconds for the call.
+   * @param 5 (bool): Optional flag. If true, filter continues without waiting for HTTP response
+   * from upstream service. False/synchronous by default.
    * @return headers (table), body (string/nil)
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCall);
@@ -247,7 +236,8 @@ private:
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
 
-  static Http::HeaderMapPtr buildHeadersFromTable(lua_State* state, int table_index);
+  int luaHttpCallSynchronous(lua_State* state);
+  int luaHttpCallAsynchronous(lua_State* state);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
@@ -263,8 +253,8 @@ private:
   }
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason) override;
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
 
   Filters::Common::Lua::Coroutine& coroutine_;
   Http::HeaderMap& headers_;
@@ -285,6 +275,16 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
+};
+
+/**
+ * An empty Callbacks client. It will ignore everything, including successes and failures.
+ */
+class NoopCallbacks : public Http::AsyncClient::Callbacks {
+public:
+  // Http::AsyncClient::Callbacks
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {}
 };
 
 /**
@@ -327,14 +327,15 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override {
     return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
                      config_->requestFunctionRef(), headers, end_stream);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
   }
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override {
     return doTrailers(request_stream_wrapper_, trailers);
   }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
@@ -342,17 +343,18 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override {
     return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
                      config_->responseFunctionRef(), headers, end_stream);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
   };
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override {
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
     return doTrailers(response_stream_wrapper_, trailers);
   };
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
@@ -373,9 +375,10 @@ private:
     const Buffer::Instance* bufferedBody() override { return callbacks_->decodingBuffer(); }
     void continueIteration() override { return callbacks_->continueDecoding(); }
     void onHeadersModified() override { callbacks_->clearRouteCache(); }
-    void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
+    void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
+                 lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+    const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
 
@@ -393,9 +396,10 @@ private:
     const Buffer::Instance* bufferedBody() override { return callbacks_->encodingBuffer(); }
     void continueIteration() override { return callbacks_->continueEncoding(); }
     void onHeadersModified() override {}
-    void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
+    void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
+                 lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+    const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
 

@@ -98,6 +98,8 @@ for how to update or override dependencies.
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
 1. `go get -u github.com/bazelbuild/buildtools/buildifier` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
    in your shell for buildifier to work.
+1. `go get -u github.com/bazelbuild/buildtools/buildozer` to install buildozer. You may need to set `BUILDOZER_BIN` to `$GOPATH/bin/buildozer`
+   in your shell for buildozer to work.
 1. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Envoy with the CI Docker image
@@ -147,20 +149,15 @@ set different options. See below to configure test IP versions.
 
 ## Linking against libc++ on Linux
 
-To link Envoy against libc++, use the following commands:
+To link Envoy against libc++, follow the [quick start](#quick-start-bazel-build-for-developers) to setup Clang+LLVM and run:
 ```
-export CC=clang
-export CXX=clang++
 bazel build --config=libc++ //source/exe:envoy-static
 ```
-Note: this assumes that both: clang compiler and libc++ library are installed in the system,
-and that `clang` and `clang++` are available in `$PATH`. On some systems, you might need to
-include them in the search path, e.g. `export PATH=/usr/lib/llvm-9/bin:$PATH`.
 
-You might also need to ensure libc++ is installed correctly on your system, e.g. on Ubuntu this
-might look like `sudo apt-get install libc++abi-9-dev libc++-9-dev`.
+Or use our configuration with Remote Execution or Docker sandbox, pass `--config=remote-clang-libc++` or
+`--config=docker-clang-libc++` respectively.
 
-Note: this configuration currently doesn't work with Remote Execution or Docker sandbox.
+If you want to make libc++ as default, add a line `build --config=libc++` to the `user.bazelrc` file in Envoy source root.
 
 ## Using a compiler toolchain in a non-standard location
 
@@ -176,7 +173,7 @@ for more details.
 ## Supported compiler versions
 
 We now require Clang >= 5.0 due to known issues with std::string thread safety and C++14 support. GCC >= 7 is also
-known to work. Currently the CI is running with Clang 8.
+known to work. Currently the CI is running with Clang 9.
 
 ## Clang STL debug symbols
 
@@ -400,6 +397,13 @@ Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wi
 bazel test -c dbg --config=clang-tsan //test/...
 ```
 
+For [memory sanitizer (MSAN)](https://github.com/google/sanitizers/wiki/MemorySanitizer) testing,
+it has to be run under the docker sandbox which comes with MSAN instrumented libc++:
+
+```
+bazel test -c dbg --config=docker-msan //test/...
+```
+
 To run the sanitizers on OS X, prefix `macos-` to the config option, e.g.:
 
 ```
@@ -444,6 +448,9 @@ The following optional features can be enabled on the Bazel build command-line:
   This is needed if the `version_info_lib` is compiled via a non-binary bazel rules, e.g `envoy_cc_library`.
   Otherwise, the linker will fail to resolve symbols that are included via the `linktamp` rule, which is only available to binary targets.
   This is being tracked as a feature in: https://github.com/envoyproxy/envoy/issues/6859.
+* Process logging for Android applications can be enabled with `--define logger=android`.
+* Excluding assertions for known issues with `--define disable_known_issue_asserts=true`.
+  A KNOWN_ISSUE_ASSERT is an assertion that should pass (like all assertions), but sometimes fails for some as-yet unidentified or unresolved reason. Because it is known to potentially fail, it can be compiled out even when DEBUG is true, when this flag is set. This allows Envoy to be run in production with assertions generally enabled, without crashing for known issues. KNOWN_ISSUE_ASSERT should only be used for newly-discovered issues that represent benign violations of expectations.
 
 ## Disabling extensions
 
@@ -584,11 +591,19 @@ Sometimes it's useful to see real system paths in bazel error message output (vs
 
 Run `tools/gen_compilation_database.py` to generate
 a [JSON Compilation Database](https://clang.llvm.org/docs/JSONCompilationDatabase.html). This could be used
-with any tools (e.g. clang-tidy) compatible with the format.
+with any tools (e.g. clang-tidy) compatible with the format. It is recommended to run this script
+with `TEST_TMPDIR` set, so the Bazel artifacts doesn't get cleaned up in next `bazel build` or `bazel test`.
 
 The compilation database could also be used to setup editors with cross reference, code completion.
 For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
-[cquery](https://github.com/cquery-project/cquery) with supported editors.
+[clangd](https://clangd.llvm.org/) with supported editors.
+
+For example, use following command to prepare a compilation database:
+
+```
+TEST_TMPDIR=/tmp tools/gen_compilation_database.py --run_bazel_build
+```
+
 
 # Running clang-format without docker
 
@@ -613,10 +628,10 @@ export BUILDIFIER_BIN="/usr/bin/buildifier"
 Once this is set up, you can run clang-format without docker:
 
 ```shell
-./tools/check_format.py check
-./tools/check_spelling.sh check
-./tools/check_format.py fix
-./tools/check_spelling.sh fix
+./tools/code_format/check_format.py check
+./tools/spelling/check_spelling.sh check
+./tools/code_format/check_format.py fix
+./tools/spelling/check_spelling.sh fix
 ```
 
 # Advanced caching setup

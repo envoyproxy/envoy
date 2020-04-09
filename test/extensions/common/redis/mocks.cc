@@ -5,8 +5,8 @@ namespace Extensions {
 namespace Common {
 namespace Redis {
 
-MockRedirectionManager::MockRedirectionManager() = default;
-MockRedirectionManager::~MockRedirectionManager() = default;
+MockClusterRefreshManager::MockClusterRefreshManager() = default;
+MockClusterRefreshManager::~MockClusterRefreshManager() = default;
 
 } // namespace Redis
 } // namespace Common

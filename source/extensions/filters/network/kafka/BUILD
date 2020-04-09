@@ -1,15 +1,49 @@
 licenses(["notice"])  # Apache 2
 
 # Kafka network filter.
-# Public docs: docs/root/configuration/network_filters/kafka_filter.rst
+# Broker filter public docs: docs/root/configuration/network_filters/kafka_broker_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
 
 envoy_package()
+
+envoy_cc_extension(
+    name = "kafka_broker_config_lib",
+    srcs = ["broker/config.cc"],
+    hdrs = ["broker/config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
+    status = "wip",
+    deps = [
+        ":kafka_broker_filter_lib",
+        "//source/extensions/filters/network:well_known_names",
+        "//source/extensions/filters/network/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/network/kafka_broker/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "kafka_broker_filter_lib",
+    srcs = ["broker/filter.cc"],
+    hdrs = [
+        "broker/filter.h",
+        "external/request_metrics.h",
+        "external/response_metrics.h",
+    ],
+    deps = [
+        ":kafka_request_codec_lib",
+        ":kafka_response_codec_lib",
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:filter_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
 
 envoy_cc_library(
     name = "abstract_codec_lib",
@@ -47,6 +81,7 @@ envoy_cc_library(
     deps = [
         ":kafka_request_lib",
         ":parser_lib",
+        ":tagged_fields_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
     ],
@@ -72,11 +107,12 @@ genrule(
     outs = [
         "external/requests.h",
         "external/kafka_request_resolver.cc",
+        "external/request_metrics.h",
     ],
     cmd = """
       ./$(location :kafka_protocol_code_generator_bin) request \
         $(location external/requests.h) $(location external/kafka_request_resolver.cc) \
-        $(SRCS)
+        $(location external/request_metrics.h) $(SRCS)
     """,
     tools = [
         ":kafka_protocol_code_generator_bin",
@@ -108,6 +144,7 @@ envoy_cc_library(
     deps = [
         ":kafka_response_lib",
         ":parser_lib",
+        ":tagged_fields_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
     ],
@@ -133,11 +170,12 @@ genrule(
     outs = [
         "external/responses.h",
         "external/kafka_response_resolver.cc",
+        "external/response_metrics.h",
     ],
     cmd = """
       ./$(location :kafka_protocol_code_generator_bin) response \
         $(location external/responses.h) $(location external/kafka_response_resolver.cc) \
-        $(SRCS)
+        $(location external/response_metrics.h) $(SRCS)
     """,
     tools = [
         ":kafka_protocol_code_generator_bin",
@@ -166,6 +204,12 @@ envoy_cc_library(
     deps = [
         "//source/common/common:minimal_logger_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "tagged_fields_lib",
+    hdrs = ["tagged_fields.h"],
+    deps = [":serialization_lib"],
 )
 
 envoy_cc_library(

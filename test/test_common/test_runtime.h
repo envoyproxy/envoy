@@ -11,6 +11,8 @@
 
 #pragma once
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
@@ -28,7 +30,7 @@ namespace Envoy {
 class TestScopedRuntime {
 public:
   TestScopedRuntime() : api_(Api::createApiForTest()) {
-    envoy::config::bootstrap::v2::LayeredRuntime config;
+    envoy::config::bootstrap::v3::LayeredRuntime config;
     // The existence of an admin layer is required for mergeValues() to work.
     config.add_layers()->mutable_admin_layer();
 

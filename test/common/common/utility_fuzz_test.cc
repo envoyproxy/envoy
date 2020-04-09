@@ -46,11 +46,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     }
     {
       const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
-      StringUtil::caseCompare(string_buffer.substr(0, split_point),
-                              string_buffer.substr(split_point));
-    }
-    {
-      const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
       StringUtil::cropLeft(string_buffer.substr(0, split_point), string_buffer.substr(split_point));
     }
     {

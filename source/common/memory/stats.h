@@ -41,6 +41,11 @@ public:
   static uint64_t totalPageHeapFree();
 
   /**
+   * @return uint64_t estimate of total bytes of the physical memory usage by the allocator
+   */
+  static uint64_t totalPhysicalBytes();
+
+  /**
    * Log detailed stats about current memory allocation. Intended for debugging purposes.
    */
   static void dumpStatsToLog();

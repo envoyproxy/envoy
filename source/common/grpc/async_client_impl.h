@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 
 #include "common/common/linked_object.h"
@@ -15,7 +17,7 @@ class AsyncStreamImpl;
 
 class AsyncClientImpl final : public RawAsyncClient {
 public:
-  AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::api::v2::core::GrpcService& config,
+  AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::GrpcService& config,
                   TimeSource& time_source);
   ~AsyncClientImpl() override;
 
@@ -31,7 +33,7 @@ public:
 private:
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
-  const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue> initial_metadata_;
+  const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
   TimeSource& time_source_;
 
@@ -53,9 +55,9 @@ public:
   void sendMessage(const Protobuf::Message& request, bool end_stream);
 
   // Http::AsyncClient::StreamCallbacks
-  void onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
+  void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void onData(Buffer::Instance& data, bool end_stream) override;
-  void onTrailers(Http::HeaderMapPtr&& trailers) override;
+  void onTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
   void onComplete() override;
   void onReset() override;
 
@@ -75,7 +77,7 @@ private:
                        const std::string& grpc_message);
 
   Event::Dispatcher* dispatcher_{};
-  Http::MessagePtr headers_message_;
+  Http::RequestMessagePtr headers_message_;
   AsyncClientImpl& parent_;
   std::string service_full_name_;
   std::string method_name_;
@@ -104,10 +106,10 @@ public:
 
 private:
   // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override;
+  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override;
   bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override;
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override;
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   Buffer::InstancePtr request_;

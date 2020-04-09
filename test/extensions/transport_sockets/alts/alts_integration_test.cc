@@ -1,4 +1,5 @@
-#include "envoy/config/transport_socket/alts/v2alpha/alts.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
 
 #include "common/common/thread.h"
 
@@ -40,13 +41,13 @@ public:
         client_connect_handshaker_(client_connect_handshaker) {}
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* transport_socket = bootstrap.mutable_static_resources()
                                    ->mutable_listeners(0)
                                    ->mutable_filter_chains(0)
                                    ->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.alts");
-      envoy::config::transport_socket::alts::v2alpha::Alts alts_config;
+      envoy::extensions::transport_sockets::alts::v3::Alts alts_config;
       if (!server_peer_identity_.empty()) {
         alts_config.add_peer_service_accounts(server_peer_identity_);
       }
@@ -88,7 +89,7 @@ public:
     ON_CALL(mock_factory_ctx, singletonManager()).WillByDefault(ReturnRef(fsm));
     UpstreamAltsTransportSocketConfigFactory factory;
 
-    envoy::config::transport_socket::alts::v2alpha::Alts alts_config;
+    envoy::extensions::transport_sockets::alts::v3::Alts alts_config;
     alts_config.set_handshaker_service(fakeHandshakerServerAddress(client_connect_handshaker_));
     if (!client_peer_identity_.empty()) {
       alts_config.add_peer_service_accounts(client_peer_identity_);
@@ -164,7 +165,7 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
     return makeAltsConnection();
   };
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 class AltsIntegrationTestEmptyPeer : public AltsIntegrationTestBase {
@@ -185,7 +186,7 @@ TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
     return makeAltsConnection();
   };
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 class AltsIntegrationTestClientInvalidPeer : public AltsIntegrationTestBase {
@@ -202,7 +203,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestClientInvalidPeer,
 
 // Verifies that when client receives peer service account which does not match
 // any account in config, the handshake will fail and client closes connection.
-TEST_P(AltsIntegrationTestClientInvalidPeer, clientValidationFail) {
+TEST_P(AltsIntegrationTestClientInvalidPeer, ClientValidationFail) {
   initialize();
   codec_client_ = makeRawHttpConnection(makeAltsConnection());
   EXPECT_FALSE(codec_client_->connected());

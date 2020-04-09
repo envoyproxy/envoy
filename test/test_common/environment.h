@@ -10,6 +10,8 @@
 
 #include "common/json/json_loader.h"
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "tools/cpp/runfiles/runfiles.h"
 
@@ -74,8 +76,8 @@ public:
    * @param path path suffix.
    * @return std::string path qualified with temporary directory.
    */
-  static std::string temporaryPath(const std::string& path) {
-    return temporaryDirectory() + "/" + path;
+  static std::string temporaryPath(absl::string_view path) {
+    return absl::StrCat(temporaryDirectory(), "/", path);
   }
 
   /**
@@ -188,16 +190,24 @@ public:
   static void createPath(const std::string& path);
 
   /**
-   * Create a parent path on the filesystem (mkdir -p $(dirname ...) equivalent).
-   * @param path.
-   */
-  static void createParentPath(const std::string& path);
-
-  /**
    * Remove a path on the filesystem (rm -rf ... equivalent).
    * @param path.
    */
   static void removePath(const std::string& path);
+
+  /**
+   * Rename a file
+   * @param old_name
+   * @param new_name
+   */
+  static void renameFile(const std::string& old_name, const std::string& new_name);
+
+  /**
+   * Create a symlink
+   * @param target
+   * @param link
+   */
+  static void createSymlink(const std::string& target, const std::string& link);
 
   /**
    * Set environment variable. Same args as setenv(2).
@@ -216,6 +226,26 @@ public:
 
 private:
   static bazel::tools::cpp::runfiles::Runfiles* runfiles_;
+};
+
+/**
+ * A utility class for atomically updating a file using symbolic link swap.
+ * Note the file lifetime is limited to the instance of the AtomicFileUpdater
+ * which erases any existing files upon creation, used for specific test
+ * scenarios. See discussion at https://github.com/envoyproxy/envoy/pull/4298
+ */
+class AtomicFileUpdater {
+public:
+  AtomicFileUpdater(const std::string& filename);
+
+  void update(const std::string& contents);
+
+private:
+  const std::string link_;
+  const std::string new_link_;
+  const std::string target1_;
+  const std::string target2_;
+  bool use_target1_;
 };
 
 } // namespace Envoy

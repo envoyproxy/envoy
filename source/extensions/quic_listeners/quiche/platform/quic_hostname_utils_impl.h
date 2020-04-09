@@ -6,8 +6,8 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include "quiche/common/platform/api/quiche_string_piece.h"
 #include "quiche/quic/platform/api/quic_export.h"
-#include "quiche/quic/platform/api/quic_string_piece.h"
 
 namespace quic {
 
@@ -18,7 +18,7 @@ public:
   //  (2) check that the hostname contains valid characters only; and
   //  (3) contains at least one dot.
   // NOTE(wub): Only (3) is implemented for now.
-  static bool IsValidSNI(QuicStringPiece sni);
+  static bool IsValidSNI(quiche::QuicheStringPiece sni);
 
   // Normalize a hostname:
   //  (1) Canonicalize it, similar to what Chromium does in
@@ -27,7 +27,7 @@ public:
   //  (3) Remove the trailing '.'.
   // WARNING: May mutate |hostname| in place.
   // NOTE(wub): Only (2) and (3) are implemented for now.
-  static std::string NormalizeHostname(QuicStringPiece hostname);
+  static std::string NormalizeHostname(quiche::QuicheStringPiece hostname);
 
 private:
   QuicHostnameUtilsImpl() = delete;

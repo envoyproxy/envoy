@@ -1,14 +1,12 @@
 #pragma once
 
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/un.h>
 
 #include <array>
 #include <cstdint>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/network/address.h"
 #include "envoy/network/io_handle.h"
 
@@ -39,7 +37,7 @@ InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t
  * @param fd socket file descriptor
  * @return InstanceConstSharedPtr for bound address.
  */
-InstanceConstSharedPtr addressFromFd(int fd);
+InstanceConstSharedPtr addressFromFd(os_fd_t fd);
 
 /**
  * Obtain the address of the peer of the socket with the specified file descriptor.
@@ -47,7 +45,7 @@ InstanceConstSharedPtr addressFromFd(int fd);
  * @param fd socket file descriptor
  * @return InstanceConstSharedPtr for peer address.
  */
-InstanceConstSharedPtr peerAddressFromFd(int fd);
+InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd);
 
 /**
  * Base class for all address types.
@@ -102,8 +100,8 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(int fd) const override;
-  Api::SysCallIntResult connect(int fd) const override;
+  Api::SysCallIntResult bind(os_fd_t fd) const override;
+  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return &ip_; }
   IoHandlePtr socket(SocketType type) const override;
 
@@ -176,8 +174,8 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(int fd) const override;
-  Api::SysCallIntResult connect(int fd) const override;
+  Api::SysCallIntResult bind(os_fd_t fd) const override;
+  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return &ip_; }
   IoHandlePtr socket(SocketType type) const override;
 
@@ -230,17 +228,17 @@ public:
   /**
    * Construct from an existing unix address.
    */
-  explicit PipeInstance(const sockaddr_un* address, socklen_t ss_len);
+  explicit PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0);
 
   /**
    * Construct from a string pipe path.
    */
-  explicit PipeInstance(const std::string& pipe_path);
+  explicit PipeInstance(const std::string& pipe_path, mode_t mode = 0);
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(int fd) const override;
-  Api::SysCallIntResult connect(int fd) const override;
+  Api::SysCallIntResult bind(os_fd_t fd) const override;
+  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return nullptr; }
   IoHandlePtr socket(SocketType type) const override;
 
@@ -258,6 +256,7 @@ private:
   // For abstract namespaces.
   bool abstract_namespace_{false};
   uint32_t address_length_{0};
+  mode_t mode{0};
 };
 
 } // namespace Address

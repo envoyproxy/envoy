@@ -1,5 +1,9 @@
 #include <memory>
 
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/scoped_route.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
 #include "common/router/scoped_config_impl.h"
 
 #include "test/mocks/router/mocks.h"
@@ -361,14 +365,14 @@ public:
     route_config_->name_ = "foo_route";
   }
 
-  envoy::api::v2::RouteConfiguration route_configuration_;
-  envoy::api::v2::ScopedRouteConfiguration scoped_route_config_;
+  envoy::config::route::v3::RouteConfiguration route_configuration_;
+  envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config_;
   std::shared_ptr<MockConfig> route_config_;
   std::unique_ptr<ScopedRouteInfo> info_;
 };
 
 TEST_F(ScopedRouteInfoTest, Creation) {
-  envoy::api::v2::ScopedRouteConfiguration config_copy = scoped_route_config_;
+  envoy::config::route::v3::ScopedRouteConfiguration config_copy = scoped_route_config_;
   info_ = std::make_unique<ScopedRouteInfo>(std::move(scoped_route_config_), route_config_);
   EXPECT_EQ(info_->routeConfig().get(), route_config_.get());
   EXPECT_TRUE(TestUtility::protoEqual(info_->configProto(), config_copy));
@@ -420,7 +424,7 @@ public:
 )EOF");
   }
   std::shared_ptr<ScopedRouteInfo> makeScopedRouteInfo(const std::string& route_config_yaml) {
-    envoy::api::v2::ScopedRouteConfiguration scoped_route_config;
+    envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config;
     TestUtility::loadFromYaml(route_config_yaml, scoped_route_config);
 
     std::shared_ptr<MockConfig> route_config = std::make_shared<NiceMock<MockConfig>>();

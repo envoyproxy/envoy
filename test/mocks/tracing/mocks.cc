@@ -4,7 +4,6 @@
 #include "gtest/gtest.h"
 
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Tracing {
@@ -14,7 +13,7 @@ MockSpan::~MockSpan() = default;
 
 MockConfig::MockConfig() {
   ON_CALL(*this, operationName()).WillByDefault(Return(operation_name_));
-  ON_CALL(*this, requestHeadersForTags()).WillByDefault(ReturnRef(headers_));
+  ON_CALL(*this, customTags()).WillByDefault(Return(&custom_tags_));
   ON_CALL(*this, verbose()).WillByDefault(Return(verbose_));
   ON_CALL(*this, maxPathTagLength()).WillByDefault(Return(uint32_t(256)));
 }
@@ -25,6 +24,9 @@ MockHttpTracer::~MockHttpTracer() = default;
 
 MockDriver::MockDriver() = default;
 MockDriver::~MockDriver() = default;
+
+MockHttpTracerManager::MockHttpTracerManager() = default;
+MockHttpTracerManager::~MockHttpTracerManager() = default;
 
 } // namespace Tracing
 } // namespace Envoy

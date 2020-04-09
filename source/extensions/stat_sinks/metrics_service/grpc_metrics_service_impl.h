@@ -3,8 +3,7 @@
 #include "envoy/grpc/async_client.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
-#include "envoy/service/metrics/v2/metrics_service.pb.h"
-#include "envoy/service/metrics/v2/metrics_service.pb.validate.h"
+#include "envoy/service/metrics/v3/metrics_service.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
@@ -23,7 +22,7 @@ namespace MetricsService {
  * Interface for metrics streamer.
  */
 class GrpcMetricsStreamer
-    : public Grpc::AsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse> {
+    : public Grpc::AsyncStreamCallbacks<envoy::service::metrics::v3::StreamMetricsResponse> {
 public:
   ~GrpcMetricsStreamer() override = default;
 
@@ -31,15 +30,15 @@ public:
    * Send Metrics Message.
    * @param message supplies the metrics to send.
    */
-  virtual void send(envoy::service::metrics::v2::StreamMetricsMessage& message) PURE;
+  virtual void send(envoy::service::metrics::v3::StreamMetricsMessage& message) PURE;
 
   // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
+  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
   void
-  onReceiveMessage(std::unique_ptr<envoy::service::metrics::v2::StreamMetricsResponse>&&) override {
+  onReceiveMessage(std::unique_ptr<envoy::service::metrics::v3::StreamMetricsResponse>&&) override {
   }
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override{};
 };
 
@@ -54,15 +53,15 @@ public:
                           const LocalInfo::LocalInfo& local_info);
 
   // GrpcMetricsStreamer
-  void send(envoy::service::metrics::v2::StreamMetricsMessage& message) override;
+  void send(envoy::service::metrics::v3::StreamMetricsMessage& message) override;
 
   // Grpc::AsyncStreamCallbacks
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override { stream_ = nullptr; }
 
 private:
-  Grpc::AsyncStream<envoy::service::metrics::v2::StreamMetricsMessage> stream_{};
-  Grpc::AsyncClient<envoy::service::metrics::v2::StreamMetricsMessage,
-                    envoy::service::metrics::v2::StreamMetricsResponse>
+  Grpc::AsyncStream<envoy::service::metrics::v3::StreamMetricsMessage> stream_{};
+  Grpc::AsyncClient<envoy::service::metrics::v3::StreamMetricsMessage,
+                    envoy::service::metrics::v3::StreamMetricsResponse>
       client_;
   const LocalInfo::LocalInfo& local_info_;
 };
@@ -84,7 +83,7 @@ public:
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
-  envoy::service::metrics::v2::StreamMetricsMessage message_;
+  envoy::service::metrics::v3::StreamMetricsMessage message_;
   TimeSource& time_source_;
 };
 

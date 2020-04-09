@@ -1,3 +1,7 @@
+#include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
+
+#include "common/api/os_sys_calls_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
@@ -43,7 +47,7 @@ protected:
       auto addr_fd = Network::Test::bindFreeLoopbackPort(version_, Address::SocketType::Stream);
       auto addr = addr_fd.first;
       Network::IoHandlePtr& io_handle = addr_fd.second;
-      EXPECT_LE(0, io_handle->fd());
+      EXPECT_TRUE(SOCKET_VALID(io_handle->fd()));
 
       // Confirm that we got a reasonable address and port.
       ASSERT_EQ(Address::Type::Ip, addr->type());
@@ -55,7 +59,7 @@ protected:
 
       auto option = std::make_unique<MockSocketOption>();
       auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
-      EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+      EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
           .WillOnce(Return(true));
       options->emplace_back(std::move(option));
       std::unique_ptr<ListenSocketImpl> socket1;
@@ -76,8 +80,9 @@ protected:
 
       // TODO (conqerAtapple): This is unfortunate. We should be able to templatize this
       // instead of if block.
+      auto os_sys_calls = Api::OsSysCallsSingleton::get();
       if (NetworkSocketTrait<Type>::type == Address::SocketType::Stream) {
-        EXPECT_EQ(0, listen(socket1->ioHandle().fd(), 0));
+        EXPECT_EQ(0, os_sys_calls.listen(socket1->ioHandle().fd(), 0).rc_);
       }
 
       EXPECT_EQ(addr->ip()->port(), socket1->localAddress()->ip()->port());
@@ -86,16 +91,22 @@ protected:
 
       auto option2 = std::make_unique<MockSocketOption>();
       auto options2 = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
-      EXPECT_CALL(*option2, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+      EXPECT_CALL(*option2, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
           .WillOnce(Return(true));
       options2->emplace_back(std::move(option2));
       // The address and port are bound already, should throw exception.
       EXPECT_THROW(createListenSocketPtr(addr, options2, true), SocketBindException);
 
-      // Test the case of a socket with fd and given address and port.
-      IoHandlePtr dup_handle = std::make_unique<IoSocketHandleImpl>(dup(socket1->ioHandle().fd()));
-      auto socket3 = createListenSocketPtr(std::move(dup_handle), addr, nullptr);
-      EXPECT_EQ(addr->asString(), socket3->localAddress()->asString());
+      // Release socket and re-bind it.
+      socket1->close();
+
+      // Test createListenSocketPtr from IoHandlePtr's os_fd_t constructor
+      int domain = version_ == Address::IpVersion::v4 ? AF_INET : AF_INET6;
+      auto socket_result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
+      EXPECT_TRUE(SOCKET_VALID(socket_result.rc_));
+      io_handle = std::make_unique<IoSocketHandleImpl>(socket_result.rc_);
+      auto socket3 = createListenSocketPtr(std::move(io_handle), addr, nullptr);
+      EXPECT_EQ(socket3->localAddress()->asString(), addr->asString());
 
       // Test successful.
       return;

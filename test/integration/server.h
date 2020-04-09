@@ -81,46 +81,49 @@ public:
     wrapped_scope_->deliverHistogramToSinks(histogram, value);
   }
 
-  Counter& counterFromStatName(StatName name) override {
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->counterFromStatName(name);
+    return wrapped_scope_->counterFromStatNameWithTags(name, tags);
   }
 
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->gaugeFromStatName(name, import_mode);
+    return wrapped_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
   }
 
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                           Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->histogramFromStatName(name, unit);
+    return wrapped_scope_->histogramFromStatNameWithTags(name, tags, unit);
   }
   NullGaugeImpl& nullGauge(const std::string& str) override {
     return wrapped_scope_->nullGauge(str);
   }
 
-  Counter& counter(const std::string& name) override {
+  Counter& counterFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return counterFromStatName(storage.statName());
   }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName(), unit);
   }
 
-  OptionalCounter findCounter(StatName name) const override {
+  CounterOptConstRef findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findCounter(name);
   }
-  OptionalGauge findGauge(StatName name) const override {
+  GaugeOptConstRef findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findGauge(name);
   }
-  OptionalHistogram findHistogram(StatName name) const override {
+  HistogramOptConstRef findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findHistogram(name);
   }
@@ -142,45 +145,48 @@ private:
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
   // Stats::Scope
-  Counter& counterFromStatName(StatName name) override {
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override {
     Thread::LockGuard lock(lock_);
-    return store_.counterFromStatName(name);
+    return store_.counterFromStatNameWithTags(name, tags);
   }
-  Counter& counter(const std::string& name) override {
+  Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
-    return store_.counter(name);
+    return store_.counterFromString(name);
   }
   ScopePtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return store_.gaugeFromStatName(name, import_mode);
+    return store_.gaugeFromStatNameWithTags(name, tags, import_mode);
   }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return store_.gauge(name, import_mode);
+    return store_.gaugeFromString(name, import_mode);
   }
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                           Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return store_.histogramFromStatName(name, unit);
+    return store_.histogramFromStatNameWithTags(name, tags, unit);
   }
   NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return store_.histogram(name, unit);
+    return store_.histogramFromString(name, unit);
   }
-  OptionalCounter findCounter(StatName name) const override {
+  CounterOptConstRef findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findCounter(name);
   }
-  OptionalGauge findGauge(StatName name) const override {
+  GaugeOptConstRef findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findGauge(name);
   }
-  OptionalHistogram findHistogram(StatName name) const override {
+  HistogramOptConstRef findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findHistogram(name);
   }
@@ -231,14 +237,13 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
                               public IntegrationTestServerStats,
                               public Server::ComponentFactory {
 public:
-  static IntegrationTestServerPtr
-  create(const std::string& config_path, const Network::Address::IpVersion version,
-         std::function<void()> on_server_init_function, bool deterministic,
-         Event::TestTimeSystem& time_system, Api::Api& api,
-         bool defer_listener_finalization = false,
-         absl::optional<std::reference_wrapper<ProcessObject>> process_object = absl::nullopt,
-         bool allow_unknown_static_fields = false, bool reject_unknown_dynamic_fields = false,
-         uint32_t concurrency = 1);
+  static IntegrationTestServerPtr create(
+      const std::string& config_path, const Network::Address::IpVersion version,
+      std::function<void(IntegrationTestServer&)> on_server_ready_function,
+      std::function<void()> on_server_init_function, bool deterministic,
+      Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
+      ProcessObjectOptRef process_object = absl::nullopt, bool allow_unknown_static_fields = false,
+      bool reject_unknown_dynamic_fields = false, uint32_t concurrency = 1);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -252,12 +257,14 @@ public:
   void setOnWorkerListenerRemovedCb(std::function<void()> on_worker_listener_removed) {
     on_worker_listener_removed_cb_ = std::move(on_worker_listener_removed);
   }
-  void onRuntimeCreated() override;
+  void setOnServerReadyCb(std::function<void(IntegrationTestServer&)> on_server_ready) {
+    on_server_ready_cb_ = std::move(on_server_ready);
+  }
+  void onRuntimeCreated() override {}
 
   void start(const Network::Address::IpVersion version,
              std::function<void()> on_server_init_function, bool deterministic,
-             bool defer_listener_finalization,
-             absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+             bool defer_listener_finalization, ProcessObjectOptRef process_object,
              bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
              uint32_t concurrency);
 
@@ -321,12 +328,12 @@ protected:
   // functions server(), stat_store(), and admin_address() may be called, but before the server
   // has been started.
   // The subclass is also responsible for tearing down this server in its destructor.
-  virtual void createAndRunEnvoyServer(
-      OptionsImpl& options, Event::TimeSystem& time_system,
-      Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-      Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
-      Runtime::RandomGeneratorPtr&& random_generator,
-      absl::optional<std::reference_wrapper<ProcessObject>> process_object) PURE;
+  virtual void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
+                                       Network::Address::InstanceConstSharedPtr local_address,
+                                       ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
+                                       Server::ComponentFactory& component_factory,
+                                       Runtime::RandomGeneratorPtr&& random_generator,
+                                       ProcessObjectOptRef process_object) PURE;
 
   // Will be called by subclass on server thread when the server is ready to be accessed. The
   // server may not have been run yet, but all server access methods (server(), stat_store(),
@@ -338,9 +345,8 @@ private:
    * Runs the real server on a thread.
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
-                     absl::optional<std::reference_wrapper<ProcessObject>> process_object,
-                     bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
-                     uint32_t concurrency);
+                     ProcessObjectOptRef process_object, bool allow_unknown_static_fields,
+                     bool reject_unknown_dynamic_fields, uint32_t concurrency);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;
@@ -354,6 +360,7 @@ private:
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
   TcpDumpPtr tcp_dump_;
+  std::function<void(IntegrationTestServer&)> on_server_ready_cb_;
 };
 
 // Default implementation of IntegrationTestServer
@@ -376,12 +383,12 @@ public:
   Network::Address::InstanceConstSharedPtr admin_address() override { return admin_address_; }
 
 private:
-  void createAndRunEnvoyServer(
-      OptionsImpl& options, Event::TimeSystem& time_system,
-      Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-      Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
-      Runtime::RandomGeneratorPtr&& random_generator,
-      absl::optional<std::reference_wrapper<ProcessObject>> process_object) override;
+  void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
+                               Network::Address::InstanceConstSharedPtr local_address,
+                               ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
+                               Server::ComponentFactory& component_factory,
+                               Runtime::RandomGeneratorPtr&& random_generator,
+                               ProcessObjectOptRef process_object) override;
 
   // Owned by this class. An owning pointer is not used because the actual allocation is done
   // on a stack in a non-main thread.

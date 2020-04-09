@@ -8,8 +8,6 @@
 #include "test/common/http/http2/frame_replay.h"
 #include "test/fuzz/fuzz_runner.h"
 
-using testing::AnyNumber;
-
 namespace Envoy {
 namespace Http {
 namespace Http2 {
@@ -18,13 +16,13 @@ namespace {
 void Replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   // Create the client connection containing the nghttp2 session.
   TestClientConnectionImpl connection(
-      codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.settings_,
+      codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
   // Create a new stream.
   codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
   codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);
   // Setup a single stream to inject frames as a reply to.
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   codec.request_encoder_->encodeHeaders(request_headers, true);
 

@@ -23,6 +23,7 @@ envoy_cc_mock(
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/server:tracer_config_interface",
         "//include/envoy/server:worker_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/upstream:health_checker_interface",
@@ -46,6 +47,9 @@ envoy_cc_mock(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_time_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )

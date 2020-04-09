@@ -1,6 +1,7 @@
 #include <memory>
 
-#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -11,6 +12,7 @@
 #include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
 #include "extensions/filters/network/thrift_proxy/header_transport_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
@@ -36,7 +38,7 @@ namespace ThriftProxy {
 
 class TestConfigImpl : public ConfigImpl {
 public:
-  TestConfigImpl(envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy proto_config,
+  TestConfigImpl(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config,
                  Server::Configuration::MockFactoryContext& context,
                  ThriftFilters::DecoderFilterSharedPtr decoder_filter, ThriftFilterStats& stats)
       : ConfigImpl(proto_config, context), decoder_filter_(decoder_filter), stats_(stats) {}
@@ -95,7 +97,7 @@ public:
 
     proto_config_.set_stat_prefix("test");
 
-    decoder_filter_.reset(new NiceMock<ThriftFilters::MockDecoderFilter>());
+    decoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockDecoderFilter>>();
 
     config_ = std::make_unique<TestConfigImpl>(proto_config_, context_, decoder_filter_, stats_);
     if (custom_transport_) {
@@ -293,9 +295,9 @@ public:
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<ThriftFilters::MockDecoderFilter> decoder_filter_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   ThriftFilterStats stats_;
-  envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy proto_config_;
+  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config_;
 
   std::unique_ptr<TestConfigImpl> config_;
 
@@ -1335,7 +1337,7 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
   EXPECT_EQ(1U, stats_.request_active_.value());
 }
 
-TEST_F(ThriftConnectionManagerTest, transportEndWhenRemoteClose) {
+TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   initializeFilter();
   writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 

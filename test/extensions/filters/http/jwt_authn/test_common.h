@@ -73,7 +73,7 @@ providers:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
         timeout:
-          seconds: 5 
+          seconds: 5
       cache_duration:
         seconds: 600
     forward_payload_header: sec-istio-auth-userinfo
@@ -82,6 +82,7 @@ rules:
     path: "/"
   requires:
     provider_name: "example_provider"
+bypass_cors_preflight: true
 )";
 
 // The name of provider for above config.
@@ -133,7 +134,7 @@ const char NotYetValidToken[] =
     "V1AdwgX_5n3SmQTacVN0WcSgk6YJRZG6VE8PjxZP9bEameBmbSB0810giKRpdTU1-"
     "RJtjq6aCSTD4CYXtW38T5uko4V-S4zifK3BXeituUTebkgoA";
 
-// A token with aud as invalid_service
+// A token with "aud" as invalid_service
 // Payload:
 // {"iss":"https://example.com","sub":"test@example.com","aud":"invalid_service","exp":2001001001}
 const char InvalidAudToken[] =

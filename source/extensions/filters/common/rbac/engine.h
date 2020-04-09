@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
@@ -30,7 +29,8 @@ public:
    * @param effective_policy_id  it will be filled by the matching policy's ID,
    *                   which is used to identity the source of the allow/deny.
    */
-  virtual bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  virtual bool allowed(const Network::Connection& connection,
+                       const Envoy::Http::RequestHeaderMap& headers,
                        const StreamInfo::StreamInfo& info,
                        std::string* effective_policy_id) const PURE;
 

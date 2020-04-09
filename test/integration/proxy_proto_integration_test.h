@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "common/http/codec_client.h"
 
 #include "test/integration/fake_upstream.h"
@@ -14,7 +16,7 @@ class ProxyProtoIntegrationTest : public testing::TestWithParam<Network::Address
 public:
   ProxyProtoIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
     config_helper_.addConfigModifier(
-        [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
           auto* filter_chain = listener->mutable_filter_chains(0);
           filter_chain->mutable_use_proxy_proto()->set_value(true);

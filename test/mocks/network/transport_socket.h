@@ -16,16 +16,16 @@ public:
   MockTransportSocket();
   ~MockTransportSocket() override;
 
-  MOCK_CONST_METHOD0(implementsSecureTransport, bool());
-  MOCK_METHOD1(setTransportSocketCallbacks, void(TransportSocketCallbacks& callbacks));
-  MOCK_CONST_METHOD0(protocol, std::string());
-  MOCK_CONST_METHOD0(failureReason, absl::string_view());
-  MOCK_METHOD0(canFlushClose, bool());
-  MOCK_METHOD1(closeSocket, void(Network::ConnectionEvent event));
-  MOCK_METHOD1(doRead, IoResult(Buffer::Instance& buffer));
-  MOCK_METHOD2(doWrite, IoResult(Buffer::Instance& buffer, bool end_stream));
-  MOCK_METHOD0(onConnected, void());
-  MOCK_CONST_METHOD0(ssl, Ssl::ConnectionInfoConstSharedPtr());
+  MOCK_METHOD(bool, implementsSecureTransport, (), (const));
+  MOCK_METHOD(void, setTransportSocketCallbacks, (TransportSocketCallbacks & callbacks));
+  MOCK_METHOD(std::string, protocol, (), (const));
+  MOCK_METHOD(absl::string_view, failureReason, (), (const));
+  MOCK_METHOD(bool, canFlushClose, ());
+  MOCK_METHOD(void, closeSocket, (Network::ConnectionEvent event));
+  MOCK_METHOD(IoResult, doRead, (Buffer::Instance & buffer));
+  MOCK_METHOD(IoResult, doWrite, (Buffer::Instance & buffer, bool end_stream));
+  MOCK_METHOD(void, onConnected, ());
+  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
 
   TransportSocketCallbacks* callbacks_{};
 };
@@ -35,8 +35,9 @@ public:
   MockTransportSocketFactory();
   ~MockTransportSocketFactory() override;
 
-  MOCK_CONST_METHOD0(implementsSecureTransport, bool());
-  MOCK_CONST_METHOD1(createTransportSocket, TransportSocketPtr(TransportSocketOptionsSharedPtr));
+  MOCK_METHOD(bool, implementsSecureTransport, (), (const));
+  MOCK_METHOD(TransportSocketPtr, createTransportSocket, (TransportSocketOptionsSharedPtr),
+              (const));
 };
 
 } // namespace Network

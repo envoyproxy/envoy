@@ -3,7 +3,7 @@
 Rate limit service
 ==================
 
-The :ref:`rate limit service <arch_overview_rate_limit>` configuration specifies the global rate
+The :ref:`rate limit service <arch_overview_global_rate_limit>` configuration specifies the global rate
 limit service Envoy should talk to when it needs to make global rate limit decisions. If no rate
 limit service is configured, a "null" service will be used which will always return OK if called.
 

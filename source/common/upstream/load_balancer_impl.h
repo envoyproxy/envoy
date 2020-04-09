@@ -5,7 +5,7 @@
 #include <set>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
@@ -58,11 +58,18 @@ protected:
    * majority of hosts are unhealthy we'll be likely in a panic mode. In this case we'll route
    * requests to hosts regardless of whether they are healthy or not.
    */
-  bool isGlobalPanic(const HostSet& host_set);
+  bool isHostSetInPanic(const HostSet& host_set);
+
+  /**
+   * Method is called when all host sets are in panic mode.
+   * In such state the load is distributed based on the number of hosts
+   * in given priority regardless of their health.
+   */
+  void recalculateLoadInTotalPanic();
 
   LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                    Runtime::RandomGenerator& random,
-                   const envoy::api::v2::Cluster::CommonLbConfig& common_config);
+                   const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   // Choose host set randomly, based on the healthy_per_priority_load_ and
   // degraded_per_priority_load_. per_priority_load_ is consulted first, spilling over to
@@ -137,7 +144,7 @@ public:
 
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
 
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
+  const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 
   const HealthyAndDegradedLoad&
   determinePriorityLoad(const PrioritySet&,
@@ -162,10 +169,10 @@ public:
 class ZoneAwareLoadBalancerBase : public LoadBalancerBase {
 protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.
-  ZoneAwareLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                            ClusterStats& stats, Runtime::Loader& runtime,
-                            Runtime::RandomGenerator& random,
-                            const envoy::api::v2::Cluster::CommonLbConfig& common_config);
+  ZoneAwareLoadBalancerBase(
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
   ~ZoneAwareLoadBalancerBase() override;
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
@@ -265,9 +272,9 @@ private:
   uint32_t tryChooseLocalLocalityHosts(const HostSet& host_set);
 
   /**
-   * @return (number of hosts in a given locality)/(total number of hosts) in ret param.
+   * @return (number of hosts in a given locality)/(total number of hosts) in `ret` param.
    * The result is stored as integer number and scaled by 10000 multiplier for better precision.
-   * Caller is responsible for allocation/de-allocation of ret.
+   * Caller is responsible for allocation/de-allocation of `ret`.
    */
   void calculateLocalityPercentage(const HostsPerLocality& hosts_per_locality, uint64_t* ret);
 
@@ -345,7 +352,7 @@ public:
   EdfLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                       ClusterStats& stats, Runtime::Loader& runtime,
                       Runtime::RandomGenerator& random,
-                      const envoy::api::v2::Cluster::CommonLbConfig& common_config);
+                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   // Upstream::LoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
@@ -387,7 +394,7 @@ public:
   RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                          ClusterStats& stats, Runtime::Loader& runtime,
                          Runtime::RandomGenerator& random,
-                         const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+                         const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                             common_config) {
     initialize();
@@ -435,8 +442,9 @@ public:
   LeastRequestLoadBalancer(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
       Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-      const envoy::api::v2::Cluster::CommonLbConfig& common_config,
-      const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig> least_request_config)
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+      const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
+          least_request_config)
       : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                             common_config),
         choice_count_(
@@ -472,7 +480,7 @@ public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                      ClusterStats& stats, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random,
-                     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+                     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                   common_config) {}
 
@@ -481,11 +489,38 @@ public:
 };
 
 /**
+ * Implementation of SubsetSelector
+ */
+class SubsetSelectorImpl : public SubsetSelector {
+public:
+  SubsetSelectorImpl(const Protobuf::RepeatedPtrField<std::string>& selector_keys,
+                     envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
+                         LbSubsetSelectorFallbackPolicy fallback_policy,
+                     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset);
+
+  // SubsetSelector
+  const std::set<std::string>& selectorKeys() const override { return selector_keys_; }
+  envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
+      LbSubsetSelectorFallbackPolicy
+      fallbackPolicy() const override {
+    return fallback_policy_;
+  }
+  const std::set<std::string>& fallbackKeysSubset() const override { return fallback_keys_subset_; }
+
+private:
+  const std::set<std::string> selector_keys_;
+  const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
+      LbSubsetSelectorFallbackPolicy fallback_policy_;
+  const std::set<std::string> fallback_keys_subset_;
+};
+
+/**
  * Implementation of LoadBalancerSubsetInfo.
  */
 class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
 public:
-  LoadBalancerSubsetInfoImpl(const envoy::api::v2::Cluster::LbSubsetConfig& subset_config)
+  LoadBalancerSubsetInfoImpl(
+      const envoy::config::cluster::v3::Cluster::LbSubsetConfig& subset_config)
       : enabled_(!subset_config.subset_selectors().empty()),
         fallback_policy_(subset_config.fallback_policy()),
         default_subset_(subset_config.default_subset()),
@@ -494,16 +529,16 @@ public:
         panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
-        subset_selectors_.emplace_back(std::make_shared<SubsetSelector>(
-            SubsetSelector{std::set<std::string>(subset.keys().begin(), subset.keys().end()),
-                           subset.fallback_policy()}));
+        subset_selectors_.emplace_back(std::make_shared<SubsetSelectorImpl>(
+            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset()));
       }
     }
   }
 
   // Upstream::LoadBalancerSubsetInfo
   bool isEnabled() const override { return enabled_; }
-  envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallbackPolicy() const override {
+  envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
+  fallbackPolicy() const override {
     return fallback_policy_;
   }
   const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
@@ -517,7 +552,8 @@ public:
 
 private:
   const bool enabled_;
-  const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
+  const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
+      fallback_policy_;
   const ProtobufWkt::Struct default_subset_;
   std::vector<SubsetSelectorPtr> subset_selectors_;
   const bool locality_weight_aware_;

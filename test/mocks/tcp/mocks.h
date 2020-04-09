@@ -21,7 +21,7 @@ public:
   ~MockCancellable() override;
 
   // Tcp::ConnectionPool::Cancellable
-  MOCK_METHOD1(cancel, void(CancelPolicy cancel_policy));
+  MOCK_METHOD(void, cancel, (CancelPolicy cancel_policy));
 };
 
 class MockUpstreamCallbacks : public UpstreamCallbacks {
@@ -30,10 +30,10 @@ public:
   ~MockUpstreamCallbacks() override;
 
   // Tcp::ConnectionPool::UpstreamCallbacks
-  MOCK_METHOD2(onUpstreamData, void(Buffer::Instance& data, bool end_stream));
-  MOCK_METHOD1(onEvent, void(Network::ConnectionEvent event));
-  MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
-  MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
+  MOCK_METHOD(void, onUpstreamData, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
 };
 
 class MockConnectionData : public ConnectionData {
@@ -42,12 +42,12 @@ public:
   ~MockConnectionData() override;
 
   // Tcp::ConnectionPool::ConnectionData
-  MOCK_METHOD0(connection, Network::ClientConnection&());
-  MOCK_METHOD1(addUpstreamCallbacks, void(ConnectionPool::UpstreamCallbacks&));
+  MOCK_METHOD(Network::ClientConnection&, connection, ());
+  MOCK_METHOD(void, addUpstreamCallbacks, (ConnectionPool::UpstreamCallbacks&));
   void setConnectionState(ConnectionStatePtr&& state) override { setConnectionState_(state); }
-  MOCK_METHOD0(connectionState, ConnectionPool::ConnectionState*());
+  MOCK_METHOD(ConnectionPool::ConnectionState*, connectionState, ());
 
-  MOCK_METHOD1(setConnectionState_, void(ConnectionPool::ConnectionStatePtr& state));
+  MOCK_METHOD(void, setConnectionState_, (ConnectionPool::ConnectionStatePtr & state));
 
   // If set, invoked in ~MockConnectionData, which indicates that the connection pool
   // caller has released a connection.
@@ -60,16 +60,17 @@ public:
   ~MockInstance() override;
 
   // Tcp::ConnectionPool::Instance
-  MOCK_METHOD1(addDrainedCallback, void(DrainedCb cb));
-  MOCK_METHOD0(drainConnections, void());
-  MOCK_METHOD1(newConnection, Cancellable*(Tcp::ConnectionPool::Callbacks& callbacks));
+  MOCK_METHOD(void, addDrainedCallback, (DrainedCb cb));
+  MOCK_METHOD(void, drainConnections, ());
+  MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));
+  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 
   MockCancellable* newConnectionImpl(Callbacks& cb);
   void poolFailure(PoolFailureReason reason);
   void poolReady(Network::MockClientConnection& conn);
 
   // Invoked when connection_data_, having been assigned via poolReady is released.
-  MOCK_METHOD1(released, void(Network::MockClientConnection&));
+  MOCK_METHOD(void, released, (Network::MockClientConnection&));
 
   std::list<NiceMock<MockCancellable>> handles_;
   std::list<Callbacks*> callbacks_;

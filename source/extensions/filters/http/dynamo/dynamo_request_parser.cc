@@ -21,7 +21,6 @@ namespace Dynamo {
 const Http::LowerCaseString RequestParser::X_AMZ_TARGET("X-AMZ-TARGET");
 
 // clang-format off
-
 const std::vector<std::string> RequestParser::SINGLE_TABLE_OPERATIONS{
     "CreateTable",
     "DeleteItem",
@@ -51,7 +50,6 @@ const std::vector<std::string> RequestParser::SUPPORTED_ERROR_TYPES{
     "TransactionInProgressException",
     "UnrecognizedClientException",
     "ValidationException"};
-
 // clang-format on
 
 const std::vector<std::string> RequestParser::BATCH_OPERATIONS{"BatchGetItem", "BatchWriteItem"};

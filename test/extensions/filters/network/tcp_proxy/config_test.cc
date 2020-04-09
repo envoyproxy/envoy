@@ -1,5 +1,8 @@
 #include <string>
 
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
+
 #include "extensions/filters/network/tcp_proxy/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -87,21 +90,25 @@ TEST_P(RouteIpListConfigTest, DEPRECATED_FEATURE_TEST(TcpProxy)) {
   }
   )EOF";
 
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy proto_config;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proto_config;
   TestUtility::loadFromJson(json_string, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
+  NiceMock<Network::MockReadFilterCallbacks> readFilterCallback;
+  EXPECT_CALL(connection, addReadFilter(_))
+      .WillRepeatedly(Invoke([&readFilterCallback](Network::ReadFilterSharedPtr filter) {
+        filter->initializeReadFilterCallbacks(readFilterCallback);
+      }));
   cb(connection);
 }
 
 TEST(ConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(ConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::tcp_proxy::v2::TcpProxy(), context),
+                   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy(), context),
                ProtoValidationException);
 }
 
@@ -109,17 +116,32 @@ TEST(ConfigTest, ValidateFail) {
 TEST(ConfigTest, ConfigTest) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config =
-      *dynamic_cast<envoy::config::filter::network::tcp_proxy::v2::TcpProxy*>(
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
+      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy*>(
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
 
   EXPECT_TRUE(factory.isTerminalFilter());
+
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
+  NiceMock<Network::MockReadFilterCallbacks> readFilterCallback;
+  EXPECT_CALL(connection, addReadFilter(_))
+      .WillRepeatedly(Invoke([&readFilterCallback](Network::ReadFilterSharedPtr filter) {
+        filter->initializeReadFilterCallbacks(readFilterCallback);
+      }));
   cb(connection);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.tcp_proxy";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace TcpProxy

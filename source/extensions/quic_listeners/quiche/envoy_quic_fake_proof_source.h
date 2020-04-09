@@ -17,7 +17,7 @@
 
 #include "quiche/quic/platform/api/quic_reference_counted.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
-#include "quiche/quic/platform/api/quic_string_piece.h"
+#include "quiche/common/platform/api/quiche_string_piece.h"
 
 namespace Envoy {
 namespace Quic {
@@ -33,7 +33,7 @@ public:
   // in QuicCryptoProof.
   void GetProof(const quic::QuicSocketAddress& server_address, const std::string& hostname,
                 const std::string& server_config, quic::QuicTransportVersion /*transport_version*/,
-                quic::QuicStringPiece /*chlo_hash*/,
+                quiche::QuicheStringPiece /*chlo_hash*/,
                 std::unique_ptr<quic::ProofSource::Callback> callback) override {
     quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain =
         GetCertChain(server_address, hostname);
@@ -60,7 +60,7 @@ public:
   void
   ComputeTlsSignature(const quic::QuicSocketAddress& /*server_address*/,
                       const std::string& /*hostname*/, uint16_t /*signature_algorithm*/,
-                      quic::QuicStringPiece in,
+                      quiche::QuicheStringPiece in,
                       std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override {
     callback->Run(true, absl::StrCat("Fake signature for { ", in, " }"));
   }

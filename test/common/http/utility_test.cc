@@ -1,8 +1,10 @@
+#include <array>
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/protocol.pb.h"
-#include "envoy/api/v2/core/protocol.pb.validate.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/core/v3/protocol.pb.validate.h"
 
 #include "common/common/fmt.h"
 #include "common/http/exception.h"
@@ -39,49 +41,55 @@ TEST(HttpUtility, parseQueryString) {
 }
 
 TEST(HttpUtility, getResponseStatus) {
-  EXPECT_THROW(Utility::getResponseStatus(TestHeaderMapImpl{}), CodecClientException);
-  EXPECT_EQ(200U, Utility::getResponseStatus(TestHeaderMapImpl{{":status", "200"}}));
+  EXPECT_THROW(Utility::getResponseStatus(TestResponseHeaderMapImpl{}), CodecClientException);
+  EXPECT_EQ(200U, Utility::getResponseStatus(TestResponseHeaderMapImpl{{":status", "200"}}));
 }
 
 TEST(HttpUtility, isWebSocketUpgradeRequest) {
-  EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{}));
-  EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{{"connection", "upgrade"}}));
-  EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{{"upgrade", "websocket"}}));
+  EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestRequestHeaderMapImpl{}));
+  EXPECT_FALSE(
+      Utility::isWebSocketUpgradeRequest(TestRequestHeaderMapImpl{{"connection", "upgrade"}}));
+  EXPECT_FALSE(
+      Utility::isWebSocketUpgradeRequest(TestRequestHeaderMapImpl{{"upgrade", "websocket"}}));
   EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(
-      TestHeaderMapImpl{{"Connection", "close"}, {"Upgrade", "websocket"}}));
+      TestRequestHeaderMapImpl{{"Connection", "close"}, {"Upgrade", "websocket"}}));
   EXPECT_FALSE(Utility::isUpgrade(
-      TestHeaderMapImpl{{"Connection", "IsNotAnUpgrade"}, {"Upgrade", "websocket"}}));
+      TestRequestHeaderMapImpl{{"Connection", "IsNotAnUpgrade"}, {"Upgrade", "websocket"}}));
 
   EXPECT_TRUE(Utility::isWebSocketUpgradeRequest(
-      TestHeaderMapImpl{{"Connection", "upgrade"}, {"Upgrade", "websocket"}}));
+      TestRequestHeaderMapImpl{{"Connection", "upgrade"}, {"Upgrade", "websocket"}}));
   EXPECT_TRUE(Utility::isWebSocketUpgradeRequest(
-      TestHeaderMapImpl{{"connection", "upgrade"}, {"upgrade", "websocket"}}));
+      TestRequestHeaderMapImpl{{"connection", "upgrade"}, {"upgrade", "websocket"}}));
   EXPECT_TRUE(Utility::isWebSocketUpgradeRequest(
-      TestHeaderMapImpl{{"connection", "Upgrade"}, {"upgrade", "WebSocket"}}));
+      TestRequestHeaderMapImpl{{"connection", "Upgrade"}, {"upgrade", "WebSocket"}}));
 }
 
 TEST(HttpUtility, isUpgrade) {
-  EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{}));
-  EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{{"connection", "upgrade"}}));
-  EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{{"upgrade", "foo"}}));
-  EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{{"Connection", "close"}, {"Upgrade", "foo"}}));
+  EXPECT_FALSE(Utility::isUpgrade(TestRequestHeaderMapImpl{}));
+  EXPECT_FALSE(Utility::isUpgrade(TestRequestHeaderMapImpl{{"connection", "upgrade"}}));
+  EXPECT_FALSE(Utility::isUpgrade(TestRequestHeaderMapImpl{{"upgrade", "foo"}}));
   EXPECT_FALSE(
-      Utility::isUpgrade(TestHeaderMapImpl{{"Connection", "IsNotAnUpgrade"}, {"Upgrade", "foo"}}));
+      Utility::isUpgrade(TestRequestHeaderMapImpl{{"Connection", "close"}, {"Upgrade", "foo"}}));
   EXPECT_FALSE(Utility::isUpgrade(
-      TestHeaderMapImpl{{"Connection", "Is Not An Upgrade"}, {"Upgrade", "foo"}}));
+      TestRequestHeaderMapImpl{{"Connection", "IsNotAnUpgrade"}, {"Upgrade", "foo"}}));
+  EXPECT_FALSE(Utility::isUpgrade(
+      TestRequestHeaderMapImpl{{"Connection", "Is Not An Upgrade"}, {"Upgrade", "foo"}}));
 
-  EXPECT_TRUE(Utility::isUpgrade(TestHeaderMapImpl{{"Connection", "upgrade"}, {"Upgrade", "foo"}}));
-  EXPECT_TRUE(Utility::isUpgrade(TestHeaderMapImpl{{"connection", "upgrade"}, {"upgrade", "foo"}}));
-  EXPECT_TRUE(Utility::isUpgrade(TestHeaderMapImpl{{"connection", "Upgrade"}, {"upgrade", "FoO"}}));
+  EXPECT_TRUE(
+      Utility::isUpgrade(TestRequestHeaderMapImpl{{"Connection", "upgrade"}, {"Upgrade", "foo"}}));
+  EXPECT_TRUE(
+      Utility::isUpgrade(TestRequestHeaderMapImpl{{"connection", "upgrade"}, {"upgrade", "foo"}}));
+  EXPECT_TRUE(
+      Utility::isUpgrade(TestRequestHeaderMapImpl{{"connection", "Upgrade"}, {"upgrade", "FoO"}}));
   EXPECT_TRUE(Utility::isUpgrade(
-      TestHeaderMapImpl{{"connection", "keep-alive, Upgrade"}, {"upgrade", "FOO"}}));
+      TestRequestHeaderMapImpl{{"connection", "keep-alive, Upgrade"}, {"upgrade", "FOO"}}));
 }
 
 // Start with H1 style websocket request headers. Transform to H2 and back.
 TEST(HttpUtility, H1H2H1Request) {
-  TestHeaderMapImpl converted_headers = {
+  TestRequestHeaderMapImpl converted_headers = {
       {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
-  const TestHeaderMapImpl original_headers(converted_headers);
+  const TestRequestHeaderMapImpl original_headers(converted_headers);
 
   ASSERT_TRUE(Utility::isUpgrade(converted_headers));
   ASSERT_FALSE(Utility::isH2UpgradeRequest(converted_headers));
@@ -98,8 +106,8 @@ TEST(HttpUtility, H1H2H1Request) {
 
 // Start with H2 style websocket request headers. Transform to H1 and back.
 TEST(HttpUtility, H2H1H2Request) {
-  TestHeaderMapImpl converted_headers = {{":method", "CONNECT"}, {":protocol", "websocket"}};
-  const TestHeaderMapImpl original_headers(converted_headers);
+  TestRequestHeaderMapImpl converted_headers = {{":method", "CONNECT"}, {":protocol", "websocket"}};
+  const TestRequestHeaderMapImpl original_headers(converted_headers);
 
   ASSERT_FALSE(Utility::isUpgrade(converted_headers));
   ASSERT_TRUE(Utility::isH2UpgradeRequest(converted_headers));
@@ -117,9 +125,9 @@ TEST(HttpUtility, H2H1H2Request) {
 
 // Start with H1 style websocket response headers. Transform to H2 and back.
 TEST(HttpUtility, H1H2H1Response) {
-  TestHeaderMapImpl converted_headers = {
+  TestResponseHeaderMapImpl converted_headers = {
       {":status", "101"}, {"upgrade", "websocket"}, {"connection", "upgrade"}};
-  const TestHeaderMapImpl original_headers(converted_headers);
+  const TestResponseHeaderMapImpl original_headers(converted_headers);
 
   ASSERT_TRUE(Utility::isUpgrade(converted_headers));
   Utility::transformUpgradeResponseFromH1toH2(converted_headers);
@@ -135,10 +143,10 @@ TEST(HttpUtility, H1H2H1Response) {
 // identical. Because the headers are always added in a set order, the original
 // header order may not be preserved.
 TEST(HttpUtility, OrderNotPreserved) {
-  TestHeaderMapImpl expected_headers = {
+  TestRequestHeaderMapImpl expected_headers = {
       {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
 
-  TestHeaderMapImpl converted_headers = {
+  TestRequestHeaderMapImpl converted_headers = {
       {":method", "GET"}, {"Connection", "upgrade"}, {"Upgrade", "foo"}};
 
   Utility::transformUpgradeRequestFromH1toH2(converted_headers);
@@ -151,10 +159,10 @@ TEST(HttpUtility, OrderNotPreserved) {
 // POST. This is a documented weakness in Envoy docs and can be addressed with
 // a custom x-envoy-original-method header if it is ever needed.
 TEST(HttpUtility, MethodNotPreserved) {
-  TestHeaderMapImpl expected_headers = {
+  TestRequestHeaderMapImpl expected_headers = {
       {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
 
-  TestHeaderMapImpl converted_headers = {
+  TestRequestHeaderMapImpl converted_headers = {
       {":method", "POST"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
 
   Utility::transformUpgradeRequestFromH1toH2(converted_headers);
@@ -165,7 +173,7 @@ TEST(HttpUtility, MethodNotPreserved) {
 TEST(HttpUtility, ContentLengthMangling) {
   // Content-Length of 0 is removed on the request path.
   {
-    TestHeaderMapImpl request_headers = {
+    TestRequestHeaderMapImpl request_headers = {
         {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}, {"content-length", "0"}};
     Utility::transformUpgradeRequestFromH1toH2(request_headers);
     EXPECT_TRUE(request_headers.ContentLength() == nullptr);
@@ -173,7 +181,7 @@ TEST(HttpUtility, ContentLengthMangling) {
 
   // Non-zero Content-Length is not removed on the request path.
   {
-    TestHeaderMapImpl request_headers = {
+    TestRequestHeaderMapImpl request_headers = {
         {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}, {"content-length", "1"}};
     Utility::transformUpgradeRequestFromH1toH2(request_headers);
     EXPECT_FALSE(request_headers.ContentLength() == nullptr);
@@ -181,20 +189,20 @@ TEST(HttpUtility, ContentLengthMangling) {
 
   // Content-Length of 0 is removed on the response path.
   {
-    TestHeaderMapImpl response_headers = {{":status", "101"},
-                                          {"upgrade", "websocket"},
-                                          {"connection", "upgrade"},
-                                          {"content-length", "0"}};
+    TestResponseHeaderMapImpl response_headers = {{":status", "101"},
+                                                  {"upgrade", "websocket"},
+                                                  {"connection", "upgrade"},
+                                                  {"content-length", "0"}};
     Utility::transformUpgradeResponseFromH1toH2(response_headers);
     EXPECT_TRUE(response_headers.ContentLength() == nullptr);
   }
 
   // Non-zero Content-Length is not removed on the response path.
   {
-    TestHeaderMapImpl response_headers = {{":status", "101"},
-                                          {"upgrade", "websocket"},
-                                          {"connection", "upgrade"},
-                                          {"content-length", "1"}};
+    TestResponseHeaderMapImpl response_headers = {{":status", "101"},
+                                                  {"upgrade", "websocket"},
+                                                  {"connection", "upgrade"},
+                                                  {"content-length", "1"}};
     Utility::transformUpgradeResponseFromH1toH2(response_headers);
     EXPECT_FALSE(response_headers.ContentLength() == nullptr);
   }
@@ -202,21 +210,21 @@ TEST(HttpUtility, ContentLengthMangling) {
 
 TEST(HttpUtility, appendXff) {
   {
-    TestHeaderMapImpl headers;
+    TestRequestHeaderMapImpl headers;
     Network::Address::Ipv4Instance address("127.0.0.1");
     Utility::appendXff(headers, address);
     EXPECT_EQ("127.0.0.1", headers.get_("x-forwarded-for"));
   }
 
   {
-    TestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"}};
+    TestRequestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"}};
     Network::Address::Ipv4Instance address("127.0.0.1");
     Utility::appendXff(headers, address);
     EXPECT_EQ("10.0.0.1,127.0.0.1", headers.get_("x-forwarded-for"));
   }
 
   {
-    TestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"}};
+    TestRequestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"}};
     Network::Address::PipeInstance address("/foo");
     Utility::appendXff(headers, address);
     EXPECT_EQ("10.0.0.1", headers.get_("x-forwarded-for"));
@@ -225,13 +233,13 @@ TEST(HttpUtility, appendXff) {
 
 TEST(HttpUtility, appendVia) {
   {
-    TestHeaderMapImpl headers;
+    TestResponseHeaderMapImpl headers;
     Utility::appendVia(headers, "foo");
     EXPECT_EQ("foo", headers.get_("via"));
   }
 
   {
-    TestHeaderMapImpl headers{{"via", "foo"}};
+    TestResponseHeaderMapImpl headers{{"via", "foo"}};
     Utility::appendVia(headers, "bar");
     EXPECT_EQ("foo, bar", headers.get_("via"));
   }
@@ -239,40 +247,42 @@ TEST(HttpUtility, appendVia) {
 
 TEST(HttpUtility, createSslRedirectPath) {
   {
-    TestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/hello"}};
+    TestRequestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/hello"}};
     EXPECT_EQ("https://www.lyft.com/hello", Utility::createSslRedirectPath(headers));
   }
 }
 
 namespace {
 
-Http2Settings parseHttp2SettingsFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::core::Http2ProtocolOptions http2_protocol_options;
-  TestUtility::loadFromYamlAndValidate(yaml, http2_protocol_options);
-  return Utility::parseHttp2Settings(http2_protocol_options);
+envoy::config::core::v3::Http2ProtocolOptions parseHttp2OptionsFromV2Yaml(const std::string& yaml) {
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  TestUtility::loadFromYamlAndValidate(yaml, http2_options);
+  return ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options);
 }
 
 } // namespace
 
 TEST(HttpUtility, parseHttp2Settings) {
   {
-    auto http2_settings = parseHttp2SettingsFromV2Yaml("{}");
-    EXPECT_EQ(Http2Settings::DEFAULT_HPACK_TABLE_SIZE, http2_settings.hpack_table_size_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
-              http2_settings.max_concurrent_streams_);
-    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE,
-              http2_settings.initial_stream_window_size_);
-    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
-              http2_settings.initial_connection_window_size_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES, http2_settings.max_outbound_frames_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES,
-              http2_settings.max_outbound_control_frames_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD,
-              http2_settings.max_consecutive_inbound_frames_with_empty_payload_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM,
-              http2_settings.max_inbound_priority_frames_per_stream_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT,
-              http2_settings.max_inbound_window_update_frames_per_data_frame_sent_);
+    using ::Envoy::Http2::Utility::OptionsLimits;
+    auto http2_options = parseHttp2OptionsFromV2Yaml("{}");
+    EXPECT_EQ(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE, http2_options.hpack_table_size().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS,
+              http2_options.max_concurrent_streams().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE,
+              http2_options.initial_stream_window_size().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
+              http2_options.initial_connection_window_size().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES,
+              http2_options.max_outbound_frames().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES,
+              http2_options.max_outbound_control_frames().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD,
+              http2_options.max_consecutive_inbound_frames_with_empty_payload().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM,
+              http2_options.max_inbound_priority_frames_per_stream().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT,
+              http2_options.max_inbound_window_update_frames_per_data_frame_sent().value());
   }
 
   {
@@ -282,11 +292,11 @@ max_concurrent_streams: 2
 initial_stream_window_size: 65535
 initial_connection_window_size: 65535
     )EOF";
-    auto http2_settings = parseHttp2SettingsFromV2Yaml(yaml);
-    EXPECT_EQ(1U, http2_settings.hpack_table_size_);
-    EXPECT_EQ(2U, http2_settings.max_concurrent_streams_);
-    EXPECT_EQ(65535U, http2_settings.initial_stream_window_size_);
-    EXPECT_EQ(65535U, http2_settings.initial_connection_window_size_);
+    auto http2_options = parseHttp2OptionsFromV2Yaml(yaml);
+    EXPECT_EQ(1U, http2_options.hpack_table_size().value());
+    EXPECT_EQ(2U, http2_options.max_concurrent_streams().value());
+    EXPECT_EQ(65535U, http2_options.initial_stream_window_size().value());
+    EXPECT_EQ(65535U, http2_options.initial_connection_window_size().value());
   }
 }
 
@@ -295,7 +305,8 @@ TEST(HttpUtility, getLastAddressFromXFF) {
     const std::string first_address = "192.0.2.10";
     const std::string second_address = "192.0.2.1";
     const std::string third_address = "10.0.0.1";
-    TestHeaderMapImpl request_headers{{"x-forwarded-for", "192.0.2.10, 192.0.2.1, 10.0.0.1"}};
+    TestRequestHeaderMapImpl request_headers{
+        {"x-forwarded-for", "192.0.2.10, 192.0.2.1, 10.0.0.1"}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(third_address, ret.address_->ip()->addressAsString());
     EXPECT_FALSE(ret.single_address_);
@@ -314,7 +325,7 @@ TEST(HttpUtility, getLastAddressFromXFF) {
     const std::string second_address = "192.0.2.1";
     const std::string third_address = "10.0.0.1";
     const std::string fourth_address = "10.0.0.2";
-    TestHeaderMapImpl request_headers{
+    TestRequestHeaderMapImpl request_headers{
         {"x-forwarded-for", "192.0.2.10, 192.0.2.1 ,10.0.0.1,10.0.0.2"}};
 
     // No space on the left.
@@ -343,38 +354,38 @@ TEST(HttpUtility, getLastAddressFromXFF) {
     EXPECT_FALSE(ret.single_address_);
   }
   {
-    TestHeaderMapImpl request_headers{{"x-forwarded-for", ""}};
+    TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ""}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
     EXPECT_FALSE(ret.single_address_);
   }
   {
-    TestHeaderMapImpl request_headers{{"x-forwarded-for", ","}};
+    TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ","}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
     EXPECT_FALSE(ret.single_address_);
   }
   {
-    TestHeaderMapImpl request_headers{{"x-forwarded-for", ", "}};
+    TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ", "}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
     EXPECT_FALSE(ret.single_address_);
   }
   {
-    TestHeaderMapImpl request_headers{{"x-forwarded-for", ", bad"}};
+    TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ", bad"}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
     EXPECT_FALSE(ret.single_address_);
   }
   {
-    TestHeaderMapImpl request_headers;
+    TestRequestHeaderMapImpl request_headers;
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
     EXPECT_FALSE(ret.single_address_);
   }
   {
     const std::string first_address = "34.0.0.1";
-    TestHeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
+    TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
     EXPECT_TRUE(ret.single_address_);
@@ -453,11 +464,11 @@ TEST(HttpUtility, SendLocalGrpcReply) {
   bool is_reset = false;
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value().getStringView(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
-                  std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unknown)));
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unknown)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), "large");
       }));
@@ -479,11 +490,11 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
   )EOF";
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value().getStringView(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
-                  std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unauthenticated)));
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unauthenticated)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         const auto& encoded = Utility::PercentEncoding::encode(json);
         EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), encoded);
@@ -496,24 +507,24 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
   MockStreamDecoderFilterCallbacks callbacks;
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
-                  std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unavailable)));
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unavailable)));
       }));
   Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "", absl::nullopt,
                           false);
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
-                  std::to_string(enumToInt(Grpc::Status::GrpcStatus::ResourceExhausted)));
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)));
       }));
-  Utility::sendLocalReply(
-      true, callbacks, false, Http::Code::TooManyRequests, "",
-      absl::make_optional<Grpc::Status::GrpcStatus>(Grpc::Status::GrpcStatus::ResourceExhausted),
-      false);
+  Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "",
+                          absl::make_optional<Grpc::Status::GrpcStatus>(
+                              Grpc::Status::WellKnownGrpcStatus::ResourceExhausted),
+                          false);
 }
 
 TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
@@ -532,7 +543,7 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.ContentLength()->value().getStringView(),
                   fmt::format("{}", strlen("large")));
       }));
@@ -578,10 +589,10 @@ TEST(HttpUtility, TestExtractHostPathFromUri) {
 }
 
 TEST(HttpUtility, TestPrepareHeaders) {
-  envoy::api::v2::core::HttpUri http_uri;
+  envoy::config::core::v3::HttpUri http_uri;
   http_uri.set_uri("scheme://dns.name/x/y/z");
 
-  Http::MessagePtr message = Utility::prepareHeaders(http_uri);
+  Http::RequestMessagePtr message = Utility::prepareHeaders(http_uri);
 
   EXPECT_EQ("/x/y/z", message->headers().Path()->value().getStringView());
   EXPECT_EQ("dns.name", message->headers().Host()->value().getStringView());
@@ -752,6 +763,312 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   // make sure that the callback was called (which means that the dynamic_cast worked.)
   ASSERT_TRUE(merged_cfg.has_value());
   EXPECT_EQ(2, merged_cfg.value().state_);
+}
+
+TEST(HttpUtility, CheckIsIpAddress) {
+  std::array<std::tuple<bool, std::string, std::string, absl::optional<uint32_t>>, 15> patterns{
+      std::make_tuple(true, "1.2.3.4", "1.2.3.4", absl::nullopt),
+      std::make_tuple(true, "1.2.3.4:0", "1.2.3.4", 0),
+      std::make_tuple(true, "0.0.0.0:4000", "0.0.0.0", 4000),
+      std::make_tuple(true, "127.0.0.1:0", "127.0.0.1", 0),
+      std::make_tuple(true, "[::]:0", "::", 0),
+      std::make_tuple(true, "[::]", "::", absl::nullopt),
+      std::make_tuple(true, "[1::2:3]:0", "1::2:3", 0),
+      std::make_tuple(true, "[a::1]:0", "a::1", 0),
+      std::make_tuple(true, "[a:b:c:d::]:0", "a:b:c:d::", 0),
+      std::make_tuple(false, "example.com", "example.com", absl::nullopt),
+      std::make_tuple(false, "example.com:8000", "example.com", 8000),
+      std::make_tuple(false, "example.com:abc", "example.com:abc", absl::nullopt),
+      std::make_tuple(false, "localhost:10000", "localhost", 10000),
+      std::make_tuple(false, "localhost", "localhost", absl::nullopt),
+      std::make_tuple(false, "", "", absl::nullopt)};
+
+  for (const auto& pattern : patterns) {
+    bool status_pattern = std::get<0>(pattern);
+    const auto& try_host = std::get<1>(pattern);
+    const auto& expect_host = std::get<2>(pattern);
+    const auto& expect_port = std::get<3>(pattern);
+
+    const auto host_attributes = Utility::parseAuthority(try_host);
+
+    EXPECT_EQ(status_pattern, host_attributes.is_ip_address_);
+    EXPECT_EQ(expect_host, host_attributes.host_);
+    EXPECT_EQ(expect_port, host_attributes.port_);
+  }
+}
+
+// Validates TE header is stripped if it contains an unsupported value
+// Also validate the behavior if a nominated header does not exist
+TEST(HttpUtility, TestTeHeaderGzipTrailersSanitized) {
+  TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te, mike, sam, will, close"},
+      {"te", "gzip, trailers"},
+      {"sam", "bar"},
+      {"will", "baz"},
+  };
+
+  // Expect that the set of headers is valid and can be sanitized
+  EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
+
+  Http::TestHeaderMapImpl sanitized_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te,close"},
+      {"te", "trailers"},
+  };
+  EXPECT_EQ(sanitized_headers, request_headers);
+}
+
+// Validates that if the connection header is nominated, the
+// true connection header is not removed
+TEST(HttpUtility, TestNominatedConnectionHeader) {
+  TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te, mike, sam, will, connection, close"},
+      {"te", "gzip"},
+      {"sam", "bar"},
+      {"will", "baz"},
+  };
+  EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
+
+  TestHeaderMapImpl sanitized_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "close"},
+  };
+  EXPECT_EQ(sanitized_headers, request_headers);
+}
+
+// Validate that if the connection header is nominated, we
+// sanitize correctly preserving other nominated headers with
+// supported values
+TEST(HttpUtility, TestNominatedConnectionHeader2) {
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te, mike, sam, will, connection, close"},
+      {"te", "trailers"},
+      {"sam", "bar"},
+      {"will", "baz"},
+  };
+  EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
+
+  Http::TestHeaderMapImpl sanitized_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te,close"},
+      {"te", "trailers"},
+  };
+  EXPECT_EQ(sanitized_headers, request_headers);
+}
+
+// Validate that connection is rejected if pseudo headers are nominated
+// This includes an extra comma to ensure that the resulting
+// header is still correct
+TEST(HttpUtility, TestNominatedPseudoHeader) {
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te, :path,, :method, :authority, connection, close"},
+      {"te", "trailers"},
+  };
+
+  // Headers remain unchanged since there are nominated pseudo headers
+  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+
+  EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
+  EXPECT_EQ(sanitized_headers, request_headers);
+}
+
+// Validate that we can sanitize the headers when splitting
+// the Connection header results in empty tokens
+TEST(HttpUtility, TestSanitizeEmptyTokensFromHeaders) {
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te, foo,, bar, close"},
+      {"te", "trailers"},
+      {"foo", "monday"},
+      {"bar", "friday"},
+  };
+  EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
+
+  Http::TestHeaderMapImpl sanitized_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te,close"},
+      {"te", "trailers"},
+  };
+  EXPECT_EQ(sanitized_headers, request_headers);
+}
+
+// Validate that we fail the request if there are too many
+// nominated headers
+TEST(HttpUtility, TestTooManyNominatedHeaders) {
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te, connection, close, seahawks, niners, chargers, rams, raiders, "
+                     "cardinals, eagles, giants, ravens"},
+      {"te", "trailers"},
+  };
+
+  // Headers remain unchanged because there are too many nominated headers
+  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+
+  EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
+  EXPECT_EQ(sanitized_headers, request_headers);
+}
+
+TEST(HttpUtility, TestRejectNominatedXForwardedFor) {
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te, x-forwarded-for"},
+      {"te", "trailers"},
+  };
+
+  // Headers remain unchanged due to nominated X-Forwarded* header
+  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+
+  EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
+  EXPECT_EQ(sanitized_headers, request_headers);
+}
+
+TEST(HttpUtility, TestRejectNominatedXForwardedHost) {
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te, x-forwarded-host"},
+      {"te", "trailers"},
+  };
+
+  // Headers remain unchanged due to nominated X-Forwarded* header
+  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+
+  EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
+  EXPECT_EQ(sanitized_headers, request_headers);
+}
+
+TEST(HttpUtility, TestRejectNominatedXForwardedProto) {
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te, x-forwarded-proto"},
+      {"te", "TrAiLeRs"},
+  };
+
+  // Headers are not sanitized due to nominated X-Forwarded* header
+  EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
+
+  Http::TestHeaderMapImpl sanitized_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te, x-forwarded-proto"},
+      {"te", "trailers"},
+  };
+  EXPECT_EQ(sanitized_headers, request_headers);
+}
+
+TEST(HttpUtility, TestRejectTrailersSubString) {
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te, close"},
+      {"te", "SemisWithTripleTrailersAreAthing"},
+  };
+  EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
+
+  Http::TestHeaderMapImpl sanitized_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "close"},
+  };
+  EXPECT_EQ(sanitized_headers, request_headers);
+}
+
+TEST(HttpUtility, TestRejectTeHeaderTooLong) {
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "no-headers.com"},
+      {"x-request-foo", "downstram"},
+      {"connection", "te, close"},
+      {"te", "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"
+             "1234567890abcdef"},
+  };
+
+  // Headers remain unchanged because the TE value is too long
+  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+
+  EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
+  EXPECT_EQ(sanitized_headers, request_headers);
 }
 
 TEST(Url, ParsingFails) {

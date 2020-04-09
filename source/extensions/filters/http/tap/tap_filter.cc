@@ -1,12 +1,14 @@
 #include "extensions/filters/http/tap/tap_filter.h"
 
+#include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace TapFilter {
 
 FilterConfigImpl::FilterConfigImpl(
-    const envoy::config::filter::http::tap::v2alpha::Tap& proto_config,
+    const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
     const std::string& stats_prefix, Common::Tap::TapConfigFactoryPtr&& config_factory,
     Stats::Scope& scope, Server::Admin& admin, Singleton::Manager& singleton_manager,
     ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_thread_dispatcher)
@@ -25,7 +27,7 @@ FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope
   return {ALL_TAP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (tapper_ != nullptr) {
     tapper_->onRequestHeaders(headers);
   }
@@ -39,14 +41,14 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   if (tapper_ != nullptr) {
     tapper_->onRequestTrailers(trailers);
   }
   return Http::FilterTrailersStatus::Continue;
 }
 
-Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (tapper_ != nullptr) {
     tapper_->onResponseHeaders(headers);
   }
@@ -60,15 +62,15 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus Filter::encodeTrailers(Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   if (tapper_ != nullptr) {
     tapper_->onResponseTrailers(trailers);
   }
   return Http::FilterTrailersStatus::Continue;
 }
 
-void Filter::log(const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
-                 const StreamInfo::StreamInfo&) {
+void Filter::log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
+                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&) {
   if (tapper_ != nullptr && tapper_->onDestroyLog()) {
     config_->stats().rq_tapped_.inc();
   }

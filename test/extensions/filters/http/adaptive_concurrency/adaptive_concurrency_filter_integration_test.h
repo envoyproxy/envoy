@@ -19,6 +19,7 @@ typed_config:
     min_rtt_calc_params:
       interval: 30s
       request_count: 50
+      min_concurrency: 1
 )EOF";
 
 const std::string CONCURRENCY_LIMIT_GAUGE_NAME =

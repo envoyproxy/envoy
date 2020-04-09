@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/retry/previous_hosts/v2/previous_hosts.pb.validate.h"
 #include "envoy/upstream/retry.h"
 
 #include "extensions/retry/host/previous_hosts/previous_hosts.h"
@@ -17,10 +18,12 @@ public:
     return std::make_shared<PreviousHostsRetryPredicate>(retry_count);
   }
 
-  std::string name() override { return RetryHostPredicateValues::get().PreviousHostsPredicate; }
+  std::string name() const override {
+    return RetryHostPredicateValues::get().PreviousHostsPredicate;
+  }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    return std::make_unique<envoy::config::retry::previous_hosts::v2::PreviousHostsPredicate>();
   }
 };
 

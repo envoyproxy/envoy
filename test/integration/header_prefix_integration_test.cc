@@ -1,3 +1,5 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/server.h"
 
@@ -16,13 +18,13 @@ static const char* custom_prefix_ = "x-custom";
 
 class HeaderPrefixIntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  static void SetUpTestSuite() {
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(custom_prefix_);
   }
 };
 
 TEST_P(HeaderPrefixIntegrationTest, CustomHeaderPrefix) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.set_header_prefix("x-custom");
   });
   initialize();
@@ -45,7 +47,7 @@ TEST_P(HeaderPrefixIntegrationTest, CustomHeaderPrefix) {
 // singleton header prefix in SetUpTestSuite, and Envoy will RELEASE_ASSERT on
 // start-up.
 TEST_P(HeaderPrefixIntegrationTest, FailedCustomHeaderPrefix) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.set_header_prefix("x-custom-but-not-set");
   });
   EXPECT_DEATH(initialize(), "Attempting to change the header prefix after it has been used!");

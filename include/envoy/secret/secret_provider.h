@@ -2,9 +2,9 @@
 
 #include <functional>
 
-#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
@@ -43,23 +43,32 @@ public:
   virtual Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) PURE;
 };
 
-using TlsCertificatePtr = std::unique_ptr<envoy::api::v2::auth::TlsCertificate>;
+using TlsCertificatePtr =
+    std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>;
 using CertificateValidationContextPtr =
-    std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext>;
-using TlsSessionTicketKeysPtr = std::unique_ptr<envoy::api::v2::auth::TlsSessionTicketKeys>;
+    std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>;
+using TlsSessionTicketKeysPtr =
+    std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys>;
+using GenericSecretPtr =
+    std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::GenericSecret>;
 
-using TlsCertificateConfigProvider = SecretProvider<envoy::api::v2::auth::TlsCertificate>;
+using TlsCertificateConfigProvider =
+    SecretProvider<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>;
 using TlsCertificateConfigProviderSharedPtr = std::shared_ptr<TlsCertificateConfigProvider>;
 
 using CertificateValidationContextConfigProvider =
-    SecretProvider<envoy::api::v2::auth::CertificateValidationContext>;
+    SecretProvider<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>;
 using CertificateValidationContextConfigProviderSharedPtr =
     std::shared_ptr<CertificateValidationContextConfigProvider>;
 
 using TlsSessionTicketKeysConfigProvider =
-    SecretProvider<envoy::api::v2::auth::TlsSessionTicketKeys>;
+    SecretProvider<envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys>;
 using TlsSessionTicketKeysConfigProviderSharedPtr =
     std::shared_ptr<TlsSessionTicketKeysConfigProvider>;
+
+using GenericSecretConfigProvider =
+    SecretProvider<envoy::extensions::transport_sockets::tls::v3::GenericSecret>;
+using GenericSecretConfigProviderSharedPtr = std::shared_ptr<GenericSecretConfigProvider>;
 
 } // namespace Secret
 } // namespace Envoy

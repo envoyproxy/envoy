@@ -1,6 +1,7 @@
 #include "common/common/regex.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/type/matcher/v3/regex.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -21,13 +22,22 @@ public:
     return std::regex_match(value.begin(), value.end(), regex_);
   }
 
+  // CompiledMatcher
+  std::string replaceAll(absl::string_view value, absl::string_view substitution) const override {
+    try {
+      return std::regex_replace(std::string(value), regex_, std::string(substitution));
+    } catch (const std::regex_error& e) {
+      return std::string(value);
+    }
+  }
+
 private:
   const std::regex regex_;
 };
 
 class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
-  CompiledGoogleReMatcher(const envoy::type::matcher::RegexMatcher& config)
+  CompiledGoogleReMatcher(const envoy::type::matcher::v3::RegexMatcher& config)
       : regex_(config.regex(), re2::RE2::Quiet) {
     if (!regex_.ok()) {
       throw EnvoyException(regex_.error());
@@ -47,13 +57,21 @@ public:
     return re2::RE2::FullMatch(re2::StringPiece(value.data(), value.size()), regex_);
   }
 
+  // CompiledMatcher
+  std::string replaceAll(absl::string_view value, absl::string_view substitution) const override {
+    std::string result = std::string(value);
+    re2::RE2::GlobalReplace(&result, regex_,
+                            re2::StringPiece(substitution.data(), substitution.size()));
+    return result;
+  }
+
 private:
   const re2::RE2 regex_;
 };
 
 } // namespace
 
-CompiledMatcherPtr Utility::parseRegex(const envoy::type::matcher::RegexMatcher& matcher) {
+CompiledMatcherPtr Utility::parseRegex(const envoy::type::matcher::v3::RegexMatcher& matcher) {
   // Google Re is the only currently supported engine.
   ASSERT(matcher.has_google_re2());
   return std::make_unique<CompiledGoogleReMatcher>(matcher);

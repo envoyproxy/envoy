@@ -1,12 +1,13 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -24,10 +25,15 @@ public:
   virtual bool peerCertificatePresented() const PURE;
 
   /**
+   * @return bool whether the peer certificate was validated.
+   **/
+  virtual bool peerCertificateValidated() const PURE;
+
+  /**
    * @return std::string the URIs in the SAN field of the local certificate. Returns {} if there is
    *         no local certificate, or no SAN field, or no URI.
    **/
-  virtual std::vector<std::string> uriSanLocalCertificate() const PURE;
+  virtual absl::Span<const std::string> uriSanLocalCertificate() const PURE;
 
   /**
    * @return std::string the subject field of the local certificate in RFC 2253 format. Returns ""
@@ -63,7 +69,7 @@ public:
    * @return std::string the URIs in the SAN field of the peer certificate. Returns {} if there is
    *no peer certificate, or no SAN field, or no URI.
    **/
-  virtual std::vector<std::string> uriSanPeerCertificate() const PURE;
+  virtual absl::Span<const std::string> uriSanPeerCertificate() const PURE;
 
   /**
    * @return std::string the URL-encoded PEM-encoded representation of the peer certificate. Returns
@@ -79,16 +85,16 @@ public:
   virtual const std::string& urlEncodedPemEncodedPeerCertificateChain() const PURE;
 
   /**
-   * @return std::vector<std::string> the DNS entries in the SAN field of the peer certificate.
+   * @return absl::Span<const std::string> the DNS entries in the SAN field of the peer certificate.
    *         Returns {} if there is no peer certificate, or no SAN field, or no DNS.
    **/
-  virtual std::vector<std::string> dnsSansPeerCertificate() const PURE;
+  virtual absl::Span<const std::string> dnsSansPeerCertificate() const PURE;
 
   /**
-   * @return std::vector<std::string> the DNS entries in the SAN field of the local certificate.
-   *         Returns {} if there is no local certificate, or no SAN field, or no DNS.
+   * @return absl::Span<const std::string> the DNS entries in the SAN field of the local
+   *certificate. Returns {} if there is no local certificate, or no SAN field, or no DNS.
    **/
-  virtual std::vector<std::string> dnsSansLocalCertificate() const PURE;
+  virtual absl::Span<const std::string> dnsSansLocalCertificate() const PURE;
 
   /**
    * @return absl::optional<SystemTime> the time that the peer certificate was issued and should be
@@ -124,6 +130,17 @@ public:
    *         connection.
    **/
   virtual const std::string& tlsVersion() const PURE;
+
+  /**
+   * Retrieves the contents of the ``ASN.1`` object stored as an X.509 extension from the peer cert,
+   * if a peer cert exists and it contains the specified extension.
+   *
+   * Note: This is used out of tree, check with @snowp before removing.
+   * @param extension_name name of extension to look up
+   * @return absl::optional<std::string> the raw octets of the extension ``ASN.1`` object, if it
+   * exists.
+   */
+  virtual absl::optional<std::string> x509Extension(absl::string_view extension_name) const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;

@@ -1,3 +1,5 @@
+#include "envoy/service/runtime/v3/rtds.pb.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
@@ -13,16 +15,26 @@ std::string tdsBootstrapConfig(absl::string_view api_type) {
 static_resources:
   clusters:
   - name: dummy_cluster
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: dummy_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
   - name: rtds_cluster
     http2_protocol_options: {{}}
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: rtds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
 layered_runtime:
   layers:
   - name: some_static_layer
@@ -124,13 +136,13 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
-  auto some_rtds_layer = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
+  auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
     layer:
       foo: bar
       baz: meh
   )EOF");
-  sendDiscoveryResponse<envoy::service::discovery::v2::Runtime>(
+  sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
 
@@ -145,12 +157,12 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
 
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"some_rtds_layer"}, {}, {}));
-  some_rtds_layer = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
+  some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
     layer:
       baz: saz
   )EOF");
-  sendDiscoveryResponse<envoy::service::discovery::v2::Runtime>(
+  sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "2");
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 2);
 

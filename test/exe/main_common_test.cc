@@ -1,4 +1,4 @@
-#include <unistd.h>
+#include "envoy/common/platform.h"
 
 #include "common/common/lock_guard.h"
 #include "common/common/mutex_tracer_impl.h"
@@ -392,7 +392,7 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 
   const std::string logger_name = "logger";
-  spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err, "error");
+  spdlog::details::log_msg log_msg(logger_name, spdlog::level::level_enum::err, "error");
   Logger::Registry::getSink()->log(log_msg);
 }
 

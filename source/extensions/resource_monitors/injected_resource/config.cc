@@ -1,5 +1,7 @@
 #include "extensions/resource_monitors/injected_resource/config.h"
 
+#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
+#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"

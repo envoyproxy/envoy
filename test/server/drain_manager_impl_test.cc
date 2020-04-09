@@ -1,5 +1,7 @@
 #include <chrono>
 
+#include "envoy/config/listener/v3/listener.pb.h"
+
 #include "server/drain_manager_impl.h"
 
 #include "test/mocks/server/mocks.h"
@@ -28,7 +30,7 @@ public:
 
 TEST_F(DrainManagerImplTest, Default) {
   InSequence s;
-  DrainManagerImpl drain_manager(server_, envoy::api::v2::Listener_DrainType_DEFAULT);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
 
   // Test parent shutdown.
   Event::MockTimer* shutdown_timer = new Event::MockTimer(&server_.dispatcher_);
@@ -66,7 +68,7 @@ TEST_F(DrainManagerImplTest, Default) {
 
 TEST_F(DrainManagerImplTest, ModifyOnly) {
   InSequence s;
-  DrainManagerImpl drain_manager(server_, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::MODIFY_ONLY);
 
   EXPECT_CALL(server_, healthCheckFailed()).Times(0);
   EXPECT_FALSE(drain_manager.drainClose());

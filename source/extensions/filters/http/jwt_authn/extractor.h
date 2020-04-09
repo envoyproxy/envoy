@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_set>
 
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/logger.h"
@@ -37,6 +37,8 @@ public:
 };
 
 using JwtLocationConstPtr = std::unique_ptr<const JwtLocation>;
+using JwtProviderList =
+    std::vector<const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider*>;
 
 class Extractor;
 using ExtractorConstPtr = std::unique_ptr<const Extractor>;
@@ -72,7 +74,8 @@ public:
    * @param headers is the HTTP request headers.
    * @return list of extracted Jwt location info.
    */
-  virtual std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const PURE;
+  virtual std::vector<JwtLocationConstPtr>
+  extract(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
    * Remove headers that configured to send JWT payloads.
@@ -83,20 +86,19 @@ public:
 
   /**
    * Create an instance of Extractor for a given config.
-   * @param the JwtAuthentication config.
-   * @return the extractor object.
-   */
-  static ExtractorConstPtr
-  create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config);
-
-  /**
-   * Create an instance of Extractor for a given config.
    * @param from_headers header location config.
    * @param from_params query param location config.
    * @return the extractor object.
    */
   static ExtractorConstPtr
-  create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider& provider);
+  create(const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider& provider);
+
+  /**
+   * Create an instance of Extractor for a list of provider config.
+   * @param the list of JwtProvider configs.
+   * @return the extractor object.
+   */
+  static ExtractorConstPtr create(const JwtProviderList& providers);
 };
 
 } // namespace JwtAuthn

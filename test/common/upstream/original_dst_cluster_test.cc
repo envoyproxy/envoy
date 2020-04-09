@@ -4,6 +4,7 @@
 #include <tuple>
 #include <vector>
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/network/address_impl.h"
@@ -43,17 +44,20 @@ public:
   TestLoadBalancerContext(const Network::Connection* connection, const std::string& key,
                           const std::string& value)
       : connection_(connection) {
-    downstream_headers_ = Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{key, value}}};
+    downstream_headers_ =
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{key, value}}};
   }
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
-  const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_.get(); }
+  const Http::RequestHeaderMap* downstreamHeaders() const override {
+    return downstream_headers_.get();
+  }
 
   absl::optional<uint64_t> hash_key_;
   const Network::Connection* connection_;
-  Http::HeaderMapPtr downstream_headers_;
+  Http::RequestHeaderMapPtr downstream_headers_;
 };
 
 class OriginalDstClusterTest : public testing::Test {
@@ -67,7 +71,7 @@ public:
 
   void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV2Yaml(yaml)); }
 
-  void setup(const envoy::api::v2::Cluster& cluster_config) {
+  void setup(const envoy::config::cluster::v3::Cluster& cluster_config) {
     NiceMock<MockClusterManager> cm;
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
@@ -75,8 +79,8 @@ public:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
-    cluster_.reset(
-        new OriginalDstCluster(cluster_config, runtime_, factory_context, std::move(scope), false));
+    cluster_ = std::make_shared<OriginalDstCluster>(cluster_config, runtime_, factory_context,
+                                                    std::move(scope), false);
     cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();

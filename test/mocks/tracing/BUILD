@@ -14,5 +14,6 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//include/envoy/tracing:http_tracer_interface",
+        "//include/envoy/tracing:http_tracer_manager_interface",
     ],
 )

@@ -18,12 +18,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_names_,
+void Http1BridgeFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
+  context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_stat_names_,
                       headers.GrpcStatus());
 }
 
-Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const bool grpc_request = Grpc::Common::hasGrpcContentType(headers);
   if (grpc_request) {
     setupStatTracking(headers);
@@ -38,7 +38,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& head
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::HeaderMap& headers,
+Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                            bool end_stream) {
   if (doStatTracking()) {
     chargeStat(headers);
@@ -61,7 +61,7 @@ Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance&, bool end
   }
 }
 
-Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   if (doStatTracking()) {
     chargeStat(trailers);
   }
@@ -75,19 +75,19 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
       uint64_t grpc_status_code;
       if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
           grpc_status_code != 0) {
-        response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
+        response_headers_->setStatus(enumToInt(Http::Code::ServiceUnavailable));
       }
-      response_headers_->insertGrpcStatus().value(*grpc_status_header);
+      response_headers_->setGrpcStatus(grpc_status_header->value().getStringView());
     }
 
     const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
     if (grpc_message_header) {
-      response_headers_->insertGrpcMessage().value(*grpc_message_header);
+      response_headers_->setGrpcMessage(grpc_message_header->value().getStringView());
     }
 
     // Since we are buffering, set content-length so that HTTP/1.1 callers can better determine
     // if this is a complete response.
-    response_headers_->insertContentLength().value(
+    response_headers_->setContentLength(
         encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
   }
 
@@ -96,12 +96,12 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
   return Http::FilterTrailersStatus::Continue;
 }
 
-void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
+void Http1BridgeFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
   cluster_ = decoder_callbacks_->clusterInfo();
   if (!cluster_) {
     return;
   }
-  request_names_ = context_.resolveServiceAndMethod(headers.Path());
+  request_stat_names_ = context_.resolveDynamicServiceAndMethod(headers.Path());
 }
 
 } // namespace GrpcHttp1Bridge

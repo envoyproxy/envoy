@@ -25,11 +25,11 @@ static_resources:
         port_value: 0
     filter_chains:
       - filters:
-          - name: envoy.filters.network.mysql_proxy
+          - name: mysql
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.network.mysql_proxy.v1alpha1.MySQLProxy
               stat_prefix: mysql_stats
-          - name: envoy.tcp_proxy
+          - name: tcp
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
               stat_prefix: tcp_stats

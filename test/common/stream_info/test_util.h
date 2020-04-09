@@ -1,22 +1,26 @@
 #pragma once
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
+#include "common/http/request_id_extension_impl.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
-#include "test/test_common/test_time.h"
+#include "test/test_common/simulated_time_system.h"
 
 namespace Envoy {
 
 class TestStreamInfo : public StreamInfo::StreamInfo {
 public:
-  TestStreamInfo() {
-    tm fake_time;
-    memset(&fake_time, 0, sizeof(fake_time));
-    fake_time.tm_year = 99; // tm < 1901-12-13 20:45:52 is not valid on macOS
-    fake_time.tm_mday = 1;
-    start_time_ = std::chrono::system_clock::from_time_t(timegm(&fake_time));
+  TestStreamInfo()
+      : filter_state_(std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+            Envoy::StreamInfo::FilterState::LifeSpan::FilterChain)) {
+    // Use 1999-01-01 00:00:00 +0
+    time_t fake_time = 915148800;
+    start_time_ = std::chrono::system_clock::from_time_t(fake_time);
+    request_id_extension_ = Http::RequestIDExtensionFactory::defaultInstance(random_);
 
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;
@@ -49,6 +53,7 @@ public:
   void setResponseFlag(Envoy::StreamInfo::ResponseFlag response_flag) override {
     response_flags_ |= response_flag;
   }
+  uint64_t responseFlags() const override { return response_flags_; }
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;
   }
@@ -167,15 +172,23 @@ public:
     return duration(end_time_);
   }
 
-  envoy::api::v2::core::Metadata& dynamicMetadata() override { return metadata_; };
-  const envoy::api::v2::core::Metadata& dynamicMetadata() const override { return metadata_; };
+  envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
+  const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
 
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  const Envoy::StreamInfo::FilterState& filterState() const override { return filter_state_; }
-  Envoy::StreamInfo::FilterState& filterState() override { return filter_state_; }
+  const Envoy::StreamInfo::FilterStateSharedPtr& filterState() override { return filter_state_; }
+  const Envoy::StreamInfo::FilterState& filterState() const override { return *filter_state_; }
+
+  const Envoy::StreamInfo::FilterStateSharedPtr& upstreamFilterState() const override {
+    return upstream_filter_state_;
+  }
+  void
+  setUpstreamFilterState(const Envoy::StreamInfo::FilterStateSharedPtr& filter_state) override {
+    upstream_filter_state_ = filter_state;
+  }
 
   void setRequestedServerName(const absl::string_view requested_server_name) override {
     requested_server_name_ = std::string(requested_server_name);
@@ -191,8 +204,30 @@ public:
     return upstream_transport_failure_reason_;
   }
 
+  void setRequestHeaders(const Http::RequestHeaderMap& headers) override {
+    request_headers_ = &headers;
+  }
+
+  const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
+
+  void setRequestIDExtension(Http::RequestIDExtensionSharedPtr request_id_extension) override {
+    request_id_extension_ = request_id_extension;
+  }
+  Http::RequestIDExtensionSharedPtr getRequestIDExtension() const override {
+    return request_id_extension_;
+  }
+
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
+  void setUpstreamClusterInfo(
+      const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) override {
+    upstream_cluster_info_ = upstream_cluster_info;
+  }
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const override {
+    return upstream_cluster_info_;
+  }
+
+  Runtime::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
@@ -219,12 +254,18 @@ public:
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   const Router::RouteEntry* route_entry_{};
-  envoy::api::v2::core::Metadata metadata_{};
-  Envoy::StreamInfo::FilterStateImpl filter_state_{};
+  envoy::config::core::v3::Metadata metadata_{};
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state_{
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain)};
+  Envoy::StreamInfo::FilterStateSharedPtr upstream_filter_state_;
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
   std::string upstream_transport_failure_reason_;
-  DangerousDeprecatedTestTime test_time_;
+  const Http::RequestHeaderMap* request_headers_{};
+  Envoy::Event::SimulatedTimeSystem test_time_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_{};
+  Http::RequestIDExtensionSharedPtr request_id_extension_;
 };
 
 } // namespace Envoy

@@ -8,6 +8,7 @@
 using testing::_;
 using testing::Const;
 using testing::Invoke;
+using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -15,10 +16,17 @@ namespace Envoy {
 namespace StreamInfo {
 
 MockStreamInfo::MockStreamInfo()
-    : downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
+    : start_time_(ts_.systemTime()),
+      filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)),
+      downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
       downstream_direct_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")),
       downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
-  ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
+  ON_CALL(*this, setResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag response_flag) {
+    response_flags_ |= response_flag;
+  }));
+  ON_CALL(*this, setResponseCodeDetails(_)).WillByDefault(Invoke([this](absl::string_view details) {
+    response_code_details_ = std::string(details);
+  }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
   ON_CALL(*this, lastDownstreamRxByteReceived())
@@ -36,6 +44,11 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, lastDownstreamTxByteSent())
       .WillByDefault(ReturnPointee(&last_downstream_tx_byte_sent_));
   ON_CALL(*this, requestComplete()).WillByDefault(ReturnPointee(&end_time_));
+  ON_CALL(*this, onRequestComplete()).WillByDefault(Invoke([this]() {
+    end_time_ = absl::make_optional<std::chrono::nanoseconds>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(ts_.systemTime() - start_time_)
+            .count());
+  }));
   ON_CALL(*this, setUpstreamLocalAddress(_))
       .WillByDefault(
           Invoke([this](const Network::Address::InstanceConstSharedPtr& upstream_local_address) {
@@ -84,10 +97,27 @@ MockStreamInfo::MockStreamInfo()
     bytes_sent_ += bytes_sent;
   }));
   ON_CALL(*this, bytesSent()).WillByDefault(ReturnPointee(&bytes_sent_));
+  ON_CALL(*this, hasResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag flag) {
+    return response_flags_ & flag;
+  }));
+  ON_CALL(*this, intersectResponseFlags(_)).WillByDefault(Invoke([this](uint64_t response_flags) {
+    return (response_flags_ & response_flags) != 0;
+  }));
+  ON_CALL(*this, hasAnyResponseFlag()).WillByDefault(Invoke([this]() {
+    return response_flags_ != 0;
+  }));
+  ON_CALL(*this, responseFlags()).WillByDefault(Return(response_flags_));
+  ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
+
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
-  ON_CALL(Const(*this), filterState()).WillByDefault(ReturnRef(filter_state_));
+  ON_CALL(Const(*this), filterState()).WillByDefault(ReturnRef(*filter_state_));
+  ON_CALL(*this, upstreamFilterState()).WillByDefault(ReturnRef(upstream_filter_state_));
+  ON_CALL(*this, setUpstreamFilterState(_))
+      .WillByDefault(Invoke([this](const FilterStateSharedPtr& filter_state) {
+        upstream_filter_state_ = filter_state;
+      }));
   ON_CALL(*this, setRequestedServerName(_))
       .WillByDefault(Invoke([this](const absl::string_view requested_server_name) {
         requested_server_name_ = std::string(requested_server_name);

@@ -17,11 +17,6 @@ public:
     const_cast<Runtime::RuntimeFeatures*>(&Runtime::RuntimeFeaturesDefaults::get())
         ->enabled_features_.erase(feature);
   }
-  static void setAllFeaturesAllowed() {
-    for (const std::string& feature : RuntimeFeaturesDefaults::get().disallowed_features_) {
-      Runtime::LoaderSingleton::getExisting()->mergeValues({{feature, "true"}});
-    }
-  }
 };
 
 } // namespace Runtime

@@ -4,6 +4,8 @@
 #include <memory>
 #include <new>
 
+#include "envoy/config/listener/v3/listener.pb.h"
+
 #include "common/common/compiler_requirements.h"
 #include "common/common/perf_annotation.h"
 #include "common/network/utility.h"
@@ -29,8 +31,8 @@ Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instanc
   // The global drain manager only triggers on listener modification, which effectively is
   // hot restart at the global level. The per-listener drain managers decide whether to
   // to include /healthcheck/fail status.
-  return std::make_unique<Server::DrainManagerImpl>(server,
-                                                    envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+  return std::make_unique<Server::DrainManagerImpl>(
+      server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
 }
 
 Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
@@ -49,6 +51,10 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
       file_system_(file_system), symbol_table_(Stats::SymbolTableCreator::initAndMakeSymbolTable(
                                      options_.fakeSymbolTableEnabled())),
       stats_allocator_(*symbol_table_) {
+  // Process the option to disable extensions as early as possible,
+  // before we do any configuration loading.
+  OptionsImpl::disableExtensions(options.disabledExtensions());
+
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
   case Server::Mode::Serve: {
@@ -65,8 +71,8 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    logging_context_ =
-        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(), log_lock);
+    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
+                                                         log_lock, options_.logFormatEscaped());
 
     configureComponentLogLevels();
 
@@ -85,8 +91,9 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
   }
   case Server::Mode::Validate:
     restarter_ = std::make_unique<Server::HotRestartNopImpl>();
-    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         restarter_->logLock());
+    logging_context_ =
+        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
+                                          restarter_->logLock(), options_.logFormatEscaped());
     break;
   }
 }
@@ -121,7 +128,7 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
   std::string path_and_query_buf = std::string(path_and_query);
   std::string method_buf = std::string(method);
   server_->dispatcher().post([this, path_and_query_buf, method_buf, handler]() {
-    Http::HeaderMapImpl response_headers;
+    Http::ResponseHeaderMapImpl response_headers;
     std::string body;
     server_->admin().request(path_and_query_buf, method_buf, response_headers, body);
     handler(response_headers, body);

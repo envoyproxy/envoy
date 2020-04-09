@@ -9,14 +9,6 @@
 namespace Envoy {
 namespace Event {
 
-void TimerUtils::millisecondsToTimeval(const std::chrono::milliseconds& d, timeval& tv) {
-  std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(d);
-  std::chrono::microseconds usecs = std::chrono::duration_cast<std::chrono::microseconds>(d - secs);
-
-  tv.tv_sec = secs.count();
-  tv.tv_usec = usecs.count();
-}
-
 TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Dispatcher& dispatcher)
     : cb_(cb), dispatcher_(dispatcher) {
   ASSERT(cb_);
@@ -38,12 +30,23 @@ TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Dispatcher& dispat
 void TimerImpl::disableTimer() { event_del(&raw_event_); }
 
 void TimerImpl::enableTimer(const std::chrono::milliseconds& d, const ScopeTrackedObject* object) {
+  timeval tv;
+  TimerUtils::durationToTimeval(d, tv);
+  internalEnableTimer(tv, object);
+}
+
+void TimerImpl::enableHRTimer(const std::chrono::microseconds& d,
+                              const ScopeTrackedObject* object = nullptr) {
+  timeval tv;
+  TimerUtils::durationToTimeval(d, tv);
+  internalEnableTimer(tv, object);
+}
+
+void TimerImpl::internalEnableTimer(const timeval& tv, const ScopeTrackedObject* object) {
   object_ = object;
-  if (d.count() == 0) {
+  if (tv.tv_sec == 0 && tv.tv_usec == 0) {
     event_active(&raw_event_, EV_TIMEOUT, 0);
   } else {
-    timeval tv;
-    TimerUtils::millisecondsToTimeval(d, tv);
     event_add(&raw_event_, &tv);
   }
 }

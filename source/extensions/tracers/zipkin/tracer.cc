@@ -22,9 +22,9 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   Annotation cs;
   cs.setEndpoint(std::move(ep));
   if (config.operationName() == Tracing::OperationName::Egress) {
-    cs.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
+    cs.setValue(CLIENT_SEND);
   } else {
-    cs.setValue(ZipkinCoreConstants::get().SERVER_RECV);
+    cs.setValue(SERVER_RECV);
   }
 
   // Create an all-new span, with no parent id
@@ -77,7 +77,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
     span_ptr->setParentId(previous_context.id());
 
     // Set the CS annotation value
-    annotation.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
+    annotation.setValue(CLIENT_SEND);
 
     // Set the timestamp globally for the span
     span_ptr->setTimestamp(timestamp_micro);
@@ -91,7 +91,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
     }
 
     // Set the SR annotation value
-    annotation.setValue(ZipkinCoreConstants::get().SERVER_RECV);
+    annotation.setValue(SERVER_RECV);
   } else {
     return span_ptr; // return an empty span
   }

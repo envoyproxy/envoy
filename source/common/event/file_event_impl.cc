@@ -10,14 +10,14 @@
 namespace Envoy {
 namespace Event {
 
-FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb cb,
+FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb cb,
                              FileTriggerType trigger, uint32_t events)
-    : cb_(cb), base_(&dispatcher.base()), fd_(fd), trigger_(trigger) {
+    : cb_(cb), fd_(fd), trigger_(trigger) {
 #ifdef WIN32
   RELEASE_ASSERT(trigger_ == FileTriggerType::Level,
                  "libevent does not support edge triggers on Windows");
 #endif
-  assignEvents(events);
+  assignEvents(events, &dispatcher.base());
   event_add(&raw_event_, nullptr);
 }
 
@@ -39,9 +39,10 @@ void FileEventImpl::activate(uint32_t events) {
   event_active(&raw_event_, libevent_events, 0);
 }
 
-void FileEventImpl::assignEvents(uint32_t events) {
+void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
+  ASSERT(base != nullptr);
   event_assign(
-      &raw_event_, base_, fd_,
+      &raw_event_, base, fd_,
       EV_PERSIST | (trigger_ == FileTriggerType::Level ? 0 : EV_ET) |
           (events & FileReadyType::Read ? EV_READ : 0) |
           (events & FileReadyType::Write ? EV_WRITE : 0) |
@@ -61,15 +62,20 @@ void FileEventImpl::assignEvents(uint32_t events) {
           events |= FileReadyType::Closed;
         }
 
-        ASSERT(events);
-        event->cb_(events);
+        // TODO(htuch): this should be ASSERT(events), but
+        // https://github.com/libevent/libevent/issues/984 seems to be producing unexpected
+        // behavior. The ASSERT should be restored once this issue is resolved.
+        if (events) {
+          event->cb_(events);
+        }
       },
       this);
 }
 
 void FileEventImpl::setEnabled(uint32_t events) {
+  auto* base = event_get_base(&raw_event_);
   event_del(&raw_event_);
-  assignEvents(events);
+  assignEvents(events, base);
   event_add(&raw_event_, nullptr);
 }
 

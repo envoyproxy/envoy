@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/platform.h"
+
 namespace Envoy {
 namespace Api {
 /**
@@ -26,6 +28,7 @@ using SysCallSizeResult = SysCallResult<ssize_t>;
 using SysCallPtrResult = SysCallResult<void*>;
 using SysCallStringResult = SysCallResult<std::string>;
 using SysCallBoolResult = SysCallResult<bool>;
+using SysCallSocketResult = SysCallResult<os_fd_t>;
 
 } // namespace Api
 } // namespace Envoy

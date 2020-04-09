@@ -4,9 +4,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
 
 namespace Envoy {
@@ -15,7 +15,7 @@ class HeaderOnlyDecoderFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "decode-headers-only";
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     return Http::FilterHeadersStatus::ContinueAndEndStream;
   }
 };
@@ -29,7 +29,7 @@ class HeaderOnlyEncoderFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "encode-headers-only";
 
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
     return Http::FilterHeadersStatus::ContinueAndEndStream;
   }
 };

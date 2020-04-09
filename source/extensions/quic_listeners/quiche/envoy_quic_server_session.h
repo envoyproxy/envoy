@@ -14,12 +14,15 @@
 #include <memory>
 
 #include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_stream.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 
 namespace Envoy {
 namespace Quic {
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
+// TODO(danzh) Lifetime of quic connection and filter manager connection can be
+// simplified by changing the inheritance to a member variable instantiated
+// before quic_connection_.
 class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
                                public QuicFilterManagerConnectionImpl {
 public:
@@ -27,10 +30,12 @@ public:
                          const quic::ParsedQuicVersionVector& supported_versions,
                          std::unique_ptr<EnvoyQuicConnection> connection,
                          quic::QuicSession::Visitor* visitor,
-                         quic::QuicCryptoServerStream::Helper* helper,
+                         quic::QuicCryptoServerStreamBase::Helper* helper,
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
-                         Event::Dispatcher& dispatcher);
+                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+
+  ~EnvoyQuicServerSession() override;
 
   // Network::Connection
   absl::string_view requestedServerName() const override;
@@ -44,13 +49,15 @@ public:
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                           quic::ConnectionCloseSource source) override;
   void Initialize() override;
-  void SendGoAway(quic::QuicErrorCode error_code, const std::string& reason) override;
+  void OnCanWrite() override;
   // quic::QuicSpdySession
-  void OnCryptoHandshakeEvent(CryptoHandshakeEvent event) override;
+  void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
+
+  using quic::QuicSession::stream_map;
 
 protected:
   // quic::QuicServerSessionBase
-  quic::QuicCryptoServerStreamBase*
+  std::unique_ptr<quic::QuicCryptoServerStreamBase>
   CreateQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
                                quic::QuicCompressedCertsCache* compressed_certs_cache) override;
 
@@ -61,9 +68,13 @@ protected:
   quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;
   quic::QuicSpdyStream* CreateOutgoingUnidirectionalStream() override;
 
-private:
-  void setUpRequestDecoder(EnvoyQuicStream& stream);
+  // QuicFilterManagerConnectionImpl
+  bool hasDataToWrite() override;
 
+private:
+  void setUpRequestDecoder(EnvoyQuicServerStream& stream);
+
+  std::unique_ptr<EnvoyQuicConnection> quic_connection_;
   // These callbacks are owned by network filters and quic session should out live
   // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};

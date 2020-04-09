@@ -109,6 +109,7 @@ to each upstream cluster.
          - match: { prefix: / }
            route:
              weighted_clusters:
+               runtime_key_prefix: routing.traffic_split.helloworld
                clusters:
                  - name: helloworld_v1
                    weight: 33

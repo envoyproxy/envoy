@@ -8,9 +8,9 @@
 
 #include "common/buffer/buffer_impl.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
 
 #include "gtest/gtest.h"
@@ -21,8 +21,9 @@ class MetadataStopAllFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "metadata-stop-all-filter";
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& header_map, bool) override {
-    Http::HeaderEntry* entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& header_map, bool) override {
+    const Http::HeaderEntry* entry_content =
+        header_map.get(Envoy::Http::LowerCaseString("content_size"));
     ASSERT(entry_content != nullptr);
     content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
 
@@ -36,7 +37,7 @@ public:
     return Http::FilterDataStatus::Continue;
   }
 
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     ASSERT(timer_triggered_);
     return Http::FilterTrailersStatus::Continue;
   }

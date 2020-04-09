@@ -23,19 +23,24 @@ public:
         stats_(stats), singleton_manager_(singleton_manager), tls_(tls),
         validation_visitor_(validation_visitor), api_(api) {}
 
+  /**
+   * Pass an init manager to register dynamic secret provider.
+   * @param init_manager instance of init manager.
+   */
+  void setInitManager(Init::Manager& init_manager) { init_manager_ = &init_manager; }
+
   // TransportSocketFactoryContext
   Server::Admin& admin() override { return admin_; }
   Ssl::ContextManager& sslContextManager() override { return context_manager_; }
-  Stats::Scope& statsScope() const override { return stats_scope_; }
+  Stats::Scope& scope() override { return stats_scope_; }
   Secret::SecretManager& secretManager() override {
     return cluster_manager_.clusterManagerFactory().secretManager();
   }
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
-  const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   Envoy::Runtime::RandomGenerator& random() override { return random_; }
   Stats::Store& stats() override { return stats_; }
-  void setInitManager(Init::Manager& init_manager) override { init_manager_ = &init_manager; }
   Init::Manager* initManager() override { return init_manager_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }

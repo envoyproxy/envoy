@@ -4,10 +4,10 @@
 
 // We don't use all the headers in the test below, but including them anyway as
 // a cheap way to get some C++ compiler sanity checking.
-#include "envoy/api/v2/cds.pb.validate.h"
-#include "envoy/api/v2/eds.pb.validate.h"
-#include "envoy/api/v2/lds.pb.validate.h"
-#include "envoy/api/v2/rds.pb.validate.h"
+#include "envoy/api/v2/cluster.pb.validate.h"
+#include "envoy/api/v2/endpoint.pb.validate.h"
+#include "envoy/api/v2/listener.pb.validate.h"
+#include "envoy/api/v2/route.pb.validate.h"
 #include "envoy/api/v2/core/protocol.pb.validate.h"
 #include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/router/string_accessor.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
@@ -25,9 +26,8 @@ namespace JwtAuthn {
 class ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
 public:
   // Load the config from envoy config.
-  ThreadLocalCache(
-      const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config,
-      TimeSource& time_source, Api::Api& api) {
+  ThreadLocalCache(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
+                   TimeSource& time_source, Api::Api& api) {
     jwks_cache_ = JwksCache::create(config, time_source, api);
   }
 
@@ -42,12 +42,10 @@ private:
 /**
  * All stats for the Jwt Authn filter. @see stats_macros.h
  */
-
-// clang-format off
 #define ALL_JWT_AUTHN_FILTER_STATS(COUNTER)                                                        \
   COUNTER(allowed)                                                                                 \
+  COUNTER(cors_preflight_bypassed)                                                                 \
   COUNTER(denied)
-// clang-format on
 
 /**
  * Wrapper struct for jwt_authn filter stats. @see stats_macros.h
@@ -57,41 +55,42 @@ struct JwtAuthnFilterStats {
 };
 
 /**
+ * The filter config interface. It is an interface so that we can mock it in tests.
+ */
+class FilterConfig {
+public:
+  virtual ~FilterConfig() = default;
+
+  virtual JwtAuthnFilterStats& stats() PURE;
+
+  virtual bool bypassCorsPreflightRequest() const PURE;
+
+  // Finds the matcher that matched the header
+  virtual const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
+                                       const StreamInfo::FilterState& filter_state) const PURE;
+};
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+
+/**
  * The filter config object to hold config and relevant objects.
  */
-class FilterConfig : public Logger::Loggable<Logger::Id::jwt>, public AuthFactory {
+class FilterConfigImpl : public Logger::Loggable<Logger::Id::jwt>,
+                         public FilterConfig,
+                         public AuthFactory,
+                         public std::enable_shared_from_this<FilterConfigImpl> {
 public:
-  ~FilterConfig() override = default;
+  ~FilterConfigImpl() override = default;
 
-  FilterConfig(::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication proto_config,
-               const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
-      : proto_config_(std::move(proto_config)),
-        stats_(generateStats(stats_prefix, context.scope())),
-        tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
-        time_source_(context.dispatcher().timeSource()), api_(context.api()) {
-    ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
-    tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ThreadLocalCache>(proto_config_, time_source_, api_);
-    });
-    extractor_ = Extractor::create(proto_config_);
-
-    for (const auto& rule : proto_config_.rules()) {
-      rule_pairs_.emplace_back(
-          Matcher::create(rule),
-          Verifier::create(rule.requires(), proto_config_.providers(), *this, getExtractor()));
-    }
-
-    if (proto_config_.has_filter_state_rules()) {
-      filter_state_name_ = proto_config_.filter_state_rules().name();
-      for (const auto& it : proto_config_.filter_state_rules().requires()) {
-        filter_state_verifiers_.emplace(
-            it.first,
-            Verifier::create(it.second, proto_config_.providers(), *this, getExtractor()));
-      }
-    }
+  // Finds the matcher that matched the header
+  static std::shared_ptr<FilterConfigImpl>
+  create(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
+         const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    // We can't use make_shared here because the constructor of this class is private.
+    std::shared_ptr<FilterConfigImpl> ptr(
+        new FilterConfigImpl(proto_config, stats_prefix, context));
+    ptr->init();
+    return ptr;
   }
-
-  JwtAuthnFilterStats& stats() { return stats_; }
 
   // Get per-thread cache object.
   ThreadLocalCache& getCache() const { return tls_->getTyped<ThreadLocalCache>(); }
@@ -99,12 +98,14 @@ public:
   Upstream::ClusterManager& cm() const { return cm_; }
   TimeSource& timeSource() const { return time_source_; }
 
-  // Get the token  extractor.
-  const Extractor& getExtractor() const { return *extractor_; }
+  // FilterConfig
 
-  // Finds the matcher that matched the header
-  virtual const Verifier* findVerifier(const Http::HeaderMap& headers,
-                                       const StreamInfo::FilterState& filter_state) const {
+  JwtAuthnFilterStats& stats() override { return stats_; }
+
+  bool bypassCorsPreflightRequest() const override { return proto_config_.bypass_cors_preflight(); }
+
+  const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
+                               const StreamInfo::FilterState& filter_state) const override {
     for (const auto& pair : rule_pairs_) {
       if (pair.matcher_->matches(headers)) {
         return pair.verifier_.get();
@@ -124,13 +125,23 @@ public:
 
   // methods for AuthFactory interface. Factory method to help create authenticators.
   AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
-                          const absl::optional<std::string>& provider,
-                          bool allow_failed) const override {
-    return Authenticator::create(check_audience, provider, allow_failed, getCache().getJwksCache(),
-                                 cm(), Common::JwksFetcher::create, timeSource());
+                          const absl::optional<std::string>& provider, bool allow_failed,
+                          bool allow_missing) const override {
+    return Authenticator::create(check_audience, provider, allow_failed, allow_missing,
+                                 getCache().getJwksCache(), cm(), Common::JwksFetcher::create,
+                                 timeSource());
   }
 
 private:
+  FilterConfigImpl(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
+                   const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
+      : proto_config_(std::move(proto_config)),
+        stats_(generateStats(stats_prefix, context.scope())),
+        tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
+        time_source_(context.dispatcher().timeSource()), api_(context.api()) {}
+
+  void init();
+
   JwtAuthnFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     const std::string final_prefix = prefix + "jwt_authn.";
     return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
@@ -144,15 +155,13 @@ private:
   };
 
   // The proto config.
-  ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication proto_config_;
+  envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config_;
   // The stats for the filter.
   JwtAuthnFilterStats stats_;
   // Thread local slot to store per-thread auth store
   ThreadLocal::SlotPtr tls_;
   // the cluster manager object.
   Upstream::ClusterManager& cm_;
-  // The object to extract tokens.
-  ExtractorConstPtr extractor_;
   // The list of rule matchers.
   std::vector<MatcherVerifierPair> rule_pairs_;
   // The filter state name to lookup filter_state_rules.
@@ -162,7 +171,6 @@ private:
   TimeSource& time_source_;
   Api::Api& api_;
 };
-using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 } // namespace JwtAuthn
 } // namespace HttpFilters

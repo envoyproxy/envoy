@@ -1,4 +1,5 @@
-#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
 #include "extensions/filters/network/well_known_names.h"
 
@@ -22,11 +23,11 @@ class ThriftTranslationIntegrationTest
           std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>>,
       public BaseThriftIntegrationTest {
 public:
-  static void SetUpTestSuite() {
-    thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    thrift_config_ = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
-        - name: envoy.filters.network.thrift_proxy
+        - name: thrift
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy
             stat_prefix: thrift_stats
@@ -37,7 +38,7 @@ public:
                     method_name: "add"
                   route:
                     cluster: "cluster_0"
-      )EOF";
+      )EOF");
   }
 
   void initialize() override {
@@ -49,11 +50,11 @@ public:
     auto upstream_transport_proto = transportTypeToProto(upstream_transport);
     auto upstream_protocol_proto = protocolTypeToProto(upstream_protocol);
 
-    envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProtocolOptions proto_opts;
+    envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions proto_opts;
     proto_opts.set_transport(upstream_transport_proto);
     proto_opts.set_protocol(upstream_protocol_proto);
 
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* opts = bootstrap.mutable_static_resources()
                        ->mutable_clusters(0)
                        ->mutable_typed_extension_protocol_options();

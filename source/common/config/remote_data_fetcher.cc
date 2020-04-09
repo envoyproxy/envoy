@@ -1,5 +1,7 @@
 #include "common/config/remote_data_fetcher.h"
 
+#include "envoy/config/core/v3/http_uri.pb.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/common/hex.h"
 #include "common/crypto/utility.h"
@@ -11,7 +13,7 @@ namespace Config {
 namespace DataFetcher {
 
 RemoteDataFetcher::RemoteDataFetcher(Upstream::ClusterManager& cm,
-                                     const ::envoy::api::v2::core::HttpUri& uri,
+                                     const envoy::config::core::v3::HttpUri& uri,
                                      const std::string& content_hash,
                                      RemoteDataFetcherCallback& callback)
     : cm_(cm), uri_(uri), content_hash_(content_hash), callback_(callback) {}
@@ -28,8 +30,8 @@ void RemoteDataFetcher::cancel() {
 }
 
 void RemoteDataFetcher::fetch() {
-  Http::MessagePtr message = Http::Utility::prepareHeaders(uri_);
-  message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
+  Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
+  message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   ENVOY_LOG(debug, "fetch remote data from [uri = {}]: start", uri_.uri());
   request_ = cm_.httpAsyncClientForCluster(uri_.cluster())
                  .send(std::move(message), *this,
@@ -37,13 +39,14 @@ void RemoteDataFetcher::fetch() {
                            DurationUtil::durationToMilliseconds(uri_.timeout()))));
 }
 
-void RemoteDataFetcher::onSuccess(Http::MessagePtr&& response) {
+void RemoteDataFetcher::onSuccess(const Http::AsyncClient::Request&,
+                                  Http::ResponseMessagePtr&& response) {
   const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
   if (status_code == enumToInt(Http::Code::OK)) {
     ENVOY_LOG(debug, "fetch remote data [uri = {}]: success", uri_.uri());
     if (response->body()) {
-      const auto content_hash =
-          Hex::encode(Envoy::Common::Crypto::Utility::getSha256Digest(*response->body()));
+      auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+      const auto content_hash = Hex::encode(crypto_util.getSha256Digest(*response->body()));
 
       if (content_hash_ != content_hash) {
         ENVOY_LOG(debug, "fetch remote data [uri = {}]: data is invalid", uri_.uri());
@@ -64,7 +67,8 @@ void RemoteDataFetcher::onSuccess(Http::MessagePtr&& response) {
   request_ = nullptr;
 }
 
-void RemoteDataFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
+void RemoteDataFetcher::onFailure(const Http::AsyncClient::Request&,
+                                  Http::AsyncClient::FailureReason reason) {
   ENVOY_LOG(debug, "fetch remote data [uri = {}]: network error {}", uri_.uri(), enumToInt(reason));
   request_ = nullptr;
   callback_.onFailure(FailureReason::Network);

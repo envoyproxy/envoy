@@ -20,7 +20,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
-  std::string name() override;
+  std::string name() const override;
 };
 
 } // namespace DogStatsd

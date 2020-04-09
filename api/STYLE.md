@@ -85,23 +85,87 @@ In addition, the following conventions should be followed:
 
 ## Package organization
 
-API definitions are layered hierarchically in packages from top-to-bottom:
-
-- `envoy.service` contains gRPC definitions of supporting services;
-- `envoy.config` contains definitions for service configuration, filter
-configuration, and bootstrap;
-- `envoy.api.v2` contains definitions for EDS, CDS, RDS, LDS, and top-level
-resources such as `Cluster`;
-- `envoy.api.v2.endpoint`, `envoy.api.v2.cluster`, `envoy.api.v2.route`,
-`envoy.api.v2.listener`, `envoy.api.v2.ratelimit` define sub-messages of the top-level resources;
-- `envoy.api.v2.core` and `envoy.api.v2.auth` hold core definitions consumed
-throughout the API.
-
-Dependencies are enforced from top-to-bottom using visibility constraints in
-the build system to prevent circular dependency formation. Package group
-`//envoy/api/v2:friends` selects consumers of the core API package (services and configs)
-and is the default visibility for the core API packages. The default visibility
-for services and configs should be `//docs` (proto documentation tool).
+API definitions are layered hierarchically in packages from top-to-bottom as following:
+- `envoy.extensions` contains all definitions for the extensions, the package should match the structure of the `source` directory.
+- `envoy.service` contains gRPC definitions of supporting services and top-level messages for the services.
+e.g. `envoy.service.route.v3` contains RDS, `envoy.service.listener.v3` contains LDS.
+- `envoy.config` contains other definitions for service configuration, bootstrap and some legacy core types.
+- `envoy.data` contains data format declaration for data types that Envoy produces.
+- `envoy.type` contains common protobuf types such as percent, range and matchers.
 
 Extensions should use the regular hierarchy. For example, configuration for network filters belongs
-in a package under `envoy.config.filter.network`.
+in a package under `envoy.extensions.filter.network`.
+
+## Adding an extension configuration to the API
+
+Extensions must currently be added as v3 APIs following the [package
+organization](#package-organization) above.
+To add an extension config to the API, the steps below should be followed:
+
+1. If this is still WiP and subject to breaking changes, use `vNalpha` instead of `vN` in steps
+   below. Refer to the [Cache filter config](envoy/extensions/filter/http/cache/v3alpha/cache.proto)
+   as an example of `v3alpha`, and the
+   [Buffer filter config](envoy/extensions/filter/http/buffer/v3/buffer.proto) as an example of `v3`.
+1. Place the v3 extension configuration `.proto` in `api/envoy/extensions`, e.g.
+   `api/envoy/extensions/filter/http/foobar/v3/foobar.proto` together with an initial BUILD file:
+   ```bazel
+   load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
+
+   licenses(["notice"])  # Apache 2
+
+   api_proto_package(
+       deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
+   )
+   ```
+1. Add to the v3 extension config proto `import "udpa/annotations/migrate.proto";`
+   and `import "udpa/annotations/status.proto";`
+1. If this is still WiP and subject to breaking changes, set
+   `option (udpa.annotations.file_status).work_in_progress = true;`.
+1. Add to the v3 extension config proto a file level
+   `option (udpa.annotations.file_status).package_version_status = ACTIVE;`.
+   This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD).
+1. Add a reference to the v3 extension config in (1) in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
+1. Run `./tools/proto_format/proto_format.sh fix`. This should regenerate the `BUILD` file,
+   reformat `foobar.proto` as needed and also generate the v4alpha extension config (if needed),
+   together with shadow API protos.
+1. `git add api/ generated_api_shadow/` to add any new files to your Git index.
+
+## API annotations
+
+A number of annotations are used in the Envoy APIs to provide additional API
+metadata. We describe these annotations below by category.
+
+### Field level
+* `[deprecated = true]` to denote fields that are deprecated in a major version.
+  These fields are slated for removal at the next major cycle and follow the
+  [breaking change policy](../CONTRIBUTING.md#breaking-change-policy).
+* `[envoy.annotations.disallowed_by_default = true]` to denote fields that have
+  been disallowed by default as per the [breaking change policy](../CONTRIBUTING.md#breaking-change-policy).
+* `[(udpa.annotations.field_migrate).rename = "<new field name>"]` to denote that
+  the field will be renamed to a given name in the next API major version.
+* `[(udpa.annotations.field_migrate).oneof_promotion = "<oneof name>"]` to denote that
+  the field will be promoted to a given `oneof` in the next API major version.
+* `[(udpa.annotations.sensitive) = true]` to denote sensitive fields that
+  should be redacted in output such as logging or configuration dumps.
+* [PGV annotations](https://github.com/envoyproxy/protoc-gen-validate) to denote field
+  value constraints.
+
+### Enum value level
+* `[(udpa.annotations.enum_value_migrate).rename = "new enum value name"]` to denote that
+  the enum value will be renamed to a given name in the next API major version.
+
+### Message level
+* `option (udpa.annotations.versioning).previous_message_type = "<message type
+  name>";` to denote the previous type name for an upgraded message. You should
+  never have to write these manually, they are generated by `protoxform`.
+
+### Service level
+* `option (envoy.annotations.resource).type = "<resource type name>";` to denote
+  the resource type for an xDS service definition.
+
+### File level
+* `option (udpa.annotations.file_migrate).move_to_package = "<package name>";`
+  to denote that in the next major version of the API, the file will be moved to
+  the given package. This is consumed by `protoxform`.
+* `option (udpa.annotations.file_status).work_in_progress = true;` to denote a
+  file that is still work-in-progress and subject to breaking changes.

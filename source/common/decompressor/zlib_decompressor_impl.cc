@@ -5,7 +5,8 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
-#include "common/common/stack_array.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Decompressor {
@@ -13,8 +14,7 @@ namespace Decompressor {
 ZlibDecompressorImpl::ZlibDecompressorImpl() : ZlibDecompressorImpl(4096) {}
 
 ZlibDecompressorImpl::ZlibDecompressorImpl(uint64_t chunk_size)
-    : chunk_size_{chunk_size}, initialized_{false}, chunk_char_ptr_(new unsigned char[chunk_size]),
-      zstream_ptr_(new z_stream(), [](z_stream* z) {
+    : Zlib::Base(chunk_size, [](z_stream* z) {
         inflateEnd(z);
         delete z;
       }) {
@@ -32,15 +32,9 @@ void ZlibDecompressorImpl::init(int64_t window_bits) {
   initialized_ = true;
 }
 
-uint64_t ZlibDecompressorImpl::checksum() { return zstream_ptr_->adler; }
-
 void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
-  const uint64_t num_slices = input_buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-  input_buffer.getRawSlices(slices.begin(), num_slices);
-
-  for (const Buffer::RawSlice& input_slice : slices) {
+  for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
     while (inflateNext()) {
@@ -68,18 +62,16 @@ bool ZlibDecompressorImpl::inflateNext() {
     return false; // This means that zlib needs more input, so stop here.
   }
 
-  RELEASE_ASSERT(result == Z_OK, "");
-  return true;
-}
-
-void ZlibDecompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
-  const uint64_t n_output = chunk_size_ - zstream_ptr_->avail_out;
-  if (n_output > 0) {
-    output_buffer.add(static_cast<void*>(chunk_char_ptr_.get()), n_output);
+  if (result < 0) {
+    decompression_error_ = result;
+    ENVOY_LOG(
+        trace,
+        "zlib decompression error: {}. Error codes are defined in https://www.zlib.net/manual.html",
+        result);
+    return false;
   }
-  chunk_char_ptr_ = std::make_unique<unsigned char[]>(chunk_size_);
-  zstream_ptr_->avail_out = chunk_size_;
-  zstream_ptr_->next_out = chunk_char_ptr_.get();
+
+  return true;
 }
 
 } // namespace Decompressor

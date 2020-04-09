@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -20,6 +21,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -33,6 +35,19 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "codec_fuzz_test",
+    srcs = ["codec_fuzz_test.cc"],
+    corpus = "codec_corpus",
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/grpc:codec_lib",
+        "//test/fuzz:utility_lib",
+        "//test/proto:helloworld_proto_cc_proto",
     ],
 )
 
@@ -118,6 +133,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -137,6 +153,8 @@ envoy_cc_test_library(
         "//test/test_common:global_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -157,6 +175,6 @@ envoy_cc_test_library(
     data = ["//test/config/integration/certs"],
     deps = [
         "//test/test_common:environment_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

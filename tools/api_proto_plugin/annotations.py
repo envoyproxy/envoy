@@ -10,6 +10,11 @@ ANNOTATION_REGEX = re.compile('\[#([\w-]+?):\s*(.*?)\](\s?)', re.DOTALL)
 # Page/section titles with special prefixes in the proto comments
 DOC_TITLE_ANNOTATION = 'protodoc-title'
 
+# When documenting an extension, this should be used to specify the qualified
+# name that the extension registers as in the static registry, e.g.
+# envoy.filters.network.http_connection_manager.
+EXTENSION_ANNOTATION = 'extension'
+
 # Not implemented yet annotation on leading comments, leading to hiding of
 # field.
 NOT_IMPLEMENTED_HIDE_ANNOTATION = 'not-implemented-hide'
@@ -26,6 +31,7 @@ COMMENT_ANNOTATION = 'comment'
 
 VALID_ANNOTATIONS = set([
     DOC_TITLE_ANNOTATION,
+    EXTENSION_ANNOTATION,
     NOT_IMPLEMENTED_HIDE_ANNOTATION,
     NEXT_FREE_FIELD_ANNOTATION,
     NEXT_MAJOR_VERSION_ANNOTATION,

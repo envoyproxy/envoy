@@ -1,5 +1,7 @@
 #include "extensions/filters/common/rbac/engine_impl.h"
 
+#include "envoy/config/rbac/v3/rbac.pb.h"
+
 #include "common/http/header_map_impl.h"
 
 namespace Envoy {
@@ -9,9 +11,8 @@ namespace Common {
 namespace RBAC {
 
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
-    const envoy::config::rbac::v2::RBAC& rules)
-    : allowed_if_matched_(rules.action() ==
-                          envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW) {
+    const envoy::config::rbac::v3::RBAC& rules)
+    : allowed_if_matched_(rules.action() == envoy::config::rbac::v3::RBAC::ALLOW) {
   // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
@@ -26,7 +27,7 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
 }
 
 bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection,
-                                               const Envoy::Http::HeaderMap& headers,
+                                               const Envoy::Http::RequestHeaderMap& headers,
                                                const StreamInfo::StreamInfo& info,
                                                std::string* effective_policy_id) const {
   bool matched = false;
@@ -50,7 +51,7 @@ bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connec
 bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection,
                                                const StreamInfo::StreamInfo& info,
                                                std::string* effective_policy_id) const {
-  static const Http::HeaderMapImpl* empty_header = new Http::HeaderMapImpl();
+  static const Http::RequestHeaderMapImpl* empty_header = new Http::RequestHeaderMapImpl();
   return allowed(connection, *empty_header, info, effective_policy_id);
 }
 

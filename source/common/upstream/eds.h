@@ -1,14 +1,18 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/locality.h"
 
+#include "common/config/subscription_base.h"
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -20,10 +24,12 @@ namespace Upstream {
 /**
  * Cluster implementation that reads host information from the Endpoint Discovery Service.
  */
-class EdsClusterImpl : public BaseDynamicClusterImpl, Config::SubscriptionCallbacks {
+class EdsClusterImpl
+    : public BaseDynamicClusterImpl,
+      Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment> {
 public:
-  EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                 Server::Configuration::TransportSocketFactoryContext& factory_context,
+  EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
+                 Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                  Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
@@ -33,16 +39,16 @@ private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+    return MessageUtil::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
+        .cluster_name();
   }
-
-  using LocalityWeightsMap =
-      std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
+  using LocalityWeightsMap = std::unordered_map<envoy::config::core::v3::Locality, uint32_t,
+                                                LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
                               const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
                               LocalityWeightsMap& new_locality_weights_map,
@@ -57,8 +63,9 @@ private:
 
   class BatchUpdateHelper : public PrioritySet::BatchUpdateCb {
   public:
-    BatchUpdateHelper(EdsClusterImpl& parent,
-                      const envoy::api::v2::ClusterLoadAssignment& cluster_load_assignment)
+    BatchUpdateHelper(
+        EdsClusterImpl& parent,
+        const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment)
         : parent_(parent), cluster_load_assignment_(cluster_load_assignment) {}
 
     // Upstream::PrioritySet::BatchUpdateCb
@@ -66,10 +73,9 @@ private:
 
   private:
     EdsClusterImpl& parent_;
-    const envoy::api::v2::ClusterLoadAssignment& cluster_load_assignment_;
+    const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment_;
   };
 
-  const ClusterManager& cm_;
   std::unique_ptr<Config::Subscription> subscription_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
@@ -85,10 +91,10 @@ public:
   EdsClusterFactory() : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Eds) {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) override;
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
+      Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream

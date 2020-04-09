@@ -4,10 +4,6 @@
 
 #include "exe/platform_impl.h"
 
-// clang-format off
-#include <winsock2.h>
-// clang-format on
-
 namespace Envoy {
 
 PlatformImpl::PlatformImpl()

@@ -53,7 +53,7 @@ bool CompactProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMeta
   }
 
   if (name_len < 0) {
-    throw EnvoyException(fmt::format("negative compact protocol message name length {}", name_len));
+    throw EnvoyException(absl::StrCat("negative compact protocol message name length ", name_len));
   }
 
   if (buffer.length() < static_cast<uint64_t>(id_size + name_len_size + name_len + 2)) {
@@ -138,7 +138,7 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
     }
 
     if (id < 0 || id > std::numeric_limits<int16_t>::max()) {
-      throw EnvoyException(fmt::format("invalid compact protocol field id {}", id));
+      throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
     }
 
     compact_field_type = static_cast<CompactFieldType>(delta_and_type);
@@ -179,7 +179,7 @@ bool CompactProtocolImpl::readMapBegin(Buffer::Instance& buffer, FieldType& key_
   }
 
   if (s < 0) {
-    throw EnvoyException(fmt::format("negative compact protocol map size {}", s));
+    throw EnvoyException(absl::StrCat("negative compact protocol map size ", s));
   }
 
   if (s == 0) {
@@ -468,7 +468,7 @@ void CompactProtocolImpl::writeFieldEnd(Buffer::Instance& buffer) {
 void CompactProtocolImpl::writeMapBegin(Buffer::Instance& buffer, FieldType key_type,
                                         FieldType value_type, uint32_t size) {
   if (size > static_cast<uint32_t>(std::numeric_limits<int32_t>::max())) {
-    throw EnvoyException(fmt::format("illegal compact protocol map size {}", size));
+    throw EnvoyException(absl::StrCat("illegal compact protocol map size ", size));
   }
 
   BufferHelper::writeVarIntI32(buffer, static_cast<int32_t>(size));

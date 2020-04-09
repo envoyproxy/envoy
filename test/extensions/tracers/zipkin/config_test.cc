@@ -1,3 +1,5 @@
+#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/tracers/zipkin/config.h"
@@ -16,39 +18,42 @@ namespace Zipkin {
 namespace {
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
 
-  EXPECT_CALL(server.cluster_manager_, get(Eq("fake_cluster")))
-      .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_, get(Eq("fake_cluster")))
+      .WillRepeatedly(
+          Return(&context.server_factory_context_.cluster_manager_.thread_local_cluster_));
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.zipkin
-    config:
+    name: zipkin
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
       collector_cluster: fake_cluster
       collector_endpoint: /api/v1/spans
       collector_endpoint_version: HTTP_JSON
   )EOF";
 
-  envoy::config::trace::v2::Tracing configuration;
+  envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   ZipkinTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, server);
+  Tracing::HttpTracerSharedPtr zipkin_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
 
-  EXPECT_CALL(server.cluster_manager_, get(Eq("fake_cluster")))
-      .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_, get(Eq("fake_cluster")))
+      .WillRepeatedly(
+          Return(&context.server_factory_context_.cluster_manager_.thread_local_cluster_));
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.zipkin
+    name: zipkin
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
       collector_cluster: fake_cluster
@@ -56,20 +61,28 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
       collector_endpoint_version: HTTP_PROTO
   )EOF";
 
-  envoy::config::trace::v2::Tracing configuration;
+  envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   ZipkinTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, server);
+  Tracing::HttpTracerSharedPtr zipkin_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
 TEST(ZipkinTracerConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ZipkinTracerFactory, Server::Configuration::TracerFactory>()),
-      EnvoyException, "Double registration for name: 'envoy.zipkin'");
+      EnvoyException, "Double registration for name: 'envoy.tracers.zipkin'");
+}
+
+// Test that the deprecated extension name still functions.
+TEST(ZipkinTracerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.zipkin";
+
+  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
+                         deprecated_name));
 }
 
 } // namespace

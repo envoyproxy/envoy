@@ -54,15 +54,17 @@ Stats::SymbolTable::StoragePtr DynamoStats::addPrefix(const Stats::StatNameVec& 
   return scope_.symbolTable().join(names_with_prefix);
 }
 
-Stats::Counter& DynamoStats::counter(const Stats::StatNameVec& names) {
+void DynamoStats::incCounter(const Stats::StatNameVec& names) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
+  scope_.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
-Stats::Histogram& DynamoStats::histogram(const Stats::StatNameVec& names,
-                                         Stats::Histogram::Unit unit) {
+void DynamoStats::recordHistogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
+                                  uint64_t value) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  return scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit);
+  Stats::Histogram& histogram =
+      scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit);
+  histogram.recordValue(value);
 }
 
 Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_name,
@@ -70,9 +72,11 @@ Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_
                                                        const std::string& partition_id) {
   // Use the last 7 characters of the partition id.
   absl::string_view id_last_7 = absl::string_view(partition_id).substr(partition_id.size() - 7);
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(
-      {table_, getDynamic(table_name), capacity_, getBuiltin(operation, unknown_operation_),
-       getDynamic(absl::StrCat("__partition_id=", id_last_7))});
+  Stats::StatNameDynamicPool dynamic(scope_.symbolTable());
+  const Stats::StatName partition = dynamic.add(absl::StrCat("__partition_id=", id_last_7));
+  const Stats::SymbolTable::StoragePtr stat_name_storage =
+      addPrefix({table_, dynamic.add(table_name), capacity_,
+                 getBuiltin(operation, unknown_operation_), partition});
   return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
 }
 

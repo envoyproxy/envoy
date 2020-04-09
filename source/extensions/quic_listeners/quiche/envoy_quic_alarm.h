@@ -6,8 +6,8 @@
 #include "common/common/assert.h"
 
 #include "quiche/quic/core/quic_alarm.h"
+#include "quiche/quic/core/quic_clock.h"
 #include "quiche/quic/core/quic_time.h"
-#include "quiche/quic/platform/api/quic_clock.h"
 
 namespace Envoy {
 namespace Quic {
@@ -20,7 +20,8 @@ public:
   EnvoyQuicAlarm(Event::Dispatcher& dispatcher, const quic::QuicClock& clock,
                  quic::QuicArenaScopedPtr<quic::QuicAlarm::Delegate> delegate);
 
-  ~EnvoyQuicAlarm() override { ASSERT(!IsSet()); };
+  // TimerImpl destruction deletes in-flight alarm firing event.
+  ~EnvoyQuicAlarm() override = default;
 
   // quic::QuicAlarm
   void CancelImpl() override;

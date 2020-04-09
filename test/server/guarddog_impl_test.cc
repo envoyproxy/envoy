@@ -71,7 +71,7 @@ protected:
   }
 
   std::unique_ptr<Event::TestTimeSystem> time_system_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   std::unique_ptr<GuardDogImpl> guard_dog_;
 };
@@ -323,14 +323,14 @@ TEST_P(GuardDogTestBase, LoopIntervalNoKillTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(40, 50, 0, 0);
   initGuardDog(stats, config);
-  EXPECT_EQ(guard_dog_->loopIntervalForTest(), 40);
+  EXPECT_EQ(guard_dog_->loopIntervalForTest(), std::chrono::milliseconds(40));
 }
 
 TEST_P(GuardDogTestBase, LoopIntervalTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
   initGuardDog(stats, config);
-  EXPECT_EQ(guard_dog_->loopIntervalForTest(), 90);
+  EXPECT_EQ(guard_dog_->loopIntervalForTest(), std::chrono::milliseconds(90));
 }
 
 TEST_P(GuardDogTestBase, WatchDogThreadIdTest) {

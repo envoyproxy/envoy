@@ -177,7 +177,7 @@ value.
 gRPC
 ----------------------
 
-For gRPC requests, the outlier detection will use the HTTP status mapped from the `grpc-status <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses>`_ response header. This behavior is guarded by the runtime feature `envoy.reloadable_features.outlier_detection_support_for_grpc_status` which defaults to true.
+For gRPC requests, the outlier detection will use the HTTP status mapped from the `grpc-status <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses>`_ response header.
 
 
 .. _arch_overview_outlier_detection_logging:

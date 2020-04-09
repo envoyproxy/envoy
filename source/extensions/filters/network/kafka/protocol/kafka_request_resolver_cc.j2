@@ -12,6 +12,25 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
+// Implements declaration from 'kafka_request.h'.
+bool requestUsesTaggedFieldsInHeader(const uint16_t api_key, const uint16_t api_version) {
+  switch (api_key) {
+    {% for message_type in message_types %}
+    case {{ message_type.get_extra('api_key') }}:
+      switch (api_version) {
+        {% for flexible_version in message_type.flexible_versions %}
+        case {{ flexible_version }}:
+          return true;
+        {% endfor %}
+        default:
+          return false;
+      }
+    {% endfor %}
+    default:
+      return false;
+  }
+}
+
 /**
  * Creates a parser that corresponds to provided key and version.
  * If corresponding parser cannot be found (what means a newer version of Kafka protocol),

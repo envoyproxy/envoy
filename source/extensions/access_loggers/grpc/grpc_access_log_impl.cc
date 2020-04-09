@@ -1,5 +1,7 @@
 #include "extensions/access_loggers/grpc/grpc_access_log_impl.h"
 
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
@@ -36,7 +38,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std
   flush_timer_->enableTimer(buffer_flush_interval_msec_);
 }
 
-void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) {
+void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
   approximate_message_size_bytes_ += entry.ByteSizeLong();
   message_.mutable_http_logs()->mutable_log_entry()->Add(std::move(entry));
   if (approximate_message_size_bytes_ >= buffer_size_bytes_) {
@@ -44,7 +46,7 @@ void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& 
   }
 }
 
-void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v2::TCPAccessLogEntry&& entry) {
+void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) {
   approximate_message_size_bytes_ += entry.ByteSizeLong();
   message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
   if (approximate_message_size_bytes_ >= buffer_size_bytes_) {
@@ -96,7 +98,7 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
 }
 
 GrpcAccessLoggerSharedPtr GrpcAccessLoggerCacheImpl::getOrCreateLogger(
-    const envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
+    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
     GrpcAccessLoggerType logger_type) {
   // TODO(euroelessar): Consider cleaning up loggers.
   auto& cache = tls_slot_->getTyped<ThreadLocalCache>();

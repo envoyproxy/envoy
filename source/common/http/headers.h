@@ -51,7 +51,6 @@ public:
 
   const LowerCaseString Accept{"accept"};
   const LowerCaseString AcceptEncoding{"accept-encoding"};
-  const LowerCaseString AccessControlRequestHeaders{"access-control-request-headers"};
   const LowerCaseString AccessControlRequestMethod{"access-control-request-method"};
   const LowerCaseString AccessControlAllowOrigin{"access-control-allow-origin"};
   const LowerCaseString AccessControlAllowHeaders{"access-control-allow-headers"};
@@ -59,6 +58,7 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString Age{"age"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
   const LowerCaseString ProxyAuthorization{"proxy-authorization"};
@@ -117,6 +117,7 @@ public:
   const LowerCaseString EnvoyDecoratorOperation{absl::StrCat(prefix(), "-decorator-operation")};
   const LowerCaseString Etag{"etag"};
   const LowerCaseString Expect{"expect"};
+  const LowerCaseString Expires{"expires"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedHost{"x-forwarded-host"};
@@ -130,10 +131,8 @@ public:
   const LowerCaseString HostLegacy{"host"};
   const LowerCaseString Http2Settings{"http2-settings"};
   const LowerCaseString KeepAlive{"keep-alive"};
-  const LowerCaseString LastModified{"last-modified"};
   const LowerCaseString Location{"location"};
   const LowerCaseString Method{":method"};
-  const LowerCaseString NoChunks{":no-chunks"};
   const LowerCaseString Origin{"origin"};
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
@@ -171,6 +170,7 @@ public:
     const std::string NoCache{"no-cache"};
     const std::string NoCacheMaxAge0{"no-cache, max-age=0"};
     const std::string NoTransform{"no-transform"};
+    const std::string Private{"private"};
   } CacheControlValues;
 
   struct {
@@ -248,6 +248,7 @@ public:
     const std::string Chunked{"chunked"};
     const std::string Deflate{"deflate"};
     const std::string Gzip{"gzip"};
+    const std::string Identity{"identity"};
   } TransferEncodingValues;
 
   struct {

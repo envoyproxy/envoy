@@ -1,6 +1,9 @@
 #pragma once
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/common/empty_string.h"
+#include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 
 #include "test/common/stream_info/test_util.h"
@@ -42,23 +45,25 @@ inline std::string replaceInvalidCharacters(absl::string_view string) {
   return filtered;
 }
 
-// Return a new RepeatedPtrField of HeaderValueOptions with invalid characters removed.
-inline Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> replaceInvalidHeaders(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> processed;
-  for (const auto& header : headers_to_add) {
-    auto* header_value_option = processed.Add();
-    auto* mutable_header = header_value_option->mutable_header();
-    mutable_header->set_key(replaceInvalidCharacters(header.header().key()));
-    mutable_header->set_value(replaceInvalidCharacters(header.header().value()));
-    header_value_option->mutable_append()->CopyFrom(header.append());
+// Replace invalid host characters.
+inline std::string replaceInvalidHostCharacters(absl::string_view string) {
+  std::string filtered;
+  filtered.reserve(string.length());
+  for (const char& c : string) {
+    switch (c) {
+    case ' ':
+      filtered.push_back('0');
+      break;
+    default:
+      filtered.push_back(c);
+    }
   }
-  return processed;
+  return filtered;
 }
 
-inline envoy::api::v2::core::Metadata
-replaceInvalidStringValues(const envoy::api::v2::core::Metadata& upstream_metadata) {
-  envoy::api::v2::core::Metadata processed = upstream_metadata;
+inline envoy::config::core::v3::Metadata
+replaceInvalidStringValues(const envoy::config::core::v3::Metadata& upstream_metadata) {
+  envoy::config::core::v3::Metadata processed = upstream_metadata;
   for (auto& metadata_struct : *processed.mutable_filter_metadata()) {
     // Metadata fields consist of keyed Structs, which is a map of dynamically typed values. These
     // values can be null, a number, a string, a boolean, a list of values, or a recursive struct.
@@ -73,21 +78,16 @@ replaceInvalidStringValues(const envoy::api::v2::core::Metadata& upstream_metada
   return processed;
 }
 
-// Convert from test proto Headers to TestHeaderMapImpl.
-inline Http::TestHeaderMapImpl fromHeaders(
+// Convert from test proto Headers to a variant of TestHeaderMapImpl. Validate proto if you intend
+// to sanitize for invalid header characters.
+template <class T>
+inline T fromHeaders(
     const test::fuzz::Headers& headers,
     const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>()) {
-  Http::TestHeaderMapImpl header_map;
+  T header_map;
   for (const auto& header : headers.headers()) {
-    // HeaderMapImpl and places such as the route lookup should never see strings with embedded
-    // {NULL, CR, LF} values, the HTTP codecs should reject them. So, don't inject any such strings
-    // into the fuzz tests and replace these invalid characters with spaces.
-    // When we are injecting headers, we don't allow the key to ever be empty, since calling code is
-    // not supposed to do this.
-    const std::string key =
-        header.key().empty() ? "not-empty" : replaceInvalidCharacters(header.key());
-    if (ignore_headers.find(StringUtil::toLower(key)) == ignore_headers.end()) {
-      header_map.addCopy(key, replaceInvalidCharacters(header.value()));
+    if (ignore_headers.find(absl::AsciiStrToLower(header.key())) == ignore_headers.end()) {
+      header_map.addCopy(header.key(), header.value());
     }
   }
   return header_map;
@@ -112,9 +112,17 @@ const std::string TestSubjectPeer =
 
 inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) {
   // Set mocks' default string return value to be an empty string.
+  // TODO(asraa): Speed up this function, which is slowed because of the use of mocks.
   testing::DefaultValue<const std::string&>::Set(EMPTY_STRING);
   TestStreamInfo test_stream_info;
   test_stream_info.metadata_ = stream_info.dynamic_metadata();
+  // Truncate recursive filter metadata fields.
+  // TODO(asraa): Resolve MessageToJsonString failure on recursive filter metadata.
+  for (auto& pair : *test_stream_info.metadata_.mutable_filter_metadata()) {
+    std::string value;
+    pair.second.SerializeToString(&value);
+    pair.second.ParseFromString(value.substr(0, 128));
+  }
   // libc++ clocks don't track at nanosecond on macOS.
   const auto start_time =
       static_cast<uint64_t>(std::numeric_limits<std::chrono::nanoseconds::rep>::max()) <
@@ -125,13 +133,20 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   if (stream_info.has_response_code()) {
     test_stream_info.response_code_ = stream_info.response_code().value();
   }
+  test_stream_info.setRequestedServerName(stream_info.requested_server_name());
   auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-  auto upstream_metadata = std::make_shared<envoy::api::v2::core::Metadata>(
+  auto upstream_metadata = std::make_shared<envoy::config::core::v3::Metadata>(
       replaceInvalidStringValues(stream_info.upstream_metadata()));
   ON_CALL(*upstream_host, metadata()).WillByDefault(testing::Return(upstream_metadata));
   test_stream_info.upstream_host_ = upstream_host;
-  auto address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");
-  test_stream_info.upstream_local_address_ = address;
+  auto address = stream_info.has_address()
+                     ? Envoy::Network::Address::resolveProtoAddress(stream_info.address())
+                     : Network::Utility::resolveUrl("tcp://10.0.0.1:443");
+  auto upstream_local_address =
+      stream_info.has_upstream_local_address()
+          ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
+          : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
+  test_stream_info.upstream_local_address_ = upstream_local_address;
   test_stream_info.downstream_local_address_ = address;
   test_stream_info.downstream_direct_remote_address_ = address;
   test_stream_info.downstream_remote_address_ = address;

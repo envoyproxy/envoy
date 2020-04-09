@@ -15,13 +15,6 @@ namespace Common {
 template <class ConfigProto, class ProtocolOptionsProto = ConfigProto>
 class FactoryBase : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
-  // Server::Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Server::Configuration::FactoryContext&) override {
-    // Only used in v1 filters.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext& context) override {
@@ -45,7 +38,7 @@ public:
         proto_config, validation_visitor));
   }
 
-  std::string name() override { return name_; }
+  std::string name() const override { return name_; }
 
   bool isTerminalFilter() override { return is_terminal_filter_; }
 

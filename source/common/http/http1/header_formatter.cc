@@ -1,5 +1,7 @@
 #include "common/http/http1/header_formatter.h"
 
+#include <string>
+
 namespace Envoy {
 namespace Http {
 namespace Http1 {

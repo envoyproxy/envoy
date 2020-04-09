@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -17,8 +17,8 @@ namespace BufferFilter {
 
 class BufferFilterSettings : public Router::RouteSpecificFilterConfig {
 public:
-  BufferFilterSettings(const envoy::config::filter::http::buffer::v2::Buffer&);
-  BufferFilterSettings(const envoy::config::filter::http::buffer::v2::BufferPerRoute&);
+  BufferFilterSettings(const envoy::extensions::filters::http::buffer::v3::Buffer&);
+  BufferFilterSettings(const envoy::extensions::filters::http::buffer::v3::BufferPerRoute&);
 
   bool disabled() const { return disabled_; }
   uint64_t maxRequestBytes() const { return max_request_bytes_; }
@@ -33,7 +33,7 @@ private:
  */
 class BufferFilterConfig {
 public:
-  BufferFilterConfig(const envoy::config::filter::http::buffer::v2::Buffer& proto_config);
+  BufferFilterConfig(const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config);
 
   const BufferFilterSettings* settings() const { return &settings_; }
 
@@ -54,9 +54,10 @@ public:
   void onDestroy() override {}
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
@@ -66,7 +67,7 @@ private:
   BufferFilterConfigSharedPtr config_;
   const BufferFilterSettings* settings_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  Http::HeaderMap* request_headers_{};
+  Http::RequestHeaderMap* request_headers_{};
   uint64_t content_length_{};
   bool config_initialized_{};
 };

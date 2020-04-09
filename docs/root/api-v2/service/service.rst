@@ -10,5 +10,6 @@ Services
   discovery/v2/*
   metrics/v2/*
   ratelimit/v2/*
+  status/v2/*
   tap/v2alpha/*
   trace/v2/*

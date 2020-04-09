@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+
 #include "common/memory/stats.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/maglev_lb.h"
@@ -38,13 +40,19 @@ public:
                                     {}, hosts, {}, absl::nullopt);
   }
 
+  Envoy::Thread::MutexBasicLockable lock_;
+  // Reduce default log level to warn while running this benchmark to avoid problems due to
+  // excessive debug logging in upstream_impl.cc
+  Envoy::Logger::Context logging_context_{spdlog::level::warn,
+                                          Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock_, false};
+
   PrioritySetImpl priority_set_;
   PrioritySetImpl local_priority_set_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_)};
   NiceMock<Runtime::MockLoader> runtime_;
   Runtime::RandomGeneratorImpl random_;
-  envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 };
 
@@ -59,6 +67,19 @@ public:
   }
 
   std::unique_ptr<RoundRobinLoadBalancer> lb_;
+};
+
+class LeastRequestTester : public BaseTester {
+public:
+  LeastRequestTester(uint64_t num_hosts, uint32_t choice_count) : BaseTester(num_hosts) {
+    envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+    lr_lb_config.mutable_choice_count()->set_value(choice_count);
+    lb_ =
+        std::make_unique<LeastRequestLoadBalancer>(priority_set_, &local_priority_set_, stats_,
+                                                   runtime_, random_, common_config_, lr_lb_config);
+  }
+
+  std::unique_ptr<LeastRequestLoadBalancer> lb_;
 };
 
 void BM_RoundRobinLoadBalancerBuild(benchmark::State& state) {
@@ -106,13 +127,13 @@ BENCHMARK(BM_RoundRobinLoadBalancerBuild)
 class RingHashTester : public BaseTester {
 public:
   RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) : BaseTester(num_hosts) {
-    config_ = envoy::api::v2::Cluster::RingHashLbConfig();
+    config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
     config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
     ring_hash_lb_ = std::make_unique<RingHashLoadBalancer>(
         priority_set_, stats_, stats_store_, runtime_, random_, config_, common_config_);
   }
 
-  absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> config_;
+  absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> config_;
   std::unique_ptr<RingHashLoadBalancer> ring_hash_lb_;
 };
 
@@ -211,6 +232,36 @@ void computeHitStats(benchmark::State& state,
   state.counters["stddev_hits"] = stddev;
   state.counters["relative_stddev_hits"] = (stddev / mean);
 }
+
+void BM_LeastRequestLoadBalancerChooseHost(benchmark::State& state) {
+  for (auto _ : state) {
+    state.PauseTiming();
+    const uint64_t num_hosts = state.range(0);
+    const uint64_t choice_count = state.range(1);
+    const uint64_t keys_to_simulate = state.range(2);
+    LeastRequestTester tester(num_hosts, choice_count);
+    std::unordered_map<std::string, uint64_t> hit_counter;
+    TestLoadBalancerContext context;
+    state.ResumeTiming();
+
+    for (uint64_t i = 0; i < keys_to_simulate; ++i) {
+      hit_counter[tester.lb_->chooseHost(&context)->address()->asString()] += 1;
+    }
+
+    // Do not time computation of mean, standard deviation, and relative standard deviation.
+    state.PauseTiming();
+    computeHitStats(state, hit_counter);
+    state.ResumeTiming();
+  }
+}
+BENCHMARK(BM_LeastRequestLoadBalancerChooseHost)
+    ->Args({100, 1, 1000000})
+    ->Args({100, 2, 1000000})
+    ->Args({100, 3, 1000000})
+    ->Args({100, 10, 1000000})
+    ->Args({100, 50, 1000000})
+    ->Args({100, 100, 1000000})
+    ->Unit(benchmark::kMillisecond);
 
 void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
   for (auto _ : state) {
@@ -437,18 +488,3 @@ BENCHMARK(BM_MaglevLoadBalancerWeighted)
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
-
-// Boilerplate main(), which discovers benchmarks in the same file and runs them.
-int main(int argc, char** argv) {
-  // TODO(mattklein123): Provide a common bazel benchmark wrapper much like we do for normal tests,
-  // fuzz, etc.
-  Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Context logging_context(spdlog::level::warn,
-                                         Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
-
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
-  }
-  benchmark::RunSpecifiedBenchmarks();
-}

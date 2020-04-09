@@ -174,8 +174,8 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
   {
     Buffer::OwnedImpl buffer;
     FrameInspector counter;
-    EXPECT_EQ(0, counter.decode(buffer));
-    EXPECT_EQ(counter.state(), State::FH_FLAG);
+    EXPECT_EQ(0, counter.inspect(buffer));
+    EXPECT_EQ(counter.state(), State::FhFlag);
     EXPECT_EQ(counter.frameCount(), 0);
   }
 
@@ -183,8 +183,8 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     Buffer::OwnedImpl buffer;
     FrameInspector counter;
     Buffer::addSeq(buffer, {0});
-    EXPECT_EQ(1, counter.decode(buffer));
-    EXPECT_EQ(counter.state(), State::FH_LEN_0);
+    EXPECT_EQ(1, counter.inspect(buffer));
+    EXPECT_EQ(counter.state(), State::FhLen0);
     EXPECT_EQ(counter.frameCount(), 1);
   }
 
@@ -192,8 +192,8 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     Buffer::OwnedImpl buffer;
     FrameInspector counter;
     Buffer::addSeq(buffer, {1, 0, 0, 0, 1, 0xFF});
-    EXPECT_EQ(1, counter.decode(buffer));
-    EXPECT_EQ(counter.state(), State::FH_FLAG);
+    EXPECT_EQ(1, counter.inspect(buffer));
+    EXPECT_EQ(counter.state(), State::FhFlag);
     EXPECT_EQ(counter.frameCount(), 1);
   }
 
@@ -201,12 +201,12 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     FrameInspector counter;
     Buffer::OwnedImpl buffer1;
     Buffer::addSeq(buffer1, {1, 0, 0, 0});
-    EXPECT_EQ(1, counter.decode(buffer1));
-    EXPECT_EQ(counter.state(), State::FH_LEN_3);
+    EXPECT_EQ(1, counter.inspect(buffer1));
+    EXPECT_EQ(counter.state(), State::FhLen3);
     EXPECT_EQ(counter.frameCount(), 1);
     Buffer::OwnedImpl buffer2;
     Buffer::addSeq(buffer2, {1, 0xFF});
-    EXPECT_EQ(0, counter.decode(buffer2));
+    EXPECT_EQ(0, counter.inspect(buffer2));
     EXPECT_EQ(counter.frameCount(), 1);
   }
 
@@ -215,8 +215,8 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     FrameInspector counter;
     Buffer::addSeq(buffer, {1, 0, 0, 0, 1, 0xFF});
     Buffer::addSeq(buffer, {0, 0, 0, 0, 2, 0xFF, 0xFF});
-    EXPECT_EQ(2, counter.decode(buffer));
-    EXPECT_EQ(counter.state(), State::FH_FLAG);
+    EXPECT_EQ(2, counter.inspect(buffer));
+    EXPECT_EQ(counter.state(), State::FhFlag);
     EXPECT_EQ(counter.frameCount(), 2);
   }
 
@@ -227,9 +227,9 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     // message spans two buffers
     Buffer::addSeq(buffer1, {1, 0, 0, 0, 2, 0xFF});
     Buffer::addSeq(buffer2, {0xFF, 0, 0, 0, 0, 2, 0xFF, 0xFF});
-    EXPECT_EQ(1, counter.decode(buffer1));
-    EXPECT_EQ(1, counter.decode(buffer2));
-    EXPECT_EQ(counter.state(), State::FH_FLAG);
+    EXPECT_EQ(1, counter.inspect(buffer1));
+    EXPECT_EQ(1, counter.inspect(buffer2));
+    EXPECT_EQ(counter.state(), State::FhFlag);
     EXPECT_EQ(counter.frameCount(), 2);
   }
 
@@ -241,8 +241,8 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     Buffer::addRepeated(buffer, 1 << 8, 0xFF);
     // Start second message
     Buffer::addSeq(buffer, {0});
-    EXPECT_EQ(2, counter.decode(buffer));
-    EXPECT_EQ(counter.state(), State::FH_LEN_0);
+    EXPECT_EQ(2, counter.inspect(buffer));
+    EXPECT_EQ(counter.state(), State::FhLen0);
     EXPECT_EQ(counter.frameCount(), 2);
   }
 
@@ -251,7 +251,7 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     Buffer::OwnedImpl buffer;
     FrameInspector counter;
     Buffer::addRepeated(buffer, 10, 0);
-    EXPECT_EQ(2, counter.decode(buffer));
+    EXPECT_EQ(2, counter.inspect(buffer));
     EXPECT_EQ(counter.frameCount(), 2);
   }
 }

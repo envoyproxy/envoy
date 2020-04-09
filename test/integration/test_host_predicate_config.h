@@ -9,14 +9,16 @@
 namespace Envoy {
 class TestHostPredicateFactory : public Upstream::RetryHostPredicateFactory {
 public:
-  std::string name() override { return "envoy.test_host_predicate"; }
+  std::string name() const override { return "envoy.test_host_predicate"; }
 
   Upstream::RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message&,
                                                             uint32_t) override {
     return std::make_shared<testing::NiceMock<TestHostPredicate>>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 };
 } // namespace Envoy

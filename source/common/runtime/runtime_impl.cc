@@ -5,13 +5,21 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
+#include "envoy/service/runtime/v3/rtds.pb.h"
+#include "envoy/service/runtime/v3/rtds.pb.validate.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/type/percent.pb.validate.h"
+#include "envoy/type/v3/percent.pb.h"
+#include "envoy/type/v3/percent.pb.validate.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/config/api_version.h"
 #include "common/filesystem/directory.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -24,9 +32,17 @@
 
 namespace Envoy {
 namespace Runtime {
+namespace {
+
+bool isRuntimeFeature(absl::string_view feature) {
+  return RuntimeFeaturesDefaults::get().enabledByDefault(feature) ||
+         RuntimeFeaturesDefaults::get().existsButDisabled(feature);
+}
+
+} // namespace
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
+  ASSERT(isRuntimeFeature(feature));
   if (Runtime::LoaderSingleton::getExisting()) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
         feature);
@@ -37,7 +53,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
 }
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
-  ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
+  ASSERT(absl::StartsWith(feature, "envoy."));
   if (Runtime::LoaderSingleton::getExisting()) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
         std::string(feature), default_value);
@@ -171,12 +187,10 @@ std::string RandomGeneratorImpl::uuid() {
   return std::string(uuid, UUID_LENGTH);
 }
 
-bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
-  const bool default_allowed = !RuntimeFeaturesDefaults::get().disallowedByDefault(key);
-
-  // If the value is not explicitly set as a runtime boolean, the default value is based on
-  // disallowedByDefault.
-  if (!getBoolean(key, default_allowed)) {
+bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_value) const {
+  // If the value is not explicitly set as a runtime boolean, trust the proto annotations passed as
+  // default_value.
+  if (!getBoolean(key, default_value)) {
     // If either disallowed by default or configured off, the feature is not enabled.
     return false;
   }
@@ -197,12 +211,12 @@ bool SnapshotImpl::runtimeFeatureEnabled(absl::string_view key) const {
   return getBoolean(key, RuntimeFeaturesDefaults::get().enabledByDefault(key));
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
+bool SnapshotImpl::featureEnabled(absl::string_view key, uint64_t default_value,
                                   uint64_t random_value, uint64_t num_buckets) const {
   return random_value % num_buckets < std::min(getInteger(key, default_value), num_buckets);
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value) const {
+bool SnapshotImpl::featureEnabled(absl::string_view key, uint64_t default_value) const {
   // Avoid PRNG if we know we don't need it.
   uint64_t cutoff = std::min(getInteger(key, default_value), static_cast<uint64_t>(100));
   if (cutoff == 0) {
@@ -214,30 +228,31 @@ bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value
   }
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
+bool SnapshotImpl::featureEnabled(absl::string_view key, uint64_t default_value,
                                   uint64_t random_value) const {
   return featureEnabled(key, default_value, random_value, 100);
 }
 
-const std::string& SnapshotImpl::get(const std::string& key) const {
-  auto entry = values_.find(key);
+Snapshot::ConstStringOptRef SnapshotImpl::get(absl::string_view key) const {
+  ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
+  auto entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end()) {
-    return EMPTY_STRING;
+    return absl::nullopt;
   } else {
     return entry->second.raw_string_value_;
   }
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key,
-                                  const envoy::type::FractionalPercent& default_value) const {
+bool SnapshotImpl::featureEnabled(absl::string_view key,
+                                  const envoy::type::v3::FractionalPercent& default_value) const {
   return featureEnabled(key, default_value, generator_.random());
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key,
-                                  const envoy::type::FractionalPercent& default_value,
+bool SnapshotImpl::featureEnabled(absl::string_view key,
+                                  const envoy::type::v3::FractionalPercent& default_value,
                                   uint64_t random_value) const {
-  const auto& entry = values_.find(key);
-  envoy::type::FractionalPercent percent;
+  const auto& entry = key.empty() ? values_.end() : values_.find(key);
+  envoy::type::v3::FractionalPercent percent;
   if (entry != values_.end() && entry->second.fractional_percent_value_.has_value()) {
     percent = entry->second.fractional_percent_value_.value();
   } else if (entry != values_.end() && entry->second.uint_value_.has_value()) {
@@ -252,7 +267,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
     // percent proto. To preserve legacy semantics, we treat it as a percentage
     // (i.e. denominator of 100).
     percent.set_numerator(entry->second.uint_value_.value());
-    percent.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+    percent.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   } else {
     percent = default_value;
   }
@@ -260,8 +275,9 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
   return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
 }
 
-uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value) const {
-  auto entry = values_.find(key);
+uint64_t SnapshotImpl::getInteger(absl::string_view key, uint64_t default_value) const {
+  ASSERT(!isRuntimeFeature(key));
+  const auto& entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end() || !entry->second.uint_value_) {
     return default_value;
   } else {
@@ -269,8 +285,9 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
   }
 }
 
-double SnapshotImpl::getDouble(const std::string& key, double default_value) const {
-  auto entry = values_.find(key);
+double SnapshotImpl::getDouble(absl::string_view key, double default_value) const {
+  ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
+  const auto& entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end() || !entry->second.double_value_) {
     return default_value;
   } else {
@@ -279,7 +296,7 @@ double SnapshotImpl::getDouble(const std::string& key, double default_value) con
 }
 
 bool SnapshotImpl::getBoolean(absl::string_view key, bool default_value) const {
-  auto entry = values_.find(key);
+  const auto& entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end() || !entry->second.bool_value_.has_value()) {
     return default_value;
   } else {
@@ -324,7 +341,13 @@ bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
   absl::string_view stripped = entry.raw_string_value_;
   stripped = absl::StripAsciiWhitespace(stripped);
 
-  if (absl::EqualsIgnoreCase(stripped, "true")) {
+  uint64_t parse_int;
+  if (absl::SimpleAtoi(stripped, &parse_int)) {
+    entry.bool_value_ = (parse_int != 0);
+    // This is really an integer, so return false here not because of failure, but so we continue to
+    // parse doubles/int.
+    return false;
+  } else if (absl::EqualsIgnoreCase(stripped, "true")) {
     entry.bool_value_ = true;
     return true;
   } else if (absl::EqualsIgnoreCase(stripped, "false")) {
@@ -344,7 +367,7 @@ bool SnapshotImpl::parseEntryDoubleValue(Entry& entry) {
 }
 
 void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
-  envoy::type::FractionalPercent converted_fractional_percent;
+  envoy::type::v3::FractionalPercent converted_fractional_percent;
   try {
     MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
                                          ProtobufMessage::getStrictValidationVisitor());
@@ -382,11 +405,11 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 
   ENVOY_LOG(debug, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
-    throw EnvoyException(fmt::format("Walk recursion depth exceeded {}", MaxWalkDepth));
+    throw EnvoyException(absl::StrCat("Walk recursion depth exceeded ", MaxWalkDepth));
   }
   // Check if this is an obviously bad path.
   if (api.fileSystem().illegalPath(path)) {
-    throw EnvoyException(fmt::format("Invalid path: {}", path));
+    throw EnvoyException(absl::StrCat("Invalid path: ", path));
   }
 
   Filesystem::Directory directory(path);
@@ -444,7 +467,7 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
   case ProtobufWkt::Value::KIND_NOT_SET:
   case ProtobufWkt::Value::kListValue:
   case ProtobufWkt::Value::kNullValue:
-    throw EnvoyException(fmt::format("Invalid runtime entry value for {}", prefix));
+    throw EnvoyException(absl::StrCat("Invalid runtime entry value for ", prefix));
     break;
   case ProtobufWkt::Value::kStringValue:
     values_.emplace(prefix, SnapshotImpl::createEntry(v.string_value()));
@@ -471,7 +494,7 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
 }
 
 LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
-                       const envoy::config::bootstrap::v2::LayeredRuntime& config,
+                       const envoy::config::bootstrap::v3::LayeredRuntime& config,
                        const LocalInfo::LocalInfo& local_info, Init::Manager& init_manager,
                        Stats::Store& store, RandomGenerator& generator,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
@@ -484,24 +507,24 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       throw EnvoyException(absl::StrCat("Duplicate layer name: ", layer.name()));
     }
     switch (layer.layer_specifier_case()) {
-    case envoy::config::bootstrap::v2::RuntimeLayer::kStaticLayer:
+    case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kStaticLayer:
       // Nothing needs to be done here.
       break;
-    case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
+    case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kAdminLayer:
       if (admin_layer_ != nullptr) {
         throw EnvoyException(
             "Too many admin layers specified in LayeredRuntime, at most one may be specified");
       }
       admin_layer_ = std::make_unique<AdminLayer>(layer.name(), stats_);
       break;
-    case envoy::config::bootstrap::v2::RuntimeLayer::kDiskLayer:
+    case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kDiskLayer:
       if (watcher_ == nullptr) {
         watcher_ = dispatcher.createFilesystemWatcher();
       }
       watcher_->addWatch(layer.disk_layer().symlink_root(), Filesystem::Watcher::Events::MovedTo,
                          [this](uint32_t) -> void { loadNewSnapshot(); });
       break;
-    case envoy::config::bootstrap::v2::RuntimeLayer::kRtdsLayer:
+    case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kRtdsLayer:
       subscriptions_.emplace_back(
           std::make_unique<RtdsSubscription>(*this, layer.rtds_layer(), store, validation_visitor));
       init_manager.add(subscriptions_.back()->init_target_);
@@ -517,9 +540,11 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
 void LoaderImpl::initialize(Upstream::ClusterManager& cm) { cm_ = &cm; }
 
 RtdsSubscription::RtdsSubscription(
-    LoaderImpl& parent, const envoy::config::bootstrap::v2::RuntimeLayer::RtdsLayer& rtds_layer,
+    LoaderImpl& parent, const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
     Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
+    : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(
+          rtds_layer.rtds_config().resource_api_version()),
+      parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }),
       validation_visitor_(validation_visitor) {}
@@ -527,8 +552,8 @@ RtdsSubscription::RtdsSubscription(
 void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
   validateUpdateSize(resources.size());
-  auto runtime = MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(resources[0]);
-  MessageUtil::validate(runtime, validation_visitor_);
+  auto runtime = MessageUtil::anyConvertAndValidate<envoy::service::runtime::v3::Runtime>(
+      resources[0], validation_visitor_);
   if (runtime.name() != resource_name_) {
     throw EnvoyException(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));
@@ -540,7 +565,7 @@ void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufW
 }
 
 void RtdsSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
     const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
   validateUpdateSize(resources.size());
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
@@ -560,10 +585,9 @@ void RtdsSubscription::start() {
   // We have to delay the subscription creation until init-time, since the
   // cluster manager resources are not available in the constructor when
   // instantiated in the server instance.
+  const auto resource_name = getResourceName();
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_,
-      Grpc::Common::typeUrl(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()),
-      store_, *this);
+      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this);
   subscription_->start({resource_name_});
 }
 
@@ -625,10 +649,10 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
   uint32_t rtds_layer = 0;
   for (const auto& layer : config_.layers()) {
     switch (layer.layer_specifier_case()) {
-    case envoy::config::bootstrap::v2::RuntimeLayer::kStaticLayer:
+    case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kStaticLayer:
       layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), layer.static_layer()));
       break;
-    case envoy::config::bootstrap::v2::RuntimeLayer::kDiskLayer: {
+    case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kDiskLayer: {
       std::string path =
           layer.disk_layer().symlink_root() + "/" + layer.disk_layer().subdirectory();
       if (layer.disk_layer().append_service_cluster()) {
@@ -648,10 +672,10 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
       }
       break;
     }
-    case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
+    case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kAdminLayer:
       layers.push_back(std::make_unique<AdminLayer>(*admin_layer_));
       break;
-    case envoy::config::bootstrap::v2::RuntimeLayer::kRtdsLayer: {
+    case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kRtdsLayer: {
       auto* subscription = subscriptions_[rtds_layer++].get();
       layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), subscription->proto_));
       break;

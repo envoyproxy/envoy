@@ -5,13 +5,18 @@ load("@rules_foreign_cc//tools/build_defs:configure.bzl", "configure_make")
 
 envoy_package()
 
+# autotools packages are unusable on Windows as-is
+# TODO: Consider our own gperftools.BUILD file as we do with many other packages
 configure_make(
     name = "gperftools_build",
     configure_options = [
         "--enable-shared=no",
         "--enable-frame-pointers",
         "--disable-libunwind",
-    ],
+    ] + select({
+        "//bazel:apple": ["AR=/usr/bin/ar"],
+        "//conditions:default": [],
+    }),
     lib_source = "@com_github_gperftools_gperftools//:all",
     linkopts = ["-lpthread"],
     make_commands = ["make install-libLTLIBRARIES install-perftoolsincludeHEADERS"],
@@ -19,16 +24,20 @@ configure_make(
         "//bazel:debug_tcmalloc": ["libtcmalloc_debug.a"],
         "//conditions:default": ["libtcmalloc_and_profiler.a"],
     }),
+    tags = ["skip_on_windows"],
 )
 
 # Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/227
 cc_library(
     name = "gperftools",
+    tags = ["skip_on_windows"],
     deps = [
         "gperftools_build",
     ],
 )
 
+# autotools packages are unusable on Windows as-is
+# TODO: Consider our own luajit.BUILD file as we do with many other packages
 configure_make(
     name = "luajit",
     configure_command = "build.py",
@@ -41,9 +50,30 @@ configure_make(
     }),
     lib_source = "@com_github_luajit_luajit//:all",
     make_commands = [],
+    out_include_dir = "include/luajit-2.1",
     static_libraries = [
         "libluajit-5.1.a",
     ],
+    tags = ["skip_on_windows"],
+)
+
+configure_make(
+    name = "moonjit",
+    configure_command = "build.py",
+    configure_env_vars = select({
+        # This shouldn't be needed! See
+        # https://github.com/envoyproxy/envoy/issues/6084
+        # TODO(htuch): Remove when #6084 is fixed
+        "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
+        "//conditions:default": {},
+    }),
+    lib_source = "@com_github_moonjit_moonjit//:all",
+    make_commands = [],
+    out_include_dir = "include/moonjit-2.2",
+    static_libraries = [
+        "libluajit-5.1.a",
+    ],
+    tags = ["skip_on_windows"],
 )
 
 envoy_cmake_external(
@@ -92,8 +122,10 @@ envoy_cmake_external(
         "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib",
         "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
         "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_C_FLAGS_BAZEL": "-fPIC",
     },
     defines = ["CURL_STATICLIB"],
+    generate_crosstool_file = True,
     lib_source = "@com_github_curl//:all",
     static_libraries = select({
         "//bazel:windows_x86_64": ["libcurl.lib"],
@@ -124,14 +156,22 @@ envoy_cmake_external(
     },
     lib_source = "@com_github_libevent_libevent//:all",
     static_libraries = select({
+        # macOS organization of libevent is different from Windows/Linux.
+        # Including libevent_core is a requirement on those platforms, but
+        # results in duplicate symbols when built on macOS.
+        # See https://github.com/lyft/envoy-mobile/issues/677 for details.
+        "//bazel:apple": [
+            "libevent.a",
+            "libevent_pthreads.a",
+        ],
         "//bazel:windows_x86_64": [
             "event.lib",
             "event_core.lib",
-            "event_extra.lib",
         ],
         "//conditions:default": [
             "libevent.a",
             "libevent_pthreads.a",
+            "libevent_core.a",
         ],
     }),
 )
@@ -150,8 +190,8 @@ envoy_cmake_external(
     defines = ["NGHTTP2_STATICLIB"],
     lib_source = "@com_github_nghttp2_nghttp2//:all",
     static_libraries = select({
-        "//bazel:windows_x86_64": ["nghttp2.lib"],
-        "//conditions:default": ["libnghttp2.a"],
+        "//bazel:windows_x86_64": ["nghttp2_static.lib"],
+        "//conditions:default": ["libnghttp2_static.a"],
     }),
 )
 

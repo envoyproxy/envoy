@@ -2,10 +2,13 @@
 
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/rbac/v2/rbac.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/rbac/v3/rbac.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/type/matcher/v3/path.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
 
 #include "common/common/matchers.h"
 #include "common/http/header_utility.h"
@@ -37,20 +40,21 @@ public:
    *                   there are none headers available.
    * @param metadata   the additional information about the action/principal.
    */
-  virtual bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  virtual bool matches(const Network::Connection& connection,
+                       const Envoy::Http::RequestHeaderMap& headers,
                        const StreamInfo::StreamInfo& info) const PURE;
 
   /**
    * Creates a shared instance of a matcher based off the rules defined in the Permission config
    * proto message.
    */
-  static MatcherConstSharedPtr create(const envoy::config::rbac::v2::Permission& permission);
+  static MatcherConstSharedPtr create(const envoy::config::rbac::v3::Permission& permission);
 
   /**
    * Creates a shared instance of a matcher based off the rules defined in the Principal config
    * proto message.
    */
-  static MatcherConstSharedPtr create(const envoy::config::rbac::v2::Principal& principal);
+  static MatcherConstSharedPtr create(const envoy::config::rbac::v3::Principal& principal);
 };
 
 /**
@@ -58,7 +62,7 @@ public:
  */
 class AlwaysMatcher : public Matcher {
 public:
-  bool matches(const Network::Connection&, const Envoy::Http::HeaderMap&,
+  bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                const StreamInfo::StreamInfo&) const override {
     return true;
   }
@@ -70,10 +74,10 @@ public:
  */
 class AndMatcher : public Matcher {
 public:
-  AndMatcher(const envoy::config::rbac::v2::Permission_Set& rules);
-  AndMatcher(const envoy::config::rbac::v2::Principal_Set& ids);
+  AndMatcher(const envoy::config::rbac::v3::Permission::Set& rules);
+  AndMatcher(const envoy::config::rbac::v3::Principal::Set& ids);
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -86,12 +90,12 @@ private:
  */
 class OrMatcher : public Matcher {
 public:
-  OrMatcher(const envoy::config::rbac::v2::Permission_Set& set) : OrMatcher(set.rules()) {}
-  OrMatcher(const envoy::config::rbac::v2::Principal_Set& set) : OrMatcher(set.ids()) {}
-  OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2::Permission>& rules);
-  OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2::Principal>& ids);
+  OrMatcher(const envoy::config::rbac::v3::Permission::Set& set) : OrMatcher(set.rules()) {}
+  OrMatcher(const envoy::config::rbac::v3::Principal::Set& set) : OrMatcher(set.ids()) {}
+  OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules);
+  OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids);
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -100,12 +104,12 @@ private:
 
 class NotMatcher : public Matcher {
 public:
-  NotMatcher(const envoy::config::rbac::v2::Permission& permission)
+  NotMatcher(const envoy::config::rbac::v3::Permission& permission)
       : matcher_(Matcher::create(permission)) {}
-  NotMatcher(const envoy::config::rbac::v2::Principal& principal)
+  NotMatcher(const envoy::config::rbac::v3::Principal& principal)
       : matcher_(Matcher::create(principal)) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -118,9 +122,9 @@ private:
  */
 class HeaderMatcher : public Matcher {
 public:
-  HeaderMatcher(const envoy::api::v2::route::HeaderMatcher& matcher) : header_(matcher) {}
+  HeaderMatcher(const envoy::config::route::v3::HeaderMatcher& matcher) : header_(matcher) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -128,20 +132,22 @@ private:
 };
 
 /**
- * Perform a match against an IP CIDR range. This rule can be applied to either the source
- * (remote) or the destination (local) IP.
+ * Perform a match against an IP CIDR range. This rule can be applied to connection remote,
+ * downstream local address, downstream direct remote address or downstream remote address.
  */
 class IPMatcher : public Matcher {
 public:
-  IPMatcher(const envoy::api::v2::core::CidrRange& range, bool destination)
-      : range_(Network::Address::CidrRange::create(range)), destination_(destination) {}
+  enum Type { ConnectionRemote = 0, DownstreamLocal, DownstreamDirectRemote, DownstreamRemote };
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
-               const StreamInfo::StreamInfo&) const override;
+  IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type)
+      : range_(Network::Address::CidrRange::create(range)), type_(type) {}
+
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo& info) const override;
 
 private:
   const Network::Address::CidrRange range_;
-  const bool destination_;
+  const Type type_;
 };
 
 /**
@@ -151,8 +157,8 @@ class PortMatcher : public Matcher {
 public:
   PortMatcher(const uint32_t port) : port_(port) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
-               const StreamInfo::StreamInfo&) const override;
+  bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+               const StreamInfo::StreamInfo& info) const override;
 
 private:
   const uint32_t port_;
@@ -164,12 +170,12 @@ private:
  */
 class AuthenticatedMatcher : public Matcher {
 public:
-  AuthenticatedMatcher(const envoy::config::rbac::v2::Principal_Authenticated& auth)
+  AuthenticatedMatcher(const envoy::config::rbac::v3::Principal::Authenticated& auth)
       : matcher_(auth.has_principal_name()
                      ? absl::make_optional<Matchers::StringMatcherImpl>(auth.principal_name())
                      : absl::nullopt) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -183,7 +189,7 @@ private:
  */
 class PolicyMatcher : public Matcher, NonCopyable {
 public:
-  PolicyMatcher(const envoy::config::rbac::v2::Policy& policy, Expr::Builder* builder)
+  PolicyMatcher(const envoy::config::rbac::v3::Policy& policy, Expr::Builder* builder)
       : permissions_(policy.permissions()), principals_(policy.principals()),
         condition_(policy.condition()) {
     if (policy.has_condition()) {
@@ -191,7 +197,7 @@ public:
     }
   }
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -206,7 +212,7 @@ class MetadataMatcher : public Matcher {
 public:
   MetadataMatcher(const Envoy::Matchers::MetadataMatcher& matcher) : matcher_(matcher) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -219,11 +225,27 @@ private:
  */
 class RequestedServerNameMatcher : public Matcher, Envoy::Matchers::StringMatcherImpl {
 public:
-  RequestedServerNameMatcher(const envoy::type::matcher::StringMatcher& requested_server_name)
+  RequestedServerNameMatcher(const envoy::type::matcher::v3::StringMatcher& requested_server_name)
       : Envoy::Matchers::StringMatcherImpl(requested_server_name) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
+};
+
+/**
+ * Perform a match against the path header on the HTTP request. The query and fragment string are
+ * removed from the path header before matching.
+ */
+class PathMatcher : public Matcher {
+public:
+  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path_matcher)
+      : path_matcher_(path_matcher) {}
+
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo&) const override;
+
+private:
+  const Matchers::PathMatcher path_matcher_;
 };
 
 } // namespace RBAC

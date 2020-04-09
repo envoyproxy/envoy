@@ -1,5 +1,8 @@
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
+
 #include "common/common/assert.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"
@@ -33,8 +36,8 @@ void GrpcClientImpl::cancel() {
 }
 
 void GrpcClientImpl::check(RequestCallbacks& callbacks,
-                           const envoy::service::auth::v2::CheckRequest& request,
-                           Tracing::Span& parent_span) {
+                           const envoy::service::auth::v3::CheckRequest& request,
+                           Tracing::Span& parent_span, const StreamInfo::StreamInfo&) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
@@ -42,10 +45,10 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
                                  Http::AsyncClient::RequestOptions().setTimeout(timeout_));
 }
 
-void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
+void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckResponse>&& response,
                                Tracing::Span& span) {
   ResponsePtr authz_response = std::make_unique<Response>(Response{});
-  if (response->status().code() == Grpc::Status::GrpcStatus::Ok) {
+  if (response->status().code() == Grpc::Status::WellKnownGrpcStatus::Ok) {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
@@ -70,7 +73,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckRe
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
-  ASSERT(status != Grpc::Status::GrpcStatus::Ok);
+  ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
   Response response{};
   response.status = CheckStatus::Error;
   response.status_code = Http::Code::Forbidden;
@@ -80,7 +83,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 
 void GrpcClientImpl::toAuthzResponseHeader(
     ResponsePtr& response,
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers) {
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers) {
   for (const auto& header : headers) {
     if (header.append().value()) {
       response->headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),

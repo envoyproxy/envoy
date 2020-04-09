@@ -1,3 +1,6 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/overload/v3/overload.pb.h"
+
 #include "test/integration/http_protocol_integration.h"
 
 #include "absl/strings/str_cat.h"
@@ -11,7 +14,7 @@ protected:
         file_updater_(injected_resource_filename_) {}
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       const std::string overload_config = fmt::format(R"EOF(
         refresh_interval:
           seconds: 0
@@ -40,8 +43,7 @@ protected:
       )EOF",
                                                       injected_resource_filename_);
       *bootstrap.mutable_overload_manager() =
-          TestUtility::parseYaml<envoy::config::overload::v2alpha::OverloadManager>(
-              overload_config);
+          TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
     });
     updateResource(0);
     HttpIntegrationTest::initialize();
@@ -66,7 +68,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   updateResource(0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
 
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeRequestWithBody(request_headers, 10);
@@ -113,7 +115,7 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.disable_http_keepalive.active", 1);
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 1, default_response_headers_, 1);
   codec_client_->waitForDisconnect();
@@ -143,7 +145,7 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                1);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = codec_client_->makeRequestWithBody(request_headers, 10);
   EXPECT_FALSE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,

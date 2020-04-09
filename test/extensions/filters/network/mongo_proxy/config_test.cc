@@ -1,7 +1,8 @@
 #include <string>
 
-#include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.h"
-#include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
+#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.validate.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "extensions/filters/network/mongo_proxy/config.h"
 
@@ -21,7 +22,7 @@ namespace MongoProxy {
 TEST(MongoFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(MongoProxyFilterConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::mongo_proxy::v2::MongoProxy(), context),
+                   envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy(), context),
                ProtoValidationException);
 }
 
@@ -31,7 +32,7 @@ TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
   access_log: path/to/access/log
   )EOF";
 
-  envoy::config::filter::network::mongo_proxy::v2::MongoProxy proto_config;
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
@@ -42,7 +43,7 @@ TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
 }
 
 TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
-  envoy::config::filter::network::mongo_proxy::v2::MongoProxy config;
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy config;
 
   config.set_access_log("path/to/access/log");
   config.set_stat_prefix("my_stat_prefix");
@@ -58,8 +59,8 @@ TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
 TEST(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
-  envoy::config::filter::network::mongo_proxy::v2::MongoProxy config =
-      *dynamic_cast<envoy::config::filter::network::mongo_proxy::v2::MongoProxy*>(
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy config =
+      *dynamic_cast<envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy*>(
           factory.createEmptyConfigProto().get());
   config.set_access_log("path/to/access/log");
   config.set_stat_prefix("my_stat_prefix");
@@ -71,7 +72,7 @@ TEST(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
 }
 
 void handleInvalidConfiguration(const std::string& yaml_string, const std::string& error_regex) {
-  envoy::config::filter::network::mongo_proxy::v2::MongoProxy config;
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml_string, config), EnvoyException,
                           error_regex);
 }
@@ -194,7 +195,7 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
     fixed_delay: 0.001s
   )EOF";
 
-  envoy::config::filter::network::mongo_proxy::v2::MongoProxy proto_config;
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
@@ -205,11 +206,11 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
 }
 
 TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
-  envoy::config::filter::network::mongo_proxy::v2::MongoProxy config{};
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy config{};
   config.set_stat_prefix("my_stat_prefix");
   config.mutable_delay()->mutable_percentage()->set_numerator(50);
   config.mutable_delay()->mutable_percentage()->set_denominator(
-      envoy::type::FractionalPercent::HUNDRED);
+      envoy::type::v3::FractionalPercent::HUNDRED);
   config.mutable_delay()->mutable_fixed_delay()->set_seconds(500);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -218,6 +219,16 @@ TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(MongoFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.mongo_proxy";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace MongoProxy

@@ -8,8 +8,9 @@
 
 #include "common/stats/symbol_table_impl.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
+
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 
 namespace Envoy {
 
@@ -19,8 +20,8 @@ class EdsReadyFilter : public Http::PassThroughFilter {
 public:
   EdsReadyFilter(const Stats::Scope& root_scope, Stats::SymbolTable& symbol_table)
       : root_scope_(root_scope), stat_name_("cluster.cluster_0.membership_healthy", symbol_table) {}
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
-    Stats::OptionalGauge gauge = root_scope_.findGauge(stat_name_.statName());
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    Stats::GaugeOptConstRef gauge = root_scope_.findGauge(stat_name_.statName());
     if (!gauge.has_value()) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
                                          "Couldn't find stat", nullptr, absl::nullopt, "");

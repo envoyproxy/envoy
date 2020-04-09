@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/typed_config.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
@@ -75,36 +76,29 @@ using RetryHostPredicateSharedPtr = std::shared_ptr<RetryHostPredicate>;
 /**
  * Factory for RetryPriority.
  */
-class RetryPriorityFactory {
+class RetryPriorityFactory : public Config::TypedFactory {
 public:
-  virtual ~RetryPriorityFactory() = default;
+  ~RetryPriorityFactory() override = default;
 
   virtual RetryPrioritySharedPtr
   createRetryPriority(const Protobuf::Message& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor,
                       uint32_t retry_count) PURE;
 
-  virtual std::string name() const PURE;
-
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+  std::string category() const override { return "envoy.retry_priorities"; }
 };
 
 /**
  * Factory for RetryHostPredicate.
  */
-class RetryHostPredicateFactory {
+class RetryHostPredicateFactory : public Config::TypedFactory {
 public:
-  virtual ~RetryHostPredicateFactory() = default;
+  ~RetryHostPredicateFactory() override = default;
 
   virtual RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message& config,
                                                           uint32_t retry_count) PURE;
 
-  /**
-   * @return name name of this factory.
-   */
-  virtual std::string name() PURE;
-
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+  std::string category() const override { return "envoy.retry_host_predicates"; }
 };
 
 } // namespace Upstream

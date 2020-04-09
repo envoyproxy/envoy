@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/primitive_stats_macros.h"
@@ -16,6 +16,8 @@
 
 namespace Envoy {
 namespace Upstream {
+
+using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Metadata>;
 
 /**
  * All per host stats. @see stats_macros.h
@@ -73,12 +75,12 @@ public:
   /**
    * @return the metadata associated with this host
    */
-  virtual const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const PURE;
+  virtual MetadataConstSharedPtr metadata() const PURE;
 
   /**
    * Set the current metadata.
    */
-  virtual void metadata(const envoy::api::v2::core::Metadata& new_metadata) PURE;
+  virtual void metadata(MetadataConstSharedPtr new_metadata) PURE;
 
   /**
    * @return the cluster the host is a member of.
@@ -94,6 +96,11 @@ public:
    * @return the host's health checker monitor.
    */
   virtual HealthCheckHostMonitor& healthChecker() const PURE;
+
+  /**
+   * @return The hostname used as the host header for health checking.
+   */
+  virtual const std::string& hostnameForHealthChecks() const PURE;
 
   /**
    * @return the hostname associated with the host if any.
@@ -120,7 +127,7 @@ public:
    * @return the locality of the host (deployment specific). This will be the default instance if
    *         unknown.
    */
-  virtual const envoy::api::v2::core::Locality& locality() const PURE;
+  virtual const envoy::config::core::v3::Locality& locality() const PURE;
 
   /**
    * @return the human readable name of the host's locality zone as a StatName.
@@ -174,7 +181,7 @@ public:
    * @param metadata the metadata of the given host.
    * @return the match information of the transport socket selected.
    */
-  virtual MatchData resolve(const envoy::api::v2::core::Metadata& metadata) const PURE;
+  virtual MatchData resolve(const envoy::config::core::v3::Metadata* metadata) const PURE;
 };
 
 using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;

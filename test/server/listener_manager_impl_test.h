@@ -1,4 +1,9 @@
-#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include <memory>
+
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
@@ -25,52 +30,69 @@ namespace Server {
 
 class ListenerHandle {
 public:
-  ListenerHandle() { EXPECT_CALL(*drain_manager_, startParentShutdownSequence()).Times(0); }
+  ListenerHandle(bool need_local_drain_manager = true) {
+    if (need_local_drain_manager) {
+      drain_manager_ = new MockDrainManager();
+      EXPECT_CALL(*drain_manager_, startParentShutdownSequence()).Times(0);
+    }
+  }
   ~ListenerHandle() { onDestroy(); }
 
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(void, onDestroy, ());
 
   Init::ExpectableTargetImpl target_;
-  MockDrainManager* drain_manager_ = new MockDrainManager();
+  MockDrainManager* drain_manager_{};
   Configuration::FactoryContext* context_{};
 };
 
 class ListenerManagerImplTest : public testing::Test {
 protected:
-  ListenerManagerImplTest() : api_(Api::createApiForTest()) {
+  ListenerManagerImplTest() : api_(Api::createApiForTest()) {}
+
+  void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
-    manager_ =
-        std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_, false);
+    manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
+                                                     enable_dispatcher_stats_);
 
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-               Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
-              return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
-                                                                                   context);
+            [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
+               Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                -> std::vector<Network::FilterFactoryCb> {
+              return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+                  filters, filter_chain_factory_context);
             }));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
-        .WillByDefault(Invoke(
-            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-               Configuration::ListenerFactoryContext& context)
-                -> std::vector<Network::ListenerFilterFactoryCb> {
+        .WillByDefault(
+            Invoke([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                          filters,
+                      Configuration::ListenerFactoryContext& context)
+                       -> std::vector<Network::ListenerFilterFactoryCb> {
               return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
                                                                                     context);
             }));
     ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
-        .WillByDefault(Invoke(
-            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-               Configuration::ListenerFactoryContext& context)
-                -> std::vector<Network::UdpListenerFilterFactoryCb> {
+        .WillByDefault(
+            Invoke([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                          filters,
+                      Configuration::ListenerFactoryContext& context)
+                       -> std::vector<Network::UdpListenerFilterFactoryCb> {
               return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters,
                                                                                        context);
             }));
+    ON_CALL(listener_factory_, nextListenerTag()).WillByDefault(Invoke([this]() {
+      return listener_tag_++;
+    }));
 
-    local_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
-    remote_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
+    local_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
+    remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
     EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
+    EXPECT_CALL(os_sys_calls_, getsockname)
+        .WillRepeatedly(Invoke([this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
+          return os_sys_calls_actual_.getsockname(sockfd, addr, addrlen);
+        }));
     socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
   }
 
@@ -81,9 +103,9 @@ protected:
    * 3) Stores the factory context for later use.
    * 4) Creates a mock local drain manager for the listener.
    */
-  ListenerHandle* expectListenerCreate(
-      bool need_init, bool added_via_api,
-      envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener_DrainType_DEFAULT) {
+  ListenerHandle* expectListenerCreate(bool need_init, bool added_via_api,
+                                       envoy::config::listener::v3::Listener::DrainType drain_type =
+                                           envoy::config::listener::v3::Listener::DEFAULT) {
     if (added_via_api) {
       EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
       EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
@@ -97,12 +119,13 @@ protected:
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillOnce(Invoke(
             [raw_listener, need_init](
-                const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
-                Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
+                const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
+                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                -> std::vector<Network::FilterFactoryCb> {
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
-              raw_listener->context_ = &context;
+              raw_listener->context_ = &filter_chain_factory_context;
               if (need_init) {
-                context.initManager().add(notifier->target_);
+                filter_chain_factory_context.initManager().add(notifier->target_);
               }
               return {[notifier](Network::FilterManager&) -> void {}};
             }));
@@ -116,7 +139,7 @@ protected:
                   const std::vector<std::string>& application_protocols,
                   const std::string& source_address, uint16_t source_port) {
     if (absl::StartsWith(destination_address, "/")) {
-      local_address_.reset(new Network::Address::PipeInstance(destination_address));
+      local_address_ = std::make_shared<Network::Address::PipeInstance>(destination_address);
     } else {
       local_address_ =
           Network::Utility::parseInternetAddress(destination_address, destination_port);
@@ -130,7 +153,7 @@ protected:
         .WillByDefault(ReturnRef(application_protocols));
 
     if (absl::StartsWith(source_address, "/")) {
-      remote_address_.reset(new Network::Address::PipeInstance(source_address));
+      remote_address_ = std::make_shared<Network::Address::PipeInstance>(source_address);
     } else {
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
@@ -143,14 +166,15 @@ protected:
    * Validate that createListenSocket is called once with the expected options.
    */
   void
-  expectCreateListenSocket(const envoy::api::v2::core::SocketOption::SocketState& expected_state,
-                           Network::Socket::Options::size_type expected_num_options) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-        .WillOnce(Invoke([this, expected_num_options,
-                          &expected_state](const Network::Address::InstanceConstSharedPtr&,
-                                           Network::Address::SocketType,
-                                           const Network::Socket::OptionsSharedPtr& options,
-                                           bool) -> Network::SocketSharedPtr {
+  expectCreateListenSocket(const envoy::config::core::v3::SocketOption::SocketState& expected_state,
+                           Network::Socket::Options::size_type expected_num_options,
+                           ListenSocketCreationParams expected_creation_params = {true, true}) {
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, expected_creation_params))
+        .WillOnce(Invoke([this, expected_num_options, &expected_state](
+                             const Network::Address::InstanceConstSharedPtr&,
+                             Network::Address::SocketType,
+                             const Network::Socket::OptionsSharedPtr& options,
+                             const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
           EXPECT_EQ(options->size(), expected_num_options);
           EXPECT_TRUE(
@@ -197,15 +221,16 @@ protected:
   void checkConfigDump(const std::string& expected_dump_yaml) {
     auto message_ptr = server_.admin_.config_tracker_.config_tracker_callbacks_["listeners"]();
     const auto& listeners_config_dump =
-        dynamic_cast<const envoy::admin::v2alpha::ListenersConfigDump&>(*message_ptr);
+        dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
 
-    envoy::admin::v2alpha::ListenersConfigDump expected_listeners_config_dump;
+    envoy::admin::v3::ListenersConfigDump expected_listeners_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
   }
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
+  Api::OsSysCallsImpl os_sys_calls_actual_;
   NiceMock<MockInstance> server_;
   NiceMock<MockListenerComponentFactory> listener_factory_;
   MockWorker* worker_ = new MockWorker();
@@ -217,6 +242,8 @@ protected:
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   std::unique_ptr<Network::MockConnectionSocket> socket_;
+  uint64_t listener_tag_{1};
+  bool enable_dispatcher_stats_{false};
 };
 
 } // namespace Server

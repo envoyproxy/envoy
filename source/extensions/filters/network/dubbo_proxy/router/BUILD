@@ -22,11 +22,12 @@ envoy_cc_library(
     hdrs = ["route.h"],
     deps = [
         ":router_interface",
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
-        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -44,7 +45,9 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
         "//source/extensions/filters/network/dubbo_proxy:serializer_interface",
-        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -58,7 +61,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/dubbo_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_config_interface",
         "//source/extensions/filters/network/dubbo_proxy/filters:well_known_names",
-        "@envoy_api//envoy/config/filter/dubbo/router/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/router/v3:pkg_cc_proto",
     ],
 )
 
@@ -80,6 +83,5 @@ envoy_cc_library(
         "//source/extensions/filters/network/dubbo_proxy:protocol_interface",
         "//source/extensions/filters/network/dubbo_proxy:serializer_interface",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_interface",
-        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg_cc_proto",
     ],
 )

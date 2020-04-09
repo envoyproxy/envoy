@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.h"
-#include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
+#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -17,18 +17,13 @@ namespace MongoProxy {
  * Config registration for the mongo proxy filter. @see NamedNetworkFilterConfigFactory.
  */
 class MongoProxyFilterConfigFactory
-    : public Common::FactoryBase<envoy::config::filter::network::mongo_proxy::v2::MongoProxy> {
+    : public Common::FactoryBase<envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy> {
 public:
   MongoProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().MongoProxy) {}
 
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactory(const Json::Object& proto_config,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::network::mongo_proxy::v2::MongoProxy& proto_config,
+      const envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 

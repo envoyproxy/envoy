@@ -35,8 +35,9 @@ public:
 
   // Verify if headers satisfies the JWT requirements. Can be limited to single provider with
   // extract_param.
-  virtual void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-                      SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) PURE;
+  virtual void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
+                      std::vector<JwtLocationConstPtr>&& tokens, SetPayloadCallback set_payload_cb,
+                      AuthenticatorCallback callback) PURE;
 
   // Called when the object is about to be destroyed.
   virtual void onDestroy() PURE;
@@ -44,7 +45,8 @@ public:
   // Authenticator factory function.
   static AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
                                  const absl::optional<std::string>& provider, bool allow_failed,
-                                 JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager,
+                                 bool allow_missing, JwksCache& jwks_cache,
+                                 Upstream::ClusterManager& cluster_manager,
                                  CreateJwksFetcherCb create_jwks_fetcher_cb,
                                  TimeSource& time_source);
 };
@@ -58,8 +60,8 @@ public:
 
   // Factory method for creating authenticator, and populate it with provider config.
   virtual AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
-                                  const absl::optional<std::string>& provider,
-                                  bool allow_failed) const PURE;
+                                  const absl::optional<std::string>& provider, bool allow_failed,
+                                  bool allow_missing) const PURE;
 };
 
 } // namespace JwtAuthn

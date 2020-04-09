@@ -2,19 +2,31 @@ syntax = "proto3";
 
 package test.fuzz;
 
-import "envoy/api/v2/core/base.proto";
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/address.proto";
 
 import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
 
 // Common fuzzing input types.
 
 message Headers {
-  repeated envoy.api.v2.core.HeaderValue headers = 1;
+  repeated envoy.config.core.v3.HeaderValue headers = 1;
+}
+
+message HttpData {
+  Headers headers = 1;
+  repeated string data = 2;
+  Headers trailers = 3;
 }
 
 message StreamInfo {
-  envoy.api.v2.core.Metadata dynamic_metadata = 1;
+  envoy.config.core.v3.Metadata dynamic_metadata = 1;
   uint64 start_time = 2;
   google.protobuf.UInt32Value response_code = 3;
-  envoy.api.v2.core.Metadata upstream_metadata = 4;
+  envoy.config.core.v3.Metadata upstream_metadata = 4;
+  string requested_server_name = 5;
+  envoy.config.core.v3.Address address = 6;
+  envoy.config.core.v3.Address upstream_local_address = 7;
 }

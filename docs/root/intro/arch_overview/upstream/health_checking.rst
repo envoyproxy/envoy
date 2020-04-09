@@ -26,6 +26,13 @@ unhealthy, successes required before marking a host healthy, etc.):
   maintenance by setting the specified key to any value and waiting for traffic to drain. See
   :ref:`redis_key <envoy_api_msg_config.health_checker.redis.v2.Redis>`.
 
+Health checks occur over the transport socket specified for the cluster. This implies that if a cluster is
+using a TLS-enabled transport socket, the health check will also occur over TLS. The
+:ref:`TLS options <envoy_api_msg_core.HealthCheck.TlsOptions>` used for health check connections
+can be specified, which is useful if the corresponding upstream is using ALPN-based
+:ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>` with different protocols for
+health checks versus data connections.
+
 .. _arch_overview_per_cluster_health_check_config:
 
 Per cluster member health check config
@@ -143,12 +150,12 @@ then come back with the same IP address, but as a different host type. One solut
 is having a different HTTP health checking URL for every service type. The downside of that approach
 is that overall configuration becomes more complicated as every health check URL is fully custom.
 
-The Envoy HTTP health checker supports the :ref:`service_name
-<envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name>` option. If this option is set, the health checker
-additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* response header to
-*service_name*. If the values do not match, the health check does not pass. The upstream health
-check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers. The appended
-value is determined by the :option:`--service-cluster` command line option.
+The Envoy HTTP health checker supports the :ref:`service_name_matcher
+<envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name_matcher>` option. If this option is set,
+the health checker additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* 
+response header to *service_name_matcher*. If the values do not match, the health check does not pass.
+The upstream health check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers.
+The appended value is determined by the :option:`--service-cluster` command line option.
 
 .. _arch_overview_health_checking_degraded:
 

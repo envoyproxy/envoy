@@ -17,6 +17,12 @@ and response flows. `LuaJIT <https://luajit.org/>`_ is used as the runtime. Beca
 supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT documentation
 <https://luajit.org/extensions.html>`_ for more details.
 
+.. note::
+
+  `moonjit <https://github.com/moonjit/moonjit/>`_ is a continuation of LuaJIT development, which
+  supports more 5.2 features and additional architectures. Envoy can be built with moonjit support
+  by using the following bazel option: ``--//source/extensions/filters/common/lua:moonjit=1``.
+
 The filter only supports loading Lua code in-line in the configuration. If local filesystem code
 is desired, a trivial in-line script can be used to load the rest of the code from the local
 environment.
@@ -55,7 +61,7 @@ Configuration
 -------------
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.lua.v2.Lua>`
-* This filter should be configured with the name *envoy.lua*.
+* This filter should be configured with the name *envoy.filters.http.lua*.
 
 Script examples
 ---------------
@@ -233,13 +239,16 @@ httpCall()
 
 .. code-block:: lua
 
-  headers, body = handle:httpCall(cluster, headers, body, timeout)
+  headers, body = handle:httpCall(cluster, headers, body, timeout, asynchronous)
 
-Makes an HTTP call to an upstream host. Envoy will yield the script until the call completes or
-has an error. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
+Makes an HTTP call to an upstream host. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
 is a table of key/value pairs to send (the value can be a string or table of strings). Note that
 the *:method*, *:path*, and *:authority* headers must be set. *body* is an optional string of body
 data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
+
+*asynchronous* is a boolean flag. If asynchronous is set to true, Envoy will make the HTTP request and continue,
+regardless of response success or failure. If this is set to false, or not set, Envoy will yield the script
+until the call completes or has an error.
 
 Returns *headers* which is a table of response headers. Returns *body* which is the string response
 body. May be nil if there is no body.
@@ -277,14 +286,14 @@ metadata()
   metadata = handle:metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
-under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
+under the filter name i.e. *envoy.filters.http.lua*. Below is an example of a *metadata* in a
 :ref:`route entry <envoy_api_msg_route.Route>`.
 
 .. code-block:: yaml
 
   metadata:
     filter_metadata:
-      envoy.lua:
+      envoy.filters.http.lua:
         foo: bar
         baz:
           - bad
@@ -512,7 +521,7 @@ its keys can only be *string* or *numeric*.
 
   function envoy_on_request(request_handle)
     local headers = request_handle:headers()
-    request_handle:streamInfo():dynamicMetadata():set("envoy.lua", "request.info", {
+    request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.lua", "request.info", {
       auth: headers:get("authorization),
       token: headers:get("x-request-token"),
     })

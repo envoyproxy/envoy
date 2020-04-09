@@ -1,6 +1,6 @@
-load("@envoy_api//bazel:api_build_system.bzl", "api_cc_test", "api_go_test")
-
 licenses(["notice"])  # Apache 2
+
+load("@envoy_api//bazel:api_build_system.bzl", "api_cc_test", "api_go_test")
 
 api_cc_test(
     name = "build_test",
@@ -11,7 +11,7 @@ api_cc_test(
         "//envoy/service/discovery/v2:pkg_cc_proto",
         "//envoy/service/metrics/v2:pkg_cc_proto",
         "//envoy/service/ratelimit/v2:pkg_cc_proto",
-        "@com_github_cncf_udpa//udpa/service/orca/v1:orca_export_cc",
+        "@com_github_cncf_udpa//udpa/service/orca/v1:pkg_cc_proto",
     ],
 )
 

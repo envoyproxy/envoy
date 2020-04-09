@@ -13,14 +13,16 @@
 #include <vector>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/http/codec.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
@@ -57,7 +59,7 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/clusters/well_known_names.h"
-#include "extensions/common/redis/redirection_mgr_impl.h"
+#include "extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec.h"
@@ -91,12 +93,12 @@ namespace Redis {
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
-  RedisCluster(const envoy::api::v2::Cluster& cluster,
+  RedisCluster(const envoy::config::cluster::v3::Cluster& cluster,
                const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
                Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
-               Server::Configuration::TransportSocketFactoryContext& factory_context,
+               Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                Stats::ScopePtr&& stats_scope, bool added_via_api,
                ClusterSlotUpdateCallBackSharedPtr factory);
 
@@ -128,12 +130,12 @@ private:
 
   void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
 
-  const envoy::api::v2::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
+  const envoy::config::endpoint::v3::LocalityLbEndpoints& localityLbEndpoint() const {
     // Always use the first endpoint.
     return load_assignment_.endpoints()[0];
   }
 
-  const envoy::api::v2::endpoint::LbEndpoint& lbEndpoint() const {
+  const envoy::config::endpoint::v3::LbEndpoint& lbEndpoint() const {
     // Always use the first endpoint.
     return localityLbEndpoint().lb_endpoints()[0];
   }
@@ -143,12 +145,14 @@ private:
   public:
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
               Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool master)
-        : Upstream::HostImpl(cluster, hostname, address, parent.lbEndpoint().metadata(),
-                             parent.lbEndpoint().load_balancing_weight().value(),
-                             parent.localityLbEndpoint().locality(),
-                             parent.lbEndpoint().endpoint().health_check_config(),
-                             parent.localityLbEndpoint().priority(),
-                             parent.lbEndpoint().health_status()),
+        : Upstream::HostImpl(
+              cluster, hostname, address,
+              // TODO(zyfjeff): Created through metadata shared pool
+              std::make_shared<envoy::config::core::v3::Metadata>(parent.lbEndpoint().metadata()),
+              parent.lbEndpoint().load_balancing_weight().value(),
+              parent.localityLbEndpoint().locality(),
+              parent.lbEndpoint().endpoint().health_check_config(),
+              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
           master_(master) {}
 
     bool isMaster() const { return master_; }
@@ -194,7 +198,7 @@ private:
 
   struct RedisDiscoverySession
       : public Extensions::NetworkFilters::Common::Redis::Client::Config,
-        public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks {
+        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks {
     RedisDiscoverySession(RedisCluster& parent,
                           NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
@@ -225,11 +229,14 @@ private:
       return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
     }
 
-    // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
+    // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
     // Note: Below callback isn't used in topology updates
-    bool onRedirection(const NetworkFilters::Common::Redis::RespValue&) override { return true; }
+    bool onRedirection(NetworkFilters::Common::Redis::RespValuePtr&&, const std::string&,
+                       bool) override {
+      return true;
+    }
     void onUnexpectedResponse(const NetworkFilters::Common::Redis::RespValuePtr&);
 
     Network::Address::InstanceConstSharedPtr
@@ -254,11 +261,13 @@ private:
   const std::chrono::milliseconds cluster_refresh_timeout_;
   const std::chrono::milliseconds redirect_refresh_interval_;
   const uint32_t redirect_refresh_threshold_;
+  const uint32_t failure_refresh_threshold_;
+  const uint32_t host_degraded_refresh_threshold_;
   std::list<DnsDiscoveryResolveTargetPtr> dns_discovery_resolve_targets_;
   Event::Dispatcher& dispatcher_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Network::DnsLookupFamily dns_lookup_family_;
-  const envoy::api::v2::ClusterLoadAssignment load_assignment_;
+  const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
   Runtime::RandomGenerator& random_;
   RedisDiscoverySession redis_discovery_session_;
@@ -268,8 +277,9 @@ private:
   Upstream::HostMap all_hosts_;
 
   const std::string auth_password_;
-  const Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
-  const Common::Redis::RedirectionManager::HandlePtr registration_handle_;
+  const std::string cluster_name_;
+  const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
+  const Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
@@ -283,10 +293,10 @@ private:
 
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
-      const envoy::api::v2::Cluster& cluster,
+      const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override;
 };
 } // namespace Redis

@@ -28,10 +28,12 @@ in the configuration snippet below:
   filter_chains:
   - filters:
     - name: envoy.filters.network.zookeeper_proxy
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.zookeeper_proxy.v1alpha1.ZooKeeperProxy
         stat_prefix: zookeeper
-    - name: envoy.tcp_proxy
-      config:
+    - name: envoy.filters.network.tcp_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
         stat_prefix: tcp
         cluster: ...
 

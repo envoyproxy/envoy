@@ -17,27 +17,30 @@ public:
 
   // Scope
   ScopePtr createScope(const std::string& name) override;
-  Counter& counterFromStatName(StatName name) override;
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override;
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                           Histogram::Unit unit) override;
   void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
 
-  Counter& counter(const std::string& name) override {
+  Counter& counterFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return counterFromStatName(storage.statName());
+    return Scope::counterFromStatName(storage.statName());
   }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return gaugeFromStatName(storage.statName(), import_mode);
+    return Scope::gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return histogramFromStatName(storage.statName(), unit);
+    return Scope::histogramFromStatName(storage.statName(), unit);
   }
 
-  OptionalCounter findCounter(StatName name) const override;
-  OptionalGauge findGauge(StatName name) const override;
-  OptionalHistogram findHistogram(StatName name) const override;
+  CounterOptConstRef findCounter(StatName name) const override;
+  GaugeOptConstRef findGauge(StatName name) const override;
+  HistogramOptConstRef findHistogram(StatName name) const override;
 
   const SymbolTable& constSymbolTable() const override { return scope_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return scope_.symbolTable(); }

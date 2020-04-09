@@ -3,7 +3,7 @@
 #include <chrono>
 #include <memory>
 
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/message.h"
 #include "envoy/tracing/http_tracer.h"
@@ -21,6 +21,19 @@ namespace Http {
 class AsyncClient {
 public:
   /**
+   * An in-flight HTTP request.
+   */
+  class Request {
+  public:
+    virtual ~Request() = default;
+
+    /**
+     * Signals that the request should be cancelled.
+     */
+    virtual void cancel() PURE;
+  };
+
+  /**
    * Async Client failure reasons.
    */
   enum class FailureReason {
@@ -30,6 +43,9 @@ public:
 
   /**
    * Notifies caller of async HTTP request status.
+   *
+   * To support a use case where a caller makes multiple requests in parallel,
+   * individual callback methods provide request context corresponding to that response.
    */
   class Callbacks {
   public:
@@ -37,14 +53,23 @@ public:
 
     /**
      * Called when the async HTTP request succeeds.
+     * @param request  request handle.
+     *                 NOTE: request handle is passed for correlation purposes only, e.g.
+     *                 for client code to be able to exclude that handle from a list of
+     *                 requests in progress.
      * @param response the HTTP response
      */
-    virtual void onSuccess(MessagePtr&& response) PURE;
+    virtual void onSuccess(const Request& request, ResponseMessagePtr&& response) PURE;
 
     /**
      * Called when the async HTTP request fails.
+     * @param request request handle.
+     *                NOTE: request handle is passed for correlation purposes only, e.g.
+     *                for client code to be able to exclude that handle from a list of
+     *                requests in progress.
+     * @param reason  failure reason
      */
-    virtual void onFailure(FailureReason reason) PURE;
+    virtual void onFailure(const Request& request, FailureReason reason) PURE;
   };
 
   /**
@@ -63,7 +88,7 @@ public:
      * @param headers the headers received
      * @param end_stream whether the response is header only
      */
-    virtual void onHeaders(HeaderMapPtr&& headers, bool end_stream) PURE;
+    virtual void onHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) PURE;
 
     /**
      * Called when a data frame get received on the async HTTP stream.
@@ -77,7 +102,7 @@ public:
      * Called when all trailers get received on the async HTTP stream.
      * @param trailers the trailers received.
      */
-    virtual void onTrailers(HeaderMapPtr&& trailers) PURE;
+    virtual void onTrailers(ResponseTrailerMapPtr&& trailers) PURE;
 
     /**
      * Called when both the local and remote have gracefully closed the stream.
@@ -93,19 +118,6 @@ public:
   };
 
   /**
-   * An in-flight HTTP request.
-   */
-  class Request {
-  public:
-    virtual ~Request() = default;
-
-    /**
-     * Signals that the request should be cancelled.
-     */
-    virtual void cancel() PURE;
-  };
-
-  /**
    * An in-flight HTTP stream.
    */
   class Stream {
@@ -118,7 +130,7 @@ public:
      * @param headers supplies the headers to send.
      * @param end_stream supplies whether this is a header only request.
      */
-    virtual void sendHeaders(HeaderMap& headers, bool end_stream) PURE;
+    virtual void sendHeaders(RequestHeaderMap& headers, bool end_stream) PURE;
 
     /***
      * Send data to the stream. This method can be invoked multiple times if it get streamed.
@@ -132,7 +144,7 @@ public:
      * Send trailers. This method cannot be invoked more than once, and implicitly ends the stream.
      * @param trailers supplies the trailers to send.
      */
-    virtual void sendTrailers(HeaderMap& trailers) PURE;
+    virtual void sendTrailers(RequestTrailerMap& trailers) PURE;
 
     /***
      * Reset the stream.
@@ -163,7 +175,7 @@ public:
       return *this;
     }
     StreamOptions& setHashPolicy(
-        const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>& v) {
+        const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>& v) {
       hash_policy = v;
       return *this;
     }
@@ -188,7 +200,7 @@ public:
     bool send_xff{true};
 
     // Provides the hash policy for hashing load balancing strategies.
-    Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy> hash_policy;
+    Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy> hash_policy;
   };
 
   /**
@@ -212,7 +224,7 @@ public:
       return *this;
     }
     RequestOptions& setHashPolicy(
-        const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>& v) {
+        const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>& v) {
       StreamOptions::setHashPolicy(v);
       return *this;
     }
@@ -220,15 +232,30 @@ public:
       parent_span_ = &parent_span;
       return *this;
     }
+    RequestOptions& setChildSpanName(const std::string& child_span_name) {
+      child_span_name_ = child_span_name;
+      return *this;
+    }
+    RequestOptions& setSampled(bool sampled) {
+      sampled_ = sampled;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const RequestOptions& src) const {
-      return StreamOptions::operator==(src) && parent_span_ == src.parent_span_;
+      return StreamOptions::operator==(src) && parent_span_ == src.parent_span_ &&
+             child_span_name_ == src.child_span_name_ && sampled_ == src.sampled_;
     }
 
     // The parent span that child spans are created under to trace egress requests/responses.
     // If not set, requests will not be traced.
     Tracing::Span* parent_span_{nullptr};
+    // The name to give to the child span that represents the async http request.
+    // If left empty and parent_span_ is set, then the default name will have the cluster name.
+    // Only used if parent_span_ is set.
+    std::string child_span_name_{""};
+    // Sampling decision for the tracing span. The span is sampled by default.
+    bool sampled_{true};
   };
 
   /**
@@ -241,7 +268,7 @@ public:
    *         handle should just be used to cancel.
    */
 
-  virtual Request* send(MessagePtr&& request, Callbacks& callbacks,
+  virtual Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
                         const RequestOptions& options) PURE;
 
   /**

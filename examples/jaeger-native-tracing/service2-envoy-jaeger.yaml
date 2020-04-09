@@ -4,13 +4,12 @@ static_resources:
       socket_address:
         address: 0.0.0.0
         port_value: 80
+    traffic_direction: INBOUND
     filter_chains:
     - filters:
-      - name: envoy.http_connection_manager
+      - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
-          tracing:
-            operation_name: ingress
           codec_type: auto
           stat_prefix: ingress_http
           route_config:
@@ -27,7 +26,7 @@ static_resources:
                 decorator:
                   operation: checkStock
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
   clusters:
   - name: local_service
@@ -45,7 +44,7 @@ static_resources:
                 port_value: 8080
 tracing:
   http:
-    name: envoy.dynamic.ot
+    name: envoy.tracers.dynamic_ot
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.DynamicOtConfig
       library: /usr/local/lib/libjaegertracing_plugin.so

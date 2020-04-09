@@ -4,7 +4,7 @@
 #include <list>
 #include <string>
 
-#include "extensions/common/redis/redirection_mgr.h"
+#include "extensions/common/redis/cluster_refresh_manager.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
@@ -22,10 +22,11 @@ namespace RedisProxy {
 
 class MockRouter : public Router {
 public:
-  MockRouter();
+  MockRouter(RouteSharedPtr route);
   ~MockRouter() override;
 
-  MOCK_METHOD1(upstreamPool, RouteSharedPtr(std::string& key));
+  MOCK_METHOD(RouteSharedPtr, upstreamPool, (std::string & key));
+  RouteSharedPtr route_;
 };
 
 class MockRoute : public Route {
@@ -33,30 +34,52 @@ public:
   MockRoute(ConnPool::InstanceSharedPtr);
   ~MockRoute() override;
 
-  MOCK_CONST_METHOD0(upstream, ConnPool::InstanceSharedPtr());
-  MOCK_CONST_METHOD0(mirrorPolicies, const MirrorPolicies&());
+  MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (), (const));
+  MOCK_METHOD(const MirrorPolicies&, mirrorPolicies, (), (const));
   ConnPool::InstanceSharedPtr conn_pool_;
-  const MirrorPolicies policies_;
+  MirrorPolicies policies_;
+};
+
+class MockMirrorPolicy : public MirrorPolicy {
+public:
+  MockMirrorPolicy(ConnPool::InstanceSharedPtr);
+  ~MockMirrorPolicy() override = default;
+
+  MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (), (const));
+  MOCK_METHOD(bool, shouldMirror, (const std::string&), (const));
+
+  ConnPool::InstanceSharedPtr conn_pool_;
 };
 
 namespace ConnPool {
+
+class MockPoolCallbacks : public PoolCallbacks {
+public:
+  MockPoolCallbacks();
+  ~MockPoolCallbacks() override;
+
+  void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
+  void onFailure() override { onFailure_(); }
+
+  MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
+  MOCK_METHOD(void, onFailure_, ());
+};
 
 class MockInstance : public Instance {
 public:
   MockInstance();
   ~MockInstance() override;
 
-  MOCK_METHOD3(makeRequest,
-               Common::Redis::Client::PoolRequest*(
-                   const std::string& hash_key, const Common::Redis::RespValue& request,
-                   Common::Redis::Client::PoolCallbacks& callbacks));
-  MOCK_METHOD3(makeRequestToHost,
-               Common::Redis::Client::PoolRequest*(
-                   const std::string& host_address, const Common::Redis::RespValue& request,
-                   Common::Redis::Client::PoolCallbacks& callbacks));
-  MOCK_METHOD0(onRedirection, bool());
-};
+  Common::Redis::Client::PoolRequest* makeRequest(const std::string& hash_key,
+                                                  RespVariant&& request,
+                                                  PoolCallbacks& callbacks) override {
+    return makeRequest_(hash_key, request, callbacks);
+  }
 
+  MOCK_METHOD(Common::Redis::Client::PoolRequest*, makeRequest_,
+              (const std::string& hash_key, RespVariant& request, PoolCallbacks& callbacks));
+  MOCK_METHOD(bool, onRedirection, ());
+};
 } // namespace ConnPool
 
 namespace CommandSplitter {
@@ -66,7 +89,7 @@ public:
   MockSplitRequest();
   ~MockSplitRequest() override;
 
-  MOCK_METHOD0(cancel, void());
+  MOCK_METHOD(void, cancel, ());
 };
 
 class MockSplitCallbacks : public SplitCallbacks {
@@ -76,9 +99,9 @@ public:
 
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
 
-  MOCK_METHOD0(connectionAllowed, bool());
-  MOCK_METHOD1(onAuth, void(const std::string& password));
-  MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
+  MOCK_METHOD(bool, connectionAllowed, ());
+  MOCK_METHOD(void, onAuth, (const std::string& password));
+  MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
 };
 
 class MockInstance : public Instance {
@@ -91,8 +114,8 @@ public:
     return SplitRequestPtr{makeRequest_(*request, callbacks)};
   }
 
-  MOCK_METHOD2(makeRequest_,
-               SplitRequest*(const Common::Redis::RespValue& request, SplitCallbacks& callbacks));
+  MOCK_METHOD(SplitRequest*, makeRequest_,
+              (const Common::Redis::RespValue& request, SplitCallbacks& callbacks));
 };
 
 } // namespace CommandSplitter

@@ -28,6 +28,7 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
     ],
 )
 
@@ -39,6 +40,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
+        "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -49,5 +52,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/buffer:config",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
     ],
 )

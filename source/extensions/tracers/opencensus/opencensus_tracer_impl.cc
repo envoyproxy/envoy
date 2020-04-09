@@ -2,9 +2,11 @@
 
 #include <grpcpp/grpcpp.h>
 
+#include "envoy/config/trace/v3/trace.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/base64.h"
+#include "common/grpc/google_grpc_utils.h"
 
 #include "absl/strings/str_cat.h"
 #include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
@@ -27,6 +29,8 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
+constexpr char GoogleStackdriverTraceAddress[] = "cloudtrace.googleapis.com";
+
 namespace {
 
 class ConstantValues {
@@ -47,33 +51,33 @@ using Constants = ConstSingleton<ConstantValues>;
  */
 class Span : public Tracing::Span {
 public:
-  Span(const Tracing::Config& config, const envoy::config::trace::v2::OpenCensusConfig& oc_config,
-       Http::HeaderMap& request_headers, const std::string& operation_name, SystemTime start_time,
-       const Tracing::Decision tracing_decision);
+  Span(const Tracing::Config& config, const envoy::config::trace::v3::OpenCensusConfig& oc_config,
+       Http::RequestHeaderMap& request_headers, const std::string& operation_name,
+       SystemTime start_time, const Tracing::Decision tracing_decision);
 
   // Used by spawnChild().
-  Span(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
+  Span(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
        ::opencensus::trace::Span&& span);
 
   void setOperation(absl::string_view operation) override;
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
-  void injectContext(Http::HeaderMap& request_headers) override;
+  void injectContext(Http::RequestHeaderMap& request_headers) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
 
 private:
   ::opencensus::trace::Span span_;
-  const envoy::config::trace::v2::OpenCensusConfig& oc_config_;
+  const envoy::config::trace::v3::OpenCensusConfig& oc_config_;
 };
 
 ::opencensus::trace::Span
-startSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& request_headers,
-                const envoy::config::trace::v2::OpenCensusConfig& oc_config) {
+startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderMap& request_headers,
+                const envoy::config::trace::v3::OpenCensusConfig& oc_config) {
   // Determine if there is a parent context.
-  using OpenCensusConfig = envoy::config::trace::v2::OpenCensusConfig;
+  using OpenCensusConfig = envoy::config::trace::v3::OpenCensusConfig;
   ::opencensus::trace::SpanContext parent_ctx;
   for (const auto& incoming : oc_config.incoming_trace_context()) {
     bool found = false;
@@ -159,8 +163,8 @@ startSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& req
 }
 
 Span::Span(const Tracing::Config& config,
-           const envoy::config::trace::v2::OpenCensusConfig& oc_config,
-           Http::HeaderMap& request_headers, const std::string& operation_name,
+           const envoy::config::trace::v3::OpenCensusConfig& oc_config,
+           Http::RequestHeaderMap& request_headers, const std::string& operation_name,
            SystemTime /*start_time*/, const Tracing::Decision tracing_decision)
     : span_(startSpanHelper(operation_name, tracing_decision.traced, request_headers, oc_config)),
       oc_config_(oc_config) {
@@ -169,7 +173,7 @@ Span::Span(const Tracing::Config& config,
                                           : "Egress");
 }
 
-Span::Span(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
+Span::Span(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
            ::opencensus::trace::Span&& span)
     : span_(std::move(span)), oc_config_(oc_config) {}
 
@@ -186,8 +190,8 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
 
 void Span::finishSpan() { span_.End(); }
 
-void Span::injectContext(Http::HeaderMap& request_headers) {
-  using OpenCensusConfig = envoy::config::trace::v2::OpenCensusConfig;
+void Span::injectContext(Http::RequestHeaderMap& request_headers) {
+  using OpenCensusConfig = envoy::config::trace::v3::OpenCensusConfig;
   const auto& ctx = span_.context();
   for (const auto& outgoing : oc_config_.outgoing_trace_context()) {
     switch (outgoing) {
@@ -234,9 +238,20 @@ void Span::setSampled(bool sampled) { span_.AddAnnotation("setSampled", {{"sampl
 
 } // namespace
 
-Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
-               const LocalInfo::LocalInfo& localinfo)
+Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
+               const LocalInfo::LocalInfo& localinfo, Api::Api& api)
     : oc_config_(oc_config), local_info_(localinfo) {
+  // To give user a chance to correct initially invalid configuration and try to apply it once again
+  // without a need to restart Envoy, validation checks must be done prior to any side effects.
+  if (oc_config.stackdriver_exporter_enabled() && oc_config.has_stackdriver_grpc_service() &&
+      !oc_config.stackdriver_grpc_service().has_google_grpc()) {
+    throw EnvoyException("Opencensus stackdriver tracer only support GoogleGrpc.");
+  }
+  if (oc_config.ocagent_exporter_enabled() && oc_config.has_ocagent_grpc_service() &&
+      !oc_config.ocagent_grpc_service().has_google_grpc()) {
+    throw EnvoyException("Opencensus ocagent tracer only supports GoogleGrpc.");
+  }
+  // Process-wide side effects.
   if (oc_config.has_trace_config()) {
     applyTraceConfig(oc_config.trace_config());
   }
@@ -250,6 +265,17 @@ Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
       auto channel =
           grpc::CreateChannel(oc_config.stackdriver_address(), grpc::InsecureChannelCredentials());
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
+    } else if (oc_config.has_stackdriver_grpc_service() &&
+               oc_config.stackdriver_grpc_service().has_google_grpc()) {
+      envoy::config::core::v3::GrpcService stackdriver_service =
+          oc_config.stackdriver_grpc_service();
+      if (stackdriver_service.google_grpc().target_uri().empty()) {
+        // If stackdriver server address is not provided, the default production stackdriver
+        // address will be used.
+        stackdriver_service.mutable_google_grpc()->set_target_uri(GoogleStackdriverTraceAddress);
+      }
+      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(stackdriver_service, api);
+      opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
     }
     ::opencensus::exporters::trace::StackdriverExporter::Register(std::move(opts));
   }
@@ -260,7 +286,16 @@ Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
   }
   if (oc_config.ocagent_exporter_enabled()) {
     ::opencensus::exporters::trace::OcAgentOptions opts;
-    opts.address = oc_config.ocagent_address();
+    if (!oc_config.ocagent_address().empty()) {
+      opts.address = oc_config.ocagent_address();
+    } else if (oc_config.has_ocagent_grpc_service() &&
+               oc_config.ocagent_grpc_service().has_google_grpc()) {
+      const envoy::config::core::v3::GrpcService& ocagent_service =
+          oc_config.ocagent_grpc_service();
+      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(ocagent_service, api);
+      opts.trace_service_stub =
+          ::opencensus::proto::agent::trace::v1::TraceService::NewStub(channel);
+    }
     opts.service_name = local_info_.clusterName();
     ::opencensus::exporters::trace::OcAgentExporter::Register(std::move(opts));
   }
@@ -304,7 +339,8 @@ void Driver::applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& c
       ::opencensus::trace::ProbabilitySampler(probability)});
 }
 
-Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
+Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
+                                   Http::RequestHeaderMap& request_headers,
                                    const std::string& operation_name, SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
   return std::make_unique<Span>(config, oc_config_, request_headers, operation_name, start_time,

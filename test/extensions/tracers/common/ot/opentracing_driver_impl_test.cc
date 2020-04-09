@@ -22,14 +22,14 @@ class TestDriver : public OpenTracingDriver {
 public:
   TestDriver(OpenTracingDriver::PropagationMode propagation_mode,
              const opentracing::mocktracer::PropagationOptions& propagation_options,
-             Stats::Store& stats)
-      : OpenTracingDriver{stats}, propagation_mode_{propagation_mode} {
+             Stats::Scope& scope)
+      : OpenTracingDriver{scope}, propagation_mode_{propagation_mode} {
     opentracing::mocktracer::MockTracerOptions options;
     auto recorder = new opentracing::mocktracer::InMemoryRecorder{};
     recorder_ = recorder;
     options.recorder.reset(recorder);
     options.propagation_options = propagation_options;
-    tracer_.reset(new opentracing::mocktracer::MockTracer{std::move(options)});
+    tracer_ = std::make_shared<opentracing::mocktracer::MockTracer>(std::move(options));
   }
 
   const opentracing::mocktracer::InMemoryRecorder& recorder() const { return *recorder_; }
@@ -55,13 +55,13 @@ public:
   }
 
   const std::string operation_name_{"test"};
-  Http::TestHeaderMapImpl request_headers_{
+  Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
-  const Http::TestHeaderMapImpl response_headers_{{":status", "500"}};
+  const Http::TestResponseHeaderMapImpl response_headers_{{":status", "500"}};
   SystemTime start_time_;
 
   std::unique_ptr<TestDriver> driver_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
 
   NiceMock<Tracing::MockConfig> config_;
 };

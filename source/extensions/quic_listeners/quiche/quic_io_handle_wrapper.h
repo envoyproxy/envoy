@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "envoy/network/io_handle.h"
 
 #include "common/network/io_socket_error_impl.h"
@@ -12,7 +14,7 @@ public:
   QuicIoHandleWrapper(Network::IoHandle& io_handle) : io_handle_(io_handle) {}
 
   // Network::IoHandle
-  int fd() const override { return io_handle_.fd(); }
+  os_fd_t fd() const override { return io_handle_.fd(); }
   Api::IoCallUint64Result close() override {
     closed_ = true;
     return Api::ioCallUint64ResultNoError();
@@ -33,14 +35,6 @@ public:
     }
     return io_handle_.writev(slices, num_slice);
   }
-  Api::IoCallUint64Result sendto(const Buffer::RawSlice& slice, int flags,
-                                 const Network::Address::Instance& address) override {
-    if (closed_) {
-      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError));
-    }
-    return io_handle_.sendto(slice, flags, address);
-  }
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Envoy::Network::Address::Ip* self_ip,
                                   const Network::Address::Instance& peer_address) override {
@@ -53,11 +47,22 @@ public:
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
                                   uint32_t self_port, RecvMsgOutput& output) override {
     if (closed_) {
+      ASSERT(false, "recvmmsg is called after close.");
       return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
                                                         Network::IoSocketError::deleteIoError));
     }
     return io_handle_.recvmsg(slices, num_slice, self_port, output);
   }
+  Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   RecvMsgOutput& output) override {
+    if (closed_) {
+      ASSERT(false, "recvmmsg is called after close.");
+      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
+                                                        Network::IoSocketError::deleteIoError));
+    }
+    return io_handle_.recvmmsg(slices, self_port, output);
+  }
+  bool supportsMmsg() const override { return io_handle_.supportsMmsg(); }
 
 private:
   Network::IoHandle& io_handle_;

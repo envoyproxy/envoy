@@ -1,3 +1,4 @@
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/api/api_impl.h"
@@ -24,9 +25,9 @@ namespace {
 
 class MockGenericStub : public GoogleStub {
 public:
-  MOCK_METHOD3(PrepareCall_, grpc::GenericClientAsyncReaderWriter*(grpc::ClientContext* context,
-                                                                   const grpc::string& method,
-                                                                   grpc::CompletionQueue* cq));
+  MOCK_METHOD(grpc::GenericClientAsyncReaderWriter*, PrepareCall_,
+              (grpc::ClientContext * context, const grpc::string& method,
+               grpc::CompletionQueue* cq));
 
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter>
   PrepareCall(grpc::ClientContext* context, const grpc::string& method,
@@ -50,14 +51,16 @@ public:
   EnvoyGoogleAsyncClientImplTest()
       : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),
         dispatcher_(api_->allocateDispatcher()), scope_(stats_store_),
-        method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
-    envoy::api::v2::core::GrpcService config;
+        method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
+        stat_names_(scope_->symbolTable()) {
+
+    envoy::config::core::v3::GrpcService config;
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");
     tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *tls_, stub_factory_,
-                                                           scope_, config, *api_);
+                                                           scope_, config, *api_, stat_names_);
   }
 
   DangerousDeprecatedTestTime test_time_;
@@ -68,6 +71,7 @@ public:
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;
   const Protobuf::MethodDescriptor* method_descriptor_;
+  StatNames stat_names_;
   AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
 };
 
@@ -78,7 +82,7 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, StreamHttpStartFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
   EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
-  EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Unavailable, ""));
+  EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
   EXPECT_TRUE(grpc_stream == nullptr);
@@ -90,7 +94,7 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
   EXPECT_CALL(*stub_factory_.stub_, PrepareCall_(_, _, _)).WillOnce(Return(nullptr));
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
   EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
-  EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Unavailable, "", _));
+  EXPECT_CALL(grpc_callbacks, onFailure(Status::WellKnownGrpcStatus::Unavailable, "", _));
   helloworld::HelloRequest request_msg;
 
   Tracing::MockSpan active_span;

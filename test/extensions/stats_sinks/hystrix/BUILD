@@ -23,6 +23,7 @@ envoy_extension_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 
@@ -36,5 +37,15 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "hystrix_integration_test",
+    srcs = ["hystrix_integration_test.cc"],
+    extension_name = "envoy.stat_sinks.hystrix",
+    deps = [
+        "//source/extensions/stat_sinks/hystrix:config",
+        "//test/integration:http_protocol_integration_lib",
     ],
 )

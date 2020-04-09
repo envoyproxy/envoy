@@ -19,7 +19,7 @@ class TestThreadLocalObject : public ThreadLocalObject {
 public:
   ~TestThreadLocalObject() override { onDestroy(); }
 
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(void, onDestroy, ());
 };
 
 class ThreadLocalInstanceImplTest : public testing::Test {
@@ -31,7 +31,7 @@ public:
     tls_.registerThread(thread_dispatcher_, false);
   }
 
-  MOCK_METHOD1(createThreadLocal, ThreadLocalObjectSharedPtr(Event::Dispatcher& dispatcher));
+  MOCK_METHOD(ThreadLocalObjectSharedPtr, createThreadLocal, (Event::Dispatcher & dispatcher));
 
   TestThreadLocalObject& setObject(Slot& slot) {
     std::shared_ptr<TestThreadLocalObject> object(new TestThreadLocalObject());

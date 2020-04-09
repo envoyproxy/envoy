@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/data/tap/v3/common.pb.h"
+#include "envoy/data/tap/v3/http.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/logger.h"
@@ -16,7 +19,7 @@ class HttpTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
                           public HttpTapConfig,
                           public std::enable_shared_from_this<HttpTapConfigImpl> {
 public:
-  HttpTapConfigImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+  HttpTapConfigImpl(envoy::config::tap::v3::TapConfig&& proto_config,
                     Extensions::Common::Tap::Sink* admin_streamer);
 
   // TapFilter::HttpTapConfig
@@ -33,19 +36,19 @@ public:
   }
 
   // TapFilter::HttpPerRequestTapper
-  void onRequestHeaders(const Http::HeaderMap& headers) override;
+  void onRequestHeaders(const Http::RequestHeaderMap& headers) override;
   void onRequestBody(const Buffer::Instance& data) override;
-  void onRequestTrailers(const Http::HeaderMap& headers) override;
-  void onResponseHeaders(const Http::HeaderMap& headers) override;
+  void onRequestTrailers(const Http::RequestTrailerMap& headers) override;
+  void onResponseHeaders(const Http::ResponseHeaderMap& headers) override;
   void onResponseBody(const Buffer::Instance& data) override;
-  void onResponseTrailers(const Http::HeaderMap& headers) override;
+  void onResponseTrailers(const Http::ResponseTrailerMap& headers) override;
   bool onDestroyLog() override;
 
 private:
-  using MutableBodyChunk =
-      envoy::data::tap::v2alpha::Body* (envoy::data::tap::v2alpha::HttpStreamedTraceSegment::*)();
-  using MutableMessage = envoy::data::tap::v2alpha::HttpBufferedTrace::Message* (
-      envoy::data::tap::v2alpha::HttpBufferedTrace::*)();
+  using HttpStreamedTraceSegment = envoy::data::tap::v3::HttpStreamedTraceSegment;
+  using MutableBodyChunk = envoy::data::tap::v3::Body* (HttpStreamedTraceSegment::*)();
+  using HttpBufferedTrace = envoy::data::tap::v3::HttpBufferedTrace;
+  using MutableMessage = envoy::data::tap::v3::HttpBufferedTrace::Message* (HttpBufferedTrace::*)();
 
   void onBody(const Buffer::Instance& data,
               Extensions::Common::Tap::TraceWrapperPtr& buffered_streamed_body,
@@ -75,10 +78,10 @@ private:
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   Extensions::Common::Tap::Matcher::MatchStatusVector statuses_;
   bool started_streaming_trace_{};
-  const Http::HeaderMap* request_headers_{};
+  const Http::RequestHeaderMap* request_headers_{};
   const Http::HeaderMap* request_trailers_{};
-  const Http::HeaderMap* response_headers_{};
-  const Http::HeaderMap* response_trailers_{};
+  const Http::ResponseHeaderMap* response_headers_{};
+  const Http::ResponseTrailerMap* response_trailers_{};
   // Must be a shared_ptr because of submitTrace().
   Extensions::Common::Tap::TraceWrapperPtr buffered_streamed_request_body_;
   Extensions::Common::Tap::TraceWrapperPtr buffered_streamed_response_body_;

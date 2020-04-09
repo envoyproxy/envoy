@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "extensions/filters/network/dubbo_proxy/app_exception.h"
 #include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
 #include "extensions/filters/network/dubbo_proxy/message_impl.h"
@@ -35,7 +37,7 @@ public:
   TestNamedSerializerConfigFactory(std::function<MockSerializer*()> f) : f_(f) {}
 
   SerializerPtr createSerializer() override { return SerializerPtr{f_()}; }
-  std::string name() override {
+  std::string name() const override {
     return SerializerNames::get().fromType(SerializationType::Hessian2);
   }
 
@@ -51,7 +53,7 @@ public:
     protocol->initSerializer(serialization_type);
     return protocol;
   }
-  std::string name() override { return ProtocolNames::get().fromType(ProtocolType::Dubbo); }
+  std::string name() const override { return ProtocolNames::get().fromType(ProtocolType::Dubbo); }
 
   std::function<MockProtocol*()> f_;
 };
@@ -93,7 +95,7 @@ public:
   void initializeMetadata(MessageType msg_type) {
     msg_type_ = msg_type;
 
-    metadata_.reset(new MessageMetadata());
+    metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMessageType(msg_type_);
     metadata_->setRequestId(1);
 

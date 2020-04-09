@@ -1,5 +1,7 @@
 #include "extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
 
+#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
+
 #include "common/common/assert.h"
 
 #include "absl/strings/numbers.h"

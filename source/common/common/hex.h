@@ -35,9 +35,19 @@ public:
   static std::vector<uint8_t> decode(const std::string& input);
 
   /**
-   * Converts the given 64-bit integer into a hexadecimal string.
-   * @param value The integer to be converted.
+   * Converts the given 64-bit unsigned integer into a hexadecimal string.
+   * The result is always a string of 16 characters left padded with zeroes.
+   * @param value The unsigned integer to be converted.
+   * @return value as hexadecimal string
    */
   static std::string uint64ToHex(uint64_t value);
+
+  /**
+   * Converts the given 32-bit unsigned integer into a hexadecimal string.
+   * The result is always a string of 8 characters left padded with zeroes.
+   * @param value The unsigned integer to be converted.
+   * @return value as hexadecimal string
+   */
+  static std::string uint32ToHex(uint32_t value);
 };
 } // namespace Envoy

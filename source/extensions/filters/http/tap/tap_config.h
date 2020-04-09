@@ -3,7 +3,6 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
-#include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "extensions/common/tap/tap.h"
 
@@ -23,7 +22,7 @@ public:
   /**
    * Called when request headers are received.
    */
-  virtual void onRequestHeaders(const Http::HeaderMap& headers) PURE;
+  virtual void onRequestHeaders(const Http::RequestHeaderMap& headers) PURE;
 
   /**
    * Called when request body is received.
@@ -33,12 +32,12 @@ public:
   /**
    * Called when request trailers are received.
    */
-  virtual void onRequestTrailers(const Http::HeaderMap& trailers) PURE;
+  virtual void onRequestTrailers(const Http::RequestTrailerMap& trailers) PURE;
 
   /**
    * Called when response headers are received.
    */
-  virtual void onResponseHeaders(const Http::HeaderMap& headers) PURE;
+  virtual void onResponseHeaders(const Http::ResponseHeaderMap& headers) PURE;
 
   /**
    * Called when response body is received.
@@ -48,7 +47,7 @@ public:
   /**
    * Called when response trailers are received.
    */
-  virtual void onResponseTrailers(const Http::HeaderMap& headers) PURE;
+  virtual void onResponseTrailers(const Http::ResponseTrailerMap& headers) PURE;
 
   /**
    * Called when the request is being destroyed and is being logged.

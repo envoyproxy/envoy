@@ -20,7 +20,9 @@ public:
     directory_ = TestEnvironment::temporaryDirectory() + "/test/config_test/";
   }
 
-  static void SetUpTestSuite() { SetupTestDirectory(); }
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    SetupTestDirectory();
+  }
 
 protected:
   ValidationServerTest() : options_(directory_ + GetParam()) {}
@@ -76,14 +78,15 @@ TEST_P(ValidationServerTest, NoopLifecycleNotifier) {
 INSTANTIATE_TEST_SUITE_P(ValidConfigs, ValidationServerTest,
                          ::testing::Values("front-proxy_front-envoy.yaml",
                                            "google_com_proxy.v2.yaml",
-                                           "grpc-bridge_config_s2s-grpc-envoy.yaml",
+                                           "grpc-bridge_server_envoy-proxy.yaml",
                                            "front-proxy_service-envoy.yaml"));
 
 // Just make sure that all configs can be ingested without a crash. Processing of config files
 // may not be successful, but there should be no crash.
 TEST_P(ValidationServerTest_1, RunWithoutCrash) {
-  validateConfig(options_, Network::Address::InstanceConstSharedPtr(), component_factory_,
-                 Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+  auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+  validateConfig(options_, local_address, component_factory_, Thread::threadFactoryForTest(),
+                 Filesystem::fileSystemForTest());
   SUCCEED();
 }
 

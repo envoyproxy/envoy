@@ -65,11 +65,11 @@ public:
   void sendMessage(const RequestProto& request) { stream_->sendMessage(request, false); }
 
   // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override {
+  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
 
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override {
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
 
@@ -83,12 +83,13 @@ public:
     callbacks_->onDiscoveryResponse(std::move(message));
   }
 
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override {
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
 
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
-    ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
+    ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
+              message);
     stream_ = nullptr;
     control_plane_stats_.connected_state_.set(0);
     callbacks_->onEstablishmentFailure();

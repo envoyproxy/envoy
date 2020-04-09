@@ -7,7 +7,8 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/http/codes.h"
-#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/singleton/const_singleton.h"
@@ -21,14 +22,14 @@ namespace ExtAuthz {
 /**
  * Constant values used for tracing metadata.
  */
-struct TracingContantValues {
+struct TracingConstantValues {
   const std::string TraceStatus = "ext_authz_status";
   const std::string TraceUnauthz = "ext_authz_unauthorized";
   const std::string TraceOk = "ext_authz_ok";
   const std::string HttpStatus = "ext_authz_http_status";
 };
 
-using TracingConstants = ConstSingleton<TracingContantValues>;
+using TracingConstants = ConstSingleton<TracingConstantValues>;
 
 /**
  * Possible async results for a check call.
@@ -90,11 +91,11 @@ public:
    *        NOTE: The callback may happen within the calling stack.
    * @param request is the proto message with the attributes of the specific payload.
    * @param parent_span source for generating an egress child span as part of the trace.
-   *
+   * @param stream_info supplies the client's stream info.
    */
   virtual void check(RequestCallbacks& callback,
-                     const envoy::service::auth::v2::CheckRequest& request,
-                     Tracing::Span& parent_span) PURE;
+                     const envoy::service::auth::v3::CheckRequest& request,
+                     Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;

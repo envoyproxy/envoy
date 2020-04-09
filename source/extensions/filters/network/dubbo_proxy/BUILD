@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -37,6 +38,7 @@ envoy_cc_library(
         ":message_lib",
         ":metadata_lib",
         ":serializer_interface",
+        "//include/envoy/config:typed_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
@@ -66,6 +68,7 @@ envoy_cc_library(
         ":message_lib",
         ":metadata_lib",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/config:typed_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
@@ -99,17 +102,18 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
+    status = "alpha",
     deps = [
         ":conn_manager_lib",
         "//include/envoy/registry",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/common:utility_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
@@ -118,7 +122,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/dubbo_proxy/router:config",
         "//source/extensions/filters/network/dubbo_proxy/router:route_matcher",
         "//source/extensions/filters/network/dubbo_proxy/router:router_lib",
-        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -226,6 +230,6 @@ envoy_cc_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_interface",
         "//source/extensions/filters/network/dubbo_proxy/router:router_interface",
-        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
 )

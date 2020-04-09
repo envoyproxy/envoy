@@ -22,7 +22,7 @@ public:
   // request from the child for that action.
   class Internal {
   public:
-    explicit Internal(Server::Instance* server) : server_(server) {}
+    explicit Internal(Server::Instance* server);
     // Return value is the response to return to the child.
     envoy::HotRestartMessage shutdownAdmin();
     // Return value is the response to return to the child.
@@ -30,6 +30,8 @@ public:
     getListenSocketsForChild(const envoy::HotRestartMessage::Request& request);
     // 'stats' is a field in the reply protobuf to be sent to the child, which we should populate.
     void exportStatsToChild(envoy::HotRestartMessage::Reply::Stats* stats);
+    void recordDynamics(envoy::HotRestartMessage::Reply::Stats* stats, const std::string& name,
+                        Stats::StatName stat_name);
     void drainListeners();
 
   private:

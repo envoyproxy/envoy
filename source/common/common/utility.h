@@ -137,6 +137,12 @@ public:
    * @return whether a time_point contains a valid, not default constructed time.
    */
   static bool timePointValid(MonotonicTime time_point);
+
+  /**
+   * @param time_source time keeping source.
+   * @return uint64_t the number of milliseconds since the epoch.
+   */
+  static uint64_t nowToMilliseconds(TimeSource& time_source);
 };
 
 /**
@@ -222,6 +228,15 @@ public:
   static absl::string_view trim(absl::string_view source);
 
   /**
+   * Removes any specific trailing characters from the end of a string_view.
+   *
+   * @param source the string_view.
+   * @param ch the character to strip from the end of the string_view.
+   * @return a view of the string with the end characters removed.
+   */
+  static absl::string_view removeTrailingCharacters(absl::string_view source, char ch);
+
+  /**
    * Look up for an exactly token in a delimiter-separated string view.
    * @param source supplies the delimiter-separated string view.
    * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
@@ -259,20 +274,6 @@ public:
                             absl::string_view key_token, bool trim_whitespace = true);
 
   /**
-   * Compare one string view with another string view ignoring case sensitivity.
-   * @param lhs supplies the first string view.
-   * @param rhs supplies the second string view.
-   * @return true if strings are semantically the same and false otherwise.
-   *
-   * E.g.,
-   *
-   * caseCompare("hello", "hello")   . true
-   * caseCompare("hello", "HELLO")   . true
-   * caseCompare("hello", "HellO")   . true
-   */
-  static bool caseCompare(absl::string_view lhs, absl::string_view rhs);
-
-  /**
    * Crop characters from a string view starting at the first character of the matched
    * delimiter string view until the end of the source string view.
    * @param source supplies the string view to be processed.
@@ -304,11 +305,14 @@ public:
    * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
    * @param keep_empty_string result contains empty strings if the string starts or ends with
    * 'split', or if instances of 'split' are adjacent; default = false.
+   * @param trim_whitespace remove leading and trailing whitespaces from each of the split
+   * string views; default = false.
    * @return vector containing views of the split strings
    */
   static std::vector<absl::string_view> splitToken(absl::string_view source,
                                                    absl::string_view delimiters,
-                                                   bool keep_empty_string = false);
+                                                   bool keep_empty_string = false,
+                                                   bool trim_whitespace = false);
 
   /**
    * Remove tokens from a delimiter-separated string view. The tokens are trimmed before
@@ -328,14 +332,6 @@ public:
    * Size-bounded string copying and concatenation
    */
   static size_t strlcpy(char* dst, const char* src, size_t size);
-
-  /**
-   * Join elements of a vector into a string delimited by delimiter.
-   * @param source supplies the strings to join.
-   * @param delimiter supplies the delimiter to join them together.
-   * @return string combining elements of `source` with `delimiter` in between each element.
-   */
-  static std::string join(const std::vector<std::string>& source, const std::string& delimiter);
 
   /**
    * Version of substr() that operates on a start and end index instead of a start index and a
@@ -367,13 +363,6 @@ public:
    * @return std::string s converted to upper case.
    */
   static std::string toUpper(absl::string_view s);
-
-  /**
-   * Convert a string to lower case.
-   * @param s string.
-   * @return std::string s converted to lower case.
-   */
-  static std::string toLower(absl::string_view s);
 
   /**
    * Removes all the character indices from str contained in the interval-set.

@@ -5,6 +5,10 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/type/v3/percent.pb.h"
+
 #include "common/network/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
@@ -15,65 +19,55 @@
 
 namespace Envoy {
 // static
-ToolConfig ToolConfig::create(const Json::ObjectSharedPtr check_config) {
-  Json::ObjectSharedPtr input = check_config->getObject("input");
-  int random_value = input->getInteger("random_value", 0);
-
-  // Add header field values
-  std::unique_ptr<Http::TestHeaderMapImpl> headers(new Http::TestHeaderMapImpl());
-  headers->addCopy(":authority", input->getString(":authority", ""));
-  headers->addCopy(":path", input->getString(":path", ""));
-  headers->addCopy(":method", input->getString(":method", "GET"));
-  headers->addCopy("x-forwarded-proto", input->getBoolean("ssl", false) ? "https" : "http");
-
-  if (input->getBoolean("internal", false)) {
-    headers->addCopy("x-envoy-internal", "true");
-  }
-
-  if (input->hasObject("additional_headers")) {
-    for (const Json::ObjectSharedPtr& header_config : input->getObjectArray("additional_headers")) {
-      headers->addCopy(header_config->getString("field"), header_config->getString("value"));
-    }
-  }
-
-  return ToolConfig(std::move(headers), random_value);
-}
-
 ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem& check_config) {
   // Add header field values
-  std::unique_ptr<Http::TestHeaderMapImpl> headers(new Http::TestHeaderMapImpl());
-  headers->addCopy(":authority", check_config.input().authority());
-  headers->addCopy(":path", check_config.input().path());
-  headers->addCopy(":method", check_config.input().method());
-  headers->addCopy("x-forwarded-proto", check_config.input().ssl() ? "https" : "http");
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers(
+      new Http::TestRequestHeaderMapImpl());
+  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
+      new Http::TestResponseHeaderMapImpl());
+  request_headers->addCopy(":authority", check_config.input().authority());
+  request_headers->addCopy(":path", check_config.input().path());
+  request_headers->addCopy(":method", check_config.input().method());
+  request_headers->addCopy("x-forwarded-proto", check_config.input().ssl() ? "https" : "http");
 
   if (check_config.input().internal()) {
-    headers->addCopy("x-envoy-internal", "true");
+    request_headers->addCopy("x-envoy-internal", "true");
   }
 
-  if (check_config.input().additional_headers().data()) {
-    for (const envoy::api::v2::core::HeaderValue& header_config :
-         check_config.input().additional_headers()) {
-      headers->addCopy(header_config.key(), header_config.value());
+  if (check_config.input().additional_request_headers().data()) {
+    for (const envoy::config::core::v3::HeaderValue& header_config :
+         check_config.input().additional_request_headers()) {
+      request_headers->addCopy(header_config.key(), header_config.value());
     }
   }
 
-  return ToolConfig(std::move(headers), check_config.input().random_value());
+  if (check_config.input().additional_response_headers().data()) {
+    for (const envoy::config::core::v3::HeaderValue& header_config :
+         check_config.input().additional_response_headers()) {
+      response_headers->addCopy(header_config.key(), header_config.value());
+    }
+  }
+
+  return ToolConfig(std::move(request_headers), std::move(response_headers),
+                    check_config.input().random_value());
 }
 
-ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int random_value)
-    : headers_(std::move(headers)), random_value_(random_value) {}
+ToolConfig::ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers,
+                       std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers,
+                       int random_value)
+    : request_headers_(std::move(request_headers)), response_headers_(std::move(response_headers)),
+      random_value_(random_value) {}
 
 // static
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
                                         const bool disable_deprecation_check) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
-  envoy::api::v2::RouteConfiguration route_config;
+  envoy::config::route::v3::RouteConfiguration route_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
   TestUtility::loadFromFile(router_config_file, route_config, *api);
   assignUniqueRouteNames(route_config);
-
+  assignRuntimeFraction(route_config);
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(
@@ -88,13 +82,46 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
                          std::move(api), Coverage(route_config));
 }
 
-void RouterCheckTool::assignUniqueRouteNames(envoy::api::v2::RouteConfiguration& route_config) {
+void RouterCheckTool::assignUniqueRouteNames(
+    envoy::config::route::v3::RouteConfiguration& route_config) {
   Runtime::RandomGeneratorImpl random;
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
       route.set_name(random.uuid());
     }
   }
+}
+
+void RouterCheckTool::assignRuntimeFraction(
+    envoy::config::route::v3::RouteConfiguration& route_config) {
+  for (auto& host : *route_config.mutable_virtual_hosts()) {
+    for (auto& route : *host.mutable_routes()) {
+      if (route.match().has_runtime_fraction() &&
+          route.match().runtime_fraction().default_value().numerator() == 0) {
+        route.mutable_match()->mutable_runtime_fraction()->mutable_default_value()->set_numerator(
+            1);
+      }
+    }
+  }
+}
+
+void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
+                                      Envoy::StreamInfo::StreamInfoImpl stream_info) {
+  if (!headers_finalized_ && tool_config.route_ != nullptr) {
+    if (tool_config.route_->directResponseEntry() != nullptr) {
+      tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.request_headers_,
+                                                                   true);
+      tool_config.route_->directResponseEntry()->finalizeResponseHeaders(
+          *tool_config.response_headers_, stream_info);
+    } else if (tool_config.route_->routeEntry() != nullptr) {
+      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.request_headers_,
+                                                               stream_info, true);
+      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.response_headers_,
+                                                                stream_info);
+    }
+  }
+
+  headers_finalized_ = true;
 }
 
 RouterCheckTool::RouterCheckTool(
@@ -104,74 +131,17 @@ RouterCheckTool::RouterCheckTool(
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
       stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)) {
   ON_CALL(factory_context_->runtime_loader_.snapshot_,
-          featureEnabled(_, testing::An<const envoy::type::FractionalPercent&>(),
+          featureEnabled(_, testing::An<const envoy::type::v3::FractionalPercent&>(),
                          testing::An<uint64_t>()))
       .WillByDefault(testing::Invoke(this, &RouterCheckTool::runtimeMock));
 }
 
-// TODO(jyotima): Remove this code path once the json schema code path is deprecated.
-bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
-  loader->validateSchema(Json::ToolSchema::routerCheckSchema());
-  bool no_failures = true;
-  for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {
-    headers_finalized_ = false;
-    Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                  factory_context_->dispatcher().timeSource());
-    ToolConfig tool_config = ToolConfig::create(check_config);
-    tool_config.route_ =
-        config_->route(*tool_config.headers_, stream_info, tool_config.random_value_);
-    std::string test_name = check_config->getString("test_name", "");
-    tests_.emplace_back(test_name, std::vector<std::string>{});
-    Json::ObjectSharedPtr validate = check_config->getObject("validate");
-    using CheckerFunc = std::function<bool(ToolConfig&, const std::string&)>;
-    const std::unordered_map<std::string, CheckerFunc> checkers = {
-        {"cluster_name",
-         [this](auto&... params) -> bool { return this->compareCluster(params...); }},
-        {"virtual_cluster_name",
-         [this](auto&... params) -> bool { return this->compareVirtualCluster(params...); }},
-        {"virtual_host_name",
-         [this](auto&... params) -> bool { return this->compareVirtualHost(params...); }},
-        {"path_rewrite",
-         [this](auto&... params) -> bool { return this->compareRewritePath(params...); }},
-        {"host_rewrite",
-         [this](auto&... params) -> bool { return this->compareRewriteHost(params...); }},
-        {"path_redirect",
-         [this](auto&... params) -> bool { return this->compareRedirectPath(params...); }},
-    };
-    // Call appropriate function for each match case.
-    for (const auto& test : checkers) {
-      if (validate->hasObject(test.first)) {
-        const std::string& expected = validate->getString(test.first);
-        if (tool_config.route_ == nullptr) {
-          compareResults("", expected, test.first);
-        } else {
-          if (!test.second(tool_config, expected)) {
-            no_failures = false;
-          }
-        }
-      }
-    }
-    if (validate->hasObject("header_fields")) {
-      for (const Json::ObjectSharedPtr& header_field : validate->getObjectArray("header_fields")) {
-        if (!compareHeaderField(tool_config, header_field->getString("field"),
-                                header_field->getString("value"))) {
-          no_failures = false;
-        }
-      }
-    }
-    if (validate->hasObject("custom_header_fields")) {
-      for (const Json::ObjectSharedPtr& header_field :
-           validate->getObjectArray("custom_header_fields")) {
-        if (!compareCustomHeaderField(tool_config, header_field->getString("field"),
-                                      header_field->getString("value"))) {
-          no_failures = false;
-        }
-      }
-    }
+Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) {
+  std::string contents = api.fileSystem().fileReadToEnd(file_path);
+  if (absl::EndsWith(file_path, ".yaml")) {
+    contents = MessageUtil::getJsonStringFromMessage(ValueUtil::loadFromYaml(contents));
   }
-  printResults();
-  return no_failures;
+  return Json::Factory::loadFromString(contents);
 }
 
 bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
@@ -189,10 +159,10 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
     headers_finalized_ = false;
     Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
                                                   factory_context_->dispatcher().timeSource());
-
+    stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ =
-        config_->route(*tool_config.headers_, stream_info, tool_config.random_value_);
+        config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);
 
     const std::string& test_name = check_config.test_name();
     tests_.emplace_back(test_name, std::vector<std::string>{});
@@ -207,10 +177,10 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
         [this](auto&... params) -> bool { return this->compareRewritePath(params...); },
         [this](auto&... params) -> bool { return this->compareRewriteHost(params...); },
         [this](auto&... params) -> bool { return this->compareRedirectPath(params...); },
-        [this](auto&... params) -> bool { return this->compareHeaderField(params...); },
-        [this](auto&... params) -> bool { return this->compareCustomHeaderField(params...); },
+        [this](auto&... params) -> bool { return this->compareRequestHeaderField(params...); },
+        [this](auto&... params) -> bool { return this->compareResponseHeaderField(params...); },
     };
-
+    finalizeHeaders(tool_config, stream_info);
     // Call appropriate function for each match case.
     for (const auto& test : checkers) {
       if (!test(tool_config, validate)) {
@@ -250,9 +220,9 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
   std::string actual = "";
 
   if (tool_config.route_->routeEntry() != nullptr &&
-      tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_) != nullptr) {
+      tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_) != nullptr) {
     Stats::StatName stat_name =
-        tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_)->statName();
+        tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_)->statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches = compareResults(actual, expected, "virtual_cluster_name");
@@ -299,16 +269,8 @@ bool RouterCheckTool::compareVirtualHost(
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
-    if (!headers_finalized_) {
-      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
-                                                               true);
-      headers_finalized_ = true;
-    }
-
-    actual = tool_config.headers_->get_(Http::Headers::get().Path);
+    actual = tool_config.request_headers_->get_(Http::Headers::get().Path);
   }
   const bool matches = compareResults(actual, expected, "path_rewrite");
   if (matches && tool_config.route_->routeEntry() != nullptr) {
@@ -330,16 +292,8 @@ bool RouterCheckTool::compareRewritePath(
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
-    if (!headers_finalized_) {
-      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
-                                                               true);
-      headers_finalized_ = true;
-    }
-
-    actual = tool_config.headers_->get_(Http::Headers::get().Host);
+    actual = tool_config.request_headers_->get_(Http::Headers::get().Host);
   }
   const bool matches = compareResults(actual, expected, "host_rewrite");
   if (matches && tool_config.route_->routeEntry() != nullptr) {
@@ -362,7 +316,7 @@ bool RouterCheckTool::compareRewriteHost(
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
   if (tool_config.route_->directResponseEntry() != nullptr) {
-    actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.headers_);
+    actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.request_headers_);
   }
 
   const bool matches = compareResults(actual, expected, "path_redirect");
@@ -383,12 +337,12 @@ bool RouterCheckTool::compareRedirectPath(
   return compareRedirectPath(tool_config, expected.path_redirect().value());
 }
 
-bool RouterCheckTool::compareHeaderField(
+bool RouterCheckTool::compareRequestHeaderField(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
-  if (expected.header_fields().data()) {
-    for (const envoy::api::v2::core::HeaderValue& header : expected.header_fields()) {
-      if (!compareHeaderField(tool_config, header.key(), header.value())) {
+  if (expected.request_header_fields().data()) {
+    for (const envoy::config::core::v3::HeaderValue& header : expected.request_header_fields()) {
+      if (!compareRequestHeaderField(tool_config, header.key(), header.value())) {
         no_failures = false;
       }
     }
@@ -396,37 +350,29 @@ bool RouterCheckTool::compareHeaderField(
   return no_failures;
 }
 
-bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const std::string& field,
-                                         const std::string& expected) {
-  std::string actual = tool_config.headers_->get_(field);
-  return compareResults(actual, expected, "check_header");
+bool RouterCheckTool::compareRequestHeaderField(ToolConfig& tool_config, const std::string& field,
+                                                const std::string& expected) {
+  std::string actual = tool_config.request_headers_->get_(field);
+  return compareResults(actual, expected, "request_header_fields");
 }
 
-bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
-                                               const std::string& expected) {
-  std::string actual = "";
-  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                factory_context_->dispatcher().timeSource());
-  stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
-  if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
-                                                             true);
-    actual = tool_config.headers_->get_(field);
-  }
-  return compareResults(actual, expected, "custom_header");
-}
-
-bool RouterCheckTool::compareCustomHeaderField(
+bool RouterCheckTool::compareResponseHeaderField(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
-  if (expected.custom_header_fields().data()) {
-    for (const envoy::api::v2::core::HeaderValue& header : expected.custom_header_fields()) {
-      if (!compareCustomHeaderField(tool_config, header.key(), header.value())) {
+  if (expected.response_header_fields().data()) {
+    for (const envoy::config::core::v3::HeaderValue& header : expected.response_header_fields()) {
+      if (!compareResponseHeaderField(tool_config, header.key(), header.value())) {
         no_failures = false;
       }
     }
   }
   return no_failures;
+}
+
+bool RouterCheckTool::compareResponseHeaderField(ToolConfig& tool_config, const std::string& field,
+                                                 const std::string& expected) {
+  std::string actual = tool_config.response_headers_->get_(field);
+  return compareResults(actual, expected, "response_header_fields");
 }
 
 bool RouterCheckTool::compareResults(const std::string& actual, const std::string& expected,
@@ -456,16 +402,15 @@ void RouterCheckTool::printResults() {
 
 // The Mock for runtime value checks.
 // This is a simple implementation to mimic the actual runtime checks in Snapshot.featureEnabled
-bool RouterCheckTool::runtimeMock(const std::string& key,
-                                  const envoy::type::FractionalPercent& default_value,
+bool RouterCheckTool::runtimeMock(absl::string_view key,
+                                  const envoy::type::v3::FractionalPercent& default_value,
                                   uint64_t random_value) {
-  return !active_runtime_.empty() && active_runtime_.compare(key) == 0 &&
+  return !active_runtime_.empty() && key.compare(active_runtime_) == 0 &&
          ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 
 Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
-  TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
   TCLAP::SwitchArg only_show_failures("", "only-show-failures", "Only display failing tests", cmd,
                                       false);
@@ -489,27 +434,18 @@ Options::Options(int argc, char** argv) {
     exit(EXIT_FAILURE);
   }
 
-  is_proto_ = is_proto.getValue();
   is_detailed_ = is_detailed.getValue();
   only_show_failures_ = only_show_failures.getValue();
   fail_under_ = fail_under.getValue();
   comprehensive_coverage_ = comprehensive_coverage.getValue();
   disable_deprecation_check_ = disable_deprecation_check.getValue();
 
-  if (is_proto_) {
-    config_path_ = config_path.getValue();
-    test_path_ = test_path.getValue();
-    if (config_path_.empty() || test_path_.empty()) {
-      std::cerr << "error: "
-                << "Both --config-path/c and --test-path/t are mandatory with --useproto"
-                << std::endl;
-      exit(EXIT_FAILURE);
-    }
-  } else {
-    if (!unlabelled_configs.getValue().empty()) {
-      unlabelled_config_path_ = unlabelled_configs.getValue()[0];
-      unlabelled_test_path_ = unlabelled_configs.getValue()[1];
-    }
+  config_path_ = config_path.getValue();
+  test_path_ = test_path.getValue();
+  if (config_path_.empty() || test_path_.empty()) {
+    std::cerr << "error: "
+              << "Both --config-path/c and --test-path/t are mandatory" << std::endl;
+    exit(EXIT_FAILURE);
   }
 }
 } // namespace Envoy

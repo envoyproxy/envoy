@@ -11,7 +11,7 @@ namespace Common {
 namespace Wasm {
 namespace Null {
 
-WasmVmPtr createVm();
+WasmVmPtr createVm(const Stats::ScopeSharedPtr& scope);
 
 } // namespace Null
 } // namespace Wasm

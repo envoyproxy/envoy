@@ -19,7 +19,7 @@
 namespace quic {
 namespace {
 
-void QuicRecordTestOutputToFile(const std::string& filename, QuicStringPiece data) {
+void QuicRecordTestOutputToFile(const std::string& filename, quiche::QuicheStringPiece data) {
   const char* output_dir_env = std::getenv("QUIC_TEST_OUTPUT_DIR");
   if (output_dir_env == nullptr) {
     QUIC_LOG(WARNING) << "Could not save test output since QUIC_TEST_OUTPUT_DIR is not set";
@@ -45,8 +45,7 @@ void QuicRecordTestOutputToFile(const std::string& filename, QuicStringPiece dat
   static constexpr Envoy::Filesystem::FlagSet DefaultFlags{
       1 << Envoy::Filesystem::File::Operation::Read |
       1 << Envoy::Filesystem::File::Operation::Write |
-      1 << Envoy::Filesystem::File::Operation::Create |
-      1 << Envoy::Filesystem::File::Operation::Append};
+      1 << Envoy::Filesystem::File::Operation::Create};
 
   const std::string output_path = output_dir + filename;
   Envoy::Filesystem::FilePtr file = file_system.createFile(output_path);
@@ -65,7 +64,39 @@ void QuicRecordTestOutputToFile(const std::string& filename, QuicStringPiece dat
 }
 } // namespace
 
-void QuicRecordTestOutputImpl(QuicStringPiece identifier, QuicStringPiece data) {
+void QuicSaveTestOutputImpl(quiche::QuicheStringPiece filename, quiche::QuicheStringPiece data) {
+  QuicRecordTestOutputToFile(filename.data(), data);
+}
+
+bool QuicLoadTestOutputImpl(quiche::QuicheStringPiece filename, std::string* data) {
+  const char* read_dir_env = std::getenv("QUIC_TEST_OUTPUT_DIR");
+  if (read_dir_env == nullptr) {
+    QUIC_LOG(WARNING) << "Could not load test output since QUIC_TEST_OUTPUT_DIR is not set";
+    return false;
+  }
+
+  std::string read_dir = read_dir_env;
+  if (read_dir.empty()) {
+    QUIC_LOG(WARNING) << "Could not load test output since QUIC_TEST_OUTPUT_DIR is empty";
+    return false;
+  }
+
+  if (read_dir.back() != '/') {
+    read_dir += '/';
+  }
+
+  const std::string read_path = read_dir + filename.data();
+
+  Envoy::Filesystem::InstanceImplPosix file_system;
+  if (!file_system.fileExists(read_path)) {
+    QUIC_LOG(ERROR) << "Test output file does not exist: " << read_path;
+    return false;
+  }
+  *data = file_system.fileReadToEnd(read_path);
+  return true;
+}
+
+void QuicRecordTraceImpl(quiche::QuicheStringPiece identifier, quiche::QuicheStringPiece data) {
   const testing::TestInfo* test_info = testing::UnitTest::GetInstance()->current_test_info();
 
   std::string timestamp = absl::FormatTime("%Y%m%d%H%M%S", absl::Now(), absl::LocalTimeZone());

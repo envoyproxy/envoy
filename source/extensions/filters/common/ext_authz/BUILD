@@ -13,8 +13,9 @@ envoy_cc_library(
     hdrs = ["ext_authz.h"],
     deps = [
         "//include/envoy/http:codes_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -42,12 +43,8 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/tracing:http_tracer_lib",
-
-        # TODO(gsagula): Descriptor pool requires this dependence in runtime only. It should NOT be
-        # removed unless v2alpha is fully deprecated, otherwise linker will drop the object file
-        # associated with v2alpha/external_auth.pb.cc causing FindMessageTypeByName() to always return
-        # nullptr when looking up for envoy.service.auth.v2alpha.Authorization.Check.
-        "@envoy_api//envoy/service/auth/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -64,7 +61,10 @@ envoy_cc_library(
         "//source/common/http:async_client_lib",
         "//source/common/http:codes_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/filter/http/ext_authz/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -78,6 +78,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:async_client_lib",
-        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )

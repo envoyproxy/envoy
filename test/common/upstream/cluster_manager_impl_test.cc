@@ -1,49 +1,10 @@
-#include <memory>
-#include <string>
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.validate.h"
+#include "envoy/config/core/v3/base.pb.h"
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/network/listen_socket.h"
-#include "envoy/upstream/upstream.h"
-
-#include "common/api/api_impl.h"
-#include "common/config/utility.h"
-#include "common/http/context_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/cluster_manager_impl.h"
-#include "common/upstream/subset_lb.h"
-
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-
-#include "test/common/upstream/utility.h"
-#include "test/integration/clusters/custom_static_cluster.h"
-#include "test/mocks/access_log/mocks.h"
-#include "test/mocks/api/mocks.h"
-#include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
-#include "test/mocks/network/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
-#include "test/mocks/server/mocks.h"
-#include "test/mocks/tcp/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/upstream/mocks.h"
-#include "test/test_common/registry.h"
-#include "test/test_common/simulated_time_system.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
-#include "test/test_common/utility.h"
-
-#include "absl/strings/str_replace.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/common/upstream/test_cluster_manager.h"
 
 using testing::_;
 using testing::Eq;
@@ -59,181 +20,27 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-// The tests in this file are split between testing with real clusters and some with mock clusters.
-// By default we setup to call the real cluster creation function. Individual tests can override
-// the expectations when needed.
-class TestClusterManagerFactory : public ClusterManagerFactory {
-public:
-  TestClusterManagerFactory() : api_(Api::createApiForTest(stats_)) {
-    ON_CALL(*this, clusterFromProto_(_, _, _, _))
-        .WillByDefault(Invoke(
-            [&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                Outlier::EventLoggerSharedPtr outlier_event_logger,
-                bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
-              auto result = ClusterFactoryImplBase::create(
-                  cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
-                  dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-                  outlier_event_logger, added_via_api, validation_visitor_, *api_);
-              // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
-              return std::make_pair(result.first, result.second.release());
-            }));
-  }
-
-  Http::ConnectionPool::InstancePtr allocateConnPool(
-      Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, Http::Protocol,
-      const Network::ConnectionSocket::OptionsSharedPtr& options,
-      const Network::TransportSocketOptionsSharedPtr& transport_socket_options) override {
-    return Http::ConnectionPool::InstancePtr{
-        allocateConnPool_(host, options, transport_socket_options)};
-  }
-
-  Tcp::ConnectionPool::InstancePtr
-  allocateTcpConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
-                      const Network::ConnectionSocket::OptionsSharedPtr&,
-                      Network::TransportSocketOptionsSharedPtr) override {
-    return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
-  }
-
-  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                   Outlier::EventLoggerSharedPtr outlier_event_logger,
-                   bool added_via_api) override {
-    auto result = clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
-    return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
-  }
-
-  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource&, ClusterManager&) override {
-    return CdsApiPtr{createCds_()};
-  }
-
-  ClusterManagerPtr
-  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) override {
-    return ClusterManagerPtr{clusterManagerFromProto_(bootstrap)};
-  }
-
-  Secret::SecretManager& secretManager() override { return secret_manager_; }
-
-  MOCK_METHOD1(clusterManagerFromProto_,
-               ClusterManager*(const envoy::config::bootstrap::v2::Bootstrap& bootstrap));
-  MOCK_METHOD3(allocateConnPool_,
-               Http::ConnectionPool::Instance*(HostConstSharedPtr host,
-                                               Network::ConnectionSocket::OptionsSharedPtr,
-                                               Network::TransportSocketOptionsSharedPtr));
-  MOCK_METHOD1(allocateTcpConnPool_, Tcp::ConnectionPool::Instance*(HostConstSharedPtr host));
-  MOCK_METHOD4(clusterFromProto_,
-               std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>(
-                   const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                   Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
-  MOCK_METHOD0(createCds_, CdsApi*());
-
-  Stats::IsolatedStoreImpl stats_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
-  std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
-      new NiceMock<Network::MockDnsResolver>};
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{
-      dispatcher_.timeSource()};
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::MockAdmin> admin_;
-  NiceMock<Secret::MockSecretManager> secret_manager_;
-  NiceMock<AccessLog::MockAccessLogManager> log_manager_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Api::ApiPtr api_;
-};
-
-// Helper to intercept calls to postThreadLocalClusterUpdate.
-class MockLocalClusterUpdate {
-public:
-  MOCK_METHOD3(post, void(uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed));
-};
-
-class MockLocalHostsRemoved {
-public:
-  MOCK_METHOD1(post, void(const HostVector&));
-};
-
-// A test version of ClusterManagerImpl that provides a way to get a non-const handle to the
-// clusters, which is necessary in order to call updateHosts on the priority set.
-class TestClusterManagerImpl : public ClusterManagerImpl {
-public:
-  using ClusterManagerImpl::ClusterManagerImpl;
-
-  TestClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                         ClusterManagerFactory& factory, Stats::Store& stats,
-                         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                         AccessLog::AccessLogManager& log_manager,
-                         Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                         ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                         Http::Context& http_context)
-      : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                           main_thread_dispatcher, admin, validation_context, api, http_context) {}
-
-  std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
-    std::map<std::string, std::reference_wrapper<Cluster>> clusters;
-    for (auto& cluster : active_clusters_) {
-      clusters.emplace(cluster.first, *cluster.second->cluster_);
-    }
-    return clusters;
-  }
-};
-
-// Override postThreadLocalClusterUpdate so we can test that merged updates calls
-// it with the right values at the right times.
-class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
-public:
-  MockedUpdatedClusterManagerImpl(
-      const envoy::config::bootstrap::v2::Bootstrap& bootstrap, ClusterManagerFactory& factory,
-      Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-      Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-      MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,
-      Http::Context& http_context)
-      : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info,
-                               log_manager, main_thread_dispatcher, admin, validation_context, api,
-                               http_context),
-        local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
-
-protected:
-  void postThreadLocalClusterUpdate(const Cluster&, uint32_t priority,
-                                    const HostVector& hosts_added,
-                                    const HostVector& hosts_removed) override {
-    local_cluster_update_.post(priority, hosts_added, hosts_removed);
-  }
-
-  void postThreadLocalDrainConnections(const Cluster&, const HostVector& hosts_removed) override {
-    local_hosts_removed_.post(hosts_removed);
-  }
-
-  MockLocalClusterUpdate& local_cluster_update_;
-  MockLocalHostsRemoved& local_hosts_removed_;
-};
-
-envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(yaml, bootstrap);
+envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(yaml, bootstrap, true);
   return bootstrap;
 }
 
 std::string clustersJson(const std::vector<std::string>& clusters) {
-  return fmt::sprintf("\"clusters\": [%s]", StringUtil::join(clusters, ","));
+  return fmt::sprintf("\"clusters\": [%s]", absl::StrJoin(clusters, ","));
 }
 
 class ClusterManagerImplTest : public testing::Test {
 public:
   ClusterManagerImplTest()
-      : api_(Api::createApiForTest()), http_context_(factory_.stats_.symbolTable()) {}
+      : api_(Api::createApiForTest()), http_context_(factory_.stats_.symbolTable()),
+        grpc_context_(factory_.stats_.symbolTable()) {}
 
-  void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *api_, http_context_);
+        *api_, http_context_, grpc_context_);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -268,7 +75,7 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *api_, local_cluster_update_, local_hosts_removed_, http_context_);
+        *api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -289,15 +96,15 @@ public:
   void checkConfigDump(const std::string& expected_dump_yaml) {
     auto message_ptr = admin_.config_tracker_.config_tracker_callbacks_["clusters"]();
     const auto& clusters_config_dump =
-        dynamic_cast<const envoy::admin::v2alpha::ClustersConfigDump&>(*message_ptr);
+        dynamic_cast<const envoy::admin::v3::ClustersConfigDump&>(*message_ptr);
 
-    envoy::admin::v2alpha::ClustersConfigDump expected_clusters_config_dump;
+    envoy::admin::v3::ClustersConfigDump expected_clusters_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_clusters_config_dump);
     EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());
   }
 
-  envoy::api::v2::core::Metadata buildMetadata(const std::string& version) const {
-    envoy::api::v2::core::Metadata metadata;
+  MetadataConstSharedPtr buildMetadata(const std::string& version) const {
+    envoy::config::core::v3::Metadata metadata;
 
     if (!version.empty()) {
       Envoy::Config::Metadata::mutableMetadataValue(
@@ -305,7 +112,7 @@ public:
           .set_string_value(version);
     }
 
-    return metadata;
+    return std::make_shared<const envoy::config::core::v3::Metadata>(metadata);
   }
 
   Event::SimulatedTimeSystem time_system_;
@@ -318,9 +125,10 @@ public:
   MockLocalClusterUpdate local_cluster_update_;
   MockLocalHostsRemoved local_hosts_removed_;
   Http::ContextImpl http_context_;
+  Grpc::ContextImpl grpc_context_;
 };
 
-envoy::config::bootstrap::v2::Bootstrap defaultConfig() {
+envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
   const std::string yaml = R"EOF(
 static_resources:
   clusters: []
@@ -383,6 +191,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   checkConfigDump(R"EOF(
 static_clusters:
   - cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
@@ -536,7 +345,7 @@ static_resources:
       ->second.get()
       .info()
       ->statsScope()
-      .counter("foo")
+      .counterFromString("foo")
       .inc();
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster.cluster_name.foo").value());
 }
@@ -559,7 +368,7 @@ static_resources:
 
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -575,28 +384,28 @@ static_resources:
                   port_value: 11001
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      "cluster: LB policy ORIGINAL_DST_LB is not valid for Cluster type STATIC. "
-      "'ORIGINAL_DST_LB' is allowed only with cluster type 'ORIGINAL_DST'");
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+                            "cluster: LB policy hidden_envoy_deprecated_ORIGINAL_DST_LB is not "
+                            "valid for Cluster type STATIC. "
+                            "'ORIGINAL_DST_LB' is allowed only with cluster type 'ORIGINAL_DST'");
 }
 
 class ClusterManagerSubsetInitializationTest
     : public ClusterManagerImplTest,
-      public testing::WithParamInterface<envoy::api::v2::Cluster_LbPolicy> {
+      public testing::WithParamInterface<envoy::config::cluster::v3::Cluster::LbPolicy> {
 public:
   ClusterManagerSubsetInitializationTest() = default;
 
-  static std::vector<envoy::api::v2::Cluster_LbPolicy> lbPolicies() {
-    int first = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MIN);
-    int last = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MAX);
+  static std::vector<envoy::config::cluster::v3::Cluster::LbPolicy> lbPolicies() {
+    int first = static_cast<int>(envoy::config::cluster::v3::Cluster::LbPolicy_MIN);
+    int last = static_cast<int>(envoy::config::cluster::v3::Cluster::LbPolicy_MAX);
     ASSERT(first < last);
 
-    std::vector<envoy::api::v2::Cluster_LbPolicy> policies;
+    std::vector<envoy::config::cluster::v3::Cluster::LbPolicy> policies;
     for (int i = first; i <= last; i++) {
-      if (envoy::api::v2::Cluster_LbPolicy_IsValid(i)) {
-        auto policy = static_cast<envoy::api::v2::Cluster_LbPolicy>(i);
-        if (policy != envoy::api::v2::Cluster_LbPolicy_LOAD_BALANCING_POLICY_CONFIG) {
+      if (envoy::config::cluster::v3::Cluster::LbPolicy_IsValid(i)) {
+        auto policy = static_cast<envoy::config::cluster::v3::Cluster::LbPolicy>(i);
+        if (policy != envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
           policies.push_back(policy);
         }
       }
@@ -605,7 +414,7 @@ public:
   }
 
   static std::string paramName(const testing::TestParamInfo<ParamType>& info) {
-    const std::string& name = envoy::api::v2::Cluster_LbPolicy_Name(info.param);
+    const std::string& name = envoy::config::cluster::v3::Cluster::LbPolicy_Name(info.param);
     return absl::StrReplaceAll(name, {{"_", ""}});
   }
 };
@@ -613,7 +422,7 @@ public:
 // Test initialization of subset load balancer with every possible load balancer policy.
 TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization) {
   const std::string yamlPattern = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -638,24 +447,23 @@ static_resources:
                   port_value: 8001
   )EOF";
 
-  const std::string& policy_name = envoy::api::v2::Cluster_LbPolicy_Name(GetParam());
+  const std::string& policy_name = envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam());
 
   std::string cluster_type = "type: STATIC";
-  if (GetParam() == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB) {
+  if (GetParam() == envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB) {
     cluster_type = "type: ORIGINAL_DST";
-  } else if (GetParam() == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+  } else if (GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     // This custom cluster type is registered by linking test/integration/custom/static_cluster.cc.
     cluster_type = "cluster_type: { name: envoy.clusters.custom_static_with_lb }";
   }
-
   const std::string yaml = fmt::format(yamlPattern, cluster_type, policy_name);
 
-  if (GetParam() == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB ||
-      GetParam() == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+  if (GetParam() == envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB ||
+      GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     EXPECT_THROW_WITH_MESSAGE(
         create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
         fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                    envoy::api::v2::Cluster_LbPolicy_Name(GetParam())));
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam())));
 
   } else {
     create(parseBootstrapFromV2Yaml(yaml));
@@ -680,7 +488,7 @@ INSTANTIATE_TEST_SUITE_P(ClusterManagerSubsetInitializationTest,
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerOriginalDstRestriction) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -692,14 +500,14 @@ static_resources:
         - keys: [ "x" ]
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      "cluster: LB policy ORIGINAL_DST_LB cannot be combined with lb_subset_config");
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+                            "cluster: LB policy hidden_envoy_deprecated_ORIGINAL_DST_LB cannot be "
+                            "combined with lb_subset_config");
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerClusterProvidedLbRestriction) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -718,7 +526,7 @@ static_resources:
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerLocalityAware) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -751,7 +559,7 @@ static_resources:
 
 TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: redis_cluster
     lb_policy: RING_HASH
@@ -888,7 +696,7 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, MaglevLoadBalancerThreadAwareUpdate)
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -925,7 +733,7 @@ static_resources:
 
 TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -985,7 +793,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
  */
 TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -1123,9 +931,10 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   cds->initialized_callback_();
   EXPECT_CALL(*cds, versionInfo()).WillOnce(Return("version3"));
   checkConfigDump(R"EOF(
-version_info: version3
-static_clusters:
+ version_info: version3
+ static_clusters:
   - cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cds_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -1137,6 +946,7 @@ static_clusters:
       seconds: 1234567891
       nanos: 234000000
   - cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -1148,6 +958,7 @@ static_clusters:
       seconds: 1234567891
       nanos: 234000000
   - cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster2"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -1158,9 +969,10 @@ static_clusters:
     last_updated:
       seconds: 1234567891
       nanos: 234000000
-dynamic_active_clusters:
+ dynamic_active_clusters:
   - version_info: "version1"
     cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster3"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -1173,6 +985,7 @@ dynamic_active_clusters:
       nanos: 234000000
   - version_info: "version2"
     cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster4"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -1185,6 +998,7 @@ dynamic_active_clusters:
       nanos: 234000000
   - version_info: "version3"
     cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster5"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -1195,7 +1009,7 @@ dynamic_active_clusters:
     last_updated:
       seconds: 1234567891
       nanos: 234000000
-dynamic_warming_clusters:
+ dynamic_warming_clusters:
 )EOF");
 
   EXPECT_CALL(*cluster3, initialize(_));
@@ -1298,6 +1112,7 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
 dynamic_warming_clusters:
   - version_info: "version1"
     cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster"
       type: STATIC
       connect_timeout: 0.25s
@@ -1340,6 +1155,7 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version1"
      cluster:
+       "@type": type.googleapis.com/envoy.api.v2.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
@@ -1372,6 +1188,7 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version2"
      cluster:
+       "@type": type.googleapis.com/envoy.api.v2.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
@@ -1511,7 +1328,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(callbacks.get()));
 }
 
-TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
+TEST_F(ClusterManagerImplTest, AddOrUpdateClusterStaticExists) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                         clustersJson({defaultStaticClusterJson("fake_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
@@ -1711,8 +1528,8 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
-// Test that we close all TCP connection pool connections when there is a host health failure, when
-// configured to do so.
+// Test that we close all TCP connection pool connections when there is a host health failure,
+// when configured to do so.
 TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
   const std::string yaml = R"EOF(
   static_resources:
@@ -1864,7 +1681,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -1887,7 +1704,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
   // initialize callback.
@@ -1946,7 +1764,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
   tcp_drained_cb();
@@ -1977,7 +1796,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
 
@@ -2004,7 +1824,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -2017,6 +1837,16 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   NiceMock<MockLoadBalancerContext> example_com_context;
   ON_CALL(example_com_context, upstreamTransportSocketOptions())
       .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>("example.com")));
+
+  NiceMock<MockLoadBalancerContext> example_com_context_with_san;
+  ON_CALL(example_com_context_with_san, upstreamTransportSocketOptions())
+      .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>(
+          "example.com", std::vector<std::string>{"example.com"})));
+
+  NiceMock<MockLoadBalancerContext> example_com_context_with_san2;
+  ON_CALL(example_com_context_with_san2, upstreamTransportSocketOptions())
+      .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>(
+          "example.com", std::vector<std::string>{"example.net"})));
 
   NiceMock<MockLoadBalancerContext> ibm_com_context;
   ON_CALL(ibm_com_context, upstreamTransportSocketOptions())
@@ -2046,7 +1876,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
   // initialize callback.
@@ -2081,7 +1912,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(*cp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb_high));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
-      .Times(8)
+      .Times(10)
       .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
 
   // This should provide us a CP for each of the above hosts, and for different SNIs
@@ -2153,7 +1984,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
   tcp_drained_cb();
@@ -2185,6 +2017,12 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   Tcp::ConnectionPool::MockInstance* tcp3_example_com =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, &example_com_context));
+  Tcp::ConnectionPool::MockInstance* tcp3_example_com_with_san =
+      dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, &example_com_context_with_san));
+  Tcp::ConnectionPool::MockInstance* tcp3_example_com_with_san2 =
+      dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, &example_com_context_with_san2));
   Tcp::ConnectionPool::MockInstance* tcp3_ibm_com =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, &ibm_com_context));
@@ -2195,10 +2033,95 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_EQ(tcp2_example_com, tcp3_example_com);
   EXPECT_EQ(tcp2_ibm_com, tcp3_ibm_com);
 
+  EXPECT_NE(tcp3_example_com, tcp3_example_com_with_san);
+  EXPECT_NE(tcp3_example_com, tcp3_example_com_with_san2);
+  EXPECT_NE(tcp3_example_com_with_san, tcp3_example_com_with_san2);
+
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
+  factory_.tls_.shutdownThread();
+}
+
+// Test that default DNS resolver with TCP lookups is used, when there are no DNS custom resolvers
+// configured per cluster and `use_tcp_for_dns_lookups` is set in bootstrap config.
+TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
+  const std::string yaml = R"EOF(
+  use_tcp_for_dns_lookups: true
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  // As custom resolvers are not specified in config, this method should not be called,
+  // resolver from context should be used instead.
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).Times(0);
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV2Yaml(yaml));
+  factory_.tls_.shutdownThread();
+}
+
+// Test that custom DNS resolver with UDP lookups is used, when custom resolver is configured
+// per cluster and `use_tcp_for_dns_lookups` is not specified.
+TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolvers:
+      - socket_address:
+          address: 1.2.3.4
+          port_value: 80
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  // `false` here stands for using udp
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, false)).WillOnce(Return(dns_resolver));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV2Yaml(yaml));
+  factory_.tls_.shutdownThread();
+}
+
+// Test that custom DNS resolver with TCP lookups is used, when custom resolver is configured
+// per cluster and `use_tcp_for_dns_lookups` is enabled for that cluster.
+TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolver) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      use_tcp_for_dns_lookups: true
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolvers:
+      - socket_address:
+          address: 1.2.3.4
+          port_value: 80
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  // `true` here stands for using tcp
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, true)).WillOnce(Return(dns_resolver));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV2Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
@@ -2229,7 +2152,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -2239,7 +2162,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   create(parseBootstrapFromV2Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
       .WillOnce(ReturnNew<Http::ConnectionPool::MockInstance>());
@@ -2264,7 +2188,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   // Remove the first host, this should lead to the cp being drained, without
   // crash.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
 }
@@ -2273,14 +2197,14 @@ class MockConnPoolWithDestroy : public Http::ConnectionPool::MockInstance {
 public:
   ~MockConnPoolWithDestroy() override { onDestroy(); }
 
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(void, onDestroy, ());
 };
 
 class MockTcpConnPoolWithDestroy : public Tcp::ConnectionPool::MockInstance {
 public:
   ~MockTcpConnPoolWithDestroy() override { onDestroy(); }
 
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(void, onDestroy, ());
 };
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/3518. Make sure we handle a
@@ -2308,7 +2232,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -2318,7 +2242,8 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   create(parseBootstrapFromV2Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   MockConnPoolWithDestroy* mock_cp = new MockConnPoolWithDestroy();
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(mock_cp));
@@ -2339,7 +2264,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb;
   EXPECT_CALL(*tcp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
 
   // The drained callback might get called when the CP is being destroyed.
   EXPECT_CALL(*mock_cp, onDestroy()).WillOnce(Invoke(drained_cb));
@@ -2846,9 +2771,11 @@ public:
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return std::make_unique<Envoy::ProtobufWkt::Struct>();
   }
-  std::string name() override { return "envoy.test.filter"; }
+  std::string name() const override { return "envoy.test.filter"; }
 };
 
 // Verify that configured upstream filters are added to client connections.
@@ -2885,7 +2812,7 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
 
 class ClusterManagerInitHelperTest : public testing::Test {
 public:
-  MOCK_METHOD1(onClusterInit, void(Cluster& cluster));
+  MOCK_METHOD(void, onClusterInit, (Cluster & cluster));
 
   NiceMock<MockClusterManager> cm_;
   ClusterManagerInitHelper init_helper_{cm_, [this](Cluster& cluster) { onClusterInit(cluster); }};
@@ -3081,7 +3008,7 @@ public:
       }
       EXPECT_CALL(os_sys_calls,
                   setsockopt_(_, name_val.first.level(), name_val.first.option(), _, sizeof(int)))
-          .WillOnce(Invoke([&name_val](int, int, int, const void* optval, socklen_t) -> int {
+          .WillOnce(Invoke([&name_val](os_fd_t, int, int, const void* optval, socklen_t) -> int {
             EXPECT_EQ(name_val.second, *static_cast<const int*>(optval));
             return 0;
           }));
@@ -3099,10 +3026,10 @@ public:
           NiceMock<Network::MockConnectionSocket> socket;
           if (expect_success) {
             EXPECT_TRUE((Network::Socket::applyOptions(
-                options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
+                options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
           } else {
             EXPECT_FALSE((Network::Socket::applyOptions(
-                options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
+                options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
           }
           return connection_;
         }));
@@ -3337,7 +3264,7 @@ public:
                 EXPECT_EQ(1, options->size());
                 NiceMock<Network::MockConnectionSocket> socket;
                 EXPECT_FALSE((Network::Socket::applyOptions(
-                    options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
+                    options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
                 return connection_;
               }));
       cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
@@ -3354,12 +3281,12 @@ public:
               EXPECT_NE(nullptr, options.get());
               NiceMock<Network::MockConnectionSocket> socket;
               EXPECT_TRUE((Network::Socket::applyOptions(
-                  options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
+                  options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
               return connection_;
             }));
     EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.level(),
                                           ENVOY_SOCKET_SO_KEEPALIVE.option(), _, sizeof(int)))
-        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+        .WillOnce(Invoke([](os_fd_t, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return 0;
         }));
@@ -3367,7 +3294,7 @@ public:
       EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_KEEPCNT.level(),
                                             ENVOY_SOCKET_TCP_KEEPCNT.option(), _, sizeof(int)))
           .WillOnce(
-              Invoke([&keepalive_probes](int, int, int, const void* optval, socklen_t) -> int {
+              Invoke([&keepalive_probes](os_fd_t, int, int, const void* optval, socklen_t) -> int {
                 EXPECT_EQ(keepalive_probes.value(), *static_cast<const int*>(optval));
                 return 0;
               }));
@@ -3375,16 +3302,17 @@ public:
     if (keepalive_time.has_value()) {
       EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_KEEPIDLE.level(),
                                             ENVOY_SOCKET_TCP_KEEPIDLE.option(), _, sizeof(int)))
-          .WillOnce(Invoke([&keepalive_time](int, int, int, const void* optval, socklen_t) -> int {
-            EXPECT_EQ(keepalive_time.value(), *static_cast<const int*>(optval));
-            return 0;
-          }));
+          .WillOnce(
+              Invoke([&keepalive_time](os_fd_t, int, int, const void* optval, socklen_t) -> int {
+                EXPECT_EQ(keepalive_time.value(), *static_cast<const int*>(optval));
+                return 0;
+              }));
     }
     if (keepalive_interval.has_value()) {
       EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_KEEPINTVL.level(),
                                             ENVOY_SOCKET_TCP_KEEPINTVL.option(), _, sizeof(int)))
-          .WillOnce(
-              Invoke([&keepalive_interval](int, int, int, const void* optval, socklen_t) -> int {
+          .WillOnce(Invoke(
+              [&keepalive_interval](os_fd_t, int, int, const void* optval, socklen_t) -> int {
                 EXPECT_EQ(keepalive_interval.value(), *static_cast<const int*>(optval));
                 return 0;
               }));
@@ -3689,6 +3617,83 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
       hosts_added, {}, 100);
 }
 
+TEST_F(ClusterManagerImplTest, InvalidPriorityLocalClusterNameStatic) {
+  std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: new_cluster
+    connect_timeout: 4s
+    type: STATIC
+    load_assignment:
+      cluster_name: "domains"
+      endpoints:
+        - priority: 10
+          lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.2
+                  port_value: 11001
+cluster_manager:
+  local_cluster_name: new_cluster
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+                            "Unexpected non-zero priority for local cluster 'new_cluster'.");
+}
+
+TEST_F(ClusterManagerImplTest, InvalidPriorityLocalClusterNameStrictDns) {
+  std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: new_cluster
+    connect_timeout: 4s
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: "domains"
+      endpoints:
+        - priority: 10
+          lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.2
+                  port_value: 11001
+cluster_manager:
+  local_cluster_name: new_cluster
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+                            "Unexpected non-zero priority for local cluster 'new_cluster'.");
+}
+
+TEST_F(ClusterManagerImplTest, InvalidPriorityLocalClusterNameLogicalDns) {
+  std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: new_cluster
+    connect_timeout: 4s
+    type: LOGICAL_DNS
+    load_assignment:
+      cluster_name: "domains"
+      endpoints:
+        - priority: 10
+          lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.2
+                  port_value: 11001
+cluster_manager:
+  local_cluster_name: new_cluster
+)EOF";
+
+  // The priority for LOGICAL_DNS endpoints are written, so we just verify that there is only a
+  // single priority even if the endpoint was configured to be priority 10.
+  create(parseBootstrapFromV2Yaml(yaml));
+  const auto cluster = cluster_manager_->get("new_cluster");
+  EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority().size());
+}
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

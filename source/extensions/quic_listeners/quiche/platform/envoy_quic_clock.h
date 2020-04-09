@@ -4,7 +4,7 @@
 
 #include "envoy/event/dispatcher.h"
 
-#include "quiche/quic/platform/api/quic_clock.h"
+#include "quiche/quic/core/quic_clock.h"
 
 namespace Envoy {
 namespace Quic {

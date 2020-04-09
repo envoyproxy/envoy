@@ -21,7 +21,7 @@ CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config)
 
 // This handles the CORS preflight request as described in
 // https://www.w3.org/TR/cors/#resource-preflight-requests
-Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (decoder_callbacks_->route() == nullptr ||
       decoder_callbacks_->route()->routeEntry() == nullptr) {
     return Http::FilterHeadersStatus::Continue;
@@ -64,26 +64,26 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
-      {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}}};
+  auto response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+      {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}})};
 
-  response_headers->insertAccessControlAllowOrigin().value(*origin_);
+  response_headers->setAccessControlAllowOrigin(origin_->value().getStringView());
 
   if (allowCredentials()) {
-    response_headers->insertAccessControlAllowCredentials().value(
+    response_headers->setReferenceAccessControlAllowCredentials(
         Http::Headers::get().CORSValues.True);
   }
 
   if (!allowMethods().empty()) {
-    response_headers->insertAccessControlAllowMethods().value(allowMethods());
+    response_headers->setAccessControlAllowMethods(allowMethods());
   }
 
   if (!allowHeaders().empty()) {
-    response_headers->insertAccessControlAllowHeaders().value(allowHeaders());
+    response_headers->setAccessControlAllowHeaders(allowHeaders());
   }
 
   if (!maxAge().empty()) {
-    response_headers->insertAccessControlMaxAge().value(maxAge());
+    response_headers->setAccessControlMaxAge(maxAge());
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
@@ -93,18 +93,18 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
 
 // This handles simple CORS requests as described in
 // https://www.w3.org/TR/cors/#resource-requests
-Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (!is_cors_request_) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  headers.insertAccessControlAllowOrigin().value(*origin_);
+  headers.setAccessControlAllowOrigin(origin_->value().getStringView());
   if (allowCredentials()) {
-    headers.insertAccessControlAllowCredentials().value(Http::Headers::get().CORSValues.True);
+    headers.setReferenceAccessControlAllowCredentials(Http::Headers::get().CORSValues.True);
   }
 
   if (!exposeHeaders().empty()) {
-    headers.insertAccessControlExposeHeaders().value(exposeHeaders());
+    headers.setAccessControlExposeHeaders(exposeHeaders());
   }
 
   return Http::FilterHeadersStatus::Continue;

@@ -8,9 +8,14 @@ from tools.api_proto_plugin import visitor
 from tools.protoxform import options
 from tools.protoxform import utils
 
+from envoy.annotations import resource_pb2
+from udpa.annotations import migrate_pb2
+from udpa.annotations import status_pb2
 from google.api import annotations_pb2
 
-ENVOY_COMMENT_WITH_TYPE_REGEX = re.compile('<envoy_api_(msg|enum_value|field|enum)_([\w\.]+)>')
+ENVOY_API_TYPE_REGEX_STR = 'envoy_api_(msg|enum_value|field|enum)_([\w\.]+)'
+ENVOY_COMMENT_WITH_TYPE_REGEX = re.compile('<%s>|:ref:`%s`' %
+                                           (ENVOY_API_TYPE_REGEX_STR, ENVOY_API_TYPE_REGEX_STR))
 
 
 class UpgradeVisitor(visitor.Visitor):
@@ -19,8 +24,11 @@ class UpgradeVisitor(visitor.Visitor):
   See visitor.Visitor for visitor method docs comments.
   """
 
-  def __init__(self, typedb):
+  def __init__(self, n, typedb, envoy_internal_shadow, package_version_status):
+    self._base_version = n
     self._typedb = typedb
+    self._envoy_internal_shadow = envoy_internal_shadow
+    self._package_version_status = package_version_status
 
   def _UpgradedComment(self, c):
 
@@ -29,7 +37,14 @@ class UpgradeVisitor(visitor.Visitor):
       # stylized and match the output format of tools/protodoc. We need to do
       # some special handling of field/enum values, and also the normalization
       # that was performed in v2 for envoy.api.v2 types.
-      ref_type, normalized_type_name = match.groups()
+      label_ref_type, label_normalized_type_name, section_ref_type, section_normalized_type_name = match.groups(
+      )
+      if label_ref_type is not None:
+        ref_type = label_ref_type
+        normalized_type_name = label_normalized_type_name
+      else:
+        ref_type = section_ref_type
+        normalized_type_name = section_normalized_type_name
       if ref_type == 'field' or ref_type == 'enum_value':
         normalized_type_name, residual = normalized_type_name.rsplit('.', 1)
       else:
@@ -44,20 +59,40 @@ class UpgradeVisitor(visitor.Visitor):
         type_desc = self._typedb.types[api_v2_type_name]
       repl_type = type_desc.next_version_type_name[len(
           'envoy.'):] if type_desc.next_version_type_name else normalized_type_name
-      return '<envoy_api_%s_%s%s>' % (ref_type, repl_type, '.' + residual if residual else '')
+      # TODO(htuch): this should really either go through the type database or
+      # via the descriptor pool and annotations, but there are only two of these
+      # we need for the initial v2 -> v3 docs cut, so hard coding for now.
+      # Tracked at https://github.com/envoyproxy/envoy/issues/9734.
+      if repl_type == 'config.route.v3.RouteAction':
+        if residual == 'host_rewrite':
+          residual = 'host_rewrite_literal'
+        elif residual == 'auto_host_rewrite_header':
+          residual = 'auto_host_rewrite'
+      new_ref = 'envoy_api_%s_%s%s' % (ref_type, repl_type, '.' + residual if residual else '')
+      if label_ref_type is not None:
+        return '<%s>' % new_ref
+      else:
+        return ':ref:`%s`' % new_ref
 
     return re.sub(ENVOY_COMMENT_WITH_TYPE_REGEX, UpgradeType, c)
 
   def _UpgradedPostMethod(self, m):
-    return re.sub(r'^/v2/', '/v3alpha/', m)
+    return re.sub(r'^/v%d/' % self._base_version, '/v%d/' % (self._base_version + 1), m)
 
+  # Upgraded type using canonical type naming, e.g. foo.bar.
+  def _UpgradedTypeCanonical(self, t):
+    if not t.startswith('envoy'):
+      return t
+    type_desc = self._typedb.types[t]
+    if type_desc.next_version_type_name:
+      return type_desc.next_version_type_name
+    return t
+
+  # Upgraded type using internal type naming, e.g. .foo.bar.
   def _UpgradedType(self, t):
     if not t.startswith('.envoy'):
       return t
-    type_desc = self._typedb.types[t[1:]]
-    if type_desc.next_version_type_name:
-      return '.' + type_desc.next_version_type_name
-    return t
+    return '.' + self._UpgradedTypeCanonical(t[1:])
 
   def _Deprecate(self, proto, field_or_value):
     """Deprecate a field or value in a message/enum proto.
@@ -66,11 +101,45 @@ class UpgradeVisitor(visitor.Visitor):
       proto: DescriptorProto or EnumDescriptorProto message.
       field_or_value: field or value inside proto.
     """
-    reserved = proto.reserved_range.add()
-    reserved.start = field_or_value.number
-    reserved.end = field_or_value.number + 1
-    proto.reserved_name.append(field_or_value.name)
-    options.AddHideOption(field_or_value.options)
+    if self._envoy_internal_shadow:
+      field_or_value.name = 'hidden_envoy_deprecated_' + field_or_value.name
+    else:
+      reserved = proto.reserved_range.add()
+      reserved.start = field_or_value.number
+      reserved.end = field_or_value.number + 1
+      proto.reserved_name.append(field_or_value.name)
+      options.AddHideOption(field_or_value.options)
+
+  def _Rename(self, proto, migrate_annotation):
+    """Rename a field/enum/service/message
+
+    Args:
+      proto: DescriptorProto or corresponding proto message
+      migrate_annotation: udpa.annotations.MigrateAnnotation message
+    """
+    if migrate_annotation.rename:
+      proto.name = migrate_annotation.rename
+      migrate_annotation.rename = ""
+
+  def _OneofPromotion(self, msg_proto, field_proto, migrate_annotation):
+    """Promote a field to a oneof.
+
+    Args:
+      msg_proto: DescriptorProto for message containing field.
+      field_proto: FieldDescriptorProto for field.
+      migrate_annotation: udpa.annotations.FieldMigrateAnnotation message
+    """
+    if migrate_annotation.oneof_promotion:
+      oneof_index = -1
+      for n, oneof_decl in enumerate(msg_proto.oneof_decl):
+        if oneof_decl.name == migrate_annotation.oneof_promotion:
+          oneof_index = n
+      if oneof_index == -1:
+        oneof_index = len(msg_proto.oneof_decl)
+        oneof_decl = msg_proto.oneof_decl.add()
+        oneof_decl.name = migrate_annotation.oneof_promotion
+      field_proto.oneof_index = oneof_index
+      migrate_annotation.oneof_promotion = ""
 
   def VisitService(self, service_proto, type_context):
     upgraded_proto = copy.deepcopy(service_proto)
@@ -82,21 +151,36 @@ class UpgradeVisitor(visitor.Visitor):
         http_options.post = self._UpgradedPostMethod(http_options.post)
       m.input_type = self._UpgradedType(m.input_type)
       m.output_type = self._UpgradedType(m.output_type)
+    if service_proto.options.HasExtension(resource_pb2.resource):
+      upgraded_proto.options.Extensions[resource_pb2.resource].type = self._UpgradedTypeCanonical(
+          service_proto.options.Extensions[resource_pb2.resource].type)
     return upgraded_proto
 
   def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
     upgraded_proto = copy.deepcopy(msg_proto)
-    if upgraded_proto.options.deprecated:
+    if upgraded_proto.options.deprecated and not self._envoy_internal_shadow:
       options.AddHideOption(upgraded_proto.options)
+    options.SetVersioningAnnotation(upgraded_proto.options, type_context.name)
     # Mark deprecated fields as ready for deletion by protoxform.
     for f in upgraded_proto.field:
       if f.options.deprecated:
         self._Deprecate(upgraded_proto, f)
-        # Make sure the type name is erased so it isn't picked up by protoxform
-        # when computing deps.
-        f.type_name = ""
+        if self._envoy_internal_shadow:
+          # When shadowing, we use the upgraded version of types (which should
+          # themselves also be shadowed), to allow us to avoid unnecessary
+          # references to the previous version (and complexities around
+          # upgrading during API boosting).
+          f.type_name = self._UpgradedType(f.type_name)
+        else:
+          # Make sure the type name is erased so it isn't picked up by protoxform
+          # when computing deps.
+          f.type_name = ""
       else:
         f.type_name = self._UpgradedType(f.type_name)
+      if f.options.HasExtension(migrate_pb2.field_migrate):
+        field_migrate = f.options.Extensions[migrate_pb2.field_migrate]
+        self._Rename(f, field_migrate)
+        self._OneofPromotion(upgraded_proto, f, field_migrate)
     # Upgrade nested messages.
     del upgraded_proto.nested_type[:]
     upgraded_proto.nested_type.extend(nested_msgs)
@@ -111,18 +195,28 @@ class UpgradeVisitor(visitor.Visitor):
       if v.options.deprecated:
         # We need special handling for the zero field, as proto3 needs some value
         # here.
-        if v.number == 0:
+        if v.number == 0 and not self._envoy_internal_shadow:
           v.name = 'DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE'
         else:
           # Mark deprecated enum values as ready for deletion by protoxform.
           self._Deprecate(upgraded_proto, v)
+      elif v.options.HasExtension(migrate_pb2.enum_value_migrate):
+        self._Rename(v, v.options.Extensions[migrate_pb2.enum_value_migrate])
     return upgraded_proto
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
     upgraded_proto = copy.deepcopy(file_proto)
+    # Upgrade imports.
+    upgraded_proto.dependency[:] = [
+        dependency for dependency in upgraded_proto.dependency
+        if dependency not in ("udpa/annotations/migrate.proto")
+    ]
     # Upgrade package.
-    upgraded_proto.package = self._typedb.next_version_packages[upgraded_proto.package]
-    upgraded_proto.name = self._typedb.next_version_proto_paths[upgraded_proto.name]
+    upgraded_proto.package = self._typedb.next_version_protos[upgraded_proto.name].qualified_package
+    upgraded_proto.name = self._typedb.next_version_protos[upgraded_proto.name].proto_path
+    upgraded_proto.options.ClearExtension(migrate_pb2.file_migrate)
+    upgraded_proto.options.Extensions[
+        status_pb2.file_status].package_version_status = self._package_version_status
     # Upgrade comments.
     for location in upgraded_proto.source_code_info.location:
       location.leading_comments = self._UpgradedComment(location.leading_comments)
@@ -142,20 +236,34 @@ class UpgradeVisitor(visitor.Visitor):
     return upgraded_proto
 
 
-def V3MigrationXform(file_proto):
-  """Transform a FileDescriptorProto from v2[alpha\d] to v3alpha.
+def VersionUpgradeXform(n, envoy_internal_shadow, file_proto, params):
+  """Transform a FileDescriptorProto from vN[alpha\d] to v(N+1).
 
   Args:
-    file_proto: v2[alpha\d] FileDescriptorProto message.
+    n: version N to upgrade from.
+    envoy_internal_shadow: generate a shadow for Envoy internal use containing deprecated fields.
+    file_proto: vN[alpha\d] FileDescriptorProto message.
+    params: plugin parameters.
 
   Returns:
-    v3 FileDescriptorProto message.
+    v(N+1) FileDescriptorProto message.
   """
   # Load type database.
-  typedb = utils.LoadTypeDb()
+  typedb = utils.GetTypeDb()
   # If this isn't a proto in an upgraded package, return None.
-  if file_proto.package not in typedb.next_version_packages or not typedb.next_version_packages[
-      file_proto.package]:
+  if file_proto.name not in typedb.next_version_protos or not typedb.next_version_protos[
+      file_proto.name]:
     return None
   # Otherwise, this .proto needs upgrading, do it.
-  return traverse.TraverseFile(file_proto, UpgradeVisitor(typedb))
+  freeze = 'extra_args' in params and params['extra_args'] == 'freeze'
+  existing_pkg_version_status = file_proto.options.Extensions[
+      status_pb2.file_status].package_version_status
+  # Normally, we are generating the NEXT_MAJOR_VERSION_CANDIDATE. However, if
+  # freezing and previously this was the active major version, the migrated
+  # version is now the ACTIVE version.
+  if freeze and existing_pkg_version_status == status_pb2.ACTIVE:
+    package_version_status = status_pb2.ACTIVE
+  else:
+    package_version_status = status_pb2.NEXT_MAJOR_VERSION_CANDIDATE
+  return traverse.TraverseFile(
+      file_proto, UpgradeVisitor(n, typedb, envoy_internal_shadow, package_version_status))

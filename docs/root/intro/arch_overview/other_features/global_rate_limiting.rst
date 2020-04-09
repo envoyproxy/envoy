@@ -1,4 +1,4 @@
-.. _arch_overview_rate_limit:
+.. _arch_overview_global_rate_limit:
 
 Global rate limiting
 ====================
@@ -29,3 +29,10 @@ written in Go which uses a Redis backend. Envoy’s rate limit integration has t
   :ref:`Configuration reference <config_http_filters_rate_limit>`
 
 Rate limit service :ref:`configuration <config_rate_limit_service>`.
+
+Note that Envoy also supports :ref:`local rate limiting <config_network_filters_local_rate_limit>`.
+Local rate limiting can be used in conjunction with global rate limiting to reduce load on the
+global rate limit service. For example, a local token bucket rate limit can absorb very large bursts
+in load that might otherwise overwhelm a global rate limit service. Thus, the rate limit is applied
+in two stages. The initial coarse grained limiting is performed by the token bucket limit before
+a fine grained global limit finishes the job.

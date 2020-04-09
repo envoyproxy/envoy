@@ -13,6 +13,16 @@ virtual_hosts:
           cluster: www2
           prefix_rewrite: /api/new_endpoint
       - match:
+          prefix: /ping
+        direct_response:
+          status: 200
+          body:
+            inline_string: "Success!"
+        response_headers_to_add:
+          - header:
+              key: "content-type"
+              value: "text/plain"
+      - match:
           path: /
         route:
           cluster: root_www2
@@ -20,7 +30,6 @@ virtual_hosts:
           prefix: /
         route:
           cluster: www2
-
   - name: www2_staging
     domains:
       - www-staging.lyft.net

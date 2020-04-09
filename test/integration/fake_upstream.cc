@@ -16,6 +16,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 
 #include "server/connection_handler_impl.h"
@@ -37,13 +38,13 @@ using testing::AssertionResult;
 using testing::AssertionSuccess;
 
 namespace Envoy {
-FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                        Event::TestTimeSystem& time_system)
     : parent_(parent), encoder_(encoder), time_system_(time_system) {
   encoder.getStream().addCallbacks(*this);
 }
 
-void FakeStream::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+void FakeStream::decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) {
   Thread::LockGuard lock(lock_);
   headers_ = std::move(headers);
   setEndStream(end_stream);
@@ -58,7 +59,7 @@ void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
   decoder_event_.notifyOne();
 }
 
-void FakeStream::decodeTrailers(Http::HeaderMapPtr&& trailers) {
+void FakeStream::decodeTrailers(Http::RequestTrailerMapPtr&& trailers) {
   Thread::LockGuard lock(lock_);
   setEndStream(true);
   trailers_ = std::move(trailers);
@@ -72,20 +73,21 @@ void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
   }
 }
 
-void FakeStream::encode100ContinueHeaders(const Http::HeaderMapImpl& headers) {
-  std::shared_ptr<Http::HeaderMapImpl> headers_copy(
-      new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
+void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
+  std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   parent_.connection().dispatcher().post(
       [this, headers_copy]() -> void { encoder_.encode100ContinueHeaders(*headers_copy); });
 }
 
-void FakeStream::encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream) {
-  std::shared_ptr<Http::HeaderMapImpl> headers_copy(
-      new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
+void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
+  std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
                           parent_.connection().localAddress()->asString());
   }
+
   parent_.connection().dispatcher().post([this, headers_copy, end_stream]() -> void {
     encoder_.encodeHeaders(*headers_copy, end_stream);
   });
@@ -106,14 +108,14 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
 }
 
 void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
-  std::shared_ptr<Buffer::Instance> data_copy(new Buffer::OwnedImpl(data));
+  std::shared_ptr<Buffer::Instance> data_copy = std::make_shared<Buffer::OwnedImpl>(data);
   parent_.connection().dispatcher().post(
       [this, data_copy, end_stream]() -> void { encoder_.encodeData(*data_copy, end_stream); });
 }
 
-void FakeStream::encodeTrailers(const Http::HeaderMapImpl& trailers) {
-  std::shared_ptr<Http::HeaderMapImpl> trailers_copy(
-      new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(trailers)));
+void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
+  std::shared_ptr<Http::ResponseTrailerMap> trailers_copy(
+      Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers));
   parent_.connection().dispatcher().post(
       [this, trailers_copy]() -> void { encoder_.encodeTrailers(*trailers_copy); });
 }
@@ -126,6 +128,11 @@ void FakeStream::encodeResetStream() {
 void FakeStream::encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) {
   parent_.connection().dispatcher().post(
       [this, &metadata_map_vector]() -> void { encoder_.encodeMetadata(metadata_map_vector); });
+}
+
+void FakeStream::readDisable(bool disable) {
+  parent_.connection().dispatcher().post(
+      [this, disable]() -> void { encoder_.getStream().readDisable(disable); });
 }
 
 void FakeStream::onResetStream(Http::StreamResetReason, absl::string_view) {
@@ -206,7 +213,7 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
 }
 
 void FakeStream::startGrpcStream() {
-  encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 }
 
 void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
@@ -214,23 +221,29 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
       Http::TestHeaderMapImpl{{"grpc-status", std::to_string(static_cast<uint32_t>(status))}});
 }
 
-FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connection,
-                                       Stats::Store& store, Type type,
-                                       Event::TestTimeSystem& time_system,
-                                       uint32_t max_request_headers_kb,
-                                       uint32_t max_request_headers_count)
+FakeHttpConnection::FakeHttpConnection(
+    SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
+    Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
+    uint32_t max_request_headers_count,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action)
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
+    Http::Http1Settings http1_settings;
+    // For the purpose of testing, we always have the upstream encode the trailers if any
+    http1_settings.enable_trailers_ = true;
     codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
-        shared_connection_.connection(), store, *this, Http::Http1Settings(),
-        max_request_headers_kb, max_request_headers_count);
+        shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   } else {
-    auto settings = Http::Http2Settings();
-    settings.allow_connect_ = true;
-    settings.allow_metadata_ = true;
+    envoy::config::core::v3::Http2ProtocolOptions http2_options =
+        ::Envoy::Http2::Utility::initializeAndValidateOptions(
+            envoy::config::core::v3::Http2ProtocolOptions());
+    http2_options.set_allow_connect(true);
+    http2_options.set_allow_metadata(true);
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, store, settings, max_request_headers_kb,
-        max_request_headers_count);
+        shared_connection_.connection(), *this, store, http2_options, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
     ASSERT(type == Type::HTTP2);
   }
 
@@ -257,7 +270,7 @@ AssertionResult FakeConnectionBase::enableHalfClose(bool enable,
       [enable](Network::Connection& connection) { connection.enableHalfClose(enable); }, timeout);
 }
 
-Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder, bool) {
+Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encoder, bool) {
   Thread::LockGuard lock(lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder, time_system_));
   connection_event_.notifyOne();
@@ -357,7 +370,7 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type
 
 static Network::SocketPtr
 makeTcpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
-  return Network::SocketPtr{new Network::TcpListenSocket(address, nullptr, true)};
+  return std::make_unique<Network::TcpListenSocket>(address, nullptr, true);
 }
 
 static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::IpVersion version) {
@@ -365,14 +378,25 @@ static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::I
       Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(version), port));
 }
 
+static Network::SocketPtr
+makeUdpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
+  auto socket = std::make_unique<Network::UdpListenSocket>(address, nullptr, true);
+  // TODO(mattklein123): These options are set in multiple locations. We should centralize them for
+  // UDP listeners.
+  socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
+  socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+  return socket;
+}
+
 FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                            FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
-                           bool enable_half_close)
-    : FakeUpstream(Network::Test::createRawBufferSocketFactory(), makeTcpListenSocket(address),
+                           bool enable_half_close, bool udp_fake_upstream)
+    : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
+                   udp_fake_upstream ? makeUdpListenSocket(address) : makeTcpListenSocket(address),
                    type, time_system, enable_half_close) {
-  ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}",
+  ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
             address->ip()->addressAsString(), address->ip()->port(),
-            Network::Test::addressVersionAsString(address->ip()->version()));
+            Network::Test::addressVersionAsString(address->ip()->version()), udp_fake_upstream);
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
@@ -381,7 +405,7 @@ FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
                    makeTcpListenSocket(port, version), type, time_system, enable_half_close) {
   ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
-            this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
+            localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
@@ -390,13 +414,14 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
     : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version), type,
                    time_system, false) {
   ENVOY_LOG(info, "starting fake SSL server on port {}. Address version is {}",
-            this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
+            localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
                            Event::TestTimeSystem& time_system, bool enable_half_close)
-    : http_type_(type), socket_(std::move(listen_socket)),
+    : http_type_(type), socket_(Network::SocketSharedPtr(listen_socket.release())),
+      socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
       dispatcher_(api_->allocateDispatcher()),
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "fake_upstream")),
@@ -426,15 +451,15 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   auto connection_wrapper =
       std::make_unique<QueuedConnectionWrapper>(connection, allow_unexpected_disconnects_);
   connection_wrapper->moveIntoListBack(std::move(connection_wrapper), new_connections_);
-  new_connection_event_.notifyOne();
+  upstream_event_.notifyOne();
   return true;
 }
 
 bool FakeUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { return true; }
 
-bool FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
-                                                Network::UdpReadFilterCallbacks&) {
-  return true;
+void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
+                                                Network::UdpReadFilterCallbacks& callbacks) {
+  udp_listener.addReadFilter(std::make_unique<FakeUpstreamUdpFilter>(*this, callbacks));
 }
 
 void FakeUpstream::threadRoutine() {
@@ -449,11 +474,11 @@ void FakeUpstream::threadRoutine() {
   }
 }
 
-AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
-                                                    FakeHttpConnectionPtr& connection,
-                                                    milliseconds timeout,
-                                                    uint32_t max_request_headers_kb,
-                                                    uint32_t max_request_headers_count) {
+AssertionResult FakeUpstream::waitForHttpConnection(
+    Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection, milliseconds timeout,
+    uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action) {
   Event::TestTimeSystem& time_system = timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   {
@@ -462,7 +487,7 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
       if (time_system.monotonicTime() >= end_time) {
         return AssertionFailure() << "Timed out waiting for new connection.";
       }
-      time_system_.waitFor(lock_, new_connection_event_, 5ms);
+      time_system_.waitFor(lock_, upstream_event_, 5ms);
       if (new_connections_.empty()) {
         // Run the client dispatcher since we may need to process window updates, etc.
         client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
@@ -472,9 +497,9 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
     if (new_connections_.empty()) {
       return AssertionFailure() << "Got a new connection event, but didn't create a connection.";
     }
-    connection = std::make_unique<FakeHttpConnection>(consumeConnection(), stats_store_, http_type_,
-                                                      time_system, max_request_headers_kb,
-                                                      max_request_headers_count);
+    connection = std::make_unique<FakeHttpConnection>(
+        consumeConnection(), stats_store_, http_type_, time_system, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   }
   VERIFY_ASSERTION(connection->initialize());
   VERIFY_ASSERTION(connection->readDisable(false));
@@ -495,7 +520,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
       FakeUpstream& upstream = *it;
       Thread::ReleasableLockGuard lock(upstream.lock_);
       if (upstream.new_connections_.empty()) {
-        time_system.waitFor(upstream.lock_, upstream.new_connection_event_, 5ms);
+        time_system.waitFor(upstream.lock_, upstream.upstream_event_, 5ms);
       }
 
       if (upstream.new_connections_.empty()) {
@@ -505,7 +530,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         connection = std::make_unique<FakeHttpConnection>(
             upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_,
             upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-            Http::DEFAULT_MAX_HEADERS_COUNT);
+            Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
         lock.release();
         VERIFY_ASSERTION(connection->initialize());
         VERIFY_ASSERTION(connection->readDisable(false));
@@ -522,7 +547,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
     Thread::LockGuard lock(lock_);
     if (new_connections_.empty()) {
       ENVOY_LOG(debug, "waiting for raw connection");
-      time_system_.waitFor(lock_, new_connection_event_,
+      time_system_.waitFor(lock_, upstream_event_,
                            timeout); // Safe since CondVar::waitFor won't throw.
     }
 
@@ -543,6 +568,36 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
   connection_wrapper->set_parented();
   connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
   return connection_wrapper->shared_connection();
+}
+
+testing::AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& data_to_fill,
+                                                          std::chrono::milliseconds timeout) {
+  Thread::LockGuard lock(lock_);
+  auto end_time = time_system_.monotonicTime() + timeout;
+  while (received_datagrams_.empty()) {
+    if (time_system_.monotonicTime() >= end_time) {
+      return AssertionFailure() << "Timed out waiting for UDP datagram.";
+    }
+    time_system_.waitFor(lock_, upstream_event_, 5ms); // Safe since CondVar::waitFor won't throw.
+  }
+  data_to_fill = std::move(received_datagrams_.front());
+  received_datagrams_.pop_front();
+  return AssertionSuccess();
+}
+
+void FakeUpstream::onRecvDatagram(Network::UdpRecvData& data) {
+  Thread::LockGuard lock(lock_);
+  received_datagrams_.emplace_back(std::move(data));
+  upstream_event_.notifyOne();
+}
+
+void FakeUpstream::sendUdpDatagram(const std::string& buffer,
+                                   const Network::Address::InstanceConstSharedPtr& peer) {
+  dispatcher_->post([this, buffer, peer] {
+    const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
+                                                    nullptr, *peer);
+    EXPECT_TRUE(rc.rc_ == buffer.length());
+  });
 }
 
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,

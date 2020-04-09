@@ -1,5 +1,7 @@
 #include "extensions/resource_monitors/fixed_heap/config.h"
 
+#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.h"
+#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"

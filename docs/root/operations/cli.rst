@@ -11,7 +11,7 @@ following are the command line options that Envoy supports.
   *(optional)* The path to the v2 :ref:`JSON/YAML/proto3 configuration
   file <config>`. If this flag is missing, :option:`--config-yaml` is required.
   This will be parsed as a :ref:`v2 bootstrap configuration file
-  <config_overview_v2_bootstrap>`.
+  <config_overview_bootstrap>`.
   Valid extensions are ``.json``, ``.yaml``, ``.pb`` and ``.pb_text``, which indicate
   JSON, YAML, `binary proto3
   <https://developers.google.com/protocol-buffers/docs/encoding>`_ and `text
@@ -94,6 +94,10 @@ following are the command line options that Envoy supports.
    *(optional)* The format string to use for laying out the log message metadata. If this is not
    set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] %v"`` is used.
 
+   When used in conjunction with ``--log-format-escaped``, the logger can be configured
+   to log in a format that is parsable by log viewers. Known integrations are documented
+   in the :ref:`application logging configuration <config_application_logs>` section.
+
    The supported format flags are (with example output):
 
    :%v:	The actual message to log ("some user text")
@@ -125,6 +129,13 @@ following are the command line options that Envoy supports.
    :%T, %X:	ISO 8601 time format (HH:MM:SS), equivalent to %H:%M:%S ("13:25:06")
    :%z:	ISO 8601 offset from UTC in timezone ([+/-]HH:MM) ("-07:00")
    :%%:	The % sign ("%")
+
+.. option:: --log-format-escaped
+
+  *(optional)* This flag enables application log sanitization to escape C-style escape sequences.
+  This can be used to prevent a single log line from spanning multiple lines in the underlying log.
+  This sanitizes all escape sequences in `this list <https://en.cppreference.com/w/cpp/language/escape>`_.
+  Note that each line's trailing whitespace characters (such as EOL characters) will not be escaped.
 
 .. option:: --restart-epoch <integer>
 
@@ -207,7 +218,7 @@ following are the command line options that Envoy supports.
   the parent shutdown time set via the :option:`--parent-shutdown-time-s` option. How the two 
   settings are configured depends on the specific deployment. In edge scenarios, it might be
   desirable to have a very long drain time. In service to service scenarios, it might be possible
-  to make the drain and shutdown ime much shorter (e.g., 60s/90s).
+  to make the drain and shutdown time much shorter (e.g., 60s/90s).
 
 .. option:: --parent-shutdown-time-s <integer>
 
@@ -248,6 +259,14 @@ following are the command line options that Envoy supports.
   desirable for most Envoy deployments. Warnings are logged for the first use of any unknown field
   and these occurrences are counted in the :ref:`server.dynamic_unknown_fields <server_statistics>`
   statistic.
+
+.. option:: --disable-extensions <extension list>
+
+  *(optional)* This flag disabled the provided list of comma-separated extension names. Disabled
+  extensions cannot be used by static or dynamic configuration, though they are still linked into
+  Envoy and may run start-up code or have other runtime effects. Extension names are created by
+  joining the extension category and name with a forward slash,
+  e.g. ``grpc_credentials/envoy.grpc_credentials.file_based_metadata``.
 
 .. option:: --version
 

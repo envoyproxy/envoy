@@ -366,35 +366,35 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
   message_length -= Message::MessageHeaderSize;
 
   switch (op_code) {
-  case Message::OpCode::OP_REPLY: {
+  case Message::OpCode::Reply: {
     std::unique_ptr<ReplyMessageImpl> message(new ReplyMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeReply(std::move(message));
     break;
   }
 
-  case Message::OpCode::OP_QUERY: {
+  case Message::OpCode::Query: {
     std::unique_ptr<QueryMessageImpl> message(new QueryMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeQuery(std::move(message));
     break;
   }
 
-  case Message::OpCode::OP_GET_MORE: {
+  case Message::OpCode::GetMore: {
     std::unique_ptr<GetMoreMessageImpl> message(new GetMoreMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeGetMore(std::move(message));
     break;
   }
 
-  case Message::OpCode::OP_INSERT: {
+  case Message::OpCode::Insert: {
     std::unique_ptr<InsertMessageImpl> message(new InsertMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeInsert(std::move(message));
     break;
   }
 
-  case Message::OpCode::OP_KILL_CURSORS: {
+  case Message::OpCode::KillCursors: {
     std::unique_ptr<KillCursorsMessageImpl> message(
         new KillCursorsMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
@@ -402,14 +402,14 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
     break;
   }
 
-  case Message::OpCode::OP_COMMAND: {
+  case Message::OpCode::Command: {
     std::unique_ptr<CommandMessageImpl> message(new CommandMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeCommand(std::move(message));
     break;
   }
 
-  case Message::OpCode::OP_COMMANDREPLY: {
+  case Message::OpCode::CommandReply: {
     std::unique_ptr<CommandReplyMessageImpl> message(
         new CommandReplyMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
@@ -448,7 +448,7 @@ void EncoderImpl::encodeGetMore(const GetMoreMessage& message) {
                        message.fullCollectionName().size() + Message::StringPaddingLength +
                        Message::Int32Length + Message::Int64Length;
 
-  encodeCommonHeader(total_size, message, Message::OpCode::OP_GET_MORE);
+  encodeCommonHeader(total_size, message, Message::OpCode::GetMore);
   Bson::BufferHelper::writeInt32(output_, 0);
   Bson::BufferHelper::writeCString(output_, message.fullCollectionName());
   Bson::BufferHelper::writeInt32(output_, message.numberToReturn());
@@ -467,7 +467,7 @@ void EncoderImpl::encodeInsert(const InsertMessage& message) {
     total_size += document->byteSize();
   }
 
-  encodeCommonHeader(total_size, message, Message::OpCode::OP_INSERT);
+  encodeCommonHeader(total_size, message, Message::OpCode::Insert);
   Bson::BufferHelper::writeInt32(output_, message.flags());
   Bson::BufferHelper::writeCString(output_, message.fullCollectionName());
   for (const Bson::DocumentSharedPtr& document : message.documents()) {
@@ -485,7 +485,7 @@ void EncoderImpl::encodeKillCursors(const KillCursorsMessage& message) {
   int32_t total_size =
       Message::MessageHeaderSize + 2 * Message::Int32Length + (message.numberOfCursorIds() * 8);
 
-  encodeCommonHeader(total_size, message, Message::OpCode::OP_KILL_CURSORS);
+  encodeCommonHeader(total_size, message, Message::OpCode::KillCursors);
   Bson::BufferHelper::writeInt32(output_, 0);
   Bson::BufferHelper::writeInt32(output_, message.numberOfCursorIds());
   for (int64_t cursor : message.cursorIds()) {
@@ -506,7 +506,7 @@ void EncoderImpl::encodeQuery(const QueryMessage& message) {
     total_size += message.returnFieldsSelector()->byteSize();
   }
 
-  encodeCommonHeader(total_size, message, Message::OpCode::OP_QUERY);
+  encodeCommonHeader(total_size, message, Message::OpCode::Query);
   Bson::BufferHelper::writeInt32(output_, message.flags());
   Bson::BufferHelper::writeCString(output_, message.fullCollectionName());
   Bson::BufferHelper::writeInt32(output_, message.numberToSkip());
@@ -525,7 +525,7 @@ void EncoderImpl::encodeReply(const ReplyMessage& message) {
     total_size += document->byteSize();
   }
 
-  encodeCommonHeader(total_size, message, Message::OpCode::OP_REPLY);
+  encodeCommonHeader(total_size, message, Message::OpCode::Reply);
   Bson::BufferHelper::writeInt32(output_, message.flags());
   Bson::BufferHelper::writeInt64(output_, message.cursorId());
   Bson::BufferHelper::writeInt32(output_, message.startingFrom());
@@ -546,7 +546,7 @@ void EncoderImpl::encodeCommand(const CommandMessage& message) {
   }
 
   // Now encode.
-  encodeCommonHeader(total_size, message, Message::OpCode::OP_COMMAND);
+  encodeCommonHeader(total_size, message, Message::OpCode::Command);
   Bson::BufferHelper::writeCString(output_, message.database());
   Bson::BufferHelper::writeCString(output_, message.commandName());
   message.metadata()->encode(output_);
@@ -565,7 +565,7 @@ void EncoderImpl::encodeCommandReply(const CommandReplyMessage& message) {
   }
 
   // Now encode.
-  encodeCommonHeader(total_size, message, Message::OpCode::OP_COMMANDREPLY);
+  encodeCommonHeader(total_size, message, Message::OpCode::CommandReply);
   message.metadata()->encode(output_);
   message.commandReply()->encode(output_);
   for (const Bson::DocumentSharedPtr& document : message.outputDocs()) {

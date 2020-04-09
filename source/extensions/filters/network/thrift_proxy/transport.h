@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
@@ -82,9 +83,9 @@ using TransportPtr = std::unique_ptr<Transport>;
  * Implemented by each Thrift transport and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedTransportConfigFactory {
+class NamedTransportConfigFactory : public Envoy::Config::UntypedFactory {
 public:
-  virtual ~NamedTransportConfigFactory() = default;
+  ~NamedTransportConfigFactory() override = default;
 
   /**
    * Create a particular Thrift transport.
@@ -92,11 +93,7 @@ public:
    */
   virtual TransportPtr createTransport() PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of thrift transport
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
+  std::string category() const override { return "envoy.thrift_proxy.transports"; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -105,7 +102,7 @@ public:
    */
   static NamedTransportConfigFactory& getFactory(TransportType type) {
     const std::string& name = TransportNames::get().fromType(type);
-    return Envoy::Config::Utility::getAndCheckFactory<NamedTransportConfigFactory>(name);
+    return Envoy::Config::Utility::getAndCheckFactoryByName<NamedTransportConfigFactory>(name);
   }
 };
 
@@ -116,7 +113,7 @@ template <class TransportImpl> class TransportFactoryBase : public NamedTranspor
 public:
   TransportPtr createTransport() override { return std::move(std::make_unique<TransportImpl>()); }
 
-  std::string name() override { return name_; }
+  std::string name() const override { return name_; }
 
 protected:
   TransportFactoryBase(const std::string& name) : name_(name) {}

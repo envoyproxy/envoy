@@ -21,7 +21,7 @@ using testing::SaveArg;
 class MockTsiHandshakerCallbacks : public TsiHandshakerCallbacks {
 public:
   void onNextDone(NextResultPtr&& result) override { onNextDone_(result.get()); }
-  MOCK_METHOD1(onNextDone_, void(NextResult*));
+  MOCK_METHOD(void, onNextDone_, (NextResult*));
 
   void expectDone(tsi_result status, Buffer::Instance& to_send, CHandshakerResultPtr& result) {
     EXPECT_CALL(*this, onNextDone_(_))

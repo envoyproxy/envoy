@@ -15,3 +15,5 @@ Extensions
   cluster/cluster
   listener/listener
   grpc_credential/grpc_credential
+  retry/retry
+  wasm/wasm

@@ -3,7 +3,8 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.pb.validate.h"
+#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
@@ -20,7 +21,8 @@ using namespace Envoy::Extensions::NetworkFilters;
 
 ThriftProxy::ThriftFilters::FilterFactoryCb
 RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::thrift::rate_limit::v2alpha1::RateLimit& proto_config,
+    const envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit&
+        proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.domain().empty());
   ConfigSharedPtr config(new Config(proto_config, context.localInfo(), context.scope(),

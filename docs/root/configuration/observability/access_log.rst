@@ -60,12 +60,11 @@ Format Dictionaries
 -------------------
 
 Format dictionaries are dictionaries that specify a structured access log output format,
-specified using the ``json_format`` key. This allows logs to be output in a structured format
-such as JSON.
-Similar to format strings, command operators are evaluated and their values inserted into the format
-dictionary to construct the log output.
+specified using the ``json_format`` or ``typed_json_format`` keys. This allows logs to be output in
+a structured format such as JSON. Similar to format strings, command operators are evaluated and
+their values inserted into the format dictionary to construct the log output.
 
-For example, with the following format provided in the configuration:
+For example, with the following format provided in the configuration as ``json_format``:
 
 .. code-block:: json
 
@@ -87,9 +86,23 @@ The following JSON object would be written to the log file:
 
 This allows you to specify a custom key for each command operator.
 
+The ``typed_json_format`` differs from ``json_format`` in that values are rendered as JSON numbers,
+booleans, and nested objects or lists where applicable. In the example, the request duration
+would be rendered as the number ``123``.
+
 Format dictionaries have the following restrictions:
 
-* The dictionary must map strings to strings (specifically, strings to command operators). Nesting is not currently supported.
+* The dictionary must map strings to strings (specifically, strings to command operators). Nesting
+  is not currently supported.
+* When using the ``typed_json_format`` command operators will only produce typed output if the
+  command operator is the only string that appears in the dictionary value. For example,
+  ``"%DURATION%"`` will log a numeric duration value, but ``"%DURATION%.0"`` will log a string
+  value.
+
+.. note::
+
+  When using the ``typed_json_format``, integer values that exceed :math:`2^{53}` will be
+  represented with reduced precision as they must be converted to floating point numbers.
 
 Command Operators
 -----------------
@@ -99,7 +112,11 @@ The same operators are used by different types of access logs (such as HTTP and 
 fields may have slightly different meanings, depending on what type of log it is. Differences
 are noted.
 
-Note that if a value is not set/empty, the logs will contain a '-' character.
+Note that if a value is not set/empty, the logs will contain a ``-`` character or, for JSON logs,
+the string ``"-"``. For typed JSON logs unset values are represented as ``null`` values and empty
+strings are rendered as ``""``.
+
+Unless otherwise noted, command operators produce string outputs for typed JSON logs.
 
 The following command operators are supported:
 
@@ -140,12 +157,16 @@ The following command operators are supported:
 
     %START_TIME(%s.%9f)%
 
+  In typed JSON logs, START_TIME is always rendered as a string.
+
 %BYTES_RECEIVED%
   HTTP
     Body bytes received.
 
   TCP
     Downstream bytes received on connection.
+
+  Renders a numeric value in typed JSON logs.
 
 %PROTOCOL%
   HTTP
@@ -154,6 +175,9 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+  In typed JSON logs, PROTOCOL will render the string ``"-"`` if the protocol is not
+  available (e.g. in TCP logs).
+
 %RESPONSE_CODE%
   HTTP
     HTTP response code. Note that a response code of '0' means that the server never sent the
@@ -161,6 +185,8 @@ The following command operators are supported:
 
   TCP
     Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
 
 .. _config_access_log_format_response_code_details:
 
@@ -179,12 +205,26 @@ The following command operators are supported:
   TCP
     Downstream bytes sent on connection.
 
+  Renders a numeric value in typed JSON logs.
+
 %DURATION%
   HTTP
     Total duration in milliseconds of the request from the start time to the last byte out.
 
   TCP
     Total duration in milliseconds of the downstream connection.
+
+  Renders a numeric value in typed JSON logs.
+
+%REQUEST_DURATION%
+  HTTP
+    Total duration in milliseconds of the request from the start time to the last byte of
+    the request received from the downstream.
+
+  TCP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
 
 %RESPONSE_DURATION%
   HTTP
@@ -193,6 +233,18 @@ The following command operators are supported:
 
   TCP
     Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
+%RESPONSE_TX_DURATION%
+  HTTP
+    Total duration in milliseconds of the request from the first byte read from the upstream host to the last
+    byte sent downstream.
+
+  TCP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
 
 .. _config_access_log_format_response_flags:
 
@@ -204,7 +256,7 @@ The following command operators are supported:
     * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
     * **UF**: Upstream connection failure in addition to 503 response code.
     * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
-    * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
+    * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
     * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_api_field_route.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.max_connect_attempts>` was reached.
   HTTP only
     * **DC**: Downstream connection termination.
@@ -222,14 +274,6 @@ The following command operators are supported:
       :ref:`strictly-checked header <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>` in addition to 400 response code.
     * **SI**: Stream idle timeout in addition to 408 response code.
     * **DPE**: The downstream request had an HTTP protocol error.
-
-%RESPONSE_TX_DURATION%
-  HTTP
-    Total duration in milliseconds of the request from the first byte read from the upstream host to the last
-    byte sent downstream.
-
-  TCP
-    Not implemented ("-").
 
 %ROUTE_NAME%
   Name of the route.
@@ -281,7 +325,7 @@ The following command operators are supported:
 
   .. note::
 
-    This is always the physical remote address of the peer even if the downstream remote address has 
+    This is always the physical remote address of the peer even if the downstream remote address has
     been inferred from :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
@@ -291,7 +335,7 @@ The following command operators are supported:
 
   .. note::
 
-    This is always the physical remote address of the peer even if the downstream remote address has 
+    This is always the physical remote address of the peer even if the downstream remote address has
     been inferred from :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
@@ -306,6 +350,9 @@ The following command operators are supported:
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
     Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+
+%DOWNSTREAM_LOCAL_PORT%
+    Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
 
 %REQ(X?Y):Z%
   HTTP
@@ -352,6 +399,30 @@ The following command operators are supported:
 
   TCP
     Not implemented ("-").
+
+  .. note::
+
+    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+    when the referenced key is a simple value. If the referenced key is a struct or list value, a
+    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+    length is ignored
+
+%FILTER_STATE(KEY):Z%
+  HTTP
+    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
+    look up the filter state object. The serialized proto will be logged as JSON string if possible.
+    If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
+    Z is an optional parameter denoting string truncation up to Z characters long.
+
+  TCP
+    Same as HTTP, the filter state is from connection instead of a L7 request.
+
+  .. note::
+
+    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+    when the referenced key is a simple value. If the referenced key is a struct or list value, a
+    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+    length is ignored
 
 %REQUESTED_SERVER_NAME%
   HTTP
@@ -437,3 +508,5 @@ The following command operators are supported:
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
 
+%HOSTNAME%
+  The system hostname.

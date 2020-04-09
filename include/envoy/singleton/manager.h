@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/registry/registry.h"
 #include "envoy/singleton/instance.h"
 
@@ -14,10 +15,10 @@ namespace Singleton {
 /**
  * An abstract registration for a singleton entry.
  */
-class Registration {
+class Registration : public Config::UntypedFactory {
 public:
-  virtual ~Registration() = default;
-  virtual std::string name() PURE;
+  ~Registration() override = default;
+  std::string category() const override { return "envoy.singleton"; }
 };
 
 /**
@@ -34,7 +35,7 @@ public:
  */
 template <const char* name_param> class RegistrationImpl : public Registration {
 public:
-  std::string name() override { return name_param; }
+  std::string name() const override { return name_param; }
 };
 
 /**
@@ -45,7 +46,7 @@ public:
  */
 #define SINGLETON_MANAGER_REGISTRATION(NAME)                                                       \
   static constexpr char NAME##_singleton_name[] = #NAME "_singleton";                              \
-  static Envoy::Registry::RegisterFactory<                                                         \
+  static Envoy::Registry::RegisterInternalFactory<                                                 \
       Envoy::Singleton::RegistrationImpl<NAME##_singleton_name>, Envoy::Singleton::Registration>   \
       NAME##_singleton_registered_;
 

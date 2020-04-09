@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/api/v2/core/http_uri.pb.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
@@ -44,14 +44,15 @@ public:
 class RemoteDataFetcher : public Logger::Loggable<Logger::Id::config>,
                           public Http::AsyncClient::Callbacks {
 public:
-  RemoteDataFetcher(Upstream::ClusterManager& cm, const ::envoy::api::v2::core::HttpUri& uri,
+  RemoteDataFetcher(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
                     const std::string& content_hash, RemoteDataFetcherCallback& callback);
 
   ~RemoteDataFetcher() override;
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&& response) override;
-  void onFailure(Http::AsyncClient::FailureReason reason) override;
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
+  void onFailure(const Http::AsyncClient::Request&,
+                 Http::AsyncClient::FailureReason reason) override;
 
   /**
    * Fetch data from remote.
@@ -68,7 +69,7 @@ public:
 
 private:
   Upstream::ClusterManager& cm_;
-  const envoy::api::v2::core::HttpUri& uri_;
+  const envoy::config::core::v3::HttpUri uri_;
   const std::string content_hash_;
   RemoteDataFetcherCallback& callback_;
 

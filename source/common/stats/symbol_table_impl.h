@@ -14,12 +14,13 @@
 #include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/lock_guard.h"
+#include "common/common/mem_block_builder.h"
 #include "common/common/non_copyable.h"
-#include "common/common/stack_array.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/stats/recent_lookups.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
@@ -29,12 +30,6 @@ namespace Stats {
 
 /** A Symbol represents a string-token with a small index. */
 using Symbol = uint32_t;
-
-/**
- * We encode the byte-size of a StatName as its first two bytes.
- */
-constexpr uint64_t StatNameSizeEncodingBytes = 2;
-constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65536
 
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
@@ -80,11 +75,11 @@ public:
   class Encoding {
   public:
     /**
-     * Before destructing SymbolEncoding, you must call moveToStorage. This
+     * Before destructing SymbolEncoding, you must call moveToMemBlock. This
      * transfers ownership, and in particular, the responsibility to call
-     * SymbolTable::clear() on all referenced symbols. If we ever wanted
-     * to be able to destruct a SymbolEncoding without transferring it
-     * we could add a clear(SymbolTable&) method.
+     * SymbolTable::clear() on all referenced symbols. If we ever wanted to be
+     * able to destruct a SymbolEncoding without transferring it we could add a
+     * clear(SymbolTable&) method.
      */
     ~Encoding();
 
@@ -93,7 +88,7 @@ public:
      *
      * @param symbol the symbol to encode.
      */
-    void addSymbol(Symbol symbol);
+    void addSymbols(const SymbolVec& symbols);
 
     /**
      * Decodes a uint8_t array into a SymbolVec.
@@ -101,27 +96,89 @@ public:
     static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
 
     /**
+     * Decodes a uint8_t array into a sequence of symbols and literal strings.
+     * There are distinct lambdas for these two options. Calls to these lambdas
+     * will be interleaved based on the sequencing of literal strings and
+     * symbols held in the data.
+     *
+     * @param array the StatName encoded as a uint8_t array.
+     * @param size the size of the array in bytes.
+     * @param symbolTokenFn a function to be called whenever a symbol is encountered in the array.
+     * @param stringVIewTokeNFn a function to be called whenever a string literal is encountered.
+     */
+    static void decodeTokens(const SymbolTable::Storage array, uint64_t size,
+                             const std::function<void(Symbol)>& symbolTokenFn,
+                             const std::function<void(absl::string_view)>& stringViewTokenFn);
+
+    /**
      * Returns the number of bytes required to represent StatName as a uint8_t
      * array, including the encoded size.
      */
-    uint64_t bytesRequired() const { return dataBytesRequired() + StatNameSizeEncodingBytes; }
+    uint64_t bytesRequired() const {
+      return data_bytes_required_ + encodingSizeBytes(data_bytes_required_);
+    }
 
     /**
      * @return the number of uint8_t entries we collected while adding symbols.
      */
-    uint64_t dataBytesRequired() const { return vec_.size(); }
+    uint64_t dataBytesRequired() const { return data_bytes_required_; }
 
     /**
      * Moves the contents of the vector into an allocated array. The array
      * must have been allocated with bytesRequired() bytes.
      *
-     * @param array destination memory to receive the encoded bytes.
-     * @return uint64_t the number of bytes transferred.
+     * @param mem_block_builder memory block to receive the encoded bytes.
      */
-    uint64_t moveToStorage(SymbolTable::Storage array);
+    void moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block_builder);
+
+    /**
+     * @param number A number to encode in a variable length byte-array.
+     * @return The number of bytes it would take to encode the number.
+     */
+    static uint64_t encodingSizeBytes(uint64_t number);
+
+    /**
+     * @param num_data_bytes The number of bytes in a data-block.
+     * @return The total number of bytes required for the data-block and its encoded size.
+     */
+    static uint64_t totalSizeBytes(uint64_t num_data_bytes) {
+      return encodingSizeBytes(num_data_bytes) + num_data_bytes;
+    }
+
+    /**
+     * Saves the specified number into the byte array, returning the next byte.
+     * There is no guarantee that bytes will be aligned, so we can't cast to a
+     * uint16_t* and assign, but must individually copy the bytes.
+     *
+     * Requires that the buffer be sized to accommodate encodingSizeBytes(number).
+     *
+     * @param number the number to write.
+     * @param mem_block the memory into which to append the number.
+     */
+    static void appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block);
+
+    /**
+     * Appends stat_name's bytes into mem_block, which must have been allocated to
+     * allow for stat_name.size() bytes.
+     *
+     * @param stat_name the stat_name to append.
+     * @param mem_block the block of memory to append to.
+     */
+    static void appendToMemBlock(StatName stat_name, MemBlockBuilder<uint8_t>& mem_block);
+
+    /**
+     * Decodes a byte-array containing a variable-length number.
+     *
+     * @param The encoded byte array, written previously by appendEncoding.
+     * @return A pair containing the decoded number, and the number of bytes consumed from encoding.
+     */
+    static std::pair<uint64_t, uint64_t> decodeNumber(const uint8_t* encoding);
+
+    StoragePtr release() { return mem_block_.release(); }
 
   private:
-    std::vector<uint8_t> vec_;
+    uint64_t data_bytes_required_{0};
+    MemBlockBuilder<uint8_t> mem_block_;
   };
 
   SymbolTableImpl();
@@ -134,9 +191,9 @@ public:
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
   StoragePtr join(const StatNameVec& stat_names) const override;
-  void populateList(const absl::string_view* names, uint32_t num_names,
-                    StatNameList& list) override;
+  void populateList(const StatName* names, uint32_t num_names, StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;
+  StoragePtr makeDynamicStorage(absl::string_view name) override;
   void callWithStringView(StatName stat_name,
                           const std::function<void(absl::string_view)>& fn) const override;
 
@@ -144,32 +201,17 @@ public:
   void debugPrint() const override;
 #endif
 
-  /**
-   * Saves the specified length into the byte array, returning the next byte.
-   * There is no guarantee that bytes will be aligned, so we can't cast to a
-   * uint16_t* and assign, but must individually copy the bytes.
-   *
-   * @param length the length in bytes to write. Must be < StatNameMaxSize.
-   * @param bytes the pointer into which to write the length.
-   * @return the pointer to the next byte for writing the data.
-   */
-  static inline uint8_t* writeLengthReturningNext(uint64_t length, uint8_t* bytes) {
-    ASSERT(length < StatNameMaxSize);
-    *bytes++ = length & 0xff;
-    *bytes++ = length >> 8;
-    return bytes;
-  }
-
   StatNameSetPtr makeSet(absl::string_view name) override;
-  void forgetSet(StatNameSet& stat_name_set) override;
   uint64_t getRecentLookups(const RecentLookupsFn&) const override;
   void clearRecentLookups() override;
   void setRecentLookupCapacity(uint64_t capacity) override;
   uint64_t recentLookupCapacity() const override;
+  DynamicSpans getDynamicSpans(StatName stat_name) const override;
 
 private:
   friend class StatName;
   friend class StatNameTest;
+  friend class StatNameDeathTest;
 
   struct SharedSymbol {
     SharedSymbol(Symbol symbol) : symbol_(symbol), ref_count_(1) {}
@@ -181,19 +223,20 @@ private:
   // This must be held during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
 
-  // This must be held while updating stat_name_sets_.
-  mutable Thread::MutexBasicLockable stat_name_set_mutex_;
-
   /**
-   * Decodes a vector of symbols back into its period-delimited stat name. If
-   * decoding fails on any part of the symbol_vec, we release_assert and crash
-   * hard, since this should never happen, and we don't want to continue running
-   * with a corrupt stats set.
+   * Decodes a uint8_t array into an array of period-delimited strings. Note
+   * that some of the strings may have periods in them, in the case where
+   * StatNameDynamicStorage was used.
    *
-   * @param symbols the vector of symbols to decode.
+   * If decoding fails on any part of the encoding, we RELEASE_ASSERT and crash,
+   * since this should never happen, and we don't want to continue running with
+   * corrupt stat names.
+   *
+   * @param array the uint8_t array of encoded symbols and dynamic strings.
+   * @param size the size of the array in bytes.
    * @return std::string the retrieved stat name.
    */
-  std::string decodeSymbolVec(const SymbolVec& symbols) const;
+  std::vector<absl::string_view> decodeStrings(const Storage array, uint64_t size) const;
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
@@ -250,8 +293,32 @@ private:
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
   RecentLookups recent_lookups_ GUARDED_BY(lock_);
+};
 
-  absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(stat_name_set_mutex_);
+// Base class for holding the backing-storing for a StatName. The two derived
+// classes, StatNameStorage and StatNameDynamicStorage, share a need to hold an
+// array of bytes, but use different representations.
+class StatNameStorageBase {
+public:
+  StatNameStorageBase(SymbolTable::StoragePtr&& bytes) : bytes_(std::move(bytes)) {}
+  StatNameStorageBase() = default;
+
+  /**
+   * @return a reference to the owned storage.
+   */
+  inline StatName statName() const;
+
+  /**
+   * @return the encoded data as a const pointer.
+   */
+  const uint8_t* bytes() const { return bytes_.get(); }
+
+protected:
+  void setBytes(SymbolTable::StoragePtr&& bytes) { bytes_ = std::move(bytes); }
+  void clear() { bytes_.reset(); }
+
+private:
+  SymbolTable::StoragePtr bytes_;
 };
 
 /**
@@ -267,7 +334,7 @@ private:
  * Thus this class is inconvenient to directly use as temp storage for building
  * a StatName from a string. Instead it should be used via StatNameManagedStorage.
  */
-class StatNameStorage {
+class StatNameStorage : public StatNameStorageBase {
 public:
   // Basic constructor for when you have a name as a string, and need to
   // generate symbols for it.
@@ -275,7 +342,7 @@ public:
 
   // Move constructor; needed for using StatNameStorage as an
   // absl::flat_hash_map value.
-  StatNameStorage(StatNameStorage&& src) noexcept : bytes_(std::move(src.bytes_)) {}
+  StatNameStorage(StatNameStorage&& src) noexcept : StatNameStorageBase(std::move(src)) {}
 
   // Obtains new backing storage for an already existing StatName. Used to
   // record a computed StatName held in a temp into a more persistent data
@@ -295,16 +362,6 @@ public:
    * @param table the symbol table.
    */
   void free(SymbolTable& table);
-
-  /**
-   * @return StatName a reference to the owned storage.
-   */
-  inline StatName statName() const;
-
-  uint8_t* bytes() { return bytes_.get(); }
-
-private:
-  SymbolTable::StoragePtr bytes_;
 };
 
 /**
@@ -359,23 +416,40 @@ public:
   bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
 
   /**
-   * @return uint64_t the number of bytes in the symbol array, excluding the two-byte
+   * @return uint64_t the number of bytes in the symbol array, excluding the
    *                  overhead for the size itself.
    */
-  uint64_t dataSize() const {
-    if (size_and_data_ == nullptr) {
-      return 0;
-    }
-    return size_and_data_[0] | (static_cast<uint64_t>(size_and_data_[1]) << 8);
+  uint64_t dataSize() const;
+
+  /**
+   * @return uint64_t the number of bytes in the symbol array, including the
+   *                  overhead for the size itself.
+   */
+  uint64_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
+
+  /**
+   * Copies the entire StatName representation into a MemBlockBuilder, including
+   * the length metadata at the beginning. The MemBlockBuilder must not have
+   * any other data in it.
+   *
+   * @param mem_block_builder the builder to receive the storage.
+   */
+  void copyToMemBlock(MemBlockBuilder<uint8_t>& mem_block_builder) {
+    ASSERT(mem_block_builder.size() == 0);
+    mem_block_builder.appendData(absl::MakeSpan(size_and_data_, size()));
   }
 
   /**
-   * @return uint64_t the number of bytes in the symbol array, including the two-byte
-   *                  overhead for the size itself.
+   * Appends the data portion of the StatName representation into a
+   * MemBlockBuilder, excluding the length metadata. This is appropriate for
+   * join(), where several stat-names are combined, and we only need the
+   * aggregated length metadata.
+   *
+   * @param mem_block_builder the builder to receive the storage.
    */
-  uint64_t size() const { return dataSize() + StatNameSizeEncodingBytes; }
-
-  void copyToStorage(SymbolTable::Storage storage) { memcpy(storage, size_and_data_, size()); }
+  void appendDataToMemBlock(MemBlockBuilder<uint8_t>& storage) {
+    storage.appendData(absl::MakeSpan(data(), dataSize()));
+  }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
@@ -384,7 +458,16 @@ public:
   /**
    * @return A pointer to the first byte of data (skipping over size bytes).
    */
-  const uint8_t* data() const { return size_and_data_ + StatNameSizeEncodingBytes; }
+  const uint8_t* data() const {
+    return size_and_data_ + SymbolTableImpl::Encoding::encodingSizeBytes(dataSize());
+  }
+
+  const uint8_t* dataIncludingSize() const { return size_and_data_; }
+
+  /**
+   * @return A pointer to the buffer, including the size bytes.
+   */
+  const uint8_t* sizeAndData() const { return size_and_data_; }
 
   /**
    * @return whether this is empty.
@@ -395,7 +478,7 @@ private:
   const uint8_t* size_and_data_{nullptr};
 };
 
-StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
+StatName StatNameStorageBase::statName() const { return StatName(bytes_.get()); }
 
 /**
  * Contains the backing store for a StatName and enough context so it can
@@ -420,11 +503,30 @@ public:
   // generate symbols for it.
   StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
+  StatNameManagedStorage(StatNameManagedStorage&& src)
+      : StatNameStorage(std::move(src)), symbol_table_(src.symbol_table_) {}
 
   ~StatNameManagedStorage() { free(symbol_table_); }
 
 private:
   SymbolTable& symbol_table_;
+};
+
+/**
+ * Holds backing-store for a dynamic stat, where are no global locks needed
+ * to create a StatName from a string, but there is no sharing of token data
+ * between names, so there may be more memory consumed.
+ */
+class StatNameDynamicStorage : public StatNameStorageBase {
+public:
+  // Basic constructor based on a name. Note the table is used for
+  // a virtual-function call to encode the name, but no locks are taken
+  // in either implementation of the SymbolTable api.
+  StatNameDynamicStorage(absl::string_view name, SymbolTable& table)
+      : StatNameStorageBase(table.makeDynamicStorage(name)) {}
+  // Move constructor.
+  StatNameDynamicStorage(StatNameDynamicStorage&& src) noexcept
+      : StatNameStorageBase(std::move(src)) {}
 };
 
 /**
@@ -437,7 +539,7 @@ private:
  *   StatNamePool pool(symbol_table);
  *   StatName name1 = pool.add("name1");
  *   StatName name2 = pool.add("name2");
- *   uint8_t* storage = pool.addReturningStorage("name3");
+ *   const uint8_t* storage = pool.addReturningStorage("name3");
  *   StatName name3(storage);
  */
 class StatNamePool {
@@ -472,7 +574,7 @@ public:
    * @return a pointer to the bytes held in the container for this name, suitable for
    *         using to construct a StatName.
    */
-  uint8_t* addReturningStorage(absl::string_view name);
+  const uint8_t* addReturningStorage(absl::string_view name);
 
 private:
   // We keep the stat names in a vector of StatNameStorage, storing the
@@ -480,6 +582,48 @@ private:
   // at the cost of having a destructor that calls clear().
   SymbolTable& symbol_table_;
   std::vector<StatNameStorage> storage_vector_;
+};
+
+/**
+ * Maintains storage for a collection of StatName objects constructed from
+ * dynamically discovered strings. Like StatNameDynamicStorage, this has an RAII
+ * usage model. Creating StatNames with this interface do not incur a
+ * SymbolTable lock, but tokens are not shared across StatNames.
+ *
+ * The SymbolTable is required as a constructor argument to assist in encoding
+ * the stat-names, which differs between FakeSymbolTableImpl and SymbolTableImpl.
+ *
+ * Example usage:
+ *   StatNameDynamicPool pool(symbol_table);
+ *   StatName name1 = pool.add("name1");
+ *   StatName name2 = pool.add("name2");
+ *
+ * Note; StatNameDynamicPool::add("foo") != StatNamePool::add("foo"), even
+ * though their string representations are identical. They also will not match
+ * in map lookups. Tests for StatName with dynamic components must therefore
+ * be looked up by string, via Stats::TestUtil::TestStore.
+ */
+class StatNameDynamicPool {
+public:
+  explicit StatNameDynamicPool(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+
+  /**
+   * Removes all StatNames from the pool.
+   */
+  void clear() { storage_vector_.clear(); }
+
+  /**
+   * @param name the name to add the container.
+   * @return the StatName held in the container for this name.
+   */
+  StatName add(absl::string_view name);
+
+private:
+  // We keep the stat names in a vector of StatNameStorage, storing the
+  // SymbolTable reference separately. This saves 8 bytes per StatName,
+  // at the cost of having a destructor that calls clear().
+  SymbolTable& symbol_table_;
+  std::vector<StatNameDynamicStorage> storage_vector_;
 };
 
 // Represents an ordered container of StatNames. The encoding for each StatName
@@ -626,11 +770,6 @@ public:
   Iterator end() { return hash_set_.end(); }
 
   /**
-   * @param set the storage set to swap with.
-   */
-  void swap(StatNameStorageSet& set) { hash_set_.swap(set.hash_set_); }
-
-  /**
    * @return the number of elements in the set.
    */
   size_t size() const { return hash_set_.size(); }
@@ -650,8 +789,6 @@ private:
 class StatNameSet {
 public:
   // This object must be instantiated via SymbolTable::makeSet(), thus constructor is private.
-
-  ~StatNameSet();
 
   /**
    * Adds a string to the builtin map, which is not mutex protected. This map is
@@ -675,23 +812,6 @@ public:
   }
 
   /**
-   * Finds a StatName by name. If 'token' has been remembered as a built-in,
-   * then no lock is required. Otherwise we must consult dynamic_stat_names_
-   * under a lock that's private to the StatNameSet. If that's empty, we need to
-   * create the StatName in the pool, which requires taking a global lock, and
-   * then remember the new StatName in the dynamic_stat_names_. This allows
-   * subsequent lookups of the same string to take only the set's lock, and not
-   * the whole symbol-table lock.
-   *
-   * @return a StatName corresponding to the passed-in token, owned by the set.
-   *
-   * TODO(jmarantz): Potential perf issue here with contention, both on this
-   * set's mutex and also the SymbolTable mutex which must be taken during
-   * StatNamePool::add().
-   */
-  StatName getDynamic(absl::string_view token);
-
-  /**
    * Finds a builtin StatName by name. If the builtin has not been registered,
    * then the fallback is returned.
    *
@@ -707,24 +827,11 @@ public:
     return pool_.add(str);
   }
 
-  /**
-   * Clears recent lookups.
-   */
-  void clearRecentLookups();
-
-  /**
-   * Sets the number of names recorded in the recent-lookups set.
-   *
-   * @param capacity the capacity to configure.
-   */
-  void setRecentLookupCapacity(uint64_t capacity);
-
 private:
   friend class FakeSymbolTableImpl;
   friend class SymbolTableImpl;
 
   StatNameSet(SymbolTable& symbol_table, absl::string_view name);
-  uint64_t getRecentLookups(const RecentLookups::IterFn& iter) const;
 
   const std::string name_;
   Stats::SymbolTable& symbol_table_;
@@ -732,8 +839,6 @@ private:
   mutable absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
-  StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
-  RecentLookups recent_lookups_ GUARDED_BY(mutex_);
 };
 
 } // namespace Stats

@@ -7,6 +7,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_callbacks.h"
 #include "envoy/ssl/private_key/private_key_callbacks.h"
+#include "envoy/ssl/ssl_socket_extended_info.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -15,6 +16,7 @@
 #include "extensions/transport_sockets/tls/context_impl.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/types/optional.h"
 #include "openssl/ssl.h"
@@ -24,12 +26,10 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-// clang-format off
-#define ALL_SSL_SOCKET_FACTORY_STATS(COUNTER)                                 \
-  COUNTER(ssl_context_update_by_sds)                                          \
-  COUNTER(upstream_context_secrets_not_ready)                                 \
+#define ALL_SSL_SOCKET_FACTORY_STATS(COUNTER)                                                      \
+  COUNTER(ssl_context_update_by_sds)                                                               \
+  COUNTER(upstream_context_secrets_not_ready)                                                      \
   COUNTER(downstream_context_secrets_not_ready)
-// clang-format on
 
 /**
  * Wrapper struct for SSL socket factory stats. @see stats_macros.h
@@ -41,29 +41,41 @@ struct SslSocketFactoryStats {
 enum class InitialState { Client, Server };
 enum class SocketState { PreHandshake, HandshakeInProgress, HandshakeComplete, ShutdownSent };
 
+class SslExtendedSocketInfoImpl : public Envoy::Ssl::SslExtendedSocketInfo {
+public:
+  void setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus validated) override;
+  Envoy::Ssl::ClientValidationStatus certificateValidationStatus() const override;
+
+private:
+  Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
+      Envoy::Ssl::ClientValidationStatus::NotValidated};
+};
+
 class SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
 public:
-  SslSocketInfo(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
+  SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx);
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
-  std::vector<std::string> uriSanLocalCertificate() const override;
+  bool peerCertificateValidated() const override;
+  absl::Span<const std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
   const std::string& serialNumberPeerCertificate() const override;
   const std::string& issuerPeerCertificate() const override;
   const std::string& subjectPeerCertificate() const override;
   const std::string& subjectLocalCertificate() const override;
-  std::vector<std::string> uriSanPeerCertificate() const override;
+  absl::Span<const std::string> uriSanPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
-  std::vector<std::string> dnsSansPeerCertificate() const override;
-  std::vector<std::string> dnsSansLocalCertificate() const override;
+  absl::Span<const std::string> dnsSansPeerCertificate() const override;
+  absl::Span<const std::string> dnsSansLocalCertificate() const override;
   absl::optional<SystemTime> validFromPeerCertificate() const override;
   absl::optional<SystemTime> expirationPeerCertificate() const override;
   const std::string& sessionId() const override;
   uint16_t ciphersuiteId() const override;
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
+  absl::optional<std::string> x509Extension(absl::string_view extension_name) const override;
 
   SSL* rawSslForTest() const { return ssl_.get(); }
 
@@ -83,6 +95,7 @@ private:
   mutable std::vector<std::string> cached_dns_san_local_certificate_;
   mutable std::string cached_session_id_;
   mutable std::string cached_tls_version_;
+  mutable SslExtendedSocketInfoImpl extended_socket_info_;
 };
 
 class SslSocket : public Network::TransportSocket,

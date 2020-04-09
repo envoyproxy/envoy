@@ -2,6 +2,9 @@
 
 #include <iostream>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
 #include "common/http/header_map_impl.h"
 
 #include "test/integration/autonomous_upstream.h"
@@ -52,7 +55,7 @@ TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
-TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048); }
+TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048, true, true); }
 
 // Ensure Envoy handles streaming requests and responses simultaneously.
 void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
@@ -61,10 +64,10 @@ void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
 
   // Start the request.
   auto encoder_decoder =
-      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                          {":path", "/test/long/url"},
-                                                          {":scheme", "http"},
-                                                          {":authority", "host"}});
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -75,12 +78,13 @@ void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, bytes));
 
   // Start sending the response and ensure it is received downstream.
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(bytes, false);
   response->waitForBodyData(bytes);
 
   // Finish the request.
-  codec_client_->sendTrailers(*request_encoder_, Http::TestHeaderMapImpl{{"trailer", "foo"}});
+  codec_client_->sendTrailers(*request_encoder_,
+                              Http::TestRequestTrailerMapImpl{{"trailer", "foo"}});
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Finish the response.
@@ -102,10 +106,10 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
 
   // Start sending the request.
   auto encoder_decoder =
-      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                          {":path", "/test/long/url"},
-                                                          {":scheme", "http"},
-                                                          {":authority", "host"}});
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -116,12 +120,13 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 1024));
 
   // Start sending the response.
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(1024, false);
   response->waitForBodyData(1024);
 
   // Finish sending the request.
-  codec_client_->sendTrailers(*request_encoder_, Http::TestHeaderMapImpl{{"trailer", "foo"}});
+  codec_client_->sendTrailers(*request_encoder_,
+                              Http::TestRequestTrailerMapImpl{{"trailer", "foo"}});
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Reset the stream.
@@ -141,22 +146,22 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
 
   // Start request 1
   auto encoder_decoder1 =
-      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                          {":path", "/test/long/url"},
-                                                          {":scheme", "http"},
-                                                          {":authority", "host"}});
-  Http::StreamEncoder* encoder1 = &encoder_decoder1.first;
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}});
+  Http::RequestEncoder* encoder1 = &encoder_decoder1.first;
   auto response1 = std::move(encoder_decoder1.second);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request1));
 
   // Start request 2
   auto encoder_decoder2 =
-      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                          {":path", "/test/long/url"},
-                                                          {":scheme", "http"},
-                                                          {":authority", "host"}});
-  Http::StreamEncoder* encoder2 = &encoder_decoder2.first;
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}});
+  Http::RequestEncoder* encoder2 = &encoder_decoder2.first;
   auto response2 = std::move(encoder_decoder2.second);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
 
@@ -169,7 +174,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
   ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
 
   // Respond to request 2
-  upstream_request2->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request2->encodeData(response2_bytes, true);
   response2->waitForEndStream();
   EXPECT_TRUE(upstream_request2->complete());
@@ -179,7 +184,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
   EXPECT_EQ(response2_bytes, response2->body().size());
 
   // Respond to request 1
-  upstream_request1->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request1->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request1->encodeData(response1_bytes, true);
   response1->waitForEndStream();
   EXPECT_TRUE(upstream_request1->complete());
@@ -201,7 +206,7 @@ TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
 void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes, uint32_t) {
   TestRandomGenerator rand;
   const uint32_t num_requests = 50;
-  std::vector<Http::StreamEncoder*> encoders;
+  std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<int> response_bytes;
   autonomous_upstream_ = true;
@@ -210,7 +215,7 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
   codec_client_ = makeHttpConnection(lookupPort("http"));
   for (uint32_t i = 0; i < num_requests; ++i) {
     response_bytes.push_back(rand.random() % (1024 * 2));
-    auto headers = Http::TestHeaderMapImpl{
+    auto headers = Http::TestRequestHeaderMapImpl{
         {":method", "POST"},
         {":path", "/test/long/url"},
         {":scheme", "http"},
@@ -261,17 +266,17 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBacku
 TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   const uint32_t num_requests = 20;
-  std::vector<Http::StreamEncoder*> encoders;
+  std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<FakeStreamPtr> upstream_requests;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   for (uint32_t i = 0; i < num_requests; ++i) {
     auto encoder_decoder =
-        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                            {":path", "/test/long/url"},
-                                                            {":scheme", "http"},
-                                                            {":authority", "host"}});
+        codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                   {":path", "/test/long/url"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "host"}});
     encoders.push_back(&encoder_decoder.first);
     responses.push_back(std::move(encoder_decoder.second));
 
@@ -302,7 +307,7 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   }
   for (uint32_t i = 1; i < num_requests; ++i) {
     ASSERT_TRUE(upstream_requests[i]->waitForEndStream(*dispatcher_));
-    upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+    upstream_requests[i]->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_requests[i]->encodeData(100, false);
   }
   // Close the connection.
@@ -317,31 +322,30 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
 // Regression test for https://github.com/envoyproxy/envoy/issues/6744
 TEST_P(Http2UpstreamIntegrationTest, HittingEncoderFilterLimitForGrpc) {
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         const std::string access_log_name =
             TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
         // Configure just enough of an upstream access log to reference the upstream headers.
         const std::string yaml_string = R"EOF(
-name: envoy.router
+name: router
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
   upstream_log:
-    name: envoy.file_access_log
+    name: accesslog
     filter:
       not_health_check_filter: {}
     typed_config:
       "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
       path: /dev/null
   )EOF";
-        const std::string json = Json::Factory::loadFromYamlString(yaml_string)->asJsonString();
-        TestUtility::loadFromJson(json, *hcm.mutable_http_filters(1));
+        TestUtility::loadFromYaml(yaml_string, *hcm.mutable_http_filters(1));
       });
 
   // As with ProtocolIntegrationTest.HittingEncoderFilterLimit use a filter
   // which buffers response data but in this case, make sure the sendLocalReply
   // is gRPC.
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+  config_helper_.addFilter("{ name: envoy.filters.http.dynamo, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
@@ -349,11 +353,11 @@ typed_config:
   // Send the request.
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
-      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                          {":path", "/test/long/url"},
-                                                          {":scheme", "http"},
-                                                          {":authority", "host"},
-                                                          {"te", "trailers"}});
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"te", "trailers"}});
   auto downstream_request = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
   Buffer::OwnedImpl data(R"({"TableName":"locations"})");
@@ -398,13 +402,13 @@ TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
 // Tests bootstrap configuration of max response headers.
 TEST_P(Http2UpstreamIntegrationTest, ManyResponseHeadersAccepted) {
   // Set max response header count to 200.
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
     http_protocol_options->mutable_max_headers_count()->set_value(200);
   });
-  Http::TestHeaderMapImpl response_headers(default_response_headers_);
+  Http::TestResponseHeaderMapImpl response_headers(default_response_headers_);
   for (int i = 0; i < 150; i++) {
     response_headers.addCopy(std::to_string(i), std::string(1, 'a'));
   }
@@ -436,6 +440,50 @@ TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
   response->waitForEndStream();
   // Upstream stream reset.
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+}
+
+// Regression test to make sure that configuring upstream logs over gRPC will not crash Envoy.
+// TODO(asraa): Test output of the upstream logs.
+// See https://github.com/envoyproxy/envoy/issues/8828.
+TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        const std::string access_log_name =
+            TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+        // Configure just enough of an upstream access log to reference the upstream headers.
+        const std::string yaml_string = R"EOF(
+name: router
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
+  upstream_log:
+    name: grpc_accesslog
+    filter:
+      not_health_check_filter: {}
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.accesslog.v2.HttpGrpcAccessLogConfig
+      common_config:
+        log_name: foo
+        grpc_service:
+          envoy_grpc:
+            cluster_name: cluster_0
+  )EOF";
+        // Replace the terminal envoy.router.
+        hcm.clear_http_filters();
+        TestUtility::loadFromYaml(yaml_string, *hcm.add_http_filters());
+      });
+
+  initialize();
+
+  // Send the request.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send the response headers.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 } // namespace Envoy

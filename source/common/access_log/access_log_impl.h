@@ -6,9 +6,11 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
+#include "envoy/config/accesslog/v3/accesslog.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/grpc/status.h"
 #include "common/http/header_utility.h"
@@ -27,7 +29,7 @@ public:
   /**
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
-  static FilterPtr fromProto(const envoy::config::filter::accesslog::v2::AccessLogFilter& config,
+  static FilterPtr fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
                              Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                              ProtobufMessage::ValidationVisitor& validation_visitor);
 };
@@ -37,12 +39,12 @@ public:
  */
 class ComparisonFilter : public Filter {
 protected:
-  ComparisonFilter(const envoy::config::filter::accesslog::v2::ComparisonFilter& config,
+  ComparisonFilter(const envoy::config::accesslog::v3::ComparisonFilter& config,
                    Runtime::Loader& runtime);
 
   bool compareAgainstValue(uint64_t lhs);
 
-  envoy::config::filter::accesslog::v2::ComparisonFilter config_;
+  envoy::config::accesslog::v3::ComparisonFilter config_;
   Runtime::Loader& runtime_;
 };
 
@@ -51,14 +53,14 @@ protected:
  */
 class StatusCodeFilter : public ComparisonFilter {
 public:
-  StatusCodeFilter(const envoy::config::filter::accesslog::v2::StatusCodeFilter& config,
+  StatusCodeFilter(const envoy::config::accesslog::v3::StatusCodeFilter& config,
                    Runtime::Loader& runtime)
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                const Http::HeaderMap& response_headers,
-                const Http::HeaderMap& response_trailers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) override;
 };
 
 /**
@@ -66,14 +68,14 @@ public:
  */
 class DurationFilter : public ComparisonFilter {
 public:
-  DurationFilter(const envoy::config::filter::accesslog::v2::DurationFilter& config,
+  DurationFilter(const envoy::config::accesslog::v3::DurationFilter& config,
                  Runtime::Loader& runtime)
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                const Http::HeaderMap& response_headers,
-                const Http::HeaderMap& response_trailers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) override;
 };
 
 /**
@@ -81,10 +83,10 @@ public:
  */
 class OperatorFilter : public Filter {
 public:
-  OperatorFilter(const Protobuf::RepeatedPtrField<
-                     envoy::config::filter::accesslog::v2::AccessLogFilter>& configs,
-                 Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                 ProtobufMessage::ValidationVisitor& validation_visitor);
+  OperatorFilter(
+      const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
+      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
 
 protected:
   std::vector<FilterPtr> filters_;
@@ -95,14 +97,14 @@ protected:
  */
 class AndFilter : public OperatorFilter {
 public:
-  AndFilter(const envoy::config::filter::accesslog::v2::AndFilter& config, Runtime::Loader& runtime,
+  AndFilter(const envoy::config::accesslog::v3::AndFilter& config, Runtime::Loader& runtime,
             Runtime::RandomGenerator& random,
             ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                const Http::HeaderMap& response_headers,
-                const Http::HeaderMap& response_trailers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) override;
 };
 
 /**
@@ -110,14 +112,14 @@ public:
  */
 class OrFilter : public OperatorFilter {
 public:
-  OrFilter(const envoy::config::filter::accesslog::v2::OrFilter& config, Runtime::Loader& runtime,
+  OrFilter(const envoy::config::accesslog::v3::OrFilter& config, Runtime::Loader& runtime,
            Runtime::RandomGenerator& random,
            ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                const Http::HeaderMap& response_headers,
-                const Http::HeaderMap& response_trailers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) override;
 };
 
 /**
@@ -128,9 +130,9 @@ public:
   NotHealthCheckFilter() = default;
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                const Http::HeaderMap& response_headers,
-                const Http::HeaderMap& response_trailers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) override;
 };
 
 /**
@@ -139,9 +141,9 @@ public:
 class TraceableRequestFilter : public Filter {
 public:
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                const Http::HeaderMap& response_headers,
-                const Http::HeaderMap& response_trailers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) override;
 };
 
 /**
@@ -149,19 +151,19 @@ public:
  */
 class RuntimeFilter : public Filter {
 public:
-  RuntimeFilter(const envoy::config::filter::accesslog::v2::RuntimeFilter& config,
-                Runtime::Loader& runtime, Runtime::RandomGenerator& random);
+  RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& config, Runtime::Loader& runtime,
+                Runtime::RandomGenerator& random);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                const Http::HeaderMap& response_headers,
-                const Http::HeaderMap& response_trailers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) override;
 
 private:
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   const std::string runtime_key_;
-  const envoy::type::FractionalPercent percent_;
+  const envoy::type::v3::FractionalPercent percent_;
   const bool use_independent_randomness_;
 };
 
@@ -170,12 +172,12 @@ private:
  */
 class HeaderFilter : public Filter {
 public:
-  HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFilter& config);
+  HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                const Http::HeaderMap& response_headers,
-                const Http::HeaderMap& response_trailers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) override;
 
 private:
   const Http::HeaderUtility::HeaderDataPtr header_data_;
@@ -186,12 +188,12 @@ private:
  */
 class ResponseFlagFilter : public Filter {
 public:
-  ResponseFlagFilter(const envoy::config::filter::accesslog::v2::ResponseFlagFilter& config);
+  ResponseFlagFilter(const envoy::config::accesslog::v3::ResponseFlagFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                const Http::HeaderMap& response_headers,
-                const Http::HeaderMap& response_trailers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) override;
 
 private:
   uint64_t configured_flags_{};
@@ -207,12 +209,12 @@ public:
   using GrpcStatusHashSet =
       std::unordered_set<Grpc::Status::GrpcStatus, absl::Hash<Grpc::Status::GrpcStatus>>;
 
-  GrpcStatusFilter(const envoy::config::filter::accesslog::v2::GrpcStatusFilter& config);
+  GrpcStatusFilter(const envoy::config::accesslog::v3::GrpcStatusFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                const Http::HeaderMap& response_headers,
-                const Http::HeaderMap& response_trailers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) override;
 
 private:
   GrpcStatusHashSet statuses_;
@@ -223,15 +225,15 @@ private:
    * status.
    */
   Grpc::Status::GrpcStatus
-  protoToGrpcStatus(envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status status) const;
+  protoToGrpcStatus(envoy::config::accesslog::v3::GrpcStatusFilter::Status status) const;
 };
 
 /**
  * Extension filter factory that reads from ExtensionFilter proto.
  */
-class ExtensionFilterFactory {
+class ExtensionFilterFactory : public Config::TypedFactory {
 public:
-  virtual ~ExtensionFilterFactory() = default;
+  ~ExtensionFilterFactory() override = default;
 
   /**
    * Create a particular extension filter implementation from a config proto. If the
@@ -242,22 +244,10 @@ public:
    * @param random supplies the random generator.
    * @return an instance of extension filter implementation from a config proto.
    */
-  virtual FilterPtr
-  createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
-               Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
+  virtual FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
+                                 Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
 
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The config, which
-   * arrives in an opaque google.protobuf.Struct message, will be converted to JSON and then parsed
-   * into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular Filter implementation
-   * produced by the factory.
-   */
-  virtual std::string name() const PURE;
+  std::string category() const override { return "envoy.access_logger.extension_filters"; }
 };
 
 /**
@@ -268,7 +258,7 @@ public:
   /**
    * Read a filter definition from proto and instantiate an Instance.
    */
-  static InstanceSharedPtr fromProto(const envoy::config::filter::accesslog::v2::AccessLog& config,
+  static InstanceSharedPtr fromProto(const envoy::config::accesslog::v3::AccessLog& config,
                                      Server::Configuration::FactoryContext& context);
 };
 

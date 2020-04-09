@@ -29,44 +29,44 @@
 // If |condition| is true, use |logstream| to stream the log message and send it to spdlog.
 // If |condition| is false, |logstream| will not be instantiated.
 // The switch(0) is used to suppress a compiler warning on ambiguous "else".
-#define QUIC_LOG_IMPL_INTERNAL(condition, logstream)                                               \
+#define QUICHE_LOG_IMPL_INTERNAL(condition, logstream)                                             \
   switch (0)                                                                                       \
   default:                                                                                         \
     if (!(condition)) {                                                                            \
     } else                                                                                         \
       logstream
 
-#define QUIC_LOG_IF_IMPL(severity, condition)                                                      \
-  QUIC_LOG_IMPL_INTERNAL((condition) && quic::IsLogLevelEnabled(quic::severity),                   \
-                         quic::QuicLogEmitter(quic::severity).stream())
+#define QUICHE_LOG_IF_IMPL(severity, condition)                                                    \
+  QUICHE_LOG_IMPL_INTERNAL((condition) && quic::IsLogLevelEnabled(quic::severity),                 \
+                           quic::QuicLogEmitter(quic::severity).stream())
 
-#define QUIC_LOG_IMPL(severity) QUIC_LOG_IF_IMPL(severity, true)
+#define QUICHE_LOG_IMPL(severity) QUICHE_LOG_IF_IMPL(severity, true)
 
-#define QUIC_VLOG_IF_IMPL(verbosity, condition)                                                    \
-  QUIC_LOG_IMPL_INTERNAL((condition) && quic::IsVerboseLogEnabled(verbosity),                      \
-                         quic::QuicLogEmitter(quic::INFO).stream())
+#define QUICHE_VLOG_IF_IMPL(verbosity, condition)                                                  \
+  QUICHE_LOG_IMPL_INTERNAL((condition) && quic::IsVerboseLogEnabled(verbosity),                    \
+                           quic::QuicLogEmitter(quic::INFO).stream())
 
-#define QUIC_VLOG_IMPL(verbosity) QUIC_VLOG_IF_IMPL(verbosity, true)
+#define QUICHE_VLOG_IMPL(verbosity) QUICHE_VLOG_IF_IMPL(verbosity, true)
 
-// TODO(wub): Implement QUIC_LOG_FIRST_N_IMPL.
-#define QUIC_LOG_FIRST_N_IMPL(severity, n) QUIC_LOG_IMPL(severity)
+// TODO(wub): Implement QUICHE_LOG_FIRST_N_IMPL.
+#define QUICHE_LOG_FIRST_N_IMPL(severity, n) QUICHE_LOG_IMPL(severity)
 
-// TODO(wub): Implement QUIC_LOG_EVERY_N_IMPL.
-#define QUIC_LOG_EVERY_N_IMPL(severity, n) QUIC_LOG_IMPL(severity)
+// TODO(wub): Implement QUICHE_LOG_EVERY_N_IMPL.
+#define QUICHE_LOG_EVERY_N_IMPL(severity, n) QUICHE_LOG_IMPL(severity)
 
-// TODO(wub): Implement QUIC_LOG_EVERY_N_SEC_IMPL.
-#define QUIC_LOG_EVERY_N_SEC_IMPL(severity, seconds) QUIC_LOG_IMPL(severity)
+// TODO(wub): Implement QUICHE_LOG_EVERY_N_SEC_IMPL.
+#define QUICHE_LOG_EVERY_N_SEC_IMPL(severity, seconds) QUICHE_LOG_IMPL(severity)
 
-#define QUIC_PLOG_IMPL(severity)                                                                   \
-  QUIC_LOG_IMPL_INTERNAL(quic::IsLogLevelEnabled(quic::severity),                                  \
-                         quic::QuicLogEmitter(quic::severity).SetPerror().stream())
+#define QUICHE_PLOG_IMPL(severity)                                                                 \
+  QUICHE_LOG_IMPL_INTERNAL(quic::IsLogLevelEnabled(quic::severity),                                \
+                           quic::QuicLogEmitter(quic::severity).SetPerror().stream())
 
-#define QUIC_LOG_INFO_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::INFO)
-#define QUIC_LOG_WARNING_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::WARNING)
-#define QUIC_LOG_ERROR_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::ERROR)
+#define QUICHE_LOG_INFO_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::INFO)
+#define QUICHE_LOG_WARNING_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::WARNING)
+#define QUICHE_LOG_ERROR_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::ERROR)
 
 #define CHECK(condition)                                                                           \
-  QUIC_LOG_IF_IMPL(FATAL, ABSL_PREDICT_FALSE(!(condition))) << "CHECK failed: " #condition "."
+  QUICHE_LOG_IF_IMPL(FATAL, ABSL_PREDICT_FALSE(!(condition))) << "CHECK failed: " #condition "."
 
 #define CHECK_GT(a, b) CHECK((a) > (b))
 #define CHECK_GE(a, b) CHECK((a) >= (b))
@@ -77,26 +77,26 @@
 
 #ifdef NDEBUG
 // Release build
-#define DCHECK(condition) QUIC_COMPILED_OUT_LOG(condition)
-#define QUIC_COMPILED_OUT_LOG(condition)                                                           \
-  QUIC_LOG_IMPL_INTERNAL(false && (condition), quic::NullLogStream().stream())
-#define QUIC_DVLOG_IMPL(verbosity) QUIC_COMPILED_OUT_LOG(false)
-#define QUIC_DVLOG_IF_IMPL(verbosity, condition) QUIC_COMPILED_OUT_LOG(condition)
-#define QUIC_DLOG_IMPL(severity) QUIC_COMPILED_OUT_LOG(false)
-#define QUIC_DLOG_IF_IMPL(severity, condition) QUIC_COMPILED_OUT_LOG(condition)
-#define QUIC_DLOG_INFO_IS_ON_IMPL() 0
-#define QUIC_DLOG_EVERY_N_IMPL(severity, n) QUIC_COMPILED_OUT_LOG(false)
-#define QUIC_NOTREACHED_IMPL()
+#define DCHECK(condition) QUICHE_COMPILED_OUT_LOG(condition)
+#define QUICHE_COMPILED_OUT_LOG(condition)                                                         \
+  QUICHE_LOG_IMPL_INTERNAL(false && (condition), quic::NullLogStream().stream())
+#define QUICHE_DVLOG_IMPL(verbosity) QUICHE_COMPILED_OUT_LOG(false)
+#define QUICHE_DVLOG_IF_IMPL(verbosity, condition) QUICHE_COMPILED_OUT_LOG(condition)
+#define QUICHE_DLOG_IMPL(severity) QUICHE_COMPILED_OUT_LOG(false)
+#define QUICHE_DLOG_IF_IMPL(severity, condition) QUICHE_COMPILED_OUT_LOG(condition)
+#define QUICHE_DLOG_INFO_IS_ON_IMPL() 0
+#define QUICHE_DLOG_EVERY_N_IMPL(severity, n) QUICHE_COMPILED_OUT_LOG(false)
+#define QUICHE_NOTREACHED_IMPL()
 #else
 // Debug build
 #define DCHECK(condition) CHECK(condition)
-#define QUIC_DVLOG_IMPL(verbosity) QUIC_VLOG_IMPL(verbosity)
-#define QUIC_DVLOG_IF_IMPL(verbosity, condition) QUIC_VLOG_IF_IMPL(verbosity, condition)
-#define QUIC_DLOG_IMPL(severity) QUIC_LOG_IMPL(severity)
-#define QUIC_DLOG_IF_IMPL(severity, condition) QUIC_LOG_IF_IMPL(severity, condition)
-#define QUIC_DLOG_INFO_IS_ON_IMPL() QUIC_LOG_INFO_IS_ON_IMPL()
-#define QUIC_DLOG_EVERY_N_IMPL(severity, n) QUIC_LOG_EVERY_N_IMPL(severity, n)
-#define QUIC_NOTREACHED_IMPL() NOT_REACHED_GCOVR_EXCL_LINE
+#define QUICHE_DVLOG_IMPL(verbosity) QUICHE_VLOG_IMPL(verbosity)
+#define QUICHE_DVLOG_IF_IMPL(verbosity, condition) QUICHE_VLOG_IF_IMPL(verbosity, condition)
+#define QUICHE_DLOG_IMPL(severity) QUICHE_LOG_IMPL(severity)
+#define QUICHE_DLOG_IF_IMPL(severity, condition) QUICHE_LOG_IF_IMPL(severity, condition)
+#define QUICHE_DLOG_INFO_IS_ON_IMPL() QUICHE_LOG_INFO_IS_ON_IMPL()
+#define QUICHE_DLOG_EVERY_N_IMPL(severity, n) QUICHE_LOG_EVERY_N_IMPL(severity, n)
+#define QUICHE_NOTREACHED_IMPL() NOT_REACHED_GCOVR_EXCL_LINE
 #endif
 
 #define DCHECK_GE(a, b) DCHECK((a) >= (b))
@@ -106,7 +106,7 @@
 #define DCHECK_NE(a, b) DCHECK((a) != (b))
 #define DCHECK_EQ(a, b) DCHECK((a) == (b))
 
-#define QUIC_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
+#define QUICHE_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
 
 namespace quic {
 
@@ -146,6 +146,8 @@ private:
 
 class NullLogStream : public std::ostream {
 public:
+  NullLogStream() : std::ostream(nullptr) {}
+
   NullLogStream& stream() { return *this; }
 };
 
@@ -167,7 +169,7 @@ inline bool IsVerboseLogEnabled(int verbosity) {
 bool IsDFatalExitDisabled();
 void SetDFatalExitDisabled(bool is_disabled);
 
-// QuicLogSink is used to capture logs emitted from the QUIC_LOG... macros.
+// QuicLogSink is used to capture logs emitted from the QUICHE_LOG... macros.
 class QuicLogSink {
 public:
   virtual ~QuicLogSink() = default;

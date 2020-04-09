@@ -1,6 +1,7 @@
 #include <fstream>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -21,7 +22,8 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-void makePortHermetic(Fuzz::PerTestEnvironment& test_env, envoy::api::v2::core::Address& address) {
+void makePortHermetic(Fuzz::PerTestEnvironment& test_env,
+                      envoy::config::core::v3::Address& address) {
   if (address.has_socket_address()) {
     address.mutable_socket_address()->set_port_value(0);
   } else if (address.has_pipe()) {
@@ -29,10 +31,10 @@ void makePortHermetic(Fuzz::PerTestEnvironment& test_env, envoy::api::v2::core::
   }
 }
 
-envoy::config::bootstrap::v2::Bootstrap
+envoy::config::bootstrap::v3::Bootstrap
 makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
-                          const envoy::config::bootstrap::v2::Bootstrap& input) {
-  envoy::config::bootstrap::v2::Bootstrap output(input);
+                          const envoy::config::bootstrap::v3::Bootstrap& input) {
+  envoy::config::bootstrap::v3::Bootstrap output(input);
   // This is not a complete list of places where we need to zero out ports or sanitize paths, so we
   // should adapt it as we go and encounter places that we need to stabilize server test flakes.
   // config_validation_fuzz_test doesn't need to do this sanitization, so should pickup the coverage
@@ -42,8 +44,8 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   // The header_prefix is a write-once then read-only singleton that persists across tests. We clear
   // this field so that fuzz tests don't fail over multiple iterations.
   output.clear_header_prefix();
-  if (output.has_runtime()) {
-    output.mutable_runtime()->set_symlink_root(test_env.temporaryPath(""));
+  if (output.has_hidden_envoy_deprecated_runtime()) {
+    output.mutable_hidden_envoy_deprecated_runtime()->set_symlink_root(test_env.temporaryPath(""));
   }
   for (auto& listener : *output.mutable_static_resources()->mutable_listeners()) {
     if (listener.has_address()) {
@@ -51,20 +53,31 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
     }
   }
   for (auto& cluster : *output.mutable_static_resources()->mutable_clusters()) {
-    for (auto& host : *cluster.mutable_hosts()) {
+    for (auto& health_check : *cluster.mutable_health_checks()) {
+      // TODO(asraa): QUIC is not enabled in production code yet, so remove references for HTTP3.
+      // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
+      health_check.mutable_http_health_check()->clear_codec_client_type();
+    }
+    // We may have both deprecated hosts() or load_assignment().
+    for (auto& host : *cluster.mutable_hidden_envoy_deprecated_hosts()) {
       makePortHermetic(test_env, host);
+    }
+    for (int j = 0; j < cluster.load_assignment().endpoints_size(); ++j) {
+      auto* locality_lb = cluster.mutable_load_assignment()->mutable_endpoints(j);
+      for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
+        auto* lb_endpoint = locality_lb->mutable_lb_endpoints(k);
+        if (lb_endpoint->endpoint().address().has_socket_address()) {
+          makePortHermetic(test_env, *lb_endpoint->mutable_endpoint()->mutable_address());
+        }
+      }
     }
   }
   return output;
 }
 
-class AllFeaturesHooks : public DefaultListenerHooks {
-  void onRuntimeCreated() override { Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed(); }
-};
-
-DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
+DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   testing::NiceMock<MockOptions> options;
-  AllFeaturesHooks hooks;
+  DefaultListenerHooks hooks;
   testing::NiceMock<MockHotRestart> restart;
   Stats::TestIsolatedStoreImpl stats_store;
   Thread::MutexBasicLockable fakelock;

@@ -1,8 +1,5 @@
 #include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
-#include <sys/ioctl.h>
-#include <unistd.h>
-
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -234,7 +231,7 @@ void Filter::parseV1Header(char* buf, size_t len) {
   }
 }
 
-bool Filter::parseExtensions(int fd) {
+bool Filter::parseExtensions(os_fd_t fd) {
   // If we ever implement extensions elsewhere, be sure to
   // continue to skip and ignore those for LOCAL.
   while (proxy_protocol_header_.value().extensions_length_) {
@@ -258,7 +255,7 @@ bool Filter::parseExtensions(int fd) {
   return true;
 }
 
-bool Filter::readProxyHeader(int fd) {
+bool Filter::readProxyHeader(os_fd_t fd) {
   while (buf_off_ < MAX_PROXY_PROTO_LEN_V2) {
     int bytes_avail;
     auto& os_syscalls = Api::OsSysCallsSingleton::get();

@@ -9,11 +9,18 @@ namespace Regex {
 
 /**
  * A compiled regex expression matcher which uses an abstract regex engine.
- *
- * NOTE: Currently this is the same as StringMatcher, however has been split out as in the future
- *       we are likely to add other methods such as returning captures, etc.
  */
-class CompiledMatcher : public Matchers::StringMatcher {};
+class CompiledMatcher : public Matchers::StringMatcher {
+public:
+  /**
+   * Replaces all non-overlapping occurrences of the pattern in "value" with
+   * "substitution". The "substitution" string can make references to
+   * capture groups in the pattern, using the syntax specific to that
+   * regular expression engine.
+   */
+  virtual std::string replaceAll(absl::string_view value,
+                                 absl::string_view substitution) const PURE;
+};
 
 using CompiledMatcherPtr = std::unique_ptr<const CompiledMatcher>;
 

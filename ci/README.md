@@ -23,10 +23,20 @@ master commit at which the binary was compiled, and `latest` corresponds to a bi
 Currently there are three build images:
 
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 16.04 (Xenial) with GCC 7 and Clang 8 compiler.
-* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 7 and Clang 8 compiler, this image is experimental and not well tested.
+* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 16.04 (Xenial) with GCC 7 and Clang 9 compiler.
+* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 7 and Clang 9 compiler, this image is experimental and not well tested.
+
+The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
+repository.
 
 We use the Clang compiler for all CI runs with tests. We have an additional CI run with GCC which builds binary only.
+
+# C++ standard library
+
+As of November 2019 after [#8859](https://github.com/envoyproxy/envoy/pull/8859) the official released binary is
+[linked against libc++ on Linux](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#linking-against-libc-on-linux).
+To override the C++ standard library in your build, set environment variable `ENVOY_STDLIB` to `libstdc++` or `libc++` and
+run `./ci/do_ci.sh` as described below.
 
 # Building and running tests as a developer
 
@@ -96,6 +106,8 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
+* `bazel.msan` &mdash; build and run tests under `-c dbg --config=clang-msan` with clang.
+* `bazel.msan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-msan` with clang.
 * `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
 * `bazel.tsan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-tsan` with clang.
 * `bazel.fuzz` &mdash; build and run fuzz tests under `-c dbg --config=asan-fuzzer` with clang.
@@ -134,7 +146,7 @@ Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](ht
 which is pre-installed on the CircleCI macOS image. The dependencies are cached are re-installed
 on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
 build and test Envoy. If Envoy cannot be built (`error: /Library/Developer/CommandLineTools/usr/bin/libtool: no output file specified (specify with -o output)`),
-ensure that XCode is installed.
+ensure that Xcode is installed.
 
 # Coverity Scan Build Flow
 

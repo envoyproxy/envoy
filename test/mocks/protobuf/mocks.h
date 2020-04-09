@@ -12,7 +12,7 @@ public:
   MockValidationVisitor();
   ~MockValidationVisitor() override;
 
-  MOCK_METHOD1(onUnknownField, void(absl::string_view));
+  MOCK_METHOD(void, onUnknownField, (absl::string_view));
 };
 
 class MockValidationContext : public ValidationContext {
@@ -20,8 +20,8 @@ public:
   MockValidationContext();
   ~MockValidationContext() override;
 
-  MOCK_METHOD0(staticValidationVisitor, ValidationVisitor&());
-  MOCK_METHOD0(dynamicValidationVisitor, ValidationVisitor&());
+  MOCK_METHOD(ValidationVisitor&, staticValidationVisitor, ());
+  MOCK_METHOD(ValidationVisitor&, dynamicValidationVisitor, ());
 
   MockValidationVisitor static_validation_visitor_;
   MockValidationVisitor dynamic_validation_visitor_;

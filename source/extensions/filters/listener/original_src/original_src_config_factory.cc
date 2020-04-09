@@ -1,7 +1,7 @@
 #include "extensions/filters/listener/original_src/original_src_config_factory.h"
 
-#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.h"
-#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.validate.h"
+#include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.h"
+#include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/listener/original_src/config.h"
@@ -13,24 +13,28 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalSrc {
 
-Network::ListenerFilterFactoryCb OriginalSrcConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& message, Server::Configuration::ListenerFactoryContext& context) {
+Network::ListenerFilterFactoryCb OriginalSrcConfigFactory::createListenerFilterFactoryFromProto(
+    const Protobuf::Message& message,
+    const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+    Server::Configuration::ListenerFactoryContext& context) {
   auto proto_config = MessageUtil::downcastAndValidate<
-      const envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc&>(
+      const envoy::extensions::filters::listener::original_src::v3::OriginalSrc&>(
       message, context.messageValidationVisitor());
   Config config(proto_config);
-  return [config](Network::ListenerFilterManager& filter_manager) -> void {
-    filter_manager.addAcceptFilter(std::make_unique<OriginalSrcFilter>(config));
+  return [listener_filter_matcher, config](Network::ListenerFilterManager& filter_manager) -> void {
+    filter_manager.addAcceptFilter(listener_filter_matcher,
+                                   std::make_unique<OriginalSrcFilter>(config));
   };
 }
 
 ProtobufTypes::MessagePtr OriginalSrcConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc>();
+  return std::make_unique<envoy::extensions::filters::listener::original_src::v3::OriginalSrc>();
 }
 /**
  * Static registration for the original_src filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(OriginalSrcConfigFactory, Server::Configuration::NamedListenerFilterConfigFactory);
+REGISTER_FACTORY(OriginalSrcConfigFactory, Server::Configuration::NamedListenerFilterConfigFactory){
+    "envoy.listener.original_src"};
 
 } // namespace OriginalSrc
 } // namespace ListenerFilters

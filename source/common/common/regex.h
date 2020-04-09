@@ -4,7 +4,7 @@
 #include <regex>
 
 #include "envoy/common/regex.h"
-#include "envoy/type/matcher/regex.pb.h"
+#include "envoy/type/matcher/v3/regex.pb.h"
 
 namespace Envoy {
 namespace Regex {
@@ -37,7 +37,7 @@ public:
   /**
    * Construct a compiled regex matcher from a match config.
    */
-  static CompiledMatcherPtr parseRegex(const envoy::type::matcher::RegexMatcher& matcher);
+  static CompiledMatcherPtr parseRegex(const envoy::type::matcher::v3::RegexMatcher& matcher);
 };
 
 } // namespace Regex

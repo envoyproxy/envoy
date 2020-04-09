@@ -1,0 +1,47 @@
+headers_to_remove: ">\000\000\000\000\000\000\000"
+stream_info {
+  dynamic_metadata {
+    filter_metadata {
+      key: ""
+      value {
+        fields {
+          key: ""
+          value {
+            list_value {
+              values {
+                null_value: NULL_VALUE
+              }
+              values {
+              }
+              values {
+                null_value: NULL_VALUE
+              }
+              values {
+                string_value: ""
+              }
+              values {
+                null_value: NULL_VALUE
+              }
+            }
+          }
+        }
+        fields {
+          key: "!"
+          value {
+          }
+        }
+        fields {
+          key: "$headers_to_add {\n  header {\n    key: \"Q(Q(\"\n  }\n}\nheaders_to_add {\n  header {\n    key: \"A\"\n    value: \"%START_TIMEt_ig(%?f,d%DYNAMIC_METAg(%?f, %DYNAMIC_MET_AEtig(%?f,d%DYNAMIC_METAg(%?f, %DYNAMIC_METAEt_ig(%?f,d%DYNbMIC_METAg(%?f, %DYNAMIG_METAEt_ig(%?f,d%DYNAMIC_METAg(%?ME9Ag(%?f, %DYNAMIC_METAEt_?f, %DYNAMIC_MEIC_METAg(%?f, %DYDYNAMIC_METAg(%?f, %DYNAMIC_METAEt_ig(%?f,d%DYNAMIC_METAg(%?f, %DYNAMIC_METAEt_ig(%?f,d%DYNAMIC_METAg(%?f, %DYNAMIC_METAEt_ig(%?f,d%DYNAMIC_METAg(%?f, %DYNAMIC_METAEt_ig(%?f,d%DYNAMIC_METAg(%?f, %DYxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxNAMIC_METAEt_ig(%?f,d%DYNAMIC_METAg(%?f, %DYNAMIC_METAEt_ig(%?f,d%DYNAMIC_METAg(%?f, %DYNAMI5_METAEt_ig(%?f,d%IC_METAg(%?f, %DYNAMIC_METAEt_ig(%?f,d%DYNAMIC_METAg(%?f, %DYNAMIC_MEVAEt_ig(%?f,d%DYNAMIC_METAg(%?f, %DYNAMIC_METAEt_ig(%?f,d%DYNAMIC_METAg(%?f,f, %DYNAMIC_METADATA()%\"\n  }\n}\nstream_info {\n  address {\n    pipe {\n      path: \"p\"\n      mode: 1\n    }\n  }\n}\n"
+          value {
+          }
+        }
+      }
+    }
+    filter_metadata {
+      key: ">\000\000\000\000\000\000\000"
+      value {
+      }
+    }
+  }
+  requested_server_name: " "
+}

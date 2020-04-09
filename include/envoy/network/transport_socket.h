@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
@@ -81,6 +83,12 @@ public:
    * @param event supplies the connection event
    */
   virtual void raiseEvent(ConnectionEvent event) PURE;
+
+  /**
+   * If the callbacks' write buffer is not empty, try to drain the buffer.
+   * As of 2/20, used by Google.
+   */
+  virtual void flushWriteBuffer() PURE;
 };
 
 /**

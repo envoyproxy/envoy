@@ -1,6 +1,7 @@
 #include "extensions/filters/http/grpc_http1_reverse_bridge/config.h"
 
-#include "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1/config.pb.validate.h"
+#include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
+#include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
@@ -11,7 +12,7 @@ namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
 
 Http::FilterFactoryCb Config::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfig& config,
+    const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig& config,
     const std::string&, Server::Configuration::FactoryContext&) {
   return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
@@ -20,7 +21,7 @@ Http::FilterFactoryCb Config::createFilterFactoryFromProtoTyped(
 }
 
 Router::RouteSpecificFilterConfigConstSharedPtr Config::createRouteSpecificFilterConfigTyped(
-    const envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfigPerRoute&
+    const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfigPerRoute&
         proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<FilterConfigPerRoute>(proto_config);

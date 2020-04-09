@@ -8,7 +8,7 @@
 
 #include <vector>
 
-#include "quiche/quic/platform/api/quic_string_piece.h"
+#include "quiche/common/platform/api/quiche_string_piece.h"
 
 namespace quic {
 
@@ -23,6 +23,6 @@ std::vector<std::string> ReadFileContentsImpl(const std::string& dirname);
  *  @param filename the full path to the file.
  *  @param contents output location of the file content.
  */
-void ReadFileContentsImpl(QuicStringPiece filename, std::string* contents);
+void ReadFileContentsImpl(quiche::QuicheStringPiece filename, std::string* contents);
 
 } // namespace quic

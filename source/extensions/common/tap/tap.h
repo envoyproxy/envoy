@@ -1,9 +1,9 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-#include "envoy/data/tap/v2alpha/wrapper.pb.h"
+#include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/data/tap/v3/wrapper.pb.h"
 #include "envoy/http/header_map.h"
-#include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "extensions/common/tap/tap_matcher.h"
 
@@ -14,9 +14,9 @@ namespace Extensions {
 namespace Common {
 namespace Tap {
 
-using TraceWrapperPtr = std::unique_ptr<envoy::data::tap::v2alpha::TraceWrapper>;
+using TraceWrapperPtr = std::unique_ptr<envoy::data::tap::v3::TraceWrapper>;
 inline TraceWrapperPtr makeTraceWrapper() {
-  return std::make_unique<envoy::data::tap::v2alpha::TraceWrapper>();
+  return std::make_unique<envoy::data::tap::v3::TraceWrapper>();
 }
 
 /**
@@ -34,7 +34,7 @@ public:
    * @param format supplies the output format to use.
    */
   virtual void submitTrace(TraceWrapperPtr&& trace,
-                           envoy::service::tap::v2alpha::OutputSink::Format format) PURE;
+                           envoy::config::tap::v3::OutputSink::Format format) PURE;
 };
 
 using PerTapSinkHandlePtr = std::unique_ptr<PerTapSinkHandle>;
@@ -98,7 +98,7 @@ public:
    *        specifies that output type. May not be used if the configuration does not specify
    *        admin output. May be nullptr if admin is not used to supply the config.
    */
-  virtual void newTapConfig(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+  virtual void newTapConfig(envoy::config::tap::v3::TapConfig&& proto_config,
                             Sink* admin_streamer) PURE;
 };
 
@@ -158,9 +158,8 @@ public:
    * @return a new configuration given a raw tap service config proto. See
    * ExtensionConfig::newTapConfig() for param info.
    */
-  virtual TapConfigSharedPtr
-  createConfigFromProto(envoy::service::tap::v2alpha::TapConfig&& proto_config,
-                        Sink* admin_streamer) PURE;
+  virtual TapConfigSharedPtr createConfigFromProto(envoy::config::tap::v3::TapConfig&& proto_config,
+                                                   Sink* admin_streamer) PURE;
 };
 
 using TapConfigFactoryPtr = std::unique_ptr<TapConfigFactory>;

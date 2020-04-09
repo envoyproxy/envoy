@@ -7,6 +7,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/common/mutex_tracer.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/context.h"
@@ -74,9 +75,9 @@ public:
   virtual void drainListeners() PURE;
 
   /**
-   * @return const DrainManager& singleton for use by the entire server.
+   * @return DrainManager& singleton for use by the entire server.
    */
-  virtual const DrainManager& drainManager() PURE;
+  virtual DrainManager& drainManager() PURE;
 
   /**
    * @return AccessLogManager for use by the entire server.
@@ -196,7 +197,7 @@ public:
   /**
    * @return the server-wide process context.
    */
-  virtual OptProcessContextRef processContext() PURE;
+  virtual ProcessContextOptRef processContext() PURE;
 
   /**
    * @return ThreadLocal::Instance& the thread local storage engine for the server. This is used to
@@ -220,6 +221,13 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
+   * Flush the stats sinks outside of a flushing interval.
+   * Note: stats flushing may not be synchronous.
+   * Therefore, this function may return prior to flushing taking place.
+   */
+  virtual void flushStats() PURE;
+
+  /**
    * @return ProtobufMessage::ValidationContext& validation context for configuration
    *         messages.
    */
@@ -229,6 +237,22 @@ public:
    * @return Configuration::ServerFactoryContext& factory context for filters.
    */
   virtual Configuration::ServerFactoryContext& serverFactoryContext() PURE;
+
+  /**
+   * @return Configuration::TransportSocketFactoryContext& factory context for transport sockets.
+   */
+  virtual Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() PURE;
+
+  /**
+   * Set the default server-wide tracer provider configuration that will be used as a fallback
+   * if an "envoy.filters.network.http_connection_manager" filter that has tracing enabled doesn't
+   * define a tracer provider in-place.
+   *
+   * Once deprecation window for the tracer provider configuration in the bootstrap config is over,
+   * this method will no longer be necessary.
+   */
+  virtual void
+  setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) PURE;
 };
 
 } // namespace Server

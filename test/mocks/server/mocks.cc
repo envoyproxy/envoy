@@ -2,6 +2,9 @@
 
 #include <string>
 
+#include "envoy/admin/v3/server_info.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/singleton/manager_impl.h"
 
 #include "gmock/gmock.h"
@@ -39,8 +42,9 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, signalHandlingEnabled()).WillByDefault(ReturnPointee(&signal_handling_enabled_));
   ON_CALL(*this, mutexTracingEnabled()).WillByDefault(ReturnPointee(&mutex_tracing_enabled_));
   ON_CALL(*this, cpusetThreadsEnabled()).WillByDefault(ReturnPointee(&cpuset_threads_enabled_));
+  ON_CALL(*this, disabledExtensions()).WillByDefault(ReturnRef(disabled_extensions_));
   ON_CALL(*this, toCommandLineOptions()).WillByDefault(Invoke([] {
-    return std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
+    return std::make_unique<envoy::admin::v3::CommandLineOptions>();
   }));
 }
 MockOptions::~MockOptions() = default;
@@ -91,15 +95,16 @@ MockOverloadManager::~MockOverloadManager() = default;
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
   ON_CALL(*this, createListenSocket(_, _, _, _))
-      .WillByDefault(Invoke(
-          [&](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
-              const Network::Socket::OptionsSharedPtr& options, bool) -> Network::SocketSharedPtr {
-            if (!Network::Socket::applyOptions(options, *socket_,
-                                               envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
-              throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
-            }
-            return socket_;
-          }));
+      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr,
+                                Network::Address::SocketType,
+                                const Network::Socket::OptionsSharedPtr& options,
+                                const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
+        if (!Network::Socket::applyOptions(options, *socket_,
+                                           envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
+          throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
+        }
+        return socket_;
+      }));
 }
 MockListenerComponentFactory::~MockListenerComponentFactory() = default;
 
@@ -115,7 +120,8 @@ MockWorkerFactory::~MockWorkerFactory() = default;
 MockWorker::MockWorker() {
   ON_CALL(*this, addListener(_, _))
       .WillByDefault(
-          Invoke([this](Network::ListenerConfig&, AddListenerCompletion completion) -> void {
+          Invoke([this](Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
+            config.listenSocketFactory().getListenSocket();
             EXPECT_EQ(nullptr, add_listener_completion_);
             add_listener_completion_ = completion;
           }));
@@ -126,6 +132,13 @@ MockWorker::MockWorker() {
             EXPECT_EQ(nullptr, remove_listener_completion_);
             remove_listener_completion_ = completion;
           }));
+
+  ON_CALL(*this, stopListener(_, _))
+      .WillByDefault(Invoke([](Network::ListenerConfig&, std::function<void()> completion) -> void {
+        if (completion != nullptr) {
+          completion();
+        }
+      }));
 }
 MockWorker::~MockWorker() = default;
 
@@ -135,7 +148,9 @@ MockInstance::MockInstance()
       singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       server_factory_context_(
-          std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()) {
+          std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()),
+      transport_socket_factory_context_(
+          std::make_shared<NiceMock<Configuration::MockTransportSocketFactoryContext>>()) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, grpcContext()).WillByDefault(ReturnRef(grpc_context_));
@@ -161,6 +176,8 @@ MockInstance::MockInstance()
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
   ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));
+  ON_CALL(*this, transportSocketFactoryContext())
+      .WillByDefault(ReturnRef(*transport_socket_factory_context_));
 }
 
 MockInstance::~MockInstance() = default;
@@ -178,7 +195,8 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
 MockMain::~MockMain() = default;
 
 MockServerFactoryContext::MockServerFactoryContext()
-    : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())) {
+    : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
+      grpc_context_(scope_.symbolTable()) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
@@ -191,15 +209,18 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
+  ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
+  ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 
 MockFactoryContext::MockFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(scope_.symbolTable()), http_context_(scope_.symbolTable()) {
+  ON_CALL(*this, getServerFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
@@ -217,6 +238,7 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
+  ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
@@ -251,6 +273,16 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 
+MockFilterChainFactoryContext::MockFilterChainFactoryContext() = default;
+MockFilterChainFactoryContext::~MockFilterChainFactoryContext() = default;
+
+MockTracerFactoryContext::MockTracerFactoryContext() {
+  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+}
+
+MockTracerFactoryContext::~MockTracerFactoryContext() = default;
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

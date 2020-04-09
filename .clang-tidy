@@ -1,18 +1,5 @@
-Checks:          'abseil-*,
-                  bugprone-*,
-                  clang-analyzer-*,
-                  clang-diagnostic-*,
-                  misc-unused-using-decls,
-                  modernize-*,
-                  -modernize-use-trailing-return-type,
-                  performance-*,
-                  readability-braces-around-statements,
-                  readability-container-size-empty,
-                  readability-identifier-naming,
-                  readability-redundant-*'
-
-#TODO(lizan): grow this list, fix possible warnings and make more checks as error
-WarningsAsErrors: 'abseil-duration-*,
+Checks:           '-clang-analyzer-optin.cplusplus.UninitializedObject,
+                   abseil-duration-*,
                    abseil-faster-strsplit-delimiter,
                    abseil-no-namespace,
                    abseil-redundant-strcat-calls,
@@ -50,6 +37,8 @@ WarningsAsErrors: 'abseil-duration-*,
                    readability-redundant-smartptr-get,
                    readability-redundant-string-cstr'
 
+WarningsAsErrors:  '*'
+
 CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros
     value:           'ASSERT'
@@ -64,6 +53,9 @@ CheckOptions:
     value:           'CamelCase'
 
   - key:             readability-identifier-naming.EnumCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.EnumConstantCase
     value:           'CamelCase'
 
   - key:             readability-identifier-naming.ParameterCase
@@ -83,3 +75,6 @@ CheckOptions:
 
   - key:             readability-identifier-naming.UnionCase
     value:           'CamelCase'
+
+  - key:             readability-identifier-naming.FunctionCase
+    value:           'camelBack'

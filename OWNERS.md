@@ -10,7 +10,7 @@ routing PRs, questions, etc. to the right place.
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
 * Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
-  * APIs, xDS, gRPC, configuration, Bazel/build, base server (startup, etc.), Python, and Bash.
+  * APIs, xDS, UDPA, gRPC, configuration, security, Python, and Bash.
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
   * HTTP, flow control, cluster manager, load balancing, and core networking (listeners,
     connections, etc.).
@@ -20,33 +20,37 @@ routing PRs, questions, etc. to the right place.
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan@tetrate.io)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), Bazel, build
     issues, and CI in general.
+* Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
+  * Upstream, host/priority sets, load balancing, and retry plugins.
+* Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
+  * TLS, TCP proxy, listeners, and HTTP proxy/connection pooling.
 
 # Maintainers
 
+* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
+  * Fuzzing, security, headers, HTTP/gRPC, router, access log, tests.
+* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
+  * Data plane, codecs, security, configuration.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
-* Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
-  * Base server (watchdog, workers, startup, stack trace handling, etc.).
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
   * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
-* Snow Pettersen ([snowp](https://github.com/snowp)) (snowp@squareup.com)
-  * Upstream, host/priority sets, load balancing, and retry plugins.
 
 # Envoy security team
 
 * All maintainers
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
-* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
-* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
+* Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
+* Tony Allen ([tonya11en](https://github.com/tonya11en)) (tallen@lyft.com)
 
 # Emeritus maintainers
 
 * Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)
 * Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
-* Greg Greenway ([ggreenway](https://github.com/ggreenway)) (greg.greenway@gmail.com, formerly ggreenway@apple.com)
+* Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
 
 # Friends of Envoy
 

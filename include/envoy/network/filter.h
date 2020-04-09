@@ -272,6 +272,17 @@ public:
 };
 
 /**
+ *  Interface for a listener filter matching with incoming traffic.
+ */
+class ListenerFilterMatcher {
+public:
+  virtual ~ListenerFilterMatcher() = default;
+  virtual bool matches(Network::ListenerFilterCallbacks& cb) const PURE;
+};
+using ListenerFilterMatcherPtr = std::unique_ptr<ListenerFilterMatcher>;
+using ListenerFilterMatcherSharedPtr = std::shared_ptr<ListenerFilterMatcher>;
+
+/**
  * Listener Filter
  */
 class ListenerFilter {
@@ -299,9 +310,11 @@ public:
   /**
    * Add a filter to the listener. Filters are invoked in FIFO order (the filter added
    * first is called first).
+   * @param listener_filter_matcher supplies the matcher to decide when filter is enabled.
    * @param filter supplies the filter being added.
    */
-  virtual void addAcceptFilter(ListenerFilterPtr&& filter) PURE;
+  virtual void addAcceptFilter(const ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+                               ListenerFilterPtr&& filter) PURE;
 };
 
 /**
@@ -334,6 +347,14 @@ public:
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
+
+/**
+ * A filter chain that can be drained.
+ */
+class DrainableFilterChain : public FilterChain {
+public:
+  virtual void startDraining() PURE;
+};
 
 /**
  * Interface for searching through configured filter chains.
@@ -377,6 +398,13 @@ public:
    * @param data supplies the read data which may be modified.
    */
   virtual void onData(UdpRecvData& data) PURE;
+
+  /**
+   * Called when there is an error event in the receive data path.
+   *
+   * @param error_code supplies the received error on the listener.
+   */
+  virtual void onReceiveError(Api::IoError::IoErrorCode error_code) PURE;
 
 protected:
   /**
@@ -436,9 +464,8 @@ public:
    *
    * @param udp_listener supplies the listener to create the chain on.
    * @param callbacks supplies the callbacks needed to create a filter.
-   * @return true if filter chain was created successfully. Otherwise false.
    */
-  virtual bool createUdpListenerFilterChain(UdpListenerFilterManager& udp_listener,
+  virtual void createUdpListenerFilterChain(UdpListenerFilterManager& udp_listener,
                                             UdpReadFilterCallbacks& callbacks) PURE;
 };
 

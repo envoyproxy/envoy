@@ -189,5 +189,17 @@ TEST_F(EnvoyQuicAlarmTest, CancelActiveAlarm) {
   EXPECT_FALSE(unowned_delegate->fired());
 }
 
+TEST_F(EnvoyQuicAlarmTest, CancelUponDestruction) {
+  auto unowned_delegate = new TestDelegate();
+  quic::QuicAlarm* alarm = alarm_factory_.CreateAlarm(unowned_delegate);
+  // alarm becomes active upon Set().
+  alarm->Set(clock_.Now() + QuicTime::Delta::FromMilliseconds(10));
+  // delegate should be destroyed with alarm.
+  delete alarm;
+  // alarm firing callback should have been cancelled, otherwise the delegate
+  // would be used after free.
+  advanceMsAndLoop(10);
+}
+
 } // namespace Quic
 } // namespace Envoy

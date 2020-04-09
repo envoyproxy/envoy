@@ -27,12 +27,14 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
-    name = "runtime_features_test",
-    srcs = ["runtime_features_test.cc"],
+    name = "runtime_protos_test",
+    srcs = ["runtime_protos_test.cc"],
     deps = [
         "//source/common/runtime:runtime_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -44,7 +46,7 @@ envoy_cc_test(
         "//source/common/config:runtime_utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/common/stats:stats_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/init:init_mocks",
@@ -54,6 +56,11 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -66,14 +73,5 @@ envoy_cc_test(
     coverage = False,
     deps = [
         "//source/common/runtime:runtime_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "uuid_util_test",
-    srcs = ["uuid_util_test.cc"],
-    deps = [
-        "//source/common/runtime:runtime_lib",
-        "//source/common/runtime:uuid_util_lib",
     ],
 )

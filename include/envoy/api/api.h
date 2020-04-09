@@ -57,7 +57,7 @@ public:
   /**
    * @return an optional reference to the ProcessContext
    */
-  virtual OptProcessContextRef processContext() PURE;
+  virtual ProcessContextOptRef processContext() PURE;
 };
 
 using ApiPtr = std::unique_ptr<Api>;

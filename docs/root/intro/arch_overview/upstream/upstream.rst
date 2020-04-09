@@ -9,6 +9,7 @@ Upstream clusters
   health_checking
   connection_pooling
   load_balancing/load_balancing
+  aggregate_cluster
   outlier
   circuit_breaking
   upstream_filters

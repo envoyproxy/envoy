@@ -113,6 +113,22 @@
         "path_rewrite": "/second/test",
         "cluster_name": "www2"
       }
+    },
+    {
+      "test_name": "Test_11",
+      "input": {
+        "authority": "redirect.lyft.com",
+        "path": "/rewrite",
+        "method": "GET",
+        "ssl": true
+      },
+      "validate": {
+        "host_rewrite": "",
+        "virtual_host_name": "",
+        "path_rewrite": "",
+        "cluster_name": "",
+        "path_redirect": "https://redirect.lyft.com/blah"
+      }
     }
   ]
 }

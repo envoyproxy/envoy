@@ -102,7 +102,7 @@ v: 1.2-pre, stage: dev  host4          Subset of hosts selected
 v: 1.0                  host1, host2   Fallback: No subset selector for "v" alone
 other: x                host1, host2   Fallback: No subset selector for "other"
 (none)                  host1, host2   Fallback: No subset requested
-stage: test             empty cluster  As fallback policy is overriden per selector with "NO_FALLBACK" value
+stage: test             empty cluster  As fallback policy is overridden per selector with "NO_FALLBACK" value
 ======================  =============  ======================================================================
 
 Metadata match criteria may also be specified on a route's weighted clusters. Metadata match

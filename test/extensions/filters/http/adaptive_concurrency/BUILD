@@ -2,7 +2,6 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
@@ -20,10 +19,11 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
-        "//source/extensions/filters/http/adaptive_concurrency/concurrency_controller:concurrency_controller_lib",
+        "//source/extensions/filters/http/adaptive_concurrency/controller:controller_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg_cc_proto",
     ],
 )
 

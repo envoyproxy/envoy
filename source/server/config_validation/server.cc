@@ -2,8 +2,7 @@
 
 #include <memory>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "common/common/utility.h"
 #include "common/common/version.h"
@@ -51,7 +50,8 @@ ValidationInstance::ValidationInstance(
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
-      http_context_(stats_store_.symbolTable()), time_system_(time_system), server_context_(*this) {
+      http_context_(stats_store_.symbolTable()), time_system_(time_system),
+      server_contexts_(*this) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
@@ -75,13 +75,13 @@ void ValidationInstance::initialize(const Options& options,
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   InstanceUtil::loadBootstrapConfig(bootstrap, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
   Config::Utility::createTagProducer(bootstrap);
 
-  bootstrap.mutable_node()->set_build_version(VersionInfo::version());
+  bootstrap.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       bootstrap.node(), local_address, options.serviceZone(), options.serviceClusterName(),
@@ -95,14 +95,13 @@ void ValidationInstance::initialize(const Options& options,
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin().getConfigTracker());
-  ssl_context_manager_ =
-      createContextManager(Ssl::ContextManagerFactory::name(), api_->timeSource());
+  ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
       dispatcher(), localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
-      accessLogManager(), singletonManager(), time_system_);
+      grpc_context_, accessLogManager(), singletonManager(), time_system_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
-  http_context_.setTracer(config_.httpTracer());
+  runtime_loader_->initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }
 

@@ -1,5 +1,7 @@
 #include "extensions/filters/http/original_src/original_src_config_factory.h"
 
+#include "envoy/extensions/filters/http/original_src/v3/original_src.pb.h"
+#include "envoy/extensions/filters/http/original_src/v3/original_src.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/original_src/config.h"
@@ -12,7 +14,7 @@ namespace HttpFilters {
 namespace OriginalSrc {
 
 Http::FilterFactoryCb OriginalSrcConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::original_src::v2alpha1::OriginalSrc& proto_config,
+    const envoy::extensions::filters::http::original_src::v3::OriginalSrc& proto_config,
     const std::string&, Server::Configuration::FactoryContext&) {
   Config config(proto_config);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

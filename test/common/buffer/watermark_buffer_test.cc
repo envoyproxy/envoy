@@ -14,12 +14,9 @@ namespace {
 
 const char TEN_BYTES[] = "0123456789";
 
-class WatermarkBufferTest : public BufferImplementationParamTest {
+class WatermarkBufferTest : public testing::Test {
 public:
-  WatermarkBufferTest() {
-    verifyImplementation(buffer_);
-    buffer_.setWatermarks(5, 10);
-  }
+  WatermarkBufferTest() { buffer_.setWatermarks(5, 10); }
 
   Buffer::WatermarkBuffer buffer_{[&]() -> void { ++times_low_watermark_called_; },
                                   [&]() -> void { ++times_high_watermark_called_; }};
@@ -27,12 +24,9 @@ public:
   uint32_t times_high_watermark_called_{0};
 };
 
-INSTANTIATE_TEST_SUITE_P(WatermarkBufferTest, WatermarkBufferTest,
-                         testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
+TEST_F(WatermarkBufferTest, TestWatermark) { ASSERT_EQ(10, buffer_.highWatermark()); }
 
-TEST_P(WatermarkBufferTest, TestWatermark) { ASSERT_EQ(10, buffer_.highWatermark()); }
-
-TEST_P(WatermarkBufferTest, CopyOut) {
+TEST_F(WatermarkBufferTest, CopyOut) {
   buffer_.add("hello world");
   std::array<char, 5> out;
   buffer_.copyOut(0, out.size(), out.data());
@@ -45,7 +39,7 @@ TEST_P(WatermarkBufferTest, CopyOut) {
   buffer_.copyOut(4, 0, out.data());
 }
 
-TEST_P(WatermarkBufferTest, AddChar) {
+TEST_F(WatermarkBufferTest, AddChar) {
   buffer_.add(TEN_BYTES, 10);
   EXPECT_EQ(0, times_high_watermark_called_);
   buffer_.add("a", 1);
@@ -53,7 +47,7 @@ TEST_P(WatermarkBufferTest, AddChar) {
   EXPECT_EQ(11, buffer_.length());
 }
 
-TEST_P(WatermarkBufferTest, AddString) {
+TEST_F(WatermarkBufferTest, AddString) {
   buffer_.add(std::string(TEN_BYTES));
   EXPECT_EQ(0, times_high_watermark_called_);
   buffer_.add(std::string("a"));
@@ -61,7 +55,7 @@ TEST_P(WatermarkBufferTest, AddString) {
   EXPECT_EQ(11, buffer_.length());
 }
 
-TEST_P(WatermarkBufferTest, AddBuffer) {
+TEST_F(WatermarkBufferTest, AddBuffer) {
   OwnedImpl first(TEN_BYTES);
   buffer_.add(first);
   EXPECT_EQ(0, times_high_watermark_called_);
@@ -71,7 +65,7 @@ TEST_P(WatermarkBufferTest, AddBuffer) {
   EXPECT_EQ(11, buffer_.length());
 }
 
-TEST_P(WatermarkBufferTest, Prepend) {
+TEST_F(WatermarkBufferTest, Prepend) {
   std::string suffix = "World!", prefix = "Hello, ";
 
   buffer_.add(suffix);
@@ -81,7 +75,7 @@ TEST_P(WatermarkBufferTest, Prepend) {
   EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
 }
 
-TEST_P(WatermarkBufferTest, PrependToEmptyBuffer) {
+TEST_F(WatermarkBufferTest, PrependToEmptyBuffer) {
   std::string suffix = "World!", prefix = "Hello, ";
 
   buffer_.prepend(suffix);
@@ -97,7 +91,7 @@ TEST_P(WatermarkBufferTest, PrependToEmptyBuffer) {
   EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
 }
 
-TEST_P(WatermarkBufferTest, PrependBuffer) {
+TEST_F(WatermarkBufferTest, PrependBuffer) {
   std::string suffix = "World!", prefix = "Hello, ";
 
   uint32_t prefix_buffer_low_watermark_hits{0};
@@ -118,7 +112,7 @@ TEST_P(WatermarkBufferTest, PrependBuffer) {
   EXPECT_EQ(0, prefixBuffer.length());
 }
 
-TEST_P(WatermarkBufferTest, Commit) {
+TEST_F(WatermarkBufferTest, Commit) {
   buffer_.add(TEN_BYTES, 10);
   EXPECT_EQ(0, times_high_watermark_called_);
   RawSlice out;
@@ -130,7 +124,7 @@ TEST_P(WatermarkBufferTest, Commit) {
   EXPECT_EQ(20, buffer_.length());
 }
 
-TEST_P(WatermarkBufferTest, Drain) {
+TEST_F(WatermarkBufferTest, Drain) {
   // Draining from above to below the low watermark does nothing if the high
   // watermark never got hit.
   buffer_.add(TEN_BYTES, 10);
@@ -140,8 +134,8 @@ TEST_P(WatermarkBufferTest, Drain) {
 
   // Go above the high watermark then drain down to just at the low watermark.
   buffer_.add(TEN_BYTES, 11);
-  buffer_.drain(6);
-  EXPECT_EQ(5, buffer_.length());
+  buffer_.drain(5);
+  EXPECT_EQ(6, buffer_.length());
   EXPECT_EQ(0, times_low_watermark_called_);
 
   // Now drain below.
@@ -153,7 +147,34 @@ TEST_P(WatermarkBufferTest, Drain) {
   EXPECT_EQ(2, times_high_watermark_called_);
 }
 
-TEST_P(WatermarkBufferTest, MoveFullBuffer) {
+// Verify that low watermark callback is called on drain in the case where the
+// high watermark is non-zero and low watermark is 0.
+TEST_F(WatermarkBufferTest, DrainWithLowWatermarkOfZero) {
+  buffer_.setWatermarks(0, 10);
+
+  // Draining from above to below the low watermark does nothing if the high
+  // watermark never got hit.
+  buffer_.add(TEN_BYTES, 10);
+  buffer_.drain(10);
+  EXPECT_EQ(0, times_high_watermark_called_);
+  EXPECT_EQ(0, times_low_watermark_called_);
+
+  // Go above the high watermark then drain down to just above the low watermark.
+  buffer_.add(TEN_BYTES, 11);
+  buffer_.drain(10);
+  EXPECT_EQ(1, buffer_.length());
+  EXPECT_EQ(0, times_low_watermark_called_);
+
+  // Now drain below.
+  buffer_.drain(1);
+  EXPECT_EQ(1, times_low_watermark_called_);
+
+  // Going back above should trigger the high again
+  buffer_.add(TEN_BYTES, 11);
+  EXPECT_EQ(2, times_high_watermark_called_);
+}
+
+TEST_F(WatermarkBufferTest, MoveFullBuffer) {
   buffer_.add(TEN_BYTES, 10);
   OwnedImpl data("a");
 
@@ -163,7 +184,7 @@ TEST_P(WatermarkBufferTest, MoveFullBuffer) {
   EXPECT_EQ(11, buffer_.length());
 }
 
-TEST_P(WatermarkBufferTest, MoveOneByte) {
+TEST_F(WatermarkBufferTest, MoveOneByte) {
   buffer_.add(TEN_BYTES, 9);
   OwnedImpl data("ab");
 
@@ -176,8 +197,8 @@ TEST_P(WatermarkBufferTest, MoveOneByte) {
   EXPECT_EQ(11, buffer_.length());
 }
 
-TEST_P(WatermarkBufferTest, WatermarkFdFunctions) {
-  int pipe_fds[2] = {0, 0};
+TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
+  os_fd_t pipe_fds[2] = {0, 0};
   ASSERT_EQ(0, pipe(pipe_fds));
 
   buffer_.add(TEN_BYTES, 10);
@@ -209,7 +230,7 @@ TEST_P(WatermarkBufferTest, WatermarkFdFunctions) {
   EXPECT_EQ(20, buffer_.length());
 }
 
-TEST_P(WatermarkBufferTest, MoveWatermarks) {
+TEST_F(WatermarkBufferTest, MoveWatermarks) {
   buffer_.add(TEN_BYTES, 9);
   EXPECT_EQ(0, times_high_watermark_called_);
   buffer_.setWatermarks(1, 9);
@@ -217,12 +238,13 @@ TEST_P(WatermarkBufferTest, MoveWatermarks) {
   buffer_.setWatermarks(1, 8);
   EXPECT_EQ(1, times_high_watermark_called_);
 
-  buffer_.setWatermarks(9, 20);
-  EXPECT_EQ(0, times_low_watermark_called_);
-  buffer_.setWatermarks(10, 20);
-  EXPECT_EQ(1, times_low_watermark_called_);
   buffer_.setWatermarks(8, 20);
-  buffer_.setWatermarks(10, 20);
+  EXPECT_EQ(0, times_low_watermark_called_);
+  buffer_.setWatermarks(9, 20);
+  EXPECT_EQ(1, times_low_watermark_called_);
+  buffer_.setWatermarks(7, 20);
+  EXPECT_EQ(1, times_low_watermark_called_);
+  buffer_.setWatermarks(9, 20);
   EXPECT_EQ(1, times_low_watermark_called_);
 
   EXPECT_EQ(1, times_high_watermark_called_);
@@ -230,14 +252,23 @@ TEST_P(WatermarkBufferTest, MoveWatermarks) {
   EXPECT_EQ(2, times_high_watermark_called_);
   EXPECT_EQ(1, times_low_watermark_called_);
   buffer_.setWatermarks(0);
+  EXPECT_EQ(2, times_high_watermark_called_);
   EXPECT_EQ(2, times_low_watermark_called_);
+  buffer_.setWatermarks(1);
+  EXPECT_EQ(3, times_high_watermark_called_);
+  EXPECT_EQ(2, times_low_watermark_called_);
+
+  // Fully drain the buffer.
+  buffer_.drain(9);
+  EXPECT_EQ(3, times_low_watermark_called_);
+  EXPECT_EQ(0, buffer_.length());
 }
 
-TEST_P(WatermarkBufferTest, GetRawSlices) {
+TEST_F(WatermarkBufferTest, GetRawSlices) {
   buffer_.add(TEN_BYTES, 10);
 
-  RawSlice slices[2];
-  ASSERT_EQ(1, buffer_.getRawSlices(&slices[0], 2));
+  RawSliceVector slices = buffer_.getRawSlices(/*max_slices=*/2);
+  ASSERT_EQ(1, slices.size());
   EXPECT_EQ(10, slices[0].len_);
   EXPECT_EQ(0, memcmp(slices[0].mem_, &TEN_BYTES[0], 10));
 
@@ -245,7 +276,7 @@ TEST_P(WatermarkBufferTest, GetRawSlices) {
   EXPECT_EQ(data_pointer, slices[0].mem_);
 }
 
-TEST_P(WatermarkBufferTest, Search) {
+TEST_F(WatermarkBufferTest, Search) {
   buffer_.add(TEN_BYTES, 10);
 
   EXPECT_EQ(1, buffer_.search(&TEN_BYTES[1], 2, 0));
@@ -253,7 +284,7 @@ TEST_P(WatermarkBufferTest, Search) {
   EXPECT_EQ(-1, buffer_.search(&TEN_BYTES[1], 2, 5));
 }
 
-TEST_P(WatermarkBufferTest, StartsWith) {
+TEST_F(WatermarkBufferTest, StartsWith) {
   buffer_.add(TEN_BYTES, 10);
 
   EXPECT_TRUE(buffer_.startsWith({TEN_BYTES, 2}));
@@ -261,7 +292,7 @@ TEST_P(WatermarkBufferTest, StartsWith) {
   EXPECT_FALSE(buffer_.startsWith({&TEN_BYTES[1], 2}));
 }
 
-TEST_P(WatermarkBufferTest, MoveBackWithWatermarks) {
+TEST_F(WatermarkBufferTest, MoveBackWithWatermarks) {
   int high_watermark_buffer1 = 0;
   int low_watermark_buffer1 = 0;
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },

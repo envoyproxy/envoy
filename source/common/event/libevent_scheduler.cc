@@ -49,21 +49,36 @@ void LibeventScheduler::run(Dispatcher::RunType mode) {
 
 void LibeventScheduler::loopExit() { event_base_loopexit(libevent_.get(), nullptr); }
 
+void LibeventScheduler::registerOnPrepareCallback(OnPrepareCallback&& callback) {
+  ASSERT(callback);
+  ASSERT(!callback_);
+
+  callback_ = std::move(callback);
+  evwatch_prepare_new(libevent_.get(), &onPrepareForCallback, this);
+}
+
 void LibeventScheduler::initializeStats(DispatcherStats* stats) {
   stats_ = stats;
   // These are thread safe.
-  evwatch_prepare_new(libevent_.get(), &onPrepare, this);
-  evwatch_check_new(libevent_.get(), &onCheck, this);
+  evwatch_prepare_new(libevent_.get(), &onPrepareForStats, this);
+  evwatch_check_new(libevent_.get(), &onCheckForStats, this);
 }
 
-void LibeventScheduler::onPrepare(evwatch*, const evwatch_prepare_cb_info* info, void* arg) {
+void LibeventScheduler::onPrepareForCallback(evwatch*, const evwatch_prepare_cb_info*, void* arg) {
+  // `self` is `this`, passed in from evwatch_prepare_new.
+  auto self = static_cast<LibeventScheduler*>(arg);
+  self->callback_();
+}
+
+void LibeventScheduler::onPrepareForStats(evwatch*, const evwatch_prepare_cb_info* info,
+                                          void* arg) {
   // `self` is `this`, passed in from evwatch_prepare_new.
   auto self = static_cast<LibeventScheduler*>(arg);
 
   // Record poll timeout and prepare time for this iteration of the event loop. The timeout is the
   // expected polling duration, whereas the actual polling duration will be the difference measured
   // between the prepare time and the check time immediately after polling. These are compared in
-  // onCheck to compute the poll_delay stat.
+  // onCheckForStats to compute the poll_delay stat.
   self->timeout_set_ = evwatch_prepare_get_timeout(info, &self->timeout_);
   evutil_gettimeofday(&self->prepare_time_, nullptr);
 
@@ -76,7 +91,7 @@ void LibeventScheduler::onPrepare(evwatch*, const evwatch_prepare_cb_info* info,
   }
 }
 
-void LibeventScheduler::onCheck(evwatch*, const evwatch_check_cb_info*, void* arg) {
+void LibeventScheduler::onCheckForStats(evwatch*, const evwatch_check_cb_info*, void* arg) {
   // `self` is `this`, passed in from evwatch_check_new.
   auto self = static_cast<LibeventScheduler*>(arg);
 

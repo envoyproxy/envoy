@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/macros.h"
@@ -20,9 +21,9 @@ namespace DubboFilters {
  * Implemented by each Dubbo filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedDubboFilterConfigFactory {
+class NamedDubboFilterConfigFactory : public Envoy::Config::TypedFactory {
 public:
-  virtual ~NamedDubboFilterConfigFactory() = default;
+  ~NamedDubboFilterConfigFactory() override = default;
 
   /**
    * Create a particular dubbo filter factory implementation. If the implementation is unable to
@@ -37,18 +38,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) PURE;
 
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular implementation of a dubbo filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
+  std::string category() const override { return "envoy.dubbo_proxy.filters"; }
 };
 
 } // namespace DubboFilters

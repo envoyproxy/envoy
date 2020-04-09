@@ -6,7 +6,8 @@
 #include <vector>
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/stack_array.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -21,141 +22,113 @@ void Encoder::newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& o
   output[4] = static_cast<uint8_t>(length);
 }
 
-Decoder::Decoder() : state_(State::FH_FLAG) {}
+void Encoder::prependFrameHeader(uint8_t flags, Buffer::Instance& buffer) {
+  // Compute the size of the payload and construct the length prefix.
+  std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
+  Grpc::Encoder().newFrame(flags, buffer.length(), frame);
+  Buffer::OwnedImpl frame_buffer(frame.data(), frame.size());
+  buffer.prepend(frame_buffer);
+}
 
 bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
-  uint64_t count = input.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, count);
-  input.getRawSlices(slices.begin(), count);
-  for (const Buffer::RawSlice& slice : slices) {
-    uint8_t* mem = reinterpret_cast<uint8_t*>(slice.mem_);
-    for (uint64_t j = 0; j < slice.len_;) {
-      uint8_t c = *mem;
-      switch (state_) {
-      case State::FH_FLAG:
-        if (c & ~GRPC_FH_COMPRESSED) {
-          // Unsupported flags.
-          return false;
-        }
-        frame_.flags_ = c;
-        state_ = State::FH_LEN_0;
-        mem++;
-        j++;
-        break;
-      case State::FH_LEN_0:
-        frame_.length_ = static_cast<uint32_t>(c) << 24;
-        state_ = State::FH_LEN_1;
-        mem++;
-        j++;
-        break;
-      case State::FH_LEN_1:
-        frame_.length_ |= static_cast<uint32_t>(c) << 16;
-        state_ = State::FH_LEN_2;
-        mem++;
-        j++;
-        break;
-      case State::FH_LEN_2:
-        frame_.length_ |= static_cast<uint32_t>(c) << 8;
-        state_ = State::FH_LEN_3;
-        mem++;
-        j++;
-        break;
-      case State::FH_LEN_3:
-        frame_.length_ |= static_cast<uint32_t>(c);
-        if (frame_.length_ == 0) {
-          output.push_back(std::move(frame_));
-          state_ = State::FH_FLAG;
-        } else {
-          frame_.data_ = std::make_unique<Buffer::OwnedImpl>();
-          state_ = State::DATA;
-        }
-        mem++;
-        j++;
-        break;
-      case State::DATA:
-        uint64_t remain_in_buffer = slice.len_ - j;
-        uint64_t remain_in_frame = frame_.length_ - frame_.data_->length();
-        if (remain_in_buffer <= remain_in_frame) {
-          frame_.data_->add(mem, remain_in_buffer);
-          mem += remain_in_buffer;
-          j += remain_in_buffer;
-        } else {
-          frame_.data_->add(mem, remain_in_frame);
-          mem += remain_in_frame;
-          j += remain_in_frame;
-        }
-        if (frame_.length_ == frame_.data_->length()) {
-          output.push_back(std::move(frame_));
-          frame_.flags_ = 0;
-          frame_.length_ = 0;
-          state_ = State::FH_FLAG;
-        }
-        break;
-      }
-    }
+  decoding_error_ = false;
+  output_ = &output;
+  inspect(input);
+  output_ = nullptr;
+  if (decoding_error_) {
+    return false;
   }
   input.drain(input.length());
   return true;
 }
 
-uint64_t FrameInspector::decode(const Buffer::Instance& data) {
-  uint64_t count = data.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, count);
-  data.getRawSlices(slices.begin(), count);
+bool Decoder::frameStart(uint8_t flags) {
+  // Unsupported flags.
+  if (flags & ~GRPC_FH_COMPRESSED) {
+    decoding_error_ = true;
+    return false;
+  }
+  frame_.flags_ = flags;
+  return true;
+}
+
+void Decoder::frameDataStart() {
+  frame_.length_ = length_;
+  frame_.data_ = std::make_unique<Buffer::OwnedImpl>();
+}
+
+void Decoder::frameData(uint8_t* mem, uint64_t length) { frame_.data_->add(mem, length); }
+
+void Decoder::frameDataEnd() {
+  output_->push_back(std::move(frame_));
+  frame_.flags_ = 0;
+  frame_.length_ = 0;
+  frame_.data_ = nullptr;
+}
+
+uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
   uint64_t delta = 0;
-  for (const Buffer::RawSlice& slice : slices) {
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     uint8_t* mem = reinterpret_cast<uint8_t*>(slice.mem_);
     for (uint64_t j = 0; j < slice.len_;) {
       uint8_t c = *mem;
       switch (state_) {
-      case State::FH_FLAG:
+      case State::FhFlag:
+        if (!frameStart(c)) {
+          return delta;
+        }
         count_ += 1;
         delta += 1;
-        state_ = State::FH_LEN_0;
+        state_ = State::FhLen0;
         mem++;
         j++;
         break;
-      case State::FH_LEN_0:
+      case State::FhLen0:
         length_ = static_cast<uint32_t>(c) << 24;
-        state_ = State::FH_LEN_1;
+        state_ = State::FhLen1;
         mem++;
         j++;
         break;
-      case State::FH_LEN_1:
+      case State::FhLen1:
         length_ |= static_cast<uint32_t>(c) << 16;
-        state_ = State::FH_LEN_2;
+        state_ = State::FhLen2;
         mem++;
         j++;
         break;
-      case State::FH_LEN_2:
+      case State::FhLen2:
         length_ |= static_cast<uint32_t>(c) << 8;
-        state_ = State::FH_LEN_3;
+        state_ = State::FhLen3;
         mem++;
         j++;
         break;
-      case State::FH_LEN_3:
+      case State::FhLen3:
         length_ |= static_cast<uint32_t>(c);
+        frameDataStart();
         if (length_ == 0) {
-          state_ = State::FH_FLAG;
+          frameDataEnd();
+          state_ = State::FhFlag;
         } else {
-          state_ = State::DATA;
+          state_ = State::Data;
         }
         mem++;
         j++;
         break;
-      case State::DATA:
+      case State::Data:
         uint64_t remain_in_buffer = slice.len_ - j;
         if (remain_in_buffer <= length_) {
+          frameData(mem, remain_in_buffer);
           mem += remain_in_buffer;
           j += remain_in_buffer;
           length_ -= remain_in_buffer;
         } else {
+          frameData(mem, length_);
           mem += length_;
           j += length_;
           length_ = 0;
         }
         if (length_ == 0) {
-          state_ = State::FH_FLAG;
+          frameDataEnd();
+          state_ = State::FhFlag;
         }
         break;
       }

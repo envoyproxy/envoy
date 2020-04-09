@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/common/assert.h"
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
@@ -34,9 +36,9 @@ std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%
 // The statement machine does minimal validation of the arguments (if any) and does not know the
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
 // StreamInfoHeaderFormatter.
-HeaderFormatterPtr
-parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option) {
-  const std::string& key = header_value_option.header().key();
+HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& header_value,
+                                 bool append) {
+  const std::string& key = header_value.key();
   // PGV constraints provide this guarantee.
   ASSERT(!key.empty());
   // We reject :path/:authority rewriting, there is already a well defined mechanism to
@@ -48,9 +50,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
     throw EnvoyException(":-prefixed headers may not be modified");
   }
 
-  const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
-
-  absl::string_view format(header_value_option.header().value());
+  absl::string_view format(header_value.value());
   if (format.empty()) {
     return std::make_unique<PlainHeaderFormatter>("", append);
   }
@@ -220,11 +220,12 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
 } // namespace
 
 HeaderParserPtr HeaderParser::configure(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add) {
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add) {
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
-    HeaderFormatterPtr header_formatter = parseInternal(header_value_option);
+    const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
+    HeaderFormatterPtr header_formatter = parseInternal(header_value_option.header(), append);
 
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()), std::move(header_formatter));
@@ -234,7 +235,22 @@ HeaderParserPtr HeaderParser::configure(
 }
 
 HeaderParserPtr HeaderParser::configure(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add,
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers_to_add,
+    bool append) {
+  HeaderParserPtr header_parser(new HeaderParser());
+
+  for (const auto& header_value : headers_to_add) {
+    HeaderFormatterPtr header_formatter = parseInternal(header_value, append);
+
+    header_parser->headers_to_add_.emplace_back(Http::LowerCaseString(header_value.key()),
+                                                std::move(header_formatter));
+  }
+
+  return header_parser;
+}
+
+HeaderParserPtr HeaderParser::configure(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add,
     const Protobuf::RepeatedPtrField<std::string>& headers_to_remove) {
   HeaderParserPtr header_parser = configure(headers_to_add);
 

@@ -6,12 +6,12 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include <memory>
+#include "absl/memory/memory.h"
 
 namespace quiche {
 
-template <typename T, typename... Args> std::unique_ptr<T> QuicheMakeUniqueImpl(Args&&... args) {
-  return std::make_unique<T>(std::forward<Args>(args)...);
+template <typename T> std::unique_ptr<T> QuicheWrapUniqueImpl(T* ptr) {
+  return absl::WrapUnique<T>(ptr);
 }
 
 } // namespace quiche

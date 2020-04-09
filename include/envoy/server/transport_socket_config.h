@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
@@ -40,7 +41,7 @@ public:
   /**
    * @return Stats::Scope& the transport socket's stats scope.
    */
-  virtual Stats::Scope& statsScope() const PURE;
+  virtual Stats::Scope& scope() PURE;
 
   /**
    * Return the instance of secret manager.
@@ -55,7 +56,7 @@ public:
   /**
    * @return information about the local environment the server is running in.
    */
-  virtual const LocalInfo::LocalInfo& localInfo() PURE;
+  virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
    * @return Event::Dispatcher& the main thread's dispatcher.
@@ -71,12 +72,6 @@ public:
    * @return the server-wide stats store.
    */
   virtual Stats::Store& stats() PURE;
-
-  /**
-   * Pass an init manager to register dynamic secret provider.
-   * @param init_manager instance of init manager.
-   */
-  virtual void setInitManager(Init::Manager& init_manager) PURE;
 
   /**
    * @return a pointer pointing to the instance of an init manager, or nullptr
@@ -106,22 +101,9 @@ public:
   virtual Api::Api& api() PURE;
 };
 
-class TransportSocketConfigFactory {
+class TransportSocketConfigFactory : public Config::TypedFactory {
 public:
-  virtual ~TransportSocketConfigFactory() = default;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message. The transport socket
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted
-   *         to JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular TransportSocketFactoryPtr
-   *         implementation produced by the factory.
-   */
-  virtual std::string name() const PURE;
+  ~TransportSocketConfigFactory() override = default;
 };
 
 /**
@@ -144,6 +126,8 @@ public:
   virtual Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context) PURE;
+
+  std::string category() const override { return "envoy.transport_sockets.upstream"; }
 };
 
 /**
@@ -169,6 +153,8 @@ public:
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) PURE;
+
+  std::string category() const override { return "envoy.transport_sockets.downstream"; }
 };
 
 } // namespace Configuration

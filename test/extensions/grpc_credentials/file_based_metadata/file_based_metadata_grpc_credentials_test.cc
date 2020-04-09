@@ -1,10 +1,12 @@
 #ifdef ENVOY_GOOGLE_GRPC
 
-#include "envoy/config/grpc_credential/v2alpha/file_based_metadata.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/grpc_credential/v3/file_based_metadata.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/grpc/google_async_client_impl.h"
 
+#include "extensions/grpc_credentials/file_based_metadata/config.h"
 #include "extensions/grpc_credentials/well_known_names.h"
 
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
@@ -30,7 +32,7 @@ public:
     }
   }
 
-  envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
+  envoy::config::core::v3::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_credentials_factory_name(credentials_factory_name_);
@@ -39,6 +41,7 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     if (!header_value_1_.empty()) {
       const std::string yaml1 = fmt::format(R"EOF(
+"@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.FileBasedMetadataConfig        
 secret_data:
   inline_string: {}
 header_key: {}
@@ -47,20 +50,21 @@ header_prefix: {}
                                             header_value_1_, header_key_1_, header_prefix_1_);
       auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
       plugin_config->set_name(credentials_factory_name_);
-      envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig metadata_config;
-      Envoy::TestUtility::loadFromYaml(yaml1, *plugin_config->mutable_config());
+      envoy::config::grpc_credential::v3::FileBasedMetadataConfig metadata_config;
+      Envoy::TestUtility::loadFromYaml(yaml1, *plugin_config->mutable_typed_config());
     }
     if (!header_value_2_.empty()) {
       // uses default key/prefix
       const std::string yaml2 = fmt::format(R"EOF(
+"@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.FileBasedMetadataConfig        
 secret_data:
   inline_string: {}
 )EOF",
                                             header_value_2_);
-      envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig metadata_config2;
+      envoy::config::grpc_credential::v3::FileBasedMetadataConfig metadata_config2;
       auto* plugin_config2 = google_grpc->add_call_credentials()->mutable_from_plugin();
       plugin_config2->set_name(credentials_factory_name_);
-      Envoy::TestUtility::loadFromYaml(yaml2, *plugin_config2->mutable_config());
+      Envoy::TestUtility::loadFromYaml(yaml2, *plugin_config2->mutable_typed_config());
     }
     if (!access_token_value_.empty()) {
       google_grpc->add_call_credentials()->set_access_token(access_token_value_);
@@ -133,6 +137,39 @@ TEST_P(GrpcFileBasedMetadataClientIntegrationTest, ExtraConfigFileBasedMetadataG
   auto request = createRequest(empty_metadata_);
   request->sendReply();
   dispatcher_helper_.runDispatcher();
+}
+
+class MockAuthContext : public ::grpc::AuthContext {
+public:
+  ~MockAuthContext() override = default;
+  MOCK_METHOD(bool, IsPeerAuthenticated, (), (const, override));
+  MOCK_METHOD(std::vector<grpc::string_ref>, GetPeerIdentity, (), (const, override));
+  MOCK_METHOD(std::string, GetPeerIdentityPropertyName, (), (const, override));
+  MOCK_METHOD(std::vector<grpc::string_ref>, FindPropertyValues, (const std::string& name),
+              (const, override));
+  MOCK_METHOD(::grpc::AuthPropertyIterator, begin, (), (const, override));
+  MOCK_METHOD(::grpc::AuthPropertyIterator, end, (), (const, override));
+  MOCK_METHOD(void, AddProperty, (const std::string& key, const grpc::string_ref& value),
+              (override));
+  MOCK_METHOD(bool, SetPeerIdentityPropertyName, (const std::string& name), (override));
+};
+
+TEST(GrpcFileBasedMetadata, MissingSecretData) {
+  const std::string yaml = R"EOF(
+secret_data:
+  filename: missing-file
+)EOF";
+  envoy::config::grpc_credential::v3::FileBasedMetadataConfig metadata_config;
+  Envoy::TestUtility::loadFromYaml(yaml, metadata_config);
+  Api::ApiPtr api = Api::createApiForTest();
+  Extensions::GrpcCredentials::FileBasedMetadata::FileBasedMetadataAuthenticator authenticator(
+      metadata_config, *api);
+
+  MockAuthContext context;
+  std::multimap<grpc::string, grpc::string> metadata;
+  auto status =
+      authenticator.GetMetadata(grpc::string_ref(), grpc::string_ref(), context, &metadata);
+  EXPECT_EQ(grpc::StatusCode::NOT_FOUND, status.error_code());
 }
 
 } // namespace

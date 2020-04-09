@@ -4,9 +4,9 @@
 #include <tuple>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/io_handle.h"
 
@@ -84,6 +84,11 @@ public:
   virtual void close() PURE;
 
   /**
+   * Return true if close() hasn't been called.
+   */
+  virtual bool isOpen() const PURE;
+
+  /**
    * Visitor class for setting socket options.
    */
   class Option {
@@ -97,7 +102,7 @@ public:
      * @return true if succeeded, false otherwise.
      */
     virtual bool setOption(Socket& socket,
-                           envoy::api::v2::core::SocketOption::SocketState state) const PURE;
+                           envoy::config::core::v3::SocketOption::SocketState state) const PURE;
 
     /**
      * @param vector of bytes to which the option should append hash key data that will be used
@@ -125,7 +130,7 @@ public:
      */
     virtual absl::optional<Details>
     getOptionDetails(const Socket& socket,
-                     envoy::api::v2::core::SocketOption::SocketState state) const PURE;
+                     envoy::config::core::v3::SocketOption::SocketState state) const PURE;
   };
 
   using OptionConstSharedPtr = std::shared_ptr<const Option>;
@@ -138,7 +143,7 @@ public:
   }
 
   static bool applyOptions(const OptionsSharedPtr& options, Socket& socket,
-                           envoy::api::v2::core::SocketOption::SocketState state) {
+                           envoy::config::core::v3::SocketOption::SocketState state) {
     if (options == nullptr) {
       return true;
     }
@@ -168,6 +173,7 @@ public:
 
 using SocketPtr = std::unique_ptr<Socket>;
 using SocketSharedPtr = std::shared_ptr<Socket>;
+using SocketOptRef = absl::optional<std::reference_wrapper<Socket>>;
 
 /**
  * A socket passed to a connection. For server connections this represents the accepted socket, and
@@ -184,6 +190,12 @@ public:
    * @return the remote address of the socket.
    */
   virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
+
+  /**
+   * @return the direct remote address of the socket. This is the address of the directly
+   *         connected peer, and cannot be modified by listener filters.
+   */
+  virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
 
   /**
    * Restores the local address of the socket. On accepted sockets the local address defaults to the

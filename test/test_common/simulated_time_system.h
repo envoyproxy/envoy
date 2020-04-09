@@ -86,7 +86,7 @@ private:
   int64_t nextIndex();
 
   // Adds/removes an alarm.
-  void addAlarmLockHeld(Alarm*, const std::chrono::milliseconds& duration)
+  void addAlarmLockHeld(Alarm*, const std::chrono::microseconds& duration)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void removeAlarmLockHeld(Alarm*) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 

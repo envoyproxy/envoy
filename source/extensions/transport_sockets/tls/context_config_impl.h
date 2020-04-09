@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/secret/secret_callbacks.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/server/transport_socket_config.h"
@@ -57,10 +57,11 @@ public:
   void setSecretUpdateCallback(std::function<void()> callback) override;
 
   Ssl::CertificateValidationContextConfigPtr getCombinedValidationContextConfig(
-      const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc);
+      const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
+          dynamic_cvc);
 
 protected:
-  ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config,
+  ContextConfigImpl(const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
                     const unsigned default_min_protocol_version,
                     const unsigned default_max_protocol_version,
                     const std::string& default_cipher_suites, const std::string& default_curves,
@@ -68,9 +69,9 @@ protected:
   Api::Api& api_;
 
 private:
-  static unsigned
-  tlsVersionFromProto(const envoy::api::v2::auth::TlsParameters_TlsProtocol& version,
-                      unsigned default_version);
+  static unsigned tlsVersionFromProto(
+      const envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol& version,
+      unsigned default_version);
 
   const std::string alpn_protocols_;
   const std::string cipher_suites_;
@@ -81,15 +82,16 @@ private:
   // If certificate validation context type is combined_validation_context. default_cvc_
   // holds a copy of CombinedCertificateValidationContext::default_validation_context.
   // Otherwise, default_cvc_ is nullptr.
-  std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext> default_cvc_;
+  std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
+      default_cvc_;
   std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
   // Handle for TLS certificate dynamic secret callback.
-  Common::CallbackHandle* tc_update_callback_handle_{};
+  Envoy::Common::CallbackHandle* tc_update_callback_handle_{};
   Secret::CertificateValidationContextConfigProviderSharedPtr
       certificate_validation_context_provider_;
   // Handle for certificate validation context dynamic secret callback.
-  Common::CallbackHandle* cvc_update_callback_handle_{};
-  Common::CallbackHandle* cvc_validation_callback_handle_{};
+  Envoy::Common::CallbackHandle* cvc_update_callback_handle_{};
+  Envoy::Common::CallbackHandle* cvc_validation_callback_handle_{};
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 };
@@ -97,10 +99,11 @@ private:
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {
 public:
   ClientContextConfigImpl(
-      const envoy::api::v2::auth::UpstreamTlsContext& config, absl::string_view sigalgs,
+      const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
+      absl::string_view sigalgs,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
   ClientContextConfigImpl(
-      const envoy::api::v2::auth::UpstreamTlsContext& config,
+      const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context)
       : ClientContextConfigImpl(config, "", secret_provider_context) {}
 
@@ -125,7 +128,7 @@ private:
 class ServerContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ServerContextConfig {
 public:
   ServerContextConfigImpl(
-      const envoy::api::v2::auth::DownstreamTlsContext& config,
+      const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
   ~ServerContextConfigImpl() override;
 
@@ -134,6 +137,7 @@ public:
   const std::vector<SessionTicketKey>& sessionTicketKeys() const override {
     return session_ticket_keys_;
   }
+  absl::optional<std::chrono::seconds> sessionTimeout() const override { return session_timeout_; }
 
   bool isReady() const override {
     const bool parent_is_ready = ContextConfigImpl::isReady();
@@ -143,6 +147,9 @@ public:
   }
 
   void setSecretUpdateCallback(std::function<void()> callback) override;
+  bool disableStatelessSessionResumption() const override {
+    return disable_stateless_session_resumption_;
+  }
 
 private:
   static const unsigned DEFAULT_MIN_VERSION;
@@ -153,12 +160,15 @@ private:
   const bool require_client_certificate_;
   std::vector<SessionTicketKey> session_ticket_keys_;
   const Secret::TlsSessionTicketKeysConfigProviderSharedPtr session_ticket_keys_provider_;
-  Common::CallbackHandle* stk_update_callback_handle_{};
-  Common::CallbackHandle* stk_validation_callback_handle_{};
+  Envoy::Common::CallbackHandle* stk_update_callback_handle_{};
+  Envoy::Common::CallbackHandle* stk_validation_callback_handle_{};
 
-  std::vector<ServerContextConfig::SessionTicketKey>
-  getSessionTicketKeys(const envoy::api::v2::auth::TlsSessionTicketKeys& keys);
+  std::vector<ServerContextConfig::SessionTicketKey> getSessionTicketKeys(
+      const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys& keys);
   ServerContextConfig::SessionTicketKey getSessionTicketKey(const std::string& key_data);
+
+  absl::optional<std::chrono::seconds> session_timeout_;
+  const bool disable_stateless_session_resumption_;
 };
 
 } // namespace Tls

@@ -35,7 +35,7 @@ Envoy configuration on the destination service
 ----------------------------------------------
 It's not necessary to run Envoy side by side with the destination service, but it's important that each host in the
 destination cluster registers with the discovery service :ref:`queried by the source service Envoy
-<config_overview_v2_management_server>`. :ref:`Zone <envoy_api_msg_endpoint.LocalityLbEndpoints>`
+<config_overview_management_server>`. :ref:`Zone <envoy_api_msg_endpoint.LocalityLbEndpoints>`
 information must be available as part of that response.
 
 Only zone related data is listed in the response below.

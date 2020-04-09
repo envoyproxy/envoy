@@ -42,6 +42,12 @@ uint64_t Stats::totalPageHeapUnmapped() {
   return value;
 }
 
+uint64_t Stats::totalPhysicalBytes() {
+  size_t value = 0;
+  MallocExtension::instance()->GetNumericProperty("generic.total_physical_bytes", &value);
+  return value;
+}
+
 void Stats::dumpStatsToLog() {
   constexpr int buffer_size = 100000;
   auto buffer = std::make_unique<char[]>(buffer_size);
@@ -62,6 +68,7 @@ uint64_t Stats::totalThreadCacheBytes() { return 0; }
 uint64_t Stats::totalCurrentlyReserved() { return 0; }
 uint64_t Stats::totalPageHeapUnmapped() { return 0; }
 uint64_t Stats::totalPageHeapFree() { return 0; }
+uint64_t Stats::totalPhysicalBytes() { return 0; }
 void Stats::dumpStatsToLog() {}
 
 } // namespace Memory

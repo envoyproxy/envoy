@@ -27,7 +27,7 @@ public:
     }
   }
 
-  MOCK_METHOD2(Log, void(QuicLogLevel level, const std::string& message));
+  MOCK_METHOD(void, Log, (QuicLogLevel level, const std::string& message));
 
   void StartCapturingLogs() {
     ASSERT(!is_capturing_);

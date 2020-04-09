@@ -1,13 +1,8 @@
 #pragma once
 
-#include <windows.h>
-
-// <windows.h> defines some macros that interfere with our code, so undef them
-#undef DELETE
-#undef GetMessage
-
 #include <functional>
 
+#include "envoy/common/platform.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {
@@ -24,6 +19,9 @@ public:
 
   // Thread::Thread
   void join() override;
+
+  // Needed for WatcherImpl for the QueueUserAPC callback context
+  HANDLE handle() const { return thread_handle_; }
 
 private:
   std::function<void()> thread_routine_;

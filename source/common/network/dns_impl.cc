@@ -1,20 +1,19 @@
 #include "common/network/dns_impl.h"
 
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include <chrono>
 #include <cstdint>
 #include <list>
 #include <memory>
 #include <string>
 
+#include "envoy/common/platform.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "ares.h"
 
 namespace Envoy {
@@ -22,12 +21,14 @@ namespace Network {
 
 DnsResolverImpl::DnsResolverImpl(
     Event::Dispatcher& dispatcher,
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers)
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+    const bool use_tcp_for_dns_lookups)
     : dispatcher_(dispatcher),
-      timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
-  ares_options options;
+      timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
+      use_tcp_for_dns_lookups_(use_tcp_for_dns_lookups) {
 
-  initializeChannel(&options, 0);
+  AresOptions options = defaultAresOptions();
+  initializeChannel(&options.options_, options.optmask_);
 
   if (!resolvers.empty()) {
     std::vector<std::string> resolver_addrs;
@@ -48,7 +49,7 @@ DnsResolverImpl::DnsResolverImpl(
                                            resolver->ip()->addressAsString(),
                                            resolver->ip()->port()));
     }
-    const std::string resolvers_csv = StringUtil::join(resolver_addrs, ",");
+    const std::string resolvers_csv = absl::StrJoin(resolver_addrs, ",");
     int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
     RELEASE_ASSERT(result == ARES_SUCCESS, "");
   }
@@ -59,8 +60,19 @@ DnsResolverImpl::~DnsResolverImpl() {
   ares_destroy(channel_);
 }
 
+DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
+  AresOptions options{};
+
+  if (use_tcp_for_dns_lookups_) {
+    options.optmask_ |= ARES_OPT_FLAGS;
+    options.options_.flags |= ARES_FLAG_USEVC;
+  }
+
+  return options;
+}
+
 void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
-  options->sock_state_cb = [](void* arg, int fd, int read, int write) {
+  options->sock_state_cb = [](void* arg, os_fd_t fd, int read, int write) {
     static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
   };
   options->sock_state_cb_data = this;
@@ -72,15 +84,37 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
+    // This destruction might have been triggered by a peer PendingResolution that received a
+    // ARES_ECONNREFUSED. If the PendingResolution has not been cancelled that means that the
+    // callback_ target _should_ still be around. In that case, raise the callback_ so the target
+    // can be done with this query and initiate a new one.
+    if (!cancelled_) {
+      callback_(ResolutionStatus::Failure, {});
+    }
     delete this;
     return;
   }
   if (!fallback_if_failed_) {
     completed_ = true;
+
+    // If c-ares returns ARES_ECONNREFUSED and there is no fallback we assume that the channel_ is
+    // broken. Mark the channel dirty so that it is destroyed and reinitialized on a subsequent call
+    // to DnsResolver::resolve(). The optimal solution would be for c-ares to reinitialize the
+    // channel, and not have Envoy track side effects.
+    // context: https://github.com/envoyproxy/envoy/issues/4543 and
+    // https://github.com/c-ares/c-ares/issues/301.
+    //
+    // The channel cannot be destroyed and reinitialized here because that leads to a c-ares
+    // segfault.
+    if (status == ARES_ECONNREFUSED) {
+      parent_.dirty_channel_ = true;
+    }
   }
 
   std::list<DnsResponse> address_list;
+  ResolutionStatus resolution_status;
   if (status == ARES_SUCCESS) {
+    resolution_status = ResolutionStatus::Success;
     if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
       if (addrinfo->nodes->ai_family == AF_INET) {
         for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
@@ -114,6 +148,8 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
     ASSERT(addrinfo != nullptr);
     ares_freeaddrinfo(addrinfo);
+  } else {
+    resolution_status = ResolutionStatus::Failure;
   }
 
   if (timeouts > 0) {
@@ -123,7 +159,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   if (completed_) {
     if (!cancelled_) {
       try {
-        callback_(std::move(address_list));
+        callback_(resolution_status, std::move(address_list));
       } catch (const EnvoyException& e) {
         ENVOY_LOG(critical, "EnvoyException in c-ares callback");
         dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
@@ -144,7 +180,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   if (!completed_ && fallback_if_failed_) {
     fallback_if_failed_ = false;
     getAddrInfo(AF_INET);
-    // Note: Nothing can follow this call to getHostByName due to deletion of this
+    // Note: Nothing can follow this call to getAddrInfo due to deletion of this
     // object upon synchronous resolution.
     return;
   }
@@ -164,14 +200,14 @@ void DnsResolverImpl::updateAresTimer() {
   }
 }
 
-void DnsResolverImpl::onEventCallback(int fd, uint32_t events) {
+void DnsResolverImpl::onEventCallback(os_fd_t fd, uint32_t events) {
   const ares_socket_t read_fd = events & Event::FileReadyType::Read ? fd : ARES_SOCKET_BAD;
   const ares_socket_t write_fd = events & Event::FileReadyType::Write ? fd : ARES_SOCKET_BAD;
   ares_process_fd(channel_, read_fd, write_fd);
   updateAresTimer();
 }
 
-void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
+void DnsResolverImpl::onAresSocketStateChange(os_fd_t fd, int read, int write) {
   updateAresTimer();
   auto it = events_.find(fd);
   // Stop tracking events for fd if no more state change events.
@@ -195,10 +231,19 @@ void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
-  // failed initial call to getHostByName followed by a synchronous IPv4
+  // failed initial call to getAddrInfo followed by a synchronous IPv4
   // resolution.
+
+  // @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for why this is done.
+  if (dirty_channel_) {
+    dirty_channel_ = false;
+    ares_destroy(channel_);
+
+    AresOptions options = defaultAresOptions();
+    initializeChannel(&options.options_, options.optmask_);
+  }
   std::unique_ptr<PendingResolution> pending_resolution(
-      new PendingResolution(callback, dispatcher_, channel_, dns_name));
+      new PendingResolution(*this, callback, dispatcher_, channel_, dns_name));
   if (dns_lookup_family == DnsLookupFamily::Auto) {
     pending_resolution->fallback_if_failed_ = true;
   }
@@ -217,8 +262,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     // Enable timer to wake us up if the request times out.
     updateAresTimer();
 
-    // The PendingResolution will self-delete when the request completes
-    // (including if cancelled or if ~DnsResolverImpl() happens).
+    // The PendingResolution will self-delete when the request completes (including if cancelled or
+    // if ~DnsResolverImpl() happens via ares_destroy() and subsequent handling of ARES_EDESTRUCTION
+    // in DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback()).
     pending_resolution->owned_ = true;
     return pending_resolution.release();
   }

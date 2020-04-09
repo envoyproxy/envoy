@@ -1,5 +1,7 @@
 #include <fstream>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "common/common/thread.h"
 #include "common/network/address_impl.h"
 
@@ -17,7 +19,7 @@ namespace {
 
 // Derived from //test/server:server_fuzz_test.cc, but starts the server in configuration validation
 // mode (quits upon validation of the given config)
-DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
+DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   testing::NiceMock<MockOptions> options;
   TestComponentFactory component_factory;
   Fuzz::PerTestEnvironment test_env;

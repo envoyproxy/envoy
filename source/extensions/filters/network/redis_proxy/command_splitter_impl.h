@@ -10,14 +10,14 @@
 #include "envoy/stats/timespan.h"
 
 #include "common/common/logger.h"
-#include "common/common/to_lower_table.h"
 #include "common/common/utility.h"
 #include "common/singleton/const_singleton.h"
 #include "common/stats/timespan_impl.h"
 
 #include "extensions/filters/network/common/redis/client_impl.h"
+#include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
-#include "extensions/filters/network/redis_proxy/conn_pool.h"
+#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "extensions/filters/network/redis_proxy/router.h"
 
 namespace Envoy {
@@ -37,20 +37,13 @@ struct ResponseValues {
 
 using Response = ConstSingleton<ResponseValues>;
 
-class Utility {
-public:
-  static Common::Redis::RespValuePtr makeError(const std::string& error);
-};
-
 /**
  * All command level stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_COMMAND_STATS(COUNTER)                                                                 \
   COUNTER(total)                                                                                   \
   COUNTER(success)                                                                                 \
   COUNTER(error)
-// clang-format on
 
 /**
  * Struct definition for all command stats. @see stats_macros.h
@@ -94,14 +87,13 @@ protected:
 /**
  * SingleServerRequest is a base class for commands that hash to a single backend.
  */
-class SingleServerRequest : public SplitRequestBase, public Common::Redis::Client::PoolCallbacks {
+class SingleServerRequest : public SplitRequestBase, public ConnPool::PoolCallbacks {
 public:
   ~SingleServerRequest() override;
 
-  // Common::Redis::Client::PoolCallbacks
+  // ConnPool::PoolCallbacks
   void onResponse(Common::Redis::RespValuePtr&& response) override;
   void onFailure() override;
-  bool onRedirection(const Common::Redis::RespValue& value) override;
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
@@ -161,34 +153,25 @@ protected:
   FragmentedRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source)
       : SplitRequestBase(command_stats, time_source), callbacks_(callbacks) {}
 
-  struct PendingRequest : public Common::Redis::Client::PoolCallbacks {
+  struct PendingRequest : public ConnPool::PoolCallbacks {
     PendingRequest(FragmentedRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
 
-    // Common::Redis::Client::PoolCallbacks
+    // ConnPool::PoolCallbacks
     void onResponse(Common::Redis::RespValuePtr&& value) override {
       parent_.onChildResponse(std::move(value), index_);
     }
     void onFailure() override { parent_.onChildFailure(index_); }
 
-    bool onRedirection(const Common::Redis::RespValue& value) override {
-      return parent_.onChildRedirection(value, index_, conn_pool_);
-    }
-
     FragmentedRequest& parent_;
     const uint32_t index_;
     Common::Redis::Client::PoolRequest* handle_{};
-    ConnPool::InstanceSharedPtr conn_pool_;
   };
 
   virtual void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) PURE;
   void onChildFailure(uint32_t index);
-  bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                          const ConnPool::InstanceSharedPtr& conn_pool);
-  virtual void recreate(Common::Redis::RespValue& request, uint32_t index) PURE;
 
   SplitCallbacks& callbacks_;
 
-  Common::Redis::RespValuePtr incoming_request_;
   Common::Redis::RespValuePtr pending_response_;
   std::vector<PendingRequest> pending_requests_;
   uint32_t num_pending_responses_;
@@ -211,7 +194,6 @@ private:
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  void recreate(Common::Redis::RespValue& request, uint32_t index) override;
 };
 
 /**
@@ -233,7 +215,6 @@ private:
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  void recreate(Common::Redis::RespValue& request, uint32_t index) override;
 
   int64_t total_{0};
 };
@@ -255,7 +236,6 @@ private:
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  void recreate(Common::Redis::RespValue& request, uint32_t index) override;
 };
 
 /**
@@ -275,11 +255,9 @@ public:
 /**
  * All splitter stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_COMMAND_SPLITTER_STATS(COUNTER)                                                        \
   COUNTER(invalid_request)                                                                         \
   COUNTER(unsupported_command)
-// clang-format on
 
 /**
  * Struct definition for all splitter stats. @see stats_macros.h
@@ -317,7 +295,6 @@ private:
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
-  const ToLowerTable to_lower_table_;
   TimeSource& time_source_;
 };
 

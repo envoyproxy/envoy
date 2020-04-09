@@ -86,6 +86,7 @@ public:
 
 private:
   void encodeArray(const std::vector<RespValue>& array, Buffer::Instance& out);
+  void encodeCompositeArray(const RespValue::CompositeArray& array, Buffer::Instance& out);
   void encodeBulkString(const std::string& string, Buffer::Instance& out);
   void encodeError(const std::string& string, Buffer::Instance& out);
   void encodeInteger(int64_t integer, Buffer::Instance& out);

@@ -28,13 +28,14 @@ RestApiFetcher::~RestApiFetcher() {
 
 void RestApiFetcher::initialize() { refresh(); }
 
-void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
+void RestApiFetcher::onSuccess(const Http::AsyncClient::Request& request,
+                               Http::ResponseMessagePtr&& response) {
   uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
   if (response_code == enumToInt(Http::Code::NotModified)) {
     requestComplete();
     return;
   } else if (response_code != enumToInt(Http::Code::OK)) {
-    onFailure(Http::AsyncClient::FailureReason::Reset);
+    onFailure(request, Http::AsyncClient::FailureReason::Reset);
     return;
   }
 
@@ -47,7 +48,8 @@ void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
   requestComplete();
 }
 
-void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
+void RestApiFetcher::onFailure(const Http::AsyncClient::Request&,
+                               Http::AsyncClient::FailureReason reason) {
   // Currently Http::AsyncClient::FailureReason only has one value: "Reset".
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
   onFetchFailure(Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
@@ -55,9 +57,9 @@ void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
 }
 
 void RestApiFetcher::refresh() {
-  MessagePtr message(new RequestMessageImpl());
+  RequestMessagePtr message(new RequestMessageImpl());
   createRequest(*message);
-  message->headers().insertHost().value(remote_cluster_name_);
+  message->headers().setHost(remote_cluster_name_);
   active_request_ = cm_.httpAsyncClientForCluster(remote_cluster_name_)
                         .send(std::move(message), *this,
                               AsyncClient::RequestOptions().setTimeout(request_timeout_));

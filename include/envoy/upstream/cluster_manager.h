@@ -8,8 +8,10 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -86,7 +88,7 @@ public:
    * @param version_info supplies the xDS version of the cluster.
    * @return true if the action results in an add/update of a cluster.
    */
-  virtual bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
+  virtual bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                   const std::string& version_info) PURE;
 
   /**
@@ -175,7 +177,7 @@ public:
    * @return const envoy::api::v2::core::BindConfig& cluster manager wide bind configuration for new
    *         upstream connections.
    */
-  virtual const envoy::api::v2::core::BindConfig& bindConfig() const PURE;
+  virtual const envoy::config::core::v3::BindConfig& bindConfig() const PURE;
 
   /**
    * Returns a shared_ptr to the singleton xDS-over-gRPC provider for upstream control plane muxing
@@ -195,9 +197,10 @@ public:
   /**
    * Return the local cluster name, if it was configured.
    *
-   * @return std::string the local cluster name, or "" if no local cluster was configured.
+   * @return absl::optional<std::string> the local cluster name, or empty if no local cluster was
+   * configured.
    */
-  virtual const std::string& localClusterName() const PURE;
+  virtual const absl::optional<std::string>& localClusterName() const PURE;
 
   /**
    * This method allows to register callbacks for cluster lifecycle events in the ClusterManager.
@@ -212,6 +215,9 @@ public:
   virtual ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
 
+  /**
+   * Return the factory to use for creating cluster manager related objects.
+   */
   virtual ClusterManagerFactory& clusterManagerFactory() PURE;
 
   /**
@@ -221,8 +227,6 @@ public:
    * @return Config::SubscriptionFactory& the subscription factory.
    */
   virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
-
-  virtual std::size_t warmingClusterCount() const PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -264,7 +268,7 @@ public:
    * Allocate a cluster manager from configuration proto.
    */
   virtual ClusterManagerPtr
-  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) PURE;
+  clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
   /**
    * Allocate an HTTP connection pool for the host. Pools are separated by 'priority',
@@ -290,13 +294,13 @@ public:
    * Allocate a cluster from configuration proto.
    */
   virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) PURE;
 
   /**
    * Create a CDS API provider from configuration proto.
    */
-  virtual CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+  virtual CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                               ClusterManager& cm) PURE;
 
   /**
@@ -318,8 +322,8 @@ public:
   struct CreateClusterInfoParams {
     Server::Admin& admin_;
     Runtime::Loader& runtime_;
-    const envoy::api::v2::Cluster& cluster_;
-    const envoy::api::v2::core::BindConfig& bind_config_;
+    const envoy::config::cluster::v3::Cluster& cluster_;
+    const envoy::config::core::v3::BindConfig& bind_config_;
     Stats::Store& stats_;
     Ssl::ContextManager& ssl_context_manager_;
     const bool added_via_api_;

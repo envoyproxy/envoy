@@ -1,8 +1,8 @@
 #pragma once
 
-#include <arpa/inet.h>
-
 #include <cstdint>
+
+#include "envoy/common/platform.h"
 
 // NOLINT(namespace-envoy)
 

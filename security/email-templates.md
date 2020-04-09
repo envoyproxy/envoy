@@ -2,16 +2,16 @@
 
 This is a collection of email templates to handle various situations the security team encounters.
 
-## Upcoming security release to envoy-announce@googlegroups.com
+## Upcoming security release to envoy-security-announce@googlegroups.com
 
 ```
 Subject: Upcoming security release of Envoy $VERSION
-To: envoy-announce@googlegroups.com
-Cc: envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
+To: envoy-security-announce@googlegroups.com
+Cc: envoy-announce@googlegroups.com, envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
 
 Hello Envoy Community,
 
-The Envoy maintainers would like to announce the forthcoming release of Envoy
+The Envoy security team would like to announce the forthcoming release of Envoy
 $VERSION.
 
 This release will be made available on the $ORDINALDAY of $MONTH $YEAR at
@@ -21,13 +21,13 @@ defect(s). The highest rated security defect is considered $SEVERITY severity.
 No further details or patches will be made available in advance of the release.
 
 Thanks,
-$PERSON (on behalf of the Envoy maintainers)
+$PERSON (on behalf of the Envoy security team and maintainers)
 ```
 
 ## Upcoming security release to cncf-envoy-distributors-announce@lists.cncf.io
 
 ```
-Subject: [CONFIDENTIAL] Further details on security release of Envoy $VERSION
+Subject: [CONFIDENTIAL] Upcoming security release of Envoy $VERSION
 To: cncf-envoy-distributors-announce@lists.cncf.io
 Cc: envoy-security@googlegroups.com
 
@@ -61,19 +61,56 @@ or to envoy-security@googlegroups.com for direct communication with the Envoy
 security team.
 
 Thanks,
-$PERSON (on behalf of the Envoy security team)
+$PERSON (on behalf of the Envoy security team and maintainers)
+```
+
+## Candidate release patches to cncf-envoy-distributors-announce@lists.cncf.io
+
+```
+Subject: [CONFIDENTIAL] Further details on security release of Envoy $VERSION
+To: cncf-envoy-distributors-announce@lists.cncf.io
+Cc: envoy-security@googlegroups.com
+
+Hello Envoy Distributors,
+
+Please find attached candidate patches for CVE-YEAR-ABCDEF. You may use the
+attached patches for testing and preparing your distributions. The patches can
+be applied with "git am".
+
+Patches starting with "$VERSION" should be applied against the $OLDVERSION release.
+
+Patches starting with "master-" should be applied against commit $COMMIT.
+
+As a reminder, these patches are under embargo until $ORDINALDAY of $MONTH $YEAR
+at $PDTHOUR PDT ($GMTHOUR GMT). The information below should be treated as
+confidential and shared only on a need-to-know basis. The rules outline in our
+embargo policy
+(https://github.com/envoyproxy/envoy/blob/master/SECURITY.md#embargo-policy)
+still apply, and it is extremely important that any communication related to
+these CVEs are not forwarded further.
+
+No fixes should be made publicly available, either in binary or source form,
+before the aforementioned disclosure date.
+
+We would appreciate any feedback on these patches. Please direct further
+communication amongst private distributors to this list or to
+envoy-security@googlegroups.com for direct communication with the Envoy
+security team.
+
+Thanks,
+$PERSON (on behalf of the Envoy security team and maintainers)
 ```
 
 ## Security Fix Announcement
 
 ```
 Subject: Security release of Envoy $VERSION is now available
-To: envoy-announce@googlegroups.com
-Cc: envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
+To: envoy-security-announce@googlegroups.com
+Cc: envoy-announce@googlegroups.com, envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
 
 Hello Envoy Community,
 
-The Envoy maintainers would like to announce the availability of Envoy $VERSION.
+The Envoy security team would like to announce the availability of Envoy $VERSION.
 This addresses the following CVE(s):
 
 * CVE-YEAR-ABCDEF (CVSS score $CVSS): $CVESUMMARY
@@ -127,5 +164,5 @@ coordination in making this release.
 
 Thanks,
 
-$PERSON (on behalf of the Envoy maintainers)
+$PERSON (on behalf of the Envoy security team and maintainers)
 ```

@@ -3,6 +3,8 @@
 #include <map>
 #include <string>
 
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
@@ -26,62 +28,57 @@ namespace ThriftProxy {
 namespace {
 
 using TransportTypeMap =
-    std::map<envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType, TransportType>;
+    std::map<envoy::extensions::filters::network::thrift_proxy::v3::TransportType, TransportType>;
 
 static const TransportTypeMap& transportTypeMap() {
   CONSTRUCT_ON_FIRST_USE(
       TransportTypeMap,
       {
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::AUTO_TRANSPORT,
+          {envoy::extensions::filters::network::thrift_proxy::v3::AUTO_TRANSPORT,
            TransportType::Auto},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::FRAMED,
-           TransportType::Framed},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::UNFRAMED,
+          {envoy::extensions::filters::network::thrift_proxy::v3::FRAMED, TransportType::Framed},
+          {envoy::extensions::filters::network::thrift_proxy::v3::UNFRAMED,
            TransportType::Unframed},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::HEADER,
-           TransportType::Header},
+          {envoy::extensions::filters::network::thrift_proxy::v3::HEADER, TransportType::Header},
       });
 }
 
 using ProtocolTypeMap =
-    std::map<envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType, ProtocolType>;
+    std::map<envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType, ProtocolType>;
 
 static const ProtocolTypeMap& protocolTypeMap() {
   CONSTRUCT_ON_FIRST_USE(
       ProtocolTypeMap,
       {
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::AUTO_PROTOCOL,
+          {envoy::extensions::filters::network::thrift_proxy::v3::AUTO_PROTOCOL,
            ProtocolType::Auto},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::BINARY,
-           ProtocolType::Binary},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::LAX_BINARY,
+          {envoy::extensions::filters::network::thrift_proxy::v3::BINARY, ProtocolType::Binary},
+          {envoy::extensions::filters::network::thrift_proxy::v3::LAX_BINARY,
            ProtocolType::LaxBinary},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::COMPACT,
-           ProtocolType::Compact},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::TWITTER,
-           ProtocolType::Twitter},
+          {envoy::extensions::filters::network::thrift_proxy::v3::COMPACT, ProtocolType::Compact},
+          {envoy::extensions::filters::network::thrift_proxy::v3::TWITTER, ProtocolType::Twitter},
       });
 }
 
 TransportType
-lookupTransport(envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType transport) {
+lookupTransport(envoy::extensions::filters::network::thrift_proxy::v3::TransportType transport) {
   const auto& transport_iter = transportTypeMap().find(transport);
   if (transport_iter == transportTypeMap().end()) {
     throw EnvoyException(fmt::format(
         "unknown transport {}",
-        envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType_Name(transport)));
+        envoy::extensions::filters::network::thrift_proxy::v3::TransportType_Name(transport)));
   }
 
   return transport_iter->second;
 }
 
 ProtocolType
-lookupProtocol(envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType protocol) {
+lookupProtocol(envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType protocol) {
   const auto& protocol_iter = protocolTypeMap().find(protocol);
   if (protocol_iter == protocolTypeMap().end()) {
     throw EnvoyException(fmt::format(
         "unknown protocol {}",
-        envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType_Name(protocol)));
+        envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType_Name(protocol)));
   }
   return protocol_iter->second;
 }
@@ -89,7 +86,7 @@ lookupProtocol(envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolT
 } // namespace
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProtocolOptions& config)
+    const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions& config)
     : transport_(lookupTransport(config.transport())),
       protocol_(lookupProtocol(config.protocol())) {}
 
@@ -102,7 +99,7 @@ ProtocolType ProtocolOptionsConfigImpl::protocol(ProtocolType downstream_protoco
 }
 
 Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy& proto_config,
+    const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
 
@@ -119,7 +116,7 @@ REGISTER_FACTORY(ThriftProxyFilterConfigFactory,
                  Server::Configuration::NamedNetworkFilterConfigFactory);
 
 ConfigImpl::ConfigImpl(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy& config,
+    const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config,
     Server::Configuration::FactoryContext& context)
     : context_(context), stats_prefix_(fmt::format("thrift.{}.", config.stat_prefix())),
       stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.scope())),
@@ -129,7 +126,7 @@ ConfigImpl::ConfigImpl(
   if (config.thrift_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");
 
-    envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftFilter router;
+    envoy::extensions::filters::network::thrift_proxy::v3::ThriftFilter router;
     router.set_name(ThriftFilters::ThriftFilterNames::get().ROUTER);
     processFilter(router);
   } else {
@@ -154,19 +151,21 @@ ProtocolPtr ConfigImpl::createProtocol() {
 }
 
 void ConfigImpl::processFilter(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftFilter& proto_config) {
+    const envoy::extensions::filters::network::thrift_proxy::v3::ThriftFilter& proto_config) {
   const std::string& string_name = proto_config.name();
 
   ENVOY_LOG(debug, "    thrift filter #{}", filter_factories_.size());
   ENVOY_LOG(debug, "      name: {}", string_name);
-
-  const Json::ObjectSharedPtr filter_config =
-      MessageUtil::getJsonObjectFromMessage(proto_config.config());
-  ENVOY_LOG(debug, "      config: {}", filter_config->asJsonString());
-
+  ENVOY_LOG(debug, "    config: {}",
+            MessageUtil::getJsonStringFromMessage(
+                proto_config.has_typed_config()
+                    ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
+                    : static_cast<const Protobuf::Message&>(
+                          proto_config.hidden_envoy_deprecated_config()),
+                true));
   auto& factory =
       Envoy::Config::Utility::getAndCheckFactory<ThriftFilters::NamedThriftFilterConfigFactory>(
-          string_name);
+          proto_config);
 
   ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
       proto_config, context_.messageValidationVisitor(), factory);

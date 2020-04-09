@@ -158,44 +158,44 @@ int32_t FieldImpl::byteSize() const {
   int32_t total = 1 + key_.size() + 1;
 
   switch (type_) {
-  case Type::DOUBLE:
-  case Type::DATETIME:
-  case Type::TIMESTAMP:
-  case Type::INT64: {
+  case Type::Double:
+  case Type::Datetime:
+  case Type::Timestamp:
+  case Type::Int64: {
     return total + 8;
   }
 
-  case Type::STRING:
-  case Type::SYMBOL: {
+  case Type::String:
+  case Type::Symbol: {
     return total + 4 + value_.string_value_.size() + 1;
   }
 
-  case Type::DOCUMENT:
-  case Type::ARRAY: {
+  case Type::Document:
+  case Type::Array: {
     return total + value_.document_value_->byteSize();
   }
 
-  case Type::BINARY: {
+  case Type::Binary: {
     return total + 5 + value_.string_value_.size();
   }
 
-  case Type::OBJECT_ID: {
+  case Type::ObjectId: {
     return total + sizeof(ObjectId);
   }
 
-  case Type::BOOLEAN: {
+  case Type::Boolean: {
     return total + 1;
   }
 
-  case Type::NULL_VALUE: {
+  case Type::NullValue: {
     return total;
   }
 
-  case Type::REGEX: {
+  case Type::Regex: {
     return total + value_.regex_value_.pattern_.size() + value_.regex_value_.options_.size() + 2;
   }
 
-  case Type::INT32: {
+  case Type::Int32: {
     return total + 4;
   }
   }
@@ -208,49 +208,49 @@ void FieldImpl::encode(Buffer::Instance& output) const {
   BufferHelper::writeCString(output, key_);
 
   switch (type_) {
-  case Type::DOUBLE: {
+  case Type::Double: {
     return BufferHelper::writeDouble(output, value_.double_value_);
   }
 
-  case Type::STRING:
-  case Type::SYMBOL: {
+  case Type::String:
+  case Type::Symbol: {
     return BufferHelper::writeString(output, value_.string_value_);
   }
 
-  case Type::DOCUMENT:
-  case Type::ARRAY: {
+  case Type::Document:
+  case Type::Array: {
     return value_.document_value_->encode(output);
   }
 
-  case Type::BINARY: {
+  case Type::Binary: {
     return BufferHelper::writeBinary(output, value_.string_value_);
   }
 
-  case Type::OBJECT_ID: {
+  case Type::ObjectId: {
     return output.add(&value_.object_id_value_[0], value_.object_id_value_.size());
   }
 
-  case Type::BOOLEAN: {
+  case Type::Boolean: {
     uint8_t to_write = value_.bool_value_ ? 1 : 0;
     return output.add(&to_write, sizeof(to_write));
   }
 
-  case Type::DATETIME:
-  case Type::TIMESTAMP:
-  case Type::INT64: {
+  case Type::Datetime:
+  case Type::Timestamp:
+  case Type::Int64: {
     return BufferHelper::writeInt64(output, value_.int64_value_);
   }
 
-  case Type::NULL_VALUE: {
+  case Type::NullValue: {
     return;
   }
 
-  case Type::REGEX: {
+  case Type::Regex: {
     BufferHelper::writeCString(output, value_.regex_value_.pattern_);
     return BufferHelper::writeCString(output, value_.regex_value_.options_);
   }
 
-  case Type::INT32:
+  case Type::Int32:
     return BufferHelper::writeInt32(output, value_.int32_value_);
   }
 
@@ -263,59 +263,59 @@ bool FieldImpl::operator==(const Field& rhs) const {
   }
 
   switch (type_) {
-  case Type::DOUBLE: {
+  case Type::Double: {
     return asDouble() == rhs.asDouble();
   }
 
-  case Type::STRING: {
+  case Type::String: {
     return asString() == rhs.asString();
   }
 
-  case Type::SYMBOL: {
+  case Type::Symbol: {
     return asSymbol() == rhs.asSymbol();
   }
 
-  case Type::DOCUMENT: {
+  case Type::Document: {
     return asDocument() == rhs.asDocument();
   }
 
-  case Type::ARRAY: {
+  case Type::Array: {
     return asArray() == rhs.asArray();
   }
 
-  case Type::BINARY: {
+  case Type::Binary: {
     return asBinary() == rhs.asBinary();
   }
 
-  case Type::OBJECT_ID: {
+  case Type::ObjectId: {
     return asObjectId() == rhs.asObjectId();
   }
 
-  case Type::BOOLEAN: {
+  case Type::Boolean: {
     return asBoolean() == rhs.asBoolean();
   }
 
-  case Type::NULL_VALUE: {
+  case Type::NullValue: {
     return true;
   }
 
-  case Type::REGEX: {
+  case Type::Regex: {
     return asRegex() == rhs.asRegex();
   }
 
-  case Type::INT32: {
+  case Type::Int32: {
     return asInt32() == rhs.asInt32();
   }
 
-  case Type::DATETIME: {
+  case Type::Datetime: {
     return asDatetime() == rhs.asDatetime();
   }
 
-  case Type::TIMESTAMP: {
+  case Type::Timestamp: {
     return asTimestamp() == rhs.asTimestamp();
   }
 
-  case Type::INT64: {
+  case Type::Int64: {
     return asInt64() == rhs.asInt64();
   }
   }
@@ -325,46 +325,46 @@ bool FieldImpl::operator==(const Field& rhs) const {
 
 std::string FieldImpl::toString() const {
   switch (type_) {
-  case Type::DOUBLE: {
+  case Type::Double: {
     return std::to_string(value_.double_value_);
   }
 
-  case Type::STRING:
-  case Type::SYMBOL:
-  case Type::BINARY: {
+  case Type::String:
+  case Type::Symbol:
+  case Type::Binary: {
     return fmt::format("\"{}\"", StringUtil::escape(value_.string_value_));
   }
 
-  case Type::DOCUMENT:
-  case Type::ARRAY: {
+  case Type::Document:
+  case Type::Array: {
     return value_.document_value_->toString();
   }
 
-  case Type::OBJECT_ID: {
+  case Type::ObjectId: {
     return fmt::format("\"{}\"",
                        Hex::encode(&value_.object_id_value_[0], value_.object_id_value_.size()));
   }
 
-  case Type::BOOLEAN: {
+  case Type::Boolean: {
     return value_.bool_value_ ? "true" : "false";
   }
 
-  case Type::NULL_VALUE: {
+  case Type::NullValue: {
     return "null";
   }
 
-  case Type::REGEX: {
+  case Type::Regex: {
     return fmt::format("[\"{}\", \"{}\"]", value_.regex_value_.pattern_,
                        value_.regex_value_.options_);
   }
 
-  case Type::INT32: {
+  case Type::Int32: {
     return std::to_string(value_.int32_value_);
   }
 
-  case Type::DATETIME:
-  case Type::TIMESTAMP:
-  case Type::INT64: {
+  case Type::Datetime:
+  case Type::Timestamp:
+  case Type::Int64: {
     return std::to_string(value_.int64_value_);
   }
   }
@@ -398,74 +398,74 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
     std::string key = BufferHelper::removeCString(data);
     ENVOY_LOG(trace, "BSON element type: {:#x} key: {}", element_type, key);
     switch (static_cast<Field::Type>(element_type)) {
-    case Field::Type::DOUBLE: {
+    case Field::Type::Double: {
       double value = BufferHelper::removeDouble(data);
       ENVOY_LOG(trace, "BSON double: {}", value);
       addDouble(key, value);
       break;
     }
 
-    case Field::Type::STRING: {
+    case Field::Type::String: {
       std::string value = BufferHelper::removeString(data);
       ENVOY_LOG(trace, "BSON string: {}", value);
       addString(key, std::move(value));
       break;
     }
 
-    case Field::Type::SYMBOL: {
+    case Field::Type::Symbol: {
       std::string value = BufferHelper::removeString(data);
       ENVOY_LOG(trace, "BSON symbol: {}", value);
       addSymbol(key, std::move(value));
       break;
     }
 
-    case Field::Type::DOCUMENT: {
+    case Field::Type::Document: {
       ENVOY_LOG(trace, "BSON document");
       addDocument(key, DocumentImpl::create(data));
       break;
     }
 
-    case Field::Type::ARRAY: {
+    case Field::Type::Array: {
       ENVOY_LOG(trace, "BSON array");
       addArray(key, DocumentImpl::create(data));
       break;
     }
 
-    case Field::Type::BINARY: {
+    case Field::Type::Binary: {
       std::string value = BufferHelper::removeBinary(data);
       ENVOY_LOG(trace, "BSON binary: {}", value);
       addBinary(key, std::move(value));
       break;
     }
 
-    case Field::Type::OBJECT_ID: {
+    case Field::Type::ObjectId: {
       Field::ObjectId value;
       BufferHelper::removeBytes(data, &value[0], value.size());
       addObjectId(key, std::move(value));
       break;
     }
 
-    case Field::Type::BOOLEAN: {
-      bool value = BufferHelper::removeByte(data) != 0;
+    case Field::Type::Boolean: {
+      const bool value = BufferHelper::removeByte(data) != 0;
       ENVOY_LOG(trace, "BSON boolean: {}", value);
       addBoolean(key, value);
       break;
     }
 
-    case Field::Type::DATETIME: {
-      int64_t value = BufferHelper::removeInt64(data);
+    case Field::Type::Datetime: {
+      const int64_t value = BufferHelper::removeInt64(data);
       ENVOY_LOG(trace, "BSON datetime: {}", value);
       addDatetime(key, value);
       break;
     }
 
-    case Field::Type::NULL_VALUE: {
+    case Field::Type::NullValue: {
       ENVOY_LOG(trace, "BSON null value");
       addNull(key);
       break;
     }
 
-    case Field::Type::REGEX: {
+    case Field::Type::Regex: {
       Field::Regex value;
       value.pattern_ = BufferHelper::removeCString(data);
       value.options_ = BufferHelper::removeCString(data);
@@ -474,21 +474,21 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
       break;
     }
 
-    case Field::Type::INT32: {
+    case Field::Type::Int32: {
       int32_t value = BufferHelper::removeInt32(data);
       ENVOY_LOG(trace, "BSON int32: {}", value);
       addInt32(key, value);
       break;
     }
 
-    case Field::Type::TIMESTAMP: {
+    case Field::Type::Timestamp: {
       int64_t value = BufferHelper::removeInt64(data);
       ENVOY_LOG(trace, "BSON timestamp: {}", value);
       addTimestamp(key, value);
       break;
     }
 
-    case Field::Type::INT64: {
+    case Field::Type::Int64: {
       int64_t value = BufferHelper::removeInt64(data);
       ENVOY_LOG(trace, "BSON int64: {}", value);
       addInt64(key, value);

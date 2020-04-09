@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "envoy/config/metrics/v2/stats.pb.h"
-#include "envoy/config/metrics/v2/stats.pb.validate.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/network/resolver_impl.h"
@@ -19,7 +19,7 @@ namespace DogStatsd {
 Stats::SinkPtr DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                      Server::Instance& server) {
   const auto& sink_config =
-      MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::DogStatsdSink&>(
+      MessageUtil::downcastAndValidate<const envoy::config::metrics::v3::DogStatsdSink&>(
           config, server.messageValidationContext().staticValidationVisitor());
   Network::Address::InstanceConstSharedPtr address =
       Network::Address::resolveProtoAddress(sink_config.address());
@@ -29,15 +29,15 @@ Stats::SinkPtr DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& co
 }
 
 ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::metrics::v2::DogStatsdSink>();
+  return std::make_unique<envoy::config::metrics::v3::DogStatsdSink>();
 }
 
-std::string DogStatsdSinkFactory::name() { return StatsSinkNames::get().DogStatsd; }
+std::string DogStatsdSinkFactory::name() const { return StatsSinkNames::get().DogStatsd; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.
  */
-REGISTER_FACTORY(DogStatsdSinkFactory, Server::Configuration::StatsSinkFactory);
+REGISTER_FACTORY(DogStatsdSinkFactory, Server::Configuration::StatsSinkFactory){"envoy.dog_statsd"};
 
 } // namespace DogStatsd
 } // namespace StatSinks

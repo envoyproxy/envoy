@@ -1,5 +1,7 @@
 #include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
@@ -24,32 +26,44 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
-Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::HeaderMap& headers) {
+Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::ResponseHeaderMap& headers) {
   const auto http_response_status = Http::Utility::getResponseStatus(headers);
 
   // Notably, we treat an upstream 200 as a successful response. This differs
   // from the standard but is key in being able to transform a successful
   // upstream HTTP response into a gRPC response.
   if (http_response_status == 200) {
-    return Grpc::Status::GrpcStatus::Ok;
+    return Grpc::Status::WellKnownGrpcStatus::Ok;
   } else {
     return Grpc::Utility::httpToGrpcStatus(http_response_status);
   }
 }
 
-void adjustContentLength(Http::HeaderMap& headers,
-                         std::function<uint64_t(uint64_t value)> adjustment) {
+std::string badContentTypeMessage(const Http::ResponseHeaderMap& headers) {
+  if (headers.ContentType() != nullptr) {
+    return fmt::format(
+        "envoy reverse bridge: upstream responded with unsupported content-type {}, status code {}",
+        headers.ContentType()->value().getStringView(), headers.Status()->value().getStringView());
+  } else {
+    return fmt::format(
+        "envoy reverse bridge: upstream responded with no content-type header, status code {}",
+        headers.Status()->value().getStringView());
+  }
+}
+
+void adjustContentLength(Http::RequestOrResponseHeaderMap& headers,
+                         const std::function<uint64_t(uint64_t value)>& adjustment) {
   auto length_header = headers.ContentLength();
   if (length_header != nullptr) {
     uint64_t length;
     if (absl::SimpleAtoi(length_header->value().getStringView(), &length)) {
-      length_header->value(adjustment(length));
+      headers.setContentLength(adjustment(length));
     }
   }
 }
 } // namespace
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   // Short circuit if header only.
   if (end_stream) {
     return Http::FilterHeadersStatus::Continue;
@@ -76,8 +90,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     // We keep track of the original content-type to ensure that we handle
     // gRPC content type variations such as application/grpc+proto.
     content_type_ = std::string(headers.ContentType()->value().getStringView());
-    headers.ContentType()->value(upstream_content_type_);
-    headers.insertAccept().value(upstream_content_type_);
+    headers.setContentType(upstream_content_type_);
+    headers.setAccept(upstream_content_type_);
 
     if (withhold_grpc_frames_) {
       // Adjust the content-length header to account for us removing the gRPC frame header.
@@ -97,7 +111,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
     // Fail the request if the body is too small to possibly contain a gRPC frame.
     if (buffer.length() < Grpc::GRPC_FRAME_HEADER_SIZE) {
       decoder_callbacks_->sendLocalReply(Http::Code::OK, "invalid request body", nullptr,
-                                         Grpc::Status::GrpcStatus::Unknown,
+                                         Grpc::Status::WellKnownGrpcStatus::Unknown,
                                          RcDetails::get().GrpcBridgeFailedTooSmall);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
@@ -110,22 +124,21 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (enabled_) {
     auto content_type = headers.ContentType();
 
     // If the response from upstream does not have the correct content-type,
     // perform an early return with a useful error message in grpc-message.
-    if (content_type->value().getStringView() != upstream_content_type_) {
-      const auto grpc_message = fmt::format("envoy reverse bridge: upstream responded with "
-                                            "unsupported content-type {}, status code {}",
-                                            content_type->value().getStringView(),
-                                            headers.Status()->value().getStringView());
+    if (content_type == nullptr ||
+        content_type->value().getStringView() != upstream_content_type_) {
+      headers.setGrpcMessage(badContentTypeMessage(headers));
+      headers.setGrpcStatus(Envoy::Grpc::Status::WellKnownGrpcStatus::Unknown);
+      headers.setStatus(enumToInt(Http::Code::OK));
 
-      headers.insertGrpcMessage().value(grpc_message);
-      headers.insertGrpcStatus().value(Envoy::Grpc::Status::GrpcStatus::Unknown);
-      headers.insertStatus().value(enumToInt(Http::Code::OK));
-      content_type->value(content_type_);
+      if (content_type != nullptr) {
+        headers.setContentType(content_type_);
+      }
 
       decoder_callbacks_->streamInfo().setResponseCodeDetails(
           RcDetails::get().GrpcBridgeFailedContentType);
@@ -133,7 +146,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
     }
 
     // Restore the content-type to match what the downstream sent.
-    content_type->value(content_type_);
+    headers.setContentType(content_type_);
 
     if (withhold_grpc_frames_) {
       // Adjust content-length to account for the frame header that's added.
@@ -156,24 +169,11 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
   if (end_stream) {
     // Insert grpc-status trailers to communicate the error code.
     auto& trailers = encoder_callbacks_->addEncodedTrailers();
-    trailers.insertGrpcStatus().value(grpc_status_);
+    trailers.setGrpcStatus(grpc_status_);
 
     if (withhold_grpc_frames_) {
-      // Compute the size of the payload and construct the length prefix.
-      //
-      // We do this even if the upstream failed: If the response returned non-200,
-      // we'll respond with a grpc-status with an error, so clients will know that the request
-      // was unsuccessful. Since we're guaranteed at this point to have a valid response
-      // (unless upstream lied in content-type) we attempt to return a well-formed gRPC
-      // response body.
-      const auto length = buffer.length() + buffer_.length();
-
-      std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
-      Grpc::Encoder().newFrame(Grpc::GRPC_FH_DEFAULT, length, frame);
-
       buffer.prepend(buffer_);
-      Buffer::OwnedImpl frame_buffer(frame.data(), frame.size());
-      buffer.prepend(frame_buffer);
+      buildGrpcFrameHeader(buffer);
     }
 
     return Http::FilterDataStatus::Continue;
@@ -188,6 +188,26 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
   } else {
     return Http::FilterDataStatus::Continue;
   }
+}
+
+Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  trailers.setGrpcStatus(grpc_status_);
+
+  if (withhold_grpc_frames_) {
+    buildGrpcFrameHeader(buffer_);
+    encoder_callbacks_->addEncodedData(buffer_, false);
+  }
+
+  return Http::FilterTrailersStatus::Continue;
+}
+
+void Filter::buildGrpcFrameHeader(Buffer::Instance& buffer) {
+  // We do this even if the upstream failed: If the response returned non-200,
+  // we'll respond with a grpc-status with an error, so clients will know that the request
+  // was unsuccessful. Since we're guaranteed at this point to have a valid response
+  // (unless upstream lied in content-type) we attempt to return a well-formed gRPC
+  // response body.
+  Grpc::Encoder().prependFrameHeader(Grpc::GRPC_FH_DEFAULT, buffer);
 }
 
 } // namespace GrpcHttp1ReverseBridge

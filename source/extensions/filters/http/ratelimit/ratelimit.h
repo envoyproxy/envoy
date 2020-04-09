@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
+#include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/http/context.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
@@ -35,7 +35,7 @@ enum class FilterRequestType { Internal, External, Both };
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::config::filter::http::rate_limit::v2::RateLimit& config,
+  FilterConfig(const envoy::extensions::filters::http::ratelimit::v3::RateLimit& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                Runtime::Loader& runtime, Http::Context& http_context)
       : domain_(config.domain()), stage_(static_cast<uint64_t>(config.stage())),
@@ -45,7 +45,7 @@ public:
         failure_mode_deny_(config.failure_mode_deny()),
         rate_limited_grpc_status_(
             config.rate_limited_as_resource_exhausted()
-                ? absl::make_optional(Grpc::Status::GrpcStatus::ResourceExhausted)
+                ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
                 : absl::nullopt),
         http_context_(http_context), stat_names_(scope.symbolTable()) {}
   const std::string& domain() const { return domain_; }
@@ -100,26 +100,28 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap& headers) override;
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap& headers) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override;
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // RateLimit::RequestCallbacks
   void complete(Filters::Common::RateLimit::LimitStatus status,
-                Http::HeaderMapPtr&& response_headers_to_add,
-                Http::HeaderMapPtr&& request_headers_to_add) override;
+                Http::ResponseHeaderMapPtr&& response_headers_to_add,
+                Http::RequestHeaderMapPtr&& request_headers_to_add) override;
 
 private:
-  void initiateCall(const Http::HeaderMap& headers);
+  void initiateCall(const Http::RequestHeaderMap& headers);
   void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                                     std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                     const Router::RouteEntry* route_entry,
@@ -137,8 +139,8 @@ private:
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
-  Http::HeaderMapPtr response_headers_to_add_;
-  Http::HeaderMap* request_headers_{};
+  Http::ResponseHeaderMapPtr response_headers_to_add_;
+  Http::RequestHeaderMap* request_headers_{};
 };
 
 } // namespace RateLimitFilter

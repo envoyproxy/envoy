@@ -3,12 +3,12 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/config/accesslog/v2/als.pb.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/service/accesslog/v2/als.pb.h"
+#include "envoy/service/accesslog/v3/als.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -35,13 +35,13 @@ public:
    * Log http access entry.
    * @param entry supplies the access log to send.
    */
-  virtual void log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) PURE;
+  virtual void log(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) PURE;
 
   /**
    * Log tcp access entry.
    * @param entry supplies the access log to send.
    */
-  virtual void log(envoy::data::accesslog::v2::TCPAccessLogEntry&& entry) PURE;
+  virtual void log(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) PURE;
 };
 
 using GrpcAccessLoggerSharedPtr = std::shared_ptr<GrpcAccessLogger>;
@@ -61,9 +61,9 @@ public:
    * @param config supplies the configuration for the logger.
    * @return GrpcAccessLoggerSharedPtr ready for logging requests.
    */
-  virtual GrpcAccessLoggerSharedPtr
-  getOrCreateLogger(const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
-                    GrpcAccessLoggerType logger_type) PURE;
+  virtual GrpcAccessLoggerSharedPtr getOrCreateLogger(
+      const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+      GrpcAccessLoggerType logger_type) PURE;
 };
 
 using GrpcAccessLoggerCacheSharedPtr = std::shared_ptr<GrpcAccessLoggerCache>;
@@ -76,37 +76,37 @@ public:
                        const LocalInfo::LocalInfo& local_info);
 
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
-  void log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) override;
-  void log(envoy::data::accesslog::v2::TCPAccessLogEntry&& entry) override;
+  void log(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
+  void log(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
 
 private:
   struct LocalStream
-      : public Grpc::AsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse> {
+      : public Grpc::AsyncStreamCallbacks<envoy::service::accesslog::v3::StreamAccessLogsResponse> {
     LocalStream(GrpcAccessLoggerImpl& parent) : parent_(parent) {}
 
     // Grpc::AsyncStreamCallbacks
-    void onCreateInitialMetadata(Http::HeaderMap&) override {}
-    void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
+    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+    void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
     void onReceiveMessage(
-        std::unique_ptr<envoy::service::accesslog::v2::StreamAccessLogsResponse>&&) override {}
-    void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
+        std::unique_ptr<envoy::service::accesslog::v3::StreamAccessLogsResponse>&&) override {}
+    void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
     void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
     GrpcAccessLoggerImpl& parent_;
-    Grpc::AsyncStream<envoy::service::accesslog::v2::StreamAccessLogsMessage> stream_{};
+    Grpc::AsyncStream<envoy::service::accesslog::v3::StreamAccessLogsMessage> stream_{};
   };
 
   void flush();
 
-  Grpc::AsyncClient<envoy::service::accesslog::v2::StreamAccessLogsMessage,
-                    envoy::service::accesslog::v2::StreamAccessLogsResponse>
+  Grpc::AsyncClient<envoy::service::accesslog::v3::StreamAccessLogsMessage,
+                    envoy::service::accesslog::v3::StreamAccessLogsResponse>
       client_;
   const std::string log_name_;
   const std::chrono::milliseconds buffer_flush_interval_msec_;
   const Event::TimerPtr flush_timer_;
   const uint64_t buffer_size_bytes_;
   uint64_t approximate_message_size_bytes_ = 0;
-  envoy::service::accesslog::v2::StreamAccessLogsMessage message_;
+  envoy::service::accesslog::v3::StreamAccessLogsMessage message_;
   absl::optional<LocalStream> stream_;
   const LocalInfo::LocalInfo& local_info_;
 };
@@ -117,9 +117,9 @@ public:
                             ThreadLocal::SlotAllocator& tls,
                             const LocalInfo::LocalInfo& local_info);
 
-  GrpcAccessLoggerSharedPtr
-  getOrCreateLogger(const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
-                    GrpcAccessLoggerType logger_type) override;
+  GrpcAccessLoggerSharedPtr getOrCreateLogger(
+      const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+      GrpcAccessLoggerType logger_type) override;
 
 private:
   /**

@@ -3,7 +3,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "jwt_verify_lib/jwks.h"
 
@@ -46,7 +46,7 @@ public:
     virtual bool areAudiencesAllowed(const std::vector<std::string>& audiences) const PURE;
 
     // Get the cached config: JWT rule.
-    virtual const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider&
+    virtual const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&
     getJwtProvider() const PURE;
 
     // Get the Jwks object.
@@ -67,7 +67,7 @@ public:
 
   // Factory function to create an instance.
   static JwksCachePtr
-  create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config,
+  create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
          TimeSource& time_source, Api::Api& api);
 };
 

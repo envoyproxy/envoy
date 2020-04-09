@@ -33,7 +33,7 @@ using RequestCapturingCallback = CapturingCallback<RequestCallback, AbstractRequ
 
 // Integration test for {{ message_type.name }} messages.
 
-TEST_F(RequestCodecRequestTest, shouldHandle{{ message_type.name }}Messages) {
+TEST_F(RequestCodecRequestTest, ShouldHandle{{ message_type.name }}Messages) {
   // given
   using RequestUnderTest = Request<{{ message_type.name }}>;
 
@@ -42,8 +42,18 @@ TEST_F(RequestCodecRequestTest, shouldHandle{{ message_type.name }}Messages) {
 
   {% for field_list in message_type.compute_field_lists() %}
   for (int i = 0; i < 100; ++i ) {
-    const RequestHeader header =
-      { {{ message_type.get_extra('api_key') }}, {{ field_list.version }}, correlation++, "id" };
+    {# Request header cannot contain tagged fields if request does not support them. #}
+    const TaggedFields tagged_fields = requestUsesTaggedFieldsInHeader(
+      {{ message_type.get_extra('api_key') }}, {{ field_list.version }}) ?
+        TaggedFields{ { TaggedField{ 10, Bytes{1, 2, 3, 4} } } }:
+        TaggedFields({});
+    const RequestHeader header = {
+      {{ message_type.get_extra('api_key') }},
+      {{ field_list.version }},
+      correlation++,
+      "id",
+      tagged_fields
+    };
     const {{ message_type.name }} data = { {{ field_list.example_value() }} };
     const RequestUnderTest request = {header, data};
     putMessageIntoBuffer(request);
@@ -64,6 +74,7 @@ TEST_F(RequestCodecRequestTest, shouldHandle{{ message_type.name }}Messages) {
   // then
   const std::vector<AbstractRequestSharedPtr>& received = callback->getCapturedMessages();
   ASSERT_EQ(received.size(), sent.size());
+  ASSERT_EQ(received.size(), correlation);
 
   for (size_t i = 0; i < received.size(); ++i) {
     const std::shared_ptr<RequestUnderTest> request =

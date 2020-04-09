@@ -11,7 +11,7 @@ namespace Api {
 
 Impl::Impl(Thread::ThreadFactory& thread_factory, Stats::Store& store,
            Event::TimeSystem& time_system, Filesystem::Instance& file_system,
-           const OptProcessContextRef& process_context)
+           const ProcessContextOptRef& process_context)
     : thread_factory_(thread_factory), store_(store), time_system_(time_system),
       file_system_(file_system), process_context_(process_context) {}
 

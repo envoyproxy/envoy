@@ -1,6 +1,8 @@
 #include <sstream>
 #include <vector>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "common/common/macros.h"
 
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
@@ -32,7 +34,7 @@ static_resources:
         port_value: 0
     filter_chains:
       filters:
-        name: envoy.redis_proxy
+        name: redis
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
@@ -50,10 +52,15 @@ const std::string& clusterConfig() {
   clusters:
     - name: cluster_0
       lb_policy: CLUSTER_PROVIDED
-      hosts:
-      - socket_address:
-          address: 127.0.0.1
-          port_value: 0
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 0
       cluster_type:
         name: envoy.clusters.redis
         typed_config:
@@ -62,12 +69,39 @@ const std::string& clusterConfig() {
             cluster_refresh_rate: 60s
             cluster_refresh_timeout: 4s
             redirect_refresh_interval: 0s
-            redirect_refresh_threshold: 0
+            redirect_refresh_threshold: 1
 )EOF");
 }
 
 const std::string& testConfig() {
   CONSTRUCT_ON_FIRST_USE(std::string, listenerConfig() + clusterConfig());
+}
+
+const std::string& testConfigWithRefresh() {
+  CONSTRUCT_ON_FIRST_USE(std::string, listenerConfig() + R"EOF(
+  clusters:
+    - name: cluster_0
+      lb_policy: CLUSTER_PROVIDED
+      load_assignment:
+        cluster_name: cluser_0
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 0
+      cluster_type:
+        name: envoy.clusters.redis
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            cluster_refresh_rate: 3600s
+            cluster_refresh_timeout: 4s
+            redirect_refresh_interval: 100s
+            redirect_refresh_threshold: 1
+            failure_refresh_threshold: 1
+)EOF");
 }
 
 const std::string& testConfigWithReadPolicy() {
@@ -82,7 +116,7 @@ const std::string& testConfigWithReadPolicy() {
 const std::string& testConfigWithAuth() {
   CONSTRUCT_ON_FIRST_USE(std::string, testConfig() + R"EOF(
       typed_extension_protocol_options:
-        envoy.redis_proxy:
+        envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
           auth_password: { inline_string: somepassword }
 )EOF");
@@ -120,29 +154,35 @@ public:
     config_helper_.renameListener("redis_proxy");
 
     // Change the port for each of the discovery host in cluster_0.
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       uint32_t upstream_idx = 0;
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
-
-      for (int j = 0; j < cluster_0->hosts_size(); ++j) {
-        if (cluster_0->mutable_hosts(j)->has_socket_address()) {
-          auto* host_socket_addr = cluster_0->mutable_hosts(j)->mutable_socket_address();
-          RELEASE_ASSERT(fake_upstreams_.size() > upstream_idx, "");
-          host_socket_addr->set_address(
-              fake_upstreams_[upstream_idx]->localAddress()->ip()->addressAsString());
-          host_socket_addr->set_port_value(
-              fake_upstreams_[upstream_idx++]->localAddress()->ip()->port());
+      for (int j = 0; j < cluster_0->load_assignment().endpoints_size(); ++j) {
+        auto locality_lb = cluster_0->mutable_load_assignment()->mutable_endpoints(j);
+        for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
+          auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
+          if (lb_endpoint->endpoint().address().has_socket_address()) {
+            auto* host_socket_addr =
+                lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+            RELEASE_ASSERT(fake_upstreams_.size() > upstream_idx, "");
+            host_socket_addr->set_address(
+                fake_upstreams_[upstream_idx]->localAddress()->ip()->addressAsString());
+            host_socket_addr->set_port_value(
+                fake_upstreams_[upstream_idx++]->localAddress()->ip()->port());
+          }
         }
       }
     });
 
-    BaseIntegrationTest::initialize();
+    on_server_ready_function_ = [this](Envoy::IntegrationTestServer& test_server) {
+      mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&(test_server.server().random()));
+      // Abort now if we cannot downcast the server's random number generator pointer.
+      ASSERT_TRUE(mock_rng_ != nullptr);
+      // Ensure that fake_upstreams_[0] is the load balancer's host of choice by default.
+      ON_CALL(*mock_rng_, random()).WillByDefault(Return(random_index_));
+    };
 
-    mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&test_server_->server().random());
-    // Abort now if we cannot downcast the server's random number generator pointer.
-    ASSERT_TRUE(mock_rng_ != nullptr);
-    // Ensure that fake_upstreams_[0] is the load balancer's host of choice by default.
-    ON_CALL(*mock_rng_, random()).WillByDefault(Return(random_index_));
+    BaseIntegrationTest::initialize();
   }
 
 protected:
@@ -318,6 +358,13 @@ class RedisClusterWithReadPolicyIntegrationTest : public RedisClusterIntegration
 public:
   RedisClusterWithReadPolicyIntegrationTest(const std::string& config = testConfigWithReadPolicy(),
                                             int num_upstreams = 3)
+      : RedisClusterIntegrationTest(config, num_upstreams) {}
+};
+
+class RedisClusterWithRefreshIntegrationTest : public RedisClusterIntegrationTest {
+public:
+  RedisClusterWithRefreshIntegrationTest(const std::string& config = testConfigWithRefresh(),
+                                         int num_upstreams = 3)
       : RedisClusterIntegrationTest(config, num_upstreams) {}
 };
 
@@ -498,5 +545,56 @@ TEST_P(RedisClusterWithAuthIntegrationTest, SingleSlotMasterReplica) {
   EXPECT_TRUE(fake_upstream_connection->close());
 }
 
+// This test show the test proxy's multi-stage response to an error from an upstream fake
+// redis server. The proxy will connect to the first fake upstream server to rediscover the
+// cluster's topology using a "cluster slots" command.
+TEST_P(RedisClusterWithRefreshIntegrationTest, ClusterSlotRequestAfterFailure) {
+  random_index_ = 0;
+
+  on_server_init_function_ = [this]() {
+    std::string cluster_slot_response = singleSlotMasterReplica(
+        fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip());
+    expectCallClusterSlot(random_index_, cluster_slot_response);
+  };
+
+  initialize();
+
+  // foo hashes to slot 12182 which the proxy believes is at the server reachable via
+  // fake_upstreams_[0], based on the singleSlotMasterReplica() response above.
+  std::string request = makeBulkStringArray({"get", "foo"});
+  // The actual error response.
+  std::string error_response = "-CLUSTERDOWN The cluster is down\r\n";
+  std::string cluster_slots_request = makeBulkStringArray({"CLUSTER", "SLOTS"});
+  std::string proxy_to_server;
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->write(request);
+
+  FakeRawConnectionPtr fake_upstream_connection_1, fake_upstream_connection_2;
+
+  // Data from the client should always be routed to fake_upstreams_[0] by the load balancer.
+  EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_1));
+  EXPECT_TRUE(fake_upstream_connection_1->waitForData(request.size(), &proxy_to_server));
+  // The data in request should be received by the first server, fake_upstreams_[0].
+  EXPECT_EQ(request, proxy_to_server);
+  proxy_to_server.clear();
+
+  // Send the server down error response from the first fake Redis server back to the proxy.
+  EXPECT_TRUE(fake_upstream_connection_1->write(error_response));
+  redis_client->waitForData(error_response);
+  // The client should receive response unchanged.
+  EXPECT_EQ(error_response, redis_client->data());
+
+  // A new connection should be created to fake_upstreams_[0] for topology discovery.
+  proxy_to_server.clear();
+  EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_2));
+  EXPECT_TRUE(
+      fake_upstream_connection_2->waitForData(cluster_slots_request.size(), &proxy_to_server));
+  EXPECT_EQ(cluster_slots_request, proxy_to_server);
+
+  EXPECT_TRUE(fake_upstream_connection_1->close());
+  EXPECT_TRUE(fake_upstream_connection_2->close());
+  redis_client->close();
+}
 } // namespace
 } // namespace Envoy

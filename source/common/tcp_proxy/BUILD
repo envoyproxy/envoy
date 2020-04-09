@@ -10,8 +10,14 @@ envoy_package()
 
 envoy_cc_library(
     name = "tcp_proxy",
-    srcs = ["tcp_proxy.cc"],
-    hdrs = ["tcp_proxy.h"],
+    srcs = [
+        "tcp_proxy.cc",
+        "upstream.cc",
+    ],
+    hdrs = [
+        "tcp_proxy.h",
+        "upstream.h",
+    ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
@@ -33,15 +39,18 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:macros",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/http:headers_lib",
         "//source/common/network:application_protocol_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:filter_lib",
+        "//source/common/network:hash_policy_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:upstream_server_name_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/upstream:load_balancer_lib",
-        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )

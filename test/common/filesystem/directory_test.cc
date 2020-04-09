@@ -14,10 +14,6 @@
 namespace Envoy {
 namespace Filesystem {
 
-// we are using this class to clean up all the files we create,
-// as it looks like some versions of libstdc++ have a bug in
-// std::experimental::filesystem::remove_all where it fails with nested directories:
-// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=71313
 class DirectoryTest : public testing::Test {
 public:
   DirectoryTest() : dir_path_(TestEnvironment::temporaryPath("envoy_test")) {
@@ -25,7 +21,7 @@ public:
   }
 
 protected:
-  void SetUp() override { TestUtility::createDirectory(dir_path_); }
+  void SetUp() override { TestEnvironment::createPath(dir_path_); }
 
   void TearDown() override {
     while (!files_to_remove_.empty()) {
@@ -38,7 +34,7 @@ protected:
   void addSubDirs(std::list<std::string> sub_dirs) {
     for (const std::string& dir_name : sub_dirs) {
       const std::string full_path = dir_path_ + "/" + dir_name;
-      TestUtility::createDirectory(full_path);
+      TestEnvironment::createPath(full_path);
       files_to_remove_.push(full_path);
     }
   }
@@ -55,7 +51,7 @@ protected:
     for (const auto& link : symlinks) {
       const std::string target_path = dir_path_ + "/" + link.first;
       const std::string link_path = dir_path_ + "/" + link.second;
-      TestUtility::createSymlink(target_path, link_path);
+      TestEnvironment::createSymlink(target_path, link_path);
       files_to_remove_.push(link_path);
     }
   }
@@ -185,6 +181,26 @@ TEST_F(DirectoryTest, DirectoryWithSymlinkToDirectory) {
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
+// Test that a broken symlink can be listed
+TEST_F(DirectoryTest, DirectoryWithBrokenSymlink) {
+  addSubDirs({"sub_dir"});
+  addSymlinks({{"sub_dir", "link_dir"}});
+  TestEnvironment::removePath(dir_path_ + "/sub_dir");
+
+  const EntrySet expected = {
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
+#ifndef WIN32
+      // On Linux, a broken directory link is simply a symlink to be rm'ed
+      {"link_dir", FileType::Regular},
+#else
+      // On Windows, a broken directory link remains a directory link to be rmdir'ed
+      {"link_dir", FileType::Directory},
+#endif
+  };
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
+}
+
 // Test that we can list an empty directory
 TEST_F(DirectoryTest, DirectoryWithEmptyDirectory) {
   const EntrySet expected = {
@@ -216,7 +232,7 @@ TEST(Directory, DirectoryHasTrailingPathSeparator) {
 #else
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test") + "/");
 #endif
-  TestUtility::createDirectory(dir_path);
+  TestEnvironment::createPath(dir_path);
 
   const EntrySet expected = {
       {".", FileType::Directory},

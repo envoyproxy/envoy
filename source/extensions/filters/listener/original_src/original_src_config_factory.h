@@ -15,13 +15,14 @@ namespace OriginalSrc {
 class OriginalSrcConfigFactory : public Server::Configuration::NamedListenerFilterConfigFactory {
 public:
   // NamedListenerFilterConfigFactory
-  Network::ListenerFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& message,
-                               Server::Configuration::ListenerFactoryContext& context) override;
+  Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message& message,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      Server::Configuration::ListenerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
-  std::string name() override { return ListenerFilterNames::get().OriginalSrc; }
+  std::string name() const override { return ListenerFilterNames::get().OriginalSrc; }
 };
 
 } // namespace OriginalSrc

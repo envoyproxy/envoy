@@ -6,7 +6,7 @@ static_resources:
         port_value: 10000
     filter_chains:
     - filters:
-      - name: envoy.http_connection_manager
+      - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: ingress_http
@@ -22,17 +22,17 @@ static_resources:
                 route:
                   cluster: cluster1
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
           codec_type: auto
     listener_filters:
-    - name: envoy.listener.original_dst
+    - name: envoy.filters.listener.original_dst
       typed_config: {}
   clusters:
   - name: cluster1
     type: ORIGINAL_DST
     connect_timeout: 6s
-    lb_policy: ORIGINAL_DST_LB
+    lb_policy: CLUSTER_PROVIDED
     dns_lookup_family: V4_ONLY
 cluster_manager: {}
 watchdog: {}

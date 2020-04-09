@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/registry/registry.h"
 
@@ -69,7 +70,7 @@ public:
     return std::make_unique<ProtobufWkt::StringValue>();
   }
 
-  std::string name() override { return "envoy.upstream.polite"; }
+  std::string name() const override { return "envoy.upstream.polite"; }
 };
 
 // perform static registration
@@ -80,11 +81,11 @@ class ClusterFilterIntegrationTest : public testing::TestWithParam<Network::Addr
                                      public BaseIntegrationTest {
 public:
   ClusterFilterIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::TCP_PROXY_CONFIG) {}
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
 
   void initialize() override {
     enable_half_close_ = true;
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       auto* filter = cluster_0->add_filters();
       filter->set_name("envoy.upstream.polite");

@@ -46,11 +46,6 @@ absl::optional<absl::string_view> NullVm::getMemory(uint64_t pointer, uint64_t s
   return absl::string_view(reinterpret_cast<char*>(pointer), static_cast<size_t>(size));
 }
 
-bool NullVm::getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) {
-  *vm_pointer = reinterpret_cast<uint64_t>(host_pointer);
-  return true;
-}
-
 bool NullVm::setMemory(uint64_t pointer, uint64_t size, const void* data) {
   if ((pointer == 0 || data == nullptr)) {
     if (size != 0) {
@@ -83,6 +78,11 @@ bool NullVm::getWord(uint64_t pointer, Word* data) {
 }
 
 absl::string_view NullVm::getCustomSection(absl::string_view /* name */) {
+  // Return nothing: there is no WASM file.
+  return {};
+}
+
+absl::string_view NullVm::getPrecompiledSectionName() {
   // Return nothing: there is no WASM file.
   return {};
 }

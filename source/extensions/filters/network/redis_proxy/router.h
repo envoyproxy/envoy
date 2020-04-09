@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 

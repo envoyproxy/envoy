@@ -31,7 +31,8 @@
   health_checks:
   - http_health_check:
       path: /healthcheck
-      service_name: accidents
+      service_name_matcher:
+        prefix: accidents
     timeout: 2s
     interval: 5s
     interval_jitter: 5s

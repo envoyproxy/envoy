@@ -1,0 +1,18 @@
+node:
+  id: bootstrap_id
+  cluster: bootstrap_cluster
+  locality:
+    zone: bootstrap_zone
+    sub_zone: bootstrap_sub_zone
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: {{ ntop_ip_loopback_address }}
+      port_value: 0
+  socket_options:
+  - description: SO_REUSEPORT
+    level: {{ sol_socket }}
+    name: {{ so_reuseport }}
+    int_value: 1
+    state: STATE_PREBIND

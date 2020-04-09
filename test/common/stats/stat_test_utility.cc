@@ -114,7 +114,8 @@ MemoryTest::Mode MemoryTest::mode() {
   // on some platforms, so try to force-allocate some heap memory
   // and determine whether we can measure it.
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-  volatile std::string long_string("more than 22 chars to exceed libc++ short-string optimization");
+  volatile std::unique_ptr<std::string> long_string = std::make_unique<std::string>(
+      "more than 22 chars to exceed libc++ short-string optimization");
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   bool can_measure_memory = end_mem > start_mem;
 
@@ -132,6 +133,124 @@ MemoryTest::Mode MemoryTest::mode() {
     return can_measure_memory ? Mode::Approximate : Mode::Disabled;
   }
 #endif
+}
+
+Counter& TestStore::counterFromString(const std::string& name) {
+  Counter*& counter_ref = counter_map_[name];
+  if (counter_ref == nullptr) {
+    counter_ref = &IsolatedStoreImpl::counterFromString(name);
+  }
+  return *counter_ref;
+}
+
+Counter& TestStore::counterFromStatNameWithTags(const StatName& stat_name,
+                                                StatNameTagVectorOptConstRef tags) {
+  std::string name = symbolTable().toString(stat_name);
+  Counter*& counter_ref = counter_map_[name];
+  if (counter_ref == nullptr) {
+    counter_ref = &IsolatedStoreImpl::counterFromStatNameWithTags(stat_name, tags);
+  } else {
+    // Ensures StatNames with the same string representation are specified
+    // consistently using symbolic/dynamic components on every access.
+    ASSERT(counter_ref->statName() == stat_name);
+  }
+  return *counter_ref;
+}
+
+Gauge& TestStore::gaugeFromString(const std::string& name, Gauge::ImportMode mode) {
+  Gauge*& gauge_ref = gauge_map_[name];
+  if (gauge_ref == nullptr) {
+    gauge_ref = &IsolatedStoreImpl::gaugeFromString(name, mode);
+  }
+  return *gauge_ref;
+}
+
+Gauge& TestStore::gaugeFromStatNameWithTags(const StatName& stat_name,
+                                            StatNameTagVectorOptConstRef tags,
+                                            Gauge::ImportMode mode) {
+  std::string name = symbolTable().toString(stat_name);
+  Gauge*& gauge_ref = gauge_map_[name];
+  if (gauge_ref == nullptr) {
+    gauge_ref = &IsolatedStoreImpl::gaugeFromStatNameWithTags(stat_name, tags, mode);
+  } else {
+    ASSERT(gauge_ref->statName() == stat_name);
+  }
+  return *gauge_ref;
+}
+
+Histogram& TestStore::histogramFromString(const std::string& name, Histogram::Unit unit) {
+  Histogram*& histogram_ref = histogram_map_[name];
+  if (histogram_ref == nullptr) {
+    histogram_ref = &IsolatedStoreImpl::histogramFromString(name, unit);
+  }
+  return *histogram_ref;
+}
+
+Histogram& TestStore::histogramFromStatNameWithTags(const StatName& stat_name,
+                                                    StatNameTagVectorOptConstRef tags,
+                                                    Histogram::Unit unit) {
+  std::string name = symbolTable().toString(stat_name);
+  Histogram*& histogram_ref = histogram_map_[name];
+  if (histogram_ref == nullptr) {
+    histogram_ref = &IsolatedStoreImpl::histogramFromStatNameWithTags(stat_name, tags, unit);
+  } else {
+    ASSERT(histogram_ref->statName() == stat_name);
+  }
+  return *histogram_ref;
+}
+
+template <class StatType>
+static absl::optional<std::reference_wrapper<const StatType>>
+findByString(const std::string& name, const absl::flat_hash_map<std::string, StatType*>& map) {
+  absl::optional<std::reference_wrapper<const StatType>> ret;
+  auto iter = map.find(name);
+  if (iter != map.end()) {
+    ret = *iter->second;
+  }
+  return ret;
+}
+
+CounterOptConstRef TestStore::findCounterByString(const std::string& name) const {
+  return findByString<Counter>(name, counter_map_);
+}
+
+GaugeOptConstRef TestStore::findGaugeByString(const std::string& name) const {
+  return findByString<Gauge>(name, gauge_map_);
+}
+
+HistogramOptConstRef TestStore::findHistogramByString(const std::string& name) const {
+  return findByString<Histogram>(name, histogram_map_);
+}
+
+// TODO(jmarantz): this utility is intended to be used both for unit tests
+// and fuzz tests. But those have different checking macros, e.g. EXPECT_EQ vs
+// FUZZ_ASSERT.
+std::vector<uint8_t> serializeDeserializeNumber(uint64_t number) {
+  uint64_t num_bytes = SymbolTableImpl::Encoding::encodingSizeBytes(number);
+  const uint64_t block_size = 10;
+  MemBlockBuilder<uint8_t> mem_block(block_size);
+  SymbolTableImpl::Encoding::appendEncoding(number, mem_block);
+  num_bytes += mem_block.capacityRemaining();
+  RELEASE_ASSERT(block_size == num_bytes, absl::StrCat("Encoding size issue: block_size=",
+                                                       block_size, " num_bytes=", num_bytes));
+  absl::Span<uint8_t> span = mem_block.span();
+  RELEASE_ASSERT(number == SymbolTableImpl::Encoding::decodeNumber(span.data()).first, "");
+  return std::vector<uint8_t>(span.data(), span.data() + span.size());
+}
+
+void serializeDeserializeString(absl::string_view in) {
+  MemBlockBuilder<uint8_t> mem_block(SymbolTableImpl::Encoding::totalSizeBytes(in.size()));
+  SymbolTableImpl::Encoding::appendEncoding(in.size(), mem_block);
+  const uint8_t* data = reinterpret_cast<const uint8_t*>(in.data());
+  mem_block.appendData(absl::MakeSpan(data, data + in.size()));
+  RELEASE_ASSERT(mem_block.capacityRemaining() == 0, "");
+  absl::Span<uint8_t> span = mem_block.span();
+  const std::pair<uint64_t, uint64_t> number_consumed =
+      SymbolTableImpl::Encoding::decodeNumber(span.data());
+  RELEASE_ASSERT(number_consumed.first == in.size(), absl::StrCat("size matches: ", in));
+  span.remove_prefix(number_consumed.second);
+  const absl::string_view out(reinterpret_cast<const char*>(span.data()), span.size());
+  RELEASE_ASSERT(in == out, absl::StrCat("'", in, "' != '", out, "'"));
 }
 
 } // namespace TestUtil

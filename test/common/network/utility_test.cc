@@ -1,8 +1,10 @@
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/config/core/v3/address.pb.h"
 
 #include "common/common/thread.h"
 #include "common/network/address_impl.h"
@@ -178,53 +180,53 @@ TEST(NetworkUtility, LocalConnection) {
   EXPECT_CALL(socket, localAddress()).WillRepeatedly(testing::ReturnRef(local_addr));
   EXPECT_CALL(socket, remoteAddress()).WillRepeatedly(testing::ReturnRef(remote_addr));
 
-  local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
-  remote_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
-  EXPECT_TRUE(Utility::isLocalConnection(socket));
+  local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  remote_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
-  remote_addr.reset(new Network::Address::PipeInstance("/pipe/path"));
-  EXPECT_TRUE(Utility::isLocalConnection(socket));
+  local_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
+  remote_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
-  remote_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
-  EXPECT_TRUE(Utility::isLocalConnection(socket));
+  local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  remote_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.2"));
-  EXPECT_TRUE(Utility::isLocalConnection(socket));
+  local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2");
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4"));
-  remote_addr.reset(new Network::Address::Ipv4Instance("8.8.8.8"));
-  EXPECT_FALSE(Utility::isLocalConnection(socket));
+  local_addr = std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4");
+  remote_addr = std::make_shared<Network::Address::Ipv4Instance>("8.8.8.8");
+  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4"));
-  remote_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4"));
-  EXPECT_TRUE(Utility::isLocalConnection(socket));
+  local_addr = std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4");
+  remote_addr = std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4");
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4", 1234));
-  remote_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4", 4321));
-  EXPECT_TRUE(Utility::isLocalConnection(socket));
+  local_addr = std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4", 1234);
+  remote_addr = std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4", 4321);
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv6Instance("::1"));
-  remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
-  EXPECT_TRUE(Utility::isLocalConnection(socket));
+  local_addr = std::make_shared<Network::Address::Ipv6Instance>("::1");
+  remote_addr = std::make_shared<Network::Address::Ipv6Instance>("::1");
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  local_addr.reset(new Network::Address::Ipv6Instance("::2"));
-  remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
-  EXPECT_TRUE(Utility::isLocalConnection(socket));
+  local_addr = std::make_shared<Network::Address::Ipv6Instance>("::2");
+  remote_addr = std::make_shared<Network::Address::Ipv6Instance>("::1");
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  remote_addr.reset(new Network::Address::Ipv6Instance("::3"));
-  EXPECT_FALSE(Utility::isLocalConnection(socket));
+  remote_addr = std::make_shared<Network::Address::Ipv6Instance>("::3");
+  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
 
-  remote_addr.reset(new Network::Address::Ipv6Instance("::2"));
-  EXPECT_TRUE(Utility::isLocalConnection(socket));
+  remote_addr = std::make_shared<Network::Address::Ipv6Instance>("::2");
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  remote_addr.reset(new Network::Address::Ipv6Instance("::2", 4321));
-  local_addr.reset(new Network::Address::Ipv6Instance("::2", 1234));
-  EXPECT_TRUE(Utility::isLocalConnection(socket));
+  remote_addr = std::make_shared<Network::Address::Ipv6Instance>("::2", 4321);
+  local_addr = std::make_shared<Network::Address::Ipv6Instance>("::2", 1234);
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
 
-  remote_addr.reset(new Network::Address::Ipv6Instance("fd00::"));
-  EXPECT_FALSE(Utility::isLocalConnection(socket));
+  remote_addr = std::make_shared<Network::Address::Ipv6Instance>("fd00::");
+  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
 }
 
 TEST(NetworkUtility, InternalAddress) {
@@ -297,25 +299,25 @@ TEST(NetworkUtility, AnyAddress) {
 
 TEST(NetworkUtility, ParseProtobufAddress) {
   {
-    envoy::api::v2::core::Address proto_address;
+    envoy::config::core::v3::Address proto_address;
     proto_address.mutable_socket_address()->set_address("127.0.0.1");
     proto_address.mutable_socket_address()->set_port_value(1234);
     EXPECT_EQ("127.0.0.1:1234", Utility::protobufAddressToAddress(proto_address)->asString());
   }
   {
-    envoy::api::v2::core::Address proto_address;
+    envoy::config::core::v3::Address proto_address;
     proto_address.mutable_socket_address()->set_address("::1");
     proto_address.mutable_socket_address()->set_port_value(1234);
     EXPECT_EQ("[::1]:1234", Utility::protobufAddressToAddress(proto_address)->asString());
   }
   {
-    envoy::api::v2::core::Address proto_address;
+    envoy::config::core::v3::Address proto_address;
     proto_address.mutable_pipe()->set_path("/tmp/unix-socket");
     EXPECT_EQ("/tmp/unix-socket", Utility::protobufAddressToAddress(proto_address)->asString());
   }
 #if defined(__linux__)
   {
-    envoy::api::v2::core::Address proto_address;
+    envoy::config::core::v3::Address proto_address;
     proto_address.mutable_pipe()->set_path("@/tmp/abstract-unix-socket");
     EXPECT_EQ("@/tmp/abstract-unix-socket",
               Utility::protobufAddressToAddress(proto_address)->asString());
@@ -325,7 +327,7 @@ TEST(NetworkUtility, ParseProtobufAddress) {
 
 TEST(NetworkUtility, AddressToProtobufAddress) {
   {
-    envoy::api::v2::core::Address proto_address;
+    envoy::config::core::v3::Address proto_address;
     Address::Ipv4Instance address("127.0.0.1");
     Utility::addressToProtobufAddress(address, proto_address);
     EXPECT_EQ(true, proto_address.has_socket_address());
@@ -333,7 +335,7 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
     EXPECT_EQ(0, proto_address.socket_address().port_value());
   }
   {
-    envoy::api::v2::core::Address proto_address;
+    envoy::config::core::v3::Address proto_address;
     Address::PipeInstance address("/hello");
     Utility::addressToProtobufAddress(address, proto_address);
     EXPECT_EQ(true, proto_address.has_pipe());
@@ -343,22 +345,24 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
 
 TEST(NetworkUtility, ProtobufAddressSocketType) {
   {
-    envoy::api::v2::core::Address proto_address;
+    envoy::config::core::v3::Address proto_address;
     proto_address.mutable_socket_address();
     EXPECT_EQ(Address::SocketType::Stream, Utility::protobufAddressSocketType(proto_address));
   }
   {
-    envoy::api::v2::core::Address proto_address;
-    proto_address.mutable_socket_address()->set_protocol(envoy::api::v2::core::SocketAddress::TCP);
+    envoy::config::core::v3::Address proto_address;
+    proto_address.mutable_socket_address()->set_protocol(
+        envoy::config::core::v3::SocketAddress::TCP);
     EXPECT_EQ(Address::SocketType::Stream, Utility::protobufAddressSocketType(proto_address));
   }
   {
-    envoy::api::v2::core::Address proto_address;
-    proto_address.mutable_socket_address()->set_protocol(envoy::api::v2::core::SocketAddress::UDP);
+    envoy::config::core::v3::Address proto_address;
+    proto_address.mutable_socket_address()->set_protocol(
+        envoy::config::core::v3::SocketAddress::UDP);
     EXPECT_EQ(Address::SocketType::Datagram, Utility::protobufAddressSocketType(proto_address));
   }
   {
-    envoy::api::v2::core::Address proto_address;
+    envoy::config::core::v3::Address proto_address;
     proto_address.mutable_pipe();
     EXPECT_EQ(Address::SocketType::Stream, Utility::protobufAddressSocketType(proto_address));
   }

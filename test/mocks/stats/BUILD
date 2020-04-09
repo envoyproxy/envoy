@@ -24,6 +24,7 @@ envoy_cc_mock(
         "//source/common/stats:store_impl_lib",
         "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:timespan_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks:common_lib",
         "//test/test_common:global_lib",
     ],

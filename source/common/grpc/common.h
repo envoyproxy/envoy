@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -14,6 +15,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
+#include "google/rpc/status.pb.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -32,22 +34,39 @@ public:
    * @param headers the headers to parse.
    * @return bool indicating whether content-type is gRPC.
    */
-  static bool hasGrpcContentType(const Http::HeaderMap& headers);
+  static bool hasGrpcContentType(const Http::RequestOrResponseHeaderMap& headers);
 
   /**
    * @param headers the headers to parse.
    * @param bool indicating whether the header is at end_stream.
    * @return bool indicating whether the header is a gRPC response header
    */
-  static bool isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream);
+  static bool isGrpcResponseHeader(const Http::ResponseHeaderMap& headers, bool end_stream);
 
   /**
    * Returns the GrpcStatus code from a given set of trailers, if present.
    * @param trailers the trailers to parse.
+   * @param allow_user_status whether allow user defined grpc status.
+   *        if this value is false, custom grpc status is regarded as invalid status
    * @return absl::optional<Status::GrpcStatus> the parsed status code or InvalidCode if no valid
    * status is found.
    */
-  static absl::optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& trailers);
+  static absl::optional<Status::GrpcStatus>
+  getGrpcStatus(const Http::ResponseHeaderOrTrailerMap& trailers, bool allow_user_defined = false);
+
+  /**
+   * Returns the GrpcStatus code from the set of trailers, headers, and StreamInfo, if present.
+   * @param trailers the trailers to parse for a status code
+   * @param headers the headers to parse if no status code was found in the trailers
+   * @param info the StreamInfo to check for HTTP response code if no code was found in the trailers
+   * or headers
+   * @return absl::optional<Status::GrpcStatus> the parsed status code or absl::nullopt if no status
+   * is found
+   */
+  static absl::optional<Status::GrpcStatus> getGrpcStatus(const Http::ResponseTrailerMap& trailers,
+                                                          const Http::ResponseHeaderMap& headers,
+                                                          const StreamInfo::StreamInfo& info,
+                                                          bool allow_user_defined = false);
 
   /**
    * Returns the grpc-message from a given set of trailers, if present.
@@ -55,7 +74,7 @@ public:
    * @return std::string the gRPC status message or empty string if grpc-message is not present in
    *         trailers.
    */
-  static std::string getGrpcMessage(const Http::HeaderMap& trailers);
+  static std::string getGrpcMessage(const Http::ResponseHeaderOrTrailerMap& trailers);
 
   /**
    * Returns the decoded google.rpc.Status message from a given set of trailers, if present.
@@ -74,15 +93,16 @@ public:
    * @return std::chrono::milliseconds the duration in milliseconds. A zero value corresponding to
    *         infinity is returned if 'grpc-timeout' is missing or malformed.
    */
-  static std::chrono::milliseconds getGrpcTimeout(Http::HeaderMap& request_headers);
+  static std::chrono::milliseconds getGrpcTimeout(const Http::RequestHeaderMap& request_headers);
 
   /**
-   * Encode 'timeout' into 'grpc-timeout' format.
+   * Encode 'timeout' into 'grpc-timeout' format in the grpc-timeout header.
    * @param timeout the duration in std::chrono::milliseconds.
-   * @param value the HeaderString onto which format the timeout in 'grpc-timeout' format, up to
-   *        8 decimal digits and a letter indicating the unit.
+   * @param headers the HeaderMap in which the grpc-timeout header will be set with the timeout in
+   * 'grpc-timeout' format, up to 8 decimal digits and a letter indicating the unit.
    */
-  static void toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderString& value);
+  static void toGrpcTimeout(const std::chrono::milliseconds& timeout,
+                            Http::RequestHeaderMap& headers);
 
   /**
    * Serialize protobuf message with gRPC frame header.
@@ -97,15 +117,15 @@ public:
   /**
    * Prepare headers for protobuf service.
    */
-  static Http::MessagePtr prepareHeaders(const std::string& upstream_cluster,
-                                         const std::string& service_full_name,
-                                         const std::string& method_name,
-                                         const absl::optional<std::chrono::milliseconds>& timeout);
+  static Http::RequestMessagePtr
+  prepareHeaders(const std::string& upstream_cluster, const std::string& service_full_name,
+                 const std::string& method_name,
+                 const absl::optional<std::chrono::milliseconds>& timeout);
 
   /**
    * Basic validation of gRPC response, @throws Grpc::Exception in case of non successful response.
    */
-  static void validateResponse(Http::Message& http_response);
+  static void validateResponse(Http::ResponseMessage& http_response);
 
   /**
    * @return const std::string& type URL prefix.
@@ -133,8 +153,22 @@ public:
    */
   static bool parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto);
 
+  struct RequestNames {
+    absl::string_view service_;
+    absl::string_view method_;
+  };
+
+  /**
+   * Resolve the gRPC service and method from the HTTP2 :path header.
+   * @param path supplies the :path header.
+   * @return if both gRPC serve and method have been resolved successfully returns
+   *   a populated RequestNames, otherwise returns an empty optional.
+   * @note The return value is only valid as long as `path` is still valid and unmodified.
+   */
+  static absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path);
+
 private:
-  static void checkForHeaderOnlyError(Http::Message& http_response);
+  static void checkForHeaderOnlyError(Http::ResponseMessage& http_response);
 };
 
 } // namespace Grpc

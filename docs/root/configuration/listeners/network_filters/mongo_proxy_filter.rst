@@ -5,7 +5,7 @@ Mongo proxy
 
 * MongoDB :ref:`architecture overview <arch_overview_mongo>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.network.mongo_proxy.v2.MongoProxy>`
-* This filter should be configured with the name *envoy.mongo_proxy*.
+* This filter should be configured with the name *envoy.filters.network.mongo_proxy*.
 
 .. _config_network_filters_mongo_proxy_fault_injection:
 

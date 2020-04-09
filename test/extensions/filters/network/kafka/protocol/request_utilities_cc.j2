@@ -1,0 +1,81 @@
+{#
+  Template for 'request_utilities.cc'.
+  This file contains implementation of request-related methods contained in 'message_utilities.h'.
+#}
+
+#include "test/extensions/filters/network/kafka/message_utilities.h"
+
+#include "extensions/filters/network/kafka/external/requests.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+
+int16_t MessageUtilities::apiKeys() {
+  return {{ message_types | length }};
+}
+
+int16_t MessageUtilities::requestApiVersions(const int16_t api_key) {
+  switch (api_key) {
+  {% for message_type in message_types %}
+  case {{ message_type.get_extra('api_key') }} :
+    return {{ message_type.compute_field_lists() | length }} ;
+  {% endfor %}
+  default:
+    throw EnvoyException("unsupported api key used in test code");
+  }
+}
+
+std::vector<AbstractRequestSharedPtr> MessageUtilities::makeRequests(
+  const int16_t api_key, int32_t& correlation_id) {
+
+  if ((api_key < 0) || (api_key >= {{ message_types | length }})) {
+    throw EnvoyException("unsupported api key used in test code");
+  }
+
+  std::vector<AbstractRequestSharedPtr> result;
+  {% for message_type in message_types %}
+  if ({{ message_type.get_extra('api_key') }} == api_key) {
+    {% for field_list in message_type.compute_field_lists() %}
+    {
+      const RequestHeader header = {
+          {{ message_type.get_extra('api_key') }}, {{ field_list.version }}, correlation_id++,
+          "id" };
+      const {{ message_type.name }} data = { {{ field_list.example_value() }} };
+      const AbstractRequestSharedPtr request = std::make_shared<Request<{{ message_type.name }}>>(
+          header, data);
+      result.push_back(request);
+    }
+    {% endfor %}
+  }
+  {% endfor %}
+  return result;
+}
+
+std::vector<AbstractRequestSharedPtr> MessageUtilities::makeAllRequests() {
+  std::vector<AbstractRequestSharedPtr> result;
+  int32_t correlation_id = 0;
+  for (int16_t i = 0; i < MessageUtilities::apiKeys(); ++i) {
+    const std::vector<AbstractRequestSharedPtr> tmp =
+        MessageUtilities::makeRequests(i, correlation_id);
+    result.insert(result.end(), tmp.begin(), tmp.end());
+  }
+  return result;
+}
+
+std::string MessageUtilities::requestMetric(const int16_t api_key) {
+  switch (api_key) {
+  {% for message_type in message_types %}
+  case {{ message_type.get_extra('api_key') }} :
+    return "kafka.prefix.request.{{ message_type.name_in_c_case() }}" ;
+  {% endfor %}
+  default:
+    throw EnvoyException("unsupported api key used in test code");
+  }
+}
+
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

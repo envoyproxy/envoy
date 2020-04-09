@@ -2,6 +2,9 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -82,25 +85,27 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher());
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>();
+  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource());
   EXPECT_DEATH_LOG_TO_STDERR(
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-                     Network::Test::createRawBufferSocket(), false),
-      ".*assert failure: ioHandle\\(\\).fd\\(\\) != -1.*");
+                     Network::Test::createRawBufferSocket(), stream_info, false),
+      ".*assert failure: SOCKET_VALID\\(ioHandle\\(\\)\\.fd\\(\\)\\).*");
 }
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
-  ConnectionImplTest() : api_(Api::createApiForTest(time_system_)) {}
+  ConnectionImplTest() : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_) {}
 
   void setUpBasicConnection() {
     if (dispatcher_.get() == nullptr) {
       dispatcher_ = api_->allocateDispatcher();
     }
+    socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                         nullptr, true);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
-
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+        socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(),
         socket_options_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
@@ -112,11 +117,11 @@ protected:
   void connect() {
     int expected_callbacks = 2;
     client_connection_->connect();
-    read_filter_.reset(new NiceMock<MockReadFilter>());
+    read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection_ = dispatcher_->createServerConnection(
-              std::move(socket), Network::Test::createRawBufferSocket());
+              std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
 
@@ -136,6 +141,11 @@ protected:
   }
 
   void disconnect(bool wait_for_remote_close) {
+    if (client_write_buffer_) {
+      EXPECT_CALL(*client_write_buffer_, drain(_))
+          .Times(AnyNumber())
+          .WillOnce(Invoke([&](uint64_t size) -> void { client_write_buffer_->baseDrain(size); }));
+    }
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
     client_connection_->close(ConnectionCloseType::NoFlush);
     if (wait_for_remote_close) {
@@ -207,7 +217,7 @@ protected:
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
+  std::shared_ptr<Network::TcpListenSocket> socket_{nullptr};
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   Network::ListenerPtr listener_;
@@ -219,6 +229,7 @@ protected:
   MockWatermarkBuffer* client_write_buffer_ = nullptr;
   Address::InstanceConstSharedPtr source_address_;
   Socket::OptionsSharedPtr socket_options_;
+  StreamInfo::StreamInfoImpl stream_info_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplTest,
@@ -247,12 +258,12 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
       }));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
 
-  read_filter_.reset(new NiceMock<MockReadFilter>());
+  read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
 
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection_ = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket());
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
       }));
@@ -269,10 +280,12 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   // Using a broadcast/multicast address as the connection destinations address causes an
   // immediate error return from connect().
   Address::InstanceConstSharedPtr broadcast_address;
-  if (socket_.localAddress()->ip()->version() == Address::IpVersion::v4) {
-    broadcast_address.reset(new Address::Ipv4Instance("224.0.0.1", 0));
+  socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                       nullptr, true);
+  if (socket_->localAddress()->ip()->version() == Address::IpVersion::v4) {
+    broadcast_address = std::make_shared<Address::Ipv4Instance>("224.0.0.1", 0);
   } else {
-    broadcast_address.reset(new Address::Ipv6Instance("ff02::1", 0));
+    broadcast_address = std::make_shared<Address::Ipv6Instance>("ff02::1", 0);
   }
 
   client_connection_ = dispatcher_->createClientConnection(
@@ -302,22 +315,22 @@ TEST_P(ConnectionImplTest, SocketOptions) {
       }));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
 
-  read_filter_.reset(new NiceMock<MockReadFilter>());
+  read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
 
   auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
       .WillOnce(Return(true));
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         socket->addOption(option);
         server_connection_ = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket());
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
 
         upstream_connection_ = dispatcher_->createClientConnection(
-            socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+            socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(),
             server_connection_->socketOptions());
       }));
 
@@ -328,6 +341,11 @@ TEST_P(ConnectionImplTest, SocketOptions) {
       }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Assert that upstream connection gets the socket options
+  ASSERT(upstream_connection_ != nullptr);
+  ASSERT(upstream_connection_->socketOptions() != nullptr);
+  ASSERT(upstream_connection_->socketOptions()->front() == option);
 }
 
 TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
@@ -346,22 +364,22 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
       }));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
 
-  read_filter_.reset(new NiceMock<MockReadFilter>());
+  read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
 
   auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
       .WillOnce(Return(false));
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         socket->addOption(option);
         server_connection_ = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket());
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
 
         upstream_connection_ = dispatcher_->createClientConnection(
-            socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+            socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(),
             server_connection_->socketOptions());
         upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
       }));
@@ -426,12 +444,12 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected)).InSequence(s1);
   EXPECT_CALL(client_connection_stats.tx_total_, add(4)).InSequence(s1);
 
-  read_filter_.reset(new NiceMock<MockReadFilter>());
+  read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
   MockConnectionStats server_connection_stats;
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection_ = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket());
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->setConnectionStats(server_connection_stats.toBufferStats());
         server_connection_->addReadFilter(read_filter_);
@@ -565,23 +583,46 @@ TEST_P(ConnectionImplTest, KickUndone) {
   disconnect(true);
 }
 
-// Regression test for (at least one failure mode of)
-// https://github.com/envoyproxy/envoy/issues/3639 where readDisable on a close
-// connection caused a crash.
-TEST_P(ConnectionImplTest, ReadDisableAfterClose) {
+// Ensure that calls to readDisable on a closed connection are handled gracefully. Known past issues
+// include a crash on https://github.com/envoyproxy/envoy/issues/3639, and ASSERT failure followed
+// by infinite loop in https://github.com/envoyproxy/envoy/issues/9508
+TEST_P(ConnectionImplTest, ReadDisableAfterCloseHandledGracefully) {
   setUpBasicConnection();
-  disconnect(false);
 
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+  client_connection_->readDisable(false);
+
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(true);
+  disconnect(false);
+#ifndef NDEBUG
+  // When running in debug mode, verify that calls to readDisable and readEnabled on a closed socket
+  // trigger ASSERT failures.
+  EXPECT_DEBUG_DEATH(client_connection_->readEnabled(), "");
   EXPECT_DEBUG_DEATH(client_connection_->readDisable(true), "");
   EXPECT_DEBUG_DEATH(client_connection_->readDisable(false), "");
+#else
+  // When running in release mode, verify that calls to readDisable change the readEnabled state.
+  client_connection_->readDisable(false);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+  EXPECT_FALSE(client_connection_->readEnabled());
+  client_connection_->readDisable(false);
+  EXPECT_TRUE(client_connection_->readEnabled());
+#endif
 }
 
+// On our current macOS build, the client connection does not get the early
+// close notification and instead gets the close after reading the FIN.
+// The Windows backend in libevent does not support the EV_CLOSED flag
+// so it won't detect the early close
+#if !defined(__APPLE__) && !defined(WIN32)
 TEST_P(ConnectionImplTest, EarlyCloseOnReadDisabledConnection) {
-#ifdef __APPLE__
-  // On our current macOS build, the client connection does not get the early
-  // close notification and instead gets the close after reading the FIN.
-  return;
-#endif
   setUpBasicConnection();
   connect();
 
@@ -593,6 +634,7 @@ TEST_P(ConnectionImplTest, EarlyCloseOnReadDisabledConnection) {
   server_connection_->close(ConnectionCloseType::FlushWrite);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+#endif
 
 TEST_P(ConnectionImplTest, CloseOnReadDisableWithoutCloseDetection) {
   setUpBasicConnection();
@@ -810,8 +852,6 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   // call to write() will succeed, bringing the connection back under the low watermark.
   EXPECT_CALL(*client_write_buffer_, write(_))
       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
-  EXPECT_CALL(*client_write_buffer_, drain(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
 
   disconnect(true);
@@ -868,7 +908,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     // If after the bytes are flushed upstream the number of bytes remaining is
     // below the low watermark and the bytes were not previously below the low
     // watermark, expect the callback for going below.
-    if (new_bytes_buffered < 5 && is_above) {
+    if (new_bytes_buffered <= 5 && is_above) {
       ENVOY_LOG_MISC(trace, "Expect onBelowWriteBufferLowWatermark");
       EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
       is_below = true;
@@ -889,6 +929,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
+  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(AnyNumber());
   disconnect(true);
 }
 
@@ -921,8 +962,8 @@ TEST_P(ConnectionImplTest, BindFromSocketTest) {
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
   auto option = std::make_shared<NiceMock<MockSocketOption>>();
-  EXPECT_CALL(*option, setOption(_, Eq(envoy::api::v2::core::SocketOption::STATE_PREBIND)))
-      .WillOnce(Invoke([&](Socket& socket, envoy::api::v2::core::SocketOption::SocketState) {
+  EXPECT_CALL(*option, setOption(_, Eq(envoy::config::core::v3::SocketOption::STATE_PREBIND)))
+      .WillOnce(Invoke([&](Socket& socket, envoy::config::core::v3::SocketOption::SocketState) {
         socket.setLocalAddress(new_source_address);
         return true;
       }));
@@ -947,10 +988,12 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
   dispatcher_ = api_->allocateDispatcher();
+  socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                       nullptr, true);
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
   client_connection_ = dispatcher_->createClientConnection(
-      socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
+      socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
 
   MockConnectionStats connection_stats;
   client_connection_->setConnectionStats(connection_stats.toBufferStats());
@@ -1048,15 +1091,16 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// Test that a FlushWriteAndDelay close causes Envoy to flush the write and wait for the client/peer
-// to close (until a configured timeout which is not expected to trigger in this test).
+// Test that a FlushWriteAndDelay close causes Envoy to flush the write and wait for the
+// client/peer to close (until a configured timeout which is not expected to trigger in this
+// test).
+//
+// libevent does not provide early close notifications on the currently supported non-Linux
+// builds, so the server connection is never notified of the close. For now, we have chosen to
+// disable tests that rely on this behavior on macOS and Windows (see
+// https://github.com/envoyproxy/envoy/pull/4299).
+#if !defined(__APPLE__) && !defined(WIN32)
 TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
-#ifdef __APPLE__
-  // libevent does not provide early close notifications on the currently supported macOS builds, so
-  // the server connection is never notified of the close. For now, we have chosen to disable tests
-  // that rely on this behavior on macOS (see https://github.com/envoyproxy/envoy/pull/4299).
-  return;
-#endif
   setUpBasicConnection();
   connect();
 
@@ -1092,6 +1136,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
   server_connection_->close(ConnectionCloseType::FlushWriteAndDelay);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+#endif
 
 // Test that a FlushWriteAndDelay close triggers a timeout which forces Envoy to close the
 // connection when a client has not issued a close within the configured interval.
@@ -1115,8 +1160,8 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTimerTriggerTest) {
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
-  // The client _will not_ close the connection. Instead, expect the delayed close timer to trigger
-  // on the server connection.
+  // The client _will not_ close the connection. Instead, expect the delayed close timer to
+  // trigger on the server connection.
   EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("Connection: Close"), false))
       .Times(1)
       .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
@@ -1204,8 +1249,8 @@ TEST_P(ConnectionImplTest, FlushWriteAfterFlushWriteAndDelayWithoutPendingWrite)
       }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // The write buffer has been flushed and a delayed close timer has been set. The socket close will
-  // happen as part of the close() since the timeout is no longer required.
+  // The write buffer has been flushed and a delayed close timer has been set. The socket close
+  // will happen as part of the close() since the timeout is no longer required.
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).Times(1);
   server_connection_->close(ConnectionCloseType::FlushWrite);
   EXPECT_CALL(stats.delayed_close_timeouts_, inc()).Times(0);
@@ -1215,8 +1260,8 @@ TEST_P(ConnectionImplTest, FlushWriteAfterFlushWriteAndDelayWithoutPendingWrite)
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// Test that delayed close processing can be disabled by setting the delayed close timeout interval
-// to 0.
+// Test that delayed close processing can be disabled by setting the delayed close timeout
+// interval to 0.
 TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
   InSequence s1;
 
@@ -1230,12 +1275,12 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
   std::unique_ptr<Network::ConnectionImpl> server_connection(new Network::ConnectionImpl(
       dispatcher, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::make_unique<NiceMock<MockTransportSocket>>(), true));
+      std::make_unique<NiceMock<MockTransportSocket>>(), stream_info_, true));
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
-  // Ensure the delayed close timer is not created when the delayedCloseTimeout config value is set
-  // to 0.
+  // Ensure the delayed close timer is not created when the delayedCloseTimeout config value is
+  // set to 0.
   server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(0));
   EXPECT_CALL(dispatcher, createTimer_(_)).Times(0);
 
@@ -1248,13 +1293,13 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
   // trigger the delayed close timer callback if set.
   time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
 
-  // Since the delayed close timer never triggers, the connection never closes. Close it here to end
-  // the test cleanly due to the (fd == -1) assert in ~ConnectionImpl().
+  // Since the delayed close timer never triggers, the connection never closes. Close it here to
+  // end the test cleanly due to the (fd == -1) assert in ~ConnectionImpl().
   server_connection->close(ConnectionCloseType::NoFlush);
 }
 
-// Test that the delayed close timer is reset while write flushes are happening when a connection is
-// in delayed close mode.
+// Test that the delayed close timer is reset while write flushes are happening when a connection
+// is in delayed close mode.
 TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) {
   ConnectionMocks mocks = createConnectionMocks();
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
@@ -1262,7 +1307,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), true);
+      std::move(mocks.transport_socket_), stream_info_, true);
 
   InSequence s1;
   // The actual timeout is insignificant, we just need to enable delayed close processing by
@@ -1283,8 +1328,8 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
   EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
 
-  // The write ready event cb (ConnectionImpl::onWriteReady()) will reset the timer to its original
-  // timeout value to avoid triggering while the write buffer is being actively flushed.
+  // The write ready event cb (ConnectionImpl::onWriteReady()) will reset the timer to its
+  // original timeout value to avoid triggering while the write buffer is being actively flushed.
   EXPECT_CALL(*transport_socket, doWrite(BufferStringEqual("data"), _))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) -> IoResult {
         // Partial flush.
@@ -1314,7 +1359,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), true);
+      std::move(mocks.transport_socket_), stream_info_, true);
 
   InSequence s1;
 
@@ -1350,17 +1395,17 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), true);
+      std::move(mocks.transport_socket_), stream_info_, true);
 
   InSequence s1;
 
-  // The actual timeout is insignificant, we just need to enable delayed close processing by setting
-  // it to > 0.
+  // The actual timeout is insignificant, we just need to enable delayed close processing by
+  // setting it to > 0.
   server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
-  // NOTE: Avoid providing stats storage to the connection via setConnectionStats(). This guarantees
-  // that connection_stats_ is a nullptr and that the callback resiliency validation below tests
-  // that edge case.
+  // NOTE: Avoid providing stats storage to the connection via setConnectionStats(). This
+  // guarantees that connection_stats_ is a nullptr and that the callback resiliency validation
+  // below tests that edge case.
 
   Buffer::OwnedImpl data("data");
   EXPECT_CALL(*mocks.file_event_, activate(Event::FileReadyType::Write))
@@ -1409,7 +1454,7 @@ private:
 
 class MockTransportConnectionImplTest : public testing::Test {
 public:
-  MockTransportConnectionImplTest() {
+  MockTransportConnectionImplTest() : stream_info_(dispatcher_.timeSource()) {
     EXPECT_CALL(dispatcher_.buffer_factory_, create_(_, _))
         .WillRepeatedly(Invoke([](std::function<void()> below_low,
                                   std::function<void()> above_high) -> Buffer::Instance* {
@@ -1427,7 +1472,7 @@ public:
     IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
     connection_ = std::make_unique<ConnectionImpl>(
         dispatcher_, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-        TransportSocketPtr(transport_socket_), true);
+        TransportSocketPtr(transport_socket_), stream_info_, true);
     connection_->addConnectionCallbacks(callbacks_);
   }
 
@@ -1448,6 +1493,7 @@ public:
   Event::MockFileEvent* file_event_;
   Event::FileReadyCb file_ready_cb_;
   TransportSocketCallbacks* transport_socket_callbacks_;
+  StreamInfo::StreamInfoImpl stream_info_;
 };
 
 // The purpose of this case is to verify the destructor order of the object.
@@ -1623,7 +1669,8 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWriteFirst) {
 }
 
 // Test that if both sides half-close, but writes have not yet been written to the Transport, that
-// the connection closes only when the writes complete flushing. The write half-close happens first.
+// the connection closes only when the writes complete flushing. The write half-close happens
+// first.
 TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedWriteFirst) {
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
@@ -1645,7 +1692,8 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedWriteFirst)
 }
 
 // Test that if both sides half-close, but writes have not yet been written to the Transport, that
-// the connection closes only when the writes complete flushing. The read half-close happens first.
+// the connection closes only when the writes complete flushing. The read half-close happens
+// first.
 TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedReadFirst) {
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
@@ -1739,6 +1787,30 @@ TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
   // in the write buffer, we should see a doWrite with this data.
   EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
     transport_socket_callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+    return IoResult{PostIoAction::KeepOpen, 0, false};
+  }));
+  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  file_ready_cb_(Event::FileReadyType::Read);
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
+}
+
+// Test the interface used by external consumers.
+TEST_F(MockTransportConnectionImplTest, FlushWriteBuffer) {
+  InSequence s;
+
+  // Queue up some data in write buffer.
+  const std::string val("some data");
+  Buffer::OwnedImpl buffer(val);
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
+  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  connection_->write(buffer, false);
+
+  // A read event triggers underlying socket to ask for more data.
+  EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
+    transport_socket_callbacks_->flushWriteBuffer();
     return IoResult{PostIoAction::KeepOpen, 0, false};
   }));
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
@@ -1921,19 +1993,21 @@ public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
     dispatcher_ = api_->allocateDispatcher();
+    socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                         nullptr, true);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), Network::Address::InstanceConstSharedPtr(),
+        socket_->localAddress(), Network::Address::InstanceConstSharedPtr(),
         Network::Test::createRawBufferSocket(), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
 
-    read_filter_.reset(new NiceMock<MockReadFilter>());
+    read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection_ = dispatcher_->createServerConnection(
-              std::move(socket), Network::Test::createRawBufferSocket());
+              std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
           server_connection_->setBufferLimits(read_buffer_limit);
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());

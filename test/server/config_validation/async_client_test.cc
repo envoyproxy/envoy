@@ -13,7 +13,7 @@ namespace Http {
 namespace {
 
 TEST(ValidationAsyncClientTest, MockedMethods) {
-  MessagePtr message{new RequestMessageImpl()};
+  RequestMessagePtr message{new RequestMessageImpl()};
   MockAsyncClientCallbacks callbacks;
   MockAsyncClientStreamCallbacks stream_callbacks;
 

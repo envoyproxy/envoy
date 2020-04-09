@@ -1,5 +1,7 @@
 #include <string>
 
+#include "envoy/extensions/filters/listener/tls_inspector/v3/tls_inspector.pb.h"
+#include "envoy/extensions/filters/listener/tls_inspector/v3/tls_inspector.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -17,27 +19,31 @@ namespace TlsInspector {
 class TlsInspectorConfigFactory : public Server::Configuration::NamedListenerFilterConfigFactory {
 public:
   // NamedListenerFilterConfigFactory
-  Network::ListenerFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::ListenerFactoryContext& context) override {
+  Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message&,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      Server::Configuration::ListenerFactoryContext& context) override {
     ConfigSharedPtr config(new Config(context.scope()));
-    return [config](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(std::make_unique<Filter>(config));
-    };
+    return
+        [listener_filter_matcher, config](Network::ListenerFilterManager& filter_manager) -> void {
+          filter_manager.addAcceptFilter(listener_filter_matcher, std::make_unique<Filter>(config));
+        };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    return std::make_unique<
+        envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector>();
   }
 
-  std::string name() override { return ListenerFilterNames::get().TlsInspector; }
+  std::string name() const override { return ListenerFilterNames::get().TlsInspector; }
 };
 
 /**
  * Static registration for the TLS inspector filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(TlsInspectorConfigFactory,
-                 Server::Configuration::NamedListenerFilterConfigFactory);
+                 Server::Configuration::NamedListenerFilterConfigFactory){
+    "envoy.listener.tls_inspector"};
 
 } // namespace TlsInspector
 } // namespace ListenerFilters

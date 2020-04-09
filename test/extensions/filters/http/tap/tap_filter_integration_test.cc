@@ -1,6 +1,7 @@
 #include <fstream>
 
-#include "envoy/data/tap/v2alpha/wrapper.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/data/tap/v3/wrapper.pb.h"
 
 #include "test/integration/http_integration.h"
 
@@ -29,9 +30,9 @@ public:
     initialize();
   }
 
-  const envoy::api::v2::core::HeaderValue*
+  const envoy::config::core::v3::HeaderValue*
   findHeader(const std::string& key,
-             const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& headers) {
+             const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers) {
     for (const auto& header : headers) {
       if (header.key() == key) {
         return &header;
@@ -41,12 +42,12 @@ public:
     return nullptr;
   }
 
-  void makeRequest(const Http::TestHeaderMapImpl& request_headers,
+  void makeRequest(const Http::TestRequestHeaderMapImpl& request_headers,
                    const std::vector<std::string>& request_body_chunks,
-                   const Http::TestHeaderMapImpl* request_trailers,
-                   const Http::TestHeaderMapImpl& response_headers,
+                   const Http::TestRequestTrailerMapImpl* request_trailers,
+                   const Http::TestResponseHeaderMapImpl& response_headers,
                    const std::vector<std::string>& response_body_chunks,
-                   const Http::TestHeaderMapImpl* response_trailers) {
+                   const Http::TestResponseTrailerMapImpl* response_trailers) {
     IntegrationStreamDecoderPtr decoder;
     if (request_trailers == nullptr && request_body_chunks.empty()) {
       decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -82,7 +83,7 @@ public:
 
   void startAdminRequest(const std::string& admin_request_yaml) {
     admin_client_ = makeHttpConnection(makeClientConnection(lookupPort("admin")));
-    const Http::TestHeaderMapImpl admin_request_headers{
+    const Http::TestRequestHeaderMapImpl admin_request_headers{
         {":method", "POST"}, {":path", "/tap"}, {":scheme", "http"}, {":authority", "host"}};
     admin_response_ = admin_client_->makeRequestWithBody(admin_request_headers, admin_request_yaml);
     admin_response_->waitForHeaders();
@@ -92,13 +93,12 @@ public:
 
   std::string getTempPathPrefix() {
     const std::string path_prefix = TestEnvironment::temporaryDirectory() + "/tap_integration_" +
-                                    testing::UnitTest::GetInstance()->current_test_info()->name() +
-                                    "/";
+                                    testing::UnitTest::GetInstance()->current_test_info()->name();
     TestEnvironment::createPath(path_prefix);
-    return path_prefix;
+    return path_prefix + "/";
   }
 
-  std::vector<envoy::data::tap::v2alpha::TraceWrapper>
+  std::vector<envoy::data::tap::v3::TraceWrapper>
   readTracesFromFile(const std::string& path_prefix) {
     // Find the written .pb file and verify it.
     auto files = TestUtility::listFiles(path_prefix, false);
@@ -107,8 +107,8 @@ public:
     });
     EXPECT_NE(pb_file_name, files.end());
 
-    std::vector<envoy::data::tap::v2alpha::TraceWrapper> traces;
-    std::ifstream pb_file(*pb_file_name);
+    std::vector<envoy::data::tap::v3::TraceWrapper> traces;
+    std::ifstream pb_file(*pb_file_name, std::ios_base::binary);
     Protobuf::io::IstreamInputStream stream(&pb_file);
     Protobuf::io::CodedInputStream coded_stream(&stream);
     while (true) {
@@ -127,26 +127,26 @@ public:
     return traces;
   }
 
-  const Http::TestHeaderMapImpl request_headers_tap_{{":method", "GET"},
-                                                     {":path", "/"},
-                                                     {":scheme", "http"},
-                                                     {":authority", "host"},
-                                                     {"foo", "bar"}};
+  const Http::TestRequestHeaderMapImpl request_headers_tap_{{":method", "GET"},
+                                                            {":path", "/"},
+                                                            {":scheme", "http"},
+                                                            {":authority", "host"},
+                                                            {"foo", "bar"}};
 
-  const Http::TestHeaderMapImpl request_headers_no_tap_{
+  const Http::TestRequestHeaderMapImpl request_headers_no_tap_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 
-  const Http::TestHeaderMapImpl request_trailers_{{"foo_trailer", "bar"}};
+  const Http::TestRequestTrailerMapImpl request_trailers_{{"foo_trailer", "bar"}};
 
-  const Http::TestHeaderMapImpl response_headers_tap_{{":status", "200"}, {"bar", "baz"}};
+  const Http::TestResponseHeaderMapImpl response_headers_tap_{{":status", "200"}, {"bar", "baz"}};
 
-  const Http::TestHeaderMapImpl response_headers_no_tap_{{":status", "200"}};
+  const Http::TestResponseHeaderMapImpl response_headers_no_tap_{{":status", "200"}};
 
-  const Http::TestHeaderMapImpl response_trailers_{{"bar_trailer", "baz"}};
+  const Http::TestResponseTrailerMapImpl response_trailers_{{"bar_trailer", "baz"}};
 
   const std::string admin_filter_config_ =
       R"EOF(
-name: envoy.filters.http.tap
+name: tap
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
   common_config:
@@ -166,7 +166,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TapIntegrationTest,
 TEST_P(TapIntegrationTest, StaticFilePerTap) {
   const std::string filter_config =
       R"EOF(
-name: envoy.filters.http.tap
+name: tap
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
   common_config:
@@ -195,7 +195,7 @@ typed_config:
                               [](const std::string& s) { return absl::EndsWith(s, ".pb"); });
   ASSERT_NE(pb_file, files.end());
 
-  envoy::data::tap::v2alpha::TraceWrapper trace;
+  envoy::data::tap::v3::TraceWrapper trace;
   TestUtility::loadFromFile(*pb_file, trace, *api_);
   EXPECT_TRUE(trace.has_http_buffered_trace());
 }
@@ -244,7 +244,7 @@ tap_config:
 
   // Wait for the tap message.
   admin_response_->waitForBodyData(1);
-  envoy::data::tap::v2alpha::TraceWrapper trace;
+  envoy::data::tap::v3::TraceWrapper trace;
   TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ(trace.http_buffered_trace().request().headers().size(), 8);
   EXPECT_EQ(trace.http_buffered_trace().response().headers().size(), 4);
@@ -340,7 +340,7 @@ tap_config:
   makeRequest(request_headers_no_tap_, {}, &request_trailers_, response_headers_no_tap_, {},
               &response_trailers_);
 
-  envoy::data::tap::v2alpha::TraceWrapper trace;
+  envoy::data::tap::v3::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
   TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("bar",
@@ -371,7 +371,7 @@ tap_config:
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_no_tap_, {{"hello"}}, nullptr, response_headers_no_tap_, {{"world"}},
               nullptr);
-  envoy::data::tap::v2alpha::TraceWrapper trace;
+  envoy::data::tap::v3::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
   TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("hello", trace.http_buffered_trace().request().body().as_bytes());
@@ -403,7 +403,7 @@ tap_config:
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_no_tap_, {{"hello"}}, nullptr, response_headers_no_tap_, {{"world"}},
               nullptr);
-  envoy::data::tap::v2alpha::TraceWrapper trace;
+  envoy::data::tap::v3::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
   TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("hello", trace.http_buffered_trace().request().body().as_string());
@@ -436,7 +436,7 @@ tap_config:
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_no_tap_, {{"hello"}}, nullptr, response_headers_no_tap_, {{"world"}},
               nullptr);
-  envoy::data::tap::v2alpha::TraceWrapper trace;
+  envoy::data::tap::v3::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
   TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("hel", trace.http_buffered_trace().request().body().as_bytes());
@@ -452,7 +452,7 @@ tap_config:
 TEST_P(TapIntegrationTest, StaticFilePerTapStreaming) {
   const std::string filter_config =
       R"EOF(
-name: envoy.filters.http.tap
+name: tap
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
   common_config:
@@ -480,7 +480,7 @@ typed_config:
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
-  std::vector<envoy::data::tap::v2alpha::TraceWrapper> traces = readTracesFromFile(path_prefix);
+  std::vector<envoy::data::tap::v3::TraceWrapper> traces = readTracesFromFile(path_prefix);
   ASSERT_EQ(6, traces.size());
   EXPECT_TRUE(traces[0].http_streamed_trace_segment().has_request_headers());
   EXPECT_EQ("hello", traces[1].http_streamed_trace_segment().request_body_chunk().as_bytes());
@@ -497,7 +497,7 @@ typed_config:
 TEST_P(TapIntegrationTest, StaticFilePerTapStreamingWithRequestBuffering) {
   const std::string filter_config =
       R"EOF(
-name: envoy.filters.http.tap
+name: tap
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
   common_config:
@@ -525,7 +525,7 @@ typed_config:
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
-  std::vector<envoy::data::tap::v2alpha::TraceWrapper> traces = readTracesFromFile(path_prefix);
+  std::vector<envoy::data::tap::v3::TraceWrapper> traces = readTracesFromFile(path_prefix);
   ASSERT_EQ(6, traces.size());
   EXPECT_TRUE(traces[0].http_streamed_trace_segment().has_request_headers());
   EXPECT_EQ("hello", traces[1].http_streamed_trace_segment().request_body_chunk().as_bytes());

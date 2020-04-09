@@ -1,8 +1,11 @@
 #include "extensions/filters/http/health_check/config.h"
 
+#include <memory>
+
+#include "envoy/extensions/filters/http/health_check/v3/health_check.pb.h"
+#include "envoy/extensions/filters/http/health_check/v3/health_check.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/filter_json.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 
@@ -14,7 +17,7 @@ namespace HttpFilters {
 namespace HealthCheck {
 
 Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::health_check::v2::HealthCheck& proto_config,
+    const envoy::extensions::filters::http::health_check::v3::HealthCheck& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   ASSERT(proto_config.has_pass_through_mode());
 
@@ -30,8 +33,8 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
 
   HealthCheckCacheManagerSharedPtr cache_manager;
   if (cache_time_ms > 0) {
-    cache_manager.reset(new HealthCheckCacheManager(context.dispatcher(),
-                                                    std::chrono::milliseconds(cache_time_ms)));
+    cache_manager = std::make_shared<HealthCheckCacheManager>(
+        context.dispatcher(), std::chrono::milliseconds(cache_time_ms));
   }
 
   ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages;
@@ -51,19 +54,11 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   };
 }
 
-Http::FilterFactoryCb
-HealthCheckFilterConfig::createFilterFactory(const Json::Object& json_config,
-                                             const std::string& stats_prefix,
-                                             Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
-  Config::FilterJson::translateHealthCheckFilter(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, stats_prefix, context);
-}
-
 /**
  * Static registration for the health check filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(HealthCheckFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(HealthCheckFilterConfig,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.health_check"};
 
 } // namespace HealthCheck
 } // namespace HttpFilters

@@ -33,16 +33,18 @@ time (minRTT) for an upstream.
 Calculating the minRTT
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The minRTT is periodically measured by only allowing a single outstanding request at a time to an
-upstream cluster and measuring the latency under these ideal conditions. The length of this minRTT
-calculation window is variable depending on the number of requests the filter is configured to
-aggregate to represent the expected latency of an upstream.
+The minRTT is periodically measured by only allowing a very low outstanding request count to an
+upstream cluster and measuring the latency under these ideal conditions. The calculation is also
+triggered in scenarios where the concurrency limit is determined to be the minimum possible value
+for 5 consecutive sampling windows. The length of this minRTT calculation window is variable
+depending on the number of requests the filter is configured to aggregate to represent the expected
+latency of an upstream.
 
 A configurable *jitter* value is used to randomly delay the start of the minRTT calculation window
 by some amount of time. This is not necessary and can be disabled; however, it is recommended to
 prevent all hosts in a cluster from being in a minRTT calculation window (and having a concurrency
-limit of 1) at the same time. The jitter helps negate the effect of the minRTT calculation on the
-downstream success rate if retries are enabled.
+limit of 3 by default) at the same time. The jitter helps negate the effect of the minRTT
+calculation on the downstream success rate if retries are enabled.
 
 It is possible that there is a noticeable increase in request 503s during the minRTT measurement
 window because of the potentially significant drop in the concurrency limit. This is expected and it
@@ -64,9 +66,19 @@ The gradient is calculated using summarized sampled request latencies (sampleRTT
 
 .. math::
 
-    gradient = \frac{minRTT}{sampleRTT}
+    gradient = \frac{minRTT + B}{sampleRTT}
 
 This gradient value has a useful property, such that it decreases as the sampled latencies increase.
+Notice that *B*, the buffer value added to the minRTT, allows for normal variance in the sampled
+latencies by requiring the sampled latencies the exceed the minRTT by some configurable threshold
+before decreasing the gradient value.
+
+The buffer will be a percentage of the measured minRTT value whose value is modified via the buffer field in the :ref:`minRTT calculation parameters <envoy_api_msg_config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig.MinimumRTTCalculationParams>`. The buffer is calculated as follows:
+
+.. math::
+
+    B = minRTT * buffer_{pct}
+
 The gradient value is then used to update the concurrency limit via:
 
 .. math::
@@ -105,7 +117,8 @@ fields can be overridden via runtime settings.
 .. code-block:: yaml
 
   name: envoy.filters.http.adaptive_concurrency
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency
     gradient_controller_config:
       sample_aggregate_percentile:
         value: 90
@@ -163,13 +176,16 @@ adaptive_concurrency.gradient_controller.sample_rtt_calc_interval_ms
 adaptive_concurrency.gradient_controller.max_concurrency_limit
     Overrides the maximum allowed concurrency limit.
 
-adaptive_concurrency.gradient_controller.max_gradient
-    Overrides the maximum allowed gradient value.
+adaptive_concurrency.gradient_controller.min_rtt_buffer
+    Overrides the padding added to the minRTT when calculating the concurrency limit.
 
 adaptive_concurrency.gradient_controller.sample_aggregate_percentile
     Overrides the percentile value used to represent the collection of latency samples in
     calculations. A value of `95` indicates the 95th percentile. The runtime value specified is
     clamped to the range [0,100].
+
+adaptive_concurrency.gradient_controller.min_concurrency
+    Overrides the concurrency that is pinned while measuring the minRTT.
 
 Statistics
 ----------

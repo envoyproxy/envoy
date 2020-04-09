@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+// The structures in this file are merely for JSON serialization to communicate with the X-Ray
+// daemon. The X-Ray daemon does not speak protobuf.
+package source.extensions.tracers.xray.daemon;
+
+import "validate/validate.proto";
+
+// see https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html
+message Segment {
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string id = 2 [(validate.rules).string = {min_len: 1}];
+  string trace_id = 3 [(validate.rules).string = {len: 35}];
+  double start_time = 4 [(validate.rules).double = {gt: 0}];
+  double end_time = 5 [(validate.rules).double = {gt: 0}];
+  string parent_id = 6;
+  map<string, string> annotations = 7;
+  http_annotations http = 8;
+  message http_annotations {
+    map<string, string> request = 1;
+    map<string, string> response = 2;
+  }
+}
+
+message Header {
+  string format = 1;
+  uint32 version = 2;
+}

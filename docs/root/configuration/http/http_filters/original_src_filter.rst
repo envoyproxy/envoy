@@ -65,7 +65,8 @@ The following example configures Envoy to use the original source for all connec
 
   http_filters:
     - name: envoy.filters.http.original_src
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.http.original_src.v2alpha1.OriginalSrc
         mark: 123
-    - name: envoy.router
-      config: {}
+    - name: envoy.filters.http.router
+      typed_config: {}

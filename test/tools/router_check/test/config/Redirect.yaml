@@ -32,6 +32,10 @@ virtual_hosts:
   - redirect.lyft.com
   routes:
     - match:
+        prefix: /blah
+      route:
+        cluster: www2
+    - match:
         prefix: /foo
       redirect:
         host_redirect: new.lyft.com
@@ -44,3 +48,7 @@ virtual_hosts:
       redirect:
         host_redirect: new.lyft.com
         path_redirect: /new_baz
+    - match:
+        prefix: /rewrite
+      redirect:
+        prefix_rewrite: /blah

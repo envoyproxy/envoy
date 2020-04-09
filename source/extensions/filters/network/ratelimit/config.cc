@@ -3,7 +3,8 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/config/filter/network/rate_limit/v2/rate_limit.pb.validate.h"
+#include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
+#include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
@@ -17,7 +18,7 @@ namespace NetworkFilters {
 namespace RateLimitFilter {
 
 Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::rate_limit::v2::RateLimit& proto_config,
+    const envoy::extensions::filters::network::ratelimit::v3::RateLimit& proto_config,
     Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
@@ -41,7 +42,8 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
 /**
  * Static registration for the rate limit filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(RateLimitConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory);
+REGISTER_FACTORY(RateLimitConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory){"envoy.ratelimit"};
 
 } // namespace RateLimitFilter
 } // namespace NetworkFilters

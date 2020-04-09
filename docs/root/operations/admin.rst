@@ -126,8 +126,51 @@ modify different aspects of the server:
   information.
 
 .. warning::
+  Configuration may include :ref:`TLS certificates <envoy_api_msg_auth.TlsCertificate>`. Before
+  dumping the configuration, Envoy will attempt to redact the ``private_key`` and ``password``
+  fields from any certificates it finds. This relies on the configuration being a strongly-typed
+  protobuf message. If your Envoy configuration uses deprecated ``config`` fields (of type
+  ``google.protobuf.Struct``), please update to the recommended ``typed_config`` fields (of type
+  ``google.protobuf.Any``) to ensure sensitive data is redacted properly.
+
+.. warning::
   The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
   are not guaranteed to be stable.
+
+.. _operations_admin_interface_config_dump_by_mask:
+
+.. http:get:: /config_dump?mask={}
+
+  Specify a subset of fields that you would like to be returned. The mask is parsed as a
+  ``ProtobufWkt::FieldMask`` and applied to each top level dump such as
+  :ref:`BootstrapConfigDump <envoy_api_msg_admin.v2alpha.BootstrapConfigDump>` and
+  :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`.
+  This behavior changes if both resource and mask query parameters are specified. See
+  below for details.
+
+.. _operations_admin_interface_config_dump_by_resource:
+
+.. http:get:: /config_dump?resource={}
+
+  Dump only the currently loaded configuration that matches the specified resource. The resource must
+  be a repeated field in one of the top level config dumps such as
+  :ref:`static_listeners <envoy_api_field_admin.v2alpha.ListenersConfigDump.static_listeners>` from
+  :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>` or
+  :ref:`dynamic_active_clusters <envoy_api_field_admin.v2alpha.ClustersConfigDump.dynamic_active_clusters>` from
+  :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`. If you need a non-repeated
+  field, use the mask query parameter documented above. If you want only a subset of fields from the repeated
+  resource, use both as documented below.
+
+.. _operations_admin_interface_config_dump_by_resource_and_mask:
+
+.. http:get:: /config_dump?resource={}&mask={}
+
+  When both resource and mask query parameters are specified, the mask is applied to every element
+  in the desired repeated field so that only a subset of fields are returned. The mask is parsed
+  as a ``ProtobufWkt::FieldMask``.
+
+  For example, get the names of all active dynamic clusters with
+  ``/config_dump?resource=dynamic_active_clusters&mask=cluster.name``
 
 .. http:get:: /contention
 
@@ -189,7 +232,7 @@ modify different aspects of the server:
 
     Generally only used during development.
 
-.. http:post:: /memory
+.. http:get:: /memory
 
   Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all `/stats` and filtering to get the memory-related statistics.
 
@@ -515,3 +558,7 @@ modify different aspects of the server:
   been configured to accept admin configuration. See:
 
   * :ref:`HTTP tap filter configuration <config_http_filters_tap_admin_handler>`
+
+.. http:post:: /reopen_logs
+
+  Triggers reopen of all access logs. Behavior is similar to SIGUSR1 handling.

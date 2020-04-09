@@ -1,7 +1,10 @@
 #pragma once
 
+#include "envoy/stats/store.h"
+
 #include "common/common/logger.h"
 #include "common/memory/stats.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/stats/symbol_table_creator.h"
 
 #include "absl/strings/str_join.h"
@@ -72,6 +75,61 @@ private:
   const size_t memory_at_construction_;
 };
 
+// Helper class to use in lieu of an actual Stats::Store for doing lookups by
+// name. The intent is to remove the deprecated Scope::counter(const
+// std::string&) methods, and always use this class for accessing stats by
+// name.
+//
+// This string-based lookup wrapper is needed because the underlying name
+// representation, StatName, has multiple ways to represent the same string,
+// depending on which name segments are symbolic (known at compile time), and
+// which are dynamic (e.g. based on the request, e.g. request-headers, ssl
+// cipher, grpc method, etc). While the production Store implementations
+// use the StatName as a key, we must use strings in tests to avoid forcing
+// the tests to construct the StatName using the same pattern of dynamic
+// and symbol strings as production.
+class TestStore : public IsolatedStoreImpl {
+public:
+  TestStore() = default;
+
+  // Constructs a store using a symbol table, allowing for explicit sharing.
+  explicit TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
+
+  Counter& counter(const std::string& name) { return counterFromString(name); }
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) {
+    return gaugeFromString(name, import_mode);
+  }
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) {
+    return histogramFromString(name, unit);
+  }
+
+  // Override the Stats::Store methods for name-based lookup of stats, to use
+  // and update the string-maps in this class. Note that IsolatedStoreImpl
+  // does not support deletion of stats, so we only have to track additions
+  // to keep the maps up-to-date.
+  //
+  // Stats::Scope
+  Counter& counterFromString(const std::string& name) override;
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override;
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                           Histogram::Unit unit) override;
+
+  // New APIs available for tests.
+  CounterOptConstRef findCounterByString(const std::string& name) const;
+  GaugeOptConstRef findGaugeByString(const std::string& name) const;
+  HistogramOptConstRef findHistogramByString(const std::string& name) const;
+
+private:
+  absl::flat_hash_map<std::string, Counter*> counter_map_;
+  absl::flat_hash_map<std::string, Gauge*> gauge_map_;
+  absl::flat_hash_map<std::string, Histogram*> histogram_map_;
+};
+
 // Compares the memory consumed against an exact expected value, but only on
 // canonical platforms, or when the expected value is zero. Canonical platforms
 // currently include only for 'release' tests in ci. On other platforms an info
@@ -107,10 +165,23 @@ private:
 
 class SymbolTableCreatorTestPeer {
 public:
-  static void setUseFakeSymbolTables(bool use_fakes) {
+  ~SymbolTableCreatorTestPeer() { SymbolTableCreator::setUseFakeSymbolTables(save_use_fakes_); }
+
+  void setUseFakeSymbolTables(bool use_fakes) {
     SymbolTableCreator::setUseFakeSymbolTables(use_fakes);
   }
+
+private:
+  const bool save_use_fakes_{SymbolTableCreator::useFakeSymbolTables()};
 };
+
+// Serializes a number into a uint8_t array, and check that it de-serializes to
+// the same number. The serialized number is also returned, which can be
+// checked in unit tests, but ignored in fuzz tests.
+std::vector<uint8_t> serializeDeserializeNumber(uint64_t number);
+
+// Serializes a string into a MemBlock and then decodes it.
+void serializeDeserializeString(absl::string_view in);
 
 } // namespace TestUtil
 } // namespace Stats

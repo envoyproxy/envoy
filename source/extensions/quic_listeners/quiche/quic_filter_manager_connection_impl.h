@@ -5,20 +5,20 @@
 
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
-#include "common/network/filter_manager_impl.h"
+#include "common/network/connection_impl_base.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_connection.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_simulated_watermark_buffer.h"
 
 namespace Envoy {
 namespace Quic {
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
-class QuicFilterManagerConnectionImpl : public Network::FilterManagerConnection,
-                                        protected Logger::Loggable<Logger::Id::connection> {
+class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase {
 public:
-  QuicFilterManagerConnectionImpl(std::unique_ptr<EnvoyQuicConnection> connection,
-                                  Event::Dispatcher& dispatcher);
+  QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection, Event::Dispatcher& dispatcher,
+                                  uint32_t send_buffer_limit);
 
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
@@ -28,7 +28,6 @@ public:
   bool initializeReadFilters() override;
 
   // Network::Connection
-  void addConnectionCallbacks(Network::ConnectionCallbacks& cb) override;
   void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override {
     // TODO(danzh): implement to support proxy. This interface is only called from
     // TCP proxy code.
@@ -37,16 +36,15 @@ public:
   void enableHalfClose(bool enabled) override;
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  uint64_t id() const override { return id_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
   void noDelay(bool /*enable*/) override {
     // No-op. TCP_NODELAY doesn't apply to UDP.
   }
-  void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   void readDisable(bool /*disable*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   bool readEnabled() const override { return true; }
   const Network::Address::InstanceConstSharedPtr& remoteAddress() const override;
+  const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override;
   const Network::Address::InstanceConstSharedPtr& localAddress() const override;
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
@@ -54,13 +52,16 @@ public:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
-    stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
+    // TODO(danzh): populate stats.
+    Network::ConnectionImplBase::setConnectionStats(stats);
     quic_connection_->setConnectionStats(stats);
   }
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   Network::Connection::State state() const override {
-    return quic_connection_->connected() ? Network::Connection::State::Open
-                                         : Network::Connection::State::Closed;
+    if (quic_connection_ != nullptr && quic_connection_->connected()) {
+      return Network::Connection::State::Open;
+    }
+    return Network::Connection::State::Closed;
   }
   void write(Buffer::Instance& /*data*/, bool /*end_stream*/) override {
     // All writes should be handled by Quic internally.
@@ -75,11 +76,8 @@ public:
     // SO_ORIGINAL_DST not supported by QUIC.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  bool aboveHighWatermark() const override {
-    // TODO(danzh) Aggregate the write buffer usage cross all the streams and
-    // add an upper limit for this connection.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  bool aboveHighWatermark() const override;
+
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override;
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
@@ -89,37 +87,51 @@ public:
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
 
   // Network::ReadBufferSource
-  Network::StreamBuffer getReadBuffer() override {
-    // Network filter has to stop iteration to prevent hitting this line.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  Network::StreamBuffer getReadBuffer() override { return {empty_buffer_, false}; }
   // Network::WriteBufferSource
   Network::StreamBuffer getWriteBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+
+  // Update the book keeping of the aggregated buffered bytes cross all the
+  // streams, and run watermark check.
+  void adjustBytesToSend(int64_t delta);
+
+  // Called after each write when a previous connection close call is postponed.
+  void maybeApplyDelayClosePolicy();
+
+  uint32_t bytesToSend() { return bytes_to_send_; }
 
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
                               quic::ConnectionCloseSource source);
 
-  void raiseEvent(Network::ConnectionEvent event);
+  void closeConnectionImmediately() override;
 
-  std::unique_ptr<EnvoyQuicConnection> quic_connection_;
-  // TODO(danzh): populate stats.
-  std::unique_ptr<Network::Connection::ConnectionStats> stats_;
+  virtual bool hasDataToWrite() PURE;
+
+  EnvoyQuicConnection* quic_connection_{nullptr};
 
 private:
+  // Called when aggregated buffered bytes across all the streams exceeds high watermark.
+  void onSendBufferHighWatermark();
+  // Called when aggregated buffered bytes across all the streams declines to low watermark.
+  void onSendBufferLowWatermark();
+
   // Currently ConnectionManagerImpl is the one and only filter. If more network
   // filters are added, ConnectionManagerImpl should always be the last one.
   // Its onRead() is only called once to trigger ReadFilter::onNewConnection()
   // and the rest incoming data bypasses these filters.
   Network::FilterManagerImpl filter_manager_;
-  Event::Dispatcher& dispatcher_;
+
   StreamInfo::StreamInfoImpl stream_info_;
-  // These callbacks are owned by network filters and quic session should out live
-  // them.
-  std::list<Network::ConnectionCallbacks*> network_connection_callbacks_;
   std::string transport_failure_reason_;
-  const uint64_t id_;
+  uint32_t bytes_to_send_{0};
+  // Keeps the buffer state of the connection, and react upon the changes of how many bytes are
+  // buffered cross all streams' send buffer. The state is evaluated and may be changed upon each
+  // stream write. QUICHE doesn't buffer data in connection, all the data is buffered in stream's
+  // send buffer.
+  EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
+  Buffer::OwnedImpl empty_buffer_;
 };
 
 } // namespace Quic

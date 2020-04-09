@@ -158,13 +158,6 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
   }
 }
 
-absl::string_view CodeStatsImpl::stripTrailingDot(absl::string_view str) {
-  if (absl::EndsWith(str, ".")) {
-    str.remove_suffix(1);
-  }
-  return str;
-}
-
 Stats::StatName CodeStatsImpl::upstreamRqGroup(Code response_code) const {
   switch (enumToInt(response_code) / 100) {
   case 1:
@@ -187,7 +180,7 @@ Stats::StatName CodeStatsImpl::upstreamRqStatName(Code response_code) const {
   if (rc_index >= NumHttpCodes) {
     return upstream_rq_unknown_;
   }
-  std::atomic<uint8_t*>& atomic_ref = rc_stat_names_[rc_index];
+  std::atomic<const uint8_t*>& atomic_ref = rc_stat_names_[rc_index];
   if (atomic_ref.load() == nullptr) {
     absl::MutexLock lock(&mutex_);
 

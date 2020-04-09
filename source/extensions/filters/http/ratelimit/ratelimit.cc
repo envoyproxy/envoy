@@ -25,7 +25,7 @@ struct RcDetailsValues {
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
-void Filter::initiateCall(const Http::HeaderMap& headers) {
+void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   const bool is_internal_request = Http::HeaderUtility::isEnvoyInternalRequest(headers);
   if ((is_internal_request && config_->requestType() == FilterRequestType::External) ||
       (!is_internal_request && config_->requestType() == FilterRequestType::Internal)) {
@@ -63,7 +63,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
   }
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (!config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enabled", 100)) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -84,7 +84,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::StopIterationAndWatermark;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
   ASSERT(state_ != State::Responded);
   return state_ == State::Calling ? Http::FilterTrailersStatus::StopIteration
                                   : Http::FilterTrailersStatus::Continue;
@@ -94,11 +94,11 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   callbacks_ = &callbacks;
 }
 
-Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::HeaderMap&) {
+Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderMap&) {
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   populateResponseHeaders(headers);
   return Http::FilterHeadersStatus::Continue;
 }
@@ -107,7 +107,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus Filter::encodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 
@@ -125,8 +125,8 @@ void Filter::onDestroy() {
 }
 
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
-                      Http::HeaderMapPtr&& response_headers_to_add,
-                      Http::HeaderMapPtr&& request_headers_to_add) {
+                      Http::ResponseHeaderMapPtr&& response_headers_to_add,
+                      Http::RequestHeaderMapPtr&& request_headers_to_add) {
   state_ = State::Complete;
   response_headers_to_add_ = std::move(response_headers_to_add);
   Http::HeaderMapPtr req_headers_to_add = std::move(request_headers_to_add);
@@ -154,9 +154,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            false};
     httpContext().codeStats().chargeResponseStat(info);
     if (response_headers_to_add_ == nullptr) {
-      response_headers_to_add_ = std::make_unique<Http::HeaderMapImpl>();
+      response_headers_to_add_ = std::make_unique<Http::ResponseHeaderMapImpl>();
     }
-    response_headers_to_add_->insertEnvoyRateLimited().value(
+    response_headers_to_add_->setReferenceEnvoyRateLimited(
         Http::Headers::get().EnvoyRateLimitedValues.True);
     break;
   }

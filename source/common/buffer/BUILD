@@ -25,7 +25,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//source/common/common:non_copyable",
-        "//source/common/common:stack_array",
         "//source/common/common:utility_lib",
         "//source/common/event:libevent_lib",
     ],

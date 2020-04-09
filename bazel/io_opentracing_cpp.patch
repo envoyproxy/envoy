@@ -1,15 +1,35 @@
+diff --git a/mocktracer/BUILD b/mocktracer/BUILD
+index 3b22bab..d425e2e 100644
+--- a/mocktracer/BUILD
++++ b/mocktracer/BUILD
+@@ -7,11 +7,13 @@ cc_library(
+     deps = [
+         "//:opentracing",
+     ],
++    alwayslink = 1,
+ )
+
+ cc_binary(
+     name = "libmocktracer_plugin.so",
+     linkshared = 1,
++    linkstatic = 1,
+     visibility = ["//visibility:public"],
+     deps = [
+         "//mocktracer:mocktracer"
 diff --git a/src/dynamic_load_unix.cpp b/src/dynamic_load_unix.cpp
-index 17e08fd..d25e0c8 100644
+index 17e08fd..7e8ac02 100644
 --- a/src/dynamic_load_unix.cpp
 +++ b/src/dynamic_load_unix.cpp
-@@ -35,7 +35,11 @@ DynamicallyLoadTracingLibrary(const char* shared_library,
+@@ -35,7 +35,13 @@ DynamicallyLoadTracingLibrary(const char* shared_library,
                                std::string& error_message) noexcept try {
    dlerror();  // Clear any existing error.
 
 -  const auto handle = dlopen(shared_library, RTLD_NOW | RTLD_LOCAL);
 +  const auto handle = dlopen(shared_library, RTLD_NOW | RTLD_LOCAL
-+#ifdef __SANITIZE_ADDRESS__
++#if defined(__has_feature)
++#if __has_feature(address_sanitizer)
 +      | RTLD_NODELETE
++#endif
 +#endif
 +  );
    if (handle == nullptr) {

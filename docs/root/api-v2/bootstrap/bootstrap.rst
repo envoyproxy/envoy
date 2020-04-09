@@ -10,4 +10,4 @@ Bootstrap
   ../config/metrics/v2/metrics_service.proto
   ../config/overload/v2alpha/overload.proto
   ../config/ratelimit/v2/rls.proto
-  ../config/trace/v2/trace.proto
+  tracing/tracing.rst

@@ -163,22 +163,21 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
 
 bool RedisLoadBalancerContextImpl::isReadRequest(
     const NetworkFilters::Common::Redis::RespValue& request) {
-  if (request.type() != NetworkFilters::Common::Redis::RespType::Array) {
+  const NetworkFilters::Common::Redis::RespValue* command = nullptr;
+  if (request.type() == NetworkFilters::Common::Redis::RespType::Array) {
+    command = &(request.asArray()[0]);
+  } else if (request.type() == NetworkFilters::Common::Redis::RespType::CompositeArray) {
+    command = request.asCompositeArray().command();
+  }
+  if (!command) {
     return false;
   }
-  auto first = request.asArray()[0];
-  if (first.type() != NetworkFilters::Common::Redis::RespType::SimpleString &&
-      first.type() != NetworkFilters::Common::Redis::RespType::BulkString) {
+  if (command->type() != NetworkFilters::Common::Redis::RespType::SimpleString &&
+      command->type() != NetworkFilters::Common::Redis::RespType::BulkString) {
     return false;
   }
-  std::string to_lower_string(first.asString());
-  toLowerTable().toLowerCase(to_lower_string);
+  std::string to_lower_string = absl::AsciiStrToLower(command->asString());
   return NetworkFilters::Common::Redis::SupportedCommands::isReadCommand(to_lower_string);
-}
-
-const ToLowerTable& RedisLoadBalancerContextImpl::toLowerTable() {
-  static auto* table = new ToLowerTable();
-  return *table;
 }
 
 RedisLoadBalancerContextImpl::RedisLoadBalancerContextImpl(

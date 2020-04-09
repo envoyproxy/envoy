@@ -5,13 +5,13 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/type/http_status.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -19,6 +19,7 @@
 #include "common/common/matchers.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
+#include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
@@ -56,7 +57,7 @@ struct ExtAuthzFilterStats {
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config,
+  FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                Runtime::Loader& runtime, Http::Context& http_context,
                const std::string& stats_prefix)
@@ -65,9 +66,15 @@ public:
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
         status_on_error_(toErrorCode(config.status_on_error().code())), local_info_(local_info),
-        scope_(scope), runtime_(runtime), http_context_(http_context), pool_(scope.symbolTable()),
+        scope_(scope), runtime_(runtime), http_context_(http_context),
+        filter_enabled_(config.has_filter_enabled()
+                            ? absl::optional<Runtime::FractionalPercent>(
+                                  Runtime::FractionalPercent(config.filter_enabled(), runtime_))
+                            : absl::nullopt),
+        pool_(scope_.symbolTable()),
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
+        include_peer_certificate_(config.include_peer_certificate()),
         stats_(generateStats(stats_prefix, scope)), ext_authz_ok_(pool_.add("ext_authz.ok")),
         ext_authz_denied_(pool_.add("ext_authz.denied")),
         ext_authz_error_(pool_.add("ext_authz.error")),
@@ -87,6 +94,8 @@ public:
 
   Http::Code statusOnError() const { return status_on_error_; }
 
+  bool filterEnabled() { return filter_enabled_.has_value() ? filter_enabled_->enabled() : true; }
+
   Runtime::Loader& runtime() { return runtime_; }
 
   Stats::Scope& scope() { return scope_; }
@@ -102,6 +111,8 @@ public:
   void incCounter(Stats::Scope& scope, Stats::StatName name) {
     scope.counterFromStatName(name).inc();
   }
+
+  bool includePeerCertificate() const { return include_peer_certificate_; }
 
 private:
   static Http::Code toErrorCode(uint64_t status) {
@@ -126,10 +137,15 @@ private:
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
+
+  const absl::optional<Runtime::FractionalPercent> filter_enabled_;
+
   // TODO(nezdolik): stop using pool as part of deprecating cluster scope stats.
   Stats::StatNamePool pool_;
 
   const std::vector<std::string> metadata_context_namespaces_;
+
+  const bool include_peer_certificate_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
@@ -153,7 +169,8 @@ class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
   using ContextExtensionsMap = Protobuf::Map<std::string, std::string>;
 
-  FilterConfigPerRoute(const envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute& config)
+  FilterConfigPerRoute(
+      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& config)
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
@@ -185,16 +202,17 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Http::StreamDecoderFilter,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
-  Filter(FilterConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
+  Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // ExtAuthz::RequestCallbacks
@@ -202,9 +220,11 @@ public:
 
 private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
-  void initiateCall(const Http::HeaderMap& headers);
+  void initiateCall(const Http::RequestHeaderMap& headers,
+                    const Router::RouteConstSharedPtr& route);
   void continueDecoding();
-  bool isBufferFull();
+  bool isBufferFull() const;
+  bool skipCheckForRoute(const Router::RouteConstSharedPtr& route) const;
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
@@ -220,7 +240,7 @@ private:
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  Http::HeaderMap* request_headers_;
+  Http::RequestHeaderMap* request_headers_;
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;
@@ -230,7 +250,8 @@ private:
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};
   bool buffer_data_{};
-  envoy::service::auth::v2::CheckRequest check_request_{};
+  bool skip_check_{false};
+  envoy::service::auth::v3::CheckRequest check_request_{};
 };
 
 } // namespace ExtAuthz

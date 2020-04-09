@@ -1,10 +1,10 @@
 #pragma once
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/stack_array.h"
 
 #include "extensions/filters/network/kafka/serialization.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -20,9 +20,8 @@ namespace Kafka {
 class BufferBasedTest {
 protected:
   const char* getBytes() {
-    uint64_t num_slices = buffer_.getRawSlices(nullptr, 0);
-    STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-    buffer_.getRawSlices(slices.begin(), num_slices);
+    Buffer::RawSliceVector slices = buffer_.getRawSlices(1);
+    ASSERT(slices.size() == 1);
     return reinterpret_cast<const char*>((slices[0]).mem_);
   }
 

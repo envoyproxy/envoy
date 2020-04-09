@@ -41,6 +41,8 @@ to find out more about the origin story and design philosophy of Envoy
 
 * [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce): Low frequency mailing
   list where we will email announcements only.
+* [envoy-security-announce](https://groups.google.com/forum/#!forum/envoy-security-announce): Low frequency mailing
+  list where we will email security related announcements only.
 * [envoy-users](https://groups.google.com/forum/#!forum/envoy-users): General user discussion.
 * [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev): Envoy developer discussion (APIs,
   feature design, etc.).
@@ -70,7 +72,8 @@ have prior experience. To get started:
 
 ## Community Meeting
 
-The Envoy team meets every other Tuesday at 9am PT. The public Google calendar is here: https://goo.gl/PkDijT
+The Envoy team meets twice per month on Tuesday, alternating between 9am PT and 5PM PT. The public
+Google calendar is here: https://goo.gl/PkDijT
 
 * Meeting minutes are [here](https://goo.gl/5Cergb)
 * Recorded videos are posted [here](https://www.youtube.com/channel/UCvqbFHwN-nwalWPjPUKpvTA/videos?view=0&sort=dd&shelf_id=1)

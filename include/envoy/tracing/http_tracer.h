@@ -11,6 +11,9 @@
 namespace Envoy {
 namespace Tracing {
 
+class Span;
+using SpanPtr = std::unique_ptr<Span>;
+
 constexpr uint32_t DefaultMaxPathTagLength = 256;
 
 enum class OperationName { Ingress, Egress };
@@ -40,6 +43,38 @@ struct Decision {
 };
 
 /**
+ * The context for the custom tag to obtain the tag value.
+ */
+struct CustomTagContext {
+  const Http::RequestHeaderMap* request_headers;
+  const StreamInfo::StreamInfo& stream_info;
+};
+
+/**
+ * Tracing custom tag, with tag name and how it would be applied to the span.
+ */
+class CustomTag {
+public:
+  virtual ~CustomTag() = default;
+
+  /**
+   * @return the tag name view.
+   */
+  virtual absl::string_view tag() const PURE;
+
+  /**
+   * The way how to apply the custom tag to the span,
+   * generally obtain the tag value from the context and attached it to the span.
+   * @param span the active span.
+   * @param ctx the custom tag context.
+   */
+  virtual void apply(Span& span, const CustomTagContext& ctx) const PURE;
+};
+
+using CustomTagConstSharedPtr = std::shared_ptr<const CustomTag>;
+using CustomTagMap = absl::flat_hash_map<std::string, CustomTagConstSharedPtr>;
+
+/**
  * Tracing configuration, it carries additional data needed to populate the span.
  */
 class Config {
@@ -52,9 +87,9 @@ public:
   virtual OperationName operationName() const PURE;
 
   /**
-   * @return list of headers to populate tags on the active span.
+   * @return custom tags to be attached to the active span.
    */
-  virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const PURE;
+  virtual const CustomTagMap* customTags() const PURE;
 
   /**
    * @return true if spans should be annotated with more detailed information.
@@ -66,9 +101,6 @@ public:
    */
   virtual uint32_t maxPathTagLength() const PURE;
 };
-
-class Span;
-using SpanPtr = std::unique_ptr<Span>;
 
 /**
  * Basic abstraction for span.
@@ -108,7 +140,7 @@ public:
    * (implementation-specific) trace.
    * @param request_headers the headers to which propagation context will be added
    */
-  virtual void injectContext(Http::HeaderMap& request_headers) PURE;
+  virtual void injectContext(Http::RequestHeaderMap& request_headers) PURE;
 
   /**
    * Create and start a child Span, with this Span as its parent in the trace.
@@ -138,7 +170,7 @@ public:
   /**
    * Start driver specific span.
    */
-  virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
+  virtual SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
                             const std::string& operation_name, SystemTime start_time,
                             const Tracing::Decision tracing_decision) PURE;
 };
@@ -153,12 +185,12 @@ class HttpTracer {
 public:
   virtual ~HttpTracer() = default;
 
-  virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
+  virtual SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
                             const StreamInfo::StreamInfo& stream_info,
                             const Tracing::Decision tracing_decision) PURE;
 };
 
-using HttpTracerPtr = std::unique_ptr<HttpTracer>;
+using HttpTracerSharedPtr = std::shared_ptr<HttpTracer>;
 
 } // namespace Tracing
 } // namespace Envoy

@@ -5,7 +5,7 @@ DynamoDB
 
 * DynamoDB :ref:`architecture overview <arch_overview_dynamo>`
 * :ref:`v2 API reference <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpFilter.name>`
-* This filter should be configured with the name *envoy.http_dynamo_filter*.
+* This filter should be configured with the name *envoy.filters.http.dynamo*.
 
 Statistics
 ----------

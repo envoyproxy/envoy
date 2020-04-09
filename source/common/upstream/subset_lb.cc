@@ -3,7 +3,8 @@
 #include <memory>
 #include <unordered_set>
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
@@ -21,9 +22,11 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
     ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
-    const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
-    const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>& least_request_config,
-    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+    const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
+        lb_ring_hash_config,
+    const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
+        least_request_config,
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
       least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
       scope_(scope), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
@@ -35,32 +38,27 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()) {
   ASSERT(subsets.isEnabled());
 
-  if (fallback_policy_ != envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK) {
+  if (fallback_policy_ != envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK) {
     HostPredicate predicate;
-    if (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
-      predicate = [](const Host&) -> bool { return true; };
-
+    if (fallback_policy_ == envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
       ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer");
+      initSubsetAnyOnce();
+      fallback_subset_ = subset_any_;
     } else {
       predicate = [this](const Host& host) -> bool {
         return hostMatches(default_subset_metadata_, host);
       };
-
       ENVOY_LOG(debug, "subset lb: creating fallback load balancer for {}",
                 describeMetadata(default_subset_metadata_));
+      fallback_subset_ = std::make_shared<LbSubsetEntry>();
+      fallback_subset_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
+          *this, predicate, locality_weight_aware_, scale_locality_weight_);
     }
-
-    fallback_subset_ = std::make_shared<LbSubsetEntry>();
-    fallback_subset_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
-        *this, predicate, locality_weight_aware_, scale_locality_weight_);
   }
 
   if (subsets.panicModeAny()) {
-    HostPredicate predicate = [](const Host&) -> bool { return true; };
-
-    panic_mode_subset_ = std::make_shared<LbSubsetEntry>();
-    panic_mode_subset_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
-        *this, predicate, locality_weight_aware_, scale_locality_weight_);
+    initSubsetAnyOnce();
+    panic_mode_subset_ = subset_any_;
   }
 
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
@@ -112,14 +110,24 @@ void SubsetLoadBalancer::refreshSubsets(uint32_t priority) {
   update(priority, host_sets[priority]->hosts(), {});
 }
 
+void SubsetLoadBalancer::initSubsetAnyOnce() {
+  if (!subset_any_) {
+    HostPredicate predicate = [](const Host&) -> bool { return true; };
+    subset_any_ = std::make_shared<LbSubsetEntry>();
+    subset_any_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
+        *this, predicate, locality_weight_aware_, scale_locality_weight_);
+  }
+}
+
 void SubsetLoadBalancer::initSubsetSelectorMap() {
   selectors_ = std::make_shared<SubsetSelectorMap>();
   SubsetSelectorMapPtr selectors;
   for (const auto& subset_selector : subset_selectors_) {
-    const auto& selector_keys = subset_selector->selector_keys_;
-    const auto& selector_fallback_policy = subset_selector->fallback_policy_;
+    const auto& selector_keys = subset_selector->selectorKeys();
+    const auto& selector_fallback_policy = subset_selector->fallbackPolicy();
+    const auto& selector_fallback_keys_subset = subset_selector->fallbackKeysSubset();
     if (selector_fallback_policy ==
-        envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
+        envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
       continue;
     }
     uint32_t pos = 0;
@@ -132,7 +140,9 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
         const auto& child_selector = selectors->subset_keys_.find(key);
         // if this is last key for given selector, check if it has fallback specified
         if (pos == selector_keys.size()) {
-          child_selector->second->fallback_policy_ = selector_fallback_policy;
+          child_selector->second->fallback_params_.fallback_policy_ = selector_fallback_policy;
+          child_selector->second->fallback_params_.fallback_keys_subset_ =
+              &selector_fallback_keys_subset;
           initSelectorFallbackSubset(selector_fallback_policy);
         }
         selectors = child_selector->second;
@@ -145,24 +155,22 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
 }
 
 void SubsetLoadBalancer::initSelectorFallbackSubset(
-    const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy&
-        fallback_policy) {
-  if (fallback_policy == envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT &&
-      selector_fallback_subset_any_ == nullptr) {
+    const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
+        LbSubsetSelectorFallbackPolicy& fallback_policy) {
+  if (fallback_policy ==
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT &&
+      subset_any_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer for selector");
-    HostPredicate predicate = [](const Host&) -> bool { return true; };
-    selector_fallback_subset_any_ = std::make_shared<LbSubsetEntry>();
-    selector_fallback_subset_any_->priority_subset_.reset(
-        new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
-  } else if (fallback_policy ==
-                 envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::DEFAULT_SUBSET &&
+    initSubsetAnyOnce();
+  } else if (fallback_policy == envoy::config::cluster::v3::Cluster::LbSubsetConfig::
+                                    LbSubsetSelector::DEFAULT_SUBSET &&
              selector_fallback_subset_default_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating default subset fallback load balancer for selector");
     HostPredicate predicate = std::bind(&SubsetLoadBalancer::hostMatches, this,
                                         default_subset_metadata_, std::placeholders::_1);
     selector_fallback_subset_default_ = std::make_shared<LbSubsetEntry>();
-    selector_fallback_subset_default_->priority_subset_.reset(
-        new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
+    selector_fallback_subset_default_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
+        *this, predicate, locality_weight_aware_, scale_locality_weight_);
   }
 }
 
@@ -175,12 +183,13 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
       return host;
     }
     // otherwise check if there is fallback policy configured for given route metadata
-    absl::optional<
-        envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy>
-        selector_fallback_policy = tryFindSelectorFallbackPolicy(context);
-    if (selector_fallback_policy) {
+    absl::optional<SubsetSelectorFallbackParamsRef> selector_fallback_params =
+        tryFindSelectorFallbackParams(context);
+    if (selector_fallback_params &&
+        selector_fallback_params->get().fallback_policy_ !=
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
       // return result according to configured fallback policy
-      return chooseHostForSelectorFallbackPolicy(selector_fallback_policy.value(), context);
+      return chooseHostForSelectorFallbackPolicy(*selector_fallback_params, context);
     }
   }
 
@@ -205,9 +214,8 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
   return nullptr;
 }
 
-absl::optional<
-    envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy>
-SubsetLoadBalancer::tryFindSelectorFallbackPolicy(LoadBalancerContext* context) {
+absl::optional<SubsetLoadBalancer::SubsetSelectorFallbackParamsRef>
+SubsetLoadBalancer::tryFindSelectorFallbackParams(LoadBalancerContext* context) {
   const Router::MetadataMatchCriteria* match_criteria = context->metadataMatchCriteria();
   if (!match_criteria) {
     return absl::nullopt;
@@ -227,7 +235,7 @@ SubsetLoadBalancer::tryFindSelectorFallbackPolicy(LoadBalancerContext* context) 
 
     if (i + 1 == match_criteria_vec.size()) {
       // We've reached the end of the criteria, and they all matched.
-      return subset_it->second->fallback_policy_;
+      return subset_it->second->fallback_params_;
     }
     selectors = subset_it->second;
   }
@@ -236,16 +244,23 @@ SubsetLoadBalancer::tryFindSelectorFallbackPolicy(LoadBalancerContext* context) 
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
-    const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy&
-        fallback_policy,
-    LoadBalancerContext* context) {
-  if (fallback_policy == envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT &&
-      selector_fallback_subset_any_ != nullptr) {
-    return selector_fallback_subset_any_->priority_subset_->lb_->chooseHost(context);
-  } else if (fallback_policy ==
-                 envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::DEFAULT_SUBSET &&
+    const SubsetSelectorFallbackParams& fallback_params, LoadBalancerContext* context) {
+  const auto& fallback_policy = fallback_params.fallback_policy_;
+  if (fallback_policy ==
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT &&
+      subset_any_ != nullptr) {
+    return subset_any_->priority_subset_->lb_->chooseHost(context);
+  } else if (fallback_policy == envoy::config::cluster::v3::Cluster::LbSubsetConfig::
+                                    LbSubsetSelector::DEFAULT_SUBSET &&
              selector_fallback_subset_default_ != nullptr) {
     return selector_fallback_subset_default_->priority_subset_->lb_->chooseHost(context);
+  } else if (fallback_policy ==
+             envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {
+    ASSERT(fallback_params.fallback_keys_subset_);
+    auto filtered_context = std::make_unique<LoadBalancerContextWrapper>(
+        context, *fallback_params.fallback_keys_subset_);
+    // Perform whole subset load balancing again with reduced metadata match criteria
+    return chooseHost(filtered_context.get());
   } else {
     return nullptr;
   }
@@ -317,8 +332,8 @@ SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
 void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
                                               const HostVector& hosts_removed) {
 
-  if (selector_fallback_subset_any_ != nullptr) {
-    selector_fallback_subset_any_->priority_subset_->update(priority, hosts_added, hosts_removed);
+  if (subset_any_ != nullptr) {
+    subset_any_->priority_subset_->update(priority, hosts_added, hosts_removed);
   }
 
   if (selector_fallback_subset_default_ != nullptr) {
@@ -331,13 +346,13 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
     return;
   }
 
-  // Add/remove hosts.
-  fallback_subset_->priority_subset_->update(priority, hosts_added, hosts_removed);
+  if (fallback_subset_ != subset_any_) {
+    // Add/remove hosts.
+    fallback_subset_->priority_subset_->update(priority, hosts_added, hosts_removed);
+  }
 
   // Same thing for the panic mode subset.
-  if (panic_mode_subset_ != nullptr) {
-    panic_mode_subset_->priority_subset_->update(priority, hosts_added, hosts_removed);
-  }
+  ASSERT(panic_mode_subset_ == nullptr || panic_mode_subset_ == subset_any_);
 }
 
 // Iterates over the added and removed hosts, looking up an LbSubsetEntryPtr for each. For every
@@ -357,7 +372,7 @@ void SubsetLoadBalancer::processSubsets(
     const bool adding_hosts = step.second;
     for (const auto& host : hosts) {
       for (const auto& subset_selector : subset_selectors_) {
-        const auto& keys = subset_selector->selector_keys_;
+        const auto& keys = subset_selector->selectorKeys();
         // For each host, for each subset key, attempt to extract the metadata corresponding to the
         // key from the host.
         std::vector<SubsetMetadata> all_kvs = extractSubsetMetadata(keys, *host);
@@ -436,7 +451,7 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
 
 bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host) {
   return Config::Metadata::metadataLabelMatch(
-      kvs, *host.metadata(), Config::MetadataFilters::get().ENVOY_LB, list_as_any_);
+      kvs, host.metadata().get(), Config::MetadataFilters::get().ENVOY_LB, list_as_any_);
 }
 
 // Iterates over subset_keys looking up values from the given host's metadata. Each key-value pair
@@ -445,8 +460,10 @@ std::vector<SubsetLoadBalancer::SubsetMetadata>
 SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_keys,
                                           const Host& host) {
   std::vector<SubsetMetadata> all_kvs;
-
-  const envoy::api::v2::core::Metadata& metadata = *host.metadata();
+  if (!host.metadata()) {
+    return all_kvs;
+  }
+  const envoy::config::core::v3::Metadata& metadata = *host.metadata();
   const auto& filter_it = metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
   if (filter_it == metadata.filter_metadata().end()) {
     return all_kvs;
@@ -698,8 +715,6 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
 
   // If we only have one locality we can avoid the first call to filter() by
   // just creating a new HostsPerLocality from the list of all hosts.
-  //
-  // TODO(rgs1): merge these two filter() calls in one loop.
   HostsPerLocalityConstSharedPtr hosts_per_locality;
 
   if (original_host_set_.hostsPerLocality().get().size() == 1) {
@@ -709,9 +724,9 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     hosts_per_locality = original_host_set_.hostsPerLocality().filter({cached_predicate})[0];
   }
 
-  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
+  auto healthy_hosts_per_locality =
       original_host_set_.healthyHostsPerLocality().filter({cached_predicate})[0];
-  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality =
+  auto degraded_hosts_per_locality =
       original_host_set_.degradedHostsPerLocality().filter({cached_predicate})[0];
   auto excluded_hosts_per_locality =
       original_host_set_.excludedHostsPerLocality().filter({cached_predicate})[0];
@@ -810,5 +825,14 @@ void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
   }
 }
 
+SubsetLoadBalancer::LoadBalancerContextWrapper::LoadBalancerContextWrapper(
+    LoadBalancerContext* wrapped,
+    const std::set<std::string>& filtered_metadata_match_criteria_names)
+    : wrapped_(wrapped) {
+  ASSERT(wrapped->metadataMatchCriteria());
+
+  metadata_match_ =
+      wrapped->metadataMatchCriteria()->filterMatchCriteria(filtered_metadata_match_criteria_names);
+}
 } // namespace Upstream
 } // namespace Envoy

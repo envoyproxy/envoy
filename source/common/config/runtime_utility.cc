@@ -1,10 +1,12 @@
 #include "common/config/runtime_utility.h"
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 namespace Envoy {
 namespace Config {
 
-void translateRuntime(const envoy::config::bootstrap::v2::Runtime& runtime_config,
-                      envoy::config::bootstrap::v2::LayeredRuntime& layered_runtime_config) {
+void translateRuntime(const envoy::config::bootstrap::v3::Runtime& runtime_config,
+                      envoy::config::bootstrap::v3::LayeredRuntime& layered_runtime_config) {
   {
     auto* layer = layered_runtime_config.add_layers();
     layer->set_name("base");

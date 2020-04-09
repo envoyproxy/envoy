@@ -5,9 +5,10 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/config/accesslog/v2/file.pb.h"
-#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
-#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
+#include "envoy/config/accesslog/v3/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/address_impl.h"
@@ -38,7 +39,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::MatchesRegex;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -54,14 +54,14 @@ using ::Envoy::Network::UpstreamServerName;
 namespace {
 Config constructConfigFromYaml(const std::string& yaml,
                                Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
   TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
   return Config(tcp_proxy, context);
 }
 
 Config constructConfigFromV2Yaml(const std::string& yaml,
                                  Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
   TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
   return Config(tcp_proxy, context);
 }
@@ -191,7 +191,8 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     // hit route with destination_ip (10.10.10.10/32)
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.10.10");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -199,14 +200,15 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.10.11");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (10.10.11.0/24)
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -214,14 +216,15 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.12.12");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (10.11.0.0/16)
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.11.11.11");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -229,14 +232,15 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.12.12.12");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (11.0.0.0/8)
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("11.11.11.11");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -244,21 +248,23 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (128.0.0.0/8)
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("128.255.255.255");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination port range
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 12345);
-    EXPECT_EQ(std::string("with_destination_ports"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_destination_ports"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -266,7 +272,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -274,7 +280,8 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 23459);
-    EXPECT_EQ(std::string("with_source_ports"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_source_ports"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -282,7 +289,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 23458);
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -291,7 +298,8 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000);
     connection.remote_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("20.0.0.0", 20000);
-    EXPECT_EQ(std::string("with_everything"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_everything"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -300,14 +308,15 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000);
     connection.remote_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("30.0.0.0", 20000);
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (::1/128)
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("::1");
-    EXPECT_EQ(std::string("with_v6_destination"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_v6_destination"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -315,7 +324,8 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ =
         std::make_shared<Network::Address::Ipv6Instance>("2001:abcd:0:0:1::");
-    EXPECT_EQ(std::string("with_v6_destination"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_v6_destination"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -326,7 +336,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     connection.remote_address_ =
         std::make_shared<Network::Address::Ipv6Instance>("2003:0:0:0:0::5");
     EXPECT_EQ(std::string("with_v6_source_and_destination"),
-              config_obj.getRouteFromEntries(connection));
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -334,29 +344,475 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("2004::");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv6Instance>("::");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 }
 
+// Tests that a deprecated_v1 route gets the top-level endpoint selector.
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(RouteWithTopLevelMetadataMatchConfig)) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: cluster
+  deprecated_v1:
+    routes:
+    - cluster: catch_all
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  Config config_obj(constructConfigFromYaml(yaml, factory_context_));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  NiceMock<Network::MockConnection> connection;
+  const auto route = config_obj.getRouteFromEntries(connection);
+  EXPECT_NE(nullptr, route);
+
+  EXPECT_EQ("catch_all", route->clusterName());
+
+  const auto* criteria = route->metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+// Tests that it's not possible to define a weighted cluster with 0 weight.
+TEST(ConfigTest, WeightedClusterWithZeroWeightConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+    - name: cluster2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_THROW(constructConfigFromV2Yaml(yaml, factory_context), EnvoyException);
+}
+
+// Tests that it is possible to define a list of weighted clusters.
+TEST(ConfigTest, WeightedClustersConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+    - name: cluster2
+      weight: 2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(0));
+  EXPECT_EQ(std::string("cluster1"), config_obj.getRouteFromEntries(connection)->clusterName());
+
+  EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(2));
+  EXPECT_EQ(std::string("cluster2"), config_obj.getRouteFromEntries(connection)->clusterName());
+}
+
+// Tests that it is possible to define a list of weighted clusters with independent endpoint
+// selectors.
+TEST(ConfigTest, WeightedClustersWithMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k1: v1
+            k2: v2
+    - name: cluster2
+      weight: 2
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k3: v3
+            k4: v4
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  {
+    ProtobufWkt::Value v1, v2;
+    v1.set_string_value("v1");
+    v2.set_string_value("v2");
+    HashedValue hv1(v1), hv2(v2);
+
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(0));
+
+    const auto route = config_obj.getRouteFromEntries(connection);
+    EXPECT_NE(nullptr, route);
+
+    EXPECT_EQ("cluster1", route->clusterName());
+
+    const auto* criteria = route->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+
+    const auto& criterions = criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, criterions.size());
+
+    EXPECT_EQ("k1", criterions[0]->name());
+    EXPECT_EQ(hv1, criterions[0]->value());
+
+    EXPECT_EQ("k2", criterions[1]->name());
+    EXPECT_EQ(hv2, criterions[1]->value());
+  }
+
+  {
+    ProtobufWkt::Value v3, v4;
+    v3.set_string_value("v3");
+    v4.set_string_value("v4");
+    HashedValue hv3(v3), hv4(v4);
+
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(2));
+
+    const auto route = config_obj.getRouteFromEntries(connection);
+    EXPECT_NE(nullptr, route);
+
+    EXPECT_EQ("cluster2", route->clusterName());
+
+    const auto* criteria = route->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+
+    const auto& criterions = criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, criterions.size());
+
+    EXPECT_EQ("k3", criterions[0]->name());
+    EXPECT_EQ(hv3, criterions[0]->value());
+
+    EXPECT_EQ("k4", criterions[1]->name());
+    EXPECT_EQ(hv4, criterions[1]->value());
+  }
+}
+
+// Tests that an individual endpoint selector of a weighted cluster gets merged with the top-level
+// endpoint selector.
+TEST(ConfigTest, WeightedClustersWithMetadataMatchAndTopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k1: v1
+            k2: v2
+    - name: cluster2
+      weight: 2
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k3: v3
+            k4: v4
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k0: v00
+        k1: v01
+        k4: v04
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  ProtobufWkt::Value v00, v01, v04;
+  v00.set_string_value("v00");
+  v01.set_string_value("v01");
+  v04.set_string_value("v04");
+  HashedValue hv00(v00), hv01(v01), hv04(v04);
+
+  {
+    ProtobufWkt::Value v1, v2;
+    v1.set_string_value("v1");
+    v2.set_string_value("v2");
+    HashedValue hv1(v1), hv2(v2);
+
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(0));
+
+    const auto route = config_obj.getRouteFromEntries(connection);
+    EXPECT_NE(nullptr, route);
+
+    EXPECT_EQ("cluster1", route->clusterName());
+
+    const auto* criteria = route->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+
+    const auto& criterions = criteria->metadataMatchCriteria();
+    EXPECT_EQ(4, criterions.size());
+
+    EXPECT_EQ("k0", criterions[0]->name());
+    EXPECT_EQ(hv00, criterions[0]->value());
+
+    EXPECT_EQ("k1", criterions[1]->name());
+    EXPECT_EQ(hv1, criterions[1]->value());
+
+    EXPECT_EQ("k2", criterions[2]->name());
+    EXPECT_EQ(hv2, criterions[2]->value());
+
+    EXPECT_EQ("k4", criterions[3]->name());
+    EXPECT_EQ(hv04, criterions[3]->value());
+  }
+
+  {
+    ProtobufWkt::Value v3, v4;
+    v3.set_string_value("v3");
+    v4.set_string_value("v4");
+    HashedValue hv3(v3), hv4(v4);
+
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(2));
+
+    const auto route = config_obj.getRouteFromEntries(connection);
+    EXPECT_NE(nullptr, route);
+
+    EXPECT_EQ("cluster2", route->clusterName());
+
+    const auto* criteria = route->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+
+    const auto& criterions = criteria->metadataMatchCriteria();
+    EXPECT_EQ(4, criterions.size());
+
+    EXPECT_EQ("k0", criterions[0]->name());
+    EXPECT_EQ(hv00, criterions[0]->value());
+
+    EXPECT_EQ("k1", criterions[1]->name());
+    EXPECT_EQ(hv01, criterions[1]->value());
+
+    EXPECT_EQ("k3", criterions[2]->name());
+    EXPECT_EQ(hv3, criterions[2]->value());
+
+    EXPECT_EQ("k4", criterions[3]->name());
+    EXPECT_EQ(hv4, criterions[3]->value());
+  }
+}
+
+// Tests that a weighted cluster gets the top-level endpoint selector.
+TEST(ConfigTest, WeightedClustersWithTopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  NiceMock<Network::MockConnection> connection;
+  const auto route = config_obj.getRouteFromEntries(connection);
+  EXPECT_NE(nullptr, route);
+
+  EXPECT_EQ("cluster1", route->clusterName());
+
+  const auto* criteria = route->metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+// Tests that it is possible to define the top-level endpoint selector.
+TEST(ConfigTest, TopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  const auto* criteria = config_obj.metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+// Tests that a regular cluster gets the top-level endpoint selector.
+TEST(ConfigTest, ClusterWithTopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  NiceMock<Network::MockConnection> connection;
+  const auto route = config_obj.getRouteFromEntries(connection);
+  EXPECT_NE(nullptr, route);
+
+  EXPECT_EQ("foo", route->clusterName());
+
+  const auto* criteria = route->metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+// Tests that a per connection cluster gets the top-level endpoint selector.
+TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  NiceMock<Network::MockConnection> connection;
+  connection.stream_info_.filterState()->setData(
+      "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
+      StreamInfo::FilterState::StateType::Mutable,
+      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+
+  const auto route = config_obj.getRouteFromEntries(connection);
+  EXPECT_NE(nullptr, route);
+
+  EXPECT_EQ("filter_state_cluster", route->clusterName());
+
+  const auto* criteria = route->metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+TEST(ConfigTest, HashWithSourceIpConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  hash_policy:
+  - source_ip: {}
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_NE(nullptr, config_obj.hashPolicy());
+}
+
+TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_EQ(nullptr, config_obj.hashPolicy());
+}
+
 TEST(ConfigTest, AccessLogConfig) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
-  envoy::config::filter::accesslog::v2::AccessLog* log = config.mutable_access_log()->Add();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
+  envoy::config::accesslog::v3::AccessLog* log = config.mutable_access_log()->Add();
   log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
   {
-    envoy::config::accesslog::v2::FileAccessLog file_access_log;
+    envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
     file_access_log.set_format("the format specifier");
-    ProtobufWkt::Struct* custom_config = log->mutable_config();
-    TestUtility::jsonConvert(file_access_log, *custom_config);
+    log->mutable_typed_config()->PackFrom(file_access_log);
   }
 
   log = config.mutable_access_log()->Add();
   log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
   {
-    envoy::config::accesslog::v2::FileAccessLog file_access_log;
+    envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
-    ProtobufWkt::Struct* custom_config = log->mutable_config();
-    TestUtility::jsonConvert(file_access_log, *custom_config);
+    log->mutable_typed_config()->PackFrom(file_access_log);
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -370,6 +826,11 @@ public:
   TcpProxyTest() {
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
+    ON_CALL(filter_callbacks_.connection_.stream_info_, onUpstreamHostSelected(_))
+        .WillByDefault(Invoke(
+            [this](Upstream::HostDescriptionConstSharedPtr host) { upstream_host_ = host; }));
+    ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamHost())
+        .WillByDefault(ReturnPointee(&upstream_host_));
   }
 
   ~TcpProxyTest() override {
@@ -378,36 +839,34 @@ public:
     }
   }
 
-  void configure(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config) {
-    config_.reset(new Config(config, factory_context_));
+  void configure(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
+    config_ = std::make_shared<Config>(config, factory_context_);
   }
 
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy defaultConfig() {
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy defaultConfig() {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
     config.set_stat_prefix("name");
-    auto* route = config.mutable_deprecated_v1()->mutable_routes()->Add();
+    auto* route = config.mutable_hidden_envoy_deprecated_deprecated_v1()->mutable_routes()->Add();
     route->set_cluster("fake_cluster");
 
     return config;
   }
 
   // Return the default config, plus one file access log with the specified format
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy
   accessLogConfig(const std::string& access_log_format) {
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
-    envoy::config::filter::accesslog::v2::AccessLog* access_log =
-        config.mutable_access_log()->Add();
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+    envoy::config::accesslog::v3::AccessLog* access_log = config.mutable_access_log()->Add();
     access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
-    envoy::config::accesslog::v2::FileAccessLog file_access_log;
+    envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.set_format(access_log_format);
-    TestUtility::jsonConvert(file_access_log, *access_log->mutable_config());
-
+    access_log->mutable_typed_config()->PackFrom(file_access_log);
     return config;
   }
 
   void setup(uint32_t connections,
-             const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config) {
+             const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
     configure(config);
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
     upstream_remote_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:80");
@@ -440,7 +899,8 @@ public:
             .WillOnce(Invoke(
                 [=](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
                   conn_pool_callbacks_.push_back(&cb);
-                  return conn_pool_handles_.at(i).get();
+
+                  return onNewConnection(conn_pool_handles_.at(i).get());
                 }))
             .RetiresOnSaturation();
       }
@@ -449,11 +909,16 @@ public:
     }
 
     {
-      testing::InSequence sequence;
-      filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+      filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
+      filter_callbacks_.connection_.streamInfo().setDownstreamSslConnection(
+          filter_callbacks_.connection_.ssl());
+      filter_callbacks_.connection_.streamInfo().setDownstreamLocalAddress(
+          filter_callbacks_.connection_.localAddress());
+      filter_callbacks_.connection_.streamInfo().setDownstreamRemoteAddress(
+          filter_callbacks_.connection_.remoteAddress());
       EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
       EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
@@ -485,12 +950,21 @@ public:
     conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, upstream_hosts_.at(conn_index));
   }
 
+  Tcp::ConnectionPool::Cancellable* onNewConnection(Tcp::ConnectionPool::Cancellable* connection) {
+    if (!new_connection_functions_.empty()) {
+      auto fn = new_connection_functions_.front();
+      new_connection_functions_.pop_front();
+      return fn(connection);
+    }
+    return connection;
+  }
+
   Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ConfigSharedPtr config_;
-  std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  std::unique_ptr<Filter> filter_;
   std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> upstream_hosts_{};
   std::vector<std::unique_ptr<NiceMock<Network::MockClientConnection>>> upstream_connections_{};
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockConnectionData>>>
@@ -502,12 +976,15 @@ public:
   StringViewSaver access_log_data_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
+  std::list<std::function<Tcp::ConnectionPool::Cancellable*(Tcp::ConnectionPool::Cancellable*)>>
+      new_connection_functions_;
+  Upstream::HostDescriptionConstSharedPtr upstream_host_{};
 };
 
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(DefaultRoutes)) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
 
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight*
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::WeightedCluster::ClusterWeight*
       ignored_cluster = config.mutable_weighted_clusters()->mutable_clusters()->Add();
   ignored_cluster->set_name("ignored_cluster");
   ignored_cluster->set_weight(10);
@@ -515,7 +992,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(DefaultRoutes)) {
   configure(config);
 
   NiceMock<Network::MockConnection> connection;
-  EXPECT_EQ(std::string("fake_cluster"), config_->getRouteFromEntries(connection));
+  EXPECT_EQ(std::string("fake_cluster"), config_->getRouteFromEntries(connection)->clusterName());
 }
 
 // Tests that half-closes are proxied and don't themselves cause any connection to be closed.
@@ -577,7 +1054,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamRemoteDisconnect)) {
 
 // Test that reconnect is attempted after a local connect failure
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamLocalFail)) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_max_connect_attempts()->set_value(2);
 
   setup(2, config);
@@ -591,9 +1068,34 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamLocalFail)) 
                     .value());
 }
 
+// Make sure that the tcp proxy code handles reentrant calls to onPoolFailure.
+TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamLocalFailReentrant)) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_max_connect_attempts()->set_value(2);
+
+  // Set up a call to onPoolFailure from inside the first newConnection call.
+  // This simulates a connection failure from under the stack of newStream.
+  new_connection_functions_.push_back(
+      [&](Tcp::ConnectionPool::Cancellable*) -> Tcp::ConnectionPool::Cancellable* {
+        raiseEventUpstreamConnectFailed(
+            0, Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+        return nullptr;
+      });
+
+  setup(2, config);
+
+  // Make sure the last connection pool to be created is the one which gets the
+  // cancellation call.
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess))
+      .Times(0);
+  EXPECT_CALL(*conn_pool_handles_.at(1), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess))
+      .Times(1);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Test that reconnect is attempted after a remote connect failure
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamRemoteFail)) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_max_connect_attempts()->set_value(2);
   setup(2, config);
 
@@ -608,7 +1110,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamRemoteFail))
 
 // Test that reconnect is attempted after a connect timeout
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamTimeout)) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_max_connect_attempts()->set_value(2);
   setup(2, config);
 
@@ -622,17 +1124,17 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamTimeout)) {
 
 // Test that only the configured number of connect attempts occur
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsLimit)) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config =
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
       accessLogConfig("%RESPONSE_FLAGS%");
   config.mutable_max_connect_attempts()->set_value(3);
   setup(3, config);
 
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
 
@@ -649,21 +1151,21 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsLimit)) {
 
 // Test that the tcp proxy sends the correct notifications to the outlier detector
 TEST_F(TcpProxyTest, OutlierDetection) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_max_connect_attempts()->set_value(3);
   setup(3, config);
 
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   raiseEventUpstreamConnectFailed(0, Tcp::ConnectionPool::PoolFailureReason::Timeout);
 
   EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   raiseEventUpstreamConnectFailed(1,
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS_FINAL, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal, _));
   raiseEventUpstreamConnected(2);
 }
 
@@ -740,7 +1242,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(NoHost)) {
   EXPECT_EQ(access_log_data_, "UH");
 }
 
-TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(WithMetadataMatch)) {
+TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(RouteWithMetadataMatch)) {
   auto v1 = ProtobufWkt::Value();
   v1.set_string_value("v1");
   auto v2 = ProtobufWkt::Value();
@@ -757,25 +1259,114 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(WithMetadataMatch)) {
     mutable_fields->insert({criterion.name(), criterion.value().value()});
   }
 
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_metadata_match()->mutable_filter_metadata()->insert(
       {Envoy::Config::MetadataFilters::get().ENVOY_LB, metadata_struct});
 
   configure(config);
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
-  const auto& metadata_criteria = filter_->metadataMatchCriteria()->metadataMatchCriteria();
+  const auto effective_criteria = filter_->metadataMatchCriteria();
+  EXPECT_NE(nullptr, effective_criteria);
 
-  EXPECT_EQ(metadata_criteria.size(), criteria.size());
+  const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
+  EXPECT_EQ(effective_criterions.size(), criteria.size());
   for (size_t i = 0; i < criteria.size(); ++i) {
-    EXPECT_EQ(metadata_criteria[i]->name(), criteria[i].name());
-    EXPECT_EQ(metadata_criteria[i]->value(), criteria[i].value());
+    EXPECT_EQ(effective_criterions[i]->name(), criteria[i].name());
+    EXPECT_EQ(effective_criterions[i]->value(), criteria[i].value());
+  }
+}
+
+// Tests that the endpoint selector of a weighted cluster gets included into the
+// LoadBalancerContext.
+TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k1: v1
+    - name: cluster2
+      weight: 2
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k2: v2
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k0: v0
+)EOF";
+
+  config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
+
+  ProtobufWkt::Value v0, v1, v2;
+  v0.set_string_value("v0");
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv0(v0), hv1(v1), hv2(v2);
+
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+
+  // Expect filter to try to open a connection to cluster1.
+  {
+    Upstream::LoadBalancerContext* context;
+
+    EXPECT_CALL(factory_context_.random_, random()).WillOnce(Return(0));
+    EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster1", _, _))
+        .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+    EXPECT_NE(nullptr, context);
+
+    const auto effective_criteria = context->metadataMatchCriteria();
+    EXPECT_NE(nullptr, effective_criteria);
+
+    const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, effective_criterions.size());
+
+    EXPECT_EQ("k0", effective_criterions[0]->name());
+    EXPECT_EQ(hv0, effective_criterions[0]->value());
+
+    EXPECT_EQ("k1", effective_criterions[1]->name());
+    EXPECT_EQ(hv1, effective_criterions[1]->value());
+  }
+
+  // Expect filter to try to open a connection to cluster2.
+  {
+    Upstream::LoadBalancerContext* context;
+
+    EXPECT_CALL(factory_context_.random_, random()).WillOnce(Return(2));
+    EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster2", _, _))
+        .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+    EXPECT_NE(nullptr, context);
+
+    const auto effective_criteria = context->metadataMatchCriteria();
+    EXPECT_NE(nullptr, effective_criteria);
+
+    const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, effective_criterions.size());
+
+    EXPECT_EQ("k0", effective_criterions[0]->name());
+    EXPECT_EQ(hv0, effective_criterions[0]->value());
+
+    EXPECT_EQ("k2", effective_criterions[1]->name());
+    EXPECT_EQ(hv2, effective_criterions[1]->value());
   }
 }
 
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(DisconnectBeforeData)) {
   configure(defaultConfig());
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -814,7 +1405,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamConnectionLimit)) {
       0, 0, 0, 0, 0);
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
   // The downstream connection closes if the proxy can't make an upstream connection.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -827,7 +1418,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamConnectionLimit)) {
 // Tests that the idle timer closes both connections, and gets updated when either
 // connection has activity.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimeout)) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
@@ -857,7 +1448,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimeout)) {
 
 // Tests that the idle timer is disabled when the downstream connection is closed.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimerDisabledDownstreamClose)) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
@@ -871,7 +1462,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimerDisabledDownstreamClose)) 
 
 // Tests that the idle timer is disabled when the upstream connection is closed.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimerDisabledUpstreamClose)) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
@@ -885,7 +1476,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimerDisabledUpstreamClose)) {
 
 // Tests that flushing data during an idle timeout doesn't cause problems.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimeoutWithOutstandingDataFlushed)) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
@@ -1000,27 +1591,6 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogDownstreamAddress)) {
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }
 
-// Test that access log fields %BYTES_RECEIVED%, %BYTES_SENT%, %START_TIME%, %DURATION% are
-// all correctly logged.
-TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogBytesRxTxDuration)) {
-  setup(1, accessLogConfig("bytesreceived=%BYTES_RECEIVED% bytessent=%BYTES_SENT% "
-                           "datetime=%START_TIME% nonzeronum=%DURATION%"));
-
-  raiseEventUpstreamConnected(0);
-  Buffer::OwnedImpl buffer("a");
-  filter_->onData(buffer, false);
-  Buffer::OwnedImpl response("bb");
-  upstream_callbacks_->onUpstreamData(response, false);
-
-  timeSystem().sleep(std::chrono::milliseconds(1));
-  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
-  filter_.reset();
-
-  EXPECT_THAT(access_log_data_,
-              MatchesRegex(
-                  "bytesreceived=1 bytessent=2 datetime=[0-9-]+T[0-9:.]+Z nonzeronum=[1-9][0-9]*"));
-}
-
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogUpstreamSSLConnection)) {
   setup(1);
 
@@ -1063,7 +1633,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamFlushNoTimeout)) {
 // Tests that upstream flush works with an idle timeout configured, but the connection
 // finishes draining before the timer expires.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamFlushTimeoutConfigured)) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
@@ -1095,7 +1665,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamFlushTimeoutConfigured)) {
 
 // Tests that upstream flush closes the connection when the idle timeout fires.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamFlushTimeoutExpired)) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
@@ -1143,6 +1713,39 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamFlushReceiveUpstreamData)) 
   upstream_callbacks_->onUpstreamData(buffer, false);
 }
 
+// Tests that downstream connection can access upstream connections filter state.
+TEST_F(TcpProxyTest, ShareFilterState) {
+  setup(1);
+
+  upstream_connections_.at(0)->streamInfo().filterState()->setData(
+      "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
+      StreamInfo::FilterState::StateType::Mutable,
+      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+  raiseEventUpstreamConnected(0);
+  EXPECT_EQ("filter_state_cluster",
+            filter_callbacks_.connection_.streamInfo()
+                .upstreamFilterState()
+                ->getDataReadOnly<PerConnectionCluster>("envoy.tcp_proxy.cluster")
+                .value());
+}
+
+// Tests that filter callback can access downstream and upstream address and ssl properties.
+TEST_F(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
+  setup(1);
+
+  raiseEventUpstreamConnected(0);
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamLocalAddress(),
+            filter_callbacks_.connection().localAddress());
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamRemoteAddress(),
+            filter_callbacks_.connection().remoteAddress());
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamSslConnection(),
+            filter_callbacks_.connection().ssl());
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamLocalAddress(),
+            upstream_connections_.at(0)->localAddress());
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamSslConnection(),
+            upstream_connections_.at(0)->streamInfo().downstreamSslConnection());
+}
+
 class TcpProxyRoutingTest : public testing::Test {
 public:
   TcpProxyRoutingTest() = default;
@@ -1157,13 +1760,13 @@ public:
         cluster: fake_cluster
     )EOF";
 
-    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+    config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 
   void initializeFilter() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
 
-    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -1223,12 +1826,10 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
   setup();
   initializeFilter();
 
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filterState().setData("envoy.tcp_proxy.cluster",
-                                    std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-                                    StreamInfo::FilterState::StateType::Mutable);
-  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
-  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+  connection_.streamInfo().filterState()->setData(
+      "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
+      StreamInfo::FilterState::StateType::Mutable,
+      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,
@@ -1243,13 +1844,10 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
   setup();
   initializeFilter();
 
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filterState().setData("envoy.network.upstream_server_name",
-                                    std::make_unique<UpstreamServerName>("www.example.com"),
-                                    StreamInfo::FilterState::StateType::ReadOnly);
-
-  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
-  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+  connection_.streamInfo().filterState()->setData(
+      "envoy.network.upstream_server_name", std::make_unique<UpstreamServerName>("www.example.com"),
+      StreamInfo::FilterState::StateType::ReadOnly,
+      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-server-name
@@ -1277,14 +1875,11 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   setup();
   initializeFilter();
 
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filterState().setData(
+  connection_.streamInfo().filterState()->setData(
       Network::ApplicationProtocols::key(),
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
-      StreamInfo::FilterState::StateType::ReadOnly);
-
-  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
-  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+      StreamInfo::FilterState::StateType::ReadOnly,
+      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-application-protocol
@@ -1305,6 +1900,95 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
 
   // Port 9999 is within the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
+  filter_->onNewConnection();
+}
+
+class TcpProxyNonDeprecatedConfigRoutingTest : public TcpProxyRoutingTest {
+public:
+  TcpProxyNonDeprecatedConfigRoutingTest() = default;
+
+  void setup() {
+    const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    )EOF";
+
+    config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
+  }
+};
+
+TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
+  setup();
+
+  initializeFilter();
+
+  // Port 9999 is within the specified destination port range.
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
+  // Expect filter to try to open a connection to specified cluster.
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(nullptr));
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info;
+  EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
+      .WillOnce(
+          Invoke([&cluster_info](const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) {
+            cluster_info = upstream_cluster_info;
+          }));
+  EXPECT_CALL(connection_.stream_info_, upstreamClusterInfo())
+      .WillOnce(ReturnPointee(&cluster_info));
+
+  filter_->onNewConnection();
+
+  EXPECT_EQ(connection_.stream_info_.upstreamClusterInfo().value()->name(), "fake_cluster");
+}
+
+class TcpProxyHashingTest : public testing::Test {
+public:
+  TcpProxyHashingTest() = default;
+
+  void setup() {
+    const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    hash_policy:
+    - source_ip: {}
+    )EOF";
+
+    config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
+  }
+
+  void initializeFilter() {
+    EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+
+    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  }
+
+  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  ConfigSharedPtr config_;
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  std::unique_ptr<Filter> filter_;
+};
+
+// Test TCP proxy use source IP to hash.
+TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
+  setup();
+  initializeFilter();
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
+            EXPECT_EQ(cluster, "fake_cluster");
+            EXPECT_TRUE(context->computeHashKey().has_value());
+            return nullptr;
+          }));
+
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("2.3.4.5", 2222);
 
   filter_->onNewConnection();
 }

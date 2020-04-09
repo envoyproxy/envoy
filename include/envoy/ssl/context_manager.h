@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "envoy/common/time.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/private_key/private_key.h"
@@ -50,13 +51,14 @@ public:
 
 using ContextManagerPtr = std::unique_ptr<ContextManager>;
 
-class ContextManagerFactory {
+class ContextManagerFactory : public Config::UntypedFactory {
 public:
-  virtual ~ContextManagerFactory() = default;
+  ~ContextManagerFactory() override = default;
   virtual ContextManagerPtr createContextManager(TimeSource& time_source) PURE;
 
   // There could be only one factory thus the name is static.
-  static std::string name() { return "ssl_context_manager"; }
+  std::string name() const override { return "ssl_context_manager"; }
+  std::string category() const override { return "envoy.ssl_context_manager"; }
 };
 
 } // namespace Ssl

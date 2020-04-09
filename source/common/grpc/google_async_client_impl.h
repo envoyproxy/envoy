@@ -3,6 +3,9 @@
 #include <queue>
 
 #include "envoy/api/api.h"
+#include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
@@ -13,6 +16,7 @@
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
 #include "common/grpc/google_grpc_context.h"
+#include "common/grpc/stat_names.h"
 #include "common/grpc/typed_async_client.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -117,7 +121,7 @@ struct GoogleAsyncClientStats {
   // .streams_total
   Stats::Counter* streams_total_;
   // .streams_closed_<gRPC status code>
-  std::array<Stats::Counter*, Status::GrpcStatus::MaximumValid + 1> streams_closed_;
+  std::array<Stats::Counter*, Status::WellKnownGrpcStatus::MaximumKnown + 1> streams_closed_;
 };
 
 // Interface to allow the gRPC stub to be mocked out by tests.
@@ -166,7 +170,8 @@ class GoogleAsyncClientImpl final : public RawAsyncClient, Logger::Loggable<Logg
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-                        const envoy::api::v2::core::GrpcService& config, Api::Api& api);
+                        const envoy::config::core::v3::GrpcService& config, Api::Api& api,
+                        const StatNames& stat_names);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -181,9 +186,6 @@ public:
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
 
 private:
-  static std::shared_ptr<grpc::Channel>
-  createChannel(const envoy::api::v2::core::GrpcService::GoogleGrpc& config);
-
   Event::Dispatcher& dispatcher_;
   GoogleAsyncClientThreadLocal& tls_;
   // This is shared with child streams, so that they can cleanup independent of
@@ -192,7 +194,7 @@ private:
   std::shared_ptr<GoogleStub> stub_;
   std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
   const std::string stat_prefix_;
-  const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue> initial_metadata_;
+  const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientStats stats_;
 
@@ -234,8 +236,8 @@ private:
   // Write the first PendingMessage in the write queue if non-empty.
   void writeQueued();
   // Deliver notification and update stats when the connection closes.
-  void notifyRemoteClose(Status::GrpcStatus grpc_status, Http::HeaderMapPtr trailing_metadata,
-                         const std::string& message);
+  void notifyRemoteClose(Status::GrpcStatus grpc_status,
+                         Http::ResponseTrailerMapPtr trailing_metadata, const std::string& message);
   // Schedule stream for deferred deletion.
   void deferredDelete();
   // Cleanup and schedule stream for deferred deletion if no inflight
@@ -319,10 +321,10 @@ public:
 
 private:
   // Grpc::RawAsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override;
+  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override;
   bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override;
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override;
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   Buffer::InstancePtr request_;

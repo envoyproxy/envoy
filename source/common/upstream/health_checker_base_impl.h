@@ -1,13 +1,17 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/type/matcher/string.pb.h"
 #include "envoy/upstream/health_checker.h"
 
 #include "common/common/logger.h"
+#include "common/common/matchers.h"
+#include "common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -42,12 +46,15 @@ public:
   // Upstream::HealthChecker
   void addHostCheckCompleteCb(HostStatusCb callback) override { callbacks_.push_back(callback); }
   void start() override;
+  std::shared_ptr<const Network::TransportSocketOptionsImpl> transportSocketOptions() const {
+    return transport_socket_options_;
+  }
 
 protected:
   class ActiveHealthCheckSession : public Event::DeferredDeletable {
   public:
     ~ActiveHealthCheckSession() override;
-    HealthTransition setUnhealthy(envoy::data::core::v2alpha::HealthCheckFailureType type);
+    HealthTransition setUnhealthy(envoy::data::core::v3::HealthCheckFailureType type);
     void onDeferredDeleteBase();
     void start() { onInitialInterval(); }
 
@@ -56,7 +63,7 @@ protected:
 
     void handleSuccess(bool degraded = false);
     void handleDegraded();
-    void handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType type);
+    void handleFailure(envoy::data::core::v3::HealthCheckFailureType type);
 
     HostSharedPtr host_;
 
@@ -82,13 +89,13 @@ protected:
 
   using ActiveHealthCheckSessionPtr = std::unique_ptr<ActiveHealthCheckSession>;
 
-  HealthCheckerImplBase(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
+  HealthCheckerImplBase(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
   ~HealthCheckerImplBase() override;
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
-  virtual envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const PURE;
+  virtual envoy::data::core::v3::HealthCheckerType healthCheckerType() const PURE;
 
   const bool always_log_health_check_failures_;
   const Cluster& cluster_;
@@ -128,6 +135,8 @@ private:
   void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
   void setUnhealthyCrossThread(const HostSharedPtr& host);
+  static std::shared_ptr<const Network::TransportSocketOptionsImpl>
+  initTransportSocketOptions(const envoy::config::core::v3::HealthCheck& config);
 
   static const std::chrono::milliseconds NO_TRAFFIC_INTERVAL;
 
@@ -143,6 +152,7 @@ private:
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   uint64_t local_process_healthy_{};
   uint64_t local_process_degraded_{};
+  const std::shared_ptr<const Network::TransportSocketOptionsImpl> transport_socket_options_;
 };
 
 class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {
@@ -151,25 +161,24 @@ public:
                              const std::string& file_name)
       : time_source_(time_source), file_(log_manager.createAccessLog(file_name)) {}
 
-  void logEjectUnhealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+  void logEjectUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                          const HostDescriptionConstSharedPtr& host,
-                         envoy::data::core::v2alpha::HealthCheckFailureType failure_type) override;
-  void logAddHealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                         envoy::data::core::v3::HealthCheckFailureType failure_type) override;
+  void logAddHealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                      const HostDescriptionConstSharedPtr& host, bool first_check) override;
-  void logUnhealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+  void logUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                     const HostDescriptionConstSharedPtr& host,
-                    envoy::data::core::v2alpha::HealthCheckFailureType failure_type,
+                    envoy::data::core::v3::HealthCheckFailureType failure_type,
                     bool first_check) override;
-  void logDegraded(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+  void logDegraded(envoy::data::core::v3::HealthCheckerType health_checker_type,
                    const HostDescriptionConstSharedPtr& host) override;
-  void logNoLongerDegraded(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+  void logNoLongerDegraded(envoy::data::core::v3::HealthCheckerType health_checker_type,
                            const HostDescriptionConstSharedPtr& host) override;
 
 private:
   void createHealthCheckEvent(
-      envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
-      const HostDescription& host,
-      std::function<void(envoy::data::core::v2alpha::HealthCheckEvent&)> callback) const;
+      envoy::data::core::v3::HealthCheckerType health_checker_type, const HostDescription& host,
+      std::function<void(envoy::data::core::v3::HealthCheckEvent&)> callback) const;
   TimeSource& time_source_;
   AccessLog::AccessLogFileSharedPtr file_;
 };

@@ -1,4 +1,5 @@
-#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -14,36 +15,36 @@ INSTANTIATE_TEST_SUITE_P(Protocols, BufferIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(BufferIntegrationTest, RouterNotFoundBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
   testRouterNotFoundWithBody();
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
   testRouterRequestAndResponseWithBody(4 * 1024 * 1024, 4 * 1024 * 1024, false);
 }
 
 TEST_P(BufferIntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
   testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithZeroByteBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
   testRouterRequestAndResponseWithBody(0, 0, false);
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(Http::TestHeaderMapImpl{
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
       {":method", "POST"}, {":scheme", "http"}, {":path", "/shelf"}, {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
@@ -66,18 +67,18 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(Http::TestHeaderMapImpl{
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
       {":method", "POST"}, {":scheme", "http"}, {":path", "/shelf"}, {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, "0123", false);
   codec_client_->sendData(*request_encoder_, "456", false);
   codec_client_->sendData(*request_encoder_, "789", false);
-  Http::TestHeaderMapImpl request_trailers{{"request", "trailer"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"request", "trailer"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -95,19 +96,19 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
-  config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
+  config_helper_.addFilter(ConfigHelper::smallBufferFilter());
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response =
-      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/dynamo/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"},
-                                                                 {"x-forwarded-for", "10.0.0.1"},
-                                                                 {"x-envoy-retry-on", "5xx"}},
-                                         1024 * 65);
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/dynamo/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024 * 65);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -115,40 +116,41 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
 }
 
 ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
-  envoy::config::filter::http::buffer::v2::BufferPerRoute buffer_per_route;
+  envoy::extensions::filters::http::buffer::v3::BufferPerRoute buffer_per_route;
   TestUtility::loadFromJson(json_config, buffer_per_route);
 
   return
       [buffer_per_route](
-          envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              cfg) {
         auto* config = cfg.mutable_route_config()
                            ->mutable_virtual_hosts()
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)["envoy.buffer"].PackFrom(buffer_per_route);
+        (*config)["envoy.filters.http.buffer"].PackFrom(buffer_per_route);
       };
 }
 
 TEST_P(BufferIntegrationTest, RouteDisabled) {
   ConfigHelper::HttpModifierFunction mod = overrideConfig(R"EOF({"disabled": true})EOF");
   config_helper_.addConfigModifier(mod);
-  config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
+  config_helper_.addFilter(ConfigHelper::smallBufferFilter());
   config_helper_.setBufferLimits(1024, 1024);
 
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response =
-      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"},
-                                                                 {"x-forwarded-for", "10.0.0.1"}},
-                                         1024 * 65);
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"}},
+      1024 * 65);
 
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -160,21 +162,21 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
     "max_request_bytes": 5242880
   }})EOF");
   config_helper_.addConfigModifier(mod);
-  config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
+  config_helper_.addFilter(ConfigHelper::smallBufferFilter());
 
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response =
-      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"},
-                                                                 {"x-forwarded-for", "10.0.0.1"}},
-                                         1024 * 65);
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"}},
+      1024 * 65);
 
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());

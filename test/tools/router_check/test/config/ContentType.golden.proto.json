@@ -15,7 +15,7 @@
         "authority": "www.lyft.com",
         "path": "/",
         "method": "GET",
-        "additional_headers": [{"key": "content-type", "value": "application/grpc"}]
+        "additional_request_headers": [{"key": "content-type", "value": "application/grpc"}]
       },
       "validate": {"cluster_name": "local_service_grpc"}
     },
@@ -25,7 +25,7 @@
         "authority": "www.lyft.com",
         "path": "/",
         "method": "GET",
-        "additional_headers": [{"key": "content-type", "value": "foo"}]
+        "additional_request_headers": [{"key": "content-type", "value": "foo"}]
       },
       "validate": {"cluster_name": "local_service"}
     }

@@ -5,6 +5,8 @@
 
 #include "test/test_common/environment.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -75,7 +77,7 @@ void BaseThriftIntegrationTest::preparePayloads(const PayloadOptions& options,
                    [](const std::pair<std::string, std::string>& header) -> std::string {
                      return header.first + "=" + header.second;
                    });
-    args.push_back(StringUtil::join(headers, ","));
+    args.push_back(absl::StrJoin(headers, ","));
   }
 
   args.push_back(options.method_name_);

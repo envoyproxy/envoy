@@ -51,7 +51,8 @@ into an instance of `ServicePolicy` class (inherited from
 `FilterState::Object`). When a `Cluster` is created, the associated
 `ServicePolicy` instance will be created and cached. Note that typed
 metadata is not a new source of metadata. It is obtained from metadata that
-is specified as part of the configuration.
+is specified as part of the configuration. A `FilterState::Object` implements
+`serializeAsProto` method can be configured in access loggers to log it.
 
 HTTP Per-Route Filter Configuration
 -----------------------------------

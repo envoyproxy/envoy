@@ -38,7 +38,7 @@ public:
     return 0;
   }
 
-  MOCK_METHOD1(testPrint, void(const std::string&));
+  MOCK_METHOD(void, testPrint, (const std::string&));
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<ThreadLocalState> state_;

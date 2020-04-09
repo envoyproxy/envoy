@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/service/ratelimit/v3/rls.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/http/header_map_impl.h"
@@ -34,13 +35,14 @@ namespace {
 
 class MockRequestCallbacks : public RequestCallbacks {
 public:
-  void complete(LimitStatus status, Http::HeaderMapPtr&& response_headers_to_add,
-                Http::HeaderMapPtr&& request_headers_to_add) override {
+  void complete(LimitStatus status, Http::ResponseHeaderMapPtr&& response_headers_to_add,
+                Http::RequestHeaderMapPtr&& request_headers_to_add) override {
     complete_(status, response_headers_to_add.get(), request_headers_to_add.get());
   }
 
-  MOCK_METHOD3(complete_, void(LimitStatus status, const Http::HeaderMap* response_headers_to_add,
-                               const Http::HeaderMap* request_headers_to_add));
+  MOCK_METHOD(void, complete_,
+              (LimitStatus status, const Http::ResponseHeaderMap* response_headers_to_add,
+               const Http::RequestHeaderMap* request_headers_to_add));
 };
 
 class RateLimitGrpcClientTest : public testing::Test {
@@ -58,11 +60,11 @@ public:
 };
 
 TEST_F(RateLimitGrpcClientTest, Basic) {
-  std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse> response;
+  std::unique_ptr<envoy::service::ratelimit::v3::RateLimitResponse> response;
 
   {
-    envoy::service::ratelimit::v2::RateLimitRequest request;
-    Http::HeaderMapImpl headers;
+    envoy::service::ratelimit::v3::RateLimitRequest request;
+    Http::RequestHeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}});
     EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(client_), _, _))
         .WillOnce(
@@ -80,16 +82,16 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     client_.onCreateInitialMetadata(headers);
     EXPECT_EQ(nullptr, headers.RequestId());
 
-    response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
-    response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT);
+    response = std::make_unique<envoy::service::ratelimit::v3::RateLimitResponse>();
+    response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT);
     EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("over_limit")));
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _, _));
     client_.onSuccess(std::move(response), span_);
   }
 
   {
-    envoy::service::ratelimit::v2::RateLimitRequest request;
-    Http::HeaderMapImpl headers;
+    envoy::service::ratelimit::v3::RateLimitRequest request;
+    Http::RequestHeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}});
     EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), _, _, _))
         .WillOnce(Return(&async_request_));
@@ -99,15 +101,15 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
     client_.onCreateInitialMetadata(headers);
 
-    response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
-    response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK);
+    response = std::make_unique<envoy::service::ratelimit::v3::RateLimitResponse>();
+    response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
     EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("ok")));
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _));
     client_.onSuccess(std::move(response), span_);
   }
 
   {
-    envoy::service::ratelimit::v2::RateLimitRequest request;
+    envoy::service::ratelimit::v3::RateLimitRequest request;
     GrpcClientImpl::createRequest(
         request, "foo",
         {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}});
@@ -118,14 +120,14 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
                   {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}},
                   Tracing::NullSpan::instance());
 
-    response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
+    response = std::make_unique<envoy::service::ratelimit::v3::RateLimitResponse>();
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::Error, _, _));
     client_.onFailure(Grpc::Status::Unknown, "", span_);
   }
 }
 
 TEST_F(RateLimitGrpcClientTest, Cancel) {
-  std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse> response;
+  std::unique_ptr<envoy::service::ratelimit::v3::RateLimitResponse> response;
 
   EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
 

@@ -6,7 +6,7 @@ Configuration reference
 .. toctree::
   :maxdepth: 2
 
-  overview/v2_overview
+  overview/overview
   listeners/listeners
   http/http
   upstream/upstream

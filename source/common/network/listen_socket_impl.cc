@@ -1,11 +1,12 @@
 #include "common/network/listen_socket_impl.h"
 
-#include <sys/socket.h>
 #include <sys/types.h>
 
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -18,7 +19,7 @@ namespace Network {
 
 void ListenSocketImpl::doBind() {
   const Api::SysCallIntResult result = local_address_->bind(io_handle_->fd());
-  if (result.rc_ == -1) {
+  if (SOCKET_FAILURE(result.rc_)) {
     close();
     throw SocketBindException(
         fmt::format("cannot bind '{}': {}", local_address_->asString(), strerror(result.errno_)),
@@ -33,7 +34,7 @@ void ListenSocketImpl::doBind() {
 
 void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
   if (!Network::Socket::applyOptions(options, *this,
-                                     envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
+                                     envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
     throw EnvoyException("ListenSocket: Setting socket options failed");
   }
 }

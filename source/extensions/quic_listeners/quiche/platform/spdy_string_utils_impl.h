@@ -9,15 +9,12 @@
 #include "extensions/quic_listeners/quiche/platform/string_utils.h"
 
 #include "absl/strings/escaping.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "fmt/printf.h"
 
 namespace spdy {
-
-template <typename... Args> inline std::string SpdyStrCatImpl(const Args&... args) {
-  return absl::StrCat(std::forward<const Args&>(args)...);
-}
 
 template <typename... Args>
 inline void SpdyStrAppendImpl(std::string* output, const Args&... args) {
@@ -43,5 +40,18 @@ inline std::string SpdyHexEncodeUInt32AndTrimImpl(uint32_t data) {
 }
 
 inline std::string SpdyHexDumpImpl(absl::string_view data) { return quiche::HexDump(data); }
+
+struct SpdyStringPieceCaseHashImpl {
+  size_t operator()(quiche::QuicheStringPiece data) const {
+    std::string lower = absl::AsciiStrToLower(data);
+    return absl::Hash<std::string>()(lower);
+  }
+};
+
+struct SpdyStringPieceCaseEqImpl {
+  bool operator()(absl::string_view piece1, absl::string_view piece2) const {
+    return absl::EqualsIgnoreCase(piece1, piece2);
+  }
+};
 
 } // namespace spdy

@@ -108,7 +108,7 @@ TEST_F(ConnPoolMapImplTest, TestAddingTwoConnPoolsIncreasesSize) {
 TEST_F(ConnPoolMapImplTest, TestConnPoolReturnedMatchesCreated) {
   TestMapPtr test_map = makeTestMap();
 
-  TestMap::OptPoolRef pool = test_map->getPool(1, getBasicFactory());
+  TestMap::PoolOptRef pool = test_map->getPool(1, getBasicFactory());
   EXPECT_EQ(&(pool.value().get()), mock_pools_[0]);
 }
 
@@ -116,15 +116,15 @@ TEST_F(ConnPoolMapImplTest, TestConnSecondPoolReturnedMatchesCreated) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());
-  TestMap::OptPoolRef pool = test_map->getPool(2, getBasicFactory());
+  TestMap::PoolOptRef pool = test_map->getPool(2, getBasicFactory());
   EXPECT_EQ(&(pool.value().get()), mock_pools_[1]);
 }
 
 TEST_F(ConnPoolMapImplTest, TestMultipleOfSameKeyReturnsOriginal) {
   TestMapPtr test_map = makeTestMap();
 
-  TestMap::OptPoolRef pool1 = test_map->getPool(1, getBasicFactory());
-  TestMap::OptPoolRef pool2 = test_map->getPool(2, getBasicFactory());
+  TestMap::PoolOptRef pool1 = test_map->getPool(1, getBasicFactory());
+  TestMap::PoolOptRef pool2 = test_map->getPool(2, getBasicFactory());
 
   EXPECT_EQ(&(pool1.value().get()), &(test_map->getPool(1, getBasicFactory()).value().get()));
   EXPECT_EQ(&(pool2.value().get()), &(test_map->getPool(2, getBasicFactory()).value().get()));

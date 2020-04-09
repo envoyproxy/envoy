@@ -6,6 +6,7 @@ load(":envoy_internal.bzl", "envoy_external_dep_path")
 load(
     ":envoy_library.bzl",
     _envoy_basic_cc_library = "envoy_basic_cc_library",
+    _envoy_cc_extension = "envoy_cc_extension",
     _envoy_cc_library = "envoy_cc_library",
     _envoy_cc_posix_library = "envoy_cc_posix_library",
     _envoy_cc_win32_library = "envoy_cc_win32_library",
@@ -20,6 +21,8 @@ load(
 )
 load(
     ":envoy_test.bzl",
+    _envoy_benchmark_test = "envoy_benchmark_test",
+    _envoy_cc_benchmark_binary = "envoy_cc_benchmark_binary",
     _envoy_cc_fuzz_test = "envoy_cc_fuzz_test",
     _envoy_cc_mock = "envoy_cc_mock",
     _envoy_cc_test = "envoy_cc_test",
@@ -61,13 +64,14 @@ def envoy_cmake_external(
         cache_entries = {},
         debug_cache_entries = {},
         cmake_options = ["-GNinja"],
-        make_commands = ["ninja", "ninja install"],
+        make_commands = ["ninja -v", "ninja -v install"],
         lib_source = "",
         postfix_script = "",
         static_libraries = [],
         copy_pdb = False,
         pdb_name = "",
         cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
+        generate_crosstool_file = False,
         **kwargs):
     cache_entries.update({"CMAKE_BUILD_TYPE": "Bazel"})
     cache_entries_debug = dict(cache_entries)
@@ -98,9 +102,10 @@ def envoy_cmake_external(
             "//conditions:default": cache_entries_debug,
         }),
         cmake_options = cmake_options,
+        # TODO(lizan): Make this always true
         generate_crosstool_file = select({
             "@envoy//bazel:windows_x86_64": True,
-            "//conditions:default": False,
+            "//conditions:default": generate_crosstool_file,
         }),
         lib_source = lib_source,
         make_commands = make_commands,
@@ -169,6 +174,7 @@ envoy_cc_binary = _envoy_cc_binary
 
 # Library wrappers (from envoy_library.bzl)
 envoy_basic_cc_library = _envoy_basic_cc_library
+envoy_cc_extension = _envoy_cc_extension
 envoy_cc_library = _envoy_cc_library
 envoy_cc_posix_library = _envoy_cc_posix_library
 envoy_cc_win32_library = _envoy_cc_win32_library
@@ -181,5 +187,7 @@ envoy_cc_mock = _envoy_cc_mock
 envoy_cc_test = _envoy_cc_test
 envoy_cc_test_binary = _envoy_cc_test_binary
 envoy_cc_test_library = _envoy_cc_test_library
+envoy_cc_benchmark_binary = _envoy_cc_benchmark_binary
+envoy_benchmark_test = _envoy_benchmark_test
 envoy_py_test_binary = _envoy_py_test_binary
 envoy_sh_test = _envoy_sh_test

@@ -3,9 +3,9 @@
 #include <functional>
 #include <string>
 
-#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/ssl/private_key/private_key_callbacks.h"
 
 #include "openssl/ssl.h"
@@ -20,7 +20,9 @@ class TransportSocketFactoryContext;
 
 namespace Ssl {
 
+#ifdef OPENSSL_IS_BORINGSSL
 using BoringSslPrivateKeyMethodSharedPtr = std::shared_ptr<SSL_PRIVATE_KEY_METHOD>;
+#endif
 
 class PrivateKeyMethodProvider {
 public:
@@ -49,12 +51,14 @@ public:
    */
   virtual bool checkFips() PURE;
 
+#ifdef OPENSSL_IS_BORINGSSL
   /**
    * Get the private key methods from the provider.
    * @return the private key methods associated with this provider and
    * configuration.
    */
   virtual BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() PURE;
+#endif
 };
 
 using PrivateKeyMethodProviderSharedPtr = std::shared_ptr<PrivateKeyMethodProvider>;
@@ -77,7 +81,7 @@ public:
    * no provider can be used with the context configuration.
    */
   virtual PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProvider(
-      const envoy::api::v2::auth::PrivateKeyProvider& config,
+      const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& config,
       Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context) PURE;
 };
 

@@ -103,8 +103,8 @@ Per-cluster command statistics can be enabled via the setting :ref:`enable_comma
   :widths: 1, 1, 2
 
   upstream_commands.[command].success, Counter, Total number of successful requests for a specific Redis command
-  upstream_commands.[command].error, Counter, Total number of failed or cancelled requests for a specific Redis command
-  upstream_commands.[command].total, Counter, Total number of requests for a specific Redis command (sum of success and error)
+  upstream_commands.[command].failure, Counter, Total number of failed or cancelled requests for a specific Redis command
+  upstream_commands.[command].total, Counter, Total number of requests for a specific Redis command (sum of success and failure)
   upstream_commands.[command].latency, Histogram, Latency of requests for a specific Redis command
   
 Supported commands

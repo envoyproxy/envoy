@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/grpc/common.h"
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -18,12 +20,12 @@ const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
 const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
 const AsyncStreamImpl::NullRetryPolicy AsyncStreamImpl::RouteEntryImpl::retry_policy_;
-const AsyncStreamImpl::NullShadowPolicy AsyncStreamImpl::RouteEntryImpl::shadow_policy_;
+const std::vector<Router::ShadowPolicyPtr> AsyncStreamImpl::RouteEntryImpl::shadow_policies_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
 const AsyncStreamImpl::NullConfig AsyncStreamImpl::NullVirtualHost::route_configuration_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
-const envoy::api::v2::core::Metadata AsyncStreamImpl::RouteEntryImpl::metadata_;
+const envoy::config::core::v3::Metadata AsyncStreamImpl::RouteEntryImpl::metadata_;
 const Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
     AsyncStreamImpl::RouteEntryImpl::typed_metadata_({});
 const AsyncStreamImpl::NullPathMatchCriterion
@@ -48,7 +50,8 @@ AsyncClientImpl::~AsyncClientImpl() {
   }
 }
 
-AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
+AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
+                                            AsyncClient::Callbacks& callbacks,
                                             const AsyncClient::RequestOptions& options) {
   AsyncRequestImpl* async_request =
       new AsyncRequestImpl(std::move(request), *this, callbacks, options);
@@ -88,7 +91,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   // TODO(mattklein123): Correctly set protocol in stream info when we support access logging.
 }
 
-void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
+void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
   ENVOY_LOG(debug, "async http request response headers (end_stream={}):\n{}", end_stream,
             *headers);
   ASSERT(!remote_closed_);
@@ -115,7 +118,7 @@ void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   closeLocal(end_stream);
 }
 
-void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
+void AsyncStreamImpl::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
   ENVOY_LOG(debug, "async http request response trailers:\n{}", *trailers);
   ASSERT(!remote_closed_);
   stream_callbacks_.onTrailers(std::move(trailers));
@@ -125,14 +128,13 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
   closeLocal(true);
 }
 
-void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
+void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
   if (Http::Headers::get().MethodValues.Head == headers.Method()->value().getStringView()) {
     is_head_request_ = true;
   }
 
   is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
-  headers.insertEnvoyInternalRequest().value().setReference(
-      Headers::get().EnvoyInternalRequestValues.True);
+  headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {
     Utility::appendXff(headers, *parent_.config_.local_info_.address());
   }
@@ -160,7 +162,7 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
   closeLocal(end_stream);
 }
 
-void AsyncStreamImpl::sendTrailers(HeaderMap& trailers) {
+void AsyncStreamImpl::sendTrailers(RequestTrailerMap& trailers) {
   // See explanation in sendData.
   if (local_closed_) {
     return;
@@ -231,21 +233,26 @@ void AsyncStreamImpl::resetStream() {
   cleanup();
 }
 
-AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
+AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks,
                                    const AsyncClient::RequestOptions& options)
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
 
   if (nullptr != options.parent_span_) {
-    child_span_ = options.parent_span_->spawnChild(Tracing::EgressConfig::get(),
-                                                   "async " + parent.cluster_->name() + " egress",
+    const std::string child_span_name =
+        options.child_span_name_.empty()
+            ? absl::StrCat("async ", parent.cluster_->name(), " egress")
+            : options.child_span_name_;
+    child_span_ = options.parent_span_->spawnChild(Tracing::EgressConfig::get(), child_span_name,
                                                    parent.dispatcher().timeSource().systemTime());
   } else {
     child_span_ = std::make_unique<Tracing::NullSpan>();
   }
+  child_span_->setSampled(options.sampled_);
 }
 
 void AsyncRequestImpl::initialize() {
+  child_span_->injectContext(request_->headers());
   sendHeaders(request_->headers(), !request_->body());
   if (request_->body()) {
     // It's possible this will be a no-op due to a local response synchronously generated in
@@ -260,10 +267,10 @@ void AsyncRequestImpl::onComplete() {
                                                    response_->trailers(), streamInfo(),
                                                    Tracing::EgressConfig::get());
 
-  callbacks_.onSuccess(std::move(response_));
+  callbacks_.onSuccess(*this, std::move(response_));
 }
 
-void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool) {
+void AsyncRequestImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   streamInfo().response_code_ = response_code;
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
@@ -277,7 +284,7 @@ void AsyncRequestImpl::onData(Buffer::Instance& data, bool) {
   response_->body()->move(data);
 }
 
-void AsyncRequestImpl::onTrailers(HeaderMapPtr&& trailers) {
+void AsyncRequestImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
   response_->trailers(std::move(trailers));
 }
 
@@ -295,7 +302,7 @@ void AsyncRequestImpl::onReset() {
 
   if (!cancelled_) {
     // In this case we don't have a valid response so we do need to raise a failure.
-    callbacks_.onFailure(AsyncClient::FailureReason::Reset);
+    callbacks_.onFailure(*this, AsyncClient::FailureReason::Reset);
   }
 }
 

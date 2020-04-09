@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/config/filter/network/thrift_proxy/v2alpha1/route.pb.h"
-#include "envoy/config/filter/network/thrift_proxy/v2alpha1/route.pb.validate.h"
+#include "envoy/config/filter/thrift/router/v2alpha1/router.pb.h"
+#include "envoy/config/filter/thrift/router/v2alpha1/router.pb.validate.h"
 #include "envoy/tcp/conn_pool.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -43,7 +43,7 @@ public:
   TestNamedTransportConfigFactory(std::function<MockTransport*()> f) : f_(f) {}
 
   TransportPtr createTransport() override { return TransportPtr{f_()}; }
-  std::string name() override { return TransportNames::get().FRAMED; }
+  std::string name() const override { return TransportNames::get().FRAMED; }
 
   std::function<MockTransport*()> f_;
 };
@@ -53,7 +53,7 @@ public:
   TestNamedProtocolConfigFactory(std::function<MockProtocol*()> f) : f_(f) {}
 
   ProtocolPtr createProtocol() override { return ProtocolPtr{f_()}; }
-  std::string name() override { return ProtocolNames::get().BINARY; }
+  std::string name() const override { return ProtocolNames::get().BINARY; }
 
   std::function<MockProtocol*()> f_;
 };
@@ -85,7 +85,7 @@ public:
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    router_ = std::make_unique<Router>(context_.clusterManager());
+    router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope());
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
@@ -95,7 +95,7 @@ public:
   void initializeMetadata(MessageType msg_type, std::string method = "method") {
     msg_type_ = msg_type;
 
-    metadata_.reset(new MessageMetadata());
+    metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMethodName(method);
     metadata_->setMessageType(msg_type_);
     metadata_->setSequenceId(1);
@@ -437,6 +437,7 @@ TEST_F(ThriftRouterTest, NoRoute) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.route_missing").value());
 }
 
 TEST_F(ThriftRouterTest, NoCluster) {
@@ -455,6 +456,7 @@ TEST_F(ThriftRouterTest, NoCluster) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.unknown_cluster").value());
 }
 
 TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
@@ -475,6 +477,7 @@ TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.upstream_rq_maintenance_mode").value());
 }
 
 TEST_F(ThriftRouterTest, NoHealthyHosts) {
@@ -496,6 +499,7 @@ TEST_F(ThriftRouterTest, NoHealthyHosts) {
       }));
 
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.no_healthy_upstream").value());
 }
 
 TEST_F(ThriftRouterTest, TruncatedResponse) {
@@ -601,6 +605,27 @@ TEST_F(ThriftRouterTest, UnexpectedUpstreamLocalClose) {
         EXPECT_TRUE(end_stream);
       }));
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/9037.
+TEST_F(ThriftRouterTest, DontCloseConnectionTwice) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::String);
+
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
+        auto& app_ex = dynamic_cast<const AppException&>(response);
+        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_TRUE(end_stream);
+      }));
+  router_->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  // Connection close shouldn't happen in onDestroy(), since it's been handled.
+  EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush)).Times(0);
+  destroyRouter();
 }
 
 TEST_F(ThriftRouterTest, UnexpectedRouterDestroyBeforeUpstreamConnect) {

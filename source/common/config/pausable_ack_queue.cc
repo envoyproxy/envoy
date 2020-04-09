@@ -30,14 +30,15 @@ const UpdateAck& PausableAckQueue::front() {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void PausableAckQueue::pop() {
+UpdateAck PausableAckQueue::popFront() {
   for (auto it = storage_.begin(); it != storage_.end(); ++it) {
     if (!paused_[it->type_url_]) {
+      UpdateAck ret = *it;
       storage_.erase(it);
-      return;
+      return ret;
     }
   }
-  RELEASE_ASSERT(false, "pop() on an empty queue is undefined behavior!");
+  RELEASE_ASSERT(false, "popFront() on an empty queue is undefined behavior!");
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 

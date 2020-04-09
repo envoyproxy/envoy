@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/dubbo/router/v2alpha1/router.pb.h"
-#include "envoy/config/filter/dubbo/router/v2alpha1/router.pb.validate.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/router/v3/router.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/router/v3/router.pb.validate.h"
 
 #include "extensions/filters/network/dubbo_proxy/filters/factory_base.h"
 #include "extensions/filters/network/dubbo_proxy/filters/well_known_names.h"
@@ -13,13 +13,14 @@ namespace DubboProxy {
 namespace Router {
 
 class RouterFilterConfig
-    : public DubboFilters::FactoryBase<envoy::config::filter::dubbo::router::v2alpha1::Router> {
+    : public DubboFilters::FactoryBase<
+          envoy::extensions::filters::network::dubbo_proxy::router::v3::Router> {
 public:
   RouterFilterConfig() : FactoryBase(DubboFilters::DubboFilterNames::get().ROUTER) {}
 
 private:
   DubboFilters::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::dubbo::router::v2alpha1::Router& proto_config,
+      const envoy::extensions::filters::network::dubbo_proxy::router::v3::Router& proto_config,
       const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;
 };
 

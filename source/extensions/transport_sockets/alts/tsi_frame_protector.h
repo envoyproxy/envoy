@@ -13,8 +13,6 @@ namespace Alts {
  * A C++ wrapper for tsi_frame_protector interface.
  * For detail of tsi_frame_protector, see
  * https://github.com/grpc/grpc/blob/v1.10.0/src/core/tsi/transport_security_interface.h#L70
- *
- * TODO(lizan): migrate to tsi_zero_copy_grpc_protector for further optimization
  */
 class TsiFrameProtector final {
 public:

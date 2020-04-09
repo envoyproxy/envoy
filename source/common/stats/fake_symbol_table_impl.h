@@ -50,8 +50,7 @@ namespace Stats {
 class FakeSymbolTableImpl : public SymbolTable {
 public:
   // SymbolTable
-  void populateList(const absl::string_view* names, uint32_t num_names,
-                    StatNameList& list) override {
+  void populateList(const StatName* names, uint32_t num_names, StatNameList& list) override {
     // This implementation of populateList is similar to
     // SymbolTableImpl::populateList. This variant is more efficient for
     // FakeSymbolTableImpl, because it avoid "encoding" each name in names. The
@@ -64,36 +63,25 @@ public:
     // than 256 of them.
     RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 
-    // First encode all the names. The '1' here represents the number of
-    // names. The num_names * StatNameSizeEncodingBytes reserves space for the
-    // lengths of each name.
-    size_t total_size_bytes = 1 + num_names * StatNameSizeEncodingBytes;
-
+    size_t total_size_bytes = 1; /* one byte for holding the number of names */
     for (uint32_t i = 0; i < num_names; ++i) {
       total_size_bytes += names[i].size();
     }
 
     // Now allocate the exact number of bytes required and move the encodings
     // into storage.
-    auto storage = std::make_unique<Storage>(total_size_bytes);
-    uint8_t* p = &storage[0];
-    *p++ = num_names;
+    MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
+    mem_block.appendOne(num_names);
     for (uint32_t i = 0; i < num_names; ++i) {
-      auto& name = names[i];
-      size_t sz = name.size();
-      p = SymbolTableImpl::writeLengthReturningNext(sz, p);
-      if (!name.empty()) {
-        memcpy(p, name.data(), sz * sizeof(uint8_t));
-        p += sz;
-      }
+      SymbolTableImpl::Encoding::appendToMemBlock(names[i], mem_block);
     }
 
     // This assertion double-checks the arithmetic where we computed
     // total_size_bytes. After appending all the encoded data into the
-    // allocated byte array, we should wind up with a pointer difference of
-    // total_size_bytes from the beginning of the allocation.
-    ASSERT(p == &storage[0] + total_size_bytes);
-    list.moveStorageIntoList(std::move(storage));
+    // allocated byte array, we should have exhausted all the memory
+    // we though we needed.
+    ASSERT(mem_block.capacityRemaining() == 0);
+    list.moveStorageIntoList(mem_block.release());
   }
 
   std::string toString(const StatName& stat_name) const override {
@@ -106,6 +94,7 @@ public:
   void free(const StatName&) override {}
   void incRefCount(const StatName&) override {}
   StoragePtr encode(absl::string_view name) override { return encodeHelper(name); }
+  StoragePtr makeDynamicStorage(absl::string_view name) override { return encodeHelper(name); }
   SymbolTable::StoragePtr join(const std::vector<StatName>& names) const override {
     std::vector<absl::string_view> strings;
     for (StatName name : names) {
@@ -129,11 +118,11 @@ public:
     // make_unique does not work with private ctor, even though FakeSymbolTableImpl is a friend.
     return StatNameSetPtr(new StatNameSet(*this, name));
   }
-  void forgetSet(StatNameSet&) override {}
   uint64_t getRecentLookups(const RecentLookupsFn&) const override { return 0; }
   void clearRecentLookups() override {}
   void setRecentLookupCapacity(uint64_t) override {}
   uint64_t recentLookupCapacity() const override { return 0; }
+  DynamicSpans getDynamicSpans(StatName) const override { return DynamicSpans(); }
 
 private:
   absl::string_view toStringView(const StatName& stat_name) const {
@@ -142,11 +131,13 @@ private:
   }
 
   StoragePtr encodeHelper(absl::string_view name) const {
-    ASSERT(!absl::EndsWith(name, "."));
-    auto bytes = std::make_unique<Storage>(name.size() + StatNameSizeEncodingBytes);
-    uint8_t* buffer = SymbolTableImpl::writeLengthReturningNext(name.size(), bytes.get());
-    memcpy(buffer, name.data(), name.size());
-    return bytes;
+    name = StringUtil::removeTrailingCharacters(name, '.');
+    MemBlockBuilder<uint8_t> mem_block(SymbolTableImpl::Encoding::totalSizeBytes(name.size()));
+    SymbolTableImpl::Encoding::appendEncoding(name.size(), mem_block);
+    mem_block.appendData(
+        absl::MakeSpan(reinterpret_cast<const uint8_t*>(name.data()), name.size()));
+    ASSERT(mem_block.capacityRemaining() == 0);
+    return mem_block.release();
   }
 };
 

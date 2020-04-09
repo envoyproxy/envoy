@@ -165,3 +165,9 @@ circuit_breakers.<cluster_name>.<priority>.max_requests
 
 circuit_breakers.<cluster_name>.<priority>.max_retries
   :ref:`Max retries circuit breaker setting <envoy_api_field_cluster.CircuitBreakers.Thresholds.max_retries>`
+
+circuit_breakers.<cluster_name>.<priority>.retry_budget.budget_percent
+  :ref:`Max retries circuit breaker setting <envoy_api_field_cluster.CircuitBreakers.Thresholds.RetryBudget.budget_percent>`
+
+circuit_breakers.<cluster_name>.<priority>.retry_budget.min_retry_concurrency
+  :ref:`Max retries circuit breaker setting <envoy_api_field_cluster.CircuitBreakers.Thresholds.RetryBudget.min_retry_concurrency>`

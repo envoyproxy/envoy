@@ -4,7 +4,7 @@
 #include <tuple>
 #include <vector>
 
-#include "envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.pb.h"
+#include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
@@ -16,9 +16,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
-using Rule = envoy::config::filter::http::header_to_metadata::v2::Config::Rule;
-using ValueType = envoy::config::filter::http::header_to_metadata::v2::Config::ValueType;
-using ValueEncode = envoy::config::filter::http::header_to_metadata::v2::Config::ValueEncode;
+using Rule = envoy::extensions::filters::http::header_to_metadata::v3::Config::Rule;
+using ValueType = envoy::extensions::filters::http::header_to_metadata::v3::Config::ValueType;
+using ValueEncode = envoy::extensions::filters::http::header_to_metadata::v3::Config::ValueEncode;
 using HeaderToMetadataRules = std::vector<std::pair<Http::LowerCaseString, Rule>>;
 
 // TODO(yangminzhu): Make MAX_HEADER_VALUE_LEN configurable.
@@ -30,7 +30,7 @@ const uint32_t MAX_HEADER_VALUE_LEN = 8 * 1024;
  */
 class Config : public Logger::Loggable<Logger::Id::config> {
 public:
-  Config(const envoy::config::filter::http::header_to_metadata::v2::Config config);
+  Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config);
 
   HeaderToMetadataRules requestRules() const { return request_rules_; }
   HeaderToMetadataRules responseRules() const { return response_rules_; }
@@ -76,24 +76,24 @@ public:
   void onDestroy() override {}
 
   // StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
   }
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
   }
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {

@@ -24,10 +24,10 @@
         "authority": "www.lyft.com",
         "path": "/bar",
         "method": "GET",
-        "additional_headers": [
+        "additional_request_headers": [
           {
-      "key": "some_header",
-      "value": "some_cluster"
+            "key": "some_header",
+            "value": "some_cluster"
           }
         ]
       },

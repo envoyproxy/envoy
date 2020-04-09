@@ -5,11 +5,13 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/rds.pb.validate.h"
-#include "envoy/api/v2/route/route.pb.validate.h"
+#include "envoy/api/v2/route/route_components.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/config/api_version.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -21,8 +23,10 @@ namespace Router {
 VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    const std::string& stat_prefix,
-                                   std::unordered_set<RouteConfigProvider*>& route_config_providers)
-    : config_update_info_(config_update_info),
+                                   std::unordered_set<RouteConfigProvider*>& route_config_providers,
+                                   envoy::config::core::v3::ApiVersion resource_api_version)
+    : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>(resource_api_version),
+      config_update_info_(config_update_info),
       scope_(factory_context.scope().createScope(stat_prefix + "vhds." +
                                                  config_update_info_->routeConfigName() + ".")),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
@@ -34,15 +38,18 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                   .config_source()
                                   .api_config_source()
                                   .api_type();
-  if (config_source != envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
+  if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
     throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
-
+  const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->routeConfiguration().vhds().config_source(),
-          Grpc::Common::typeUrl(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()),
-          *scope_, *this);
+          Grpc::Common::typeUrl(resource_name), *scope_, *this);
+}
+
+void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {
+  subscription_->updateResourceInterest({with_route_config_name_prefix});
 }
 
 void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
@@ -54,7 +61,7 @@ void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
 }
 
 void VhdsSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
   if (config_update_info_->onVhdsUpdate(added_resources, removed_resources, version_info)) {

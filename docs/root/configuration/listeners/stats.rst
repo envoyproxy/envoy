@@ -52,6 +52,8 @@ on either accepted or active connections.
    downstream_cx_total, Counter, Total connections on this handler.
    downstream_cx_active, Gauge, Total active connections on this handler.
 
+.. _config_listener_manager_stats:
+
 Listener manager
 ----------------
 
@@ -71,3 +73,4 @@ statistics. Any ``:`` character in the stats name is replaced with ``_``.
    total_listeners_warming, Gauge, Number of currently warming listeners
    total_listeners_active, Gauge, Number of currently active listeners
    total_listeners_draining, Gauge, Number of currently draining listeners
+   workers_started, Gauge, A boolean (1 if started and 0 otherwise) that indicates whether listeners have been initialized on workers.

@@ -59,25 +59,25 @@ do
     # either of these things aren't true, the check fails.
     for i in $(git diff --name-only $RANGE --diff-filter=ACMR --ignore-submodules=all 2>&1); do
       echo -ne "  Checking format for $i - "
-      "$SCRIPT_DIR"/check_format.py check $i
+      "$SCRIPT_DIR"/code_format/check_format.py check $i
       if [[ $? -ne 0 ]]; then
         exit 1
       fi
 
       echo "  Checking spelling for $i"
-      "$SCRIPT_DIR"/check_spelling_pedantic.py check $i
+      "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check $i
       if [[ $? -ne 0 ]]; then
         exit 1
       fi
     done
 
     # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
-    "$SCRIPT_DIR"/proto_format.sh check
+    "$SCRIPT_DIR"/proto_format/proto_format.sh check
     if [[ $? -ne 0 ]]; then
       exit 1
     fi
 
-    "$SCRIPT_DIR"/format_python_tools.sh check
+    "$SCRIPT_DIR"/code_format/format_python_tools.sh check
     if [[ $? -ne 0 ]]; then
       exit 1
     fi

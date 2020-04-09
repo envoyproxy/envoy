@@ -14,10 +14,10 @@
         "authority": "www.lyft.com",
         "path": "/",
         "method": "GET",
-        "additional_headers": [
+        "additional_request_headers": [
           {
-      "key": "test_header",
-      "value": "test"
+            "key": "test_header",
+            "value": "test"
           }
         ]
       },
@@ -29,14 +29,14 @@
         "authority": "www.lyft.com",
         "path": "/",
         "method": "GET",
-        "additional_headers": [
+        "additional_request_headers": [
           {
-      "key": "test_header_multiple1",
-      "value": "test1"
+            "key": "test_header_multiple1",
+            "value": "test1"
           },
           {
-      "key": "test_header_multiple2",
-      "value": "test2"
+            "key": "test_header_multiple2",
+            "value": "test2"
           }
         ]
       },
@@ -48,10 +48,10 @@
         "authority": "www.lyft.com",
         "path": "/",
         "method": "GET",
-        "additional_headers": [
+        "additional_request_headers": [
           {
-      "key": "non_existent_header",
-      "value": "foo"
+            "key": "non_existent_header",
+            "value": "foo"
           }
         ]
       },
@@ -63,10 +63,10 @@
         "authority": "www.lyft.com",
         "path": "/",
         "method": "GET",
-        "additional_headers": [
+        "additional_request_headers": [
           {
-      "key": "test_header_presence",
-      "value": "test"
+            "key": "test_header_presence",
+            "value": "test"
           }
         ]
       },
@@ -78,10 +78,10 @@
         "authority": "www.lyft.com",
         "path": "/",
         "method": "GET",
-        "additional_headers": [
+        "additional_request_headers": [
           {
-      "key": "test_header_pattern",
-      "value": "user=test-1223"
+            "key": "test_header_pattern",
+            "value": "user=test-1223"
           }
         ]
       },
@@ -93,7 +93,7 @@
         "authority": "www.lyft.com",
         "path": "/",
         "method": "GET",
-        "additional_headers": [
+        "additional_request_headers": [
           {
             "key": "test_header_pattern",
             "value": "customer=test-1223"
@@ -108,7 +108,7 @@
         "authority": "www.lyft.com",
         "path": "/",
         "method": "GET",
-        "additional_headers": [
+        "additional_request_headers": [
           {
             "key": "content-type",
             "value": "application/grpc+proto"
@@ -123,7 +123,7 @@
         "authority": "www.lyft.com",
         "path": "/",
         "method": "GET",
-        "additional_headers": [
+        "additional_request_headers": [
           {
             "key": "content-type",
             "value": "application/grpc+proto"

@@ -1,9 +1,10 @@
 #include <chrono>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
 
 #include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
+#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -22,13 +23,13 @@ namespace HttpFilters {
 namespace AdaptiveConcurrency {
 namespace {
 
-using ConcurrencyController::RequestForwardingAction;
+using Controller::RequestForwardingAction;
 
-class MockConcurrencyController : public ConcurrencyController::ConcurrencyController {
+class MockConcurrencyController : public Controller::ConcurrencyController {
 public:
-  MOCK_METHOD0(forwardingDecision, RequestForwardingAction());
-  MOCK_METHOD0(cancelLatencySample, void());
-  MOCK_METHOD1(recordLatencySample, void(std::chrono::nanoseconds));
+  MOCK_METHOD(RequestForwardingAction, forwardingDecision, ());
+  MOCK_METHOD(void, cancelLatencySample, ());
+  MOCK_METHOD(void, recordLatencySample, (std::chrono::nanoseconds));
 
   uint32_t concurrencyLimit() const override { return 0; }
 };
@@ -38,7 +39,7 @@ public:
   AdaptiveConcurrencyFilterTest() = default;
 
   void SetUp() override {
-    const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency config;
+    const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency config;
     auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
         config, runtime_, "testprefix.", stats_, time_system_);
 
@@ -49,9 +50,9 @@ public:
 
   void TearDown() override { filter_.reset(); }
 
-  envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency
+  envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency
   makeConfig(const std::string& yaml_config) {
-    envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency proto;
+    envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency proto;
     TestUtility::loadFromYamlAndValidate(yaml_config, proto);
     return proto;
   }
@@ -93,7 +94,7 @@ enabled:
 
   // The filter should behave as normal here.
 
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
 
   // The filter will be disabled when the flag is overridden. Note there is no expected call to
   // forwardingDecision() or recordLatencySample().
@@ -106,10 +107,10 @@ enabled:
   Buffer::OwnedImpl request_body;
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
 
-  Http::TestHeaderMapImpl request_trailers;
+  Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   filter_->encodeComplete();
 }
@@ -142,23 +143,23 @@ enabled:
 
   // We expect no calls to the concurrency controller.
 
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl request_body;
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
 
-  Http::TestHeaderMapImpl request_trailers;
+  Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   filter_->encodeComplete();
 }
 
 TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestForwarding) {
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
 
   EXPECT_CALL(*controller_, forwardingDecision())
       .WillOnce(Return(RequestForwardingAction::Forward));
@@ -169,12 +170,12 @@ TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestForwarding) {
   Buffer::OwnedImpl request_body;
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
 
-  Http::TestHeaderMapImpl request_trailers;
+  Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestBlock) {
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
 
   EXPECT_CALL(*controller_, forwardingDecision()).WillOnce(Return(RequestForwardingAction::Block));
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _));
@@ -186,7 +187,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, RecordSampleInDestructor) {
   // Verify that the request latency is always sampled even if encodeComplete() is never called.
   EXPECT_CALL(*controller_, forwardingDecision())
       .WillOnce(Return(RequestForwardingAction::Forward));
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   filter_->decodeHeaders(request_headers, true);
 
   EXPECT_CALL(*controller_, recordLatencySample(_));
@@ -196,7 +197,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, RecordSampleInDestructor) {
 TEST_F(AdaptiveConcurrencyFilterTest, RecordSampleOmission) {
   // Verify that the request latency is not sampled if forwardingDecision blocks the request.
   EXPECT_CALL(*controller_, forwardingDecision()).WillOnce(Return(RequestForwardingAction::Block));
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   filter_->decodeHeaders(request_headers, true);
 
   filter_.reset();
@@ -204,7 +205,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, RecordSampleOmission) {
 
 TEST_F(AdaptiveConcurrencyFilterTest, OnDestroyCleanupResetTest) {
   // Get the filter to record the request start time via decode.
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_CALL(*controller_, forwardingDecision())
       .WillOnce(Return(RequestForwardingAction::Forward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -217,7 +218,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, OnDestroyCleanupResetTest) {
 
 TEST_F(AdaptiveConcurrencyFilterTest, OnDestroyCleanupTest) {
   // Get the filter to record the request start time via decode.
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_CALL(*controller_, forwardingDecision())
       .WillOnce(Return(RequestForwardingAction::Forward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -225,7 +226,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, OnDestroyCleanupTest) {
   const auto advance_time = std::chrono::nanoseconds(42);
   time_system_.sleep(advance_time);
 
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   EXPECT_CALL(*controller_, recordLatencySample(advance_time));
   filter_->encodeComplete();
@@ -238,22 +239,24 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTestWithBody) {
   time_system_.setMonotonicTime(mt + std::chrono::nanoseconds(123));
 
   // Get the filter to record the request start time via decode.
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_CALL(*controller_, forwardingDecision())
       .WillOnce(Return(RequestForwardingAction::Forward));
   Buffer::OwnedImpl data;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
   const auto advance_time = std::chrono::nanoseconds(42);
   mt = time_system_.monotonicTime();
   time_system_.setMonotonicTime(mt + advance_time);
 
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_headers));
+  Http::TestResponseTrailerMapImpl response_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   EXPECT_CALL(*controller_, recordLatencySample(advance_time));
   filter_->encodeComplete();
 }
@@ -263,7 +266,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
   time_system_.setMonotonicTime(mt + std::chrono::nanoseconds(123));
 
   // Get the filter to record the request start time via decode.
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_CALL(*controller_, forwardingDecision())
       .WillOnce(Return(RequestForwardingAction::Forward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -272,7 +275,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
   mt = time_system_.monotonicTime();
   time_system_.setMonotonicTime(mt + advance_time);
 
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   EXPECT_CALL(*controller_, recordLatencySample(advance_time));
   filter_->encodeComplete();
@@ -283,13 +286,13 @@ TEST_F(AdaptiveConcurrencyFilterTest, DisregardHealthChecks) {
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
   EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(true));
 
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
 
   // We do not expect a call to forwardingDecision() during decode.
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 
   // We do not expect a call to recordLatencySample() as well.

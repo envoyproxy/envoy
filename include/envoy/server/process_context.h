@@ -14,6 +14,8 @@ public:
   virtual ~ProcessObject() = default;
 };
 
+using ProcessObjectOptRef = absl::optional<std::reference_wrapper<ProcessObject>>;
+
 /**
  * Context passed to filters to access resources from non-Envoy parts of the
  * process.
@@ -28,6 +30,6 @@ public:
   virtual ProcessObject& get() const PURE;
 };
 
-using OptProcessContextRef = absl::optional<std::reference_wrapper<ProcessContext>>;
+using ProcessContextOptRef = absl::optional<std::reference_wrapper<ProcessContext>>;
 
 } // namespace Envoy
