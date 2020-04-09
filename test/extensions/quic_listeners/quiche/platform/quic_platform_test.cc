@@ -251,13 +251,13 @@ TEST_F(QuicPlatformTest, QuicMockLog) {
 }
 
 TEST_F(QuicPlatformTest, QuicServerStats) {
-  Envoy::Stats::Histogram& h1 =
-      store_->histogram("quiche.test_latency", Envoy::Stats::Histogram::Unit::Milliseconds);
+  Envoy::Stats::Histogram& h1 = store_->histogramFromString(
+      "quiche.test_latency", Envoy::Stats::Histogram::Unit::Milliseconds);
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
   QUIC_SERVER_HISTOGRAM_TIMES(test_latency, 100, 0, 500, 10, "bbb");
 
-  Envoy::Stats::Histogram& h2 =
-      store_->histogram("quiche.test_trial.success", Envoy::Stats::Histogram::Unit::Unspecified);
+  Envoy::Stats::Histogram& h2 = store_->histogramFromString(
+      "quiche.test_trial.success", Envoy::Stats::Histogram::Unit::Unspecified);
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 0));
   QUIC_SERVER_HISTOGRAM_BOOL(test_trial.success, false, "just for test");
 
@@ -269,17 +269,17 @@ TEST_F(QuicPlatformTest, QuicServerStats) {
   QUIC_SERVER_HISTOGRAM_ENUM(test_trial.failure.reason, Reason1, 2, "doc");
   EXPECT_EQ(num_counters + 1, store_->counters().size());
   Envoy::Stats::Counter& c1 =
-      store_->counter(absl::StrCat("quiche.test_trial.failure.reason.", Reason1));
+      store_->counterFromString(absl::StrCat("quiche.test_trial.failure.reason.", Reason1));
   EXPECT_EQ(1u, c1.value());
 
-  Envoy::Stats::Histogram& h3 =
-      store_->histogram("quiche.test_trial.cancel", Envoy::Stats::Histogram::Unit::Unspecified);
+  Envoy::Stats::Histogram& h3 = store_->histogramFromString(
+      "quiche.test_trial.cancel", Envoy::Stats::Histogram::Unit::Unspecified);
   EXPECT_FALSE(h3.used());
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h3), 5));
   QUIC_SERVER_HISTOGRAM_COUNTS(test_trial.cancel, 5, 0, 10, 10, "aaaa");
 
-  Envoy::Stats::Histogram& h4 =
-      store_->histogram("quiche.test_session.a.b.c.d", Envoy::Stats::Histogram::Unit::Unspecified);
+  Envoy::Stats::Histogram& h4 = store_->histogramFromString(
+      "quiche.test_session.a.b.c.d", Envoy::Stats::Histogram::Unit::Unspecified);
   EXPECT_FALSE(h4.used());
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h4), 16));
   QUIC_SERVER_HISTOGRAM_COUNTS(test_session.a.b.c.d, 16, 0, 100, 10, "bbbb");

@@ -74,9 +74,10 @@ using CounterMap = absl::flat_hash_map<uint32_t, std::reference_wrapper<Envoy::S
   {}
 
 #define INIT_STATS_HISTOGRAM(a, other_param, name_str)                                             \
-  scope.histogram("quiche." name_str, other_param),
-#define INIT_STATS_COUNTER(a, name_str) scope.counter("quiche." name_str),
-#define INIT_STATS_GAUGE(a, other_param, name_str) scope.gauge("quiche." name_str, other_param),
+  scope.histogramFromString("quiche." name_str, other_param),
+#define INIT_STATS_COUNTER(a, name_str) scope.counterFromString("quiche." name_str),
+#define INIT_STATS_GAUGE(a, other_param, name_str)                                                 \
+  scope.gaugeFromString("quiche." name_str, other_param),
 #define INIT_STATS_ENUM_HISTOGRAM(a, name_str) EMPTY_MAP(a, name_str),
 #define INIT_STATS_STRUCT(name, X...) {X},
 
@@ -142,7 +143,7 @@ public:
     scope_ = nullptr;
   }
 
-  Envoy::Stats::Counter& createCounter(std::string name) { return scope_->counter(name); }
+  Envoy::Stats::Counter& createCounter(std::string name) { return scope_->counterFromString(name); }
 
   QuicheStats& stats() {
     RELEASE_ASSERT(stats_ != nullptr, "Quiche stats is not initialized_.");
