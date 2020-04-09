@@ -19,10 +19,12 @@ class HeaderNameValues {
 public:
   const char* prefix() { return ThreadSafeSingleton<Http::PrefixValue>::get().prefix(); }
 
+  const Http::LowerCaseString AbortRequest{absl::StrCat(prefix(), "-fault-abort-request")};
+  const Http::LowerCaseString AbortRequestPercentage{
+      absl::StrCat(prefix(), "-fault-abort-request-percentage")};
   const Http::LowerCaseString DelayRequest{absl::StrCat(prefix(), "-fault-delay-request")};
   const Http::LowerCaseString ThroughputResponse{
       absl::StrCat(prefix(), "-fault-throughput-response")};
-  const Http::LowerCaseString AbortRequest{absl::StrCat(prefix(), "-fault-abort-request")};
 };
 
 using HeaderNames = ConstSingleton<HeaderNameValues>;
@@ -31,9 +33,12 @@ class FaultAbortConfig {
 public:
   FaultAbortConfig(const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config);
 
-  const envoy::type::v3::FractionalPercent& percentage() const { return percentage_; }
   absl::optional<Http::Code> statusCode(const Http::HeaderEntry* header) const {
     return provider_->statusCode(header);
+  }
+
+  envoy::type::v3::FractionalPercent percentage(const Http::HeaderEntry* header) const {
+      return provider_->percentage(header);
   }
 
 private:
@@ -45,33 +50,45 @@ private:
     // Return the HTTP status code to use. Optionally passed an HTTP header that may contain the
     // HTTP status code depending on the provider implementation.
     virtual absl::optional<Http::Code> statusCode(const Http::HeaderEntry* header) const PURE;
+    // Return the percentage of requests faults should be applied to. Optionally passed an HTTP 
+    // header depending on the provider implementantion.
+    virtual envoy::type::v3::FractionalPercent percentage(const Http::HeaderEntry* header) const PURE;
   };
 
   // Delay provider that uses a fixed abort status code.
   class FixedAbortProvider : public AbortProvider {
   public:
-    FixedAbortProvider(uint64_t status_code) : status_code_(status_code) {}
+    FixedAbortProvider(uint64_t status_code, const envoy::type::v3::FractionalPercent percentage) : status_code_(status_code), percentage_(percentage) {}
 
     // AbortProvider
     absl::optional<Http::Code> statusCode(const Http::HeaderEntry*) const override {
       return static_cast<Http::Code>(status_code_);
     }
 
+    envoy::type::v3::FractionalPercent percentage(const Http::HeaderEntry*) const override {
+      return percentage_;
+    }
+
   private:
     const uint64_t status_code_;
+    const envoy::type::v3::FractionalPercent percentage_;
   };
 
   // Abort provider the reads a status code from an HTTP header.
   class HeaderAbortProvider : public AbortProvider {
   public:
+    HeaderAbortProvider(const envoy::type::v3::FractionalPercent percentage) : percentage_(percentage) {}
     // AbortProvider
     absl::optional<Http::Code> statusCode(const Http::HeaderEntry* header) const override;
+    envoy::type::v3::FractionalPercent percentage(const Http::HeaderEntry* header) const override;
+
+  private:
+    const envoy::type::v3::FractionalPercent percentage_;
   };
 
   using AbortProviderPtr = std::unique_ptr<AbortProvider>;
 
   AbortProviderPtr provider_;
-  const envoy::type::v3::FractionalPercent percentage_;
 };
 
 using FaultAbortConfigPtr = std::unique_ptr<FaultAbortConfig>;

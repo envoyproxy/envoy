@@ -12,14 +12,13 @@ namespace Common {
 namespace Fault {
 
 FaultAbortConfig::FaultAbortConfig(
-    const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config)
-    : percentage_(abort_config.percentage()) {
+    const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config) {
   switch (abort_config.error_type_case()) {
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
-    provider_ = std::make_unique<FixedAbortProvider>(abort_config.http_status());
+    provider_ = std::make_unique<FixedAbortProvider>(abort_config.http_status(), abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHeaderAbort:
-    provider_ = std::make_unique<HeaderAbortProvider>();
+    provider_ = std::make_unique<HeaderAbortProvider>(abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::ERROR_TYPE_NOT_SET:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -43,6 +42,27 @@ FaultAbortConfig::HeaderAbortProvider::statusCode(const Http::HeaderEntry* heade
   }
 
   return ret;
+}
+
+envoy::type::v3::FractionalPercent
+FaultAbortConfig::HeaderAbortProvider::percentage(const Http::HeaderEntry* header) const {
+  if (header == nullptr) {
+    return percentage_;
+  }
+
+  uint64_t header_numerator;
+  if (!absl::SimpleAtoi(header->value().getStringView(), &header_numerator)) {
+    return percentage_;
+  }
+
+  if (header_numerator > 100) {
+    return percentage_;
+  }
+
+  envoy::type::v3::FractionalPercent header_percentage;
+  header_percentage.set_numerator(header_numerator);
+  header_percentage.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+  return header_percentage;
 }
 
 FaultDelayConfig::FaultDelayConfig(

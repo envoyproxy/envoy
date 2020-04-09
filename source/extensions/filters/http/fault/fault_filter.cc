@@ -235,18 +235,19 @@ bool FaultFilter::isDelayEnabled() {
                                                       request_delay->percentage());
 }
 
-bool FaultFilter::isAbortEnabled() {
+bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) {
   const auto request_abort = fault_settings_->requestAbort();
   if (request_abort == nullptr) {
     return false;
   }
 
+  const auto percentage_header = request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortRequestPercentage);
   if (!downstream_cluster_abort_percent_key_.empty()) {
     return config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
-                                                        request_abort->percentage());
+                                                        request_abort->percentage(percentage_header));
   }
   return config_->runtime().snapshot().featureEnabled(fault_settings_->abortPercentRuntime(),
-                                                      request_abort->percentage());
+                                                      request_abort->percentage(percentage_header));
 }
 
 absl::optional<std::chrono::milliseconds>
@@ -283,7 +284,7 @@ FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
 
 absl::optional<Http::Code>
 FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
-  if (!isAbortEnabled()) {
+  if (!isAbortEnabled(request_headers)) {
     return absl::nullopt;
   }
 

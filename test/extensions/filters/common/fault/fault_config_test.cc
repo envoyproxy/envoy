@@ -40,6 +40,45 @@ TEST(FaultConfigTest, FaultAbortHeaderConfig) {
             config.statusCode(good_headers.get(HeaderNames::get().AbortRequest)).value());
 }
 
+TEST(FaultConfigTest, FaultAbortPercentageHeaderConfig) {
+  envoy::extensions::filters::http::fault::v3::FaultAbort proto_config;
+  proto_config.mutable_header_abort();
+  proto_config.mutable_percentage()->set_numerator(33);
+  proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+  FaultAbortConfig config(proto_config);
+
+  // No header.
+  const auto no_header_percentage = config.percentage(nullptr);
+  EXPECT_EQ(proto_config.percentage().numerator(), no_header_percentage.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, no_header_percentage.denominator());
+
+  // Header with bad data.
+  Http::TestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request-percentage", "abc"}};
+  const auto bad_headers_percentage = config.percentage(bad_headers.get(HeaderNames::get().AbortRequestPercentage));
+  EXPECT_EQ(proto_config.percentage().numerator(), bad_headers_percentage.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, bad_headers_percentage.denominator());
+
+  // Out of range header - value too low.
+  Http::TestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-request-percentage", "-1"}};
+  const auto too_low_headers_percentage = config.percentage(too_low_headers.get(HeaderNames::get().AbortRequestPercentage));
+  EXPECT_EQ(proto_config.percentage().numerator(), too_low_headers_percentage.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, too_low_headers_percentage.denominator());
+
+  // Out of range header - value too high.
+  Http::TestHeaderMapImpl too_high_headers{{"x-envoy-fault-abort-request-percentage", "101"}};
+  const auto too_high_headers_percentage = config.percentage(too_high_headers.get(HeaderNames::get().AbortRequestPercentage));
+  EXPECT_EQ(proto_config.percentage().numerator(), too_high_headers_percentage.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, too_high_headers_percentage.denominator());
+
+  // Valid header.
+  Http::TestHeaderMapImpl good_headers{{"x-envoy-fault-abort-request-percentage", "60"}};
+  envoy::type::v3::FractionalPercent expected_percent;
+  expected_percent.set_numerator(60);
+  const auto good_headers_percentage = config.percentage(good_headers.get(HeaderNames::get().AbortRequestPercentage));
+  EXPECT_EQ(expected_percent.numerator(), good_headers_percentage.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, good_headers_percentage.denominator());
+}
+
 TEST(FaultConfigTest, FaultDelayHeaderConfig) {
   envoy::extensions::filters::common::fault::v3::FaultDelay proto_config;
   proto_config.mutable_header_delay();
