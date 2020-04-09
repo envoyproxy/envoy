@@ -16,7 +16,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.redis_proxy.v3";
 option java_outer_classname = "RedisProxyProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Redis Proxy]
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
@@ -175,33 +175,14 @@ message RedisProxy {
 
     // Optional catch-all route to forward commands that doesn't match any of the routes. The
     // catch-all route becomes required when no routes are specified.
-    // .. attention::
-    //
-    //   This field is deprecated. Use a :ref:`catch_all
-    //   route<envoy_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route>`
-    //   instead.
+    Route catch_all_route = 4;
+
     string hidden_envoy_deprecated_catch_all_cluster = 3
         [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
-
-    // Optional catch-all route to forward commands that doesn't match any of the routes. The
-    // catch-all route becomes required when no routes are specified.
-    Route catch_all_route = 4;
   }
 
   // The prefix to use when emitting :ref:`statistics <config_network_filters_redis_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
-
-  // Name of cluster from cluster manager. See the :ref:`configuration section
-  // <arch_overview_redis_configuration>` of the architecture overview for recommendations on
-  // configuring the backing cluster.
-  //
-  // .. attention::
-  //
-  //   This field is deprecated. Use a :ref:`catch_all
-  //   route<envoy_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route>`
-  //   instead.
-  string hidden_envoy_deprecated_cluster = 2
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Network settings for the connection pool to the upstream clusters.
   ConnPoolSettings settings = 3 [(validate.rules).message = {required: true}];
@@ -248,6 +229,9 @@ message RedisProxy {
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no password is set" error will be returned.
   config.core.v3.DataSource downstream_auth_password = 6 [(udpa.annotations.sensitive) = true];
+
+  string hidden_envoy_deprecated_cluster = 2
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
