@@ -27,12 +27,25 @@ namespace {
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
-  TestLoadBalancerContext(uint64_t hash_key) : hash_key_(hash_key) {}
+  using HostPredicate = std::function<bool(const Host&)>;
+
+  TestLoadBalancerContext(uint64_t hash_key)
+      : TestLoadBalancerContext(hash_key, 0, [](const Host&) { return false; }) {}
+  TestLoadBalancerContext(uint64_t hash_key, uint32_t retry_count,
+                          HostPredicate should_select_another_host)
+      : hash_key_(hash_key), retry_count_(retry_count),
+        should_select_another_host_(should_select_another_host) {}
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+  uint32_t hostSelectionRetryCount() const override { return retry_count_; };
+  bool shouldSelectAnotherHost(const Host& host) override {
+    return should_select_another_host_(host);
+  }
 
   absl::optional<uint64_t> hash_key_;
+  uint32_t retry_count_;
+  HostPredicate should_select_another_host_;
 };
 
 class RingHashLoadBalancerTest : public testing::TestWithParam<bool> {
@@ -320,6 +333,71 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
     EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
   }
   EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
+}
+
+// Test the same ring as Basic but exercise retry host predicate behavior.
+TEST_P(RingHashLoadBalancerTest, BasicWithRetryHostPredicate) {
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
+      makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().runCallbacks({}, {});
+
+  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
+  config_.value().mutable_minimum_ring_size()->set_value(12);
+
+  init();
+  EXPECT_EQ("ring_hash_lb.size", lb_->stats().size_.name());
+  EXPECT_EQ("ring_hash_lb.min_hashes_per_host", lb_->stats().min_hashes_per_host_.name());
+  EXPECT_EQ("ring_hash_lb.max_hashes_per_host", lb_->stats().max_hashes_per_host_.name());
+  EXPECT_EQ(12, lb_->stats().size_.value());
+  EXPECT_EQ(2, lb_->stats().min_hashes_per_host_.value());
+  EXPECT_EQ(2, lb_->stats().max_hashes_per_host_.value());
+
+  // hash ring:
+  // port | position
+  // ---------------------------
+  // :94  | 833437586790550860
+  // :92  | 928266305478181108
+  // :90  | 1033482794131418490
+  // :95  | 3551244743356806947
+  // :93  | 3851675632748031481
+  // :91  | 5583722120771150861
+  // :91  | 6311230543546372928
+  // :93  | 7700377290971790572
+  // :95  | 13144177310400110813
+  // :92  | 13444792449719432967
+  // :94  | 15516499411664133160
+  // :90  | 16117243373044804889
+
+  LoadBalancerPtr lb = lb_->factory()->create();
+  {
+    // Proof that we know which host will be selected.
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(hostSet().hosts_[4], lb->chooseHost(&context));
+  }
+  {
+    // First attempt succeeds even when retry count is > 0.
+    TestLoadBalancerContext context(0, 2, [](const Host&) { return false; });
+    EXPECT_EQ(hostSet().hosts_[4], lb->chooseHost(&context));
+  }
+  {
+    // Second attempt chooses the next host in the ring.
+    TestLoadBalancerContext context(
+        0, 2, [&](const Host& host) { return &host == hostSet().hosts_[4].get(); });
+    EXPECT_EQ(hostSet().hosts_[2], lb->chooseHost(&context));
+  }
+  {
+    // Exhausted retries return the last checked host.
+    TestLoadBalancerContext context(0, 2, [](const Host&) { return true; });
+    EXPECT_EQ(hostSet().hosts_[0], lb->chooseHost(&context));
+  }
+  {
+    // Retries wrap around the ring.
+    TestLoadBalancerContext context(0, 13, [](const Host&) { return true; });
+    EXPECT_EQ(hostSet().hosts_[2], lb->chooseHost(&context));
+  }
 }
 
 // Given 2 hosts and a minimum ring size of 3, expect 2 hashes per host and a ring size of 4.

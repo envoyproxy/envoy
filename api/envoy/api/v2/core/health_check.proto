@@ -22,7 +22,7 @@ option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "HealthCheckProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Health check]
 // * Health checking :ref:`architecture overview <arch_overview_health_checking>`.
@@ -74,7 +74,8 @@ message HealthCheck {
   message HttpHealthCheck {
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
-    // with will be used.
+    // with will be used. The host header can be customized for a specific endpoint by setting the
+    // :ref:`hostname <envoy_api_field_endpoint.Endpoint.HealthCheckConfig.hostname>` field.
     string host = 1;
 
     // Specifies the HTTP path that will be requested during health checking. For example
@@ -161,7 +162,8 @@ message HealthCheck {
 
     // The value of the :authority header in the gRPC health check request. If
     // left empty (default value), the name of the cluster this health check is associated
-    // with will be used.
+    // with will be used. The authority header can be customized for a specific endpoint by setting
+    // the :ref:`hostname <envoy_api_field_endpoint.Endpoint.HealthCheckConfig.hostname>` field.
     string authority = 2;
   }
 

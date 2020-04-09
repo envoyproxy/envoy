@@ -2,6 +2,8 @@
 
 #include "envoy/compressor/compressor.h"
 
+#include "common/common/zlib/base.h"
+
 #include "zlib.h"
 
 namespace Envoy {
@@ -10,7 +12,7 @@ namespace Compressor {
 /**
  * Implementation of compressor's interface.
  */
-class ZlibCompressorImpl : public Compressor {
+class ZlibCompressorImpl : public Zlib::Base, public Compressor {
 public:
   ZlibCompressorImpl();
 
@@ -28,11 +30,13 @@ public:
    * Enum values used to set compression level during initialization.
    * best: gives best compression.
    * speed: gives best performance.
+   * levelX: allows to adjust tradoffs more precisely - from level1 (best speed, but very
+   * low compression ratio) to level9 (best compression, but low speed).
    * standard: requests a default compromise between speed and compression. (default) @see zlib
    * manual.
    */
   enum class CompressionLevel : int64_t {
-    Best = 9,
+    Best = Z_BEST_COMPRESSION,
     Level1 = 1,
     Level2 = 2,
     Level3 = 3,
@@ -42,8 +46,8 @@ public:
     Level7 = 7,
     Level8 = 8,
     Level9 = 9,
-    Speed = 1,
-    Standard = -1,
+    Speed = Z_BEST_SPEED,
+    Standard = Z_DEFAULT_COMPRESSION,
   };
 
   /**
@@ -55,11 +59,11 @@ public:
    * standard: used for normal data. (default) @see Z_DEFAULT_STRATEGY in zlib manual.
    */
   enum class CompressionStrategy : uint64_t {
-    Filtered = 1,
-    Fixed = 4,
-    Huffman = 2,
-    Rle = 3,
-    Standard = 0,
+    Filtered = Z_FILTERED,
+    Fixed = Z_FIXED,
+    Huffman = Z_HUFFMAN_ONLY,
+    Rle = Z_RLE,
+    Standard = Z_DEFAULT_STRATEGY,
   };
 
   /**
@@ -75,27 +79,12 @@ public:
   void init(CompressionLevel level, CompressionStrategy strategy, int64_t window_bits,
             uint64_t memory_level);
 
-  /**
-   * It returns the checksum of all output produced so far. Compressor's checksum at the end of the
-   * stream has to match decompressor's checksum produced at the end of the decompression.
-   * @return uint64_t CRC-32 if a gzip stream is being written or Adler-32 for other compression
-   * types.
-   */
-  uint64_t checksum();
-
   // Compressor
   void compress(Buffer::Instance& buffer, State state) override;
 
 private:
   bool deflateNext(int64_t flush_state);
   void process(Buffer::Instance& output_buffer, int64_t flush_state);
-  void updateOutput(Buffer::Instance& output_buffer);
-
-  const uint64_t chunk_size_;
-  bool initialized_;
-
-  std::unique_ptr<unsigned char[]> chunk_char_ptr_;
-  std::unique_ptr<z_stream, std::function<void(z_stream*)>> zstream_ptr_;
 };
 
 } // namespace Compressor
