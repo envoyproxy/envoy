@@ -28,7 +28,7 @@ Version history
 * ext_authz: disabled the use of lowercase string matcher for headers matching in HTTP-based `ext_authz`.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher` to false.
 * fault: added support for controlling abort faults with :ref:`HTTP header fault configuration <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
-* fault: added support for controlling the percantage of requests that abort, delay and response rate limits faults are applied to using :ref:`HTTP headers <config_http_filters_fault_injection_http_header>` to the HTTP fault filter. 
+* fault: added support for controlling the percantage of requests that abort, delay and response rate limits faults are applied to using :ref:`HTTP headers <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
 * grpc-json: added support for building HTTP request into
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 * grpc-stats: add options to limit which messages stats are created for.
