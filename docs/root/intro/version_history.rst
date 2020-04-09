@@ -3,6 +3,7 @@ Version history
 
 1.15.0 (Pending)
 ================
+* access loggers: added GRPC_STATUS operator on logging format.
 
 1.14.1 (April 8, 2020)
 ======================
@@ -12,7 +13,6 @@ Version history
 ======================
 * access log: access logger extensions use the "envoy.access_loggers" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
-* access loggers: added GRPC_STATUS operator on logging format.
 * access log: fix %DOWSTREAM_DIRECT_REMOTE_ADDRESS% when used with PROXY protocol listener filter
 * access log: introduce :ref:`connection-level access loggers<envoy_api_field_Listener.access_log>`.
 * access log: added support for `%DOWNSTREAM_LOCAL_PORT%` :ref:`access log formatters <config_access_log_format>`.
