@@ -11,12 +11,13 @@ The main goal of the Postgres filter is to capture runtime statistics without im
 generating any load on the Postgres upstream server, it is transparent to it. The filter currently
 offers the following features:
 
-* Decrypt non SSL traffic, ignore SSL traffic.
+* Decode non SSL traffic, ignore SSL traffic.
 * Decode session information.
 * Capture transaction information, including commits and rollbacks.
 * Basic decoding of the incoming SQL, exposing counters for different types of
-  transactions (INSERTs, DELETEs, UPDATEs, etc).
-* Count backend messages, distinguishing OK messages, errors and warnings.
+  statements (INSERTs, DELETEs, UPDATEs, etc).
+* Count frontend, backend and unknown messages.
+* Identify errors and notices backend responses.
 
 The Postgres filter solves a notable problem for Postgres deployments:
 gathering this information either imposes additional load to the server; or
