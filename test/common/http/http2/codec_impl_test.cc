@@ -72,7 +72,7 @@ public:
       : client_settings_(client_settings), server_settings_(server_settings) {}
   virtual ~Http2CodecImplTestFixture() = default;
 
-  virtual void initialize(bool expect_server_stream = true) {
+  virtual void initialize() {
     Http2OptionsFromTuple(client_http2_options_, client_settings_);
     Http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
@@ -82,17 +82,15 @@ public:
         server_connection_, server_callbacks_, stats_store_, server_http2_options_,
         max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
 
-    // request_encoder_ = &client_->newStream(response_decoder_);
-    // setupDefaultConnectionMocks();
+    request_encoder_ = &client_->newStream(response_decoder_);
+    setupDefaultConnectionMocks();
 
-    if (expect_server_stream) {
-      EXPECT_CALL(server_callbacks_, newStream(_, _))
-          .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-            response_encoder_ = &encoder;
-            encoder.getStream().addCallbacks(server_stream_callbacks_);
-            return request_decoder_;
-          }));
-    }
+    EXPECT_CALL(server_callbacks_, newStream(_, _))
+        .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoder_ = &encoder;
+          encoder.getStream().addCallbacks(server_stream_callbacks_);
+          return request_decoder_;
+        }));
   }
 
   void setupDefaultConnectionMocks() {
@@ -1787,6 +1785,7 @@ TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
   EXPECT_NO_THROW(server_wrapper_.dispatch(data, *server_));
 }
 
+// Test client for H/2 METADATA frame edge cases.
 class MetadataTestClientConnectionImpl : public TestClientConnectionImpl {
 public:
   MetadataTestClientConnectionImpl(
@@ -1796,6 +1795,10 @@ public:
       : TestClientConnectionImpl(connection, callbacks, scope, http2_options,
                                  max_request_headers_kb, max_request_headers_count,
                                  /*test_only_session=*/true) {
+    // For these tests, an external `nghttp2_session` needs to be used to trigger edge cases not
+    // supported by `ConnectionImpl` such as using unregistered stream IDs.
+
+    // Only need to provide callbacks required to send METADATA frames.
     nghttp2_session_callbacks_new(&metadata_callbacks_);
     nghttp2_session_callbacks_set_pack_extension_callback(
         metadata_callbacks_,
@@ -1813,10 +1816,17 @@ public:
     nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
     nghttp2_session_client_new2(&metadata_session_, metadata_callbacks_, this, options_);
     ASSERT(metadata_session_ != nullptr);
+    // Replace the `session_` used by the `ConnectionImpl` with this custom session.
     session_ = metadata_session_;
   }
 
-  bool submitMetadata(const MetadataMapVector& metadata_map_vector, int32_t stream_id) {
+  ~MetadataTestClientConnectionImpl() override {
+    nghttp2_session_callbacks_del(metadata_callbacks_);
+    nghttp2_option_del(options_);
+  }
+
+  // Overrides TestClientConnectionImpl::submitMetadata().
+  bool submitMetadata(const MetadataMapVector& metadata_map_vector, int32_t stream_id) override {
     // Creates metadata payload.
     encoder_.createPayload(metadata_map_vector);
     for (uint8_t flags : encoder_.payloadFrameFlagBytes()) {
@@ -1843,37 +1853,38 @@ public:
   Http2CodecMetadataTest() : Http2CodecImplTestFixture() {}
 
 protected:
-  void initialize(bool expect_server_stream = true) {
+  void initialize() {
     allow_metadata_ = true;
-    Http2CodecImplTestFixture::initialize(expect_server_stream);
-    metadata_client_ = std::make_unique<MetadataTestClientConnectionImpl>(
-        metadata_client_connection_, metadata_client_callbacks_, stats_store_,
-        client_http2_options_, max_request_headers_kb_, max_response_headers_count_);
+    Http2OptionsFromTuple(client_http2_options_, client_settings_);
+    Http2OptionsFromTuple(server_http2_options_, server_settings_);
+    client_ = std::make_unique<MetadataTestClientConnectionImpl>(
+        client_connection_, client_callbacks_, stats_store_, client_http2_options_,
+        max_request_headers_kb_, max_response_headers_count_);
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, stats_store_, server_http2_options_,
         max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
-    ON_CALL(metadata_client_connection_, write(_, _))
+    ON_CALL(client_connection_, write(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
           server_wrapper_.dispatch(data, *server_);
         }));
     ON_CALL(server_connection_, write(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-          client_wrapper_.dispatch(data, *metadata_client_);
+          client_wrapper_.dispatch(data, *client_);
         }));
   }
-
-  MockConnectionCallbacks metadata_client_callbacks_;
-  NiceMock<Network::MockConnection> metadata_client_connection_;
-  std::unique_ptr<MetadataTestClientConnectionImpl> metadata_client_;
 };
 
+// Validates noop handling of METADATA frames without a known stream ID.
+// This is required per RFC 7540, section 5.1.1, which states that stream ID = 0 can be used for
+// "connection control" messages, and per the H2 METADATA spec (source/docs/h2_metadata.md), which
+// states that these frames can be received prior to the headers.
 TEST_F(Http2CodecMetadataTest, UnknownStreamId) {
-  initialize(/*expect_server_stream=*/false);
+  initialize();
   MetadataMap metadata_map = {{"key", "value"}};
   MetadataMapVector metadata_vector;
   metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
-  ASSERT_EQ(nghttp2_submit_settings(metadata_client_->session(), NGHTTP2_FLAG_NONE, nullptr, 0), 0);
-  EXPECT_TRUE(metadata_client_->submitMetadata(metadata_vector, 0));
+  ASSERT_EQ(nghttp2_submit_settings(client_->session(), NGHTTP2_FLAG_NONE, nullptr, 0), 0);
+  EXPECT_TRUE(client_->submitMetadata(metadata_vector, 0));
 }
 
 } // namespace Http2

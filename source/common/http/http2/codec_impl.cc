@@ -820,12 +820,10 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
                  stream_id, end_metadata);
 
   StreamImpl* stream = getStream(stream_id);
-  ASSERT(stream != nullptr);
-#if 0
+  // ASSERT(stream != nullptr);
   if (stream == nullptr) {
     return 0;
   }
-#endif
 
   bool result = stream->getMetadataDecoder().onMetadataFrameComplete(end_metadata);
   return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
@@ -1142,6 +1140,7 @@ ClientConnectionImpl::ClientConnectionImpl(
                      max_response_headers_count),
       callbacks_(callbacks) {
   ClientHttp2Options client_http2_options(http2_options);
+  // Check if a test is going to be creating it's own session.
   if (!test_only_session) {
     nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
                                 client_http2_options.options());

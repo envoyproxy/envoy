@@ -63,7 +63,17 @@ public:
                            bool test_only_session = false)
       : ClientConnectionImpl(connection, callbacks, scope, http2_options, max_request_headers_kb,
                              max_request_headers_count, test_only_session) {}
+
   nghttp2_session* session() { return session_; }
+
+  // Submits an H/2 METADATA frame to the peer.
+  // Returns true on success, false otherwse.
+  virtual bool submitMetadata(const MetadataMapVector& mm_vector, int32_t stream_id) {
+    UNREFERENCED_PARAMETER(mm_vector);
+    UNREFERENCED_PARAMETER(stream_id);
+    return false;
+  }
+
   using ClientConnectionImpl::getStream;
   using ConnectionImpl::sendPendingFrames;
 
