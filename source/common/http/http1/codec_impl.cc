@@ -948,10 +948,11 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stat
                      max_response_headers_count, formatter(settings), settings.enable_trailers_) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
-  if ((pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) ||
-      parser_.status_code == 204 || parser_.status_code == 304 ||
-      (parser_.status_code >= 200 && parser_.content_length == 0)) {
+  if (pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) {
     ASSERT(!pending_response_done_);
+    return true;
+  } else if (parser_.status_code == 204 || parser_.status_code == 304 ||
+             (parser_.status_code >= 200 && parser_.content_length == 0)) {
     return true;
   } else {
     return false;
