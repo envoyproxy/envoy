@@ -123,6 +123,11 @@ TEST(HttpUtility, H2H1H2Request) {
   ASSERT_EQ(converted_headers, original_headers);
 }
 
+TEST(HttpUtility, ConnectBytestreamSpecialCased) {
+  TestRequestHeaderMapImpl headers = {{":method", "CONNECT"}, {":protocol", "bytestream"}};
+  ASSERT_FALSE(Utility::isH2UpgradeRequest(headers));
+}
+
 // Start with H1 style websocket response headers. Transform to H2 and back.
 TEST(HttpUtility, H1H2H1Response) {
   TestResponseHeaderMapImpl converted_headers = {

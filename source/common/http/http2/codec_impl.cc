@@ -149,6 +149,10 @@ void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& hea
     upgrade_type_ = std::string(headers.Upgrade()->value().getStringView());
     Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
     buildHeaders(final_headers, *modified_headers);
+  } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
+    modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
+    modified_headers->setProtocol("bytestream");
+    buildHeaders(final_headers, *modified_headers);
   } else {
     buildHeaders(final_headers, headers);
   }

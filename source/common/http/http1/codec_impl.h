@@ -72,6 +72,7 @@ public:
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
 
   void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
+  void isResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
 
 protected:
@@ -88,6 +89,7 @@ protected:
   bool chunk_encoding_ : 1;
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
+  bool is_response_to_connect_request_ : 1;
   bool is_content_length_allowed_ : 1;
 
 private:
@@ -145,6 +147,7 @@ public:
   RequestEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
       : StreamEncoderImpl(connection, header_key_formatter) {}
   bool headRequest() { return head_request_; }
+  bool connectRequest() { return connect_request_; }
 
   // Http::RequestEncoder
   void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
@@ -152,6 +155,7 @@ public:
 
 private:
   bool head_request_{};
+  bool connect_request_{};
 };
 
 /**

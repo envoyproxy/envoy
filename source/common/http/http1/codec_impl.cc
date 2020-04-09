@@ -57,6 +57,7 @@ HeaderKeyFormatterPtr formatter(const Http::Http1Settings& settings) {
 
   return nullptr;
 }
+
 } // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
@@ -67,7 +68,8 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
       processing_100_continue_(false), is_response_to_head_request_(false),
-      is_content_length_allowed_(true), header_key_formatter_(header_key_formatter) {
+      is_response_to_connect_request_(false), is_content_length_allowed_(true),
+      header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -172,7 +174,8 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       //
       // When sending a response to a HEAD request Envoy may send an informational
       // "Transfer-Encoding: chunked" header, but should not send a chunk encoded body.
-      chunk_encoding_ = !Utility::isUpgrade(headers) && !is_response_to_head_request_;
+      chunk_encoding_ = !Utility::isUpgrade(headers) && !is_response_to_head_request_ &&
+                        !is_response_to_connect_request_;
     }
   }
 
@@ -342,6 +345,10 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
     // set is_content_length_allowed_ back to true.
     setIsContentLengthAllowed(true);
   }
+  if (numeric_status >= 300) {
+    // Don't do special CONNECT logic if the CONNECT was rejected.
+    is_response_to_connect_request_ = false;
+  }
 
   encodeHeadersBase(headers, end_stream);
 }
@@ -351,12 +358,17 @@ static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
+
   if (!method || !path) {
     throw CodecClientException(":method and :path must be specified");
   }
   if (method->value() == Headers::get().MethodValues.Head) {
     head_request_ = true;
+  } else if (method->value() == Headers::get().MethodValues.Connect) {
+    disableChunkEncoding();
+    connect_request_ = true;
   }
+
   connection_.copyToBuffer(method->value().getStringView().data(), method->value().size());
   connection_.addCharToBuffer(' ');
   connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());
@@ -604,6 +616,10 @@ int ConnectionImpl::onHeadersCompleteBase() {
       handling_upgrade_ = true;
     }
   }
+  if (parser_.method == HTTP_CONNECT) {
+    ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT request.", connection_);
+    handling_upgrade_ = true;
+  }
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
@@ -786,9 +802,8 @@ int ServerConnectionImpl::onHeadersComplete() {
     // Inform the response encoder about any HEAD method, so it can set content
     // length and transfer encoding headers correctly.
     active_request.response_encoder_.isResponseToHeadRequest(parser_.method == HTTP_HEAD);
+    active_request.response_encoder_.isResponseToConnectRequest(parser_.method == HTTP_CONNECT);
 
-    // Currently, CONNECT is not supported, however; http_parser_parse_url needs to know about
-    // CONNECT
     handlePath(*headers, parser_.method);
     ASSERT(active_request.request_url_.empty());
 
@@ -854,6 +869,7 @@ void ServerConnectionImpl::onBody(Buffer::Instance& data) {
 }
 
 void ServerConnectionImpl::onMessageComplete() {
+  ASSERT(!handling_upgrade_);
   if (active_request_.has_value()) {
     auto& active_request = active_request_.value();
     active_request.remote_complete_ = true;
@@ -986,6 +1002,12 @@ int ClientConnectionImpl::onHeadersComplete() {
     ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
     headers->setStatus(parser_.status_code);
 
+    if (parser_.status_code >= 200 && parser_.status_code < 300 &&
+        pending_response_.value().encoder_.connectRequest()) {
+      ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT response.", connection_);
+      handling_upgrade_ = true;
+    }
+
     if (parser_.status_code == 100) {
       // http-parser treats 100 continue headers as their own complete response.
       // Swallow the spurious onMessageComplete and continue processing.
@@ -995,7 +1017,7 @@ int ClientConnectionImpl::onHeadersComplete() {
       // Reset to ensure no information from the continue headers is used for the response headers
       // in case the callee does not move the headers out.
       headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
-    } else if (cannotHaveBody()) {
+    } else if (cannotHaveBody() && !handling_upgrade_) {
       deferred_end_stream_headers_ = true;
     } else {
       pending_response_.value().decoder_->decodeHeaders(std::move(headers), false);

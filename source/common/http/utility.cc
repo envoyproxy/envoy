@@ -382,7 +382,8 @@ bool Utility::isUpgrade(const RequestOrResponseHeaderMap& headers) {
 bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
   return headers.Method() &&
          headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect &&
-         headers.Protocol() && !headers.Protocol()->value().empty();
+         headers.Protocol() && !headers.Protocol()->value().empty() &&
+         headers.Protocol()->value() != "bytestream";
 }
 
 bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {

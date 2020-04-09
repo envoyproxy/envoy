@@ -857,6 +857,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // Verify header sanity checks which should have been performed by the codec.
   ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
+  // For CONNECT requests there may not be a path. Add a placeholder path just so filters don't have
+  // to special case.
+  // TODO(alyssawilk, mattklein123) do we want to require path?  It'd probably cause interop
+  // problems.
+  // TODO(alyssawilk, mattklein123) do we need to strip outbound or is adding one OK?
+  if (Http::Headers::get().MethodValues.Connect ==
+          request_headers_->Method()->value().getStringView() &&
+      !request_headers_->Path()) {
+    request_headers_->setPath("/");
+  }
   // Currently we only support relative paths at the application layer. We expect the codec to have
   // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does this
   // when the allow_absolute_url flag is enabled on the HCM.
@@ -921,9 +931,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
-  if (protocol == Protocol::Http11 && hasCachedRoute()) {
+  if (hasCachedRoute()) {
     if (upgrade_rejected) {
       // Do not allow upgrades if the route does not support it.
+      state_.saw_connection_close_ = true;
+      // TODO(alyssawilk) can we rename this or should we just comment that it's
+      // for all upgrades?
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
                      nullptr, state_.is_head_request_, absl::nullopt,
@@ -2004,6 +2017,12 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
   }
   bool upgrade_rejected = false;
   auto upgrade = request_headers_ ? request_headers_->Upgrade() : nullptr;
+  // Treat CONNECT requests as a special upgrade case.
+  if (!upgrade && request_headers_ && request_headers_->Method() &&
+      Http::Headers::get().MethodValues.Connect ==
+          request_headers_->Method()->value().getStringView()) {
+    upgrade = request_headers_->Method();
+  }
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = nullptr;

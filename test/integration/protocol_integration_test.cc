@@ -1633,7 +1633,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
 
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
     response->waitForEndStream();
-    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("403", response->headers().Status()->value().getStringView());
     EXPECT_TRUE(response->complete());
   } else {
     response->waitForReset();
