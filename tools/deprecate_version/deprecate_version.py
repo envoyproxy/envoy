@@ -101,7 +101,7 @@ def CreateIssues(access_token, runtime_and_pr):
     else:
       # Extract Commit message, sha, and author.
       # In this case we cannot add a user login for an assignee.
-      change_title = commit.message.split('\n')[0] # Remove sign-off mesage
+      change_title = commit.message.split('\n')[0]  # Remove sign-off mesage
       number = ('commit %s') % commit.hexsha
       login = None
       user = commit.author.email
