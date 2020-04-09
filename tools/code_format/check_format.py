@@ -397,11 +397,11 @@ def hasInvalidAngleBracketDirectory(line):
 
 
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]*): ([a-z:`]+)")
-VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile("^====[=]+$")
+VERSION_HISTORY_NEW_SECTION_REGEX = re.compile("^-----[-]+$")
 
 
 def checkCurrentReleaseNotes(file_path, error_messages):
-  in_current_release = False
+  in_changes_section = False
 
   first_word_of_prior_line = ''
   next_word_to_check = ''  # first word after :
@@ -410,12 +410,12 @@ def checkCurrentReleaseNotes(file_path, error_messages):
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
-    if VERSION_HISTORY_NEW_RELEASE_REGEX.match(line):
-      # If we were in the section for the current release this means we have passed it.
-      if in_current_release:
+    if VERSION_HISTORY_NEW_SECTION_REGEX.match(line):
+      # The second section is deprecations, which are not sorted.
+      if in_changes_section:
         break
-      # If we see a version marker we are now in the section for the current release.
-      in_current_release = True
+      # If we see a section marker we are now in the changes section.
+      in_changes_section = True
 
     # Do basic alphabetization checks of the first word on the line and the
     # first word after the :
@@ -438,11 +438,15 @@ def checkCurrentReleaseNotes(file_path, error_messages):
         first_word_of_prior_line = first_word
         next_word_to_check = next_word
 
+with open('VERSION') as f:
+  VERSION_FILE_CONTENTS = f.readlines()[0]
+CURRENT_VERSION = re.match("([0-9]+\.[0-9]+\.[0-9]+)(-[a-z]+)", VERSION_FILE_CONTENTS)[1]
+VERSION_HISTORY_FILENAME_SUFFIX = "/version_history/v{}.rst".format(CURRENT_VERSION)
 
 def checkFileContents(file_path, checker):
   error_messages = []
 
-  if file_path.endswith("version_history.rst"):
+  if file_path.endswith(VERSION_HISTORY_FILENAME_SUFFIX):
     # Version file checking has enough special cased logic to merit its own checks.
     # This only validates entries for the current release as very old release
     # notes have a different format.
