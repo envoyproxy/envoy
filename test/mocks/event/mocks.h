@@ -89,7 +89,7 @@ public:
   }
 
   // Event::Dispatcher
-  MOCK_METHOD(void, initializeStats, (Stats::Scope&));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
   MOCK_METHOD(Network::Connection*, createServerConnection_, ());
   MOCK_METHOD(Network::ClientConnection*, createClientConnection_,
