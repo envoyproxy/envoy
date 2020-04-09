@@ -20,8 +20,9 @@ namespace StreamInfo {
 struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(TimeSource& time_source) : StreamInfoImpl(absl::nullopt, time_source) {}
 
-  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source)
-      : StreamInfoImpl(absl::make_optional(protocol), time_source) {}
+  StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source)
+      : StreamInfoImpl(protocol, time_source,
+                       std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
                  std::shared_ptr<FilterState>& parent_filter_state)
@@ -287,10 +288,6 @@ struct StreamInfoImpl : public StreamInfo {
   std::string route_name_;
 
 private:
-  StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source)
-      : StreamInfoImpl(protocol, time_source,
-                       std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
-
   StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source,
                  FilterStateSharedPtr filter_state)
       : time_source_(time_source), start_time_(time_source.systemTime()),
