@@ -51,7 +51,7 @@ private:
     // HTTP status code depending on the provider implementation.
     virtual absl::optional<Http::Code> statusCode(const Http::HeaderEntry* header) const PURE;
     // Return the percentage of requests faults should be applied to. Optionally passed an HTTP
-    // header depending on the provider implementantion.
+    // header depending on the provider implementation.
     virtual envoy::type::v3::FractionalPercent
     percentage(const Http::HeaderEntry* header) const PURE;
   };
