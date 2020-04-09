@@ -174,20 +174,13 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
 }
 
 void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers) {
-  if (fault_settings_->responseRateLimit() == nullptr) {
+  if (!isResponseRateLimitEnabled(request_headers)) {
     return;
   }
 
   absl::optional<uint64_t> rate_kbps = fault_settings_->responseRateLimit()->rateKbps(
       request_headers.get(Filters::Common::Fault::HeaderNames::get().ThroughputResponse));
   if (!rate_kbps.has_value()) {
-    return;
-  }
-
-  // TODO(mattklein123): Allow runtime override via downstream cluster similar to the other keys.
-  if (!config_->runtime().snapshot().featureEnabled(
-          fault_settings_->responseRateLimitPercentRuntime(),
-          fault_settings_->responseRateLimit()->percentage())) {
     return;
   }
 
@@ -221,18 +214,20 @@ bool FaultFilter::faultOverflow() {
   return false;
 }
 
-bool FaultFilter::isDelayEnabled() {
+bool FaultFilter::isDelayEnabled(const Http::RequestHeaderMap& request_headers) {
   const auto request_delay = fault_settings_->requestDelay();
   if (request_delay == nullptr) {
     return false;
   }
 
+  const auto percentage_header =
+      request_headers.get(Filters::Common::Fault::HeaderNames::get().DelayRequestPercentage);
   if (!downstream_cluster_delay_percent_key_.empty()) {
-    return config_->runtime().snapshot().featureEnabled(downstream_cluster_delay_percent_key_,
-                                                        request_delay->percentage());
+    return config_->runtime().snapshot().featureEnabled(
+        downstream_cluster_delay_percent_key_, request_delay->percentage(percentage_header));
   }
   return config_->runtime().snapshot().featureEnabled(fault_settings_->delayPercentRuntime(),
-                                                      request_delay->percentage());
+                                                      request_delay->percentage(percentage_header));
 }
 
 bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) {
@@ -251,11 +246,24 @@ bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) 
                                                       request_abort->percentage(percentage_header));
 }
 
+bool FaultFilter::isResponseRateLimitEnabled(const Http::RequestHeaderMap& request_headers) {
+  if (fault_settings_->responseRateLimit() == nullptr) {
+    return false;
+  }
+
+  const auto percentage_header =
+      request_headers.get(Filters::Common::Fault::HeaderNames::get().ThroughputResponsePercentage);
+  // TODO(mattklein123): Allow runtime override via downstream cluster similar to the other keys.
+  return config_->runtime().snapshot().featureEnabled(
+      fault_settings_->responseRateLimitPercentRuntime(),
+      fault_settings_->responseRateLimit()->percentage(percentage_header));
+}
+
 absl::optional<std::chrono::milliseconds>
 FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
   absl::optional<std::chrono::milliseconds> ret;
 
-  if (!isDelayEnabled()) {
+  if (!isDelayEnabled(request_headers)) {
     return ret;
   }
 
