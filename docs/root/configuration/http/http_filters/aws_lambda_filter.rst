@@ -182,3 +182,18 @@ An example with the Lambda metadata applied to a weighted-cluster:
         "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
         sni: "*.amazonaws.com"
 
+
+Statistics
+----------
+
+The AWS Lambda filter outputs statistics in the *http.<stat_prefix>.aws_lambda.* namespace. The
+:ref:`stat prefix <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stat_prefix>`
+comes from the owning HTTP connection manager.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  server_error, Counter, Total requests that returned invalid JSON response (see :ref:`payload_passthrough <envoy_api_msg_config.filter.http.aws_lambda.v2alpha.config>`)
+  upstream_rq_payload_size, Histogram, Size in bytes of the request after JSON-tranformation (if any).
+
