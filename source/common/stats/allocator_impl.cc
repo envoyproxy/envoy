@@ -240,9 +240,9 @@ public:
   }
 
   // Stats::TextReadout
-  void set(const std::string& value) override {
+  void set(std::string&& value) override {
     absl::MutexLock lock(&mutex_);
-    value_ = value;
+    value_ = std::move(value);
   }
   std::string value() const override {
     absl::MutexLock lock(&mutex_);
@@ -251,7 +251,7 @@ public:
 
 private:
   mutable absl::Mutex mutex_;
-  std::string value_;
+  std::string value_ ABSL_GUARDED_BY(mutex_);
 };
 
 CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracted_name,

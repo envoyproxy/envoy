@@ -170,7 +170,7 @@ public:
 
   virtual ~TextReadout() {}
 
-  virtual void set(const std::string& value) PURE;
+  virtual void set(std::string&& value) PURE;
   virtual std::string value() const PURE;
 };
 

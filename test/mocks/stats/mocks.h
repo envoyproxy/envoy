@@ -250,7 +250,7 @@ public:
   MockTextReadout();
   ~MockTextReadout();
 
-  MOCK_METHOD1(set, void(const std::string& value));
+  MOCK_METHOD1(set, void(std::string&& value));
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, std::string());
 
