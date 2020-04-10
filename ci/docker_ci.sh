@@ -4,6 +4,7 @@
 # CI logs.
 set -e
 
+# This prefix is altered for the private security images on setec builds.
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
@@ -12,13 +13,22 @@ for BUILD_TYPE in "" "-alpine" "-alpine-debug"; do
     docker build -f ci/Dockerfile-envoy"${BUILD_TYPE}" -t "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local" .
 done
 
-# Only push images for master builds and tag builds.
-if [[ "${AZP_BRANCH}" != 'refs/heads/master' ]] && ! [[ "${AZP_BRANCH}" =~ ^refs/tags/v.* ]]; then
+MASTER_BRANCH="refs/heads/master"
+RELEASE_BRANCH_REGEX="^refs/heads/release/v.*"
+RELEASE_TAG_REGEX="^refs/tags/v.*"
+
+# Only push images for master builds, release branch builds, and tag builds.
+if [[ "${AZP_BRANCH}" != "${MASTER_BRANCH}" ]] && \
+   ! [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]] && \
+   ! [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
     echo 'Ignoring non-master branch or tag for docker push.'
     exit 0
 fi
 
-if [[ "${AZP_BRANCH}" == 'refs/heads/master' ]]; then
+# For master builds and release branch builds use the dev repo. Otherwise we assume it's a tag and
+# we push to the primary repo.
+if [[ "${AZP_BRANCH}" == "${MASTER_BRANCH}" ]] || \
+   [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]]; then
   IMAGE_POSTFIX="-dev"
   IMAGE_NAME="$AZP_SHA1"
 else
@@ -32,7 +42,7 @@ for BUILD_TYPE in "" "-alpine" "-alpine-debug"; do
     docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
     docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
 
-    # Only push latest on master builds
+    # Only push latest on master builds.
     if [[ "${AZP_BRANCH}" == 'refs/heads/master' ]]; then
         docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
         docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
