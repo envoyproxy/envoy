@@ -124,7 +124,7 @@ bool ClusterRefreshManagerImpl::onEvent(const std::string& cluster_name, EventTy
         post_callback = true;
       }
 
-      // If a callback should be triggered(in this or some other threads) signaled by the changed
+      // If a callback should be triggered(in this or some other thread) signaled by the changed
       // last callback time, we reset the count to 0
       if (post_callback || info->last_callback_time_ms_.load() != last_callback_time_ms) {
         *count = 0;
