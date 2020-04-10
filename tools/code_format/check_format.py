@@ -439,16 +439,10 @@ def checkCurrentReleaseNotes(file_path, error_messages):
         next_word_to_check = next_word
 
 
-with open('VERSION') as f:
-  VERSION_FILE_CONTENTS = f.readlines()[0]
-CURRENT_VERSION = re.match("([0-9]+\.[0-9]+\.[0-9]+)(-[a-z]+)", VERSION_FILE_CONTENTS).groups()[1]
-VERSION_HISTORY_FILENAME_SUFFIX = "/version_history/v{}.rst".format(CURRENT_VERSION)
-
-
 def checkFileContents(file_path, checker):
   error_messages = []
 
-  if file_path.endswith(VERSION_HISTORY_FILENAME_SUFFIX):
+  if file_path.endswith("version_history/current.rst"):
     # Version file checking has enough special cased logic to merit its own checks.
     # This only validates entries for the current release as very old release
     # notes have a different format.

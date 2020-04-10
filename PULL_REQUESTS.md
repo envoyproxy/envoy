@@ -54,7 +54,7 @@ N/A if there were no documentation changes.
 ### <a name="relnotes"></a>Release notes
 
 If this change is user impacting OR extension developer impacting (filter API, etc.) you **must**
-add a release note to the [version history](docs/root/version_history/version_history.rst) for the 
+add a release note to the [version history](docs/root/version_history/current.rst) for the 
 current version. Please include any relevant links. Each release note should be prefixed with the
 relevant subsystem in **alphabetical order** (see existing examples as a guide) and include links
 to relevant parts of the documentation. Thank you! Please write in N/A if there are no release notes.
