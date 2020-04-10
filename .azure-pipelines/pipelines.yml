@@ -2,6 +2,7 @@ trigger:
   branches:
     include:
       - "master"
+      - "release/v*"
   tags:
     include:
       - "v*"
