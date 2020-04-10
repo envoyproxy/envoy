@@ -951,30 +951,40 @@ public:
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
 
 /**
- * RouteCallback, return these codes to the route matcher to indicate
- * whether it should continue matching routes beyond the last matched
- * route or stop matching.
+ * RouteCallback, returns one of these enums to the route matcher to indicate
+ * if the matched route has been accepted or it wants the route matching to
+ * continue.
  */
 enum class RouteMatchStatus {
   // Continue matching route
   Continue,
-  // Stop matching route
-  Stop
+  // Accept matched route
+  Accept
+};
+
+/**
+ * RouteCallback, is passed this enum to indicate if more routes are available for evaluation.
+ */
+enum class RouteEvalStatus {
+  // Has more routes that can be evaluated for match
+  HasMoreRoutes,
+  // All routes have been evaluated for match
+  NoMoreRoutes
 };
 
 /**
  * RouteCallback can be used to override routing decision made by the Route::Config::route,
- * this callback is passed the RouteConstSharedPtr which can be nullptr of no matching route
- * was found and a bool indicating if there are more routes remaining to be matched.
+ * this callback is passed the RouteConstSharedPtr, which can be null if no matching route
+ * was found, and RouteEvalStatus indicating whether there are more routes available for evaluation.
  *
  * RouteCallback will be called back at least once, RouteCallback can return
- * one of the RouteMatchStatus enum to indicate if the matching should continue or stop.
+ * one of the RouteMatchStatus enum to indicate if the match has been accepted or should the route
+ * match evaluation continue.
  *
- * Returning RouteMatchStatus::Continue, when no more routes available
- * to match will result in no further callbacks.
+ * Returning RouteMatchStatus::Continue, when no more routes available for evaluation will result in
+ * no further callbacks.
  */
-using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, bool)>;
-using RouteCallbackSharedPtr = std::shared_ptr<RouteCallback>;
+using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteEvalStatus)>;
 
 /**
  * The router configuration.
@@ -1007,10 +1017,13 @@ public:
    * @param headers supplies the request headers.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.
+   * @return the route accepted by the callback or nullptr if no match found or none of route is
+   * accepted by the callback.
    */
 
-  virtual void route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                     const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const PURE;
+  virtual RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                    const StreamInfo::StreamInfo& stream_info,
+                                    uint64_t random_value) const PURE;
 
   /**
    * Return a list of headers that will be cleaned from any requests that are not from an internal

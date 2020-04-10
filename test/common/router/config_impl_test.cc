@@ -86,16 +86,16 @@ public:
     return ConfigImpl::route(headers, stream_info, random_value);
   }
 
-  void route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-             const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override {
+  RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                            const StreamInfo::StreamInfo& stream_info,
+                            uint64_t random_value) const override {
 
     setupRouteConfig(headers, random_value);
-    ConfigImpl::route(cb, headers, stream_info, random_value);
+    return ConfigImpl::route(cb, headers, stream_info, random_value);
   }
 
-  void route(const RouteCallback& cb, const Http::RequestHeaderMap& headers) const {
-
-    route(cb, headers, NiceMock<Envoy::StreamInfo::MockStreamInfo>(), 0);
+  RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers) const {
+    return route(cb, headers, NiceMock<Envoy::StreamInfo::MockStreamInfo>(), 0);
   }
 
   RouteConstSharedPtr route(const Http::RequestHeaderMap& headers, uint64_t random_value) const {
@@ -7134,19 +7134,21 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
   std::vector<std::string> clusters{"default", "foo", "foo_bar", "foo_bar_baz"};
 
-  config.route(
-      [&clusters](RouteConstSharedPtr route, bool has_more_routes) -> RouteMatchStatus {
-        EXPECT_GE(clusters.size(), 0);
+  RouteConstSharedPtr accepted_route = config.route(
+      [&clusters](RouteConstSharedPtr route,
+                  RouteEvalStatus route_eval_status) -> RouteMatchStatus {
+        EXPECT_FALSE(clusters.empty());
         EXPECT_EQ(clusters[clusters.size() - 1], route->routeEntry()->clusterName());
         clusters.pop_back();
         if (!clusters.empty()) {
-          EXPECT_TRUE(has_more_routes);
+          EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
           return RouteMatchStatus::Continue;
         }
-        EXPECT_FALSE(has_more_routes);
-        return RouteMatchStatus::Stop;
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
+        return RouteMatchStatus::Accept;
       },
       genHeaders("bat.com", "/foo/bar/baz", "GET"));
+  EXPECT_EQ(accepted_route->routeEntry()->clusterName(), "default");
 }
 
 TEST_F(RouteMatchOverrideTest, VerifyRouteOverrideStops) {
@@ -7173,19 +7175,21 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
   std::vector<std::string> clusters{"foo", "foo_bar"};
 
-  config.route(
-      [&clusters](RouteConstSharedPtr route, bool has_more_routes) -> RouteMatchStatus {
-        EXPECT_GE(clusters.size(), 0);
+  RouteConstSharedPtr accepted_route = config.route(
+      [&clusters](RouteConstSharedPtr route,
+                  RouteEvalStatus route_eval_status) -> RouteMatchStatus {
+        EXPECT_FALSE(clusters.empty());
         EXPECT_EQ(clusters[clusters.size() - 1], route->routeEntry()->clusterName());
         clusters.pop_back();
-        EXPECT_TRUE(has_more_routes);
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
 
         if (!clusters.empty()) {
           return RouteMatchStatus::Continue;
         }
-        return RouteMatchStatus::Stop; // Do not match default route
+        return RouteMatchStatus::Accept; // Do not match default route
       },
       genHeaders("bat.com", "/foo/bar", "GET"));
+  EXPECT_EQ(accepted_route->routeEntry()->clusterName(), "foo");
 }
 
 TEST_F(RouteMatchOverrideTest, StopWhenNoMoreRoutes) {
@@ -7212,21 +7216,23 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
   std::vector<std::string> clusters{"default", "foo", "foo_bar", "foo_bar_baz"};
 
-  config.route(
-      [&clusters](RouteConstSharedPtr route, bool has_more_routes) -> RouteMatchStatus {
-        EXPECT_GE(clusters.size(), 0);
+  RouteConstSharedPtr accepted_route = config.route(
+      [&clusters](RouteConstSharedPtr route,
+                  RouteEvalStatus route_eval_status) -> RouteMatchStatus {
+        EXPECT_FALSE(clusters.empty());
         EXPECT_EQ(clusters[clusters.size() - 1], route->routeEntry()->clusterName());
         clusters.pop_back();
 
         if (!clusters.empty()) {
-          EXPECT_TRUE(has_more_routes);
+          EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
         } else {
-          EXPECT_FALSE(has_more_routes);
+          EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
         }
         // Returning continue when no more routes are available will be ignored by ConfigImpl::route
         return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/foo/bar/baz", "GET"));
+  EXPECT_EQ(accepted_route, nullptr);
 }
 
 TEST_F(RouteMatchOverrideTest, NullRouteOnNoRouteMatch) {
@@ -7249,15 +7255,16 @@ virtual_hosts:
 
   int ctr = 0;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
-  config.route(
-      [&ctr](RouteConstSharedPtr route, bool has_more_routes) -> RouteMatchStatus {
+  RouteConstSharedPtr accepted_route = config.route(
+      [&ctr](RouteConstSharedPtr route, RouteEvalStatus route_eval_status) -> RouteMatchStatus {
         EXPECT_EQ(ctr++, 0);
         EXPECT_EQ(route, nullptr);
-        EXPECT_FALSE(has_more_routes);
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
         // Returning continue when no more routes are available will be ignored by ConfigImpl::route
         return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/", "GET"));
+  EXPECT_EQ(accepted_route, nullptr);
 }
 
 TEST_F(RouteMatchOverrideTest, NullRouteOnNoHostMatch) {
@@ -7280,15 +7287,16 @@ virtual_hosts:
 
   int ctr = 0;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
-  config.route(
-      [&ctr](RouteConstSharedPtr route, bool has_more_routes) -> RouteMatchStatus {
+  RouteConstSharedPtr accepted_route = config.route(
+      [&ctr](RouteConstSharedPtr route, RouteEvalStatus route_eval_status) -> RouteMatchStatus {
         EXPECT_EQ(ctr++, 0);
         EXPECT_EQ(route, nullptr);
-        EXPECT_FALSE(has_more_routes);
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
         // Returning continue when no more routes are available will be ignored by ConfigImpl::route
         return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/", "GET"));
+  EXPECT_EQ(accepted_route, nullptr);
 }
 
 TEST_F(RouteMatchOverrideTest, NullRouteOnNullXForwardedProto) {
@@ -7311,15 +7319,82 @@ virtual_hosts:
 
   int ctr = 0;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
-  config.route(
-      [&ctr](RouteConstSharedPtr route, bool has_more_routes) -> RouteMatchStatus {
+  RouteConstSharedPtr accepted_route = config.route(
+      [&ctr](RouteConstSharedPtr route, RouteEvalStatus route_eval_status) -> RouteMatchStatus {
         EXPECT_EQ(ctr++, 0);
         EXPECT_EQ(route, nullptr);
-        EXPECT_FALSE(has_more_routes);
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
         // Returning continue when no more routes are available will be ignored by ConfigImpl::route
         return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/", "GET", ""));
+  EXPECT_EQ(accepted_route, nullptr);
+}
+
+TEST_F(RouteMatchOverrideTest, NullRouteOnRequireTlsAll) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/foo/bar/baz" }
+        route:
+          cluster: foo_bar_baz
+      - match: { prefix: "/foo/bar" }
+        route:
+          cluster: foo_bar
+      - match: { prefix: "/" }
+        route:
+          cluster: default
+    require_tls: ALL
+)EOF";
+
+  int ctr = 0;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+  RouteConstSharedPtr accepted_route = config.route(
+      [&ctr](RouteConstSharedPtr route, RouteEvalStatus route_eval_status) -> RouteMatchStatus {
+        EXPECT_EQ(ctr++, 0);
+        EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(route.get()));
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
+        // Returning continue when no more routes are available will be ignored by ConfigImpl::route
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/", "GET"));
+  EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(accepted_route.get()));
+}
+
+TEST_F(RouteMatchOverrideTest, NullRouteOnRequireTlsInternal) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/foo/bar/baz" }
+        route:
+          cluster: foo_bar_baz
+      - match: { prefix: "/foo/bar" }
+        route:
+          cluster: foo_bar
+      - match: { prefix: "/" }
+        route:
+          cluster: default
+    require_tls: EXTERNAL_ONLY
+)EOF";
+
+  int ctr = 0;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+  RouteConstSharedPtr accepted_route = config.route(
+      [&ctr](RouteConstSharedPtr route, RouteEvalStatus route_eval_status) -> RouteMatchStatus {
+        EXPECT_EQ(ctr++, 0);
+        EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(route.get()));
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
+        // Returning continue when no more routes are available will be ignored by ConfigImpl::route
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/", "GET"));
+  EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(accepted_route.get()));
 }
 
 } // namespace

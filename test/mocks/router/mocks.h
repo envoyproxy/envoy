@@ -428,7 +428,7 @@ public:
               (const Http::RequestHeaderMap&, const Envoy::StreamInfo::StreamInfo&,
                uint64_t random_value),
               (const));
-  MOCK_METHOD(void, route,
+  MOCK_METHOD(RouteConstSharedPtr, route,
               (const RouteCallback& cb, const Http::RequestHeaderMap&,
                const Envoy::StreamInfo::StreamInfo&, uint64_t random_value),
               (const));

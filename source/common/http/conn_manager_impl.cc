@@ -1402,50 +1402,18 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
 
-void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(Router::RouteCallbackSharedPtr cb) {
-  if (request_headers_ == nullptr) {
-    cacheRoute(nullptr);
-    if (cb != nullptr) {
-      (*cb)(nullptr, false);
+void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::RouteCallback& cb) {
+  Router::RouteConstSharedPtr route;
+  if (request_headers_ != nullptr) {
+    if (connection_manager_.config_.isRoutable() &&
+        connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
+      // NOTE: re-select scope as well in case the scope key header has been changed by a filter.
+      snapScopedRouteConfig();
     }
-    return;
-  }
-
-  if (connection_manager_.config_.isRoutable() &&
-      connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
-    // NOTE: re-select scope as well in case the scope key header has been changed by a filter.
-    snapScopedRouteConfig();
-  }
-
-  if (snapped_route_config_ == nullptr) {
-    cacheRoute(nullptr);
-    if (cb != nullptr) {
-      (*cb)(nullptr, false);
+    if (snapped_route_config_ != nullptr) {
+      route = snapped_route_config_->route(cb, *request_headers_, stream_info_, stream_id_);
     }
-    return;
   }
-
-  if (cb == nullptr) {
-    cacheRoute(snapped_route_config_->route(*request_headers_, stream_info_, stream_id_));
-    return;
-  }
-
-  snapped_route_config_->route(
-      [this, &cb](Router::RouteConstSharedPtr route,
-                  bool has_more_routes) -> Router::RouteMatchStatus {
-        Router::RouteMatchStatus status = (*cb)(route, has_more_routes);
-
-        if (!has_more_routes || status == Router::RouteMatchStatus::Stop) {
-          cacheRoute(route);
-          return Router::RouteMatchStatus::Stop;
-        }
-
-        return status;
-      },
-      *request_headers_, stream_info_, stream_id_);
-}
-
-void ConnectionManagerImpl::ActiveStream::cacheRoute(Router::RouteConstSharedPtr route) {
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
   cached_route_ = std::move(route);
   if (nullptr == stream_info_.route_entry_) {
@@ -2265,11 +2233,13 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
   return parent_.cached_route_.value();
 }
 
-void ConnectionManagerImpl::ActiveStreamFilterBase::route(Router::RouteCallbackSharedPtr cb) {
+Router::RouteConstSharedPtr
+ConnectionManagerImpl::ActiveStreamFilterBase::route(const Router::RouteCallback& cb) {
   if (parent_.cached_route_.has_value()) {
     clearRouteCache();
   }
   parent_.refreshCachedRoute(cb);
+  return parent_.cached_route_.value();
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {

@@ -153,12 +153,15 @@ public:
 
   /**
    * Invokes callback with a matched route, callback can choose to accept this route by returning
-   * Router::RouteMatchStatus::Stop or continue route match from last matched route by returning
+   * Router::RouteMatchStatus::Accept or continue route match from last matched route by returning
    * Router::RouteMatchStatus::Continue, if there are more routes available.
+   *
+   * Returns route accepted by the callback or nullptr if no match found or none of route is
+   * accepted by the callback.
    *
    * This method will clear any cached route upon invocation.
    */
-  virtual void route(Router::RouteCallbackSharedPtr cb) PURE;
+  virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
   /**
    * Returns the clusterInfo for the cached route.
    * This method is to avoid multiple look ups in the filter chain, it also provides a consistent

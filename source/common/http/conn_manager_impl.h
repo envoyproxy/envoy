@@ -153,7 +153,7 @@ private:
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
-    void route(Router::RouteCallbackSharedPtr callback) override;
+    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     void clearRouteCache() override;
     uint64_t streamId() const override;
@@ -575,8 +575,7 @@ private:
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
-    void refreshCachedRoute(Router::RouteCallbackSharedPtr cb);
-    void cacheRoute(Router::RouteConstSharedPtr route);
+    void refreshCachedRoute(const Router::RouteCallback& cb);
     void
     requestRouteConfigUpdate(Event::Dispatcher& thread_local_dispatcher,
                              Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
