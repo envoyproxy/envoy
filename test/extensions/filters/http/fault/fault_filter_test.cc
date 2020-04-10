@@ -1032,7 +1032,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   token_timer->invokeCallback();
 
   // Advance time by 1s which should refill all tokens.
-  time_system_.sleep(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
 
   // Send 1152 bytes of data which is 1s + 2 refill cycles of data.
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark());
@@ -1047,7 +1047,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   token_timer->invokeCallback();
 
   // Fire timer, also advance time.
-  time_system_.sleep(std::chrono::milliseconds(63));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
@@ -1058,20 +1058,20 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data3, false));
 
   // Fire timer, also advance time.
-  time_system_.sleep(std::chrono::milliseconds(63));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
   token_timer->invokeCallback();
 
   // Fire timer, also advance time. No time enable because there is nothing buffered.
-  time_system_.sleep(std::chrono::milliseconds(63));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'b')), false));
   token_timer->invokeCallback();
 
   // Advance time by 1s for a full refill.
-  time_system_.sleep(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
 
   // Now send 1024 in one shot with end_stream true which should go through and end the stream.
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
