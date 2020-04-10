@@ -74,15 +74,15 @@ bool ClusterRefreshManagerImpl::onEvent(const std::string& cluster_name, EventTy
         return false;
       }
 
-      bool postCallBack = false
-          // ignore redirects during min time between triggering
-          if ((++(*count) >= threshold) &&
-              (info->last_callback_time_ms_.compare_exchange_strong(last_callback_time_ms, now))) {
+      bool postCallBack = false;
+      // ignore redirects during min time between triggering
+      if ((++(*count) >= threshold) &&
+          (info->last_callback_time_ms_.compare_exchange_strong(last_callback_time_ms, now))) {
         // last_callback_time_ms_ successfully updated without any changes since it was
         // initially read. This thread is allowed to post a call to the registered callback
         // on the main thread. Otherwise, the thread would be ignored to prevent over-triggering
         // cluster callbacks.
-        postCallBack = true
+        postCallBack = true;
       }
 
       // If a callback should be triggered(in this or some other threads) signaled by the changed
