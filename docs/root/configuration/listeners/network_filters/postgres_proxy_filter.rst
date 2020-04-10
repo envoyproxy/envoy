@@ -40,11 +40,11 @@ example below:
     - filters:
       - name: envoy.filters.network.postgres_proxy
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy 
+          "@type": type.googleapis.com/envoy.extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy
           stat_prefix: postgres
       - name: envoy.tcp_proxy
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp
           cluster: postgres_cluster
 

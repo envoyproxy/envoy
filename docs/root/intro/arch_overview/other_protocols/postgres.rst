@@ -21,7 +21,7 @@ offers the following features:
 
 The Postgres filter solves a notable problem for Postgres deployments:
 gathering this information either imposes additional load to the server; or
-requires from pull-based querying metadata from the server, sometimes requiring
+requires pull-based querying for metadata from the server, sometimes requiring
 external components or extensions. This filter provides valuable observability
 information, without impacting the performance of the upstream Postgres
 server or requiring the installation of any software.

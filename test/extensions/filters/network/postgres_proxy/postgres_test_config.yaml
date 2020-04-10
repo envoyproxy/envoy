@@ -31,6 +31,6 @@ static_resources:
               stat_prefix: postgres_stats
           - name: tcp
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+              "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
               stat_prefix: tcp_stats
               cluster: cluster_0
