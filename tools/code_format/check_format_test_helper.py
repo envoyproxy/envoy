@@ -188,7 +188,13 @@ def runChecks():
       "serialize_as_string.cc",
       "Don't use MessageLite::SerializeAsString for generating deterministic serialization")
   errors += checkUnfixableError(
-      "version_history.rst",
+      "version_history/current.rst",
+      "Version history not in alphabetical order (zzzzz vs aaaaa): please check placement of line")
+  errors += checkUnfixableError(
+      "version_history/current.rst",
+      "Version history not in alphabetical order (this vs aaaa): please check placement of line")
+  errors += checkUnfixableError(
+      "version_history/current.rst",
       "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
       "check_format.py")
   errors += checkUnfixableError(

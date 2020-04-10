@@ -120,7 +120,7 @@ Upgrading to $VERSION is encouraged to fix these issues.
 
 GitHub tag: https://github.com/envoyproxy/envoy/releases/tag/v$VERSION
 Docker images: https://hub.docker.com/r/envoyproxy/envoy/tags
-Release notes: https://www.envoyproxy.io/docs/envoy/v$VERSION/intro/version_history
+Release notes: https://www.envoyproxy.io/docs/envoy/v$VERSION/version_history/current.rst
 Docs: https://www.envoyproxy.io/docs/envoy/v$VERSION/
 
 **Am I vulnerable?**

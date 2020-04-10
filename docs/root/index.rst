@@ -15,6 +15,7 @@ Envoy documentation
   intro/intro
   start/start
   install/install
+  version_history/version_history
   configuration/configuration
   operations/operations
   extending/extending
