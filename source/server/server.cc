@@ -522,7 +522,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     });
 
     sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
-      ENVOY_LOG(warn, "caught SIGUSR1");
+      ENVOY_LOG(info, "caught SIGUSR1. Reopening access logs.");
       access_log_manager.reopen();
     });
 
