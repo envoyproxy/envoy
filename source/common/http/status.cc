@@ -26,13 +26,13 @@ absl::string_view statusCodeToString(StatusCode code) {
 
 struct EnvoyStatusPayload {
   EnvoyStatusPayload(StatusCode status_code) : status_code_(status_code) {}
-  StatusCode status_code_;
+  const StatusCode status_code_;
 };
 
 struct PrematureResponsePayload : public EnvoyStatusPayload {
   PrematureResponsePayload(Http::Code http_code)
       : EnvoyStatusPayload(StatusCode::PrematureResponseError), http_code_(http_code) {}
-  Http::Code http_code_;
+  const Http::Code http_code_;
 };
 
 template <typename T> void storePayload(absl::Status& status, const T& payload) {
@@ -110,8 +110,8 @@ bool isPrematureResponseError(const Status& status) {
 
 Http::Code getPrematureResponseHttpCode(const Status& status) {
   const auto* payload = getPayload<PrematureResponsePayload>(status);
-  RELEASE_ASSERT(payload->status_code_ == StatusCode::PrematureResponseError,
-                 "Must be PrematureResponseError");
+  ASSERT(payload->status_code_ == StatusCode::PrematureResponseError,
+         "Must be PrematureResponseError");
   return payload->http_code_;
 }
 
