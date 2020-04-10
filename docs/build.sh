@@ -15,7 +15,7 @@ then
     echo "${CIRCLE_TAG} vs $(cat VERSION)"
     exit 1
   fi
-  # Check the version_history.rst contains current release version.		
+  # Check the version_history.rst contains current release version.
   grep --fixed-strings "$VERSION_NUMBER" docs/root/version_history/current.rst \
     || (echo "Git tag not found in version_history/current.rst" && exit 1)
 
