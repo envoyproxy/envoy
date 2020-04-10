@@ -161,9 +161,15 @@ message HttpConnectionManager {
     repeated type.tracing.v2.CustomTag custom_tags = 8;
 
     // Configuration for an external tracing provider.
-    // If not specified, Envoy will fall back to using tracing provider configuration
-    // from the bootstrap config.
-    // [#not-implemented-hide:]
+    // If not specified, no tracing will be performed.
+    //
+    // .. attention::
+    //   Please be aware that *envoy.tracers.opencensus* provider can only be configured once
+    //   in Envoy lifetime.
+    //   Any attempts to reconfigure it or to use different configurations for different HCM filters
+    //   will be rejected.
+    //   Such a constraint is inherent to OpenCensus itself. It cannot be overcome without changes
+    //   on OpenCensus side.
     trace.v2.Tracing.Http provider = 9;
   }
 

@@ -940,10 +940,10 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
               ProtoEq(server_->httpContext().defaultTracingConfig()));
 }
 
-TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(ZipkinHttpTracingEnabled)) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  EXPECT_NO_THROW(initialize("test/server/test_data/server/zipkin_tracing.yaml"));
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/zipkin_tracing_deprecated_config.yaml"));
   EXPECT_EQ("zipkin", server_->httpContext().defaultTracingConfig().http().name());
 }
 

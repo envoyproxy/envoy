@@ -11,7 +11,6 @@ import "envoy/config/core/v4alpha/socket_option.proto";
 import "envoy/config/listener/v3/listener.proto";
 import "envoy/config/metrics/v3/stats.proto";
 import "envoy/config/overload/v3/overload.proto";
-import "envoy/config/trace/v4alpha/trace.proto";
 import "envoy/extensions/transport_sockets/tls/v4alpha/cert.proto";
 
 import "google/protobuf/duration.proto";
@@ -85,9 +84,9 @@ message Bootstrap {
     core.v4alpha.ApiConfigSource ads_config = 3;
   }
 
-  reserved 10, 11;
+  reserved 10, 11, 9;
 
-  reserved "runtime";
+  reserved "runtime", "tracing";
 
   // Node identity to present to the management server and for instance
   // identification purposes (e.g. in generated headers).
@@ -128,10 +127,6 @@ message Bootstrap {
 
   // Optional watchdog configuration.
   Watchdog watchdog = 8;
-
-  // Configuration for an external tracing provider. If not specified, no
-  // tracing will be performed.
-  trace.v4alpha.Tracing tracing = 9;
 
   // Configuration for the runtime configuration provider. If not
   // specified, a “null” provider will be used which will result in all defaults
