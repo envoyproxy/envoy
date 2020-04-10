@@ -75,6 +75,11 @@ MockStore::MockStore() : TestUtil::TestStore(*global_symbol_table_) {
         histograms_.emplace_back(histogram);
         return *histogram;
       }));
+
+  ON_CALL(*this, histogramFromString(_, _))
+      .WillByDefault(Invoke([this](const std::string& name, Histogram::Unit unit) -> Histogram& {
+        return TestUtil::TestStore::histogramFromString(name, unit);
+      }));
 }
 MockStore::~MockStore() = default;
 
