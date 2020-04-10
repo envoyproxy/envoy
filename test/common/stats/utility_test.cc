@@ -15,15 +15,15 @@ namespace Envoy {
 namespace Stats {
 namespace {
 
-class UtilityTest : public testing::Test {
+class StatsUtilityTest : public testing::Test {
 protected:
-  UtilityTest()
+  StatsUtilityTest()
       : symbol_table_(SymbolTableCreator::makeSymbolTable()),
         store_(std::make_unique<IsolatedStoreImpl>(*symbol_table_)), pool_(*symbol_table_),
         tags_(
             {{pool_.add("tag1"), pool_.add("value1")}, {pool_.add("tag2"), pool_.add("value2")}}) {}
 
-  ~UtilityTest() override {
+  ~StatsUtilityTest() override {
     pool_.clear();
     store_.reset();
     EXPECT_EQ(0, symbol_table_->numSymbols());
@@ -35,7 +35,7 @@ protected:
   StatNameTagVector tags_;
 };
 
-TEST_F(UtilityTest, Counters) {
+TEST_F(StatsUtilityTest, Counters) {
   ScopePtr scope = store_->createScope("scope.");
   Counter& c1 = Utility::counterFromElements(*scope, {"a", "b"});
   EXPECT_EQ("scope.a.b", c1.name());
@@ -50,7 +50,7 @@ TEST_F(UtilityTest, Counters) {
   EXPECT_EQ("scope.x.token.y.tag1.value1.tag2.value2", ctags.name());
 }
 
-TEST_F(UtilityTest, Gauges) {
+TEST_F(StatsUtilityTest, Gauges) {
   ScopePtr scope = store_->createScope("scope.");
   Gauge& g1 = Utility::gaugeFromElements(*scope, {"a", "b"}, Gauge::ImportMode::NeverImport);
   EXPECT_EQ("scope.a.b", g1.name());
@@ -64,7 +64,7 @@ TEST_F(UtilityTest, Gauges) {
   EXPECT_EQ("scope.token.suffix", g3.name());
 }
 
-TEST_F(UtilityTest, Histograms) {
+TEST_F(StatsUtilityTest, Histograms) {
   ScopePtr scope = store_->createScope("scope.");
   Histogram& h1 = Utility::histogramFromElements(*scope, {"a", "b"}, Histogram::Unit::Milliseconds);
   EXPECT_EQ("scope.a.b", h1.name());
