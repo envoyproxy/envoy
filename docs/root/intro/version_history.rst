@@ -58,10 +58,9 @@ Version history
 * lua: added moonjit support.
 * mongo: the stat emitted for queries without a max time set in the :ref:`MongoDB filter<config_network_filters_mongo_proxy>` was modified to emit correctly for Mongo v3.2+.
 * network filters: added a :ref:`direct response filter <config_network_filters_direct_response>`.
+* network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
 * network filters: network filter extensions use the "envoy.filters.network" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
-* network filters: added a :ref:`direct response filter <config_network_filters_direct_response>`.
-* network filters: added a :ref:`postgres proxy <config_network_filters_postgres_proxy>`.
 * rbac: added :ref:`url_path <envoy_api_field_config.rbac.v2.Permission.url_path>` for matching URL path without the query and fragment string.
 * request_id_extension: add an ability to extend request ID handling at :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_id_extension>`.
 * retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
