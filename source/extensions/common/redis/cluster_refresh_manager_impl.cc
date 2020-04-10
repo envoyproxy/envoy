@@ -73,14 +73,25 @@ bool ClusterRefreshManagerImpl::onEvent(const std::string& cluster_name, EventTy
       if (threshold <= 0) {
         return false;
       }
-      // ignore redirects during min time between triggering
-      if ((++(*count) >= threshold) &&
-          (info->last_callback_time_ms_.compare_exchange_strong(last_callback_time_ms, now))) {
+
+      bool postCallBack = false
+          // ignore redirects during min time between triggering
+          if ((++(*count) >= threshold) &&
+              (info->last_callback_time_ms_.compare_exchange_strong(last_callback_time_ms, now))) {
         // last_callback_time_ms_ successfully updated without any changes since it was
         // initially read. This thread is allowed to post a call to the registered callback
         // on the main thread. Otherwise, the thread would be ignored to prevent over-triggering
         // cluster callbacks.
+        postCallBack = true
+      }
+
+      // If a callback should be triggered(in this or some other threads) signaled by the changed
+      // last callback time, we reset the count to 0
+      if (postCallBack || info->last_callback_time_ms_.load() != last_callback_time_ms) {
         *count = 0;
+      }
+
+      if (postCallBack) {
         main_thread_dispatcher_.post([this, cluster_name, info]() {
           // Ensure that cluster is still active before calling callback.
           auto map = cm_.clusters();
@@ -90,11 +101,6 @@ bool ClusterRefreshManagerImpl::onEvent(const std::string& cluster_name, EventTy
           }
         });
         return true;
-      } else if (info->last_callback_time_ms_.load() != last_callback_time_ms) {
-        // If someone else updated the last callback time, then they will trigger the callback.
-        // During this time we don't want to continue to increment the count, so we enforce the
-        // count is 0
-        *count = 0;
       }
     }
   }
