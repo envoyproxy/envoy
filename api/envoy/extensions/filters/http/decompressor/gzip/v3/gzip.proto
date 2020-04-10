@@ -13,7 +13,6 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.http.decompressor.
 option java_outer_classname = "GzipProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Gzip]
 // [#extension: envoy.filters.http.decompressor.gzip]
