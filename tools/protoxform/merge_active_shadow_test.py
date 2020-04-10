@@ -216,6 +216,24 @@ oneof_decl {
     """
     self.assertTextProtoEq(target_pb_text, str(target_proto))
 
+  def testMergeActiveShadowMessageNoShadowMessage(self):
+    """MergeActiveShadowMessage doesn't require a shadow message for new nested active messages."""
+    active_proto = descriptor_pb2.DescriptorProto()
+    shadow_proto = descriptor_pb2.DescriptorProto()
+    active_proto.nested_type.add().name = 'foo'
+    target_proto = descriptor_pb2.DescriptorProto()
+    merge_active_shadow.MergeActiveShadowMessage(active_proto, shadow_proto, target_proto)
+    self.assertEqual(target_proto.nested_type[0].name, 'foo')
+
+  def testMergeActiveShadowMessageNoShadowEnum(self):
+    """MergeActiveShadowMessage doesn't require a shadow enum for new nested active enums."""
+    active_proto = descriptor_pb2.DescriptorProto()
+    shadow_proto = descriptor_pb2.DescriptorProto()
+    active_proto.enum_type.add().name = 'foo'
+    target_proto = descriptor_pb2.DescriptorProto()
+    merge_active_shadow.MergeActiveShadowMessage(active_proto, shadow_proto, target_proto)
+    self.assertEqual(target_proto.enum_type[0].name, 'foo')
+
   def testMergeActiveShadowMessageMissing(self):
     """MergeActiveShadowMessage recovers missing messages from shadow."""
     active_proto = descriptor_pb2.DescriptorProto()
@@ -233,6 +251,24 @@ oneof_decl {
     target_proto = descriptor_pb2.DescriptorProto()
     target_proto = merge_active_shadow.MergeActiveShadowFile(active_proto, shadow_proto)
     self.assertEqual(target_proto.message_type[0].name, 'foo')
+
+  def testMergeActiveShadowFileNoShadowMessage(self):
+    """MergeActiveShadowFile doesn't require a shadow message for new active messages."""
+    active_proto = descriptor_pb2.FileDescriptorProto()
+    shadow_proto = descriptor_pb2.FileDescriptorProto()
+    active_proto.message_type.add().name = 'foo'
+    target_proto = descriptor_pb2.DescriptorProto()
+    target_proto = merge_active_shadow.MergeActiveShadowFile(active_proto, shadow_proto)
+    self.assertEqual(target_proto.message_type[0].name, 'foo')
+
+  def testMergeActiveShadowFileNoShadowEnum(self):
+    """MergeActiveShadowFile doesn't require a shadow enum for new active enums."""
+    active_proto = descriptor_pb2.FileDescriptorProto()
+    shadow_proto = descriptor_pb2.FileDescriptorProto()
+    active_proto.enum_type.add().name = 'foo'
+    target_proto = descriptor_pb2.DescriptorProto()
+    target_proto = merge_active_shadow.MergeActiveShadowFile(active_proto, shadow_proto)
+    self.assertEqual(target_proto.enum_type[0].name, 'foo')
 
 
 # TODO(htuch): add some test for recursion.

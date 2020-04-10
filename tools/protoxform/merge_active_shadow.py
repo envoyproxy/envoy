@@ -36,6 +36,8 @@ def AdjustReservedRange(target_proto, previous_reserved_range, skip_reserved_num
 # Merge active/shadow EnumDescriptorProtos to a fresh target EnumDescriptorProto.
 def MergeActiveShadowEnum(active_proto, shadow_proto, target_proto):
   target_proto.MergeFrom(active_proto)
+  if not shadow_proto:
+    return
   shadow_values = {v.name: v for v in shadow_proto.value}
   skip_reserved_numbers = []
   # For every reserved name, check to see if it's in the shadow, and if so,
@@ -62,6 +64,8 @@ def MergeActiveShadowEnum(active_proto, shadow_proto, target_proto):
 # Merge active/shadow DescriptorProtos to a fresh target DescriptorProto.
 def MergeActiveShadowMessage(active_proto, shadow_proto, target_proto):
   target_proto.MergeFrom(active_proto)
+  if not shadow_proto:
+    return
   shadow_fields = {f.name: f for f in shadow_proto.field}
   skip_reserved_numbers = []
   # For every reserved name, check to see if it's in the shadow, and if so,
@@ -99,12 +103,12 @@ def MergeActiveShadowMessage(active_proto, shadow_proto, target_proto):
   del target_proto.nested_type[:]
   shadow_msgs = {msg.name: msg for msg in shadow_proto.nested_type}
   for msg in active_proto.nested_type:
-    MergeActiveShadowMessage(msg, shadow_msgs[msg.name], target_proto.nested_type.add())
+    MergeActiveShadowMessage(msg, shadow_msgs.get(msg.name), target_proto.nested_type.add())
   # Visit nested enum types
   del target_proto.enum_type[:]
   shadow_enums = {msg.name: msg for msg in shadow_proto.enum_type}
   for enum in active_proto.enum_type:
-    MergeActiveShadowEnum(enum, shadow_enums[enum.name], target_proto.enum_type.add())
+    MergeActiveShadowEnum(enum, shadow_enums.get(enum.name), target_proto.enum_type.add())
   # Ensure target has any deprecated sub-message types in case they are needed.
   active_msg_names = set([msg.name for msg in active_proto.nested_type])
   for msg in shadow_proto.nested_type:
@@ -119,12 +123,12 @@ def MergeActiveShadowFile(active_file_proto, shadow_file_proto):
   del target_file_proto.message_type[:]
   shadow_msgs = {msg.name: msg for msg in shadow_file_proto.message_type}
   for msg in active_file_proto.message_type:
-    MergeActiveShadowMessage(msg, shadow_msgs[msg.name], target_file_proto.message_type.add())
+    MergeActiveShadowMessage(msg, shadow_msgs.get(msg.name), target_file_proto.message_type.add())
   # Visit enum types
   del target_file_proto.enum_type[:]
   shadow_enums = {msg.name: msg for msg in shadow_file_proto.enum_type}
   for enum in active_file_proto.enum_type:
-    MergeActiveShadowEnum(enum, shadow_enums[enum.name], target_file_proto.enum_type.add())
+    MergeActiveShadowEnum(enum, shadow_enums.get(enum.name), target_file_proto.enum_type.add())
   # Ensure target has any deprecated message types in case they are needed.
   active_msg_names = set([msg.name for msg in active_file_proto.message_type])
   for msg in shadow_file_proto.message_type:
