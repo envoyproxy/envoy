@@ -55,11 +55,6 @@ TEST(Status, PrematureResponseError) {
   EXPECT_FALSE(isCodecClientError(status));
 }
 
-TEST(Status, getPrematureResponseHttpCodeWithWrongStatus) {
-  auto status = codecClientError("foobar");
-  EXPECT_DEATH(getPrematureResponseHttpCode(status), "");
-}
-
 TEST(Status, CodecClientError) {
   auto status = codecClientError("foobar");
   EXPECT_FALSE(status.ok());

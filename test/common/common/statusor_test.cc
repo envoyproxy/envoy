@@ -16,9 +16,4 @@ TEST(StatusOr, Initialization) {
             Http::getPrematureResponseHttpCode(statusor.status()));
 }
 
-TEST(StatusOr, DefaultInitialization) {
-  StatusOr<int> statusor;
-  EXPECT_DEATH(Http::getStatusCode(statusor.status()), "");
-}
-
 } // namespace Envoy
