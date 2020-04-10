@@ -55,6 +55,11 @@ void StrictDnsClusterImpl::startPreInit() {
   for (const ResolveTargetPtr& target : resolve_targets_) {
     target->startResolve();
   }
+  // If the config provides no endpoints, the cluster is initialized immediately as if all hosts are
+  // resolved in failure.
+  if (resolve_targets_.empty()) {
+    onPreInitComplete();
+  }
 }
 
 void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
