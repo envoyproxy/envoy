@@ -70,12 +70,14 @@ public:
                               std::function<void()> completion) PURE;
   /**
    * Remove the stale filter chains of the given listener but leave the listener running.
-   * @param draining_filter_chains supplies the filter chains and the listener id to be removed.
+   * @param listener_tag supplies the tag passed to addListener().
+   * @param filter_chains supplies the filter chains to be removed.
    * @param completion supplies the completion to be called when the listener removed all the
    * untracked connections. This completion is called on the worker thread. No locking is performed
    * by the worker.
    */
-  virtual void removeFilterChains(const Network::DrainingFilterChains& draining_filter_chains,
+  virtual void removeFilterChains(uint64_t listener_tag,
+                                  const std::list<const Network::FilterChain*>& filter_chains,
                                   std::function<void()> completion) PURE;
 
   /**

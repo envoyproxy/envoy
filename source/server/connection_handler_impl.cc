@@ -39,8 +39,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           return;
         }
       }
-      ASSERT(false, absl::StrCat("fail to replace tcp listener ", config.name(), " tagged ",
-                                 overridden_listener.value()));
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
     auto tcp_listener = std::make_unique<ActiveTcpListener>(*this, config);
     details.tcp_listener_ = *tcp_listener;
@@ -67,14 +66,14 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
 }
 
 void ConnectionHandlerImpl::removeFilterChains(
-    const Network::DrainingFilterChains& draining_filter_chains, std::function<void()> completion) {
+    uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
+    std::function<void()> completion) {
+  // TODO(lambdai): Merge the optimistic path and the pessimistic path.
   for (auto& listener : listeners_) {
-    // TODO(lambdai): merge the optimistic path and the pessimistic locking.
-    if (listener.second.listener_->listenerTag() ==
-        draining_filter_chains.getDrainingListenerTag()) {
+    // Optimistic path: The listener tag provided by arg is not stale.
+    if (listener.second.listener_->listenerTag() == listener_tag) {
       ASSERT(listener.second.tcp_listener_.has_value());
-      listener.second.tcp_listener_->get().removeFilterChains(
-          draining_filter_chains.getDrainingFilterChains());
+      listener.second.tcp_listener_->get().removeFilterChains(filter_chains);
       Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
       return;
     }
@@ -83,8 +82,7 @@ void ConnectionHandlerImpl::removeFilterChains(
   // another update and the previous tag is lost.
   for (auto& listener : listeners_) {
     if (listener.second.tcp_listener_.has_value()) {
-      listener.second.tcp_listener_->get().removeFilterChains(
-          draining_filter_chains.getDrainingFilterChains());
+      listener.second.tcp_listener_->get().removeFilterChains(filter_chains);
     }
   }
   Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
@@ -429,8 +427,8 @@ ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(
 
 void ConnectionHandlerImpl::ActiveTcpListener::removeFilterChains(
     const std::list<const Network::FilterChain*>& draining_filter_chains) {
-  // Need to recover the original deleting state
-  bool was_deleting = is_deleting_;
+  // Need to recover the original deleting state.
+  const bool was_deleting = is_deleting_;
   is_deleting_ = true;
   for (const auto* filter_chain : draining_filter_chains) {
     auto iter = connections_by_context_.find(filter_chain);
@@ -441,9 +439,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::removeFilterChains(
       while (!connections.empty()) {
         connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
       }
-      // since is_deleting_ is on, we need to manually remove the map value and drive the iterator
-
-      // Defer delete connection container to avoid race condition in destroying connection
+      // Since is_deleting_ is on, we need to manually remove the map value and drive the iterator.
+      // Defer delete connection container to avoid race condition in destroying connection.
       parent_.dispatcher_.deferredDelete(std::move(iter->second));
       iter = connections_by_context_.erase(iter);
     }

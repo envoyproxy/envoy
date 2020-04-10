@@ -877,14 +877,10 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {
   EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "test.downstream_cx_total")->value());
   EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
 
-  Network::MockDrainingFilterChains mock_draining_filter_chains;
-  EXPECT_CALL(mock_draining_filter_chains, getDrainingListenerTag).WillOnce(Return(listener_tag));
   const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
-  EXPECT_CALL(mock_draining_filter_chains, getDrainingFilterChains)
-      .WillOnce(ReturnRef(filter_chains));
 
   // The completion callback is scheduled
-  handler_->removeFilterChains(mock_draining_filter_chains,
+  handler_->removeFilterChains(listener_tag, filter_chains,
                                []() { ENVOY_LOG(debug, "removed filter chains"); });
   // Trigger the deletion if any.
   dispatcher_.clearDeferredDeleteList();

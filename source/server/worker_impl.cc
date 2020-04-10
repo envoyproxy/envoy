@@ -70,12 +70,14 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
   });
 }
 
-void WorkerImpl::removeFilterChains(const Network::DrainingFilterChains& draining_filter_chains,
+void WorkerImpl::removeFilterChains(uint64_t listener_tag,
+                                    const std::list<const Network::FilterChain*>& filter_chains,
                                     std::function<void()> completion) {
   ASSERT(thread_);
-  dispatcher_->post([this, &draining_filter_chains, completion = std::move(completion)]() -> void {
-    handler_->removeFilterChains(draining_filter_chains, completion);
-  });
+  dispatcher_->post(
+      [this, listener_tag, &filter_chains, completion = std::move(completion)]() -> void {
+        handler_->removeFilterChains(listener_tag, filter_chains, completion);
+      });
 }
 
 void WorkerImpl::start(GuardDog& guard_dog) {

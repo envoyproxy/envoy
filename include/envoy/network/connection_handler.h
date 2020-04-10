@@ -38,7 +38,7 @@ public:
   virtual void decNumConnections() PURE;
 
   /**
-   * Adds a listener to the handler. and replace the existing listener.
+   * Adds a listener to the handler, optionally replacing the existing listener.
    * @param overridden_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
    */
@@ -56,9 +56,11 @@ public:
    * Remove the filter chains and the connections in the listener. All connections owned
    * by the filter chains will be closed. Once all the connections are destroyed(connections
    * could be deferred deleted!), invoke the completion.
-   * @param draining_filter_chains supplies the listener and the the filter chains.
+   * @param listener_tag supplies the tag passed to addListener().
+   * @param filter_chains supplies the filter chains to be removed.
    */
-  virtual void removeFilterChains(const DrainingFilterChains& draining_filter_chains,
+  virtual void removeFilterChains(uint64_t listener_tag,
+                                  const std::list<const FilterChain*>& filter_chains,
                                   std::function<void()> completion) PURE;
 
   /**

@@ -895,7 +895,7 @@ filter_chains:
   auto* timer = new Event::MockTimer(dynamic_cast<Event::MockDispatcher*>(&server_.dispatcher()));
   EXPECT_CALL(*timer, enableTimer(_, _));
   manager_->drainFilterChainsForTest(listener_impl);
-  EXPECT_CALL(*worker_, removeFilterChains(_, _));
+  EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
   timer->invokeCallback();
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callDrainFilterChainsComplete();

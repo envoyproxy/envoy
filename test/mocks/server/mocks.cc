@@ -142,12 +142,12 @@ MockWorker::MockWorker() {
         }
       }));
 
-  ON_CALL(*this, removeFilterChains(_, _))
-      .WillByDefault(Invoke(
-          [this](const Network::DrainingFilterChains&, std::function<void()> completion) -> void {
-            EXPECT_EQ(nullptr, remove_filter_chains_completion_);
-            remove_filter_chains_completion_ = completion;
-          }));
+  ON_CALL(*this, removeFilterChains(_, _, _))
+      .WillByDefault(Invoke([this](uint64_t, const std::list<const Network::FilterChain*>&,
+                                   std::function<void()> completion) -> void {
+        EXPECT_EQ(nullptr, remove_filter_chains_completion_);
+        remove_filter_chains_completion_ = completion;
+      }));
 }
 MockWorker::~MockWorker() = default;
 

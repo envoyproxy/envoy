@@ -359,7 +359,7 @@ public:
               (absl::optional<uint64_t> overridden_listener, ListenerConfig& config));
   MOCK_METHOD(void, removeListeners, (uint64_t listener_tag));
   MOCK_METHOD(void, removeFilterChains,
-              (const DrainingFilterChains& draining_filter_chains,
+              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
                std::function<void()> completion));
   MOCK_METHOD(void, stopListeners, (uint64_t listener_tag));
   MOCK_METHOD(void, stopListeners, ());
@@ -476,14 +476,6 @@ public:
   MOCK_METHOD(void, unregisterHandler, (BalancedConnectionHandler & handler));
   MOCK_METHOD(BalancedConnectionHandler&, pickTargetHandler,
               (BalancedConnectionHandler & current_handler));
-};
-
-class MockDrainingFilterChains : public DrainingFilterChains {
-public:
-  MockDrainingFilterChains();
-  ~MockDrainingFilterChains() override;
-  MOCK_METHOD(uint64_t, getDrainingListenerTag, (), (const));
-  MOCK_METHOD(const std::list<const FilterChain*>&, getDrainingFilterChains, (), (const));
 };
 
 class MockListenerFilterMatcher : public ListenerFilterMatcher {

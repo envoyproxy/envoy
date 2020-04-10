@@ -673,8 +673,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   // The warmed listener should be added first so that the worker will accept new connections
   // when it stops listening on the old listener.
   for (const auto& worker : workers_) {
-    addListenerToWorker(*worker, /*overridden_listener=*/absl::nullopt, listener,
-                        /*callback=*/nullptr);
+    addListenerToWorker(*worker, absl::nullopt, listener, nullptr);
   }
 
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
@@ -695,10 +694,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   updateWarmingActiveGauges();
 }
 
-void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
-                                            ListenerImpl& new_listener) {
-  // TODO(lambdai): Calculate the filter chains to drain.
-  UNREFERENCED_PARAMETER(new_listener);
+void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener) {
   // First add the listener to the draining list.
   std::list<DrainingFilterChainsImpl>::iterator draining_group = draining_filter_groups_.emplace(
       draining_filter_groups_.begin(), std::move(listener), workers_.size());
@@ -725,20 +721,22 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
         for (const auto& worker : workers_) {
           // Once the drain time has completed via the drain manager's timer, we tell the workers
           // to remove the filter chains.
-          worker->removeFilterChains(*draining_group, [this, draining_group]() -> void {
-            // The remove listener completion is called on the worker thread. We post back to
-            // the main thread to avoid locking. This makes sure that we don't destroy the
-            // listener while filters might still be using its context (stats, etc.).
-            server_.dispatcher().post([this, draining_group]() -> void {
-              if (draining_group->decWorkersPendingRemoval() == 0) {
-                draining_group->getDrainingListener().debugLog(
-                    absl::StrCat("draining filter chains from listener ",
-                                 draining_group->getDrainingListener().name(), " complete"));
-                draining_filter_groups_.erase(draining_group);
-                stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
-              }
-            });
-          });
+          worker->removeFilterChains(
+              draining_group->getDrainingListenerTag(), draining_group->getDrainingFilterChains(),
+              [this, draining_group]() -> void {
+                // The remove listener completion is called on the worker thread. We post back to
+                // the main thread to avoid locking. This makes sure that we don't destroy the
+                // listener while filters might still be using its context (stats, etc.).
+                server_.dispatcher().post([this, draining_group]() -> void {
+                  if (draining_group->decWorkersPendingRemoval() == 0) {
+                    draining_group->getDrainingListener().debugLog(
+                        absl::StrCat("draining filter chains from listener ",
+                                     draining_group->getDrainingListener().name(), " complete"));
+                    draining_filter_groups_.erase(draining_group);
+                    stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
+                  }
+                });
+              });
         }
       });
 

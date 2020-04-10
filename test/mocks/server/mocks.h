@@ -355,7 +355,7 @@ public:
   MOCK_METHOD(void, stopListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
   MOCK_METHOD(void, removeFilterChains,
-              (const Network::DrainingFilterChains& draining_filter_chains,
+              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
                std::function<void()> completion));
 
   AddListenerCompletion add_listener_completion_;

@@ -47,7 +47,8 @@ public:
   uint64_t numConnections() const override;
 
   void removeListener(Network::ListenerConfig& listener, std::function<void()> completion) override;
-  void removeFilterChains(const Network::DrainingFilterChains& draining_filter_chains,
+  void removeFilterChains(uint64_t listener_tag,
+                          const std::list<const Network::FilterChain*>& filter_chains,
                           std::function<void()> completion) override;
   void start(GuardDog& guard_dog) override;
   void initializeStats(Stats::Scope& scope, const std::string& prefix) override;

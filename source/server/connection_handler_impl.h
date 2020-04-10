@@ -70,7 +70,8 @@ public:
   void addListener(absl::optional<uint64_t> overridden_listener,
                    Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
-  void removeFilterChains(const Network::DrainingFilterChains& draining_filter_chains,
+  void removeFilterChains(uint64_t listener_tag,
+                          const std::list<const Network::FilterChain*>& filter_chains,
                           std::function<void()> completion) override;
   void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
