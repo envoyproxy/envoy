@@ -26,6 +26,11 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 //
 // Envoy may support other tracers in the future, but right now the HTTP tracer is the only one
 // supported.
+//
+// .. attention::
+//
+//   Use of this message type has been deprecated in favor of direct use of
+//   :ref:`Tracing.Http <envoy_api_msg_config.trace.v3.Tracing.Http>`.
 message Tracing {
   // Configuration for an HTTP tracer provider used by Envoy.
   //
