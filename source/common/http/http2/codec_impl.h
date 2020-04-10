@@ -335,6 +335,9 @@ protected:
   using ServerStreamImplPtr = std::unique_ptr<ServerStreamImpl>;
 
   ConnectionImpl* base() { return this; }
+  // NOTE: Always use runtime nullptr checks against the return value of this function. There are
+  // edge cases (such as for METADATA frames) where nghttp2 will issue a callback for a stream_id
+  // that is not associated with an existing stream.
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
   void sendPendingFrames();

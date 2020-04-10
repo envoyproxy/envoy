@@ -832,7 +832,9 @@ ssize_t ConnectionImpl::packMetadata(int32_t stream_id, uint8_t* buf, size_t len
   ENVOY_CONN_LOG(trace, "pack METADATA frame on stream {}", connection_, stream_id);
 
   StreamImpl* stream = getStream(stream_id);
-  ASSERT(stream != nullptr);
+  if (stream == nullptr) {
+    return 0;
+  }
 
   MetadataEncoder& encoder = stream->getMetadataEncoder();
   return encoder.packNextFramePayload(buf, len);
