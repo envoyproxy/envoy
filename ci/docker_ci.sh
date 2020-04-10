@@ -43,7 +43,7 @@ for BUILD_TYPE in "" "-alpine" "-alpine-debug"; do
     docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
 
     # Only push latest on master builds.
-    if [[ "${AZP_BRANCH}" == 'refs/heads/master' ]]; then
+    if [[ "${AZP_BRANCH}" == "${MASTER_BRANCH}" ]]; then
         docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
         docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
     fi
