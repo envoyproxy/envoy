@@ -35,6 +35,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.new_http2_connection_pool_behavior",
     "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher",
+    "envoy.reloadable_features.fix_upgrade_response",
 };
 
 // This is a section for officially sanctioned runtime features which are too

@@ -1254,4 +1254,30 @@ TEST_P(IntegrationTest, TestManyBadRequests) {
   EXPECT_EQ(0, test_server_->counter("http1.response_flood")->value());
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/10566
+TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\n"
+                                              "connection: upgrade\r\n"
+                                              "upgrade: h2\r\n"
+                                              "Transfer-encoding: chunked\r\n\r\n"
+                                              "b\r\nHello World\r\n0\r\n\r\n",
+                                              false));
+
+  response->waitForHeaders();
+  EXPECT_EQ(nullptr, response->headers().Upgrade());
+  EXPECT_EQ(nullptr, response->headers().Connection());
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("Hello World", response->body());
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace Envoy
