@@ -154,11 +154,11 @@ void ZooKeeperFilter::onPing() {
 }
 
 void ZooKeeperFilter::onAuthRequest(const std::string& scheme) {
-  Stats::SymbolTable::StoragePtr storage = config_->scope_.symbolTable().join(
-      {config_->stat_prefix_, config_->auth_,
-       config_->stat_name_set_->getBuiltin(absl::StrCat(scheme, "_rq"),
-                                           config_->unknown_scheme_rq_)});
-  config_->scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+  Stats::Counter& counter = Stats::Utility::counterFromElements(
+      config_->scope_, {config_->stat_prefix_, config_->auth_,
+                        config_->stat_name_set_->getBuiltin(absl::StrCat(scheme, "_rq"),
+                                                            config_->unknown_scheme_rq_)});
+  counter.inc();
   setDynamicMetadata("opname", "auth");
 }
 
