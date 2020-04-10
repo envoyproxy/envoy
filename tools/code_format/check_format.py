@@ -396,8 +396,12 @@ def hasInvalidAngleBracketDirectory(line):
   return subdir in SUBDIR_SET
 
 
-VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]*): ([a-z:`]+)")
+VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile("^====[=]+$")
+RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
+# Check for punctuation in a terminal ref clause, e.g.
+# :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
+REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
 
 
 def checkCurrentReleaseNotes(file_path, error_messages):
@@ -405,6 +409,17 @@ def checkCurrentReleaseNotes(file_path, error_messages):
 
   first_word_of_prior_line = ''
   next_word_to_check = ''  # first word after :
+  prior_line = ''
+
+  def endsWithPeriod(prior_line):
+    if not prior_line:
+      return True  # Don't punctuation-check empty lines.
+    if prior_line.endswith('.'):
+      return True  # Actually ends with .
+    if prior_line.endswith('`') and REF_WITH_PUNCTUATION_REGEX.match(prior_line):
+      return True  # The text in the :ref ends with a .
+    return False
+
   for line_number, line in enumerate(readLines(file_path)):
 
     def reportError(message):
@@ -417,9 +432,16 @@ def checkCurrentReleaseNotes(file_path, error_messages):
       # If we see a version marker we are now in the section for the current release.
       in_current_release = True
 
-    # Do basic alphabetization checks of the first word on the line and the
-    # first word after the :
+    # make sure flags are surrounded by ``s
+    flag_match = RELOADABLE_FLAG_REGEX.match(line)
+    if flag_match:
+      if not flag_match.groups()[0].startswith('`'):
+        reportError("Flag `%s` should be enclosed in back ticks" % flag_match.groups()[1])
+
     if line.startswith("*"):
+      if not endsWithPeriod(prior_line):
+        reportError("The following release note does not end with a '.'\n %s" % prior_line)
+
       match = VERSION_HISTORY_NEW_LINE_REGEX.match(line)
       if not match:
         reportError("Version history line malformed. "
@@ -427,6 +449,8 @@ def checkCurrentReleaseNotes(file_path, error_messages):
       else:
         first_word = match.groups()[0]
         next_word = match.groups()[1]
+        # Do basic alphabetization checks of the first word on the line and the
+        # first word after the :
         if first_word_of_prior_line and first_word_of_prior_line > first_word:
           reportError(
               "Version history not in alphabetical order (%s vs %s): please check placement of line\n %s. "
@@ -437,6 +461,14 @@ def checkCurrentReleaseNotes(file_path, error_messages):
               % (next_word_to_check, next_word, line))
         first_word_of_prior_line = first_word
         next_word_to_check = next_word
+
+        prior_line = line
+    elif not line:
+      # If we hit the end of this release note block block, check the prior line.
+      if not endsWithPeriod(prior_line):
+        reportError("The following release note does not end with a '.'\n %s" % prior_line)
+    elif prior_line:
+      prior_line += line
 
 
 def checkFileContents(file_path, checker):
