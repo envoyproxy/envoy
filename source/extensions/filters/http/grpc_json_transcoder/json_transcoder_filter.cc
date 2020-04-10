@@ -504,12 +504,10 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
 
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
-  if (!method_->descriptor_->server_streaming() ||
-      (method_->descriptor_->server_streaming() && method_->response_type_is_http_body_)) {
-    return Http::FilterHeadersStatus::StopIteration;
+  if (method_->descriptor_->server_streaming() && !method_->response_type_is_http_body_) {
+    return Http::FilterHeadersStatus::Continue;
   }
-
-  return Http::FilterHeadersStatus::Continue;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
