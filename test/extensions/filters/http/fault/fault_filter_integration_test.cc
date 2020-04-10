@@ -189,8 +189,6 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultsConfig100PercentageHeaders)
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
                                      {":authority", "host"},
-                                     {"x-envoy-fault-abort-request", "429"},
-                                     {"x-envoy-fault-abort-request-percentage", "100"},
                                      {"x-envoy-fault-delay-request", "100"},
                                      {"x-envoy-fault-delay-request-percentage", "100"},
                                      {"x-envoy-fault-throughput-response", "100"},
@@ -199,7 +197,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultsConfig100PercentageHeaders)
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
 
-  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
