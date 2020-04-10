@@ -43,7 +43,6 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactory
       deferred_delete_timer_(createTimerInternal([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimerInternal([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
-  ASSERT(!name.empty());
 #ifdef ENVOY_HANDLE_SIGNALS
   SignalAction::registerFatalErrorHandler(*this);
 #endif
