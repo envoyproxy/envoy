@@ -431,18 +431,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "status_lib",
-    srcs = ["status.cc"],
-    hdrs = ["status.h"],
-    external_deps = [
-        "abseil_status",
-    ],
-    deps = [
-        "//include/envoy/http:codes_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "statusor_lib",
     hdrs = ["statusor.h"],
     deps = [

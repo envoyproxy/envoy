@@ -267,18 +267,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "status_test",
-    srcs = ["status_test.cc"],
-    deps = [
-        "//source/common/common:status_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "statusor_test",
     srcs = ["statusor_test.cc"],
     deps = [
-        "//source/common/common:status_lib",
         "//source/common/common:statusor_lib",
+        "//source/common/http:status_lib",
     ],
 )

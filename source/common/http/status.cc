@@ -1,12 +1,13 @@
-#include "common/common/status.h"
+#include "common/http/status.h"
 
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
+namespace Http {
 
 namespace {
 
-const char EnvoyPayloadUrl[] = {"Envoy"};
+constexpr absl::string_view EnvoyPayloadUrl = "Envoy";
 
 absl::string_view statusCodeToString(StatusCode code) {
   switch (code) {
@@ -42,9 +43,9 @@ template <typename T> void storePayload(absl::Status& status, const T& payload) 
 
 template <typename T = EnvoyStatusPayload> const T* getPayload(const absl::Status& status) {
   auto payload = status.GetPayload(EnvoyPayloadUrl);
-  RELEASE_ASSERT(payload.has_value(), "Must have payload");
+  ASSERT(payload.has_value(), "Must have payload");
   auto data = payload.value().Flatten();
-  RELEASE_ASSERT(data.length() >= sizeof(T), "Invalid payload length");
+  ASSERT(data.length() >= sizeof(T), "Invalid payload length");
   return reinterpret_cast<const T*>(data.data());
 }
 
@@ -118,4 +119,5 @@ bool isCodecClientError(const Status& status) {
   return getStatusCode(status) == StatusCode::CodecClientError;
 }
 
+} // namespace Http
 } // namespace Envoy

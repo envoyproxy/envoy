@@ -1,9 +1,10 @@
-#include "common/common/status.h"
+#include "common/http/status.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Http {
 
 TEST(Status, Ok) {
   auto status = okStatus();
@@ -71,4 +72,5 @@ TEST(Status, CodecClientError) {
   EXPECT_TRUE(isCodecClientError(status));
 }
 
+} // namespace Http
 } // namespace Envoy

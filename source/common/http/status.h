@@ -41,15 +41,33 @@
  */
 
 namespace Envoy {
+namespace Http {
 
 /**
  * Status codes for representing classes of Envoy errors.
  */
 enum class StatusCode : int {
   Ok = 0,
+
+  /**
+   * Indicates a non-recoverable protocol error that should result in connection termination.
+   */
   CodecProtocolError = 1,
+
+  /**
+   * Indicates detection of outbound frame queue flood.
+   */
   BufferFloodError = 2,
+
+  /**
+   * Indicates a response is received on a connection that did not send a request. In practice
+   * this can only happen on HTTP/1.1 connections.
+   */
   PrematureResponseError = 3,
+
+  /**
+   * Indicates a client (local) side error which should not happen.
+   */
   CodecClientError = 4
 };
 
@@ -91,4 +109,5 @@ ABSL_MUST_USE_RESULT bool isCodecClientError(const Status& status);
  */
 Http::Code getPrematureResponseHttpCode(const Status& status);
 
+} // namespace Http
 } // namespace Envoy

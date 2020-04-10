@@ -37,6 +37,6 @@
 
 namespace Envoy {
 
-using absl::StatusOr; // NOLINT: disable misc-unused-using-decls clang-tidy check
+using absl::StatusOr; // NOLINT(misc-unused-using-decls)
 
 } // namespace Envoy
