@@ -13,14 +13,15 @@
 
 namespace Envoy {
 namespace Stats {
+namespace {
 
 class UtilityTest : public testing::Test {
 protected:
   UtilityTest()
       : symbol_table_(SymbolTableCreator::makeSymbolTable()),
         store_(std::make_unique<IsolatedStoreImpl>(*symbol_table_)), pool_(*symbol_table_),
-        tags_(
-            {{pool_.add("tag1"), pool_.add("value1")}, {pool_.add("tag2"), pool_.add("value2")}}) {}
+        tags_({{pool_.add("tag1"), pool_.add("value1")},
+               {pool_.add("tag2"), pool_.add("value2")}}) {}
 
   ~UtilityTest() override {
     pool_.clear();
@@ -69,8 +70,7 @@ TEST_F(UtilityTest, Histograms) {
   EXPECT_EQ("scope.a.b", h1.name());
   EXPECT_EQ(Histogram::Unit::Milliseconds, h1.unit());
   StatName token = pool_.add("token");
-  Histogram& h2 =
-      Utility::histogramFromElements(*scope, {"a", token, "b"}, Histogram::Unit::Microseconds);
+  Histogram& h2 = Utility::histogramFromElements(*scope, {"a", token, "b"}, Histogram::Unit::Microseconds);
   EXPECT_EQ("scope.a.token.b", h2.name());
   EXPECT_EQ(Histogram::Unit::Microseconds, h2.unit());
   StatName suffix = pool_.add("suffix");
@@ -79,5 +79,6 @@ TEST_F(UtilityTest, Histograms) {
   EXPECT_EQ(Histogram::Unit::Bytes, h3.unit());
 }
 
+} // namespace
 } // namespace Stats
 } // namespace Envoy
