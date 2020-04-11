@@ -18,9 +18,11 @@ namespace Envoy {
 namespace StreamInfo {
 
 struct StreamInfoImpl : public StreamInfo {
-  StreamInfoImpl(TimeSource& time_source) : StreamInfoImpl(absl::nullopt, time_source) {}
+  StreamInfoImpl(TimeSource& time_source)
+      : StreamInfoImpl(absl::nullopt, time_source,
+                       std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
-  StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source)
+  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source)
       : StreamInfoImpl(protocol, time_source,
                        std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
