@@ -274,7 +274,9 @@ envoy_cc_library(
     name = "thread_lib",
     hdrs = ["thread.h"],
     external_deps = ["abseil_synchronization"],
-    deps = envoy_cc_platform_dep("thread_impl_lib"),
+    deps = envoy_cc_platform_dep("thread_impl_lib") + [
+        "//include/envoy/common:time_interface",
+    ],
 )
 
 envoy_cc_posix_library(

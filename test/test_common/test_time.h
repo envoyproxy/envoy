@@ -12,7 +12,10 @@ namespace Event {
 class TestRealTimeSystem : public TestTimeSystem {
 public:
   // TestTimeSystem
-  void sleep(const Duration& duration) override;
+  bool await(const bool& cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override;
+  bool await(BoolFn cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override;
+  void advanceTimeAsync(const Duration& duration) override;
+  void advanceTimeWait(const Duration& duration) override;
   void waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
                const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 

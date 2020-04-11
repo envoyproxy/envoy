@@ -10,27 +10,49 @@
 namespace Envoy {
 namespace Event {
 
-class TestTimeSystem;
-
 // Adds sleep() and waitFor() interfaces to Event::TimeSystem.
 class TestTimeSystem : public Event::TimeSystem {
 public:
   ~TestTimeSystem() override = default;
 
+  using BoolFn = std::function<bool()>;
+
   // Returns true if the condition was unsatisfied prior to the timeout.
-  virtual bool awaitWithTimeout(const bool& cond, absl::Mutex& mutex, const Duration& duration);
-  virtual bool awaitWithTimeout(std::function<bool()> cond, absl::Mutex& mutex,
-                                const Duration& duration);
+  virtual bool await(const bool& cond, Thread::MutexBasicLockable& mutex,
+                     const Duration& duration) PURE;
+  virtual bool await(BoolFn cond, Thread::MutexBasicLockable& mutex,
+                     const Duration& duration) PURE;
 
   /**
    * Advances time forward by the specified duration, running any timers
-   * along the way that have been scheduled to fire.
+   * scheduled to fire, and blocking until the timer callbacks are complete.
+   * See also advanceTimeAsync(), which does not block.
+   *
+   * This function should be used in multi-threaded tests, where other
+   * threads are running dispatcher loops. Integration tests should usually
+   * use this variant.
    *
    * @param duration The amount of time to sleep.
    */
-  virtual void sleep(const Duration& duration) PURE;
-  template <class D> void sleep(const D& duration) {
-    sleep(std::chrono::duration_cast<Duration>(duration));
+  virtual void advanceTimeWait(const Duration& duration) PURE;
+  template <class D> void advanceTimeWait(const D& duration) {
+    advanceTimeWait(std::chrono::duration_cast<Duration>(duration));
+  }
+
+  /**
+   * Advances time forward by the specified duration. Timers may be triggered on
+   * their threads, but unlike advanceTimeWait(), this method does not block
+   * waiting for them to complete.
+   *
+   * This function should be used in single-threaded tests, in scenarios where
+   * after time is advanced, the main test thread will run a dispatcher
+   * loop. Unit tests will often use this variant.
+   *
+   * @param duration The amount of time to sleep.
+   */
+  virtual void advanceTimeAsync(const Duration& duration) PURE;
+  template <class D> void advanceTimeAsync(const D& duration) {
+    advanceTimeAsync(std::chrono::duration_cast<Duration>(duration));
   }
 
   /**
@@ -85,7 +107,18 @@ private:
 // subclass.
 template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public TestTimeSystem {
 public:
-  void sleep(const Duration& duration) override { timeSystem().sleep(duration); }
+  bool await(const bool& cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override {
+    return timeSystem().await(cond, mutex, duration);
+  }
+  bool await(BoolFn cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override {
+    return timeSystem().await(cond, mutex, duration);
+  }
+  void advanceTimeAsync(const Duration& duration) override {
+    timeSystem().advanceTimeAsync(duration);
+  }
+  void advanceTimeWait(const Duration& duration) override {
+    timeSystem().advanceTimeWait(duration);
+  }
 
   void waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
                const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {

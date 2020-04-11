@@ -143,7 +143,7 @@ void FakeStream::onResetStream(Http::StreamResetReason, absl::string_view) {
 
 AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  if (time_system.awaitWithTimeout(headers_, lock_, timeout)) {
+  if (!time_system_.await([this]() -> bool { return headers_ != nullptr; }, lock_, timeout)) {
     return AssertionFailure() << "Timed out waiting for headers.";
   }
   return AssertionSuccess();
@@ -152,8 +152,8 @@ AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length,
                                         milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  if (time_system_.awaitWithTimeout(
-          [this, body_length, &client_dispatcher] -> bool {
+  if (!time_system_.await(
+          [this, body_length, &client_dispatcher]() -> bool {
             // Run the client dispatcher since we may need to process window updates, etc.
             client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
             return bodyLength() >= body_length;
@@ -179,29 +179,21 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
 AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher,
                                              milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  auto start_time = time_system_.monotonicTime();
-  while (!end_stream_) {
-    if (time_system_.monotonicTime() >= start_time + timeout) {
-      return AssertionFailure() << "Timed out waiting for end of stream.";
-    }
-    time_system_.waitFor(lock_, decoder_event_, 5ms);
-    if (!end_stream_) {
-      // Run the client dispatcher since we may need to process window updates, etc.
-      client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-    }
+  auto cond = [this, &client_dispatcher]() {
+    // Run the client dispatcher since we may need to process window updates, etc.
+    client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+    return end_stream_;
+  };
+  if (!time_system_.await(cond, lock_, timeout)) {
+    return AssertionFailure() << "Timed out waiting for end of stream.";
   }
   return AssertionSuccess();
 }
 
 AssertionResult FakeStream::waitForReset(milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  auto start_time = time_system_.monotonicTime();
-  while (!saw_reset_) {
-    if (time_system_.monotonicTime() >= start_time + timeout) {
-      return AssertionFailure() << "Timed out waiting for reset.";
-    }
-    // Safe since CondVar::waitFor won't throw.
-    time_system_.waitFor(lock_, decoder_event_, 5ms);
+  if (!time_system_.await(saw_reset_, lock_, timeout)) {
+    return AssertionFailure() << "Timed out waiting for reset.";
   }
   return AssertionSuccess();
 }

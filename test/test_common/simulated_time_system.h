@@ -26,7 +26,10 @@ public:
   SchedulerPtr createScheduler(Scheduler& base_scheduler) override;
 
   // TestTimeSystem
-  void sleep(const Duration& duration) override;
+  bool await(const bool& cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override;
+  bool await(BoolFn cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override;
+  void advanceTimeWait(const Duration& duration) override;
+  void advanceTimeAsync(const Duration& duration) override;
   void waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
                const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
@@ -43,8 +46,8 @@ public:
    * @param monotonic_time The desired new current time.
    */
   void setMonotonicTime(const MonotonicTime& monotonic_time) {
-    mutex_.lock();
-    setMonotonicTimeAndUnlock(monotonic_time);
+    absl::MutexLock lock(&mutex_);
+    setMonotonicTimeLockHeld(monotonic_time);
   }
 
   /**
@@ -67,6 +70,9 @@ private:
   };
   using AlarmSet = std::set<Alarm*, CompareAlarms>;
 
+  template<typename Condition> bool awaitHelper(Condition cond, Thread::MutexBasicLockable& mutex,
+                                                const Duration& timeout);
+
   /**
    * Sets the time forward monotonically. If the supplied argument moves
    * backward in time, the call is a no-op. If the supplied argument moves
@@ -75,7 +81,8 @@ private:
    *
    * @param monotonic_time The desired new current time.
    */
-  void setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) UNLOCK_FUNCTION(mutex_);
+  void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   MonotonicTime alarmTimeLockHeld(Alarm* alarm) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void alarmActivateLockHeld(Alarm* alarm) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
@@ -91,17 +98,20 @@ private:
 
   // Keeps track of how many alarms have been activated but not yet called,
   // which helps waitFor() determine when to give up and declare a timeout.
-  void incPending() { ++pending_alarms_; }
-  void decPending() { --pending_alarms_; }
-  bool hasPending() const { return pending_alarms_ > 0; }
+  void incPendingLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_) { ++pending_alarms_; }
+  void decPending() {
+    absl::MutexLock lock(&mutex_);
+    --pending_alarms_;
+  }
+  void waitForNoPendingLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ GUARDED_BY(mutex_);
   SystemTime system_time_ GUARDED_BY(mutex_);
   AlarmSet alarms_ GUARDED_BY(mutex_);
   uint64_t index_ GUARDED_BY(mutex_);
-  mutable Thread::MutexBasicLockable mutex_;
-  std::atomic<uint32_t> pending_alarms_;
+  mutable absl::Mutex mutex_;
+  uint32_t pending_alarms_ GUARDED_BY(mutex_);
   Thread::OnlyOneThread only_one_thread_;
 };
 
@@ -111,6 +121,14 @@ private:
 // to adjustments in time.
 class SimulatedTimeSystem : public DelegatingTestTimeSystem<SimulatedTimeSystemHelper> {
 public:
+  bool await(const bool& cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override {
+    return timeSystem().await(cond, mutex, duration);
+  }
+
+  bool await(BoolFn cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override {
+    return timeSystem().await(cond, mutex, duration);
+  }
+
   void setMonotonicTime(const MonotonicTime& monotonic_time) {
     timeSystem().setMonotonicTime(monotonic_time);
   }
@@ -122,6 +140,8 @@ public:
   template <class Duration> void setSystemTime(const Duration& duration) {
     setSystemTime(SystemTime(duration));
   }
+
+ private:
 };
 
 // Class encapsulating a SimulatedTimeSystem, intended for integration tests.
