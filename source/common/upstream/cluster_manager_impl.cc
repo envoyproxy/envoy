@@ -271,7 +271,7 @@ ClusterManagerImpl::ClusterManagerImpl(
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
       ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats)
+                                                         dyn_resources.ads_config(), stats, false)
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -288,7 +288,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats)
+                                                         dyn_resources.ads_config(), stats, false)
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -363,12 +363,13 @@ void ClusterManagerImpl::initializeSecondaryClusters(
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
-    load_stats_reporter_ =
-        std::make_unique<LoadStatsReporter>(local_info_, *this, stats_,
-                                            Config::Utility::factoryForGrpcApiConfigSource(
-                                                *async_client_manager_, load_stats_config, stats_)
-                                                ->create(),
-                                            load_stats_config.transport_api_version(), dispatcher_);
+
+    load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
+        local_info_, *this, stats_,
+        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
+                                                       stats_, false)
+            ->create(),
+        load_stats_config.transport_api_version(), dispatcher_);
   }
 }
 
