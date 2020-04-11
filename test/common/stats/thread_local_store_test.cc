@@ -536,7 +536,7 @@ TEST_F(StatsThreadLocalStoreTest, TextReadoutAllLengths) {
   // ASCII
   for (int i = 0; i < 15; i++) {
     str += ('a' + i);
-    t.set(str);
+    t.set(std::string(str));
     EXPECT_EQ(str, t.value());
   }
 
@@ -544,7 +544,7 @@ TEST_F(StatsThreadLocalStoreTest, TextReadoutAllLengths) {
   str = "";
   for (int i = 0; i < 15; i++) {
     str += ('\xEE' + i);
-    t.set(str);
+    t.set(std::string(str));
     EXPECT_EQ(str, t.value());
   }
 
