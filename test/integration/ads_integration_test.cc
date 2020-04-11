@@ -943,6 +943,8 @@ public:
             sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {}
 
   void testBasicFlow() {
+    // Test that runtime discovery request comes first and cluster discovery request comes after
+    // runtime was loaded.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"ads_rtds_layer"},
                                         {"ads_rtds_layer"}, {}, true));
     auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
@@ -953,47 +955,11 @@ public:
     )EOF");
     sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
         Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
-    // Send initial configuration, validate we can process a request.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, false));
-    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, {buildCluster("cluster_0")}, {buildCluster("cluster_0")},
-        {}, "1");
 
+    test_server_->waitForCounterGe("runtime.load_success", 1);
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, false));
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"ads_rtds_layer"}, {},
                                         {}, false));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
-                                        {"cluster_0"}, {"cluster_0"}, {}, false));
-    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
-        {buildClusterLoadAssignment("cluster_0")}, {}, "1");
-
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, false));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false));
-    sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-        Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
-        {buildListener("listener_0", "route_config_0")}, {}, "1");
-
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                        {"cluster_0"}, {}, {}, false));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
-                                        {"route_config_0"}, {"route_config_0"}, {}, false));
-    sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-        Config::TypeUrl::get().RouteConfiguration,
-        {buildRouteConfig("route_config_0", "cluster_0")},
-        {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
-
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}, false));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
-                                        {"route_config_0"}, {}, {}, false));
-
-    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
-    makeSingleRequest();
-    const ProtobufWkt::Timestamp first_active_listener_ts_1 =
-        getListenersConfigDump().dynamic_listeners(0).active_state().last_updated();
-    const ProtobufWkt::Timestamp first_active_cluster_ts_1 =
-        getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
-    const ProtobufWkt::Timestamp first_route_config_ts_1 =
-        getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
   }
 };
 
@@ -1050,6 +1016,8 @@ public:
   }
 
   void testBasicFlow() {
+    // Test that runtime discovery request comes first followed by the cluster load assignment
+    // discovery request for secondary cluster and then CDS discovery request.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"ads_rtds_layer"},
                                         {"ads_rtds_layer"}, {}, true));
     auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
@@ -1061,6 +1029,7 @@ public:
     sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
         Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
 
+    test_server_->waitForCounterGe("runtime.load_success", 1);
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
                                         {"eds_cluster"}, {"eds_cluster"}, {}, false));
     sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
@@ -1073,43 +1042,6 @@ public:
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
         Config::TypeUrl::get().Cluster, {buildCluster("cluster_0")}, {buildCluster("cluster_0")},
         {}, "1");
-
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                        {"eds_cluster"}, {}, {}, false));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                        {"cluster_0", "eds_cluster"}, {"cluster_0"}, {}, false));
-
-    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
-        {buildClusterLoadAssignment("cluster_0")}, {}, "1");
-
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, false));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false));
-    sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-        Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
-        {buildListener("listener_0", "route_config_0")}, {}, "1");
-
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                        {"cluster_0", "eds_cluster"}, {}, {}, false));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
-                                        {"route_config_0"}, {"route_config_0"}, {}, false));
-    sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-        Config::TypeUrl::get().RouteConfiguration,
-        {buildRouteConfig("route_config_0", "cluster_0")},
-        {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
-
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}, false));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
-                                        {"route_config_0"}, {}, {}, false));
-
-    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
-    makeSingleRequest();
-    const ProtobufWkt::Timestamp first_active_listener_ts_1 =
-        getListenersConfigDump().dynamic_listeners(0).active_state().last_updated();
-    const ProtobufWkt::Timestamp first_active_cluster_ts_1 =
-        getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
-    const ProtobufWkt::Timestamp first_route_config_ts_1 =
-        getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
   }
 };
 
