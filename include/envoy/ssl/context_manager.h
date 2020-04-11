@@ -53,7 +53,7 @@ using ContextManagerPtr = std::unique_ptr<ContextManager>;
 
 class ContextManagerFactory : public Config::UntypedFactory {
 public:
-  virtual ~ContextManagerFactory() = default;
+  ~ContextManagerFactory() override = default;
   virtual ContextManagerPtr createContextManager(TimeSource& time_source) PURE;
 
   // There could be only one factory thus the name is static.

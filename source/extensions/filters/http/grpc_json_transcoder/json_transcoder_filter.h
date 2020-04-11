@@ -47,7 +47,7 @@ struct MethodInfo {
   bool request_type_is_http_body_ = false;
   bool response_type_is_http_body_ = false;
 };
-typedef std::shared_ptr<MethodInfo> MethodInfoSharedPtr;
+using MethodInfoSharedPtr = std::shared_ptr<MethodInfo>;
 
 void createHttpBodyEnvelope(Buffer::Instance& output,
                             const std::vector<const Protobuf::Field*>& request_body_field_path,

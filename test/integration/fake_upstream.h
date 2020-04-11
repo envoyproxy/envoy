@@ -673,9 +673,7 @@ private:
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
-    std::chrono::milliseconds listenerFiltersTimeout() const override {
-      return std::chrono::milliseconds();
-    }
+    std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
     bool continueOnListenerFiltersTimeout() const override { return false; }
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }

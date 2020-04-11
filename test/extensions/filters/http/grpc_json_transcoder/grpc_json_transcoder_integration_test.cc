@@ -12,7 +12,6 @@
 #include "gtest/gtest.h"
 
 using Envoy::Protobuf::TextFormat;
-using Envoy::Protobuf::util::MessageDifferencer;
 using Envoy::ProtobufUtil::Status;
 using Envoy::ProtobufUtil::error::Code;
 using Envoy::ProtobufWkt::Empty;
