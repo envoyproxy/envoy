@@ -9,8 +9,8 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "decompressor_test",
-    srcs = ["zlib_decompressor_test.cc"],
+    name = "zlib_decompressor_impl_test",
+    srcs = ["zlib_decompressor_impl_test.cc"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
