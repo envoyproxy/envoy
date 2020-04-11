@@ -56,18 +56,11 @@ std::string buildQueryForDomain(const std::string& name, uint16_t rec_type, uint
   buffer_.writeBEInt<uint16_t>(query.authority_rrs);
   buffer_.writeBEInt<uint16_t>(query.additional_rrs);
 
-  DnsQueryRecord query_rec(id, name, rec_type, rec_class);
+  DnsQueryRecord query_rec(name, rec_type, rec_class);
 
   query_rec.serialize(buffer_);
 
   return buffer_.toString();
-}
-
-size_t getResponseQueryCount(DnsMessageParser& parser) {
-  const uint16_t id = parser.getCurrentQueryId();
-  const auto& queries = parser.getActiveQueryRecords();
-
-  return queries.count(id);
 }
 
 } // namespace Utils

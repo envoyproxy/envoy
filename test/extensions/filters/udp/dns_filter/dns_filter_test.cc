@@ -35,13 +35,18 @@ public:
     // Logger::Registry::setLogLevel(TestEnvironment::getOptions().logLevel());
     Logger::Registry::setLogLevel(spdlog::level::trace);
 
+    response_parser_ = std::make_unique<DnsMessageParser>();
+
+    client_request_.addresses_.local_ = listener_address_;
+    client_request_.addresses_.peer_ = listener_address_;
+    client_request_.buffer_ = std::make_unique<Buffer::OwnedImpl>();
+
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
     EXPECT_CALL(callbacks_.udp_listener_, send(_))
         .WillRepeatedly(
             Invoke([this](const Network::UdpSendData& send_data) -> Api::IoCallUint64Result {
-              response_ptr = std::make_unique<Buffer::OwnedImpl>();
-              response_ptr->move(send_data.buffer_);
-              return makeNoError(response_ptr->length());
+              client_request_.buffer_->move(send_data.buffer_);
+              return makeNoError(client_request_.buffer_->length());
             }));
 
     EXPECT_CALL(callbacks_.udp_listener_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
@@ -77,10 +82,12 @@ public:
   std::unique_ptr<DnsFilter> filter_;
   Network::MockUdpReadFilterCallbacks callbacks_;
   Stats::IsolatedStoreImpl stats_store_;
-  Buffer::InstancePtr response_ptr;
-  DnsMessageParser response_parser_;
+  Network::UdpRecvData client_request_;
 
+  std::unique_ptr<DnsMessageParser> response_parser_;
   Event::MockDispatcher dispatcher_;
+
+  DnsQueryContextPtr query_ctx_;
 
   // This config has external resolution disabled and is used to verify local lookups. With
   // external resolution disabled, it eliminates having to setup mocks for the resolver callbacks in
@@ -128,7 +135,8 @@ TEST_F(DnsFilterTest, InvalidQuery) {
 
   sendQueryFromClient("10.0.0.1:1000", "hello");
 
-  ASSERT_FALSE(response_parser_.parseDnsObject(response_ptr));
+  query_ctx_ = response_parser_->createQueryContext(client_request_);
+  ASSERT_FALSE(query_ctx_->status_);
 }
 
 TEST_F(DnsFilterTest, SingleTypeAQuery) {
@@ -142,9 +150,10 @@ TEST_F(DnsFilterTest, SingleTypeAQuery) {
   ASSERT_FALSE(query.empty());
 
   sendQueryFromClient("10.0.0.1:1000", query);
+  query_ctx_ = response_parser_->createQueryContext(client_request_);
 
   // This will fail since the response generation is not being done yet
-  ASSERT_FALSE(response_parser_.parseDnsObject(response_ptr));
+  ASSERT_FALSE(query_ctx_->status_);
 }
 
 } // namespace

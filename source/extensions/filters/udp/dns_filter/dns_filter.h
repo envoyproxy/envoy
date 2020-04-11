@@ -103,8 +103,10 @@ public:
 private:
   /**
    * Prepare the response buffer and send it to the client
+   *
+   * @param context contains the data necessary to create a response and send it to a client
    */
-  void sendDnsResponse();
+  void sendDnsResponse(DnsQueryContextPtr context);
 
   /**
    * @brief Encapsulates all of the logic required to find an answer for a DNS query
@@ -134,7 +136,6 @@ private:
 
   Network::Address::InstanceConstSharedPtr local_;
   Network::Address::InstanceConstSharedPtr peer_;
-  Buffer::OwnedImpl response_;
 
   AnswerCallback answer_callback_;
 };

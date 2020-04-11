@@ -66,7 +66,20 @@ void DnsQueryRecord::serialize(Buffer::OwnedImpl& output) {
   output.writeBEInt<uint16_t>(class_);
 }
 
-bool DnsMessageParser::parseDnsObject(const Buffer::InstancePtr& buffer) {
+DnsQueryContextPtr DnsMessageParser::createQueryContext(Network::UdpRecvData& client_request) {
+  DnsQueryContextPtr query_context = std::make_unique<DnsQueryContext>(
+      client_request.addresses_.local_, client_request.addresses_.peer_);
+
+  query_context->status_ = parseDnsObject(query_context, client_request.buffer_);
+  if (!query_context->status_) {
+    ENVOY_LOG(error, "Unable to parse buffer into a DNS object");
+  }
+
+  return query_context;
+}
+
+bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
+                                      const Buffer::InstancePtr& buffer) {
 
   auto available_bytes = buffer->length();
 
@@ -144,28 +157,10 @@ bool DnsMessageParser::parseDnsObject(const Buffer::InstancePtr& buffer) {
     return false;
   }
 
-  // Each dns request has a Identification ID. This is used to match the request and replies.
-  // We should not see a duplicate ID when handling DNS requests. The ID is removed from the
-  // active transactions queue when we build a response for the identified query
-  const uint16_t id = static_cast<uint16_t>(incoming_.id);
-  if (std::find(active_transactions_.begin(), active_transactions_.end(), id) !=
-      active_transactions_.end()) {
-    ENVOY_LOG(error, "The filter has already encountered ID {} in a previous request", id);
-    return false;
-  }
+  context->id_ = static_cast<uint16_t>(incoming_.id);
 
-  // Double check that this ID is not already being handled.
-  if (queries_.find(id) != queries_.end()) {
-    ENVOY_LOG(
-        error,
-        "There are queries matching ID {} from a previous request for which we have not responded",
-        id);
-    return false;
-  }
-
-  active_transactions_.push_back(id);
-
-  // Almost always, we will have only one query here
+  // Almost always, we will have only one query here. Per the RFC, QDCOUNT is usually 1
+  context->queries_.reserve(incoming_.questions);
   for (auto index = 0; index < incoming_.questions; index++) {
     ENVOY_LOG(trace, "Parsing [{}/{}] questions", index, incoming_.questions);
     auto rec = parseDnsQueryRecord(buffer, &offset);
@@ -173,7 +168,7 @@ bool DnsMessageParser::parseDnsObject(const Buffer::InstancePtr& buffer) {
       ENVOY_LOG(error, "Couldn't parse query record from buffer");
       return false;
     }
-    queries_.emplace(id, std::move(rec));
+    context->queries_.push_back(std::move(rec));
   }
 
   return true;
@@ -268,8 +263,7 @@ DnsQueryRecordPtr DnsMessageParser::parseDnsQueryRecord(const Buffer::InstancePt
 
   // This is shared because we use the query from a list when building the response.
   // Using a shared pointer avoids duplicating this data in the asynchronous resolution path
-  auto rec = std::make_shared<DnsQueryRecord>(static_cast<uint16_t>(incoming_.id), record_name,
-                                              record_type, record_class);
+  auto rec = std::make_unique<DnsQueryRecord>(record_name, record_type, record_class);
 
   // stop reading he buffer here since we aren't parsing additional records
   ENVOY_LOG(trace, "Extracted query record. Name: {} type: {} class: {}", rec->name_, rec->type_,

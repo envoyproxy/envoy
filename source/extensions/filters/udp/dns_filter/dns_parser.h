@@ -48,15 +48,13 @@ enum DnsResponseCode { NoError, FormatError, ServerFailure, NameError, NotImplem
  */
 class BaseDnsRecord {
 public:
-  BaseDnsRecord(const uint16_t id, const std::string& rec_name, const uint16_t rec_type,
-                const uint16_t rec_class)
-      : id_(id), name_(rec_name), type_(rec_type), class_(rec_class){};
+  BaseDnsRecord(const std::string& rec_name, const uint16_t rec_type, const uint16_t rec_class)
+      : name_(rec_name), type_(rec_type), class_(rec_class){};
 
   virtual ~BaseDnsRecord() = default;
   void serializeName(Buffer::OwnedImpl& output);
   virtual void serialize(Buffer::OwnedImpl& output) PURE;
 
-  const uint16_t id_;
   const std::string name_;
   const uint16_t type_;
   const uint16_t class_;
@@ -69,16 +67,15 @@ public:
 class DnsQueryRecord : public BaseDnsRecord {
 
 public:
-  DnsQueryRecord(const uint16_t id, const std::string& rec_name, const uint16_t rec_type,
-                 const uint16_t rec_class)
-      : BaseDnsRecord(id, rec_name, rec_type, rec_class) {}
+  DnsQueryRecord(const std::string& rec_name, const uint16_t rec_type, const uint16_t rec_class)
+      : BaseDnsRecord(rec_name, rec_type, rec_class) {}
 
   ~DnsQueryRecord() override = default;
   void serialize(Buffer::OwnedImpl& output) override;
 };
 
-using DnsQueryRecordPtr = std::shared_ptr<DnsQueryRecord>;
-using DnsQueryMap = std::unordered_multimap<uint16_t, DnsQueryRecordPtr>;
+using DnsQueryRecordPtr = std::unique_ptr<DnsQueryRecord>;
+using DnsQueryPtrVec = std::vector<DnsQueryRecordPtr>;
 
 using AddressConstPtrVec = std::vector<Network::Address::InstanceConstSharedPtr>;
 using AnswerCallback = std::function<void(DnsQueryRecordPtr& query, AddressConstPtrVec& ipaddr)>;
@@ -90,10 +87,9 @@ using AnswerCallback = std::function<void(DnsQueryRecordPtr& query, AddressConst
  */
 class DnsAnswerRecord : public BaseDnsRecord {
 public:
-  DnsAnswerRecord(const uint16_t id, const std::string& query_name, const uint16_t rec_type,
-                  const uint16_t rec_class, const uint32_t ttl,
-                  Network::Address::InstanceConstSharedPtr ipaddr)
-      : BaseDnsRecord(id, query_name, rec_type, rec_class), ttl_(ttl), ip_addr_(ipaddr) {}
+  DnsAnswerRecord(const std::string& query_name, const uint16_t rec_type, const uint16_t rec_class,
+                  const uint32_t ttl, Network::Address::InstanceConstSharedPtr ipaddr)
+      : BaseDnsRecord(query_name, rec_type, rec_class), ttl_(ttl), ip_addr_(ipaddr) {}
 
   ~DnsAnswerRecord() override = default;
   void serialize(Buffer::OwnedImpl& output) override { UNREFERENCED_PARAMETER(output); }
@@ -103,7 +99,29 @@ public:
 };
 
 using DnsAnswerRecordPtr = std::unique_ptr<DnsAnswerRecord>;
-using DnsAnswerMap = absl::flat_hash_map<std::string, std::list<DnsAnswerRecordPtr>>;
+using DnsAnswerMap = std::unordered_multimap<std::string, DnsAnswerRecordPtr>;
+
+/**
+ * DnsQueryContext contains all the data associated with a query. The filter uses this object to
+ * generate a response and determine where it should be transmitted.
+ */
+class DnsQueryContext {
+public:
+  DnsQueryContext(Network::Address::InstanceConstSharedPtr local,
+                  Network::Address::InstanceConstSharedPtr peer)
+      : local_(std::move(local)), peer_(std::move(peer)), status_(false), id_() {}
+  ~DnsQueryContext() = default;
+
+  Network::Address::InstanceConstSharedPtr local_;
+  Network::Address::InstanceConstSharedPtr peer_;
+
+  bool status_;
+  uint16_t id_;
+  DnsQueryPtrVec queries_;
+  DnsAnswerMap answers_;
+};
+
+using DnsQueryContextPtr = std::unique_ptr<DnsQueryContext>;
 
 enum class DnsQueryParseState {
   Init = 0,
@@ -125,12 +143,6 @@ public:
   ~DnsMessageParser() = default;
 
   /**
-   * @param buffer a reference to the incoming request object received by the listener
-   * @return bool true if all DNS records and flags were successfully parsed from the buffer
-   */
-  bool parseDnsObject(const Buffer::InstancePtr& buffer);
-
-  /**
    * @brief parse a single query record from a client request
    *
    * @param buffer a reference to the incoming request object received by the listener
@@ -142,36 +154,30 @@ public:
   DnsQueryRecordPtr parseDnsQueryRecord(const Buffer::InstancePtr& buffer, uint64_t* offset);
 
   /**
-   * @return a reference to the map of queries parsed from a client request
-   */
-  const DnsQueryMap& getActiveQueryRecords() { return queries_; }
-
-  /**
-   * @return the current query transaction ID being handled
-   */
-  uint16_t getCurrentQueryId() const { return active_transactions_.front(); }
-
-  /**
    * @return uint16_t the response code flag value from a parsed dns object
    */
   uint16_t getQueryResponseCode() { return static_cast<uint16_t>(incoming_.flags.rcode); }
 
   /**
-   * Reset the internal state of the class.
+   * @brief Create a context object for handling a DNS Query
+   *
+   * @param client_request the context containing the client addressing and the buffer with the DNS
+   * query contents
    */
-  void reset() {
-    active_transactions_.clear();
-    queries_.clear();
-  }
+  DnsQueryContextPtr createQueryContext(Network::UdpRecvData& client_request);
 
 private:
+  /**
+   * @param buffer a reference to the incoming request object received by the listener
+   * @return bool true if all DNS records and flags were successfully parsed from the buffer
+   */
+  bool parseDnsObject(DnsQueryContextPtr& context, const Buffer::InstancePtr& buffer);
+
   const std::string parseDnsNameRecord(const Buffer::InstancePtr& buffer, uint64_t* available_bytes,
                                        uint64_t* name_offset);
 
   struct DnsHeader incoming_;
   std::deque<uint16_t> active_transactions_;
-
-  DnsQueryMap queries_;
 };
 
 using DnsMessageParserPtr = std::unique_ptr<DnsMessageParser>;

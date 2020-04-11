@@ -77,30 +77,26 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
 
 void DnsFilter::onData(Network::UdpRecvData& client_request) {
 
-  // Save the connection endpoints so that we can respond
-  local_ = client_request.addresses_.local_;
-  peer_ = client_request.addresses_.peer_;
-
   // Parse the query, if it fails return an response to the client
-  if (!message_parser_->parseDnsObject(client_request.buffer_)) {
-    sendDnsResponse();
+  DnsQueryContextPtr query_context = message_parser_->createQueryContext(client_request);
+  if (!query_context->status_) {
+    sendDnsResponse(std::move(query_context));
     return;
   }
 
   // TODO(abaptiste): Resolve the requested name
 
   // Send an answer to the client
-  sendDnsResponse();
+  sendDnsResponse(std::move(query_context));
 }
 
-void DnsFilter::sendDnsResponse() {
+void DnsFilter::sendDnsResponse(DnsQueryContextPtr query_context) {
 
-  // Clear any cruft in the outgoing buffer
-  response_.drain(response_.length());
-
+  Buffer::OwnedImpl response_;
   // TODO(abaptiste): serialize and return a response to the client
 
-  Network::UdpSendData response_data{local_->ip(), *peer_, response_};
+  Network::UdpSendData response_data{query_context->local_->ip(), *(query_context->peer_),
+                                     response_};
   listener_.send(response_data);
 }
 
