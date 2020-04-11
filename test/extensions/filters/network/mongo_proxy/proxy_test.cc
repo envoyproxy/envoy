@@ -75,7 +75,7 @@ public:
         .WillRepeatedly(ReturnRef(stream_info_));
 
     EXPECT_CALL(log_manager_, createAccessLog(_)).WillOnce(Return(file_));
-    access_log_.reset(new AccessLog("test", log_manager_, dispatcher_.timeSource()));
+    access_log_ = std::make_shared<AccessLog>("test", log_manager_, dispatcher_.timeSource());
   }
 
   void initializeFilter(bool emit_dynamic_metadata = false) {
@@ -96,7 +96,7 @@ public:
     fault.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
     fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
 
-    fault_config_.reset(new Filters::Common::Fault::FaultDelayConfig(fault));
+    fault_config_ = std::make_shared<Filters::Common::Fault::FaultDelayConfig>(fault);
 
     EXPECT_CALL(runtime_.snapshot_,
                 featureEnabled("mongo.fault.fixed_delay.percent",

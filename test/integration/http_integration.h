@@ -222,6 +222,7 @@ protected:
   void testAdminDrain(Http::CodecClient::Type admin_request_type);
   // Test max stream duration.
   void testMaxStreamDuration();
+  void testMaxStreamDurationWithRetry();
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   // Prefix listener stat with IP:port, including IP version dependent loopback address.
   std::string listenerStatPrefix(const std::string& stat_name);

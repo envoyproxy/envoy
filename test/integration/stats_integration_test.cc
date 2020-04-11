@@ -270,7 +270,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/03/16  9964     44085       44600   http2: support custom SETTINGS parameters.
   // 2020/03/24  10501    44261       44600   upstream: upstream_rq_retry_limit_exceeded.
   // 2020/04/02  10624    43356       44000   Use 100 clusters rather than 1000 to avoid timeouts
-  // 2020/04/07  10531    43532       44600   http: max stream duration upstream support.
+  // 2020/04/07  10661    43349       44000   fix clang tidy on master
+  // 2020/04/12  10531    43532       44600   http: max stream duration upstream support.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -284,6 +285,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
+
   EXPECT_MEMORY_EQ(m_per_cluster, 43532);
   EXPECT_MEMORY_LE(m_per_cluster, 44600);
 }
@@ -328,7 +330,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/03/16  9964     36220       36800   http2: support custom SETTINGS parameters.
   // 2020/03/24  10501    36300       36800   upstream: upstream_rq_retry_limit_exceeded.
   // 2020/04/02  10624    35564       36000   Use 100 clusters rather than 1000 to avoid timeouts
-  // 2020/04/07  10531    35644       36800   http: max stream duration upstream support.
+  // 2020/04/07  10661    35557       36000   fix clang tidy on master
+  // 2020/04/12  10531    35644       36800   http: max stream duration upstream support.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -342,6 +345,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
+
   EXPECT_MEMORY_EQ(m_per_cluster, 35644);
   EXPECT_MEMORY_LE(m_per_cluster, 36800);
 }

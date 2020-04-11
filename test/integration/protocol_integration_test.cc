@@ -637,6 +637,10 @@ TEST_P(ProtocolIntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(t
 
 TEST_P(ProtocolIntegrationTest, BasicMaxStreamDuration) { testMaxStreamDuration(); }
 
+TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicy) {
+  testMaxStreamDurationWithRetry();
+}
+
 // Verify that headers with underscores in their names are dropped from client requests
 // but remain in upstream responses.
 TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {

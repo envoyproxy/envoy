@@ -98,7 +98,7 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
   // Convert the protobuf for serialized dynamic spans into the structure
   // required by StatMerger.
   Stats::StatMerger::DynamicsMap dynamics;
-  for (auto iter : stats_proto.dynamics()) {
+  for (const auto& iter : stats_proto.dynamics()) {
     Stats::DynamicSpans& spans = dynamics[iter.first];
     for (int i = 0; i < iter.second.spans_size(); ++i) {
       const HotRestartMessage::Reply::Span& span_proto = iter.second.spans(i);

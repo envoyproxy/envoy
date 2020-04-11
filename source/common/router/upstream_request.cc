@@ -415,10 +415,9 @@ void UpstreamRequest::onPoolReady(
 void UpstreamRequest::onStreamMaxDurationReached() {
   ASSERT(upstream_host_);
   upstream_host_->cluster().stats().upstream_rq_max_duration_reached_.inc();
-  max_stream_duration_timer_->disableTimer();
-  max_stream_duration_timer_.reset();
-  resetStream();
-  parent_.callbacks()->resetStream();
+
+  // The upstream had closed then try to retry along with retry policy.
+  parent_.onStreamMaxDurationReached(*this);
 }
 
 void UpstreamRequest::clearRequestEncoder() {
