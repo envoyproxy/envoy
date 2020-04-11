@@ -170,7 +170,14 @@ public:
 
   virtual ~TextReadout() {}
 
+  /**
+   * Sets the value of this TextReadout by moving the input |value| to minimize
+   * buffer copies under the lock.
+   */
   virtual void set(std::string&& value) PURE;
+  /**
+   * @return the copy of this TextReadout value.
+   */
   virtual std::string value() const PURE;
 };
 
