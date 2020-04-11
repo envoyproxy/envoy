@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.decompressor.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/extensions/decompressors/v3/library.proto";
+import "envoy/extensions/compression/common/decompressor/v3/decompressor.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
@@ -34,6 +34,6 @@ message Decompressor {
   // A decompressor library to use for decompression. Currently only
   // :ref:`envoy.decompressors.gzip<envoy_api_msg_extensions.decompressors.gzip.v3.Gzip>`
   // is included in Envoy.
-  decompressors.v3.DecompressorLibrary decompressor_library = 3
+  compression.common.decompressor.v3.DecompressorLibrary decompressor_library = 3
       [(validate.rules).message = {required: true}];
 }
