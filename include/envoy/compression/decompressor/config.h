@@ -1,10 +1,11 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
-#include "envoy/decompressor/decompressor.h"
+#include "envoy/compression/decompressor/decompressor.h"
 #include "envoy/server/filter_config.h"
 
 namespace Envoy {
+namespace Compression {
 namespace Decompressor {
 
 class DecompressorFactory {
@@ -31,4 +32,5 @@ public:
 };
 
 } // namespace Decompressor
+}
 } // namespace Envoy

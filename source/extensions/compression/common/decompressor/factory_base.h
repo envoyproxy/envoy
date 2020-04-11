@@ -1,17 +1,19 @@
 #pragma once
 
-#include "envoy/decompressor/config.h"
-#include "envoy/decompressor/decompressor.h"
+#include "envoy/compression/decompressor/config.h"
+#include "envoy/compression/decompressor/decompressor.h"
 #include "envoy/server/filter_config.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace Decompressors {
+namespace Compression {
+namespace Common {
+namespace Decompressor {
 
 template <class ConfigProto>
-class DecompressorLibraryFactoryBase : public Decompressor::NamedDecompressorLibraryConfigFactory {
+class DecompressorLibraryFactoryBase : public Envoy::Compression::Decompressor::NamedDecompressorLibraryConfigFactory {
 public:
-  Decompressor::DecompressorFactoryPtr
+  Envoy::Compression::Decompressor::DecompressorFactoryPtr
   createDecompressorLibraryFromProto(const Protobuf::Message& proto_config,
                                      Server::Configuration::FactoryContext& context) override {
     return createDecompressorLibraryFromProtoTyped(
@@ -28,11 +30,13 @@ protected:
   DecompressorLibraryFactoryBase(const std::string& name) : name_(name) {}
 
 private:
-  virtual Decompressor::DecompressorFactoryPtr
+  virtual Envoy::Compression::Decompressor::DecompressorFactoryPtr
   createDecompressorLibraryFromProtoTyped(const ConfigProto&) PURE;
   const std::string name_;
 };
 
 } // namespace Decompressors
+}
+}
 } // namespace Extensions
 } // namespace Envoy

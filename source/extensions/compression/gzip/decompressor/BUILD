@@ -15,7 +15,7 @@ envoy_cc_library(
     hdrs = ["zlib_decompressor.h"],
     external_deps = ["zlib"],
     deps = [
-        "//include/envoy/decompressor:decompressor_interface",
+        "//include/envoy/compression/decompressor:decompressor_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
@@ -30,10 +30,8 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":zlib_lib",
-        "//source/common/compressor:compressor_lib",
         "//source/common/http:headers_lib",
-        "//source/extensions/decompressors:factory_base_lib",
-        "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/extensions/decompressors/gzip/v3:pkg_cc_proto",
+        "//source/extensions/compression/common/decompressor:factory_base_lib",
+        "@envoy_api//envoy/extensions/compression/gzip/decompressor/v3:pkg_cc_proto",
     ],
 )

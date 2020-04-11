@@ -1,4 +1,4 @@
-#include "extensions/decompressors/gzip/zlib_decompressor.h"
+#include "extensions/compression/gzip/decompressor/zlib_decompressor.h"
 
 #include <memory>
 
@@ -10,8 +10,9 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Decompressors {
+namespace Compression {
 namespace Gzip {
+namespace Decompressor {
 
 ZlibDecompressor::ZlibDecompressor() : ZlibDecompressor(4096) {}
 
@@ -76,7 +77,8 @@ bool ZlibDecompressor::inflateNext() {
   return true;
 }
 
+} // namespace Decompressor
 } // namespace Gzip
-} // namespace Decompressors
+}
 } // namespace Extensions
 } // namespace Envoy
