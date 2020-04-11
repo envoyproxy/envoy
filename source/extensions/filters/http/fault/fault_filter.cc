@@ -168,7 +168,8 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   const auto abort_code = abortHttpStatus(headers);
   if (abort_code.has_value()) {
-    abortWithHTTPStatus(abort_code.value());
+    abortWithStatus(abort_code.value(), abortGrpcStatus(headers));
+
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -289,9 +290,14 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
     return absl::nullopt;
   }
 
+  // If gRPC status code is set, then HTTP will be set to 200
+  if (abortGrpcStatus(request_headers).has_value()) {
+    return Http::Code::OK;
+  }
+
   // See if the configured abort provider has a default status code, if not there is no abort status
   // code (e.g., header configuration and no/invalid header).
-  const auto config_abort = fault_settings_->requestAbort()->statusCode(
+  const auto config_abort = fault_settings_->requestAbort()->httpStatusCode(
       request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortRequest));
   if (!config_abort.has_value()) {
     return absl::nullopt;
@@ -310,19 +316,22 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
 }
 
 absl::optional<Grpc::Status::GrpcStatus>
-FaultFilter::abortGrpcStatus() {
-  auto grpc_status_code = fault_settings_->requestAbort()->grpcStatusCode().has_value() 
-                            ? static_cast<uint64_t>(fault_settings_->requestAbort()->grpcStatusCode().value())
-                            : std::numeric_limits<uint64_t>::max();
+FaultFilter::abortGrpcStatus(const Http::RequestHeaderMap& request_headers) {
+  auto grpc_status_code = fault_settings_->requestAbort()->grpcStatusCode(
+      request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortGrpcRequest));
 
-  grpc_status_code = config_->runtime().snapshot().getInteger(
-    fault_settings_->abortGrpcStatusRuntime(), grpc_status_code);
+  auto default_grpc_status_code = grpc_status_code.has_value()
+                                      ? static_cast<uint64_t>(grpc_status_code.value())
+                                      : std::numeric_limits<uint64_t>::max();
 
-  if(grpc_status_code == std::numeric_limits<uint64_t>::max()) {
+  auto runtime_grpc_status_code = config_->runtime().snapshot().getInteger(
+      fault_settings_->abortGrpcStatusRuntime(), default_grpc_status_code);
+
+  if (runtime_grpc_status_code == std::numeric_limits<uint64_t>::max()) {
     return absl::nullopt;
   }
 
-  return static_cast<Grpc::Status::GrpcStatus>(grpc_status_code);
+  return static_cast<Grpc::Status::GrpcStatus>(runtime_grpc_status_code);
 }
 
 void FaultFilter::recordDelaysInjectedStats() {
@@ -393,18 +402,18 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
   // Delays can be followed by aborts
   const auto abort_code = abortHttpStatus(request_headers);
   if (abort_code.has_value()) {
-    abortWithHTTPStatus(abort_code.value());
+    abortWithStatus(abort_code.value(), abortGrpcStatus(request_headers));
   } else {
     // Continue request processing.
     decoder_callbacks_->continueDecoding();
   }
 }
 
-void FaultFilter::abortWithHTTPStatus(Http::Code abort_code) {
+void FaultFilter::abortWithStatus(Http::Code http_status_code,
+                                  absl::optional<Grpc::Status::GrpcStatus> grpc_status_code) {
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
-  decoder_callbacks_->sendLocalReply(abort_code, "fault filter abort", nullptr,
-                                     abortGrpcStatus(),
-                                     RcDetails::get().FaultAbort);
+  decoder_callbacks_->sendLocalReply(http_status_code, "fault filter abort", nullptr,
+                                     grpc_status_code, RcDetails::get().FaultAbort);
   recordAbortsInjectedStats();
 }
 

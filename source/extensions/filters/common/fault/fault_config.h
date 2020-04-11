@@ -24,6 +24,7 @@ public:
   const Http::LowerCaseString ThroughputResponse{
       absl::StrCat(prefix(), "-fault-throughput-response")};
   const Http::LowerCaseString AbortRequest{absl::StrCat(prefix(), "-fault-abort-request")};
+  const Http::LowerCaseString AbortGrpcRequest{absl::StrCat(prefix(), "-fault-abort-grpc-request")};
 };
 
 using HeaderNames = ConstSingleton<HeaderNameValues>;
@@ -33,10 +34,12 @@ public:
   FaultAbortConfig(const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config);
 
   const envoy::type::v3::FractionalPercent& percentage() const { return percentage_; }
-  absl::optional<Http::Code> statusCode(const Http::HeaderEntry* header) const {
-    return provider_->statusCode(header);
+  absl::optional<Http::Code> httpStatusCode(const Http::HeaderEntry* header) const {
+    return provider_->httpStatusCode(header);
   }
-  absl::optional<Grpc::Status::GrpcStatus> grpcStatusCode() const { return grpc_status_code_; }
+  absl::optional<Grpc::Status::GrpcStatus> grpcStatusCode(const Http::HeaderEntry* header) const {
+    return provider_->grpcStatusCode(header);
+  }
 
 private:
   // Abstract abort provider.
@@ -46,35 +49,48 @@ private:
 
     // Return the HTTP status code to use. Optionally passed an HTTP header that may contain the
     // HTTP status code depending on the provider implementation.
-    virtual absl::optional<Http::Code> statusCode(const Http::HeaderEntry* header) const PURE;
+    virtual absl::optional<Http::Code> httpStatusCode(const Http::HeaderEntry* header) const PURE;
+
+    // Return the gRPC status code to use. Optionally passed an HTTP header that may contain the
+    // gRPC status code depending on the provider implementation.
+    virtual absl::optional<Grpc::Status::GrpcStatus>
+    grpcStatusCode(const Http::HeaderEntry* header) const PURE;
   };
 
   // Delay provider that uses a fixed abort status code.
   class FixedAbortProvider : public AbortProvider {
   public:
-    FixedAbortProvider(uint64_t status_code) : status_code_(status_code) {}
+    FixedAbortProvider(absl::optional<Http::Code> http_status_code,
+                       absl::optional<Grpc::Status::GrpcStatus> grpc_status_code)
+        : http_status_code_(http_status_code), grpc_status_code_(grpc_status_code) {}
 
-    // AbortProvider
-    absl::optional<Http::Code> statusCode(const Http::HeaderEntry*) const override {
-      return static_cast<Http::Code>(status_code_);
+    absl::optional<Http::Code> httpStatusCode(const Http::HeaderEntry*) const override {
+      return http_status_code_;
+    }
+
+    absl::optional<Grpc::Status::GrpcStatus>
+    grpcStatusCode(const Http::HeaderEntry*) const override {
+      return grpc_status_code_;
     }
 
   private:
-    const uint64_t status_code_;
+    const absl::optional<Http::Code> http_status_code_;
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status_code_;
   };
 
   // Abort provider the reads a status code from an HTTP header.
   class HeaderAbortProvider : public AbortProvider {
   public:
-    // AbortProvider
-    absl::optional<Http::Code> statusCode(const Http::HeaderEntry* header) const override;
+    absl::optional<Http::Code> httpStatusCode(const Http::HeaderEntry* header) const override;
+
+    absl::optional<Grpc::Status::GrpcStatus>
+    grpcStatusCode(const Http::HeaderEntry*) const override;
   };
 
   using AbortProviderPtr = std::unique_ptr<AbortProvider>;
 
   AbortProviderPtr provider_;
   const envoy::type::v3::FractionalPercent percentage_;
-  absl::optional<Grpc::Status::GrpcStatus> grpc_status_code_;
 };
 
 using FaultAbortConfigPtr = std::unique_ptr<FaultAbortConfig>;

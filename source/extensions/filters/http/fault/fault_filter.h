@@ -248,7 +248,8 @@ private:
   void recordDelaysInjectedStats();
   void resetTimerState();
   void postDelayInjection(const Http::RequestHeaderMap& request_headers);
-  void abortWithHTTPStatus(Http::Code abort_code);
+  void abortWithStatus(Http::Code http_status_code,
+                       absl::optional<Grpc::Status::GrpcStatus> grpc_status_code);
   bool matchesTargetUpstreamCluster();
   bool matchesDownstreamNodes(const Http::RequestHeaderMap& headers);
   bool isAbortEnabled();
@@ -256,7 +257,8 @@ private:
   absl::optional<std::chrono::milliseconds>
   delayDuration(const Http::RequestHeaderMap& request_headers);
   absl::optional<Http::Code> abortHttpStatus(const Http::RequestHeaderMap& request_headers);
-  absl::optional<Grpc::Status::GrpcStatus> abortGrpcStatus();
+  absl::optional<Grpc::Status::GrpcStatus>
+  abortGrpcStatus(const Http::RequestHeaderMap& request_headers);
   void maybeIncActiveFaults();
   void maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers);
 

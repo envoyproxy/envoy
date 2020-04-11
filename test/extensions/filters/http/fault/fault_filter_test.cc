@@ -257,7 +257,8 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.abort.grpc_status", std::numeric_limits<uint64_t>::max()))
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+      .Times(2)
+      .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "429"}, {"content-length", "18"}, {"content-type", "text/plain"}};
@@ -283,15 +284,14 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
 }
 
-TEST_F(FaultFilterTest, AbortWithHttpAndGrpcStatus) {
+TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
   decoder_filter_callbacks_.is_grpc_request_ = true;
 
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
   fault.mutable_abort()->mutable_percentage()->set_numerator(100);
   fault.mutable_abort()->mutable_percentage()->set_denominator(
       envoy::type::v3::FractionalPercent::HUNDRED);
-  fault.mutable_abort()->set_http_status(200);
-  fault.mutable_abort()->mutable_grpc_error()->set_grpc_status(5);
+  fault.mutable_abort()->set_grpc_status(5);
   SetUpTest(fault);
 
   EXPECT_CALL(runtime_.snapshot_,
@@ -309,15 +309,14 @@ TEST_F(FaultFilterTest, AbortWithHttpAndGrpcStatus) {
                              Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 200))
-      .WillOnce(Return(200));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.grpc_status", 5))
+      .Times(2)
+      .WillRepeatedly(Return(5));
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.abort.grpc_status", 5))
-      .WillOnce(Return(5));
-
-  Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "200"}, {"content-type", "application/grpc"}, {"grpc-status", "5"}, {"grpc-message", "fault filter abort"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", "application/grpc"},
+                                                   {"grpc-status", "5"},
+                                                   {"grpc-message", "fault filter abort"}};
   EXPECT_CALL(decoder_filter_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -364,7 +363,8 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.abort.grpc_status", std::numeric_limits<uint64_t>::max()))
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+      .Times(2)
+      .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "429"}, {"content-length", "18"}, {"content-type", "text/plain"}};
@@ -570,7 +570,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.abort.grpc_status", std::numeric_limits<uint64_t>::max()))
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+      .Times(2)
+      .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "500"}, {"content-length", "18"}, {"content-type", "text/plain"}};
@@ -632,7 +633,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.abort.grpc_status", std::numeric_limits<uint64_t>::max()))
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+      .Times(2)
+      .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "18"}, {"content-type", "text/plain"}};
@@ -688,7 +690,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.abort.grpc_status", std::numeric_limits<uint64_t>::max()))
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+      .Times(2)
+      .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "18"}, {"content-type", "text/plain"}};
@@ -758,7 +761,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.abort.grpc_status", std::numeric_limits<uint64_t>::max()))
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+      .Times(2)
+      .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "18"}, {"content-type", "text/plain"}};

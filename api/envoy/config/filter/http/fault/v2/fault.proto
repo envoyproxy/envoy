@@ -30,12 +30,6 @@ message FaultAbort {
   message HeaderAbort {
   }
 
-  // [#next-free-field: 6]
-  message GrpcError {
-    // gRPC status code to use to abort the gRPC request.
-    uint32 grpc_status = 5 [(validate.rules).uint32 = {lte: 16}];
-  }
-
   reserved 1;
 
   oneof error_type {
@@ -44,11 +38,12 @@ message FaultAbort {
     // HTTP status code to use to abort the HTTP request.
     uint32 http_status = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
+    // gRPC status code to use to abort the gRPC request.
+    uint32 grpc_status = 5 [(validate.rules).uint32 = {lte: 16}];
+
     // Fault aborts are controlled via an HTTP header (if applicable).
     HeaderAbort header_abort = 4;
   }
-
-  GrpcError grpc_error = 5;
 
   // The percentage of requests/operations/connections that will be aborted with the error code
   // provided.
