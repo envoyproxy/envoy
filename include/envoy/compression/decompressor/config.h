@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/typed_config.h"
 #include "envoy/compression/decompressor/decompressor.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/server/filter_config.h"
 
 namespace Envoy {
@@ -32,5 +32,5 @@ public:
 };
 
 } // namespace Decompressor
-}
+} // namespace Compression
 } // namespace Envoy

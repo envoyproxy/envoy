@@ -7,7 +7,7 @@
 #include "common/http/headers.h"
 
 #include "extensions/compression/common/decompressor/factory_base.h"
-#include "extensions/compression/gzip/decompressor/zlib_decompressor.h"
+#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,7 +45,8 @@ private:
 };
 
 class GzipDecompressorLibraryFactory
-    : public Common::Decompressor::DecompressorLibraryFactoryBase<envoy::extensions::compression::gzip::decompressor::v3::Gzip> {
+    : public Common::Decompressor::DecompressorLibraryFactoryBase<
+          envoy::extensions::compression::gzip::decompressor::v3::Gzip> {
 public:
   GzipDecompressorLibraryFactory() : DecompressorLibraryFactoryBase(gzipExtensionName()) {}
 
@@ -58,6 +59,6 @@ DECLARE_FACTORY(GzipDecompressorLibraryFactory);
 
 } // namespace Decompressor
 } // namespace Gzip
-}
+} // namespace Compression
 } // namespace Extensions
 } // namespace Envoy

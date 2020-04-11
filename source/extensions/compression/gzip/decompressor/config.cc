@@ -17,7 +17,7 @@ GzipDecompressorFactory::GzipDecompressorFactory(
       chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, chunk_size, DefaultChunkSize)) {}
 
 Envoy::Compression::Decompressor::DecompressorPtr GzipDecompressorFactory::createDecompressor() {
-  auto decompressor = std::make_unique<ZlibDecompressor>(chunk_size_);
+  auto decompressor = std::make_unique<ZlibDecompressorImpl>(chunk_size_);
   decompressor->init(window_bits_);
   return decompressor;
 }
@@ -33,8 +33,8 @@ GzipDecompressorLibraryFactory::createDecompressorLibraryFromProtoTyped(
  */
 REGISTER_FACTORY(GzipDecompressorLibraryFactory,
                  Envoy::Compression::Decompressor::NamedDecompressorLibraryConfigFactory);
-}
+} // namespace Decompressor
 } // namespace Gzip
-}
+} // namespace Compression
 } // namespace Extensions
 } // namespace Envoy

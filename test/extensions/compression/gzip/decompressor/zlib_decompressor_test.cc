@@ -1,13 +1,17 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/hex.h"
 #include "common/compressor/zlib_compressor_impl.h"
-#include "common/decompressor/zlib_decompressor_impl.h"
+
+#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Compression {
+namespace Gzip {
 namespace Decompressor {
 namespace {
 
@@ -286,4 +290,7 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
 
 } // namespace
 } // namespace Decompressor
+} // namespace Gzip
+} // namespace Compression
+} // namespace Extensions
 } // namespace Envoy

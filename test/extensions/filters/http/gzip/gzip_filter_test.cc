@@ -4,10 +4,10 @@
 
 #include "common/common/hex.h"
 #include "common/compressor/zlib_compressor_impl.h"
-#include "common/decompressor/zlib_decompressor_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/gzip/gzip_filter.h"
+#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -154,7 +154,7 @@ protected:
   std::shared_ptr<GzipFilterConfig> config_;
   std::unique_ptr<Common::Compressors::CompressorFilter> filter_;
   Buffer::OwnedImpl data_;
-  Decompressor::ZlibDecompressorImpl decompressor_;
+  Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_;
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
   Stats::TestUtil::TestStore stats_;

@@ -11,7 +11,8 @@ namespace Common {
 namespace Decompressor {
 
 template <class ConfigProto>
-class DecompressorLibraryFactoryBase : public Envoy::Compression::Decompressor::NamedDecompressorLibraryConfigFactory {
+class DecompressorLibraryFactoryBase
+    : public Envoy::Compression::Decompressor::NamedDecompressorLibraryConfigFactory {
 public:
   Envoy::Compression::Decompressor::DecompressorFactoryPtr
   createDecompressorLibraryFromProto(const Protobuf::Message& proto_config,
@@ -35,8 +36,8 @@ private:
   const std::string name_;
 };
 
-} // namespace Decompressors
-}
-}
+} // namespace Decompressor
+} // namespace Common
+} // namespace Compression
 } // namespace Extensions
 } // namespace Envoy

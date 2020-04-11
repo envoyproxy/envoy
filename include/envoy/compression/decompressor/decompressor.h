@@ -25,5 +25,5 @@ public:
 using DecompressorPtr = std::unique_ptr<Decompressor>;
 
 } // namespace Decompressor
-}
+} // namespace Compression
 } // namespace Envoy

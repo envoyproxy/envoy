@@ -11,16 +11,16 @@ namespace Envoy {
 namespace Extensions {
 namespace Compression {
 namespace Gzip {
-  namespace Decompressor {
+namespace Decompressor {
 
 /**
  * Implementation of decompressor's interface.
  */
-class ZlibDecompressor : public Zlib::Base,
-                         public Envoy::Compression::Decompressor::Decompressor,
-                         public Logger::Loggable<Logger::Id::decompression> {
+class ZlibDecompressorImpl : public Zlib::Base,
+                             public Envoy::Compression::Decompressor::Decompressor,
+                             public Logger::Loggable<Logger::Id::decompression> {
 public:
-  ZlibDecompressor();
+  ZlibDecompressorImpl();
 
   /**
    * Constructor that allows setting the size of decompressor's output buffer. It
@@ -30,7 +30,7 @@ public:
    * 256K bytes. @see http://zlib.net/zlib_how.html
    * @param chunk_size amount of memory reserved for the decompressor output.
    */
-  ZlibDecompressor(uint64_t chunk_size);
+  ZlibDecompressorImpl(uint64_t chunk_size);
 
   /**
    * Init must be called in order to initialize the decompressor. Once decompressor is initialized,
@@ -53,6 +53,6 @@ private:
 
 } // namespace Decompressor
 } // namespace Gzip
-}
+} // namespace Compression
 } // namespace Extensions
 } // namespace Envoy
