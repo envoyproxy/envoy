@@ -8,16 +8,18 @@
 #include "zlib.h"
 
 namespace Envoy {
-namespace Decompressor {
+namespace Extensions {
+namespace Decompressors {
+namespace Gzip {
 
 /**
  * Implementation of decompressor's interface.
  */
-class ZlibDecompressorImpl : public Zlib::Base,
-                             public Decompressor,
-                             public Logger::Loggable<Logger::Id::decompression> {
+class ZlibDecompressor : public Zlib::Base,
+                         public Decompressor::Decompressor,
+                         public Logger::Loggable<Logger::Id::decompression> {
 public:
-  ZlibDecompressorImpl();
+  ZlibDecompressor();
 
   /**
    * Constructor that allows setting the size of decompressor's output buffer. It
@@ -27,7 +29,7 @@ public:
    * 256K bytes. @see http://zlib.net/zlib_how.html
    * @param chunk_size amount of memory reserved for the decompressor output.
    */
-  ZlibDecompressorImpl(uint64_t chunk_size);
+  ZlibDecompressor(uint64_t chunk_size);
 
   /**
    * Init must be called in order to initialize the decompressor. Once decompressor is initialized,
@@ -37,7 +39,7 @@ public:
    */
   void init(int64_t window_bits);
 
-  // Decompressor
+  // Decompressor::Decompressor
   void decompress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
 
   // Flag to track whether error occurred during decompression.
@@ -48,5 +50,7 @@ private:
   bool inflateNext();
 };
 
-} // namespace Decompressor
+} // namespace Gzip
+} // namespace Decompressors
+} // namespace Extensions
 } // namespace Envoy

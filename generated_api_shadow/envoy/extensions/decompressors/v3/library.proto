@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.decompressors.v3;
 
 import "google/protobuf/any.proto";
-import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
