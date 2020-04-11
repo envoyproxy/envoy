@@ -16,6 +16,8 @@ option java_outer_classname = "OpencensusProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
+// [#protodoc-title: OpenCensus tracer]
+
 // Configuration for the OpenCensus tracer.
 // [#next-free-field: 15]
 // [#extension: envoy.tracers.opencensus]

@@ -13,6 +13,8 @@ option java_outer_classname = "ZipkinProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
+// [#protodoc-title: Zipkin tracer]
+
 // Configuration for the Zipkin tracer.
 // [#extension: envoy.tracers.zipkin]
 // [#next-free-field: 6]
