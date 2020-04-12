@@ -6,7 +6,6 @@ import "envoy/api/v2/core/grpc_service.proto";
 
 import "opencensus/proto/trace/v1/trace_config.proto";
 
-import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
