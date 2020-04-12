@@ -43,10 +43,11 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactory
       deferred_delete_timer_(createTimerInternal([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimerInternal([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
+  ASSERT(!name_.empty());
 #ifdef ENVOY_HANDLE_SIGNALS
   SignalAction::registerFatalErrorHandler(*this);
 #endif
-  updateApproximateMonotonicTime();
+  updateApproximateMonotonicTimeInternal();
   base_scheduler_.registerOnPrepareCallback(
       std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
@@ -153,10 +154,12 @@ Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedP
   return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource());
 }
 
-TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return createTimerInternal(cb); }
+TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
+  ASSERT(isThreadSafe());
+  return createTimerInternal(cb);
+}
 
 TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
-  ASSERT(isThreadSafe());
   return scheduler_->createTimer(cb, *this);
 }
 
@@ -204,8 +207,10 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
   return approximate_monotonic_time_;
 }
 
-void DispatcherImpl::updateApproximateMonotonicTime() {
-  approximate_monotonic_time_ = timeSource().monotonicTime();
+void DispatcherImpl::updateApproximateMonotonicTime() { updateApproximateMonotonicTimeInternal(); }
+
+void DispatcherImpl::updateApproximateMonotonicTimeInternal() {
+  approximate_monotonic_time_ = api_.timeSource().monotonicTime();
 }
 
 void DispatcherImpl::runPostCallbacks() {
