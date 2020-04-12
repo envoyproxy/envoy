@@ -24,6 +24,9 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // <envoy_api_field_config.bootstrap.v4alpha.Bootstrap.tracing>` field. Envoy may support other tracers
 // in the future, but right now the HTTP tracer is the only one supported.
 message Tracing {
+  // Use type Tracing.Http directly instead.
+  option deprecated = true;
+
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v3.Tracing";
 
   message Http {
