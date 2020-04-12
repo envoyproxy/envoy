@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Compressor]
 // Compressor :ref:`configuration overview <config_http_filters_compressor>`.
-// [#extension: envoy.filters.http.compressor]
+// [#extension: envoy.filters.http.decompressor]
 
 message Decompressor {
   // Runtime flag that controls whether the filter is enabled for Request decompression or not. If set to false, the

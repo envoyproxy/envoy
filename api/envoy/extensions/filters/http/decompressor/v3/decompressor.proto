@@ -18,10 +18,10 @@ option java_outer_classname = "DecompressorProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Compressor]
-// Compressor :ref:`configuration overview <config_http_filters_compressor>`.
-// [#extension: envoy.filters.http.compressor]
+// [#protodoc-title: Decompressor]
+// Decompressor :ref:`configuration overview <config_http_filters_decompressor>`.
 
+// [#not-implemented-hide:]
 message Decompressor {
   // Runtime flag that controls whether the filter is enabled for Request decompression or not. If set to false, the
   // filter will operate as a pass-through filter. If not specified, defaults to enabled.

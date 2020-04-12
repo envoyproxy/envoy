@@ -24,7 +24,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ConfigProto>();
   }
-  std::string category() const override { return "envoy.decompressors"; }
+  std::string category() const override { return "envoy.compression.decompressors"; }
   std::string name() const override { return name_; }
 
 protected:
