@@ -6,7 +6,7 @@ import "envoy/config/core/v3/grpc_service.proto";
 
 import "opencensus/proto/trace/v1/trace_config.proto";
 
-import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -14,6 +14,8 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "OpencensusProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.tracers.opencensus.v4alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: OpenCensus tracer]

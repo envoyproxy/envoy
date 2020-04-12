@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.trace.v3;
 
-import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -10,6 +10,8 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "LightstepProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.tracers.lightstep.v4alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: LightStep tracer]

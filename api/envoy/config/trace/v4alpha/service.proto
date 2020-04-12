@@ -4,7 +4,6 @@ package envoy.config.trace.v4alpha;
 
 import "envoy/config/core/v4alpha/grpc_service.proto";
 
-import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
