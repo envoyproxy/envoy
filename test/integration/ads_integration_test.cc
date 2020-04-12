@@ -889,58 +889,25 @@ TEST_P(AdsClusterFromFileIntegrationTest, BasicTestWidsAdsEndpointLoadedFromFile
                                       {"ads_eds_cluster"}, {}, {}));
 }
 
-namespace {
-static std::string AdsIntegrationConfigWithRdts(const std::string& api_type) {
-  // Note: do not use CONSTRUCT_ON_FIRST_USE here!
-  return fmt::format(R"EOF(
-layered_runtime:
-  layers:
-    - name: foobar
-      rtds_layer:
-        name: ads_rtds_layer
-        rtds_config:
-          ads: {{}}
-dynamic_resources:
-  lds_config:
-    ads: {{}}
-  cds_config:
-    ads: {{}}
-  ads_config:
-    api_type: {}
-    set_node_on_first_message_only: true
-static_resources:
-  clusters:
-    name: dummy_cluster
-    connect_timeout:
-      seconds: 5
-    type: STATIC
-    load_assignment:
-      cluster_name: dummy_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 0
-    lb_policy: ROUND_ROBIN
-    http2_protocol_options: {{}}
-admin:
-  access_log_path: /dev/null
-  address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 0
-)EOF",
-                     api_type);
-}
-} // namespace
-
 class AdsIntegrationTestWithRtds : public AdsIntegrationTest {
 public:
-  AdsIntegrationTestWithRtds()
-      : AdsIntegrationTest(AdsIntegrationConfigWithRdts(
-            sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {}
+  AdsIntegrationTestWithRtds() = default;
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* layered_runtime = bootstrap.mutable_layered_runtime();
+      auto* layer = layered_runtime->add_layers();
+      layer->set_name("foobar");
+      auto* rtds_layer = layer->mutable_rtds_layer();
+      rtds_layer->set_name("ads_rtds_layer");
+      auto* rtds_config = rtds_layer->mutable_rtds_config();
+      rtds_config->mutable_ads();
+
+      auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+      ads_config->set_set_node_on_first_message_only(true);
+    });
+    AdsIntegrationTest::initialize();
+  }
 
   void testBasicFlow() {
     // Test that runtime discovery request comes first and cluster discovery request comes after
@@ -971,48 +938,19 @@ TEST_P(AdsIntegrationTestWithRtds, Basic) {
   testBasicFlow();
 }
 
-class AdsIntegrationTestWithRtdsAndSecondaryClusters : public AdsIntegrationTest {
+class AdsIntegrationTestWithRtdsAndSecondaryClusters : public AdsIntegrationTestWithRtds {
 public:
-  AdsIntegrationTestWithRtdsAndSecondaryClusters()
-      : AdsIntegrationTest(AdsIntegrationConfigWithRdts(
-            sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {}
+  AdsIntegrationTestWithRtdsAndSecondaryClusters() = default;
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
-      auto* grpc_service = ads_config->add_grpc_services();
-      setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
-      auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      ads_cluster->set_name("ads_cluster");
-      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext context;
-      auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
-      validation_context->mutable_trusted_ca()->set_filename(
-          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-      validation_context->add_match_subject_alt_names()->set_suffix("lyft.com");
-      if (clientType() == Grpc::ClientType::GoogleGrpc) {
-        auto* google_grpc = grpc_service->mutable_google_grpc();
-        auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
-        ssl_creds->mutable_root_certs()->set_filename(
-            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-      }
-      ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-      ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
-
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       eds_cluster->set_name("eds_cluster");
       eds_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
       auto* eds_cluster_config = eds_cluster->mutable_eds_cluster_config();
       eds_cluster_config->mutable_eds_config()->mutable_ads();
     });
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    HttpIntegrationTest::initialize();
-    if (xds_stream_ == nullptr) {
-      createXdsConnection();
-      AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
-      RELEASE_ASSERT(result, result.message());
-      xds_stream_->startGrpcStream();
-    }
+    AdsIntegrationTestWithRtds::initialize();
   }
 
   void testBasicFlow() {
