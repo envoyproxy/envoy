@@ -156,7 +156,13 @@ void AuthenticatorImpl::startVerify() {
   }
 
   // Check "exp" claim.
-  const uint64_t unix_timestamp = absl::ToUnixSeconds(absl::Now());
+  // We use the current system time and allow for up to 5 seconds of slack.
+  // Consider the following case:
+  // AWS ALB receives a request and determines that the existing access token is valid 
+  // (for another 1 seconds), forwards the request to Istio Ingressgateway and subsequently 
+  // to some pod with an envoy sidecar. Meanwhile, 0.1 seconds have passed and when envoy checks 
+  // the token it finds that it has expired.
+  const uint64_t unix_timestamp = absl::ToUnixSeconds(absl::Now()) - 5;
   // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
   // to 0.
   if (jwt_->nbf_ > unix_timestamp) {
