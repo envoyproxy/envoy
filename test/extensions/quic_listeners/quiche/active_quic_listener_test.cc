@@ -79,7 +79,7 @@ protected:
                                                           quic_config_, nullptr, enabledFlag());
     quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
         ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_));
-    simulated_time_system_.sleep(std::chrono::milliseconds(100));
+    simulated_time_system_.advanceTimeWait(std::chrono::milliseconds(100));
   }
 
   void configureMocks(int connection_count) {
