@@ -333,11 +333,11 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       status = Envoy::Http::codecProtocolError(e.what());
     }
 
-    ASSERT(!Envoy::Http::IsPrematureResponseError(status));
-    if (Envoy::Http::IsBufferFloodError(status)) {
+    ASSERT(!Envoy::Http::isPrematureResponseError(status));
+    if (Envoy::Http::isBufferFloodError(status)) {
       handleCodecException(status.message());
       return Network::FilterStatus::StopIteration;
-    } else if (Envoy::Http::IsCodecProtocolError(status)) {
+    } else if (Envoy::Http::isCodecProtocolError(status)) {
       stats_.named_.downstream_cx_protocol_error_.inc();
       handleCodecException(status.message());
       return Network::FilterStatus::StopIteration;

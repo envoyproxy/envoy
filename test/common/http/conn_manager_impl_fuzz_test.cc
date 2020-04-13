@@ -362,7 +362,8 @@ public:
     }
     case test::common::http::RequestAction::kThrowDecoderException: {
       if (state == StreamState::PendingDataOrTrailers) {
-        EXPECT_CALL(*config_.codec_, dispatch(_)).WillOnce(Throw(CodecProtocolException("blah")));
+        EXPECT_CALL(*config_.codec_, dispatch(_))
+            .WillOnce(testing::Throw(CodecProtocolException("blah")));
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = StreamState::Closed;
