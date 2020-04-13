@@ -30,7 +30,7 @@ Version history
 * grpc-json: added support for building HTTP request into
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 * grpc-stats: add options to limit which messages stats are created for.
-* gzip filter: added option to set zlib's next output buffer.
+* gzip filter: added option to set zlib's next output buffer size.
 * http: added HTTP/1.1 flood protection. Can be temporarily disabled using the runtime feature `envoy.reloadable_features.http1_flood_protection`
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
 * http: fixed a bug that could send extra METADATA frames and underflow memory when encoding METADATA frames on a connection that was dispatching data.
