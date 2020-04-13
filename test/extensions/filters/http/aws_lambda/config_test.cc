@@ -98,6 +98,39 @@ TEST(AwsLambdaFilterConfigTest, ValidPerRouteConfigCreatesFilter) {
   EXPECT_EQ(InvocationMode::Synchronous, filter_settings_ptr->invocationMode());
 }
 
+TEST(AwsLambdaFilterConfigTest, InvalidARNThrows) {
+  const std::string yaml = R"EOF(
+arn: "arn:aws:lambda:region:424242:fun"
+  )EOF";
+
+  LambdaConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsLambdaFilterFactory factory;
+
+  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context),
+               EnvoyException);
+}
+
+TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithInvalidARNThrows) {
+  const std::string yaml = R"EOF(
+  invoke_config:
+    arn: "arn:aws:lambda:region:424242:fun"
+    payload_passthrough: true
+  )EOF";
+
+  LambdaPerRouteConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  AwsLambdaFilterFactory factory;
+
+  EXPECT_THROW(factory.createRouteSpecificFilterConfig(
+                   proto_config, context, ProtobufMessage::getStrictValidationVisitor()),
+               EnvoyException);
+}
+
 TEST(AwsLambdaFilterConfigTest, AsynchrnousPerRouteConfig) {
   const std::string yaml = R"EOF(
   invoke_config:
