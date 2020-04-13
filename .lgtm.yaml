@@ -1,0 +1,63 @@
+# https://lgtm.com/docs/lgtm/lgtm.yml-configuration-file
+path_classifiers:
+    test:
+      # Classify all files in top-level directory test/ as test code.
+        - test        
+    docs:
+        - LICENSE
+        - CODEOWNERS
+        - NOTICE
+        - VERSION
+        - WORKSPACE
+        - DCO
+        - docs
+        - security
+    generated:
+        - generated_api_shadow
+    library:
+        - boost
+    tools:
+        - tools
+        - ci
+        - support
+
+queries:
+     - exclude: "*"
+     - include:
+         tags:
+           - "security"
+           - "correctness"
+         severity: "error"
+         
+extraction:
+    cpp:
+        prepare:
+            packages:
+                - build-essential
+                - openjdk-8-jdk
+                - cmake
+                - ninja-build
+                - make
+                - unzip
+                - curl
+                - autoconf
+                - libtool
+                - wget
+                - golang
+                - python
+                - automake
+                - clang
+        after_prepare:
+          - urlbase="https://github.com/bazelbuild/bazel/releases/download"
+          - version=2.2.0
+          - filename="bazel-${version}-installer-linux-x86_64.sh"
+          - wget "${urlbase}/${version}/${filename}" -O $filename
+          - chmod +x $filename
+          - ./$filename --user
+          - export PATH=$PATH:$HOME/bin
+          - export BAZEL=bazel
+          - export "CC=/usr/bin/clang"
+          - export "CXX=/usr/bin/clang++"
+        index:
+            build_command:
+                - bazel --host_jvm_args=-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts --host_jvm_args=-Djavax.net.ssl.trustStorePassword=changeit build -c opt //source/exe:envoy-static

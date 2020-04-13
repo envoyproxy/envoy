@@ -79,7 +79,8 @@ def CreateIssues(access_token, runtime_and_pr):
     access_token: GitHub access token (see comment at top of file).
     runtime_and_pr: a list of runtime guards and the PRs and commits they were added.
   """
-  repo = github.Github(access_token).get_repo('envoyproxy/envoy')
+  git = github.Github(access_token)
+  repo = git.get_repo('envoyproxy/envoy')
 
   # Find GitHub label objects for LABELS.
   labels = []
@@ -99,12 +100,13 @@ def CreateIssues(access_token, runtime_and_pr):
       number = ('#%d') % pr
       login = pr_info.user.login
     else:
-      # Extract Commit message, sha, and author.
+      # Extract commit message, sha, and author.
       # In this case we cannot add a user login for an assignee.
-      change_title = commit.message.split('\n')[0]  # Remove sign-off mesage
+      change_title = commit.message.split('\n')[0]  # Remove description.
       number = ('commit %s') % commit.hexsha
-      login = None
-      user = commit.author.email
+      email = commit.author.email
+      search_user = git.search_users(email.split('@')[0] + " in:email")
+      login = search_user[0].login if search_user else None
 
     title = '%s deprecation' % (runtime_guard)
     body = ('%s (%s) introduced a runtime guarded feature. This issue '
@@ -112,7 +114,7 @@ def CreateIssues(access_token, runtime_and_pr):
 
     print(title)
     print(body)
-    print('  >> Assigning to %s' % (login if login else user))
+    print('  >> Assigning to %s' % (login if login else email))
 
     # TODO(htuch): Figure out how to do this without legacy and faster.
     exists = repo.legacy_search_issues('open', '"%s"' % title) or repo.legacy_search_issues(
