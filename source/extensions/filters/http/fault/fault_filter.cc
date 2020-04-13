@@ -178,8 +178,8 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
     return;
   }
 
-  absl::optional<uint64_t> rate_kbps = fault_settings_->responseRateLimit()->rateKbps(
-      request_headers.get(Filters::Common::Fault::HeaderNames::get().ThroughputResponse));
+  absl::optional<uint64_t> rate_kbps =
+      fault_settings_->responseRateLimit()->rateKbps(&request_headers);
   if (!rate_kbps.has_value()) {
     return;
   }
@@ -220,14 +220,12 @@ bool FaultFilter::isDelayEnabled(const Http::RequestHeaderMap& request_headers) 
     return false;
   }
 
-  const auto percentage_header =
-      request_headers.get(Filters::Common::Fault::HeaderNames::get().DelayRequestPercentage);
   if (!downstream_cluster_delay_percent_key_.empty()) {
     return config_->runtime().snapshot().featureEnabled(
-        downstream_cluster_delay_percent_key_, request_delay->percentage(percentage_header));
+        downstream_cluster_delay_percent_key_, request_delay->percentage(&request_headers));
   }
   return config_->runtime().snapshot().featureEnabled(fault_settings_->delayPercentRuntime(),
-                                                      request_delay->percentage(percentage_header));
+                                                      request_delay->percentage(&request_headers));
 }
 
 bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) {
@@ -236,14 +234,12 @@ bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) 
     return false;
   }
 
-  const auto percentage_header =
-      request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortRequestPercentage);
   if (!downstream_cluster_abort_percent_key_.empty()) {
     return config_->runtime().snapshot().featureEnabled(
-        downstream_cluster_abort_percent_key_, request_abort->percentage(percentage_header));
+        downstream_cluster_abort_percent_key_, request_abort->percentage(&request_headers));
   }
   return config_->runtime().snapshot().featureEnabled(fault_settings_->abortPercentRuntime(),
-                                                      request_abort->percentage(percentage_header));
+                                                      request_abort->percentage(&request_headers));
 }
 
 bool FaultFilter::isResponseRateLimitEnabled(const Http::RequestHeaderMap& request_headers) {
@@ -251,12 +247,10 @@ bool FaultFilter::isResponseRateLimitEnabled(const Http::RequestHeaderMap& reque
     return false;
   }
 
-  const auto percentage_header =
-      request_headers.get(Filters::Common::Fault::HeaderNames::get().ThroughputResponsePercentage);
   // TODO(mattklein123): Allow runtime override via downstream cluster similar to the other keys.
   return config_->runtime().snapshot().featureEnabled(
       fault_settings_->responseRateLimitPercentRuntime(),
-      fault_settings_->responseRateLimit()->percentage(percentage_header));
+      fault_settings_->responseRateLimit()->percentage(&request_headers));
 }
 
 absl::optional<std::chrono::milliseconds>
@@ -269,8 +263,7 @@ FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
 
   // See if the configured delay provider has a default delay, if not there is no delay (e.g.,
   // header configuration and no/invalid header).
-  auto config_duration = fault_settings_->requestDelay()->duration(
-      request_headers.get(Filters::Common::Fault::HeaderNames::get().DelayRequest));
+  auto config_duration = fault_settings_->requestDelay()->duration(&request_headers);
   if (!config_duration.has_value()) {
     return ret;
   }
@@ -299,8 +292,7 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
 
   // See if the configured abort provider has a default status code, if not there is no abort status
   // code (e.g., header configuration and no/invalid header).
-  const auto config_abort = fault_settings_->requestAbort()->statusCode(
-      request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortRequest));
+  const auto config_abort = fault_settings_->requestAbort()->statusCode(&request_headers);
   if (!config_abort.has_value()) {
     return absl::nullopt;
   }

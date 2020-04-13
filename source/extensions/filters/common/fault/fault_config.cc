@@ -12,7 +12,12 @@ namespace Common {
 namespace Fault {
 
 envoy::type::v3::FractionalPercent
-HeaderPercentageProvider::percentage(const Http::HeaderEntry* header) const {
+HeaderPercentageProvider::percentage(const Http::RequestHeaderMap* request_headers) const {
+  if (!request_headers) {
+    return percentage_;
+  }
+
+  const auto header = request_headers->get(header_name_);
   if (header == nullptr) {
     return percentage_;
   }
@@ -46,9 +51,14 @@ FaultAbortConfig::FaultAbortConfig(
   }
 }
 
-absl::optional<Http::Code>
-FaultAbortConfig::HeaderAbortProvider::statusCode(const Http::HeaderEntry* header) const {
+absl::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::statusCode(
+    const Http::RequestHeaderMap* request_headers) const {
   absl::optional<Http::Code> ret;
+  if (!request_headers) {
+    return absl::nullopt;
+  }
+
+  const auto header = request_headers->get(HeaderNames::get().AbortRequest);
   if (header == nullptr) {
     return ret;
   }
@@ -84,8 +94,13 @@ FaultDelayConfig::FaultDelayConfig(
   }
 }
 
-absl::optional<std::chrono::milliseconds>
-FaultDelayConfig::HeaderDelayProvider::duration(const Http::HeaderEntry* header) const {
+absl::optional<std::chrono::milliseconds> FaultDelayConfig::HeaderDelayProvider::duration(
+    const Http::RequestHeaderMap* request_headers) const {
+  if (!request_headers) {
+    return absl::nullopt;
+  }
+
+  const auto header = request_headers->get(HeaderNames::get().DelayRequest);
   if (header == nullptr) {
     return absl::nullopt;
   }
@@ -114,8 +129,13 @@ FaultRateLimitConfig::FaultRateLimitConfig(
   }
 }
 
-absl::optional<uint64_t>
-FaultRateLimitConfig::HeaderRateLimitProvider::rateKbps(const Http::HeaderEntry* header) const {
+absl::optional<uint64_t> FaultRateLimitConfig::HeaderRateLimitProvider::rateKbps(
+    const Http::RequestHeaderMap* request_headers) const {
+  if (!request_headers) {
+    return absl::nullopt;
+  }
+
+  const auto header = request_headers->get(HeaderNames::get().ThroughputResponse);
   if (header == nullptr) {
     return absl::nullopt;
   }
