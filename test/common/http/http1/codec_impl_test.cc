@@ -1927,6 +1927,15 @@ TEST_F(Http1ClientConnectionImplTest, GiantPath) {
   EXPECT_TRUE(status.ok());
 }
 
+TEST_F(Http1ClientConnectionImplTest, PrematureUpgradeResponse) {
+  initialize();
+
+  // make sure upgradeAllowed doesn't cause crashes if run with no pending response.
+  Buffer::OwnedImpl response(
+      "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: upgrade\r\nUpgrade: websocket\r\n\r\n");
+  EXPECT_THROW(codec_->dispatch(response), PrematureResponseException);
+}
+
 TEST_F(Http1ClientConnectionImplTest, UpgradeResponse) {
   initialize();
 
@@ -1934,7 +1943,11 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponse) {
 
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                   {":path", "/"},
+                                   {":authority", "host"},
+                                   {"connection", "upgrade"},
+                                   {"upgrade", "websocket"}};
   request_encoder.encodeHeaders(headers, true);
 
   // Send upgrade headers
@@ -1967,7 +1980,11 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {
 
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                   {":path", "/"},
+                                   {":authority", "host"},
+                                   {"connection", "upgrade"},
+                                   {"upgrade", "websocket"}};
   request_encoder.encodeHeaders(headers, true);
 
   // Send upgrade headers

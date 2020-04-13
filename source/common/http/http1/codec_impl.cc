@@ -358,6 +358,9 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   if (method->value() == Headers::get().MethodValues.Head) {
     head_request_ = true;
   }
+  if (Utility::isUpgrade(headers)) {
+    upgrade_request_ = true;
+  }
   connection_.copyToBuffer(method->value().getStringView().data(), method->value().size());
   connection_.addCharToBuffer(' ');
   connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());
@@ -621,7 +624,7 @@ absl::Status ConnectionImpl::onHeadersCompleteBase() {
     protocol_ = Protocol::Http10;
   }
   RequestOrResponseHeaderMap& request_or_response_headers = requestOrResponseHeaders();
-  if (Utility::isUpgrade(request_or_response_headers)) {
+  if (Utility::isUpgrade(request_or_response_headers) && upgradeAllowed()) {
     // Ignore h2c upgrade requests until we support them.
     // See https://github.com/envoyproxy/envoy/issues/7161 for details.
     if (request_or_response_headers.Upgrade() &&
@@ -995,10 +998,11 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stat
                      max_response_headers_count, formatter(settings), settings.enable_trailers_) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
-  if ((pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) ||
-      parser_.status_code == 204 || parser_.status_code == 304 ||
-      (parser_.status_code >= 200 && parser_.content_length == 0)) {
+  if (pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) {
     ASSERT(!pending_response_done_);
+    return true;
+  } else if (parser_.status_code == 204 || parser_.status_code == 304 ||
+             (parser_.status_code >= 200 && parser_.content_length == 0)) {
     return true;
   } else {
     return false;
@@ -1052,6 +1056,13 @@ absl::Status ClientConnectionImpl::onHeadersComplete() {
   // Here we deal with cases where the response cannot have a body, but http_parser does not deal
   // with it for us.
   return cannotHaveBody() ? absl::UnknownError("1") : absl::OkStatus();
+}
+
+bool ClientConnectionImpl::upgradeAllowed() const {
+  if (pending_response_.has_value()) {
+    return pending_response_->encoder_.upgrade_request_;
+  }
+  return false;
 }
 
 void ClientConnectionImpl::onBody(Buffer::Instance& data) {
