@@ -79,7 +79,7 @@ void DnsFilter::onData(Network::UdpRecvData& client_request) {
 
   // Parse the query, if it fails return an response to the client
   DnsQueryContextPtr query_context = message_parser_->createQueryContext(client_request);
-  if (!query_context->status_) {
+  if (!query_context->parse_status_) {
     sendDnsResponse(std::move(query_context));
     return;
   }
@@ -92,11 +92,11 @@ void DnsFilter::onData(Network::UdpRecvData& client_request) {
 
 void DnsFilter::sendDnsResponse(DnsQueryContextPtr query_context) {
 
-  Buffer::OwnedImpl response_;
+  Buffer::OwnedImpl response;
   // TODO(abaptiste): serialize and return a response to the client
 
   Network::UdpSendData response_data{query_context->local_->ip(), *(query_context->peer_),
-                                     response_};
+                                     response};
   listener_.send(response_data);
 }
 

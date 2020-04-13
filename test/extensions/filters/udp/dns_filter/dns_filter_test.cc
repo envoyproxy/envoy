@@ -136,7 +136,7 @@ TEST_F(DnsFilterTest, InvalidQuery) {
   sendQueryFromClient("10.0.0.1:1000", "hello");
 
   query_ctx_ = response_parser_->createQueryContext(client_request_);
-  ASSERT_FALSE(query_ctx_->status_);
+  ASSERT_FALSE(query_ctx_->parse_status_);
 }
 
 TEST_F(DnsFilterTest, SingleTypeAQuery) {
@@ -153,7 +153,7 @@ TEST_F(DnsFilterTest, SingleTypeAQuery) {
   query_ctx_ = response_parser_->createQueryContext(client_request_);
 
   // This will fail since the response generation is not being done yet
-  ASSERT_FALSE(query_ctx_->status_);
+  ASSERT_FALSE(query_ctx_->parse_status_);
 }
 
 } // namespace

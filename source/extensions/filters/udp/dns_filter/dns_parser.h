@@ -109,13 +109,13 @@ class DnsQueryContext {
 public:
   DnsQueryContext(Network::Address::InstanceConstSharedPtr local,
                   Network::Address::InstanceConstSharedPtr peer)
-      : local_(std::move(local)), peer_(std::move(peer)), status_(false), id_() {}
+      : local_(std::move(local)), peer_(std::move(peer)), parse_status_(false), id_() {}
   ~DnsQueryContext() = default;
 
   Network::Address::InstanceConstSharedPtr local_;
   Network::Address::InstanceConstSharedPtr peer_;
 
-  bool status_;
+  bool parse_status_;
   uint16_t id_;
   DnsQueryPtrVec queries_;
   DnsAnswerMap answers_;
@@ -177,7 +177,6 @@ private:
                                        uint64_t* name_offset);
 
   struct DnsHeader incoming_;
-  std::deque<uint16_t> active_transactions_;
 };
 
 using DnsMessageParserPtr = std::unique_ptr<DnsMessageParser>;
