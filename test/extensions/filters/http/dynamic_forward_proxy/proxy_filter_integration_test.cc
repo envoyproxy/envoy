@@ -211,7 +211,7 @@ TEST_P(ProxyFilterIntegrationTest, RemoveHostViaTTL) {
   cleanupUpstreamAndDownstream();
 
   // > 5m
-  simTime().sleep(std::chrono::milliseconds(300001));
+  simTime().advanceTimeWait(std::chrono::milliseconds(300001));
   test_server_->waitForGaugeEq("dns_cache.foo.num_hosts", 0);
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_removed")->value());
 }
