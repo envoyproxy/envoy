@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.api.v2.listener;
 
-import "envoy/api/v2/core/base.proto";
-
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
