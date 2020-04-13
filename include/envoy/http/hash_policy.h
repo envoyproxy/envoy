@@ -12,7 +12,7 @@ namespace Http {
 class Hashable {
 public:
   virtual absl::optional<uint64_t> hash() const PURE;
-  virtual ~Hashable() {}
+  virtual ~Hashable() = default;
 };
 
 /**
