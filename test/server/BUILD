@@ -349,6 +349,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/tracers/zipkin:config",
+        "//source/server:process_context_lib",
         "//source/server:server_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/integration:integration_lib",
