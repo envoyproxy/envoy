@@ -378,7 +378,7 @@ x-b3-traceid
 The *x-b3-traceid* HTTP header is used by the Zipkin tracer in Envoy.
 The TraceId is 64-bit in length and indicates the overall ID of the
 trace. Every span in a trace shares this ID. See more on zipkin tracing
-`here <https://github.com/openzipkin/b3-propagation>`.
+`here <https://github.com/openzipkin/b3-propagation>`__.
 
 .. _config_http_conn_man_headers_x-b3-spanid:
 
@@ -389,7 +389,7 @@ The *x-b3-spanid* HTTP header is used by the Zipkin tracer in Envoy.
 The SpanId is 64-bit in length and indicates the position of the current
 operation in the trace tree. The value should not be interpreted: it may or
 may not be derived from the value of the TraceId. See more on zipkin tracing
-`here <https://github.com/openzipkin/b3-propagation>`.
+`here <https://github.com/openzipkin/b3-propagation>`__.
 
 .. _config_http_conn_man_headers_x-b3-parentspanid:
 
@@ -400,7 +400,7 @@ The *x-b3-parentspanid* HTTP header is used by the Zipkin tracer in Envoy.
 The ParentSpanId is 64-bit in length and indicates the position of the
 parent operation in the trace tree. When the span is the root of the trace
 tree, the ParentSpanId is absent. See more on zipkin tracing
-`here <https://github.com/openzipkin/b3-propagation>`.
+`here <https://github.com/openzipkin/b3-propagation>`__.
 
 .. _config_http_conn_man_headers_x-b3-sampled:
 
@@ -411,7 +411,7 @@ The *x-b3-sampled* HTTP header is used by the Zipkin tracer in Envoy.
 When the Sampled flag is either not specified or set to 1, the span will be reported to the tracing
 system. Once Sampled is set to 0 or 1, the same
 value should be consistently sent downstream. See more on zipkin tracing
-`here <https://github.com/openzipkin/b3-propagation>`.
+`here <https://github.com/openzipkin/b3-propagation>`__.
 
 .. _config_http_conn_man_headers_x-b3-flags:
 
@@ -421,7 +421,7 @@ x-b3-flags
 The *x-b3-flags* HTTP header is used by the Zipkin tracer in Envoy.
 The encode one or more options. For example, Debug is encoded as
 ``X-B3-Flags: 1``. See more on zipkin tracing
-`here <https://github.com/openzipkin/b3-propagation>`.
+`here <https://github.com/openzipkin/b3-propagation>`__.
 
 .. _config_http_conn_man_headers_b3:
 
@@ -430,7 +430,7 @@ b3
 
 The *b3* HTTP header is used by the Zipkin tracer in Envoy.
 Is a more compressed header format. See more on zipkin tracing
-`here <https://github.com/openzipkin/b3-propagation#single-header>`.
+`here <https://github.com/openzipkin/b3-propagation#single-header>`__.
 
 .. _config_http_conn_man_headers_x-datadog-trace-id:
 
