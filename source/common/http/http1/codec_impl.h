@@ -15,10 +15,12 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
+#include "common/common/statusor.h"
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/header_formatter.h"
+#include "common/http/status.h"
 
 namespace Envoy {
 namespace Http {
@@ -201,7 +203,7 @@ public:
   bool enableTrailers() const { return enable_trailers_; }
 
   // Http::Connection
-  absl::Status dispatch(Buffer::Instance& data) override;
+  Envoy::Http::Status dispatch(Buffer::Instance& data) override;
   void goAway() override {} // Called during connection manager drain flow
   Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow
@@ -245,8 +247,10 @@ private:
 
   /**
    * Called in order to complete an in progress header decode.
+   * @return an error status indicating an error during the callback, or an integer representing a
+   * successful exit code.
    */
-  absl::Status completeLastHeader();
+  Envoy::StatusOr<int> completeLastHeader();
 
   /**
    * Check if header name contains underscore character.
@@ -265,7 +269,7 @@ private:
    * @param slice supplies the start address.
    * @len supplies the length of the span.
    */
-  ssize_t dispatchSlice(const char* slice, size_t len);
+  Envoy::StatusOr<ssize_t> dispatchSlice(const char* slice, size_t len);
 
   /**
    * Called by the http_parser when body data is received.
@@ -297,8 +301,9 @@ private:
    * Called when header field data is received.
    * @param data supplies the start address.
    * @param length supplies the length.
+   * @return Either a codec error status, or an integer representing a successful exit-code.
    */
-  absl::Status onHeaderField(const char* data, size_t length);
+  Envoy::StatusOr<int> onHeaderField(const char* data, size_t length);
 
   /**
    * Called when header value data is received.
@@ -311,10 +316,13 @@ private:
    * Called when headers are complete. A base routine happens first then a virtual dispatch is
    * invoked. Note that this only applies to headers and NOT trailers. End of
    * trailers are signaled via onMessageCompleteBase().
-   * @return 0 if no error, 1 if there should be no body.
+   * @return An error status containing an error during codec callbacks, or an integer exit code
+   * representing successful callback execution.
+   * The integer may be 0 for success, 1 to indicate to http_parser not to expect a body, and 2 if
+   * http_parser should not expect a body or further data on the connection.
    */
-  absl::Status onHeadersCompleteBase();
-  virtual absl::Status onHeadersComplete() PURE;
+  Envoy::StatusOr<int> onHeadersCompleteBase();
+  virtual int onHeadersComplete() PURE;
 
   /**
    * Called to see if upgrade transition is allowed.
@@ -335,8 +343,10 @@ private:
 
   /**
    * Called when the request/response is complete.
+   * @return an error status indicating an error during the callback, or an integer representing a
+   * successful exit code.
    */
-  absl::Status onMessageCompleteBase();
+  Envoy::StatusOr<int> onMessageCompleteBase();
   virtual void onMessageComplete() PURE;
 
   /**
@@ -376,8 +386,8 @@ private:
 
   bool dispatching_{false};
   // Codec errors found in callbacks are overridden within the http_parser library. This holds those
-  // errors to propogate them through to dispatch() where we can handle the error.
-  absl::Status codec_status_;
+  // errors to propagate them through to dispatch() where we can handle the error.
+  Envoy::Http::Status codec_status_;
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   // Used to accumulate the HTTP message body during the current dispatch call. The accumulated body
   // is pushed through the filter pipeline either at the end of the current dispatch call, or when
@@ -430,7 +440,7 @@ private:
   void onEncodeComplete() override;
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
-  absl::Status onHeadersComplete() override;
+  int onHeadersComplete() override;
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
   bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
@@ -514,7 +524,7 @@ private:
   void onEncodeComplete() override {}
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  absl::StatusOr<int> onHeadersComplete() override;
+  int onHeadersComplete() override;
   bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;

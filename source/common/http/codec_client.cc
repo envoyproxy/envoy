@@ -12,6 +12,7 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
 
 namespace Envoy {
@@ -121,23 +122,28 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
 
 void CodecClient::onData(Buffer::Instance& data) {
   bool protocol_error = false;
+  Envoy::Http::Status status;
   try {
-    auto status = codec_->dispatch(data);
-    if (!status.ok()) {
-      ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, status.message());
-      close();
-      protocol_error = true;
-    }
+    status = codec_->dispatch(data);
+    // Exception removal is still in migration. Soon we won't need to catch these exceptions, as
+    // they'll be propagated through the callbacks and returned from dispatch.
   } catch (CodecProtocolException& e) {
-    ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, e.what());
+    status = Envoy::Http::codecProtocolError(e.what());
+  } catch (PrematureResponseException& e) {
+    status = Envoy::Http::prematureResponseError(e.what(), e.responseCode());
+  }
+
+  if (Envoy::Http::IsCodecProtocolError(status)) {
+    ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, status.message());
     close();
     protocol_error = true;
-  } catch (PrematureResponseException& e) {
+  } else if (Envoy::Http::IsPrematureResponseError(status)) {
     ENVOY_CONN_LOG(debug, "premature response", *connection_);
     close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
-    if (!active_requests_.empty() || e.responseCode() != Code::RequestTimeout) {
+    if (!active_requests_.empty() ||
+        status.getPrematureResponseHttpCode() != Code::RequestTimeout) {
       protocol_error = true;
     }
   }

@@ -34,6 +34,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/path_utility.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
@@ -322,20 +323,23 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   bool redispatch;
   do {
     redispatch = false;
+    Envoy::Http::Status status;
 
     try {
-      auto status = codec_->dispatch(data);
-      if (!status.ok()) {
-        stats_.named_.downstream_cx_protocol_error_.inc();
-        handleCodecException(status.message());
-        return Network::FilterStatus::StopIteration;
-      }
+      status = codec_->dispatch(data);
     } catch (const FrameFloodException& e) {
-      handleCodecException(e.what());
-      return Network::FilterStatus::StopIteration;
+      status = Envoy::Http::bufferFloodError(e.what());
     } catch (const CodecProtocolException& e) {
+      status = Envoy::Http::codecProtocolError(e.what());
+    }
+
+    ASSERT(!Envoy::Http::IsPrematureResponseError(status));
+    if (Envoy::Http::IsBufferFloodError(status)) {
+      handleCodecException(status.message());
+      return Network::FilterStatus::StopIteration;
+    } else if (Envoy::Http::IsCodecProtocolError(status)) {
       stats_.named_.downstream_cx_protocol_error_.inc();
-      handleCodecException(e.what());
+      handleCodecException(status.message());
       return Network::FilterStatus::StopIteration;
     }
 
