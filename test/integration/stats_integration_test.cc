@@ -284,7 +284,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 44023);
+  EXPECT_MEMORY_EQ(m_per_cluster, 43993);
   EXPECT_MEMORY_LE(m_per_cluster, 44100);
 }
 
@@ -342,7 +342,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 36232);
+  EXPECT_MEMORY_EQ(m_per_cluster, 36201);
   EXPECT_MEMORY_LE(m_per_cluster, 36300);
 }
 
@@ -375,7 +375,6 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // 2020/02/13  10042    1363         1655   Metadata object are shared across different clusters
   //                                          and hosts.
   // 2020/04/02  10624    1380         1655   Use 100 clusters rather than 1000 to avoid timeouts
-  // 2020/04/10  10639    1412         1655   Implement TextReadout stats.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -385,7 +384,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_host, 1412);
+  EXPECT_MEMORY_EQ(m_per_host, 1380);
   EXPECT_MEMORY_LE(m_per_host, 1655);
 }
 
