@@ -133,17 +133,17 @@ void CodecClient::onData(Buffer::Instance& data) {
     status = Envoy::Http::prematureResponseError(e.what(), e.responseCode());
   }
 
-  if (Envoy::Http::IsCodecProtocolError(status)) {
+  if (Envoy::Http::isCodecProtocolError(status)) {
     ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, status.message());
     close();
     protocol_error = true;
-  } else if (Envoy::Http::IsPrematureResponseError(status)) {
+  } else if (Envoy::Http::isPrematureResponseError(status)) {
     ENVOY_CONN_LOG(debug, "premature response", *connection_);
     close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
     if (!active_requests_.empty() ||
-        status.getPrematureResponseHttpCode() != Code::RequestTimeout) {
+        Envoy::Http::getPrematureResponseHttpCode(status) != Code::RequestTimeout) {
       protocol_error = true;
     }
   }
