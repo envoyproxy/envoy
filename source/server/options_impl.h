@@ -118,7 +118,6 @@ public:
   }
   const std::string& logFormat() const override { return log_format_; }
   bool logFormatEscaped() const override { return log_format_escaped_; }
-  bool logFormatPrefixWithLocation() const override { return log_format_prefix_with_location_; }
   const std::string& logPath() const override { return log_path_; }
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
   uint64_t restartEpoch() const override { return restart_epoch_; }
@@ -167,7 +166,6 @@ private:
   std::string component_log_level_str_;
   std::string log_format_;
   bool log_format_escaped_;
-  bool log_format_prefix_with_location_;
   std::string log_path_;
   uint64_t restart_epoch_;
   std::string service_cluster_;

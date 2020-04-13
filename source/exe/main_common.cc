@@ -72,8 +72,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         log_lock, options_.logFormatEscaped(),
-                                                         options_.logFormatPrefixWithLocation());
+                                                         log_lock, options_.logFormatEscaped());
 
     configureComponentLogLevels();
 
@@ -92,9 +91,9 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
   }
   case Server::Mode::Validate:
     restarter_ = std::make_unique<Server::HotRestartNopImpl>();
-    logging_context_ = std::make_unique<Logger::Context>(
-        options_.logLevel(), options_.logFormat(), restarter_->logLock(),
-        options_.logFormatEscaped(), options_.logFormatPrefixWithLocation());
+    logging_context_ =
+        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
+                                          restarter_->logLock(), options_.logFormatEscaped());
     break;
   }
 }
