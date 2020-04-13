@@ -73,7 +73,7 @@ DnsQueryContextPtr DnsMessageParser::createQueryContext(Network::UdpRecvData& cl
   query_context->parse_status_ = parseDnsObject(query_context, client_request.buffer_);
   if (!query_context->parse_status_) {
     ENVOY_LOG(error, "Unable to parse query buffer from '{}' into a DNS object.",
-              client_request.addresses_.local_->ip()->addressAsString());
+              client_request.addresses_.peer_->ip()->addressAsString());
   }
 
   return query_context;
