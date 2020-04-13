@@ -13,6 +13,8 @@
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
 
+#include "absl/time/clock.h"
+
 using ::google::jwt_verify::CheckAudience;
 using ::google::jwt_verify::Status;
 
@@ -153,14 +155,8 @@ void AuthenticatorImpl::startVerify() {
     return;
   }
 
-  // TODO(qiwzhang): Cross-platform-wise the below unix_timestamp code is wrong as the
-  // epoch is not guaranteed to be defined as the unix epoch. We should use
-  // the abseil time functionality instead or use the jwt_verify_lib to check
-  // the validity of a JWT.
   // Check "exp" claim.
-  const uint64_t unix_timestamp =
-      std::chrono::duration_cast<std::chrono::seconds>(timeSource().systemTime().time_since_epoch())
-          .count();
+  const uint64_t unix_timestamp = absl::ToUnixSeconds(absl::Now());
   // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
   // to 0.
   if (jwt_->nbf_ > unix_timestamp) {

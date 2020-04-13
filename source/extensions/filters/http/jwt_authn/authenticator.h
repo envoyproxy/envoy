@@ -9,6 +9,8 @@
 #include "jwt_verify_lib/check_audience.h"
 #include "jwt_verify_lib/status.h"
 
+#include "absl/time/clock.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

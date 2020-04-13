@@ -31,6 +31,7 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
+        "@com_google_absl//absl/time",
     ],
 )
 
