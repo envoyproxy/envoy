@@ -246,7 +246,6 @@ public:
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
-  MOCK_METHOD(const absl::optional<ProxyConfig>&, proxyConfig, (), (const));
   MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, ());
   MOCK_METHOD(Upstream::RetryHostPredicateSharedPtr, retryHostPredicate, ());
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
@@ -261,7 +260,7 @@ public:
   mutable std::unique_ptr<Stats::StatNameManagedStorage> stat_name_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestCorsPolicy cors_policy_;
-  absl::optional<ProxyConfig> proxy_config_;
+  absl::optional<ConnectConfig> connect_config_;
 };
 
 class MockHashPolicy : public Http::HashPolicy {
@@ -355,7 +354,7 @@ public:
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
-  MOCK_METHOD(const absl::optional<ProxyConfig>&, proxyConfig, (), (const));
+  MOCK_METHOD(const absl::optional<ConnectConfig>&, connectConfig, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(InternalRedirectAction, internalRedirectAction, (), (const));
   MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));

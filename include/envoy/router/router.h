@@ -484,7 +484,7 @@ public:
    * TCP  upstream.
    * @return configuration for TCP proxying, if present.
    */
-  using ProxyConfig = envoy::config::route::v3::VirtualHost::ProxyConfig;
+  using ProxyConfig = envoy::config::route::v3::RouteMatch::ProxyConfig;
   virtual const absl::optional<ProxyConfig>& proxyConfig() const PURE;
 
   /**
@@ -829,15 +829,6 @@ public:
    */
   virtual bool includeAttemptCountInResponse() const PURE;
 
-  /**
-   * If present, this indicates that CONNECT requests on this route should be converted
-   * to TCP proxying, i.e. the payload of the HTTP body should be sent as raw
-   * TCP  upstream.
-   * @return configuration for TCP proxying, if present.
-   */
-  using ProxyConfig = envoy::config::route::v3::VirtualHost::ProxyConfig;
-  virtual const absl::optional<ProxyConfig>& proxyConfig() const PURE;
-
   using UpgradeMap = std::map<std::string, bool>;
   /**
    * @return a map of route-specific upgrades to their enabled/disabled status.
@@ -965,6 +956,13 @@ public:
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
   }
+
+  /**
+   * If present, this indicates that CONNECT requests are alowed on this route.
+   */
+  using ConnectConfig = envoy::config::route::v3::RouteMatch::ConnectConfig;
+  using ProxyConfig = envoy::config::route::v3::RouteMatch::ProxyConfig;
+  virtual const absl::optional<ConnectConfig>& connectConfig() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;

@@ -24,16 +24,14 @@ const std::vector<Router::ShadowPolicyPtr> AsyncStreamImpl::RouteEntryImpl::shad
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
 const AsyncStreamImpl::NullConfig AsyncStreamImpl::NullVirtualHost::route_configuration_;
-const absl::optional<AsyncStreamImpl::NullVirtualHost::ProxyConfig>
-    AsyncStreamImpl::NullVirtualHost::proxy_config_nullopt_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
 const envoy::config::core::v3::Metadata AsyncStreamImpl::RouteEntryImpl::metadata_;
 const Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
     AsyncStreamImpl::RouteEntryImpl::typed_metadata_({});
 const AsyncStreamImpl::NullPathMatchCriterion
     AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
-const absl::optional<AsyncStreamImpl::RouteEntryImpl::ProxyConfig>
-    AsyncStreamImpl::RouteEntryImpl::proxy_config_nullopt_;
+const absl::optional<AsyncStreamImpl::RouteEntryImpl::ConnectConfig>
+    AsyncStreamImpl::RouteEntryImpl::connect_config_nullopt_;
 const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,

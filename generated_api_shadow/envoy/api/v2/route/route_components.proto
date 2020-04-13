@@ -34,7 +34,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 23]
+// [#next-free-field: 21]
 message VirtualHost {
   enum TlsRequirementType {
     // No TLS requirement for the virtual host.
@@ -47,13 +47,6 @@ message VirtualHost {
     // All requests must use TLS. If a request is not using TLS, a 301 redirect
     // will be sent telling the client to use HTTPS.
     ALL = 2;
-  }
-
-  // [#not-implemented-hide:]
-  // Configuration for sending data upstream as a raw data payload. This is used for
-  // CONNECT requests, when forwarding CONNECT payload as raw TCP.
-  message ProxyConfig {
-    // TODO(alyssawilk) add proxy proto configuration here.
   }
 
   reserved 9;
@@ -187,13 +180,6 @@ message VirtualHost {
   // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
   // value of this and the listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
-
-  // [#not-implemented-hide:]
-  // Configuration for sending data upstream as a raw data payload. This is used for terminating
-  // CONNECT requests. If this message is present, the HTTP body of incoming CONNECT request
-  // will be proxied upstream as raw TCP. Upstream TCP payload will result in Envoy synthesizing
-  // response headers and forwarding the TCP response payload in the HTTP response body.
-  ProxyConfig proxying_config = 22;
 }
 
 // A filter-defined action type.

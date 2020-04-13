@@ -176,7 +176,6 @@ public:
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
-  const absl::optional<ProxyConfig>& proxyConfig() const override { return proxying_config_; }
   const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() const {
     return retry_policy_;
   }
@@ -233,7 +232,6 @@ private:
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   const bool include_attempt_count_in_request_;
   const bool include_attempt_count_in_response_;
-  absl::optional<ProxyConfig> proxying_config_;
   absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
   absl::optional<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   const CatchAllVirtualCluster virtual_cluster_catch_all_;
@@ -467,7 +465,7 @@ public:
   bool includeAttemptCountInResponse() const override {
     return vhost_.includeAttemptCountInResponse();
   }
-  const absl::optional<ProxyConfig>& proxyConfig() const override { return vhost_.proxyConfig(); }
+  const absl::optional<ConnectConfig>& connectConfig() const override { return connect_config_; }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
   InternalRedirectAction internalRedirectAction() const override {
     return internal_redirect_action_;
@@ -497,6 +495,8 @@ protected:
   std::string regex_rewrite_substitution_;
   const std::string host_rewrite_;
   bool include_vh_rate_limits_;
+  absl::optional<ConnectConfig> connect_config_;
+
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
 
@@ -594,7 +594,7 @@ private:
     bool includeAttemptCountInResponse() const override {
       return parent_->includeAttemptCountInResponse();
     }
-    const absl::optional<ProxyConfig>& proxyConfig() const override {
+    const absl::optional<ProxyConfig> proxyConfig() const override {
       return parent_->proxyConfig();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
