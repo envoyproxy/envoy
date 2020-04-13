@@ -37,7 +37,7 @@ This is useful in certain scenarios in which it is desired to allow the client t
 fault configuration. The currently supported header controls are:
 
 x-envoy-fault-abort-request
-  HTTP status code to fail a request with. The header value should be an integer that specifies
+  HTTP status code to abort a request with. The header value should be an integer that specifies
   the HTTP status code to return in response to a request and must be in the range [200, 600). 
   In order for the header to work, :ref:`header_abort
   <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set.
@@ -125,7 +125,7 @@ fault.http.abort.abort_percent
   <envoy_api_field_config.filter.http.fault.v2.HTTPFault.abort>`.
 
 fault.http.abort.http_status
-  HTTP status code that will be used as the of requests that will be
+  HTTP status code that will be used as the response status code of requests that will be
   aborted if the headers match. Defaults to the HTTP status code specified
   in the config. If the config does not contain an *abort* block, then
   *http_status* defaults to 0. For historic reasons, this runtime key is
