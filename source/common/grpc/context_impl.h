@@ -39,8 +39,8 @@ public:
                                  const absl::optional<RequestStatNames>& request_names,
                                  uint64_t amount) override;
   void chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
-                                 const absl::optional<RequestStatNames>& request_names,
-                                 uint64_t duration) override;
+                          const absl::optional<RequestStatNames>& request_names,
+                          uint64_t duration) override;
 
   /**
    * Resolve the gRPC service and method from the HTTP2 :path header.

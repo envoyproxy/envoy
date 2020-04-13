@@ -14,8 +14,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Return;
 using testing::Property;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -36,7 +36,8 @@ protected:
 
     ON_CALL(decoder_callbacks_, streamInfo()).WillByDefault(testing::ReturnRef(stream_info_));
 
-    ON_CALL(*decoder_callbacks_.cluster_info_, statsScope()).WillByDefault(testing::ReturnRef(stats_store_));
+    ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
+        .WillByDefault(testing::ReturnRef(stats_store_));
 
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
@@ -59,7 +60,6 @@ protected:
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, false));
     Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
-    
   }
 
   envoy::extensions::filters::http::grpc_stats::v3::FilterConfig config_;
@@ -420,11 +420,18 @@ TEST_F(GrpcStatsFilterConfigTest, UpstreamStats) {
       {"content-type", "application/grpc+proto"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
-  ON_CALL(stream_info_, lastUpstreamRxByteReceived()).WillByDefault(testing::Return(absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(30000000))));
-  ON_CALL(stream_info_, lastUpstreamTxByteSent()).WillByDefault(testing::Return(absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(20000000))));
+  ON_CALL(stream_info_, lastUpstreamRxByteReceived())
+      .WillByDefault(testing::Return(
+          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(30000000))));
+  ON_CALL(stream_info_, lastUpstreamTxByteSent())
+      .WillByDefault(testing::Return(
+          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(20000000))));
 
-  EXPECT_CALL(stats_store_, deliverHistogramToSinks(Property(&Stats::Metric::name, "grpc.lyft.users.BadCompanions.GetBadCompanions.upstream_rq_time"), 
-                            10ul));
+  EXPECT_CALL(stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name,
+                           "grpc.lyft.users.BadCompanions.GetBadCompanions.upstream_rq_time"),
+                  10ul));
 
   doRequestResponse(request_headers);
 }

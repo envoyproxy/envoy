@@ -15,8 +15,7 @@ ContextImpl::ContextImpl(Stats::SymbolTable& symbol_table)
       total_(stat_name_pool_.add("total")), zero_(stat_name_pool_.add("0")),
       request_message_count_(stat_name_pool_.add("request_message_count")),
       response_message_count_(stat_name_pool_.add("response_message_count")),
-      upstream_rq_time_(stat_name_pool_.add("upstream_rq_time")),
-      stat_names_(symbol_table) {}
+      upstream_rq_time_(stat_name_pool_.add("upstream_rq_time")), stat_names_(symbol_table) {}
 
 // Makes a stat name from a string, if we don't already have one for it.
 // This always takes a lock on mutex_, and if we haven't seen the name
@@ -125,7 +124,8 @@ void ContextImpl::chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
       symbol_table_.join({prefix, upstream_rq_time_});
 
   cluster.statsScope()
-      .histogramFromStatName(Stats::StatName(upstream_rq_time.get()), Stats::Histogram::Unit::Milliseconds)
+      .histogramFromStatName(Stats::StatName(upstream_rq_time.get()),
+                             Stats::Histogram::Unit::Milliseconds)
       .recordValue(duration);
 }
 

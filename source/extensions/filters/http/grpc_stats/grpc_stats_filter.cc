@@ -93,7 +93,7 @@ struct Config {
   Config(const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
          Server::Configuration::FactoryContext& context)
       : context_(context.grpcContext()), emit_filter_state_(proto_config.emit_filter_state()),
-              enable_upstream_stats_(proto_config.enable_upstream_stats()) {
+        enable_upstream_stats_(proto_config.enable_upstream_stats()) {
 
     switch (proto_config.per_method_stat_specifier_case()) {
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
@@ -229,11 +229,15 @@ public:
       config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
                                    trailers.GrpcStatus());
 
-      if (config_->enable_upstream_stats_ && decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().has_value() && decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().has_value()) {
-              std::chrono::milliseconds chrono_duration = std::chrono::duration_cast<std::chrono::milliseconds>(decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().value() - decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().value());
-              config_->context_.chargeUpstreamStat(*cluster_, request_names_, chrono_duration.count());
+      if (config_->enable_upstream_stats_ &&
+          decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().has_value() &&
+          decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().has_value()) {
+        std::chrono::milliseconds chrono_duration =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().value() -
+                decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().value());
+        config_->context_.chargeUpstreamStat(*cluster_, request_names_, chrono_duration.count());
       }
-
     }
     return Http::FilterTrailersStatus::Continue;
   }
