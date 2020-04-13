@@ -97,21 +97,6 @@ public:
       numerator: 100
   )EOF";
 
-  const std::string header_faults_yaml = R"EOF(
-  abort:
-    header_abort: {}
-    percentage:
-      numerator: 100
-  delay:
-    header_delay: {}
-    percentage:
-      numerator: 100
-  response_rate_limit:
-    header_limit: {}
-    percentage:
-      numerator: 100
-  )EOF";
-
   const std::string fixed_delay_and_abort_match_headers_yaml = R"EOF(
   delay:
     type: fixed
@@ -339,32 +324,6 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
   EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
-}
-
-TEST_F(FaultFilterTest, HeaderFaultPercentages) {
-  SetUpTest(header_faults_yaml);
-
-  request_headers_.addCopy("x-envoy-fault-abort-request", "429");
-  request_headers_.addCopy("x-envoy-fault-abort-request-percentage", "30");
-  request_headers_.addCopy("x-envoy-fault-delay-request", "400");
-  request_headers_.addCopy("x-envoy-fault-delay-request-percentage", "40");
-  request_headers_.addCopy("x-envoy-fault-throughput-response", "400");
-  request_headers_.addCopy("x-envoy-fault-throughput-response", "50");
-
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.abort.abort_percent",
-                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(30))))
-      .WillOnce(Return(true));
-
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
-  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  filter_->onDestroy();
 }
 
 TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
