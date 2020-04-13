@@ -71,6 +71,9 @@ protected:
     listen_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
 
+    quic_listener_ = std::make_unique<ActiveQuicListener>(
+        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_, nullptr);
+    simulated_time_system_.advanceTimeWait(std::chrono::milliseconds(100));
     quic_listener_ = std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_,
                                                           listen_socket_, listener_config_,
                                                           quic_config_, nullptr, enabledFlag());
@@ -79,6 +82,7 @@ protected:
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 
+  void configureMocks(int connection_count) {
   void configureQuicRuntimeFlag(bool runtime_enabled) {
     EXPECT_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true))
         .WillRepeatedly(Return(runtime_enabled));

@@ -420,7 +420,7 @@ void InstanceImpl::initialize(const Options& options,
     hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
         stats_store_,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                       stats_store_)
+                                                       stats_store_, false)
             ->create(),
         hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
         stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
@@ -500,7 +500,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     });
 
     sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
-      ENVOY_LOG(warn, "caught SIGUSR1");
+      ENVOY_LOG(info, "caught SIGUSR1. Reopening access logs.");
       access_log_manager.reopen();
     });
 

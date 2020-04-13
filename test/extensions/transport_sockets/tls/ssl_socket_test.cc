@@ -4297,7 +4297,7 @@ protected:
         socket_->localAddress(), source_address_, std::move(transport_socket), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
-    read_filter_.reset(new Network::MockReadFilter());
+    read_filter_ = std::make_shared<Network::MockReadFilter>();
   }
 
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,

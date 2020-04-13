@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.api.v2.listener;
 
-import "envoy/api/v2/core/base.proto";
-
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -16,12 +14,12 @@ option java_multiple_files = true;
 option csharp_namespace = "Envoy.Api.V2.ListenerNS";
 option ruby_package = "Envoy.Api.V2.ListenerNS";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.listener.v3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: QUIC listener Config]
 
 // Configuration specific to the QUIC protocol.
-// Next id: 5
+// Next id: 4
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
@@ -34,8 +32,4 @@ message QuicProtocolOptions {
   // Connection timeout in milliseconds before the crypto handshake is finished.
   // 20000ms if not specified.
   google.protobuf.Duration crypto_handshake_timeout = 3;
-
-  // Runtime flag that controls whether the listener is enabled or not. If not specified, defaults
-  // to enabled.
-  core.RuntimeFeatureFlag enabled = 4;
 }

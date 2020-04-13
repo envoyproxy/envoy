@@ -13,7 +13,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.data.dns.v3";
 option java_outer_classname = "DnsTableProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: DNS Filter Table Data]
 // :ref:`DNS Filter config overview <config_udp_listener_filters_dns_filter>`.
