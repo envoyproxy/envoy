@@ -900,10 +900,10 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
 
   Buffer::OwnedImpl empty_data;
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, dispatch(BufferEqual(&empty_data)))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> absl::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
         // Simulate the onResponseComplete call to decodeData since dispatch is mocked out.
         inner_decoder->decodeData(data, true);
-        return absl::OkStatus();
+        return Envoy::Http::okStatus();
       }));
 
   EXPECT_CALL(*conn_pool_.test_clients_[0].connection_,

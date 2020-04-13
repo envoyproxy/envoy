@@ -428,10 +428,6 @@ def _com_google_absl():
         name = "abseil_base",
         actual = "@com_google_absl//absl/base:base",
     )
-    native.bind(
-        name = "abseil_status",
-        actual = "@com_google_absl//absl/status:status",
-    )
 
     # Bind for grpc.
     native.bind(

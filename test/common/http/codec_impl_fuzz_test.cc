@@ -346,7 +346,7 @@ public:
   }
 
   void drain() {
-    absl::Status status = absl::OkStatus();
+    Envoy::Http::Status status = Envoy::Http::okStatus();
     while (!bufs_.empty()) {
       Buffer::OwnedImpl& buf = bufs_.front();
       while (buf.length() > 0) {

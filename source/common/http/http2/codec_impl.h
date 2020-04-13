@@ -21,6 +21,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -89,7 +90,7 @@ public:
 
   // Http::Connection
   // NOTE: the `dispatch` method is also overridden in the ServerConnectionImpl class
-  absl::Status dispatch(Buffer::Instance& data) override;
+  Envoy::Http::Status dispatch(Buffer::Instance& data) override;
   void goAway() override;
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
@@ -526,7 +527,7 @@ private:
   // ClientConnectionImpl::checkOutboundQueueLimits method). The dispatch method on the
   // ServerConnectionImpl objects is called only when processing data from the downstream client in
   // the ConnectionManagerImpl::onData method.
-  absl::Status dispatch(Buffer::Instance& data) override;
+  Envoy::Http::Status dispatch(Buffer::Instance& data) override;
 
   ServerConnectionCallbacks& callbacks_;
 

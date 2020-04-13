@@ -451,8 +451,11 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
 
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
-absl::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
+Envoy::Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
+  // Make sure that dispatching_ is set to false after dispatching, even when
+  // ConnectionImpl::dispatch throws an exception.
+  Cleanup cleanup([this]() { dispatching_ = false; });
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     dispatching_ = true;
     ssize_t rc =
@@ -1319,7 +1322,7 @@ void ServerConnectionImpl::checkOutboundQueueLimits() {
   }
 }
 
-absl::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+Envoy::Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   ASSERT(!dispatching_downstream_data_);
   dispatching_downstream_data_ = true;
 
