@@ -103,10 +103,6 @@ void ActiveQuicListener::onReadReady() {
 }
 
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {
-  if (!enabled()) {
-    ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_.name());
-    return;
-  }
   quic_dispatcher_->OnCanWrite();
 }
 

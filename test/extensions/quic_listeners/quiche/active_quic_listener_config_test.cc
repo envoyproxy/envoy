@@ -55,5 +55,31 @@ TEST(ActiveQuicListenerConfigTest, CreateActiveQuicListenerFactory) {
   EXPECT_EQ("foo_key", runtime_enabled.runtime_key());
 }
 
+TEST(ActiveQuicListenerConfigTest, QuicListenerEnabledByDefault) {
+  std::string listener_name = QuicListenerName;
+  auto& config_factory =
+      Config::Utility::getAndCheckFactoryByName<Server::ActiveUdpListenerConfigFactory>(
+          listener_name);
+  ProtobufTypes::MessagePtr config = config_factory.createEmptyConfigProto();
+
+  std::string yaml = R"EOF(
+    max_concurrent_streams: 10
+    idle_timeout: {
+      seconds: 2
+    }
+  )EOF";
+  TestUtility::loadFromYaml(yaml, *config);
+  Network::ActiveUdpListenerFactoryPtr listener_factory =
+      config_factory.createActiveUdpListenerFactory(*config, /*concurrency=*/1);
+  EXPECT_NE(nullptr, listener_factory);
+  quic::QuicConfig& quic_config = ActiveQuicListenerFactoryPeer::quicConfig(
+      dynamic_cast<ActiveQuicListenerFactory&>(*listener_factory));
+  envoy::config::core::v3::RuntimeFeatureFlag& runtime_enabled =
+      ActiveQuicListenerFactoryPeer::runtimeEnabled(
+          dynamic_cast<ActiveQuicListenerFactory&>(*listener_factory));
+  EXPECT_EQ(true, runtime_enabled.default_value().value());
+  EXPECT_EQ("foo_key", runtime_enabled.runtime_key());
+}
+
 } // namespace Quic
 } // namespace Envoy
