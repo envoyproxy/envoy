@@ -265,3 +265,12 @@ envoy_cc_test(
         "//source/common/common:version_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "statusor_test",
+    srcs = ["statusor_test.cc"],
+    deps = [
+        "//source/common/common:statusor_lib",
+        "//source/common/http:status_lib",
+    ],
+)
