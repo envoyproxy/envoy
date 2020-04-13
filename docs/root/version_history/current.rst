@@ -1,5 +1,6 @@
 1.15.0 (Pending)
 ================
+access loggers: added GRPC_STATUS operator on logging format.
 
 Changes
 -------
