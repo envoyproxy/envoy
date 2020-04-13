@@ -18,6 +18,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -73,8 +74,8 @@ public:
   virtual ~Http2CodecImplTestFixture() = default;
 
   virtual void initialize() {
-    Http2OptionsFromTuple(client_http2_options_, client_settings_);
-    Http2OptionsFromTuple(server_http2_options_, server_settings_);
+    http2OptionsFromTuple(client_http2_options_, client_settings_);
+    http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
         client_connection_, client_callbacks_, stats_store_, client_http2_options_,
         max_request_headers_kb_, max_response_headers_count_);
@@ -107,7 +108,7 @@ public:
         }));
   }
 
-  void Http2OptionsFromTuple(envoy::config::core::v3::Http2ProtocolOptions& options,
+  void http2OptionsFromTuple(envoy::config::core::v3::Http2ProtocolOptions& options,
                              const absl::optional<const Http2SettingsTuple>& tp) {
     options.mutable_hpack_table_size()->set_value(
         (tp.has_value()) ? ::testing::get<SettingsTupleIndex::HpackTableSize>(*tp)
@@ -996,8 +997,8 @@ class Http2CodecImplStreamLimitTest : public Http2CodecImplTest {};
 // TODO(PiotrSikora): add tests that exercise both scenarios: before and after receiving
 // the HTTP/2 SETTINGS frame.
 TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
-  Http2OptionsFromTuple(client_http2_options_, ::testing::get<0>(GetParam()));
-  Http2OptionsFromTuple(server_http2_options_, ::testing::get<1>(GetParam()));
+  http2OptionsFromTuple(client_http2_options_, ::testing::get<0>(GetParam()));
+  http2OptionsFromTuple(server_http2_options_, ::testing::get<1>(GetParam()));
   client_ = std::make_unique<TestClientConnectionImpl>(
       client_connection_, client_callbacks_, stats_store_, client_http2_options_,
       max_request_headers_kb_, max_response_headers_count_);
@@ -1785,6 +1786,8 @@ TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
   EXPECT_NO_THROW(server_wrapper_.dispatch(data, *server_));
 }
 
+class TestNghttp2SessionFactory;
+
 // Test client for H/2 METADATA frame edge cases.
 class MetadataTestClientConnectionImpl : public TestClientConnectionImpl {
 public:
@@ -1793,70 +1796,82 @@ public:
       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
       uint32_t max_request_headers_kb, uint32_t max_request_headers_count)
       : TestClientConnectionImpl(connection, callbacks, scope, http2_options,
-                                 max_request_headers_kb, max_request_headers_count,
-                                 /*test_only_session=*/true) {
-    // For these tests, an external `nghttp2_session` needs to be used to trigger edge cases not
-    // supported by `ConnectionImpl` such as using unregistered stream IDs.
-
-    // Only need to provide callbacks required to send METADATA frames.
-    nghttp2_session_callbacks_new(&metadata_callbacks_);
-    nghttp2_session_callbacks_set_pack_extension_callback(
-        metadata_callbacks_,
-        [](nghttp2_session*, uint8_t* data, size_t length, const nghttp2_frame*,
-           void* user_data) -> ssize_t {
-          return static_cast<MetadataTestClientConnectionImpl*>(user_data)
-              ->encoder_.packNextFramePayload(data, length);
-        });
-    nghttp2_session_callbacks_set_send_callback(
-        metadata_callbacks_,
-        [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
-          return static_cast<MetadataTestClientConnectionImpl*>(user_data)->onSend(data, length);
-        });
-    nghttp2_option_new(&options_);
-    nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
-    nghttp2_session_client_new2(&metadata_session_, metadata_callbacks_, this, options_);
-    ASSERT(metadata_session_ != nullptr);
-    // Replace the `session_` used by the `ConnectionImpl` with this custom session.
-    session_ = metadata_session_;
-  }
-
-  ~MetadataTestClientConnectionImpl() override {
-    nghttp2_session_callbacks_del(metadata_callbacks_);
-    nghttp2_option_del(options_);
-  }
+                                 max_request_headers_kb, max_request_headers_count) {}
 
   // Overrides TestClientConnectionImpl::submitMetadata().
   bool submitMetadata(const MetadataMapVector& metadata_map_vector, int32_t stream_id) override {
     // Creates metadata payload.
     encoder_.createPayload(metadata_map_vector);
     for (uint8_t flags : encoder_.payloadFrameFlagBytes()) {
-      int result = nghttp2_submit_extension(metadata_session_, ::Envoy::Http::METADATA_FRAME_TYPE,
-                                            flags, stream_id, nullptr);
+      int result = nghttp2_submit_extension(session(), ::Envoy::Http::METADATA_FRAME_TYPE, flags,
+                                            stream_id, nullptr);
       if (result != 0) {
         return false;
       }
     }
     // Triggers nghttp2 to populate the payloads of the METADATA frames.
-    int result = nghttp2_session_send(metadata_session_);
+    int result = nghttp2_session_send(session());
     return result == 0;
   }
 
 protected:
+  friend class TestNghttp2SessionFactory;
+
   MetadataEncoder encoder_;
-  nghttp2_option* options_{};
-  nghttp2_session_callbacks* metadata_callbacks_{};
-  nghttp2_session* metadata_session_{};
+};
+
+class TestNghttp2SessionFactory : public Nghttp2SessionFactory {
+public:
+  ~TestNghttp2SessionFactory() override {
+    nghttp2_session_callbacks_del(callbacks_);
+    nghttp2_option_del(options_);
+  }
+
+  nghttp2_session* create(const nghttp2_session_callbacks*, ConnectionImpl* connection,
+                          const nghttp2_option*) override {
+    // Only need to provide callbacks required to send METADATA frames.
+    nghttp2_session_callbacks_new(&callbacks_);
+    nghttp2_session_callbacks_set_pack_extension_callback(
+        callbacks_,
+        [](nghttp2_session*, uint8_t* data, size_t length, const nghttp2_frame*,
+           void* user_data) -> ssize_t {
+          // Double cast required due to multiple inheritance.
+          return static_cast<MetadataTestClientConnectionImpl*>(
+                     static_cast<ConnectionImpl*>(user_data))
+              ->encoder_.packNextFramePayload(data, length);
+        });
+    nghttp2_session_callbacks_set_send_callback(
+        callbacks_,
+        [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
+          // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
+          return static_cast<MetadataTestClientConnectionImpl*>(
+                     static_cast<ConnectionImpl*>(user_data))
+              ->onSend(data, length);
+        });
+    nghttp2_option_new(&options_);
+    nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
+    nghttp2_session* session;
+    nghttp2_session_client_new2(&session, callbacks_, connection, options_);
+    return session;
+  }
+
+  void init(nghttp2_session*, ConnectionImpl*,
+            const envoy::config::core::v3::Http2ProtocolOptions&) override {}
+
+private:
+  nghttp2_session_callbacks* callbacks_;
+  nghttp2_option* options_;
 };
 
 class Http2CodecMetadataTest : public Http2CodecImplTestFixture, public ::testing::Test {
 public:
-  Http2CodecMetadataTest() : Http2CodecImplTestFixture() {}
+  Http2CodecMetadataTest() = default;
 
 protected:
-  void initialize() {
+  void initialize() override {
     allow_metadata_ = true;
-    Http2OptionsFromTuple(client_http2_options_, client_settings_);
-    Http2OptionsFromTuple(server_http2_options_, server_settings_);
+    http2OptionsFromTuple(client_http2_options_, client_settings_);
+    http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<MetadataTestClientConnectionImpl>(
         client_connection_, client_callbacks_, stats_store_, client_http2_options_,
         max_request_headers_kb_, max_response_headers_count_);
@@ -1879,6 +1894,9 @@ protected:
 // "connection control" messages, and per the H2 METADATA spec (source/docs/h2_metadata.md), which
 // states that these frames can be received prior to the headers.
 TEST_F(Http2CodecMetadataTest, UnknownStreamId) {
+  TestNghttp2SessionFactory session_factory;
+  Registry::InjectFactory<Nghttp2SessionFactory> registered_nghttp2_session_factory(
+      session_factory);
   initialize();
   MetadataMap metadata_map = {{"key", "value"}};
   MetadataMapVector metadata_vector;

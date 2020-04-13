@@ -59,10 +59,9 @@ public:
   TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
                            Stats::Scope& scope,
                            const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                           uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
-                           bool test_only_session = false)
+                           uint32_t max_request_headers_kb, uint32_t max_request_headers_count)
       : ClientConnectionImpl(connection, callbacks, scope, http2_options, max_request_headers_kb,
-                             max_request_headers_count, test_only_session) {}
+                             max_request_headers_count) {}
 
   nghttp2_session* session() { return session_; }
 

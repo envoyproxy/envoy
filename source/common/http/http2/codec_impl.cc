@@ -71,6 +71,19 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
 
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
 
+nghttp2_session* Nghttp2SessionFactory::create(const nghttp2_session_callbacks* callbacks,
+                                               ConnectionImpl* connection,
+                                               const nghttp2_option* options) {
+  nghttp2_session* session;
+  nghttp2_session_client_new2(&session, callbacks, connection, options);
+  return session;
+}
+
+void Nghttp2SessionFactory::init(nghttp2_session*, ConnectionImpl* connection,
+                                 const envoy::config::core::v3::Http2ProtocolOptions& options) {
+  connection->sendSettings(options, true);
+}
+
 /**
  * Helper to remove const during a cast. nghttp2 takes non-const pointers for headers even though
  * it copies them.
@@ -1135,18 +1148,17 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
 ClientConnectionImpl::ClientConnectionImpl(
     Network::Connection& connection, Http::ConnectionCallbacks& callbacks, Stats::Scope& stats,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-    const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count,
-    bool test_only_session)
+    const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, http2_options, max_response_headers_kb,
                      max_response_headers_count),
       callbacks_(callbacks) {
   ClientHttp2Options client_http2_options(http2_options);
-  // Check if a test is going to be creating its own session.
-  if (!test_only_session) {
-    nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
-                                client_http2_options.options());
-    sendSettings(http2_options, true);
-  }
+  Nghttp2SessionFactory* session_factory =
+      Registry::FactoryRegistry<Nghttp2SessionFactory>::getFactory("envoy.http2.session");
+  ASSERT(session_factory != nullptr);
+  session_ =
+      session_factory->create(http2_callbacks_.callbacks(), base(), client_http2_options.options());
+  session_factory->init(session_, base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
 }
 
@@ -1358,6 +1370,9 @@ ServerConnectionImpl::checkHeaderNameForUnderscores(absl::string_view header_nam
   }
   return absl::nullopt;
 }
+
+static Registry::RegisterFactory<Nghttp2SessionFactory, Nghttp2SessionFactory>
+    register_nghttp2_session_factory_;
 
 } // namespace Http2
 } // namespace Http

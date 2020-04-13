@@ -76,6 +76,29 @@ public:
                                           HeaderString& cookies);
 };
 
+class ConnectionImpl;
+
+class Nghttp2SessionFactory {
+public:
+  virtual ~Nghttp2SessionFactory() = default;
+
+  // Satisfy the Registry::FactoryRegistry() interface requirements.
+  virtual std::string name() const { return "envoy.http2.session"; }
+  virtual std::string category() const { return "envoy.http2.session"; }
+  virtual std::string configType() const { return ""; }
+
+  // Creates a new nghttp2 session with |callbacks| and |options|, binding |connection| to the
+  // session's user_data.
+  // Returns a newly allocated nghttp2_session on success, nullptr otherwise.
+  virtual nghttp2_session* create(const nghttp2_session_callbacks* callbacks,
+                                  ConnectionImpl* connection, const nghttp2_option* options);
+
+  // Initializes the |session| by sending initial control data to the peer (H/2 SETTINGS
+  // parameters).
+  virtual void init(nghttp2_session* session, ConnectionImpl* connection,
+                    const envoy::config::core::v3::Http2ProtocolOptions& options);
+};
+
 /**
  * Base class for HTTP/2 client and server codecs.
  */
@@ -107,6 +130,8 @@ public:
   }
 
 protected:
+  friend class Nghttp2SessionFactory;
+
   /**
    * Wrapper for static nghttp2 callback dispatchers.
    */
@@ -475,7 +500,7 @@ public:
                        Stats::Scope& stats,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
-                       const uint32_t max_response_headers_count, bool test_only_session = false);
+                       const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
