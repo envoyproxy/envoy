@@ -226,6 +226,10 @@ def runChecks():
                                 "Don't use mangled Protobuf names for enum constants")
   errors += checkUnfixableError("test_naming.cc",
                                 "Test names should be CamelCase, starting with a capital letter")
+  errors += checkUnfixableError(
+      "test/register_factory.cc",
+      "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, use "
+      "Registry::InjectFactory instead.")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",
@@ -245,7 +249,7 @@ def runChecks():
   errors += checkAndFixError("update_license.BUILD", "envoy_build_fixer check failed")
   # Validate that envoy_package() is added where there is an envoy_* rule occurring.
   errors += checkAndFixError("add_envoy_package.BUILD", "envoy_build_fixer check failed")
-  # Validate that we don't add envoy_packag() when no envoy_* rule.
+  # Validate that we don't add envoy_package() when no envoy_* rule.
   errors += checkFileExpectingOK("skip_envoy_package.BUILD")
   # Validate that we clean up gratuitous blank lines.
   errors += checkAndFixError("canonical_spacing.BUILD", "envoy_build_fixer check failed")

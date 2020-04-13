@@ -70,7 +70,7 @@ public:
 class TransportSocketMatcherTest : public testing::Test {
 public:
   TransportSocketMatcherTest()
-      : mock_default_factory_(new FakeTransportSocketFactory("default")),
+      : registration_(factory_), mock_default_factory_(new FakeTransportSocketFactory("default")),
         stats_scope_(stats_store_.createScope("transport_socket_match.test")) {}
 
   void init(const std::vector<std::string>& match_yaml) {
@@ -90,6 +90,10 @@ public:
   }
 
 protected:
+  FooTransportSocketFactory factory_;
+  Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
+      registration_;
+
   TransportSocketMatcherPtr matcher_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_context_;
   Network::TransportSocketFactoryPtr mock_default_factory_;
@@ -194,9 +198,6 @@ filter_metadata:
                             metadata);
   validate(metadata, "match_all");
 }
-
-REGISTER_FACTORY(FooTransportSocketFactory,
-                 Server::Configuration::UpstreamTransportSocketConfigFactory);
 
 } // namespace
 } // namespace Upstream

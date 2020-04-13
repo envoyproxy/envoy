@@ -17,6 +17,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/wasm:wasm_vm_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )

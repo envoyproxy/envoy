@@ -10,6 +10,7 @@
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/registry.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
@@ -59,10 +60,6 @@ public:
   }
 };
 
-// perform static registration
-REGISTER_FACTORY(HeaderToFilterStateFilterConfig,
-                 Server::Configuration::NamedHttpFilterConfigFactory);
-
 std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config_str, proto_config);
@@ -84,7 +81,13 @@ std::string getFilterConfig(bool use_local_jwks) {
   return getAuthFilterConfig(ExampleConfig, use_local_jwks);
 }
 
-using LocalJwksIntegrationTest = HttpProtocolIntegrationTest;
+class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {
+public:
+  LocalJwksIntegrationTest() : registration_(factory_) {}
+
+  HeaderToFilterStateFilterConfig factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
+};
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),

@@ -22,6 +22,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1245,7 +1246,8 @@ public:
 };
 
 TEST_F(AccessLogImplTest, TestHeaderFilterPresence) {
-  Registry::RegisterFactory<TestHeaderFilterFactory, ExtensionFilterFactory> registered;
+  TestHeaderFilterFactory factory;
+  Registry::InjectFactory<ExtensionFilterFactory> registration(factory);
 
   const std::string yaml = R"EOF(
 name: accesslog
@@ -1321,7 +1323,8 @@ public:
 };
 
 TEST_F(AccessLogImplTest, SampleExtensionFilter) {
-  Registry::RegisterFactory<SampleExtensionFilterFactory, ExtensionFilterFactory> registered;
+  SampleExtensionFilterFactory factory;
+  Registry::InjectFactory<ExtensionFilterFactory> registration(factory);
 
   const std::string yaml = R"EOF(
 name: accesslog
