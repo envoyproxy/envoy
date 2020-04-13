@@ -328,6 +328,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
