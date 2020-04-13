@@ -194,6 +194,34 @@ protected:
       std::make_shared<Network::MockDnsResolver>();
 };
 
+TEST_F(StrictDnsClusterImplTest, ZeroHostsIsInializedImmediately) {
+  ReadyWatcher initialized;
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+      - lb_endpoints:
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_);
+  StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, factory_context,
+                               std::move(scope), false);
+  EXPECT_CALL(initialized, ready());
+  cluster.initialize([&]() -> void { initialized.ready(); });
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+}
+
 // Resolve zero hosts, while using health checking.
 TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   ReadyWatcher initialized;
