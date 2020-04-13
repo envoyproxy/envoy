@@ -128,11 +128,6 @@ public:
   virtual bool logFormatEscaped() const PURE;
 
   /**
-   * @return const bool indicating whether to prefix the log message with location.
-   */
-  virtual bool logFormatPrefixWithLocation() const PURE;
-
-  /**
    * @return const std::string& the log file path.
    */
   virtual const std::string& logPath() const PURE;

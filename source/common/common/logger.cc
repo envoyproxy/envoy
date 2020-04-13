@@ -47,28 +47,15 @@ void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatt
   formatter_ = std::move(formatter);
 }
 
-void DelegatingLogSink::log(const spdlog::details::log_msg& msg_candidate) {
-  const spdlog::details::log_msg* msg = &msg_candidate;
-  // This memory buffer is used for compatibility and has to be in the scope of the function to
-  // avoid use-after-free.
-  // TODO(euroelessar): Delete this logic after after 0.16 release.
-  std::string msg_payload_with_prefix;
-  spdlog::details::log_msg msg_with_prefix = msg_candidate;
-  if (prefix_with_location_) {
-    msg_payload_with_prefix =
-        fmt::format("[{}:{}] {}", msg->source.filename, msg->source.line,
-                    absl::string_view(msg->payload.data(), msg->payload.size()));
-    msg_with_prefix.payload = msg_payload_with_prefix;
-    msg = &msg_with_prefix;
-  }
-
+void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   absl::ReleasableMutexLock lock(&format_mutex_);
-  absl::string_view msg_view = absl::string_view(msg->payload.data(), msg->payload.size());
+  absl::string_view msg_view = absl::string_view(msg.payload.data(), msg.payload.size());
+
   // This memory buffer must exist in the scope of the entire function,
   // otherwise the string_view will refer to memory that is already free.
   spdlog::memory_buf_t formatted;
   if (formatter_) {
-    formatter_->format(*msg, formatted);
+    formatter_->format(msg, formatted);
     msg_view = absl::string_view(formatted.data(), formatted.size());
   }
   lock.Release();
@@ -100,9 +87,9 @@ DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
 static Context* current_context = nullptr;
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
-                 Thread::BasicLockable& lock, bool should_escape, bool prefix_with_location)
+                 Thread::BasicLockable& lock, bool should_escape)
     : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
-      prefix_with_location_(prefix_with_location), save_context_(current_context) {
+      save_context_(current_context) {
   current_context = this;
   activate();
 }
@@ -119,7 +106,6 @@ Context::~Context() {
 void Context::activate() {
   Registry::getSink()->setLock(lock_);
   Registry::getSink()->set_should_escape(should_escape_);
-  Registry::getSink()->set_prefix_with_location(prefix_with_location_);
   Registry::setLogLevel(log_level_);
   Registry::setLogFormat(log_format_);
 }
