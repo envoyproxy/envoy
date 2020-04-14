@@ -281,7 +281,6 @@ SRDS
 SRV
 SS
 SSL
-STATUSOR
 STDSTRING
 STL
 STRLEN
@@ -985,6 +984,7 @@ stacktrace
 startup
 stateful
 statsd
+statusor
 stderr
 stdev
 stdout
