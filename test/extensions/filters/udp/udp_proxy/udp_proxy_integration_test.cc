@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "test/integration/integration.h"
@@ -107,20 +109,20 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnNonLocalAddress) {
   Network::Address::InstanceConstSharedPtr listener_address;
   if (version_ == Network::Address::IpVersion::v4) {
     // Kernel regards any 127.x.x.x as local address.
-    listener_address.reset(new Network::Address::Ipv4Instance(
+    listener_address = std::make_shared<Network::Address::Ipv4Instance>(
 #ifndef __APPLE__
         "127.0.0.3",
 #else
         "127.0.0.1",
 #endif
-        port));
+        port);
   } else {
     // IPv6 doesn't allow any non-local source address for sendmsg. And the only
     // local address guaranteed in tests in loopback. Unfortunately, even if it's not
     // specified, kernel will pick this address as source address. So this test
     // only checks if IoSocketHandle::sendmsg() sets up CMSG_DATA correctly,
     // i.e. cmsg_len is big enough when that code path is executed.
-    listener_address.reset(new Network::Address::Ipv6Instance("::1", port));
+    listener_address = std::make_shared<Network::Address::Ipv6Instance>("::1", port);
   }
 
   requestResponseWithListenerAddress(*listener_address);

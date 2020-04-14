@@ -16,7 +16,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_authz.v3";
 option java_outer_classname = "ExtAuthzProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
@@ -27,14 +27,11 @@ message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
 
-  // External authorization service configuration.
-  oneof services {
-    // gRPC service configuration (default timeout: 200ms).
-    config.core.v3.GrpcService grpc_service = 1;
+  // gRPC service configuration (default timeout: 200ms).
+  bool failure_mode_allow = 2;
 
-    // HTTP service configuration (default timeout: 200ms).
-    HttpService http_service = 3;
-  }
+  // HTTP service configuration (default timeout: 200ms).
+  BufferSettings with_request_body = 5;
 
   //  Changes filter's behaviour on errors:
   //
@@ -48,19 +45,12 @@ message ExtAuthz {
   //
   // Note that errors can be *always* tracked in the :ref:`stats
   // <config_http_filters_ext_authz_stats>`.
-  bool failure_mode_allow = 2;
-
-  // Sets the package version the gRPC service should use. This is particularly
-  // useful when transitioning from alpha to release versions assuming that both definitions are
-  // semantically compatible. Deprecation note: This field is deprecated and should only be used for
-  // version upgrade. See release notes for more details.
-  bool hidden_envoy_deprecated_use_alpha = 4
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  bool clear_route_cache = 6;
 
   // Enables filter to buffer the client request body and send it within the authorization request.
   // A ``x-envoy-auth-partial-body: false|true`` metadata header will be added to the authorization
   // request message indicating if the body data is partial.
-  BufferSettings with_request_body = 5;
+  type.v3.HttpStatus status_on_error = 7;
 
   // Clears route cache in order to allow the external authorization service to correctly affect
   // routing decisions. Filter clears all cached routes when:
@@ -72,11 +62,11 @@ message ExtAuthz {
   // 3. At least one *authorization response header* is added to the client request, or is used for
   // altering another client request header.
   //
-  bool clear_route_cache = 6;
+  repeated string metadata_context_namespaces = 8;
 
   // Sets the HTTP status that is returned to the client when there is a network error between the
   // filter and the authorization server. The default status is HTTP 403 Forbidden.
-  type.v3.HttpStatus status_on_error = 7;
+  config.core.v3.RuntimeFractionalPercent filter_enabled = 9;
 
   // Specifies a list of metadata namespaces whose values, if present, will be passed to the
   // ext_authz service as an opaque *protobuf::Struct*.
@@ -90,7 +80,7 @@ message ExtAuthz {
   //    metadata_context_namespaces:
   //    - envoy.filters.http.jwt_authn
   //
-  repeated string metadata_context_namespaces = 8;
+  bool include_peer_certificate = 10;
 
   // Specifies if the filter is enabled.
   //
@@ -98,13 +88,19 @@ message ExtAuthz {
   // Envoy will lookup the runtime key to get the percentage of requests to filter.
   //
   // If this field is not specified, the filter will be enabled for all requests.
-  config.core.v3.RuntimeFractionalPercent filter_enabled = 9;
+  bool hidden_envoy_deprecated_use_alpha = 4
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
-  // Specifies if the peer certificate is sent to the external service.
-  //
-  // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
-  // :ref:`certificate<envoy_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
-  bool include_peer_certificate = 10;
+  // External authorization service configuration.
+  oneof services {
+    // Specifies if the peer certificate is sent to the external service.
+    //
+    // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
+    // :ref:`certificate<envoy_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
+    config.core.v3.GrpcService grpc_service = 1;
+
+    HttpService http_service = 3;
+  }
 }
 
 // Configuration for buffering the request data.
