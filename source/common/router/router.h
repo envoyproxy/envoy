@@ -295,7 +295,8 @@ public:
   Filter(FilterConfig& config)
       : config_(config), final_upstream_request_(nullptr), downstream_response_started_(false),
         downstream_end_stream_(false), is_retry_(false),
-        attempting_internal_redirect_with_complete_stream_(false) {}
+        attempting_internal_redirect_with_complete_stream_(false),
+        allow_full_streaming_retry_(false) {}
 
   ~Filter() override;
 
@@ -539,6 +540,7 @@ private:
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
+  bool allow_full_streaming_retry_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 

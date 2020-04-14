@@ -4,6 +4,8 @@
 Changes
 -------
 
+* http: added :ref:`max_stream_duration <envoy_api_field_core.HttpProtocolOptions.max_stream_duration>`
+  to specify the duration of existing streams to upstream HTTP connection. See :ref:`connection and stream timeouts <faq_configuration_timeouts>`.
 * http: fixed a bug where the upgrade header was not cleared on responses to non-upgrade requests.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager

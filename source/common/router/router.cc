@@ -916,6 +916,12 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
 
 void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   upstream_request.resetStream();
+
+  // In general, we don't have to retry when downstream didn't end. But when stream max duration
+  // timer was invoked, We must retry with keeping downstream connection so that we must allow to
+  // retry by switching full streaming retry flag.
+  allow_full_streaming_retry_ = true;
+
   if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request)) {
     return;
   }
@@ -1403,7 +1409,7 @@ bool Filter::setupRetry() {
   // overflow of some kind. However, in many cases deployments will use the buffer filter before
   // this filter which will make this a non-issue. The implementation of supporting retry in cases
   // where the request is not complete is more complicated so we will start with this for now.
-  if (!downstream_end_stream_) {
+  if (!downstream_end_stream_ && !allow_full_streaming_retry_) {
     config_.stats_.rq_retry_skipped_request_not_complete_.inc();
     return false;
   }
@@ -1476,7 +1482,7 @@ void Filter::doRetry() {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 
-  ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);
+  ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0 || allow_full_streaming_retry_);
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(!callbacks_->decodingBuffer() && !downstream_trailers_);
