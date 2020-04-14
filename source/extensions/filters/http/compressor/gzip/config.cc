@@ -81,13 +81,13 @@ Envoy::Compressor::CompressorPtr GzipCompressorFactory::createCompressor() {
 }
 
 Compressor::CompressorFactoryPtr
-GzipCompressorLibraryFactory::createCompressorLibraryFromProtoTyped(
+GzipCompressorLibraryFactory::createCompressorFactoryFromProtoTyped(
     const envoy::extensions::filters::http::compressor::gzip::v3::Gzip& proto_config) {
   return std::make_unique<GzipCompressorFactory>(proto_config);
 }
 
 /**
- * Static registration for the gzip filter. @see NamedCompressorLibraryConfigFactory.
+ * Static registration for the gzip compressor library. @see NamedCompressorLibraryConfigFactory.
  */
 REGISTER_FACTORY(GzipCompressorLibraryFactory, NamedCompressorLibraryConfigFactory);
 

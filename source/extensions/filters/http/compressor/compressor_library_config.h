@@ -15,7 +15,7 @@ public:
   ~NamedCompressorLibraryConfigFactory() override = default;
 
   virtual CompressorFactoryPtr
-  createCompressorLibraryFromProto(const Protobuf::Message& config,
+  createCompressorFactoryFromProto(const Protobuf::Message& config,
                                    Server::Configuration::FactoryContext& context) PURE;
 };
 

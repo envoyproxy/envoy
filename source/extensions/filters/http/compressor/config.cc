@@ -26,7 +26,7 @@ Http::FilterFactoryCb CompressorFilterFactory::createFilterFactoryFromProtoTyped
       proto_config.compressor_library().typed_config(), context.messageValidationVisitor(),
       *config_factory);
   CompressorFactoryPtr compressor_factory =
-      config_factory->createCompressorLibraryFromProto(*message, context);
+      config_factory->createCompressorFactoryFromProto(*message, context);
   Common::Compressors::CompressorFilterConfigSharedPtr config =
       std::make_shared<CompressorFilterConfig>(proto_config, stats_prefix, context.scope(),
                                                context.runtime(), std::move(compressor_factory));

@@ -59,7 +59,7 @@ public:
   GzipCompressorLibraryFactory() : CompressorLibraryFactoryBase(gzipExtensionName()) {}
 
 private:
-  Compressor::CompressorFactoryPtr createCompressorLibraryFromProtoTyped(
+  Compressor::CompressorFactoryPtr createCompressorFactoryFromProtoTyped(
       const envoy::extensions::filters::http::compressor::gzip::v3::Gzip& config) override;
 };
 

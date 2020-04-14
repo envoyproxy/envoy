@@ -14,9 +14,9 @@ template <class ConfigProto>
 class CompressorLibraryFactoryBase : public NamedCompressorLibraryConfigFactory {
 public:
   CompressorFactoryPtr
-  createCompressorLibraryFromProto(const Protobuf::Message& proto_config,
+  createCompressorFactoryFromProto(const Protobuf::Message& proto_config,
                                    Server::Configuration::FactoryContext& context) override {
-    return createCompressorLibraryFromProtoTyped(
+    return createCompressorFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config,
                                                              context.messageValidationVisitor()));
   }
@@ -33,7 +33,7 @@ protected:
   CompressorLibraryFactoryBase(const std::string& name) : name_(name) {}
 
 private:
-  virtual CompressorFactoryPtr createCompressorLibraryFromProtoTyped(const ConfigProto&) PURE;
+  virtual CompressorFactoryPtr createCompressorFactoryFromProtoTyped(const ConfigProto&) PURE;
   const std::string name_;
 };
 
