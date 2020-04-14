@@ -47,7 +47,7 @@ RingHashLoadBalancerStats RingHashLoadBalancer::generateStats(Stats::Scope& scop
   return {ALL_RING_HASH_LOAD_BALANCER_STATS(POOL_GAUGE(scope))};
 }
 
-HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
+HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h, uint32_t attempt) const {
   if (ring_.empty()) {
     return nullptr;
   }
@@ -58,18 +58,20 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
   //       change them!
   int64_t lowp = 0;
   int64_t highp = ring_.size();
+  int64_t midp = 0;
   while (true) {
-    int64_t midp = (lowp + highp) / 2;
+    midp = (lowp + highp) / 2;
 
     if (midp == static_cast<int64_t>(ring_.size())) {
-      return ring_[0].host_;
+      midp = 0;
+      break;
     }
 
     uint64_t midval = ring_[midp].hash_;
     uint64_t midval1 = midp == 0 ? 0 : ring_[midp - 1].hash_;
 
     if (h <= midval && h > midval1) {
-      return ring_[midp].host_;
+      break;
     }
 
     if (midval < h) {
@@ -79,9 +81,19 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
     }
 
     if (lowp > highp) {
-      return ring_[0].host_;
+      midp = 0;
+      break;
     }
   }
+
+  // If a retry host predicate is being applied, behave as if this host was not in the ring.
+  // Note that this does not guarantee a different host: e.g., attempt == ring_.size() or
+  // when the offset causes us to select the same host at another location in the ring.
+  if (attempt > 0) {
+    midp = (midp + attempt) % ring_.size();
+  }
+
+  return ring_[midp].host_;
 }
 
 using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;

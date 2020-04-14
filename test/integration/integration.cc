@@ -262,7 +262,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // notification and clear the pool connection if necessary. A real fix would require adding fairly
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
-  timeSystem().sleep(std::chrono::milliseconds(10));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, create_(_, _))
       .WillByDefault(Invoke([](std::function<void()> below_low,
                                std::function<void()> above_high) -> Buffer::Instance* {
@@ -415,9 +415,20 @@ void BaseIntegrationTest::setUpstreamAddress(
 }
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
-  auto port_it = port_names.cbegin();
-  auto listeners = test_server_->server().listenerManager().listeners();
+  bool listeners_ready = false;
+  absl::Mutex l;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  test_server_->server().dispatcher().post([this, &listeners, &listeners_ready, &l]() {
+    listeners = test_server_->server().listenerManager().listeners();
+    l.Lock();
+    listeners_ready = true;
+    l.Unlock();
+  });
+  l.LockWhen(absl::Condition(&listeners_ready));
+  l.Unlock();
+
   auto listener_it = listeners.cbegin();
+  auto port_it = port_names.cbegin();
   for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
     const auto listen_addr = listener_it->get().listenSocketFactory().localAddress();
     if (listen_addr->type() == Network::Address::Type::Ip) {
@@ -468,7 +479,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
                        absl::StrCat("Lds update failed. Details\n",
                                     getListenerDetails(test_server_->server())));
       }
-      time_system_.sleep(std::chrono::milliseconds(10));
+      time_system_.advanceTimeWait(std::chrono::milliseconds(10));
     }
 
     registerTestServerPorts(port_names);

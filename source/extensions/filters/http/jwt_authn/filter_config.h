@@ -104,8 +104,8 @@ public:
 
   bool bypassCorsPreflightRequest() const override { return proto_config_.bypass_cors_preflight(); }
 
-  virtual const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
-                                       const StreamInfo::FilterState& filter_state) const override {
+  const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
+                               const StreamInfo::FilterState& filter_state) const override {
     for (const auto& pair : rule_pairs_) {
       if (pair.matcher_->matches(headers)) {
         return pair.verifier_.get();

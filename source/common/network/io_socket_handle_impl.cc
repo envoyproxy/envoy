@@ -207,7 +207,7 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
                                                     RecvMsgOutput& output) {
-  ASSERT(output.msg_.size() > 0);
+  ASSERT(!output.msg_.empty());
 
   absl::FixedArray<char> cbuf(cmsg_space_);
   memset(cbuf.begin(), 0, cmsg_space_);
@@ -271,7 +271,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
 Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uint32_t self_port,
                                                      RecvMsgOutput& output) {
   ASSERT(output.msg_.size() == slices.size());
-  if (slices.size() == 0) {
+  if (slices.empty()) {
     return sysCallResultToIoCallResult(Api::SysCallIntResult{0, EAGAIN});
   }
   const uint32_t num_packets_per_mmsg_call = slices.size();
@@ -291,7 +291,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     msghdr* hdr = &mmsg_hdr[i].msg_hdr;
     hdr->msg_name = &raw_addresses[i];
     hdr->msg_namelen = sizeof(sockaddr_storage);
-    ASSERT(slices[i].size() > 0);
+    ASSERT(!slices[i].empty());
 
     for (size_t j = 0; j < slices[i].size(); ++j) {
       iovs[i][j].iov_base = slices[i][j].mem_;

@@ -24,6 +24,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//test/common/http:common_lib",
         "//test/common/http/http2:http2_frame",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",

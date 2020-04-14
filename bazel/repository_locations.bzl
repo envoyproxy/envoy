@@ -85,14 +85,14 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/mirror/tclap/archive/tclap-1-2-1-release-final.tar.gz"],
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "4c0741e10183f75d7d6f730b8708a99b329b2f942dad5a9da3385ab92bb4a15c",
-        strip_prefix = "fmt-5.3.0",
-        urls = ["https://github.com/fmtlib/fmt/releases/download/5.3.0/fmt-5.3.0.zip"],
+        sha256 = "f1907a58d5e86e6c382e51441d92ad9e23aea63827ba47fd647eacc0d3a16c78",
+        strip_prefix = "fmt-6.0.0",
+        urls = ["https://github.com/fmtlib/fmt/archive/6.0.0.tar.gz"],
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "160845266e94db1d4922ef755637f6901266731c4cb3b30b45bf41efa0e6ab70",
-        strip_prefix = "spdlog-1.3.1",
-        urls = ["https://github.com/gabime/spdlog/archive/v1.3.1.tar.gz"],
+        sha256 = "afd18f62d1bc466c60bef088e6b637b0284be88c515cedc59ad4554150af6043",
+        strip_prefix = "spdlog-1.4.0",
+        urls = ["https://github.com/gabime/spdlog/archive/v1.4.0.tar.gz"],
     ),
     com_github_google_libprotobuf_mutator = dict(
         sha256 = "",
@@ -272,13 +272,18 @@ REPOSITORY_LOCATIONS = dict(
     com_googlesource_chromium_v8 = dict(
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "e46ebfd9752b54c13653ee4dd5af8533cb6722d938ba9496f034bc58391edb38",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.0.426.12.tar.gz"],
+        sha256 = "03ff00e41cf259db473dfade9548493e4a2372c0b701a66cd7ff76215bd55a64",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.1.307.28.tar.gz"],
     ),
     com_googlesource_quiche = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz
         sha256 = "75af53154402e1654cfd32d8aaeed5fab4dbb79d3cab8c9866019d5369c1889e",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz"],
+    ),
+    com_googlesource_googleurl = dict(
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/googleurl_dbf5ad147f60afc125e99db7549402af49a5eae8.tar.gz
+        sha256 = "b40cd22cadba577b7281a76db66f6a66dd744edbad8cc2c861c2c976ef721e4d",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_dbf5ad147f60afc125e99db7549402af49a5eae8.tar.gz"],
     ),
     com_google_cel_cpp = dict(
         sha256 = "326ec397b55e39f48bd5380ccded1af5b04653ee96e769cd4d694f9a3bacef50",
@@ -297,7 +302,7 @@ REPOSITORY_LOCATIONS = dict(
     org_llvm_releases_compiler_rt = dict(
         sha256 = "56e4cd96dd1d8c346b07b4d6b255f976570c6f2389697347a6c3dcb9e820d10e",
         # Only allow peeking at fuzzer related files for now.
-        strip_prefix = "compiler-rt-9.0.0.src/lib/fuzzer",
+        strip_prefix = "compiler-rt-9.0.0.src/lib",
         urls = ["http://releases.llvm.org/9.0.0/compiler-rt-9.0.0.src.tar.xz"],
     ),
     fuzzit_linux = dict(

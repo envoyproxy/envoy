@@ -1,0 +1,79 @@
+1.5.0 (December 4, 2017)
+========================
+
+Changes
+-------
+
+* access log: added fields for :ref:`UPSTREAM_LOCAL_ADDRESS and DOWNSTREAM_ADDRESS
+  <config_access_log_format>`.
+* admin: added :ref:`JSON output <operations_admin_interface_stats>` for stats admin endpoint.
+* admin: added basic :ref:`Prometheus output <operations_admin_interface_stats>` for stats admin
+  endpoint. Histograms are not currently output.
+* admin: added ``version_info`` to the :ref:`/clusters admin endpoint<operations_admin_interface_clusters>`.
+* config: the :ref:`v2 API <config_overview>` is now considered production ready.
+* config: added --v2-config-only CLI flag.
+* cors: added :ref:`CORS filter <config_http_filters_cors>`.
+* health check: added :ref:`x-envoy-immediate-health-check-fail
+  <config_http_filters_router_x-envoy-immediate-health-check-fail>` header support.
+* health check: added :ref:`reuse_connection <envoy_api_field_core.HealthCheck.reuse_connection>` option.
+* http: added :ref:`per-listener stats <config_http_conn_man_stats_per_listener>`.
+* http: end-to-end HTTP flow control is now complete across both connections, streams, and filters.
+* load balancer: added :ref:`subset load balancer <arch_overview_load_balancer_subsets>`.
+* load balancer: added ring size and hash :ref:`configuration options
+  <envoy_api_msg_Cluster.RingHashLbConfig>`. This used to be configurable via runtime. The runtime
+  configuration was deleted without deprecation as we are fairly certain no one is using it.
+* log: added the ability to optionally log to a file instead of stderr via the
+  :option:`--log-path` option.
+* listeners: added :ref:`drain_type <envoy_api_field_Listener.drain_type>` option.
+* lua: added experimental :ref:`Lua filter <config_http_filters_lua>`.
+* mongo filter: added :ref:`fault injection <config_network_filters_mongo_proxy_fault_injection>`.
+* mongo filter: added :ref:`"drain close" <arch_overview_draining>` support.
+* outlier detection: added :ref:`HTTP gateway failure type <arch_overview_outlier_detection>`.
+  See :ref:`deprecated log <deprecated>`
+  for outlier detection stats deprecations in this release.
+* redis: the :ref:`redis proxy filter <config_network_filters_redis_proxy>` is now considered
+  production ready.
+* redis: added :ref:`"drain close" <arch_overview_draining>` functionality.
+* router: added :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>` support.
+* router: added :ref:`regex <envoy_api_field_route.RouteMatch.regex>` route matching.
+* router: added :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`
+  for upstream requests.
+* router: added :ref:`downstream IP hashing
+  <envoy_api_field_route.RouteAction.HashPolicy.connection_properties>` for HTTP ketama routing.
+* router: added :ref:`cookie hashing <envoy_api_field_route.RouteAction.HashPolicy.cookie>`.
+* router: added :ref:`start_child_span <envoy_api_field_config.filter.http.router.v2.Router.start_child_span>` option
+  to create child span for egress calls.
+* router: added optional :ref:`upstream logs <envoy_api_field_config.filter.http.router.v2.Router.upstream_log>`.
+* router: added complete :ref:`custom append/override/remove support
+  <config_http_conn_man_headers_custom_request_headers>` of request/response headers.
+* router: added support to :ref:`specify response code during redirect
+  <envoy_api_field_route.RedirectAction.response_code>`.
+* router: added :ref:`configuration <envoy_api_field_route.RouteAction.cluster_not_found_response_code>`
+  to return either a 404 or 503 if the upstream cluster does not exist.
+* runtime: added :ref:`comment capability <config_runtime_comments>`.
+* server: change default log level (:option:`-l`) to `info`.
+* stats: maximum stat/name sizes and maximum number of stats are now variable via the
+  `--max-obj-name-len` and `--max-stats` options.
+* tcp proxy: added :ref:`access logging <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.access_log>`.
+* tcp proxy: added :ref:`configurable connect retries
+  <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.max_connect_attempts>`.
+* tcp proxy: enable use of :ref:`outlier detector <arch_overview_outlier_detection>`.
+* tls: added :ref:`SNI support <faq_how_to_setup_sni>`.
+* tls: added support for specifying :ref:`TLS session ticket keys
+  <envoy_api_field_auth.DownstreamTlsContext.session_ticket_keys>`.
+* tls: allow configuration of the :ref:`min
+  <envoy_api_field_auth.TlsParameters.tls_minimum_protocol_version>` and :ref:`max
+  <envoy_api_field_auth.TlsParameters.tls_maximum_protocol_version>` TLS protocol versions.
+* tracing: added :ref:`custom trace span decorators <envoy_api_field_route.Route.decorator>`.
+* Many small bug fixes and performance improvements not listed.
+
+Deprecated
+----------
+
+* The outlier detection `ejections_total` stats counter has been deprecated and not replaced. Monitor
+  the individual `ejections_detected_*` counters for the detectors of interest, or
+  `ejections_enforced_total` for the total number of ejections that actually occurred.
+* The outlier detection `ejections_consecutive_5xx` stats counter has been deprecated in favour of
+  `ejections_detected_consecutive_5xx` and `ejections_enforced_consecutive_5xx`.
+* The outlier detection `ejections_success_rate` stats counter has been deprecated in favour of
+  `ejections_detected_success_rate` and `ejections_enforced_success_rate`.

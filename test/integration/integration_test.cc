@@ -141,7 +141,7 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
 }
 
 TEST_P(IntegrationTest, ConnectionClose) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -158,12 +158,39 @@ TEST_P(IntegrationTest, ConnectionClose) {
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(1024, 512, false);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false);
+}
+
+TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
 }
 
 TEST_P(IntegrationTest, FlowControlOnAndGiantBody) {
   config_helper_.setBufferLimits(1024, 1024);
-  testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
+}
+
+TEST_P(IntegrationTest, LargeFlowControlOnAndGiantBody) {
+  config_helper_.setBufferLimits(128 * 1024, 128 * 1024);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
+}
+
+TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyAndContentLengthNoBuffer) {
+  testRouterRequestAndResponseWithBody(1024, 512, false, true);
+}
+
+TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyAndContentLengthNoBuffer) {
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
+}
+
+TEST_P(IntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
+  config_helper_.setBufferLimits(1024, 1024);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
+}
+
+TEST_P(IntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
+  config_helper_.setBufferLimits(128 * 1024, 128 * 1024);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
@@ -1225,6 +1252,32 @@ TEST_P(IntegrationTest, TestManyBadRequests) {
     EXPECT_THAT(response->headers(), HttpStatusIs("400"));
   }
   EXPECT_EQ(0, test_server_->counter("http1.response_flood")->value());
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/10566
+TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\n"
+                                              "connection: upgrade\r\n"
+                                              "upgrade: h2\r\n"
+                                              "Transfer-encoding: chunked\r\n\r\n"
+                                              "b\r\nHello World\r\n0\r\n\r\n",
+                                              false));
+
+  response->waitForHeaders();
+  EXPECT_EQ(nullptr, response->headers().Upgrade());
+  EXPECT_EQ(nullptr, response->headers().Connection());
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("Hello World", response->body());
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace Envoy
