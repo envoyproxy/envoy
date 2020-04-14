@@ -276,6 +276,13 @@ MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 MockFilterChainFactoryContext::MockFilterChainFactoryContext() = default;
 MockFilterChainFactoryContext::~MockFilterChainFactoryContext() = default;
 
+MockTracerFactory::MockTracerFactory(const std::string& name) : name_(name) {
+  ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Invoke([] {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }));
+}
+MockTracerFactory::~MockTracerFactory() = default;
+
 MockTracerFactoryContext::MockTracerFactoryContext() {
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
   ON_CALL(*this, messageValidationVisitor())
