@@ -11,7 +11,7 @@ class CompressorFactory {
 public:
   virtual ~CompressorFactory() = default;
 
-  virtual std::unique_ptr<Envoy::Compressor::Compressor> createCompressor() PURE;
+  virtual Envoy::Compressor::CompressorPtr createCompressor() PURE;
   virtual const std::string& statsPrefix() const PURE;
   virtual const std::string& contentEncoding() const PURE;
 };

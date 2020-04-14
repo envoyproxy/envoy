@@ -23,7 +23,7 @@ public:
       const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
       CompressorFactoryPtr compressor_factory);
 
-  std::unique_ptr<Envoy::Compressor::Compressor> makeCompressor() override;
+  Envoy::Compressor::CompressorPtr makeCompressor() override;
 
 private:
   const CompressorFactoryPtr compressor_factory_;

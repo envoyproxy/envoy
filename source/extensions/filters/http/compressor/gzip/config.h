@@ -28,7 +28,7 @@ class GzipCompressorFactory : public Compressor::CompressorFactory {
 public:
   GzipCompressorFactory(const envoy::extensions::filters::http::compressor::gzip::v3::Gzip& gzip);
 
-  std::unique_ptr<Envoy::Compressor::Compressor> createCompressor() override;
+  Envoy::Compressor::CompressorPtr createCompressor() override;
   const std::string& statsPrefix() const override { return gzipStatsPrefix(); }
   const std::string& contentEncoding() const override {
     return Http::Headers::get().ContentEncodingValues.Gzip;

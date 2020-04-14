@@ -35,9 +35,7 @@ public:
       : CompressorFilterConfig(compressor, stats_prefix + compressor_name + ".", scope, runtime,
                                compressor_name) {}
 
-  std::unique_ptr<Compressor::Compressor> makeCompressor() override {
-    return std::make_unique<MockCompressor>();
-  }
+  Compressor::CompressorPtr makeCompressor() override { return std::make_unique<MockCompressor>(); }
 };
 
 class CompressorFilterTest : public testing::Test {

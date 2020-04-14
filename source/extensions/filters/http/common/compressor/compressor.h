@@ -62,7 +62,7 @@ public:
   CompressorFilterConfig() = delete;
   virtual ~CompressorFilterConfig() = default;
 
-  virtual std::unique_ptr<Envoy::Compressor::Compressor> makeCompressor() PURE;
+  virtual Envoy::Compressor::CompressorPtr makeCompressor() PURE;
 
   bool enabled() const { return enabled_.enabled(); }
   const CompressorStats& stats() { return stats_; }
@@ -149,7 +149,7 @@ private:
   bool shouldCompress(const EncodingDecision& decision) const;
 
   bool skip_compression_;
-  std::unique_ptr<Envoy::Compressor::Compressor> compressor_;
+  Envoy::Compressor::CompressorPtr compressor_;
   const CompressorFilterConfigSharedPtr config_;
   std::unique_ptr<std::string> accept_encoding_;
 };

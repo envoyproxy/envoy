@@ -26,5 +26,7 @@ public:
   virtual void compress(Buffer::Instance& buffer, State state) PURE;
 };
 
+using CompressorPtr = std::unique_ptr<Compressor>;
+
 } // namespace Compressor
 } // namespace Envoy

@@ -20,7 +20,7 @@ public:
   GzipFilterConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip,
                    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
 
-  std::unique_ptr<Compressor::Compressor> makeCompressor() override;
+  Compressor::CompressorPtr makeCompressor() override;
 
   Compressor::ZlibCompressorImpl::CompressionLevel compressionLevel() const {
     return compression_level_;

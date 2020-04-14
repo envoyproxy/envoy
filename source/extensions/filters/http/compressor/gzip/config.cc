@@ -74,7 +74,7 @@ GzipCompressorFactory::compressionStrategyEnum(
   }
 }
 
-std::unique_ptr<Envoy::Compressor::Compressor> GzipCompressorFactory::createCompressor() {
+Envoy::Compressor::CompressorPtr GzipCompressorFactory::createCompressor() {
   auto compressor = std::make_unique<Envoy::Compressor::ZlibCompressorImpl>(chunk_size_);
   compressor->init(compression_level_, compression_strategy_, window_bits_, memory_level_);
   return compressor;
