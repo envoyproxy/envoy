@@ -112,6 +112,11 @@ public:
   static bool authorityIsValid(const absl::string_view authority_value);
 
   /**
+   * @brief a helper function to determine if the headers represent a CONNECT request.
+   */
+  static bool isConnect(const RequestHeaderMap& headers);
+
+  /**
    * Add headers from one HeaderMap to another
    * @param headers target where headers will be added
    * @param headers_to_add supplies the headers to be added

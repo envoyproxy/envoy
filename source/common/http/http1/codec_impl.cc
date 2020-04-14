@@ -167,8 +167,8 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     } else {
       encodeFormattedHeader(Headers::get().TransferEncoding.get(),
                             Headers::get().TransferEncodingValues.Chunked);
-      // We do not apply chunk encoding for HTTP upgrades.
-      // If there is a body in a WebSocket Upgrade response, the chunks will be
+      // We do not apply chunk encoding for HTTP upgrades, including CONNECT style upgrades.
+      // If there is a body in a response on the upgrade path, the chunks will be
       // passed through via maybeDirectDispatch so we need to avoid appending
       // extra chunk boundaries.
       //
@@ -804,8 +804,8 @@ int ServerConnectionImpl::onHeadersComplete() {
 
     // Inform the response encoder about any HEAD method, so it can set content
     // length and transfer encoding headers correctly.
-    active_request.response_encoder_.isResponseToHeadRequest(parser_.method == HTTP_HEAD);
-    active_request.response_encoder_.isResponseToConnectRequest(parser_.method == HTTP_CONNECT);
+    active_request.response_encoder_.setIsResponseToHeadRequest(parser_.method == HTTP_HEAD);
+    active_request.response_encoder_.setIsResponseToConnectRequest(parser_.method == HTTP_CONNECT);
 
     handlePath(*headers, parser_.method);
     ASSERT(active_request.request_url_.empty());

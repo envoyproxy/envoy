@@ -151,7 +151,7 @@ void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& hea
     buildHeaders(final_headers, *modified_headers);
   } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
-    modified_headers->setProtocol("bytestream");
+    modified_headers->setProtocol(Headers::get().ProtocolValues.Bytestream);
     buildHeaders(final_headers, *modified_headers);
   } else {
     buildHeaders(final_headers, headers);

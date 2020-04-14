@@ -858,10 +858,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
   // TODO(alyssawilk) remove this synthetic path in a follow-up PR, including
-  // auditing of empty path headers.
-  if (Http::Headers::get().MethodValues.Connect ==
-          request_headers_->Method()->value().getStringView() &&
-      !request_headers_->Path()) {
+  // auditing of empty path headers, and make sure the CONNECT firstline is a host:port.
+  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) {
     request_headers_->setPath("/");
   }
   // Currently we only support relative paths at the application layer. We expect the codec to have
@@ -929,8 +927,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
   if (hasCachedRoute()) {
-    if (upgrade_rejected) {
-      // Do not allow upgrades if the route does not support it.
+    if (upgrade_rejected) { // Do not allow upgrades if the route does not support it.
+      // While downstream servers should not send upgrade payload without the upgrade being
+      // accepeted, err on the side of caution and refuse to process any further requests on this
+      // connection, to avoid a class of HTTP/1.1 smuggling bugs where Upgrade or CONNECT payload
+      // contians a smuggled HTTP request.
       state_.saw_connection_close_ = true;
       // TODO(alyssawilk) can we rename this or should we just comment that it's
       // for all upgrades?
@@ -2013,11 +2014,10 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
     return false;
   }
   bool upgrade_rejected = false;
-  auto upgrade = request_headers_ ? request_headers_->Upgrade() : nullptr;
+  const Envoy::Http::HeaderEntry* upgrade =
+      request_headers_ ? request_headers_->Upgrade() : nullptr;
   // Treat CONNECT requests as a special upgrade case.
-  if (!upgrade && request_headers_ && request_headers_->Method() &&
-      Http::Headers::get().MethodValues.Connect ==
-          request_headers_->Method()->value().getStringView()) {
+  if (!upgrade && request_headers_ && HeaderUtility::isConnect(*request_headers_)) {
     upgrade = request_headers_->Method();
   }
   state_.created_filter_chain_ = true;

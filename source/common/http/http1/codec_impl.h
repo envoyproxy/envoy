@@ -71,8 +71,8 @@ public:
   absl::string_view responseDetails() override { return details_; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
 
-  void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
-  void isResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
+  void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
+  void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
 
 protected:

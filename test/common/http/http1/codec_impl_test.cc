@@ -907,7 +907,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAllowed) {
       {":method", "GET"},
       {"foo_bar", "bar"},
   };
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
   codec_->dispatch(buffer);
@@ -929,7 +929,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAreDropped) {
       {":path", "/"},
       {":method", "GET"},
   };
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
   codec_->dispatch(buffer);
@@ -1544,13 +1544,13 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestNoContentLength) {
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
-  Buffer::OwnedImpl buffer("CONNECT / HTTP/1.1\r\n\r\n");
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\n\r\n");
   codec_->dispatch(buffer);
 
   Buffer::OwnedImpl expected_data("abcd");
   Buffer::OwnedImpl connect_payload("abcd");
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
   codec_->dispatch(connect_payload);
 }
 
@@ -1562,9 +1562,9 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithEarlyData) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl expected_data("abcd");
-  EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
-  Buffer::OwnedImpl buffer("CONNECT / HTTP/1.1\r\n\r\nabcd");
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+  Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\n\r\nabcd");
   codec_->dispatch(buffer);
 }
 
@@ -1579,9 +1579,10 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithTEChunked) {
   // body to see if there is a non-zero byte chunk. It will instead pass it
   // through.
   Buffer::OwnedImpl expected_data("12345abcd");
-  EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
-  Buffer::OwnedImpl buffer("CONNECT / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n12345abcd");
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+  Buffer::OwnedImpl buffer(
+      "CONNECT host:80 HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n12345abcd");
   codec_->dispatch(buffer);
 }
 
@@ -1595,9 +1596,9 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithContentLength) {
   // Make sure we avoid the deferred_end_stream_headers_ optimization for
   // requests-with-no-body.
   Buffer::OwnedImpl expected_data("abcd");
-  EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
-  Buffer::OwnedImpl buffer("CONNECT / HTTP/1.1\r\ncontent-length: 0\r\n\r\nabcd");
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+  Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\ncontent-length: 0\r\n\r\nabcd");
   codec_->dispatch(buffer);
 }
 
@@ -1964,13 +1965,13 @@ TEST_F(Http1ClientConnectionImplTest, ConnectResponse) {
   // Send body payload
   Buffer::OwnedImpl expected_data1("12345");
   Buffer::OwnedImpl body("12345");
-  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data1), false)).Times(1);
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data1), false));
   codec_->dispatch(body);
 
   // Send connect payload
   Buffer::OwnedImpl expected_data2("abcd");
   Buffer::OwnedImpl connect_payload("abcd");
-  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data2), false)).Times(1);
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data2), false));
   codec_->dispatch(connect_payload);
 }
 
@@ -2006,7 +2007,7 @@ TEST_F(Http1ClientConnectionImplTest, ConnectRejected) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl expected_data("12345abcd");
-  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl response("HTTP/1.1 400 OK\r\n\r\n12345abcd");
   codec_->dispatch(response);
 }

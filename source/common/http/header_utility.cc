@@ -157,6 +157,10 @@ bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
                                  header_value.size()) != 0;
 }
 
+bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
+  return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
+}
+
 void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
   headers_to_add.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
