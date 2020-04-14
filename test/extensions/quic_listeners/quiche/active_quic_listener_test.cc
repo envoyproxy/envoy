@@ -55,9 +55,9 @@ protected:
 
   ActiveQuicListenerTest()
       : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
-        dispatcher_(api_->allocateDispatcher()), clock_(*dispatcher_),
+        dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
-        connection_handler_(*dispatcher_, "test_thread") {}
+        connection_handler_(*dispatcher_) {}
 
   void SetUp() override {
     listen_socket_ =

@@ -15,7 +15,7 @@ namespace Quic {
 TEST(EnvoyQuicClockTest, TestNow) {
   Event::SimulatedTimeSystemHelper time_system;
   Api::ApiPtr api = Api::createApiForTest(time_system);
-  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   EnvoyQuicClock clock(*dispatcher);
   uint64_t mono_time = std::chrono::duration_cast<std::chrono::microseconds>(
                            time_system.monotonicTime().time_since_epoch())
@@ -44,7 +44,7 @@ TEST(EnvoyQuicClockTest, TestNow) {
 TEST(EnvoyQuicClockTest, TestMonotonicityWithReadTimeSystem) {
   Event::TestRealTimeSystem time_system;
   Api::ApiPtr api = Api::createApiForTest(time_system);
-  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   EnvoyQuicClock clock(*dispatcher);
   quic::QuicTime last_now = clock.Now();
   for (int i = 0; i < 1000; ++i) {
@@ -57,7 +57,7 @@ TEST(EnvoyQuicClockTest, TestMonotonicityWithReadTimeSystem) {
 TEST(EnvoyQuicClockTest, ApproximateNow) {
   Event::SimulatedTimeSystemHelper time_system;
   Api::ApiPtr api = Api::createApiForTest(time_system);
-  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   EnvoyQuicClock clock(*dispatcher);
 
   // ApproximateTime() is cached, it not change only because time passes.

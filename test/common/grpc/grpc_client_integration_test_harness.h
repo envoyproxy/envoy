@@ -226,7 +226,8 @@ public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())),
-        dispatcher_(api_->allocateDispatcher()), http_context_(stats_store_->symbolTable()) {}
+        dispatcher_(api_->allocateDispatcher("test_thread")),
+        http_context_(stats_store_->symbolTable()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {

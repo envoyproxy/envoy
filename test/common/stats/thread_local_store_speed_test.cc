@@ -50,7 +50,7 @@ public:
   }
 
   void initThreading() {
-    dispatcher_ = api_->allocateDispatcher();
+    dispatcher_ = api_->allocateDispatcher("test_thread");
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     store_.initializeThreading(*dispatcher_, *tls_);
   }

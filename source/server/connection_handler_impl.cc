@@ -15,9 +15,8 @@
 namespace Envoy {
 namespace Server {
 
-ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
-                                             const std::string& per_handler_stat_prefix)
-    : dispatcher_(dispatcher), per_handler_stat_prefix_(per_handler_stat_prefix + "."),
+ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher)
+    : dispatcher_(dispatcher), per_handler_stat_prefix_(dispatcher.name() + "."),
       disable_listeners_(false) {}
 
 void ConnectionHandlerImpl::incNumConnections() { ++num_handler_connections_; }

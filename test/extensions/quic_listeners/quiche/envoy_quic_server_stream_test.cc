@@ -27,7 +27,7 @@ namespace Quic {
 class EnvoyQuicServerStreamTest : public testing::TestWithParam<bool> {
 public:
   EnvoyQuicServerStreamTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());

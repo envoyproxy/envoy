@@ -30,7 +30,7 @@ public:
   FilesystemSubscriptionTestHarness()
       : path_(TestEnvironment::temporaryPath("eds.json")),
         api_(Api::createApiForTest(stats_store_, simTime())),
-        dispatcher_(api_->allocateDispatcher()),
+        dispatcher_(api_->allocateDispatcher("test_thread")),
         subscription_(*dispatcher_, path_, callbacks_, stats_, validation_visitor_, *api_) {}
 
   ~FilesystemSubscriptionTestHarness() override { TestEnvironment::removePath(path_); }

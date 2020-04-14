@@ -15,19 +15,18 @@ namespace Server {
 
 WorkerPtr ProdWorkerFactory::createWorker(OverloadManager& overload_manager,
                                           const std::string& worker_name) {
-  Event::DispatcherPtr dispatcher(api_.allocateDispatcher());
-  return WorkerPtr{new WorkerImpl(
-      tls_, hooks_, std::move(dispatcher),
-      Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(*dispatcher, worker_name)},
-      overload_manager, api_, worker_name)};
+  Event::DispatcherPtr dispatcher(api_.allocateDispatcher(worker_name));
+  return WorkerPtr{
+      new WorkerImpl(tls_, hooks_, std::move(dispatcher),
+                     Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(*dispatcher)},
+                     overload_manager, api_)};
 }
 
 WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
-                       OverloadManager& overload_manager, Api::Api& api,
-                       const std::string& worker_name)
+                       OverloadManager& overload_manager, Api::Api& api)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
-      api_(api), worker_name_(worker_name) {
+      api_(api) {
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -75,9 +74,7 @@ void WorkerImpl::start(GuardDog& guard_dog) {
       api_.threadFactory().createThread([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
 }
 
-void WorkerImpl::initializeStats(Stats::Scope& scope, const std::string& prefix) {
-  dispatcher_->initializeStats(scope, prefix);
-}
+void WorkerImpl::initializeStats(Stats::Scope& scope) { dispatcher_->initializeStats(scope); }
 
 void WorkerImpl::stop() {
   // It's possible for the server to cleanly shut down while cluster initialization during startup
@@ -104,7 +101,8 @@ void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   // The watch dog must be created after the dispatcher starts running and has post events flushed,
   // as this is when TLS stat scopes start working.
   dispatcher_->post([this, &guard_dog]() {
-    watch_dog_ = guard_dog.createWatchDog(api_.threadFactory().currentThreadId(), worker_name_);
+    watch_dog_ =
+        guard_dog.createWatchDog(api_.threadFactory().currentThreadId(), dispatcher_->name());
     watch_dog_->startWatchdog(*dispatcher_);
   });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
