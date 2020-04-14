@@ -384,3 +384,11 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "status_test",
+    srcs = ["status_test.cc"],
+    deps = [
+        "//source/common/http:status_lib",
+    ],
+)

@@ -17,7 +17,7 @@ namespace {
 
 class InternalFactory : public Config::UntypedFactory {
 public:
-  virtual ~InternalFactory() = default;
+  ~InternalFactory() override = default;
   std::string category() const override { return ""; }
 };
 
@@ -50,7 +50,7 @@ TEST(RegistryTest, InternalFactoryNotPublished) {
 
 class PublishedFactory : public Config::UntypedFactory {
 public:
-  virtual ~PublishedFactory() = default;
+  ~PublishedFactory() override = default;
   std::string category() const override { return "testing.published"; }
 };
 
@@ -174,6 +174,12 @@ TEST(RegistryTest, DEPRECATED_FEATURE_TEST(VersionedWithDeprecatedNamesFactory))
           ->second->getFactoryVersion("testing.published.versioned.deprecated_name");
   EXPECT_TRUE(deprecated_version.has_value());
   EXPECT_THAT(deprecated_version.value(), ProtoEq(version.value()));
+}
+
+TEST(RegistryTest, TestDoubleRegistrationByName) {
+  EXPECT_THROW_WITH_MESSAGE((Registry::RegisterFactory<TestPublishedFactory, PublishedFactory>()),
+                            EnvoyException,
+                            "Double registration for name: 'testing.published.test'");
 }
 
 } // namespace

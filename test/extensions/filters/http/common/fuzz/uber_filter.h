@@ -76,7 +76,7 @@ public:
       headers.setHost("foo.com");
     }
 
-    if (data.data().size() == 0 && !data.has_trailers()) {
+    if (data.data().empty() && !data.has_trailers()) {
       end_stream = true;
     }
     ENVOY_LOG_MISC(debug, "Decoding headers: {} ", data.headers().DebugString());
@@ -127,8 +127,8 @@ public:
   }
 
   void reset() {
-    if (filter_.get() != nullptr) {
-      filter_.get()->onDestroy();
+    if (filter_ != nullptr) {
+      filter_->onDestroy();
     }
     filter_.reset();
   }
