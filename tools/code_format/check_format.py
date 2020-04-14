@@ -18,7 +18,7 @@ import paths
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
                      "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
-                     "./tools/pyformat/")
+                     "./tools/pyformat/", "./third_party/")
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
             ".rst")
 DOCS_SUFFIX = (".md", ".rst")
@@ -42,6 +42,12 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
                        "./test/test_common/test_time.cc", "./test/test_common/test_time.h",
                        "./test/test_common/utility.cc", "./test/test_common/utility.h",
                        "./test/integration/integration.h")
+
+# Tests in these paths may make use of the Registry::RegisterFactory constructor or the
+# REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
+# perform temporary registrations.
+REGISTER_FACTORY_TEST_WHITELIST = ("./test/common/config/registry_test.cc",
+                                   "./test/integration/clusters/", "./test/integration/filters/")
 
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = (
@@ -312,6 +318,13 @@ def whitelistedForRealTime(file_path):
   return file_path in REAL_TIME_WHITELIST
 
 
+def whitelistedForRegisterFactory(file_path):
+  if not file_path.startswith("./test/"):
+    return True
+
+  return any(file_path.startswith(prefix) for prefix in REGISTER_FACTORY_TEST_WHITELIST)
+
+
 def whitelistedForSerializeAsString(file_path):
   return file_path in SERIALIZE_AS_STRING_WHITELIST
 
@@ -396,30 +409,52 @@ def hasInvalidAngleBracketDirectory(line):
   return subdir in SUBDIR_SET
 
 
-VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]*): ([a-z:`]+)")
-VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile("^====[=]+$")
+VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
+VERSION_HISTORY_NEW_SECTION_REGEX = re.compile("^-----[-]+$")
+RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
+# Check for punctuation in a terminal ref clause, e.g.
+# :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
+REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
 
 
 def checkCurrentReleaseNotes(file_path, error_messages):
-  in_current_release = False
+  in_changes_section = False
 
   first_word_of_prior_line = ''
   next_word_to_check = ''  # first word after :
+  prior_line = ''
+
+  def endsWithPeriod(prior_line):
+    if not prior_line:
+      return True  # Don't punctuation-check empty lines.
+    if prior_line.endswith('.'):
+      return True  # Actually ends with .
+    if prior_line.endswith('`') and REF_WITH_PUNCTUATION_REGEX.match(prior_line):
+      return True  # The text in the :ref ends with a .
+    return False
+
   for line_number, line in enumerate(readLines(file_path)):
 
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
-    if VERSION_HISTORY_NEW_RELEASE_REGEX.match(line):
-      # If we were in the section for the current release this means we have passed it.
-      if in_current_release:
+    if VERSION_HISTORY_NEW_SECTION_REGEX.match(line):
+      # The second section is deprecations, which are not sorted.
+      if in_changes_section:
         break
-      # If we see a version marker we are now in the section for the current release.
-      in_current_release = True
+      # If we see a section marker we are now in the changes section.
+      in_changes_section = True
 
-    # Do basic alphabetization checks of the first word on the line and the
-    # first word after the :
+    # make sure flags are surrounded by ``s
+    flag_match = RELOADABLE_FLAG_REGEX.match(line)
+    if flag_match:
+      if not flag_match.groups()[0].startswith('`'):
+        reportError("Flag `%s` should be enclosed in back ticks" % flag_match.groups()[1])
+
     if line.startswith("*"):
+      if not endsWithPeriod(prior_line):
+        reportError("The following release note does not end with a '.'\n %s" % prior_line)
+
       match = VERSION_HISTORY_NEW_LINE_REGEX.match(line)
       if not match:
         reportError("Version history line malformed. "
@@ -427,6 +462,8 @@ def checkCurrentReleaseNotes(file_path, error_messages):
       else:
         first_word = match.groups()[0]
         next_word = match.groups()[1]
+        # Do basic alphabetization checks of the first word on the line and the
+        # first word after the :
         if first_word_of_prior_line and first_word_of_prior_line > first_word:
           reportError(
               "Version history not in alphabetical order (%s vs %s): please check placement of line\n %s. "
@@ -438,11 +475,19 @@ def checkCurrentReleaseNotes(file_path, error_messages):
         first_word_of_prior_line = first_word
         next_word_to_check = next_word
 
+        prior_line = line
+    elif not line:
+      # If we hit the end of this release note block block, check the prior line.
+      if not endsWithPeriod(prior_line):
+        reportError("The following release note does not end with a '.'\n %s" % prior_line)
+    elif prior_line:
+      prior_line += line
+
 
 def checkFileContents(file_path, checker):
   error_messages = []
 
-  if file_path.endswith("version_history.rst"):
+  if file_path.endswith("version_history/current.rst"):
     # Version file checking has enough special cased logic to merit its own checks.
     # This only validates entries for the current release as very old release
     # notes have a different format.
@@ -556,6 +601,10 @@ def checkSourceLine(line, file_path, reportError):
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  if not whitelistedForRegisterFactory(file_path):
+    if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
+      reportError("Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
+                  "use Registry::InjectFactory instead.")
   if not whitelistedForUnpackTo(file_path):
     if "UnpackTo" in line:
       reportError("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
