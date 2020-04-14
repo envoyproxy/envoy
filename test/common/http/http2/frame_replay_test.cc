@@ -91,7 +91,8 @@ TEST_F(ResponseFrameCommentTest, SimpleExampleHuffman) {
   ClientCodecFrameInjector codec;
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
-      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+      ProdNghttp2SessionFactory::get());
   setupStream(codec, connection);
 
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
@@ -170,7 +171,8 @@ TEST_F(ResponseFrameCommentTest, SimpleExamplePlain) {
   ClientCodecFrameInjector codec;
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
-      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+      ProdNghttp2SessionFactory::get());
   setupStream(codec, connection);
 
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
@@ -233,7 +235,8 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       ClientCodecFrameInjector codec;
       TestClientConnectionImpl connection(
           codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
-          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+          ProdNghttp2SessionFactory::get());
       setupStream(codec, connection);
 
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
@@ -307,7 +310,8 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       ClientCodecFrameInjector codec;
       TestClientConnectionImpl connection(
           codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
-          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+          ProdNghttp2SessionFactory::get());
       setupStream(codec, connection);
 
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
