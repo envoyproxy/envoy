@@ -26,7 +26,7 @@ std::string prefixLogFormatWithLocation(const std::string& log_format) {
   std::string result;
   for (size_t i = 0; i < log_format.size(); ++i) {
     if (i + 1 < log_format.size() && log_format[i] == '%') {
-      if (log_format[i] == 'v') {
+      if (log_format[i + 1] == 'v') {
         result += "[%g:%#] ";
       }
       // Print '%' and go directly to the next character.
