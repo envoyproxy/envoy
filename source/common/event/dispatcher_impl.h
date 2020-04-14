@@ -101,7 +101,7 @@ private:
     return run_tid_.isEmpty() || run_tid_ == api_.threadFactory().currentThreadId();
   }
 
-  std::string name_;
+  const std::string name_;
   Api::Api& api_;
   std::string stats_prefix_;
   std::unique_ptr<DispatcherStats> stats_;
