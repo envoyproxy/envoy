@@ -25,6 +25,16 @@ HttpTracerManagerImpl::getOrCreateHttpTracer(const envoy::config::trace::v3::Tra
   }
 
   // Free memory held by expired weak references.
+  //
+  // Given that:
+  //
+  // * HttpTracer is obtained only once per listener lifecycle
+  // * in a typical case, all listeners will have identical tracing configuration and, consequently,
+  //   will share the same HttpTracer instance
+  // * amount of memory held by an expired weak reference is minimal
+  //
+  // it seems reasonable to avoid introducing an external sweeper and only reclaim memory at
+  // the moment when a new HttpTracer instance is about to be created.
   removeExpiredCacheEntries();
 
   // Initialize a new tracer.
