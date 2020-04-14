@@ -72,8 +72,6 @@ TEST(ActiveQuicListenerConfigTest, QuicListenerEnabledByDefault) {
   Network::ActiveUdpListenerFactoryPtr listener_factory =
       config_factory.createActiveUdpListenerFactory(*config, /*concurrency=*/1);
   EXPECT_NE(nullptr, listener_factory);
-  quic::QuicConfig& quic_config = ActiveQuicListenerFactoryPeer::quicConfig(
-      dynamic_cast<ActiveQuicListenerFactory&>(*listener_factory));
   envoy::config::core::v3::RuntimeFeatureFlag& runtime_enabled =
       ActiveQuicListenerFactoryPeer::runtimeEnabled(
           dynamic_cast<ActiveQuicListenerFactory&>(*listener_factory));
