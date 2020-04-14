@@ -684,7 +684,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     active_shadow_policies_.clear();
 
     // If we had to abandon buffering and there's no request in progress, abort the request and
-    // cleanup.
+    // clean up. This happens if the initial upstream request failed, and we are currently waiting
+    // for a backoff timer before starting the next upstream attempt.
     if (upstream_requests_.empty()) {
       cleanup();
       callbacks_->sendLocalReply(
@@ -745,8 +746,7 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
 Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_map) {
   Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
   if (!upstream_requests_.empty()) {
-    // TODO: buffer this if there's no request? It doesn't look like the upstream request has
-    // any handling for metadata in retries already, so I don't think this is a regression.
+    // TODO(soya3129): Save metadata for retry, redirect and shadowing case.
     upstream_requests_.front()->encodeMetadata(std::move(metadata_map_ptr));
   }
   return Http::FilterMetadataStatus::Continue;
