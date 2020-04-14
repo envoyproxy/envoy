@@ -944,6 +944,7 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Add secondary cluster to the list of static resources.
       auto* eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       eds_cluster->set_name("eds_cluster");
       eds_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
