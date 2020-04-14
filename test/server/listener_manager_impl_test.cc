@@ -11,7 +11,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
-#include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/listener_manager.h"
 
@@ -3370,12 +3369,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     std::string name() const override { return "test.listener.original_dst"; }
   };
 
-  /**
-   * Static registration for the original dst filter. @see RegisterFactory.
-   */
-  static Registry::RegisterFactory<OriginalDstTestConfigFactory,
-                                   Configuration::NamedListenerFilterConfigFactory>
-      registered_;
+  OriginalDstTestConfigFactory factory;
+  Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
 
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -3448,12 +3443,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     std::string name() const override { return "test.listener.original_dstipv6"; }
   };
 
-  /**
-   * Static registration for the original dst filter. @see RegisterFactory.
-   */
-  static Registry::RegisterFactory<OriginalDstTestConfigFactory,
-                                   Configuration::NamedListenerFilterConfigFactory>
-      registered_;
+  OriginalDstTestConfigFactory factory;
+  Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
 
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -3842,7 +3833,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
 // Validate that dispatcher stats prefix is set correctly when enabled.
 TEST_F(ListenerManagerImplWithDispatcherStatsTest, DispatherStatsWithCorrectPrefix) {
   EXPECT_CALL(*worker_, start(_));
-  EXPECT_CALL(*worker_, initializeStats(_, "worker_0."));
+  EXPECT_CALL(*worker_, initializeStats(_));
   manager_->startWorkers(guard_dog_);
 }
 
