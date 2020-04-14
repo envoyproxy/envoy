@@ -49,18 +49,33 @@ using CompressionParams =
     std::tuple<Envoy::Compressor::ZlibCompressorImpl::CompressionLevel,
                Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy, int64_t, uint64_t>;
 
+static constexpr uint64_t TestDataSize = 122880;
+
+Buffer::OwnedImpl generateTestData() {
+  Buffer::OwnedImpl data;
+  TestUtility::feedBufferWithRandomCharacters(data, TestDataSize);
+  return data;
+}
+
+const Buffer::OwnedImpl& testData() { CONSTRUCT_ON_FIRST_USE(Buffer::OwnedImpl, generateTestData()); }
+
 static std::vector<Buffer::OwnedImpl> generateChunks(const uint64_t chunk_count,
                                                      const uint64_t chunk_size) {
   std::vector<Buffer::OwnedImpl> vec;
   vec.reserve(chunk_count);
 
-  Buffer::OwnedImpl data;
-  TestUtility::feedBufferWithRandomCharacters(data, chunk_size);
+  const auto& test_data = testData();
+  uint64_t added = 0;
 
   for (uint64_t i = 0; i < chunk_count; ++i) {
     Buffer::OwnedImpl chunk;
-    chunk.add(data);
+    std::unique_ptr<char[]> data(new char[chunk_size]);
+
+    test_data.copyOut(added, chunk_size, data.get());
+    chunk.add(absl::string_view(data.get(), chunk_size));
     vec.push_back(std::move(chunk));
+
+    added += chunk_size;
   }
 
   return vec;
@@ -144,15 +159,30 @@ Load Average: 1.82, 1.72, 1.74
 Benchmark                  Time             CPU   Iterations
 ------------------------------------------------------------
 ....
-
-CompressChunks8192/2           2971499 ns      2967258 ns          248
-CompressChunks8192/2           3015538 ns      3008694 ns          248
-CompressChunks8192/2           2919954 ns      2907698 ns          248
-CompressChunks8192/2           2838894 ns      2831851 ns          248
-CompressChunks8192/2           2867619 ns      2865883 ns          248
-CompressChunks8192/2_mean      2922701 ns      2916277 ns            5
-CompressChunks8192/2_median    2919954 ns      2907698 ns            5
-CompressChunks8192/2_stddev      72569 ns        72251 ns            5
+compressFull/0/manual_time              14.1 ms         14.3 ms           48
+compressFull/1/manual_time              7.06 ms         7.22 ms          104
+compressFull/2/manual_time              5.17 ms         5.33 ms          123
+compressFull/3/manual_time              15.4 ms         15.5 ms           45
+compressFull/4/manual_time              10.1 ms         10.3 ms           69
+compressFull/5/manual_time              15.8 ms         16.0 ms           40
+compressFull/6/manual_time              15.3 ms         15.5 ms           42
+compressFull/7/manual_time              9.91 ms         10.1 ms           71
+compressFull/8/manual_time              15.8 ms         16.0 ms           45
+compressChunks16384/0/manual_time       13.4 ms         13.5 ms           52
+compressChunks16384/1/manual_time       6.33 ms         6.48 ms          111
+compressChunks16384/2/manual_time       5.09 ms         5.27 ms          147
+compressChunks16384/3/manual_time       15.1 ms         15.3 ms           46
+compressChunks16384/4/manual_time       9.61 ms         9.78 ms           71
+compressChunks16384/5/manual_time       14.5 ms         14.6 ms           47
+compressChunks16384/6/manual_time       14.0 ms         14.1 ms           48
+compressChunks16384/7/manual_time       9.20 ms         9.36 ms           76
+compressChunks16384/8/manual_time       14.5 ms         14.6 ms           48
+compressChunks8192/0/manual_time        14.3 ms         14.5 ms           50
+compressChunks8192/1/manual_time        6.80 ms         6.96 ms          100
+compressChunks8192/2/manual_time        5.21 ms         5.36 ms          135
+compressChunks8192/3/manual_time        14.9 ms         15.0 ms           47
+compressChunks8192/4/manual_time        9.71 ms         9.87 ms           68
+compressChunks8192/5/manual_time        15.9 ms         16.1 ms           45
 ....
 */
 // SPELLCHECKER(on)
