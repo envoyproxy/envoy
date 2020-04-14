@@ -92,7 +92,7 @@ TEST_F(ResponseFrameCommentTest, SimpleExampleHuffman) {
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-      std::make_unique<ProdNghttp2SessionFactory>());
+      ProdNghttp2SessionFactory::get());
   setupStream(codec, connection);
 
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
@@ -172,7 +172,7 @@ TEST_F(ResponseFrameCommentTest, SimpleExamplePlain) {
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-      std::make_unique<ProdNghttp2SessionFactory>());
+      ProdNghttp2SessionFactory::get());
   setupStream(codec, connection);
 
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
@@ -236,7 +236,7 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       TestClientConnectionImpl connection(
           codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
           Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-          std::make_unique<ProdNghttp2SessionFactory>());
+          ProdNghttp2SessionFactory::get());
       setupStream(codec, connection);
 
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
@@ -311,7 +311,7 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       TestClientConnectionImpl connection(
           codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
           Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-          std::make_unique<ProdNghttp2SessionFactory>());
+          ProdNghttp2SessionFactory::get());
       setupStream(codec, connection);
 
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);

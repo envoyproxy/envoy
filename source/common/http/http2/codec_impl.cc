@@ -1149,14 +1149,14 @@ ClientConnectionImpl::ClientConnectionImpl(
     Network::Connection& connection, Http::ConnectionCallbacks& callbacks, Stats::Scope& stats,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count,
-    Nghttp2SessionFactoryPtr&& http2_session_factory)
+    Nghttp2SessionFactory& http2_session_factory)
     : ConnectionImpl(connection, stats, http2_options, max_response_headers_kb,
                      max_response_headers_count),
-      callbacks_(callbacks), http2_session_factory_(std::move(http2_session_factory)) {
+      callbacks_(callbacks) {
   ClientHttp2Options client_http2_options(http2_options);
-  session_ = http2_session_factory_->create(http2_callbacks_.callbacks(), base(),
-                                            client_http2_options.options());
-  http2_session_factory_->init(session_, base(), http2_options);
+  session_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
+                                          client_http2_options.options());
+  http2_session_factory.init(session_, base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
 }
 

@@ -78,8 +78,7 @@ public:
     http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
         client_connection_, client_callbacks_, stats_store_, client_http2_options_,
-        max_request_headers_kb_, max_response_headers_count_,
-        std::make_unique<ProdNghttp2SessionFactory>());
+        max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, stats_store_, server_http2_options_,
         max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
@@ -1002,8 +1001,7 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   http2OptionsFromTuple(server_http2_options_, ::testing::get<1>(GetParam()));
   client_ = std::make_unique<TestClientConnectionImpl>(
       client_connection_, client_callbacks_, stats_store_, client_http2_options_,
-      max_request_headers_kb_, max_response_headers_count_,
-      std::make_unique<ProdNghttp2SessionFactory>());
+      max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
   server_ = std::make_unique<TestServerConnectionImpl>(
       server_connection_, server_callbacks_, stats_store_, server_http2_options_,
       max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
@@ -1797,10 +1795,10 @@ public:
       Network::Connection& connection, Http::ConnectionCallbacks& callbacks, Stats::Scope& scope,
       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
       uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
-      Nghttp2SessionFactoryPtr&& http2_session_factory)
+      Nghttp2SessionFactory& http2_session_factory)
       : TestClientConnectionImpl(connection, callbacks, scope, http2_options,
                                  max_request_headers_kb, max_request_headers_count,
-                                 std::move(http2_session_factory)) {}
+                                 http2_session_factory) {}
 
   // Overrides TestClientConnectionImpl::submitMetadata().
   bool submitMetadata(const MetadataMapVector& metadata_map_vector, int32_t stream_id) override {
@@ -1878,8 +1876,7 @@ protected:
     http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<MetadataTestClientConnectionImpl>(
         client_connection_, client_callbacks_, stats_store_, client_http2_options_,
-        max_request_headers_kb_, max_response_headers_count_,
-        std::make_unique<TestNghttp2SessionFactory>());
+        max_request_headers_kb_, max_response_headers_count_, http2_session_factory_);
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, stats_store_, server_http2_options_,
         max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
@@ -1892,6 +1889,9 @@ protected:
           client_wrapper_.dispatch(data, *client_);
         }));
   }
+
+private:
+  TestNghttp2SessionFactory http2_session_factory_;
 };
 
 // Validates noop handling of METADATA frames without a known stream ID.

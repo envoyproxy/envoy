@@ -100,6 +100,14 @@ public:
 
   void init(nghttp2_session* session, ConnectionImpl* connection,
             const envoy::config::core::v3::Http2ProtocolOptions& options) override;
+
+  // Returns a global factory instance. Note that this is possible because no internal state is
+  // maintained; the thread safety of create() and init()'s side effects is guaranteed by Envoy's
+  // worker based threading model.
+  static ProdNghttp2SessionFactory& get() {
+    static ProdNghttp2SessionFactory* instance = new ProdNghttp2SessionFactory();
+    return *instance;
+  }
 };
 
 /**
@@ -504,7 +512,7 @@ public:
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
                        const uint32_t max_response_headers_count,
-                       Nghttp2SessionFactoryPtr&& http2_session_factory);
+                       Nghttp2SessionFactory& http2_session_factory);
 
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
@@ -527,7 +535,6 @@ private:
   bool checkInboundFrameLimits() override { return true; }
 
   Http::ConnectionCallbacks& callbacks_;
-  Nghttp2SessionFactoryPtr http2_session_factory_;
 };
 
 /**

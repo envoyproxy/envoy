@@ -18,7 +18,7 @@ void Replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-      std::make_unique<ProdNghttp2SessionFactory>());
+      ProdNghttp2SessionFactory::get());
   // Create a new stream.
   codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
   codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);

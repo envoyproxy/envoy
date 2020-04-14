@@ -157,7 +157,7 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
         *connection_, *this, host->cluster().statsScope(), host->cluster().http2Options(),
         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount(),
-        std::make_unique<Http2::ProdNghttp2SessionFactory>());
+        Http2::ProdNghttp2SessionFactory::get());
     break;
   }
   case Type::HTTP3: {
