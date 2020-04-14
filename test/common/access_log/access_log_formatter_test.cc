@@ -1345,6 +1345,58 @@ TEST(AccessLogFormatterTest, StartTimeFormatter) {
   }
 }
 
+TEST(AccessLogFormatterTest, GrpcStatusFormatterTest) {
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+
+  std::array<std::string, 17> grpc_statuses{
+      "OK",       "Canceled",       "Unknown",          "InvalidArgument",   "DeadlineExceeded",
+      "NotFound", "AlreadyExists",  "PermissionDenied", "ResourceExhausted", "FailedPrecondition",
+      "Aborted",  "OutOfRange",     "Unimplemented",    "Internal",          "Unavailable",
+      "DataLoss", "Unauthenticated"};
+  for (size_t i = 0; i < grpc_statuses.size(); ++i) {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
+    EXPECT_EQ(grpc_statuses[i],
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(ValueUtil::stringValue("-1")));
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(ValueUtil::stringValue("42738")));
+    response_trailer.clear();
+  }
+  {
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(ValueUtil::stringValue("-1")));
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(ValueUtil::stringValue("42738")));
+    response_header.clear();
+  }
+}
+
 void verifyJsonOutput(std::string json_string,
                       std::unordered_map<std::string, std::string> expected_map) {
   const auto parsed = Json::Factory::loadFromString(json_string);

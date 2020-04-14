@@ -85,5 +85,47 @@ uint64_t Utility::grpcToHttpStatus(Status::GrpcStatus grpc_status) {
   }
 }
 
+std::string Utility::grpcStatusToString(Status::GrpcStatus grpc_status) {
+  switch (grpc_status) {
+  case Status::WellKnownGrpcStatus::Ok:
+    return "OK";
+  case Status::WellKnownGrpcStatus::Canceled:
+    return "Canceled";
+  case Status::WellKnownGrpcStatus::Unknown:
+    return "Unknown";
+  case Status::WellKnownGrpcStatus::InvalidArgument:
+    return "InvalidArgument";
+  case Status::WellKnownGrpcStatus::DeadlineExceeded:
+    return "DeadlineExceeded";
+  case Status::WellKnownGrpcStatus::NotFound:
+    return "NotFound";
+  case Status::WellKnownGrpcStatus::AlreadyExists:
+    return "AlreadyExists";
+  case Status::WellKnownGrpcStatus::PermissionDenied:
+    return "PermissionDenied";
+  case Status::WellKnownGrpcStatus::ResourceExhausted:
+    return "ResourceExhausted";
+  case Status::WellKnownGrpcStatus::FailedPrecondition:
+    return "FailedPrecondition";
+  case Status::WellKnownGrpcStatus::Aborted:
+    return "Aborted";
+  case Status::WellKnownGrpcStatus::OutOfRange:
+    return "OutOfRange";
+  case Status::WellKnownGrpcStatus::Unimplemented:
+    return "Unimplemented";
+  case Status::WellKnownGrpcStatus::Internal:
+    return "Internal";
+  case Status::WellKnownGrpcStatus::Unavailable:
+    return "Unavailable";
+  case Status::WellKnownGrpcStatus::DataLoss:
+    return "DataLoss";
+  case Status::WellKnownGrpcStatus::Unauthenticated:
+    return "Unauthenticated";
+  case Status::WellKnownGrpcStatus::InvalidCode:
+  default:
+    return "InvalidCode";
+  }
+}
+
 } // namespace Grpc
 } // namespace Envoy
