@@ -14,15 +14,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "deferred_task",
-    hdrs = ["deferred_task.h"],
-    deps = [
-        ":deferred_deletable",
-        ":dispatcher_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "dispatcher_interface",
     hdrs = ["dispatcher.h"],
     deps = [

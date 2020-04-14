@@ -70,7 +70,6 @@ envoy_cc_library(
         ":libevent_scheduler_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:deferred_deletable",
-        "//include/envoy/event:deferred_task",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
         "//include/envoy/network:connection_handler_interface",
@@ -122,5 +121,14 @@ envoy_cc_library(
         ":libevent_lib",
         "//include/envoy/event:timer_interface",
         "//source/common/common:scope_tracker",
+    ],
+)
+
+envoy_cc_library(
+    name = "deferred_task",
+    hdrs = ["deferred_task.h"],
+    deps = [
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/event:dispatcher_interface",
     ],
 )
