@@ -940,6 +940,7 @@ ruleset
 runfiles
 runtime
 runtimes
+rvalue
 rver
 rxhash
 sandboxed
