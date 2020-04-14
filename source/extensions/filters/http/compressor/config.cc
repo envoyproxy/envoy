@@ -4,7 +4,6 @@
 
 #include "extensions/filters/http/compressor/compressor_filter.h"
 #include "extensions/filters/http/compressor/compressor_library_config.h"
-#include "extensions/filters/http/compressor/gzip/config.h"
 
 namespace Envoy {
 namespace Extensions {
