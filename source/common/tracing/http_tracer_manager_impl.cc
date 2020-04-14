@@ -21,8 +21,6 @@ HttpTracerManagerImpl::getOrCreateHttpTracer(const envoy::config::trace::v3::Tra
     auto http_tracer = it->second.lock();
     if (http_tracer) { // HttpTracer might have been released since it's a weak reference
       return http_tracer;
-    } else {
-      http_tracers_.erase(it);
     }
   }
 
