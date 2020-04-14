@@ -18,7 +18,7 @@ import paths
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
                      "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
-                     "./tools/pyformat/")
+                     "./tools/pyformat/", "./third_party/")
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
             ".rst")
 DOCS_SUFFIX = (".md", ".rst")
@@ -42,6 +42,12 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
                        "./test/test_common/test_time.cc", "./test/test_common/test_time.h",
                        "./test/test_common/utility.cc", "./test/test_common/utility.h",
                        "./test/integration/integration.h")
+
+# Tests in these paths may make use of the Registry::RegisterFactory constructor or the
+# REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
+# perform temporary registrations.
+REGISTER_FACTORY_TEST_WHITELIST = ("./test/common/config/registry_test.cc",
+                                   "./test/integration/clusters/", "./test/integration/filters/")
 
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = (
@@ -310,6 +316,13 @@ def whitelistedForRealTime(file_path):
   if file_path.endswith(".md"):
     return True
   return file_path in REAL_TIME_WHITELIST
+
+
+def whitelistedForRegisterFactory(file_path):
+  if not file_path.startswith("./test/"):
+    return True
+
+  return any(file_path.startswith(prefix) for prefix in REGISTER_FACTORY_TEST_WHITELIST)
 
 
 def whitelistedForSerializeAsString(file_path):
@@ -588,6 +601,10 @@ def checkSourceLine(line, file_path, reportError):
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  if not whitelistedForRegisterFactory(file_path):
+    if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
+      reportError("Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
+                  "use Registry::InjectFactory instead.")
   if not whitelistedForUnpackTo(file_path):
     if "UnpackTo" in line:
       reportError("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
