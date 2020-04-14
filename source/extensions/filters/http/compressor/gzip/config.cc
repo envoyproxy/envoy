@@ -16,15 +16,18 @@ const uint64_t DefaultWindowBits = 12;
 // When summed to window bits, this sets a gzip header and trailer around the compressed data.
 const uint64_t GzipHeaderValue = 16;
 
+// Default zlib chunk size.
+const uint32_t DefaultChunkSize = 4096;
 } // namespace
 
 GzipCompressorFactory::GzipCompressorFactory(
     const envoy::extensions::filters::http::compressor::gzip::v3::Gzip& gzip)
     : compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
-      memory_level_(memoryLevelUint(gzip.memory_level().value())),
-      window_bits_(windowBitsUint(gzip.window_bits().value())),
-      chunk_size_(gzip.chunk_size().value() > 0 ? gzip.chunk_size().value() : 4096) {}
+      memory_level_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, memory_level, DefaultMemoryLevel)),
+      window_bits_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, window_bits, DefaultWindowBits) |
+                   GzipHeaderValue),
+      chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, chunk_size, DefaultChunkSize)) {}
 
 Envoy::Compressor::ZlibCompressorImpl::CompressionLevel GzipCompressorFactory::compressionLevelEnum(
     envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionLevel
@@ -69,14 +72,6 @@ GzipCompressorFactory::compressionStrategyEnum(
   default:
     return Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
   }
-}
-
-uint64_t GzipCompressorFactory::memoryLevelUint(Protobuf::uint32 level) {
-  return level > 0 ? level : DefaultMemoryLevel;
-}
-
-uint64_t GzipCompressorFactory::windowBitsUint(Protobuf::uint32 window_bits) {
-  return (window_bits > 0 ? window_bits : DefaultWindowBits) | GzipHeaderValue;
 }
 
 std::unique_ptr<Envoy::Compressor::Compressor> GzipCompressorFactory::createCompressor() {

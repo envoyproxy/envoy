@@ -44,9 +44,6 @@ private:
       envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionStrategy
           compression_strategy);
 
-  static uint64_t memoryLevelUint(Protobuf::uint32 level);
-  static uint64_t windowBitsUint(Protobuf::uint32 window_bits);
-
   Envoy::Compressor::ZlibCompressorImpl::CompressionLevel compression_level_;
   Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy compression_strategy_;
 
