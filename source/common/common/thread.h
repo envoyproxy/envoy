@@ -55,11 +55,11 @@ public:
   void wait(MutexBasicLockable& mutex) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     condvar_.Wait(&mutex.mutex_);
   }
-  template <class Rep, class Period>
 
   /**
    * @return WaitStatus whether the condition timed out or not.
    */
+  template <class Rep, class Period>
   WaitStatus waitFor(
       MutexBasicLockable& mutex,
       std::chrono::duration<Rep, Period> duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {

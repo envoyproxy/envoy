@@ -17,6 +17,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -185,41 +186,6 @@ http_filters:
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
-TEST_F(HttpConnectionManagerConfigTest, TracingConfigurationWithInlinedTracerProvider) {
-  const std::string yaml_string = R"EOF(
-codec_type: http1
-server_name: foo
-stat_prefix: router
-route_config:
-  virtual_hosts:
-  - name: service
-    domains:
-    - "*"
-    routes:
-    - match:
-        prefix: "/"
-      route:
-        cluster: cluster
-tracing:
-  operation_name: ingress
-  max_path_tag_length: 128
-  provider:                # notice inlined tracing provider configuration
-    name: zipkin
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
-      collector_cluster: zipkin
-      collector_endpoint: "/api/v1/spans"
-      collector_endpoint_version: HTTP_JSON
-http_filters:
-- name: envoy.filters.http.router
-  )EOF";
-
-  auto config = parseHttpConnectionManagerFromV2Yaml(yaml_string);
-
-  // Verify that inlined tracing provider configuration is actually parsed.
-  EXPECT_EQ("zipkin", config.tracing().provider().name());
-}
-
 TEST_F(HttpConnectionManagerConfigTest, TracingNotEnabledAndNoTracingConfigInBootstrap) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
@@ -354,6 +320,65 @@ http_filters:
   // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
   // an actual HttpTracer must be obtained from the HttpTracerManager.
   EXPECT_CALL(http_tracer_manager_, getOrCreateHttpTracer(Pointee(ProtoEq(tracing_config.http()))))
+      .WillOnce(Return(http_tracer_));
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+
+  // Actual HttpTracer must be obtained from the HttpTracerManager.
+  EXPECT_THAT(config.tracer(), Eq(http_tracer_));
+}
+
+TEST_F(HttpConnectionManagerConfigTest, TracingIsEnabledAndThereIsInlinedTracerProvider) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+tracing:
+  operation_name: ingress
+  max_path_tag_length: 128
+  provider:                # notice inlined tracing provider configuration
+    name: zipkin
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
+      collector_cluster: zipkin
+      collector_endpoint: "/api/v1/spans"
+      collector_endpoint_version: HTTP_JSON
+http_filters:
+- name: envoy.filters.http.router
+  )EOF";
+
+  // Simulate tracer provider configuration in the bootstrap config.
+  envoy::config::trace::v3::Tracing bootstrap_tracing_config;
+  bootstrap_tracing_config.mutable_http()->set_name("opencensus");
+  bootstrap_tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
+      envoy::config::trace::v3::OpenCensusConfig{});
+  context_.http_context_.setDefaultTracingConfig(bootstrap_tracing_config);
+
+  // Set up expected tracer provider configuration.
+  envoy::config::trace::v3::Tracing_Http inlined_tracing_config;
+  inlined_tracing_config.set_name("zipkin");
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  zipkin_config.set_collector_cluster("zipkin");
+  zipkin_config.set_collector_endpoint("/api/v1/spans");
+  zipkin_config.set_collector_endpoint_version(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON);
+  inlined_tracing_config.mutable_typed_config()->PackFrom(zipkin_config);
+
+  // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
+  // an actual HttpTracer must be obtained from the HttpTracerManager.
+  // Expect inlined tracer provider configuration to take precedence over bootstrap configuration.
+  EXPECT_CALL(http_tracer_manager_, getOrCreateHttpTracer(Pointee(ProtoEq(inlined_tracing_config))))
       .WillOnce(Return(http_tracer_));
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -1485,9 +1510,9 @@ TEST_F(HttpConnectionManagerConfigTest, CustomRequestIDExtension) {
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
-  Registry::RegisterFactory<TestRequestIDExtensionFactory,
-                            Server::Configuration::RequestIDExtensionFactory>
-      registered;
+
+  TestRequestIDExtensionFactory factory;
+  Registry::InjectFactory<Server::Configuration::RequestIDExtensionFactory> registration(factory);
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
