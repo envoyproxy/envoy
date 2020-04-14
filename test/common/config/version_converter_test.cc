@@ -62,6 +62,15 @@ TEST(VersionConverterTest, Upgrade) {
   EXPECT_THAT(original_sub_msg, ProtoEq(source.eds_cluster_config()));
 }
 
+// Empty upgrade between version_converter.proto entities. TODO(htuch): consider migrating all the
+// upgrades in this test to version_converter.proto to reduce dependence on APIs that will be
+// removed at EOY.
+TEST(VersionConverterProto, UpgradeNextVersion) {
+  test::common::config::PreviousVersion source;
+  test::common::config::NextVersion dst;
+  VersionConverter::upgrade(source, dst);
+}
+
 // Bad UTF-8 can fail wire cast during upgrade.
 TEST(VersionConverterTest, UpgradeException) {
   API_NO_BOOST(envoy::api::v2::Cluster) source;

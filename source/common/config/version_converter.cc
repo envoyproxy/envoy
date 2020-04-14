@@ -100,7 +100,7 @@ void annotateWithOriginalType(const Protobuf::Descriptor& prev_descriptor,
       }
       const Protobuf::FieldDescriptor* prev_field =
           prev_descriptor.FindFieldByNumber(field.number());
-      return prev_field->message_type();
+      return prev_field != nullptr ? prev_field->message_type() : nullptr;
     }
   };
   TypeAnnotatingProtoVisitor proto_visitor;
