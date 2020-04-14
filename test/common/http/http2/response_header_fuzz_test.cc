@@ -19,7 +19,8 @@ void Replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   // Create the client connection containing the nghttp2 session.
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
-      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+      std::make_unique<ProdNghttp2SessionFactory>());
   // Create a new stream.
   codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
   codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);

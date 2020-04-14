@@ -59,9 +59,10 @@ public:
   TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
                            Stats::Scope& scope,
                            const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                           uint32_t max_request_headers_kb, uint32_t max_request_headers_count)
+                           uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+                           Nghttp2SessionFactoryPtr&& http2_session_factory)
       : ClientConnectionImpl(connection, callbacks, scope, http2_options, max_request_headers_kb,
-                             max_request_headers_count) {}
+                             max_request_headers_count, std::move(http2_session_factory)) {}
 
   nghttp2_session* session() { return session_; }
 

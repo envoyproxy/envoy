@@ -78,25 +78,28 @@ public:
 
 class ConnectionImpl;
 
+// Abstract nghttp2_session factory. Used to enable injection of factories for testing.
 class Nghttp2SessionFactory {
 public:
   virtual ~Nghttp2SessionFactory() = default;
 
-  // Satisfy the Registry::FactoryRegistry() interface requirements.
-  virtual std::string name() const { return "envoy.http2.session"; }
-  virtual std::string category() const { return "envoy.http2.session"; }
-  virtual std::string configType() const { return ""; }
-
-  // Creates a new nghttp2 session with |callbacks| and |options|, binding |connection| to the
-  // session's user_data.
-  // Returns a newly allocated nghttp2_session on success, nullptr otherwise.
+  // Returns a new nghttp2_session to be used with |connection|.
   virtual nghttp2_session* create(const nghttp2_session_callbacks* callbacks,
-                                  ConnectionImpl* connection, const nghttp2_option* options);
+                                  ConnectionImpl* connection, const nghttp2_option* options) PURE;
 
-  // Initializes the |session| by sending initial control data to the peer (H/2 SETTINGS
-  // parameters).
+  // Initializes the |session|.
   virtual void init(nghttp2_session* session, ConnectionImpl* connection,
-                    const envoy::config::core::v3::Http2ProtocolOptions& options);
+                    const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
+};
+using Nghttp2SessionFactoryPtr = std::unique_ptr<Nghttp2SessionFactory>;
+
+class ProdNghttp2SessionFactory : public Nghttp2SessionFactory {
+public:
+  nghttp2_session* create(const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
+                          const nghttp2_option* options) override;
+
+  void init(nghttp2_session* session, ConnectionImpl* connection,
+            const envoy::config::core::v3::Http2ProtocolOptions& options) override;
 };
 
 /**
@@ -130,7 +133,7 @@ public:
   }
 
 protected:
-  friend class Nghttp2SessionFactory;
+  friend class ProdNghttp2SessionFactory;
 
   /**
    * Wrapper for static nghttp2 callback dispatchers.
@@ -500,7 +503,8 @@ public:
                        Stats::Scope& stats,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
-                       const uint32_t max_response_headers_count);
+                       const uint32_t max_response_headers_count,
+                       Nghttp2SessionFactoryPtr&& http2_session_factory);
 
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
@@ -523,6 +527,7 @@ private:
   bool checkInboundFrameLimits() override { return true; }
 
   Http::ConnectionCallbacks& callbacks_;
+  Nghttp2SessionFactoryPtr http2_session_factory_;
 };
 
 /**
