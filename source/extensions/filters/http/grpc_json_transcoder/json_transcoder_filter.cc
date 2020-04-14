@@ -502,6 +502,9 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
 
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
+  // In case of HttpBody in response - content type is unknown at this moment.
+  // So "Continue" only for regular streaming use case and StopIteration for
+  // all other cases (non streaming, streaming + httpBody)
   if (method_->descriptor_->server_streaming() && !method_->response_type_is_http_body_) {
     return Http::FilterHeadersStatus::Continue;
   }
