@@ -1033,7 +1033,7 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
 TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   SymbolTablePtr symbol_table(SymbolTableCreator::makeSymbolTable());
   Api::ApiPtr api = Api::createApiForTest();
-  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   NiceMock<ThreadLocal::MockInstance> tls;
   AllocatorImpl alloc(*symbol_table);
   ThreadLocalStoreImpl store(alloc);
@@ -1335,13 +1335,14 @@ public:
   }
 
   void workerThreadFn(uint32_t thread_index, BlockingBarrier& blocking_barrier) {
-    thread_dispatchers_[thread_index] = api_->allocateDispatcher();
+    thread_dispatchers_[thread_index] =
+        api_->allocateDispatcher(absl::StrCat("test_worker_", thread_index));
     blocking_barrier.decrementCount();
     thread_dispatchers_[thread_index]->run(Event::Dispatcher::RunType::RunUntilExit);
   }
 
   void mainThreadFn(BlockingBarrier& blocking_barrier) {
-    main_dispatcher_ = api_->allocateDispatcher();
+    main_dispatcher_ = api_->allocateDispatcher("test_main_thread");
     blocking_barrier.decrementCount();
     main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   }
