@@ -547,11 +547,15 @@ const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
  * "envoy.filters.network.http_connection_manager" filter instance.
  */
 const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPerFilterTracerConfig(
-    const envoy::extensions::filters::network::http_connection_manager::v3::
-        HttpConnectionManager&) {
-  // At the moment, it is not yet possible to define tracing provider as part of
-  // "envoy.filters.network.http_connection_manager" config.
-  // Therefore, we always fallback to using the default server-wide tracing provider.
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        config) {
+  // Give precedence to tracing provider configuration defined as part of
+  // "envoy.filters.network.http_connection_manager" filter config.
+  if (config.tracing().has_provider()) {
+    return &config.tracing().provider();
+  }
+  // Otherwise, for the sake of backwards compatibility, fallback to using tracing provider
+  // configuration defined in the bootstrap config.
   if (context_.httpContext().defaultTracingConfig().has_http()) {
     return &context_.httpContext().defaultTracingConfig().http();
   }

@@ -91,8 +91,8 @@ public:
 class EnvoyQuicClientSessionTest : public testing::TestWithParam<bool> {
 public:
   EnvoyQuicClientSessionTest()
-      : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()),
-        connection_helper_(*dispatcher_),
+      : api_(Api::createApiForTest(time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
@@ -115,7 +115,7 @@ public:
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
     EXPECT_EQ(Http::Protocol::Http3, http_connection_.protocol());
 
-    time_system_.sleep(std::chrono::milliseconds(1));
+    time_system_.advanceTimeWait(std::chrono::milliseconds(1));
     ON_CALL(writer_, WritePacket(_, _, _, _, _))
         .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
   }

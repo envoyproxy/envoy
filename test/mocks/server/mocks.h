@@ -343,7 +343,7 @@ public:
   MOCK_METHOD(void, removeListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
   MOCK_METHOD(void, start, (GuardDog & guard_dog));
-  MOCK_METHOD(void, initializeStats, (Stats::Scope & scope, const std::string& prefix));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope & scope));
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(void, stopListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
