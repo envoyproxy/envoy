@@ -13,7 +13,7 @@ at the expense of higher CPU load or offloading it to a compression accelerator.
 
 Configuration
 -------------
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.compressor.v2.Compressor>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`
 * This filter should be configured with the name *envoy.filters.http.compressor*.
 
 How it works
@@ -23,7 +23,7 @@ determine whether or not the content should be compressed. The content is
 compressed and then sent to the client with the appropriate headers, if
 response and request allow.
 
-Currently the filter supports :ref:`gzip compression<envoy_api_msg_config.filter.http.compressor.gzip.v2.Gzip>`
+Currently the filter supports :ref:`gzip compression <envoy_v3_api_msg_extensions.filters.http.compressor.gzip.v3.Gzip>`
 only. Other compression libraries can be supported as extensions.
 
 An example configuration of the filter may look like the following:
