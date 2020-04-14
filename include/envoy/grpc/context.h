@@ -92,7 +92,7 @@ public:
    */
   virtual void chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
                                   const absl::optional<RequestStatNames>& request_names,
-                                  uint64_t duration) PURE;
+                                  std::chrono::milliseconds duration) PURE;
 
   /**
    * @return a struct containing StatNames for gRPC stat tokens.

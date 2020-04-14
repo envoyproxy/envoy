@@ -116,7 +116,7 @@ void ContextImpl::chargeResponseMessageStat(const Upstream::ClusterInfo& cluster
 
 void ContextImpl::chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
                                      const absl::optional<RequestStatNames>& request_names,
-                                     uint64_t duration) {
+                                     std::chrono::milliseconds duration) {
   auto prefix_and_storage = getPrefix(Protocol::Grpc, request_names);
   Stats::StatName prefix = prefix_and_storage.first;
 
@@ -126,7 +126,7 @@ void ContextImpl::chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
   cluster.statsScope()
       .histogramFromStatName(Stats::StatName(upstream_rq_time.get()),
                              Stats::Histogram::Unit::Milliseconds)
-      .recordValue(duration);
+      .recordValue(duration.count());
 }
 
 absl::optional<ContextImpl::RequestStatNames>

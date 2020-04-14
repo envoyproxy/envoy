@@ -236,7 +236,7 @@ public:
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().value() -
                 decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().value());
-        config_->context_.chargeUpstreamStat(*cluster_, request_names_, chrono_duration.count());
+        config_->context_.chargeUpstreamStat(*cluster_, request_names_, chrono_duration);
       }
     }
     return Http::FilterTrailersStatus::Continue;

@@ -21,7 +21,7 @@ are shown in this form. See the documentation for
 :ref:`individual_method_stats_allowlist <envoy_api_field_config.filter.http.grpc_stats.v2alpha.FilterConfig.individual_method_stats_allowlist>`
 and :ref:`stats_for_all_methods <envoy_api_field_config.filter.http.grpc_stats.v2alpha.FilterConfig.stats_for_all_methods>`.
 
-To enable *upstream_rq_time* see :ref:`enable_upstream_stats <envoy_api_field_config.filter.http.grpc_stats.v2alpha.FilterConfig.enable_upstream_stats>`.
+To enable *upstream_rq_time* (v3 API only) see :ref:`enable_upstream_stats <envoy_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.enable_upstream_stats>`.
 
 
 .. csv-table::
