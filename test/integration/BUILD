@@ -91,7 +91,6 @@ py_binary(
     name = "capture_fuzz_gen",
     srcs = ["capture_fuzz_gen.py"],
     licenses = ["notice"],  # Apache 2
-    python_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         ":capture_fuzz_proto_py_proto",
@@ -175,9 +174,9 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//include/envoy/network:filter_interface",
-        "//include/envoy/registry",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/config:utility_lib",
+        "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -840,6 +839,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//include/envoy/registry",
         "//source/common/grpc:common_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

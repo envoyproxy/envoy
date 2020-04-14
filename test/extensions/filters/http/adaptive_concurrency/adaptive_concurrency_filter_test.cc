@@ -224,7 +224,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, OnDestroyCleanupTest) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   const auto advance_time = std::chrono::nanoseconds(42);
-  time_system_.sleep(advance_time);
+  time_system_.advanceTimeWait(advance_time);
 
   Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));

@@ -49,7 +49,7 @@ public:
                   std::unique_ptr<quic::ProofVerifyDetails>* /*details*/,
                   std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) override {
     // Cert SCT support is not enabled for fake ProofSource.
-    if (cert_sct == "" && certs.size() == 1 && certs[0] == "Fake cert") {
+    if (cert_sct.empty() && certs.size() == 1 && certs[0] == "Fake cert") {
       return quic::QUIC_SUCCESS;
     }
     return quic::QUIC_FAILURE;

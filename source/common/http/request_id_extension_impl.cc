@@ -7,6 +7,20 @@
 namespace Envoy {
 namespace Http {
 
+namespace {
+
+// NoopRequestIDExtension is the implementation used outside of HTTP context.
+class NoopRequestIDExtension : public RequestIDExtension {
+public:
+  void set(RequestHeaderMap&, bool) override {}
+  void setInResponse(ResponseHeaderMap&, const RequestHeaderMap&) override {}
+  bool modBy(const RequestHeaderMap&, uint64_t&, uint64_t) override { return false; }
+  TraceStatus getTraceStatus(const RequestHeaderMap&) override { return TraceStatus::NoTrace; }
+  void setTraceStatus(RequestHeaderMap&, TraceStatus) override {}
+};
+
+} // namespace
+
 RequestIDExtensionSharedPtr RequestIDExtensionFactory::fromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension&
         config,
@@ -28,6 +42,11 @@ RequestIDExtensionSharedPtr RequestIDExtensionFactory::fromProto(
 RequestIDExtensionSharedPtr
 RequestIDExtensionFactory::defaultInstance(Envoy::Runtime::RandomGenerator& random) {
   return std::make_shared<UUIDRequestIDExtension>(random);
+}
+
+RequestIDExtensionSharedPtr RequestIDExtensionFactory::noopInstance() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(std::shared_ptr<RequestIDExtension>,
+                                 std::make_shared<NoopRequestIDExtension>());
 }
 
 } // namespace Http

@@ -1,6 +1,7 @@
 #include "common/tcp_proxy/tcp_proxy.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -438,7 +439,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
       Tcp::ConnectionPool::Cancellable* handle = conn_pool->newConnection(*this);
       if (handle) {
         ASSERT(upstream_handle_.get() == nullptr);
-        upstream_handle_.reset(new TcpConnectionHandle(handle));
+        upstream_handle_ = std::make_shared<TcpConnectionHandle>(handle);
       }
       // Because we never return open connections to the pool, this either has a handle waiting on
       // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
@@ -448,11 +449,11 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     Http::ConnectionPool::Instance* conn_pool = cluster_manager_.httpConnPoolForCluster(
         cluster_name, Upstream::ResourcePriority::Default, Http::Protocol::Http2, this);
     if (conn_pool) {
-      upstream_.reset(
-          new HttpUpstream(*upstream_callbacks_, config_->tunnelingConfig()->hostname()));
+      upstream_ = std::make_unique<HttpUpstream>(*upstream_callbacks_,
+                                                 config_->tunnelingConfig()->hostname());
       HttpUpstream* http_upstream = static_cast<HttpUpstream*>(upstream_.get());
-      upstream_handle_.reset(
-          new HttpConnectionHandle(conn_pool->newStream(http_upstream->responseDecoder(), *this)));
+      upstream_handle_ = std::make_shared<HttpConnectionHandle>(
+          conn_pool->newStream(http_upstream->responseDecoder(), *this));
       return Network::FilterStatus::StopIteration;
     }
   }
@@ -506,7 +507,7 @@ void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                          Upstream::HostDescriptionConstSharedPtr host) {
   Tcp::ConnectionPool::ConnectionData* latched_data = conn_data.get();
 
-  upstream_.reset(new TcpUpstream(std::move(conn_data), *upstream_callbacks_));
+  upstream_ = std::make_unique<TcpUpstream>(std::move(conn_data), *upstream_callbacks_);
   onPoolReadyBase(host, latched_data->connection().localAddress(),
                   latched_data->connection().streamInfo().downstreamSslConnection());
   read_callbacks_->connection().streamInfo().setUpstreamFilterState(

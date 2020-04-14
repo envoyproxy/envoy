@@ -8,8 +8,6 @@
 #include "test/common/http/http2/frame_replay.h"
 #include "test/fuzz/fuzz_runner.h"
 
-using testing::AnyNumber;
-
 namespace Envoy {
 namespace Http {
 namespace Http2 {
