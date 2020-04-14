@@ -21,8 +21,13 @@ HttpTracerManagerImpl::getOrCreateHttpTracer(const envoy::config::trace::v3::Tra
     auto http_tracer = it->second.lock();
     if (http_tracer) { // HttpTracer might have been released since it's a weak reference
       return http_tracer;
+    } else {
+      http_tracers_.erase(it);
     }
   }
+
+  // Free memory held by expired weak references.
+  removeExpiredCacheEntries();
 
   // Initialize a new tracer.
   ENVOY_LOG(info, "instantiating a new tracer: {}", config->name());
@@ -34,8 +39,15 @@ HttpTracerManagerImpl::getOrCreateHttpTracer(const envoy::config::trace::v3::Tra
       *config, factory_context_->messageValidationVisitor(), factory);
 
   HttpTracerSharedPtr http_tracer = factory.createHttpTracer(*message, *factory_context_);
-  http_tracers_.insert_or_assign(cache_key, http_tracer); // cache a weak reference
+  http_tracers_.emplace(cache_key, http_tracer); // cache a weak reference
   return http_tracer;
+}
+
+void HttpTracerManagerImpl::removeExpiredCacheEntries() {
+  absl::erase_if(http_tracers_,
+                 [](const std::pair<const std::size_t, std::weak_ptr<HttpTracer>>& entry) {
+                   return entry.second.expired();
+                 });
 }
 
 } // namespace Tracing
