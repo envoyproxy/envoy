@@ -258,7 +258,35 @@ public:
   std::shared_ptr<Router::MockRoute> route_;
 };
 
-class MockFilterConfigFactory : public ThriftFilters::FactoryBase<ProtobufWkt::Struct> {
+template <class ConfigProto> class MockFactoryBase : public NamedThriftFilterConfigFactory {
+public:
+  FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) override {
+    const auto& typed_config = dynamic_cast<const ConfigProto&>(proto_config);
+    return createFilterFactoryFromProtoTyped(typed_config, stats_prefix, context);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ConfigProto>();
+  }
+
+  std::string name() const override { return name_; }
+
+protected:
+  MockFactoryBase(const std::string& name) : name_(name) {}
+
+private:
+  virtual FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
+                                    const std::string& stats_prefix,
+                                    Server::Configuration::FactoryContext& context) PURE;
+
+  const std::string name_;
+};
+
+class MockFilterConfigFactory : public MockFactoryBase<ProtobufWkt::Struct> {
 public:
   MockFilterConfigFactory();
   ~MockFilterConfigFactory() override;

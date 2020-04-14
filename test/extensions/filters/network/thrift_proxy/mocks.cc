@@ -93,7 +93,7 @@ MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() = default;
 
 MockFilterConfigFactory::MockFilterConfigFactory()
-    : FactoryBase("envoy.filters.thrift.mock_filter") {
+    : MockFactoryBase("envoy.filters.thrift.mock_filter") {
   mock_filter_ = std::make_shared<NiceMock<MockDecoderFilter>>();
 }
 
