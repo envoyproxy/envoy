@@ -34,7 +34,7 @@ BAZEL_BUILD_OPTIONS="-c opt --config=msvc-cl --show_task_finish --verbose_failur
 bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //source/exe:envoy-static --build_tag_filters=-skip_on_windows
 
 # TODO(sunjayBhatia, wrowe): We are disabling building/running tests for now as the AZP pipelines
-# workers do not provide enough resources for us to produce fast enouge or reliable enough builds.
+# workers do not provide enough resources for us to produce fast enough or reliable enough builds.
 # Test compilation of known MSVC-compatible test sources
 # bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //test/... --test_tag_filters=-skip_on_windows --build_tests_only
 
