@@ -91,7 +91,6 @@ public:
   virtual void init(nghttp2_session* session, ConnectionImpl* connection,
                     const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
 };
-using Nghttp2SessionFactoryPtr = std::unique_ptr<Nghttp2SessionFactory>;
 
 class ProdNghttp2SessionFactory : public Nghttp2SessionFactory {
 public:
