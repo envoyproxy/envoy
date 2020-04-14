@@ -26,7 +26,14 @@ protected:
   void onSettingsFrame(const nghttp2_settings& settings_frame) {
     for (uint32_t i = 0; i < settings_frame.niv; ++i) {
       auto result = settings_.insert(settings_frame.iv[i]);
+      // In case of fuzzing, we expect possible duplicates settings.
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
       ASSERT(result.second);
+#else
+      if (!result.second) {
+        ENVOY_LOG_MISC(debug, "Duplicated settings parameter {}", settings_frame.iv[i].settings_id);
+      }
+#endif
     }
   }
 
