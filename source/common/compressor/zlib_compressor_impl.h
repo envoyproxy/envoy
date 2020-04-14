@@ -30,7 +30,7 @@ public:
    * Enum values used to set compression level during initialization.
    * best: gives best compression.
    * speed: gives best performance.
-   * levelX: allows to adjust tradoffs more precisely - from level1 (best speed, but very
+   * levelX: allows to adjust trad-offs more precisely - from level1 (best speed, but very
    * low compression ratio) to level9 (best compression, but low speed).
    * standard: requests a default compromise between speed and compression. (default) @see zlib
    * manual.
