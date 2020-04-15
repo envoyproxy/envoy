@@ -54,16 +54,13 @@ message DnsFilterConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig.ClientContextConfig";
 
-    // Enable forwarding of the query to an upstream DNS server
-    bool forward_query = 1;
-
     // Sets the maximum time we will wait for the upstream query to complete
     // We allow 5 ms for the upstream resolution to complete, so the minimum
     // value here is 5
-    google.protobuf.Duration resolver_timeout = 2 [(validate.rules).duration = {gt {}}];
+    google.protobuf.Duration resolver_timeout = 1 [(validate.rules).duration = {gt {}}];
 
     // A list of DNS servers to which we can forward queries
-    repeated string upstream_resolvers = 3 [(validate.rules).repeated = {
+    repeated string upstream_resolvers = 2 [(validate.rules).repeated = {
       min_items: 1
       items {string {min_len: 3}}
     }];

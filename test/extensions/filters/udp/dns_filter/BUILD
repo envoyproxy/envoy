@@ -33,6 +33,6 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
-        "@envoy_api//envoy/config/filter/udp/dns_filter/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filter/udp/dns_filter/v3alpha:pkg_cc_proto",
     ],
 )

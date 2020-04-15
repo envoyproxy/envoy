@@ -9,16 +9,16 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "ares.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
 namespace DnsFilter {
 
 inline void BaseDnsRecord::serializeName(Buffer::OwnedImpl& output) {
-
   // Iterate over a name e.g. "www.domain.com" once and produce a buffer containing each name
   // segment prefixed by its length
-
   static constexpr char SEPARATOR('.');
 
   size_t last = 0;
@@ -60,7 +60,6 @@ inline void BaseDnsRecord::serializeName(Buffer::OwnedImpl& output) {
 
 // Serialize a DNS Query Record
 void DnsQueryRecord::serialize(Buffer::OwnedImpl& output) {
-
   serializeName(output);
   output.writeBEInt<uint16_t>(type_);
   output.writeBEInt<uint16_t>(class_);
@@ -81,7 +80,6 @@ DnsQueryContextPtr DnsMessageParser::createQueryContext(Network::UdpRecvData& cl
 
 bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
                                       const Buffer::InstancePtr& buffer) {
-
   auto available_bytes = buffer->length();
 
   memset(&incoming_, 0x00, sizeof(incoming_));
@@ -178,60 +176,21 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
 const std::string DnsMessageParser::parseDnsNameRecord(const Buffer::InstancePtr& buffer,
                                                        uint64_t* available_bytes,
                                                        uint64_t* name_offset) {
-  std::stringstream name_ss{};
-  unsigned char c;
+  void* buf = buffer->linearize(static_cast<uint32_t>(buffer->length()));
+  const unsigned char* linearized_data = static_cast<const unsigned char*>(buf);
+  const unsigned char* record = linearized_data + *name_offset;
+  long encoded_len;
+  char* output;
 
-  do {
-    // Read the name segment length or flag;
-    c = buffer->peekBEInt<unsigned char>(*name_offset);
-    *name_offset += sizeof(unsigned char);
-    *available_bytes -= sizeof(unsigned char);
+  int result = ares_expand_name(record, linearized_data, buffer->length(), &output, &encoded_len);
+  if (result != ARES_SUCCESS) {
+    return EMPTY_STRING;
+  }
 
-    if (c == 0xc0) {
-      // This is a compressed response. Get the offset in the query record where the domain name
-      // begins. This is done to reduce the name duplication in DNS answer buffers.
-      c = buffer->peekBEInt<unsigned char>(*name_offset);
-
-      // We will restart the loop from this offset and read until we encounter a null byte
-      // signifying the end of the name
-      *name_offset = static_cast<uint64_t>(c);
-
-      continue;
-
-    } else if (c == 0x00) {
-      // We've reached the end of the query.
-      ENVOY_LOG(trace, "End of name: [{}] {}", name_ss.str(), *name_offset);
-      break;
-    }
-
-    const uint64_t segment_length = static_cast<uint64_t>(c);
-
-    // Verify that we have enough data to read the segment length
-    if (segment_length > *available_bytes) {
-      ENVOY_LOG(error,
-                "Insufficient data in buffer for name segment. "
-                "available bytes: {}  segment length: {}",
-                *available_bytes, segment_length);
-      return EMPTY_STRING;
-    }
-
-    // Add the name separator if we have already accumulated name data
-    if (name_ss.tellp()) {
-      name_ss << '.';
-    }
-
-    *available_bytes -= segment_length;
-
-    // The value read is a name segment length
-    for (uint64_t index = 0; index < segment_length; index++) {
-      c = buffer->peekBEInt<unsigned char>(*name_offset);
-      *name_offset += sizeof(unsigned char);
-      name_ss << c;
-    }
-
-  } while (c != 0x00);
-
-  const std::string name = name_ss.str();
+  std::string name(output);
+  ares_free_string(output);
+  *name_offset += encoded_len;
+  *available_bytes -= encoded_len;
 
   return name;
 }

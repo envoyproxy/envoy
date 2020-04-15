@@ -1,5 +1,5 @@
-#include "envoy/config/filter/udp/dns_filter/v2alpha/dns_filter.pb.h"
-#include "envoy/config/filter/udp/dns_filter/v2alpha/dns_filter.pb.validate.h"
+#include "envoy/extensions/filter/udp/dns_filter/v3alpha/dns_filter.pb.h"
+#include "envoy/extensions/filter/udp/dns_filter/v3alpha/dns_filter.pb.validate.h"
 
 #include "common/common/logger.h"
 
@@ -55,7 +55,7 @@ public:
   ~DnsFilterTest() override { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
 
   void setup(const std::string& yaml) {
-    envoy::config::filter::udp::dns_filter::v2alpha::DnsFilterConfig config;
+    envoy::extensions::filter::udp::dns_filter::v3alpha::DnsFilterConfig config;
     TestUtility::loadFromYamlAndValidate(yaml, config);
     auto store = stats_store_.createScope("dns_scope");
     EXPECT_CALL(listener_factory_, scope()).WillOnce(ReturnRef(*store));
@@ -89,17 +89,8 @@ public:
 
   DnsQueryContextPtr query_ctx_;
 
-  // This config has external resolution disabled and is used to verify local lookups. With
-  // external resolution disabled, it eliminates having to setup mocks for the resolver callbacks in
-  // each test.
-  const std::string forward_query_on_config = R"EOF(
+  const std::string forward_query_off_config = R"EOF(
 stat_prefix: "my_prefix"
-client_config:
-  forward_query: true
-  upstream_resolvers:
-  - "1.1.1.1"
-  - "8.8.8.8"
-  - "8.8.4.4"
 server_config:
   inline_dns_table:
     external_retry_count: 3
@@ -111,27 +102,27 @@ server_config:
       endpoint:
         address_list:
           address:
-          - 10.0.0.1
-          - 10.0.0.2
+          - "10.0.0.1"
+          - "10.0.0.2"
     - name: "www.foo2.com"
       endpoint:
         address_list:
           address:
-          - 2001:8a:c1::2800:7
-          - 2001:8a:c1::2800:8
-          - 2001:8a:c1::2800:9
+          - "2001:8a:c1::2800:7"
+          - "2001:8a:c1::2800:8"
+          - "2001:8a:c1::2800:9"
     - name: "www.foo3.com"
       endpoint:
         address_list:
           address:
-          - 10.0.3.1
+          - "10.0.3.1"
   )EOF";
 };
 
 TEST_F(DnsFilterTest, InvalidQuery) {
   InSequence s;
 
-  setup(forward_query_on_config);
+  setup(forward_query_off_config);
 
   sendQueryFromClient("10.0.0.1:1000", "hello");
 
@@ -142,7 +133,7 @@ TEST_F(DnsFilterTest, InvalidQuery) {
 TEST_F(DnsFilterTest, SingleTypeAQuery) {
   InSequence s;
 
-  setup(forward_query_on_config);
+  setup(forward_query_off_config);
 
   const std::string domain("www.foo3.com");
   const std::string query =

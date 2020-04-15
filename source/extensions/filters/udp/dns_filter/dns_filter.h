@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/udp/dns_filter/v2alpha/dns_filter.pb.h"
 #include "envoy/event/file_event.h"
+#include "envoy/extensions/filter/udp/dns_filter/v3alpha/dns_filter.pb.h"
 #include "envoy/network/filter.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -19,7 +19,7 @@ namespace UdpFilters {
 namespace DnsFilter {
 
 /**
- * All Dns Filter stats. @see stats_macros.h
+ * All DNS Filter stats. @see stats_macros.h
  * Track the number of answered and un-answered queries for A and AAAA records
  */
 #define ALL_DNS_FILTER_STATS(COUNTER)                                                              \
@@ -31,7 +31,7 @@ namespace DnsFilter {
   COUNTER(answers_aaaa_record)
 
 /**
- * Struct definition for all Dns Filter stats. @see stats_macros.h
+ * Struct definition for all DNS Filter stats. @see stats_macros.h
  */
 struct DnsFilterStats {
   ALL_DNS_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -46,7 +46,7 @@ class DnsFilterEnvoyConfig {
 public:
   DnsFilterEnvoyConfig(
       Server::Configuration::ListenerFactoryContext& context,
-      const envoy::config::filter::udp::dns_filter::v2alpha::DnsFilterConfig& config);
+      const envoy::extensions::filter::udp::dns_filter::v3alpha::DnsFilterConfig& config);
 
   DnsFilterStats& stats() const { return stats_; }
   const DnsVirtualDomainConfig& domains() const { return virtual_domains_; }
@@ -93,7 +93,7 @@ public:
 
   // Network::UdpListenerReadFilter callbacks
   void onData(Network::UdpRecvData& client_request) override;
-  void onReceiveError(Api::IoError::IoErrorCode) override;
+  void onReceiveError(Api::IoError::IoErrorCode error_code) override;
 
   /**
    * @return bool true if the domain_name is a known domain for which we respond to queries
