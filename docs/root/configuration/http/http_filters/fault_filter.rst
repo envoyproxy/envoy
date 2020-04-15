@@ -47,9 +47,9 @@ x-envoy-fault-abort-request-percentage
   by the value of *x-envoy-fault-abort-request* HTTP header. The header value should be an integer
   that specifies the numerator of the percentage of request to apply aborts to and must be greater
   or equal to 0 and its maximum value is capped by the value of the numerator of
-  :ref:`percentage <envoy_api_field_config.filter.fault.v2.FaultAbort.percentage>` field.
+  :ref:`percentage <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>` field.
   Percentage's denominator is equal to default percentage's denominator
-  :ref:`percentage <envoy_api_field_config.filter.fault.v2.FaultAbort.percentage>` field.
+  :ref:`percentage <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>` field.
   In order for the header to work, :ref:`header_abort
   <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set and
   *x-envoy-fault-abort-request* HTTP header needs to be a part of a request.
