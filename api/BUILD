@@ -76,7 +76,6 @@ proto_library(
         "//envoy/config/filter/network/rbac/v2:pkg",
         "//envoy/config/filter/network/redis_proxy/v2:pkg",
         "//envoy/config/filter/network/sni_cluster/v2:pkg",
-        "//envoy/config/filter/network/sni_dynamic_forward_proxy/v2alpha:pkg",
         "//envoy/config/filter/network/tcp_proxy/v2:pkg",
         "//envoy/config/filter/network/thrift_proxy/v2alpha1:pkg",
         "//envoy/config/filter/network/zookeeper_proxy/v1alpha1:pkg",

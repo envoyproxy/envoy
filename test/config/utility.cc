@@ -830,18 +830,6 @@ envoy::config::listener::v3::Filter* ConfigHelper::getFilterFromListener(const s
   return nullptr;
 }
 
-void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
-  RELEASE_ASSERT(!finalized_, "");
-  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
-  auto* filter_list_back = listener->add_listener_filters();
-  TestUtility::loadFromYaml(filter_yaml, *filter_list_back);
-
-  // Now move it to the front.
-  for (int i = listener->listener_filters_size() - 1; i > 0; --i) {
-    listener->mutable_listener_filters()->SwapElements(i, i - 1);
-  }
-}
-
 void ConfigHelper::addNetworkFilter(const std::string& filter_yaml) {
   RELEASE_ASSERT(!finalized_, "");
   auto* filter_chain =

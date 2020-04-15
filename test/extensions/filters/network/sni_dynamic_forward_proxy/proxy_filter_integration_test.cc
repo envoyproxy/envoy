@@ -16,27 +16,16 @@ class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Addres
                                    public Event::TestUsingSimulatedTime,
                                    public HttpIntegrationTest {
 public:
+  // This test is using HTTP integration test to use the utilities to pass SNI from downstream
+  // to upstream. The config being tested is tcp_proxy.
   ProxyFilterIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(),
-                            ConfigHelper::TCP_PROXY_CONFIG) {}
-
-  // TODO(lizan): move this to a utility.
-  static std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
-    switch (version) {
-    case Network::Address::IpVersion::v4:
-      return "V4_ONLY";
-    case Network::Address::IpVersion::v6:
-      return "V6_ONLY";
-    }
-
-    // This seems to be needed on the coverage build for some reason.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+                            ConfigHelper::tcpProxyConfig()) {}
 
   void setup(uint64_t max_hosts = 1024) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
 
-    config_helper_.addListenerFilter("name: envoy.filters.listener.tls_inspector");
+    config_helper_.addListenerFilter(ConfigHelper::tlsInspectorFilter());
 
     config_helper_.addConfigModifier([this, max_hosts](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -44,18 +33,19 @@ public:
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
 
-      const std::string filter = fmt::format(R"EOF(
+      const std::string filter =
+          fmt::format(R"EOF(
 name: envoy.filters.http.dynamic_forward_proxy
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.network.sni_dynamic_forward_proxy.v2alpha.FilterConfig
+  "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha.FilterConfig
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
     max_hosts: {}
   port_value: {}
 )EOF",
-                                             ipVersionToDnsFamily(GetParam()), max_hosts,
-                                             fake_upstreams_[0]->localAddress()->ip()->port());
+                      Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts,
+                      fake_upstreams_[0]->localAddress()->ip()->port());
       config_helper_.addNetworkFilter(filter);
     });
 
@@ -69,13 +59,13 @@ typed_config:
         fmt::format(R"EOF(
 name: envoy.clusters.dynamic_forward_proxy
 typed_config:
-  "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+  "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
     max_hosts: {}
 )EOF",
-                    ipVersionToDnsFamily(GetParam()), max_hosts);
+                    Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts);
 
     TestUtility::loadFromYaml(cluster_type_config, *cluster_.mutable_cluster_type());
 

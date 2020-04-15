@@ -23,9 +23,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // to work.
 // [#extension: envoy.filters.network.sni_dynamic_forward_proxy]
 message FilterConfig {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.network.sni_dynamic_forward_proxy.v2alpha.FilterConfig";
-
   // The DNS cache configuration that the filter will attach to. Note this
   // configuration must match that of associated :ref:`dynamic forward proxy
   // cluster configuration

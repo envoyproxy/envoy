@@ -18,22 +18,11 @@ class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Addres
 public:
   ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
-  static std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
-    switch (version) {
-    case Network::Address::IpVersion::v4:
-      return "V4_ONLY";
-    case Network::Address::IpVersion::v6:
-      return "V6_ONLY";
-    }
-
-    // This seems to be needed on the coverage build for some reason.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-
   void setup(uint64_t max_hosts = 1024) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
 
-    const std::string filter = fmt::format(R"EOF(
+    const std::string filter =
+        fmt::format(R"EOF(
 name: dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig
@@ -42,7 +31,7 @@ typed_config:
     dns_lookup_family: {}
     max_hosts: {}
 )EOF",
-                                           ipVersionToDnsFamily(GetParam()), max_hosts);
+                    Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts);
     config_helper_.addFilter(filter);
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -82,7 +71,7 @@ typed_config:
     dns_lookup_family: {}
     max_hosts: {}
 )EOF",
-                    ipVersionToDnsFamily(GetParam()), max_hosts);
+                    Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts);
 
     TestUtility::loadFromYaml(cluster_type_config, *cluster_.mutable_cluster_type());
 
