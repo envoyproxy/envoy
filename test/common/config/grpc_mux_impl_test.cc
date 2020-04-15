@@ -280,9 +280,9 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
       load_assignment.set_cluster_name("x");
       response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment));
       EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-          .WillOnce(
-              Invoke([&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                        const std::string&) {
+          .WillOnce(Invoke(
+              [&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                 const std::string&) {
                 EXPECT_EQ(1, resources.size());
                 envoy::config::endpoint::v3::ClusterLoadAssignment expected_assignment =
                     MessageUtil::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(
@@ -293,7 +293,6 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
       grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
     }
   }
-  
 }
 
 // Validate behavior when watches specify resources (potentially overlapping).

@@ -14,6 +14,7 @@
 #include "common/common/cleanup.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
+#include "common/config/resource_name.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -70,14 +71,9 @@ void CdsApiImpl::onConfigUpdate(
   if (cm_.adsMux()) {
     const auto target_type_urls =
         Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-    for (const auto& type_url : target_type_urls) {
-      cm_.adsMux()->pause(type_url);
-    }
-    maybe_eds_resume = std::make_unique<Cleanup>([this, target_type_urls] {
-      for (const auto& type_url : target_type_urls) {
-        cm_.adsMux()->resume(type_url);
-      }
-    });
+    cm_.adsMux()->pause(target_type_urls);
+    maybe_eds_resume = std::make_unique<Cleanup>(
+        [this, target_type_urls] { cm_.adsMux()->resume(target_type_urls); });
   }
 
   ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),

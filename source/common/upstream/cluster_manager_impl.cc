@@ -152,20 +152,15 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
         initializeSecondaryClusters();
         return;
       } else {
-        bool cluster_load_assignment_paused = false;
-        for (const auto& type_url : target_type_urls) {
+        for (auto&& type_url : target_type_urls) {
+          bool cluster_load_assignment_paused = false;
           cluster_load_assignment_paused =
               cluster_load_assignment_paused || cm_.adsMux()->paused(type_url);
-        }
-        if (!cluster_load_assignment_paused) {
-          for (const auto& type_url : target_type_urls) {
+
+          if (!cluster_load_assignment_paused) {
             cm_.adsMux()->pause(type_url);
+            Cleanup eds_resume([this, type_url] { cm_.adsMux()->resume(type_url); });
           }
-          Cleanup eds_resume([this, target_type_urls] {
-            for (const auto& type_url : target_type_urls) {
-              cm_.adsMux()->resume(type_url);
-            }
-          });
         }
         initializeSecondaryClusters();
       }
@@ -770,13 +765,9 @@ void ClusterManagerImpl::updateClusterCounts() {
     const auto target_type_urls =
         Config::getAllVersionTypeUrls<envoy::config::cluster::v3::Cluster>();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      for (const auto& type_url : target_type_urls) {
-        ads_mux_->pause(type_url);
-      }
+      ads_mux_->pause(target_type_urls);
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
-      for (const auto& type_url : target_type_urls) {
-        ads_mux_->resume(type_url);
-      }
+      ads_mux_->resume(target_type_urls);
     }
   }
   cm_stats_.active_clusters_.set(active_clusters_.size());

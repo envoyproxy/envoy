@@ -528,9 +528,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
     if (cm.adsMux()) {
-      for (const auto& type_url : target_type_urls) {
-        cm.adsMux()->pause(type_url);
-      }
+      cm.adsMux()->pause(target_type_urls);
     }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
@@ -539,9 +537,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
     if (cm.adsMux()) {
-      for (const auto& type_url : target_type_urls) {
-        cm.adsMux()->resume(type_url);
-      }
+      cm.adsMux()->resume(target_type_urls);
     }
   });
 }
