@@ -21,8 +21,6 @@ absl::string_view statusCodeToString(StatusCode code) {
     return "PrematureResponseError";
   case StatusCode::CodecClientError:
     return "CodecClientError";
-  default:
-    RELEASE_ASSERT(false, "Invalid StatusCode value");
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
