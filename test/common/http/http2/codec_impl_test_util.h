@@ -59,10 +59,21 @@ public:
   TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
                            Stats::Scope& scope,
                            const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                           uint32_t max_request_headers_kb, uint32_t max_request_headers_count)
+                           uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+                           Nghttp2SessionFactory& http2_session_factory)
       : ClientConnectionImpl(connection, callbacks, scope, http2_options, max_request_headers_kb,
-                             max_request_headers_count) {}
+                             max_request_headers_count, http2_session_factory) {}
+
   nghttp2_session* session() { return session_; }
+
+  // Submits an H/2 METADATA frame to the peer.
+  // Returns true on success, false otherwise.
+  virtual bool submitMetadata(const MetadataMapVector& mm_vector, int32_t stream_id) {
+    UNREFERENCED_PARAMETER(mm_vector);
+    UNREFERENCED_PARAMETER(stream_id);
+    return false;
+  }
+
   using ClientConnectionImpl::getStream;
   using ConnectionImpl::sendPendingFrames;
 

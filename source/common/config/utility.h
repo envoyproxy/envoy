@@ -158,11 +158,13 @@ public:
   /**
    * Check the validity of a cluster backing an api config source. Throws on error.
    * @param clusters the clusters currently loaded in the cluster manager.
-   * @param api_config_source the config source to validate.
+   * @param cluster_name the cluster name to validate.
+   * @param config_source the config source typed name.
    * @throws EnvoyException when an API config doesn't have a statically defined non-EDS cluster.
    */
   static void validateClusterName(const Upstream::ClusterManager::ClusterInfoMap& clusters,
-                                  const std::string& cluster_name);
+                                  const std::string& cluster_name,
+                                  const std::string& config_source);
 
   /**
    * Potentially calls Utility::validateClusterName, if a cluster name can be found.
@@ -317,13 +319,14 @@ public:
   /**
    * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
-   * @param api_config_source envoy::api::v2::core::ApiConfigSource. Must have config type GRPC.
+   * @param api_config_source envoy::api::v3::core::ApiConfigSource. Must have config type GRPC.
+   * @param skip_cluster_check whether to skip cluster validation.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
   static Grpc::AsyncClientFactoryPtr
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
-                                Stats::Scope& scope);
+                                Stats::Scope& scope, bool skip_cluster_check);
 
   /**
    * Translate a set of cluster's hosts into a load assignment configuration.
