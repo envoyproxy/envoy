@@ -274,11 +274,11 @@ public:
 
   std::string name() const override { return name_; }
 
-  std::shared_ptr<MockDecoderFilter> mock_filter_;
   ProtobufWkt::Struct config_struct_;
   std::string config_stat_prefix_;
 
 private:
+  std::shared_ptr<MockDecoderFilter> mock_filter_;
   const std::string name_;
 };
 
