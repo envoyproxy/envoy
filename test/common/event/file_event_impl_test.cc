@@ -19,7 +19,7 @@ namespace {
 class FileEventImplTest : public testing::Test {
 public:
   FileEventImplTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         os_sys_calls_(Api::OsSysCallsSingleton::get()) {}
 
   void SetUp() override {
@@ -65,7 +65,7 @@ TEST_P(FileEventImplActivateTest, Activate) {
   ASSERT_TRUE(SOCKET_VALID(fd));
 
   Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher());
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(1);
   ReadyWatcher write_event;
