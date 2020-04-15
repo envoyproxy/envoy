@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
+
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/utility.h"
@@ -6,6 +8,8 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/proto/bookstore.pb.h"
+#include "test/test_common/environment.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -58,6 +62,18 @@ public:
     ON_CALL(factory_context_.admin_, addHandler(_, _, _, _, _))
         .WillByDefault(testing::Return(true));
     ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
+  }
+
+  void addProtoDescriptor(absl::string_view filter_name, Protobuf::Message* message) {
+    if (filter_name.find("grpc_json_transcoder") != absl::string_view::npos) {
+      envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder& config =
+          dynamic_cast<
+              envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&>(
+              *message);
+      config.add_services("bookstore.Bookstore");
+      config.set_proto_descriptor(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"));
+      ENVOY_LOG_MISC(info, "{}", message->DebugString());
+    }
   }
 
   // This executes the decode methods to be fuzzed.
@@ -114,6 +130,8 @@ public:
           Server::Configuration::NamedHttpFilterConfigFactory>(proto_config.name());
       ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
           proto_config, factory_context_.messageValidationVisitor(), factory);
+      // To get more coverage over gRPC transcoder filter, use a fixed test service.
+      addProtoDescriptor(proto_config.name(), message.get());
       cb_ = factory.createFilterFactoryFromProto(*message, "stats", factory_context_);
       cb_(filter_callback_);
     } catch (const EnvoyException& e) {

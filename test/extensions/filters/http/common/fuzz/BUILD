@@ -26,6 +26,10 @@ envoy_proto_library(
 envoy_cc_test_library(
     name = "uber_filter_lib",
     hdrs = ["uber_filter.h"],
+    data = [
+        "//test/proto:bookstore.proto",
+        "//test/proto:bookstore_proto_descriptor",
+    ],
     deps = [
         ":filter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
@@ -34,6 +38,9 @@ envoy_cc_test_library(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/proto:bookstore_proto_cc_proto",
+        "//test/test_common:environment_lib",
+        "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )
 
@@ -48,6 +55,7 @@ envoy_cc_fuzz_test(
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//test/config:utility_lib",
+        "//test/test_common:environment_lib",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v2alpha:pkg_cc_proto",
     ] + envoy_all_extensions(),

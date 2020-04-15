@@ -10,6 +10,9 @@
 // https://github.com/google/fuzzing/blob/master/docs/split-inputs.md#fuzzed-data-provider
 #include "fuzzer/utils/FuzzedDataProvider.h"
 #include "spdlog/spdlog.h"
+#include "tools/cpp/runfiles/runfiles.h"
+
+using bazel::tools::cpp::runfiles::Runfiles;
 
 namespace Envoy {
 namespace Fuzz {
@@ -22,6 +25,7 @@ public:
   PerTestEnvironment();
   ~PerTestEnvironment();
 
+  static std::string runfilesPath(const std::string& path, const std::string& workspace = "envoy");
   std::string temporaryPath(const std::string& path) const { return test_tmpdir_ + "/" + path; }
   const std::string& testId() const { return test_id_; }
 
