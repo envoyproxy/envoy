@@ -345,23 +345,19 @@ typed_config:
   // As with ProtocolIntegrationTest.HittingEncoderFilterLimit use a filter
   // which buffers response data but in this case, make sure the sendLocalReply
   // is gRPC.
-  config_helper_.addFilter("{ name: envoy.filters.http.dynamo, typed_config: { \"@type\": "
+  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
   // Send the request.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"},
-                                                                 {"te", "trailers"}});
-  auto downstream_request = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-  Buffer::OwnedImpl data(R"({"TableName":"locations"})");
-  codec_client_->sendData(*downstream_request, data, true);
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"te", "trailers"}});
   waitForNextUpstreamRequest();
 
   // Send the response headers.
