@@ -14,6 +14,8 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
+#include "common/grpc/common.h"
+#include "common/grpc/status.h"
 #include "common/http/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
@@ -309,6 +311,9 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
           throw EnvoyException("Invalid header configuration. Format string contains newline.");
         }
         formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(args)});
+      } else if (absl::StartsWith(token, "GRPC_STATUS")) {
+        formatters.emplace_back(FormatterProviderPtr{
+            new GrpcStatusFormatter("grpc-status", "", absl::optional<size_t>())});
       } else {
         formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(token)});
       }
@@ -864,6 +869,42 @@ ResponseTrailerFormatter::formatValue(const Http::RequestHeaderMap&, const Http:
                                       const Http::ResponseTrailerMap& response_trailers,
                                       const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(response_trailers);
+}
+
+GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
+                                         const std::string& alternative_header,
+                                         absl::optional<size_t> max_length)
+    : HeaderFormatter(main_header, alternative_header, max_length) {}
+
+std::string GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
+                                        const Http::ResponseHeaderMap& response_headers,
+                                        const Http::ResponseTrailerMap& response_trailers,
+                                        const StreamInfo::StreamInfo& info) const {
+  const auto grpc_status =
+      Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
+  if (!grpc_status.has_value()) {
+    return UnspecifiedValueString;
+  }
+  const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
+  if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
+    return std::to_string(grpc_status.value());
+  }
+  return grpc_status_message;
+}
+
+ProtobufWkt::Value GrpcStatusFormatter::formatValue(
+    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
+    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& info) const {
+  const auto grpc_status =
+      Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
+  if (!grpc_status.has_value()) {
+    return unspecifiedValue();
+  }
+  const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
+  if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
+    return ValueUtil::stringValue(std::to_string(grpc_status.value()));
+  }
+  return ValueUtil::stringValue(grpc_status_message);
 }
 
 MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
