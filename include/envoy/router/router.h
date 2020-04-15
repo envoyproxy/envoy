@@ -479,15 +479,6 @@ public:
   virtual bool includeAttemptCountInResponse() const PURE;
 
   /**
-   * If present, this indicates that CONNECT requests to this host should be converted
-   * to TCP proxying, i.e. the payload of the HTTP body should be sent as raw
-   * TCP  upstream.
-   * @return configuration for TCP proxying, if present.
-   */
-  using ProxyConfig = envoy::config::route::v3::RouteMatch::ProxyConfig;
-  virtual const absl::optional<ProxyConfig>& proxyConfig() const PURE;
-
-  /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
    *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
    *         as other limits may apply.
@@ -835,6 +826,15 @@ public:
    */
   virtual const UpgradeMap& upgradeMap() const PURE;
 
+  // TODO(alyssar) rename alias, and interface from proxy to connect.
+  // TODO(alyssar) validate this is only used on routes with the CONNECT action.
+  using ConnectConfig = envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig;
+
+  /**
+   * If present, informs how to handle proxying CONNECT requests on this route.
+   */
+  virtual const absl::optional<ConnectConfig>& connectConfig() const PURE;
+
   /**
    * @returns the internal redirect action which should be taken on this route.
    */
@@ -956,13 +956,6 @@ public:
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
   }
-
-  /**
-   * If present, this indicates that CONNECT requests are alowed on this route.
-   */
-  using ConnectConfig = envoy::config::route::v3::RouteMatch::ConnectConfig;
-  using ProxyConfig = envoy::config::route::v3::RouteMatch::ProxyConfig;
-  virtual const absl::optional<ConnectConfig>& connectConfig() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;

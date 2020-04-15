@@ -59,8 +59,10 @@ convertInternalRedirectAction(const envoy::config::route::v3::RouteAction& route
 
 const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
+// TODO(alyssawilk) use utility.
 bool isConnect(const Http::RequestHeaderMap& headers) {
   return headers.Method() && headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect;
+}
 } // namespace
 
 std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
@@ -925,21 +927,21 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
   return nullptr;
 }
 
-ConnectRouteEntryImpl::RegexRouteEntryImpl(
+// TODO(alyssawilk) unit tests.
+ConnectRouteEntryImpl::ConnectRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, factory_context, validator) {
-  connect_config_ = route.match().connect_matcher();
 }
 
-void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
-                                            bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, prefix_, insert_envoy_original_path);
+void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap&, bool) const {
+  // TODO(alyssar) handle this for HTTP/2 CONNECT with path?
+  // finalizePathHeader(headers, prefix_, insert_envoy_original_path);
 }
 
 RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
-                                                 const StreamInfo::StreamInfo& stream_info,
+                                                 const StreamInfo::StreamInfo&,
                                                  uint64_t random_value) const {
   if (isConnect(headers)) {
     return clusterEntry(headers, random_value);
@@ -1007,7 +1009,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
       break;
     }
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher: {
-      // FIXME;
+      routes_.emplace_back(new ConnectRouteEntryImpl(*this, route, factory_context, validator));
       break;
     }
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
@@ -1153,9 +1155,6 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::RequestHead
   // Check for a route that matches the request.
   for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
     RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
-    if (nullptr != route_entry && (isConnect(headers) || route_entry->connectConfig.has_value()) {
-      return route_entry;
-    }
   }
 
   return nullptr;

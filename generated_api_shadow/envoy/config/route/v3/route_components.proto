@@ -369,7 +369,7 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -392,19 +392,8 @@ message RouteMatch {
   }
 
   // [#not-implemented-hide:]
-  // Configuration for sending data upstream as a raw data payload. This is used for
-  // CONNECT requests, when forwarding CONNECT payload as raw TCP.
-  message ProxyConfig {
-    // TODO(alyssawilk) add proxy proto configuration here.
-  }
-
-  // [#not-implemented-hide:]
-  // Configuration for proxying CONNECT requests.
-  message ConnectConfig {
-    // If this is present, CONNECT requests will be decapsulated with the
-    // CONNECT payload proxied upstream.  If this is not present, it will result
-    // in a CONNECT request being sent upstream.
-    ProxyConfig proxy_config = 1;
+  // An extensible message for matching CONNECT requests.
+  message ConnectMatcher {
   }
 
   reserved 5;
@@ -418,7 +407,11 @@ message RouteMatch {
   core.v3.RuntimeFractionalPercent runtime_fraction = 9;
 
   // [#not-implemented-hide:]
-  //message ConnectConfig = 3;
+  // If this is used as the matcher, the matcher will only match CONNECT requests.
+  // Note that this will not match HTTP/2 upgrade-style CONNECT requests
+  // (WebSocket and the like) as they are normalized in Envoy HTTP/1.1 style
+  // upgrades.
+  repeated HeaderMatcher headers = 6;
 
   // If specified, the route is a regular expression rule meaning that the
   // regex must match the *:path* header once the query string is removed. The entire path
@@ -432,11 +425,11 @@ message RouteMatch {
   // path_specifier entirely and just rely on a set of header matchers which can already match
   // on :path, etc. The issue with that is it is unclear how to generically deal with query string
   // stripping. This needs more thought.]
-  repeated HeaderMatcher headers = 6;
+  repeated QueryParameterMatcher query_parameters = 7;
 
   // Indicates that prefix/path matching should be case insensitive. The default
   // is true.
-  repeated QueryParameterMatcher query_parameters = 7;
+  GrpcRouteMatchOptions grpc = 8;
 
   // Indicates that the route should additionally match on a runtime key. Every time the route
   // is considered for a match, it must also fall under the percentage of matches indicated by
@@ -454,29 +447,29 @@ message RouteMatch {
   //    integer with the assumption that the value is an integral percentage out of 100. For
   //    instance, a runtime key lookup returning the value "42" would parse as a FractionalPercent
   //    whose numerator is 42 and denominator is HUNDRED. This preserves legacy semantics.
-  GrpcRouteMatchOptions grpc = 8;
-
-  // Specifies a set of headers that the route should match on. The router will
-  // check the request’s headers against all the specified headers in the route
-  // config. A match will happen if all the headers in the route are present in
-  // the request with the same values (or based on presence if the value field
-  // is not in the config).
   TlsContextMatchOptions tls_context = 11;
 
   oneof path_specifier {
     option (validate.required) = true;
+
+    // Specifies a set of headers that the route should match on. The router will
+    // check the request’s headers against all the specified headers in the route
+    // config. A match will happen if all the headers in the route are present in
+    // the request with the same values (or based on presence if the value field
+    // is not in the config).
+    string prefix = 1;
 
     // Specifies a set of URL query parameters on which the route should
     // match. The router will check the query string from the *path* header
     // against all the specified query parameters. If the number of specified
     // query parameters is nonzero, they all must match the *path* header's
     // query string for a match to occur.
-    string prefix = 1;
+    string path = 2;
 
     // If specified, only gRPC requests will be matched. The router will check
     // that the content-type header has a application/grpc or one of the various
     // application/grpc+ values.
-    string path = 2;
+    ConnectMatcher connect_matcher = 12;
 
     // If specified, the client tls context will be matched against the defined
     // match options.
@@ -731,6 +724,15 @@ message RouteAction {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.UpgradeConfig";
 
+    // [#not-implemented-hide:]
+    // Configuration for sending data upstream as a raw data payload. This is used for
+    // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+    // This may ONLY be used on routes which are selected via a ConnectMatcher
+    // and is only valid if the upgrade type is "CONNECT"
+    message ConnectConfig {
+      // TODO(alyssawilk) add proxy proto configuration here.
+    }
+
     // The case-insensitive name of this upgrade, e.g. "websocket".
     // For each upgrade type present in upgrade_configs, requests with
     // Upgrade: [upgrade_type] will be proxied upstream.
@@ -739,6 +741,8 @@ message RouteAction {
 
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
+
+    ConnectConfig connect_config = 3;
   }
 
   reserved 12, 18, 19, 16, 22, 21;

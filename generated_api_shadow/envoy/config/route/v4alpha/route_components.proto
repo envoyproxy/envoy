@@ -367,7 +367,7 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RouteMatch";
 
@@ -390,25 +390,10 @@ message RouteMatch {
   }
 
   // [#not-implemented-hide:]
-  // Configuration for sending data upstream as a raw data payload. This is used for
-  // CONNECT requests, when forwarding CONNECT payload as raw TCP.
-  message ProxyConfig {
-    // TODO(alyssawilk) add proxy proto configuration here.
-
+  // An extensible message for matching CONNECT requests.
+  message ConnectMatcher {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.route.v3.RouteMatch.ProxyConfig";
-  }
-
-  // [#not-implemented-hide:]
-  // Configuration for proxying CONNECT requests.
-  message ConnectConfig {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.route.v3.RouteMatch.ConnectConfig";
-
-    // If this is present, CONNECT requests will be decapsulated with the
-    // CONNECT payload proxied upstream.  If this is not present, it will result
-    // in a CONNECT request being sent upstream.
-    ProxyConfig proxy_config = 1;
+        "envoy.config.route.v3.RouteMatch.ConnectMatcher";
   }
 
   reserved 5, 3;
@@ -427,7 +412,11 @@ message RouteMatch {
     string path = 2;
 
     // [#not-implemented-hide:]
-    //message ConnectConfig = 3;
+    // If this is used as the matcher, the matcher will only match CONNECT requests.
+    // Note that this will not match HTTP/2 upgrade-style CONNECT requests
+    // (WebSocket and the like) as they are normalized in Envoy HTTP/1.1 style
+    // upgrades.
+    ConnectMatcher connect_matcher = 12;
 
     // If specified, the route is a regular expression rule meaning that the
     // regex must match the *:path* header once the query string is removed. The entire path
@@ -727,6 +716,18 @@ message RouteAction {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.route.v3.RouteAction.UpgradeConfig";
 
+    // [#not-implemented-hide:]
+    // Configuration for sending data upstream as a raw data payload. This is used for
+    // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+    // This may ONLY be used on routes which are selected via a ConnectMatcher
+    // and is only valid if the upgrade type is "CONNECT"
+    message ConnectConfig {
+      // TODO(alyssawilk) add proxy proto configuration here.
+
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.route.v3.RouteAction.UpgradeConfig.ConnectConfig";
+    }
+
     // The case-insensitive name of this upgrade, e.g. "websocket".
     // For each upgrade type present in upgrade_configs, requests with
     // Upgrade: [upgrade_type] will be proxied upstream.
@@ -735,6 +736,8 @@ message RouteAction {
 
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
+
+    ConnectConfig connect_config = 3;
   }
 
   reserved 12, 18, 19, 16, 22, 21, 10;

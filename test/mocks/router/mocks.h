@@ -260,7 +260,6 @@ public:
   mutable std::unique_ptr<Stats::StatNameManagedStorage> stat_name_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestCorsPolicy cors_policy_;
-  absl::optional<ConnectConfig> connect_config_;
 };
 
 class MockHashPolicy : public Http::HashPolicy {
@@ -376,7 +375,7 @@ public:
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   envoy::config::core::v3::Metadata metadata_;
   UpgradeMap upgrade_map_;
-  absl::optional<ProxyConfig> proxy_config_;
+  absl::optional<ConnectConfig> connect_config_;
 };
 
 class MockDecorator : public Decorator {
