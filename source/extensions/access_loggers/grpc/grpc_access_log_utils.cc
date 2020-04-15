@@ -116,6 +116,9 @@ void Utility::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError)) {
     common_access_log.mutable_response_flags()->set_downstream_protocol_error(true);
   }
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached)) {
+    common_access_log.mutable_response_flags()->set_upstream_max_stream_duration_reached(true);
+  }
 }
 
 void Utility::extractCommonAccessLogProperties(

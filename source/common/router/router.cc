@@ -917,11 +917,7 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
 void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   upstream_request.resetStream();
 
-  // In general, we don't have to retry when downstream didn't end. But when stream max duration
-  // timer was invoked, We must retry with keeping downstream connection so that we must allow to
-  // retry by switching full streaming retry flag.
-  allow_full_streaming_retry_ = true;
-
+  // TODO(shikugawa): Add retry with keeping downstream connection
   if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request)) {
     return;
   }

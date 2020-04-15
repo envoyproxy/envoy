@@ -37,7 +37,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::StreamIdleTimeout, "SI"),
       std::make_pair(ResponseFlag::InvalidEnvoyRequestHeaders, "IH"),
       std::make_pair(ResponseFlag::DownstreamProtocolError, "DPE"),
-  };
+      std::make_pair(ResponseFlag::UpstreamMaxStreamDurationReached, "UMSDR")};
 
   for (const auto& test_case : expected) {
     NiceMock<MockStreamInfo> stream_info;
@@ -87,7 +87,7 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
       std::make_pair("SI", ResponseFlag::StreamIdleTimeout),
       std::make_pair("IH", ResponseFlag::InvalidEnvoyRequestHeaders),
       std::make_pair("DPE", ResponseFlag::DownstreamProtocolError),
-  };
+      std::make_pair("UMSDR", ResponseFlag::UpstreamMaxStreamDurationReached)};
 
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());
 
