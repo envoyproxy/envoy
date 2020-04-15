@@ -16,13 +16,13 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.redis_proxy.v3";
 option java_outer_classname = "RedisProxyProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Redis Proxy]
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -175,14 +175,64 @@ message RedisProxy {
 
     // Optional catch-all route to forward commands that doesn't match any of the routes. The
     // catch-all route becomes required when no routes are specified.
-    Route catch_all_route = 4;
-
+    // .. attention::
+    //
+    //   This field is deprecated. Use a :ref:`catch_all
+    //   route<envoy_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route>`
+    //   instead.
     string hidden_envoy_deprecated_catch_all_cluster = 3
         [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+
+    // Optional catch-all route to forward commands that doesn't match any of the routes. The
+    // catch-all route becomes required when no routes are specified.
+    Route catch_all_route = 4;
+  }
+
+  // RedisFault defines faults used for fault injection.
+  // TODO: More explanation
+  message RedisFault {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.network.redis_proxy.v2.RedisProxy.RedisFault";
+
+    enum RedisFaultType {
+      // Delays requests. This is the base fault; other faults can have delays added.
+      DELAY = 0;
+
+      // Returns errors on requests.
+      ERROR = 1;
+    }
+
+    // Fault type.
+    // TODO: How do we make this a required field
+    RedisFaultType fault_type = 1 [(validate.rules).enum = {defined_only: true}];
+
+    // Percentage of requests fault applies to.
+    // TODO: How do we make this a required field
+    config.core.v3.RuntimeFractionalPercent fault_enabled = 2;
+
+    // Configureable delay for all faults. If not set, defaults to zero
+    google.protobuf.Duration delay = 3;
+    // TODO: Make this runtime-tuneable? Do we care- most delays aren't tuneable.
+
+    // Commands fault is restricted to, if any.
+    // TODO: Make this optional
+    repeated string commands = 4;
   }
 
   // The prefix to use when emitting :ref:`statistics <config_network_filters_redis_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // Name of cluster from cluster manager. See the :ref:`configuration section
+  // <arch_overview_redis_configuration>` of the architecture overview for recommendations on
+  // configuring the backing cluster.
+  //
+  // .. attention::
+  //
+  //   This field is deprecated. Use a :ref:`catch_all
+  //   route<envoy_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route>`
+  //   instead.
+  string hidden_envoy_deprecated_cluster = 2
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Network settings for the connection pool to the upstream clusters.
   ConnPoolSettings settings = 3 [(validate.rules).message = {required: true}];
@@ -230,8 +280,9 @@ message RedisProxy {
   // AUTH, but no password is set" error will be returned.
   config.core.v3.DataSource downstream_auth_password = 6 [(udpa.annotations.sensitive) = true];
 
-  string hidden_envoy_deprecated_cluster = 2
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  // List of faults.
+  // TODO: More description, example config
+  repeated RedisFault faults = 7;
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in

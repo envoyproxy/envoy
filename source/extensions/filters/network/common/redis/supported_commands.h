@@ -34,6 +34,11 @@ struct SupportedCommands {
         "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore");
   }
 
+  // TEST -- TODO Remove
+    static const absl::flat_hash_set<std::string>& testCommands() {
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "get");
+    }
+
   /**
    * @return commands which hash on the fourth argument
    */

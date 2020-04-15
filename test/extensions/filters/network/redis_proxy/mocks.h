@@ -7,6 +7,7 @@
 #include "extensions/common/redis/cluster_refresh_manager.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
+#include "extensions/filters/network/common/redis/fault.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 #include "extensions/filters/network/redis_proxy/router.h"
@@ -49,6 +50,16 @@ public:
   MOCK_METHOD(bool, shouldMirror, (const std::string&), (const));
 
   ConnPool::InstanceSharedPtr conn_pool_;
+};
+
+class MockFaultManager : public Common::Redis::FaultManager {
+public:
+  MockFaultManager();
+  MockFaultManager(const MockFaultManager &other);
+  ~MockFaultManager();
+
+  MOCK_METHOD((absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>>), getFaultForCommand, (std::string));
+  MOCK_METHOD(int, numberOfFaults, ());
 };
 
 namespace ConnPool {

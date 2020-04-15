@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <map>
+#include <list>
 
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/base.pb.h"

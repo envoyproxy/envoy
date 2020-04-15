@@ -58,7 +58,9 @@ changed to microseconds by setting the configuration parameter :ref:`latency_in_
   total, Counter, Number of commands
   success, Counter, Number of commands that were successful
   error, Counter, Number of commands that returned a partial or complete error response
-  latency, Histogram, Command execution time in milliseconds
+  latency, Histogram, Command execution time in milliseconds (including delay faults)
+  error_fault, Counter, Number of commands that had an error fault injected
+  delay_fault, Counter, Number of commands that had a delay fault injected
   
 .. _config_network_filters_redis_proxy_per_command_stats:
 
@@ -70,3 +72,16 @@ The Redis proxy filter supports the following runtime settings:
 redis.drain_close_enabled
   % of connections that will be drain closed if the server is draining and would otherwise
   attempt a drain close. Defaults to 100.
+
+.. _config_network_filters_redis_proxy_fault_injection:
+
+Fault Injection
+-------------
+
+The Redis filter can perform fault injection. Currently, Delay and Error faults are supported.
+Delay faults delay a request, and Error faults respond with an error. Moreover, errors can be delayed.
+
+Note that if a delay is injected, the delay is additive- if the request took 400ms and a delay of 100ms
+is injected, then the total request latency is 500ms. Also, due to implementation of the redis proxy,
+a delayed request will delay everything that comes in after it, due to the proxy's need to respect the 
+order of commands it receives.

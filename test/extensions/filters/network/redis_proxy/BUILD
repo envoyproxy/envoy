@@ -26,8 +26,11 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/redis_proxy:router_interface",
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/mocks/runtime:runtime_mocks",
     ],
 )
 
@@ -84,6 +87,7 @@ envoy_cc_mock(
         "//source/extensions/common/redis:cluster_refresh_manager_interface",
         "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/common/redis:fault_interface",
         "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
         "//source/extensions/filters/network/redis_proxy:conn_pool_interface",
         "//source/extensions/filters/network/redis_proxy:router_interface",

@@ -79,7 +79,9 @@ void SplitRequestBase::updateStats(const bool success) {
   } else {
     command_stats_.error_.inc();
   }
-  command_latency_->complete();
+  if (!delay_command_latency_) {
+    command_latency_->complete();
+  }
 }
 
 SingleServerRequest::~SingleServerRequest() { ASSERT(!handle_); }
@@ -122,6 +124,53 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   }
 
   return request_ptr;
+}
+
+const std::string ErrorFaultRequest::FAULT_INJECTED_ERROR = "Fault Injected: Error";
+
+SplitRequestPtr ErrorFaultRequest::create(Router& router,
+                                      Common::Redis::RespValuePtr&& incoming_request,
+                                      SplitCallbacks& callbacks, CommandStats& command_stats,
+                                      TimeSource& time_source) {
+  std::unique_ptr<ErrorFaultRequest> request_ptr{
+      new ErrorFaultRequest(callbacks, command_stats, time_source)};
+
+  const auto route = router.upstreamPool(incoming_request->asArray()[1].asString());
+  if (route) {
+    request_ptr->onResponse(Common::Redis::Utility::makeError(FAULT_INJECTED_ERROR));
+    command_stats.error_.inc();
+    request_ptr->command_stats_.error_fault_.inc();
+  }
+  
+  return request_ptr;
+}
+
+std::unique_ptr<DelayFaultRequest> DelayFaultRequest::create(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, 
+    Event::Dispatcher& dispatcher, std::chrono::milliseconds delay) {
+  std::unique_ptr<DelayFaultRequest> delay_fault_ptr{new DelayFaultRequest(callbacks, command_stats, time_source, dispatcher, delay)};
+  return delay_fault_ptr;
+}
+
+void DelayFaultRequest::onResponse(Common::Redis::RespValuePtr&& response) {
+  response_ = std::move(response);
+  dispatcher_.post([this]() {
+    delay_timer_ = dispatcher_.createTimer([this]()-> void {
+      onDelayResponse();
+    });
+    delay_timer_->enableTimer(delay_);
+  });
+}
+
+void DelayFaultRequest::onDelayResponse() {
+  command_stats_.delay_fault_.inc();
+  wrapped_request_ptr_->completeLatency();
+  callbacks_.onResponse(std::move(response_));
+  delay_timer_ = nullptr;
+}
+
+void DelayFaultRequest::cancel() {
+  delay_timer_->disableTimer();
+  delay_timer_ = nullptr;
 }
 
 SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
@@ -392,12 +441,13 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
 }
 
 InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
-                           TimeSource& time_source, bool latency_in_micros)
+                           TimeSource& time_source, bool latency_in_micros, 
+                           Event::Dispatcher& dispatcher, Common::Redis::FaultManagerPtr&& fault_manager)
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
-      split_keys_sum_result_handler_(*router_),
+      split_keys_sum_result_handler_(*router_), error_fault_handler_(*router_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
-      time_source_(time_source) {
+      time_source_(time_source), dispatcher_(dispatcher), fault_manager_(fault_manager) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
@@ -416,6 +466,8 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 
   addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mset(), latency_in_micros,
              mset_handler_);
+
+  addHandler(scope, stat_prefix, ERROR_FAULT, latency_in_micros, error_fault_handler_);
 }
 
 SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
@@ -463,6 +515,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
+  // Get the handler for the downstream request
   auto handler = handler_lookup_table_.find(to_lower_string.c_str());
   if (handler == nullptr) {
     stats_.unsupported_command_.inc();
@@ -470,11 +523,48 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
         fmt::format("unsupported command '{}'", request->asArray()[0].asString())));
     return nullptr;
   }
+
+  // Fault Injection Check
+  absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>> fault = fault_manager_->getFaultForCommand(to_lower_string);
+
+  // Start request
   ENVOY_LOG(debug, "redis: splitting '{}'", request->toString());
   handler->command_stats_.total_.inc();
-  SplitRequestPtr request_ptr = handler->handler_.get().startRequest(
+  if(!fault.has_value()) {
+    SplitRequestPtr request_ptr = handler->handler_.get().startRequest(
       std::move(request), callbacks, handler->command_stats_, time_source_);
-  return request_ptr;
+    return request_ptr;
+  }
+
+  // Fault injection
+
+  // Check if delay, and if so adjust callbacks.
+  bool has_delay_fault = fault.has_value() && fault.value().second > std::chrono::milliseconds(0);
+  std::unique_ptr<DelayFaultRequest> delay_fault_ptr;
+  if (has_delay_fault) {
+    delay_fault_ptr = DelayFaultRequest::create(callbacks, handler->command_stats_, time_source_, dispatcher_, fault.value().second);
+  }
+
+  // Next, check there are any non-delay faults, or if we should just use the downstream request.
+  // Note: 
+  // 1) The command_stats_ object of the original request is used for faults, so that our downstream metrics reflect any
+  // faults added (with special fault metrics) or extra latency from a delay.
+  // 2) we use a ternary operator for the callback parameter- we want to use the delay_fault as callback if there is a delay.
+  SplitRequestPtr request_ptr;
+  if (fault.has_value() && fault.value().first == Common::Redis::FaultType::Error) { // Only support Error fault currently
+    request_ptr = error_fault_handler_.startRequest(std::move(request), has_delay_fault ? *delay_fault_ptr : callbacks, handler->command_stats_, time_source_);
+  } else {
+    request_ptr = handler->handler_.get().startRequest(std::move(request), has_delay_fault ? *delay_fault_ptr : callbacks, handler->command_stats_, time_source_);
+  }
+
+  // Complete delay, if any. The delay fault takes ownership of the wrapped request.
+  if (has_delay_fault) {
+    request_ptr->delayLatencyMetric();
+    delay_fault_ptr->wrapped_request_ptr_ = std::move(request_ptr);
+    return delay_fault_ptr;
+  } else {
+    return request_ptr;
+  }
 }
 
 void InstanceImpl::onInvalidRequest(SplitCallbacks& callbacks) {
