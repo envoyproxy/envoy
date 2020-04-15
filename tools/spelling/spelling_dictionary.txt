@@ -166,6 +166,7 @@ LDS
 LEV
 LF
 LHS
+LLC
 LLVM
 LPT
 LRS
@@ -984,6 +985,7 @@ stacktrace
 startup
 stateful
 statsd
+statusor
 stderr
 stdev
 stdout
