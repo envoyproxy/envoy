@@ -54,9 +54,6 @@ message Compressor {
   // A compressor library to use for compression. Currently only
   // :ref:`envoy.filters.http.compressor.gzip<envoy_api_msg_extensions.filters.http.compressor.gzip.v3.Gzip>`
   // is included in Envoy.
-  //
-  // This field is ignored when used in the context of the deprecated "envoy.filters.http.gzip"
-  // filter.
   CompressorLibrary compressor_library = 6 [(validate.rules).message = {required: true}];
 }
 
