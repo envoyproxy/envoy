@@ -54,7 +54,7 @@ public:
   void connect();
   void shutdown(bool destroy);
 
-  ~HazelcastHttpCache();
+  ~HazelcastHttpCache() override;
 
 private:
   friend class HazelcastHttpCacheTestBase;

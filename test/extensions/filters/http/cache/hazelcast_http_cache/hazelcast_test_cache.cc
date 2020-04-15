@@ -13,9 +13,9 @@ HazelcastTestableLocalCache::HazelcastTestableLocalCache(HazelcastHttpCacheConfi
       HazelcastCache(config.unified(), config.body_partition_size(), config.max_body_size()) {}
 
 void HazelcastTestableLocalCache::clearTestMaps() {
-  headerMap.clear();
-  bodyMap.clear();
-  responseMap.clear();
+  header_map_.clear();
+  body_map_.clear();
+  response_map_.clear();
 }
 
 void HazelcastTestableLocalCache::dropTestConnection() { connected_ = false; }
@@ -24,28 +24,28 @@ void HazelcastTestableLocalCache::restoreTestConnection() { connected_ = true; }
 
 int HazelcastTestableLocalCache::headerTestMapSize() {
   ASSERT(!unified_);
-  return headerMap.size();
+  return header_map_.size();
 }
 
 int HazelcastTestableLocalCache::bodyTestMapSize() {
   ASSERT(!unified_);
-  return bodyMap.size();
+  return body_map_.size();
 }
 
 int HazelcastTestableLocalCache::responseTestMapSize() {
   ASSERT(unified_);
-  return responseMap.size();
+  return response_map_.size();
 }
 
 void HazelcastTestableLocalCache::putTestResponse(uint64_t key,
                                                   const HazelcastResponseEntry& entry) {
   checkConnection();
-  responseMap[mapKey(key)] = HazelcastResponsePtr(new HazelcastResponseEntry(entry));
+  response_map_[mapKey(key)] = HazelcastResponsePtr(new HazelcastResponseEntry(entry));
 }
 
 void HazelcastTestableLocalCache::removeTestBody(uint64_t key, uint64_t order) {
   checkConnection();
-  bodyMap.erase(orderedMapKey(key, order));
+  body_map_.erase(orderedMapKey(key, order));
 }
 
 LookupContextPtr HazelcastTestableLocalCache::makeLookupContext(LookupRequest&& request) {
@@ -72,23 +72,23 @@ void HazelcastTestableLocalCache::updateHeaders(LookupContextPtr&& lookup_contex
   ASSERT(response_headers);
 }
 
-CacheInfo HazelcastTestableLocalCache::cacheInfo() const { return CacheInfo(); }
+CacheInfo HazelcastTestableLocalCache::cacheInfo() const { return {}; }
 
 void HazelcastTestableLocalCache::putHeader(const uint64_t key, const HazelcastHeaderEntry& entry) {
   checkConnection();
-  headerMap[mapKey(key)] = HazelcastHeaderPtr(new HazelcastHeaderEntry(entry));
+  header_map_[mapKey(key)] = HazelcastHeaderPtr(new HazelcastHeaderEntry(entry));
 }
 
 void HazelcastTestableLocalCache::putBody(const uint64_t key, const uint64_t order,
                                           const HazelcastBodyEntry& entry) {
   checkConnection();
-  bodyMap[orderedMapKey(key, order)] = HazelcastBodyPtr(new HazelcastBodyEntry(entry));
+  body_map_[orderedMapKey(key, order)] = HazelcastBodyPtr(new HazelcastBodyEntry(entry));
 }
 
 HazelcastHeaderPtr HazelcastTestableLocalCache::getHeader(const uint64_t key) {
   checkConnection();
-  auto result = headerMap.find(mapKey(key));
-  if (result != headerMap.end()) {
+  auto result = header_map_.find(mapKey(key));
+  if (result != header_map_.end()) {
     // New objects are created during deserialization. Hence not returning the original one here.
     return HazelcastHeaderPtr(new HazelcastHeaderEntry(*result->second));
   } else {
@@ -98,8 +98,8 @@ HazelcastHeaderPtr HazelcastTestableLocalCache::getHeader(const uint64_t key) {
 
 HazelcastBodyPtr HazelcastTestableLocalCache::getBody(const uint64_t key, const uint64_t order) {
   checkConnection();
-  auto result = bodyMap.find(orderedMapKey(key, order));
-  if (result != bodyMap.end()) {
+  auto result = body_map_.find(orderedMapKey(key, order));
+  if (result != body_map_.end()) {
     return HazelcastBodyPtr(new HazelcastBodyEntry(*result->second));
   } else {
     return nullptr;
@@ -117,9 +117,9 @@ void HazelcastTestableLocalCache::onMissingBody(uint64_t key, int32_t version, u
   }
   int body_count = body_size / body_partition_size_;
   while (body_count >= 0) {
-    bodyMap.erase(orderedMapKey(key, body_count--));
+    body_map_.erase(orderedMapKey(key, body_count--));
   }
-  headerMap.erase(mapKey(key));
+  header_map_.erase(mapKey(key));
   unlock(key);
 }
 void HazelcastTestableLocalCache::onVersionMismatch(uint64_t key, int32_t version,
@@ -130,16 +130,16 @@ void HazelcastTestableLocalCache::onVersionMismatch(uint64_t key, int32_t versio
 void HazelcastTestableLocalCache::putResponseIfAbsent(const uint64_t key,
                                                       const HazelcastResponseEntry& entry) {
   checkConnection();
-  if (responseMap.find(mapKey(key)) != responseMap.end()) {
+  if (response_map_.find(mapKey(key)) != response_map_.end()) {
     return;
   }
-  responseMap[mapKey(key)] = HazelcastResponsePtr(new HazelcastResponseEntry(entry));
+  response_map_[mapKey(key)] = HazelcastResponsePtr(new HazelcastResponseEntry(entry));
 }
 
 HazelcastResponsePtr HazelcastTestableLocalCache::getResponse(const uint64_t key) {
   checkConnection();
-  auto result = responseMap.find(mapKey(key));
-  if (result != responseMap.end()) {
+  auto result = response_map_.find(mapKey(key));
+  if (result != response_map_.end()) {
     return HazelcastResponsePtr(new HazelcastResponseEntry(*result->second));
   } else {
     return nullptr;
@@ -149,19 +149,20 @@ HazelcastResponsePtr HazelcastTestableLocalCache::getResponse(const uint64_t key
 bool HazelcastTestableLocalCache::tryLock(const uint64_t key) {
   checkConnection();
   if (unified_) {
-    bool locked = std::find(responseLocks.begin(), responseLocks.end(), key) != responseLocks.end();
+    bool locked =
+        std::find(response_locks_.begin(), response_locks_.end(), key) != response_locks_.end();
     if (locked) {
       return false;
     } else {
-      responseLocks.push_back(key);
+      response_locks_.push_back(key);
       return true;
     }
   } else {
-    bool locked = std::find(headerLocks.begin(), headerLocks.end(), key) != headerLocks.end();
+    bool locked = std::find(header_locks_.begin(), header_locks_.end(), key) != header_locks_.end();
     if (locked) {
       return false;
     } else {
-      headerLocks.push_back(key);
+      header_locks_.push_back(key);
       return true;
     }
   }
@@ -170,10 +171,11 @@ bool HazelcastTestableLocalCache::tryLock(const uint64_t key) {
 void HazelcastTestableLocalCache::unlock(const uint64_t key) {
   checkConnection();
   if (unified_) {
-    responseLocks.erase(std::remove(responseLocks.begin(), responseLocks.end(), key),
-                        responseLocks.end());
+    response_locks_.erase(std::remove(response_locks_.begin(), response_locks_.end(), key),
+                          response_locks_.end());
   } else {
-    headerLocks.erase(std::remove(headerLocks.begin(), headerLocks.end(), key), headerLocks.end());
+    header_locks_.erase(std::remove(header_locks_.begin(), header_locks_.end(), key),
+                        header_locks_.end());
   }
 }
 

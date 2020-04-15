@@ -14,7 +14,7 @@ namespace HazelcastHttpCache {
  * Tests for UNIFIED cache mode.
  */
 class HazelcastUnifiedCacheTest : public HazelcastHttpCacheTestBase {
-  void SetUp() {
+  void SetUp() override {
     HazelcastHttpCacheConfig config = HazelcastTestUtil::getTestConfig(true);
     // To test the cache with a real Hazelcast instance, remote cache
     // must be used during tests.

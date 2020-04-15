@@ -46,8 +46,8 @@ void HazelcastHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
     ENVOY_LOG(warn, "Hazelcast Connection is offline!");
   } catch (OperationTimeoutException e) {
     ENVOY_LOG(warn, "Updating headers has timed out.");
-  } catch (...) {
-    ENVOY_LOG(warn, "Updating headers has failed.");
+  } catch (std::exception& e) {
+    ENVOY_LOG(warn, "Updating headers has failed: {}", e.what());
   }
 }
 
@@ -105,8 +105,8 @@ void HazelcastHttpCache::onMissingBody(uint64_t key, int32_t version, uint64_t b
     ENVOY_LOG(warn, "Hazelcast Connection is offline!");
   } catch (OperationTimeoutException e) {
     ENVOY_LOG(warn, "Clean up for missing body has timed out.");
-  } catch (...) {
-    ENVOY_LOG(warn, "Clean up for missing body has failed.");
+  } catch (std::exception& e) {
+    ENVOY_LOG(warn, "Clean up for missing body has failed: {}", e.what());
   }
 }
 
@@ -242,8 +242,8 @@ HttpCache& HazelcastHttpCacheFactory::getCache(
     HazelcastHttpCacheConfig hz_cache_config;
     MessageUtil::unpackTo(config.typed_config(), hz_cache_config);
     cache_ = std::make_unique<HazelcastHttpCache>(hz_cache_config);
+    cache_->connect();
   }
-  cache_->connect();
   return *cache_;
 }
 

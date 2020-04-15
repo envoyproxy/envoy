@@ -107,8 +107,9 @@ protected:
               const absl::string_view response_body) {
     InsertContextPtr insert_context = cache_->base().makeInsertContext(move(lookup));
     insert_context->insertHeaders(response_headers, response_body == nullptr);
-    if (response_body == nullptr)
+    if (response_body == nullptr) {
       return;
+    }
     insert_context->insertBody(Buffer::OwnedImpl(response_body), nullptr, true);
   }
 

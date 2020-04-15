@@ -13,7 +13,7 @@ namespace HazelcastHttpCache {
  */
 class HazelcastDividedCacheTest : public HazelcastHttpCacheTestBase {
 protected:
-  void SetUp() {
+  void SetUp() override {
     HazelcastHttpCacheConfig config = HazelcastTestUtil::getTestConfig(false);
     // To test the cache with a real Hazelcast instance, remote cache
     // must be used during tests.

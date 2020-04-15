@@ -39,7 +39,7 @@ void HazelcastLookupContextBase::handleLookupFailure(absl::string_view message,
 void HazelcastLookupContextBase::createVariantKey(Key& raw_key) {
   ASSERT(raw_key.custom_fields_size() == 0);
   ASSERT(raw_key.custom_ints_size() == 0); // Key must be pure.
-  if (lookup_request_.vary_headers().size() == 0) {
+  if (lookup_request_.vary_headers().empty()) {
     return;
   }
   std::vector<std::pair<std::string, std::string>> header_strings;
@@ -109,8 +109,8 @@ void UnifiedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
   } catch (OperationTimeoutException e) {
     handleLookupFailure("Operation timed out during cache lookup.", cb);
     return;
-  } catch (...) {
-    handleLookupFailure("Lookup to cache has failed.", cb);
+  } catch (std::exception& e) {
+    handleLookupFailure(fmt::format("Lookup to cache has failed: {}", e.what()), cb);
     return;
   }
   if (response_) {
@@ -211,8 +211,8 @@ void UnifiedInsertContext::insertResponse() {
     ENVOY_LOG(warn, "Hazelcast cluster connection is lost! Failed to insert response.");
   } catch (OperationTimeoutException e) {
     ENVOY_LOG(warn, "Operation timed out during cache insertion.");
-  } catch (...) {
-    ENVOY_LOG(warn, "Response insertion to cache has failed.");
+  } catch (std::exception& e) {
+    ENVOY_LOG(warn, "Response insertion to cache has failed: {}", e.what());
   }
 }
 
@@ -233,8 +233,8 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
   } catch (OperationTimeoutException e) {
     handleLookupFailure("Operation timed out during cache lookup.", cb);
     return;
-  } catch (...) {
-    handleLookupFailure("Lookup to cache has failed.", cb);
+  } catch (std::exception& e) {
+    handleLookupFailure(fmt::format("Lookup to cache has failed: {}", e.what()), cb);
     return;
   }
   if (header_entry) {
@@ -268,8 +268,8 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
                           " until the connection is restored...",
                           cb);
       return;
-    } catch (...) {
-      handleLookupFailure("Lock trial has failed.", cb);
+    } catch (std::exception& e) {
+      handleLookupFailure(fmt::format("Lock trial has failed: {}", e.what()), cb);
       return;
     }
     cb(LookupResult{});
@@ -308,8 +308,9 @@ void DividedLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCal
   } catch (OperationTimeoutException e) {
     handleBodyLookupFailure("Operation timed out during cache lookup.", cb);
     return;
-  } catch (...) {
-    handleBodyLookupFailure("Lookup to cache for body entry has failed.", cb);
+  } catch (std::exception& e) {
+    handleBodyLookupFailure(fmt::format("Lookup to cache for body entry has failed: {}", e.what()),
+                            cb);
     return;
   }
 
@@ -439,7 +440,7 @@ void DividedInsertContext::copyIntoLocalBuffer(uint64_t& offset, uint64_t size,
 
 bool DividedInsertContext::flushBuffer() {
   ASSERT(!abort_insertion_);
-  if (buffer_vector_.size() == 0) {
+  if (buffer_vector_.empty()) {
     return true;
   }
   total_body_size_ += buffer_vector_.size();
@@ -454,8 +455,8 @@ bool DividedInsertContext::flushBuffer() {
   } catch (OperationTimeoutException e) {
     ENVOY_LOG(warn, "Operation timed out during body insertion.");
     return false;
-  } catch (...) {
-    ENVOY_LOG(warn, "Body insertion to cache has failed.");
+  } catch (std::exception& e) {
+    ENVOY_LOG(warn, "Body insertion to cache has failed: {}", e.what());
     return false;
   }
   if (body_order_ == ConfigUtil::partitionWarnLimit()) {
@@ -486,8 +487,8 @@ void DividedInsertContext::insertHeader() {
     // option can be used when available in a future release of cpp client. The related
     // issue can be tracked at: https://github.com/hazelcast/hazelcast-cpp-client/issues/579
     // TODO(enozcan): Use tryLock with leaseTime when released for Hazelcast cpp client.
-  } catch (...) {
-    ENVOY_LOG(warn, "Failed to complete response insertion.");
+  } catch (std::exception& e) {
+    ENVOY_LOG(warn, "Failed to complete response insertion: {}", e.what());
   }
 }
 

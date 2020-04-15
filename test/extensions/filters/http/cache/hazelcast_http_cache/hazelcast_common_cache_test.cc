@@ -16,7 +16,7 @@ namespace HazelcastHttpCache {
 class HazelcastHttpCacheTest : public HazelcastHttpCacheTestBase,
                                public testing::WithParamInterface<bool> {
 protected:
-  void SetUp() {
+  void SetUp() override {
     HazelcastHttpCacheConfig config = HazelcastTestUtil::getTestConfig(GetParam());
     // To test the cache with a real Hazelcast instance, remote cache
     // must be used during tests.

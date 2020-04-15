@@ -39,11 +39,11 @@ public:
   HazelcastHeaderEntry(Http::ResponseHeaderMapPtr&& header_map, Key&& key, uint64_t body_size,
                        int32_t version);
   HazelcastHeaderEntry(const HazelcastHeaderEntry& other);
-  HazelcastHeaderEntry(HazelcastHeaderEntry&& other);
+  HazelcastHeaderEntry(HazelcastHeaderEntry&& other) noexcept;
 
   // hazelcast::client::serialization::IdentifiedDataSerializable
-  void writeData(ObjectDataOutput& writer) const;
-  void readData(ObjectDataInput& reader);
+  void writeData(ObjectDataOutput& writer) const override;
+  void readData(ObjectDataInput& reader) override;
 
   // Only required fields of a header entry for unified mode are
   // de/serialized in unifiedData methods.
@@ -61,8 +61,8 @@ public:
 
 private:
   // hazelcast::client::serialization::IdentifiedDataSerializable
-  int getClassId() const { return HAZELCAST_HEADER_TYPE_ID; }
-  int getFactoryId() const { return HAZELCAST_ENTRY_SERIALIZER_FACTORY_ID; }
+  int getClassId() const override { return HAZELCAST_HEADER_TYPE_ID; }
+  int getFactoryId() const override { return HAZELCAST_ENTRY_SERIALIZER_FACTORY_ID; }
 
   Http::ResponseHeaderMapPtr header_map_;
 
@@ -93,11 +93,11 @@ public:
   HazelcastBodyEntry();
   HazelcastBodyEntry(int64_t header_key, std::vector<hazelcast::byte>&& buffer, int32_t version);
   HazelcastBodyEntry(const HazelcastBodyEntry& other);
-  HazelcastBodyEntry(HazelcastBodyEntry&& other);
+  HazelcastBodyEntry(HazelcastBodyEntry&& other) noexcept;
 
   // hazelcast::client::serialization::IdentifiedDataSerializable
-  void writeData(ObjectDataOutput& writer) const;
-  void readData(ObjectDataInput& reader);
+  void writeData(ObjectDataOutput& writer) const override;
+  void readData(ObjectDataInput& reader) override;
 
   // Only required fields of a body entry for unified mode are
   // de/serialized in unifiedData methods.
@@ -114,11 +114,11 @@ public:
 
 private:
   // hazelcast::client::serialization::IdentifiedDataSerializable
-  int getClassId() const { return HAZELCAST_BODY_TYPE_ID; }
-  int getFactoryId() const { return HAZELCAST_ENTRY_SERIALIZER_FACTORY_ID; }
+  int getClassId() const override { return HAZELCAST_BODY_TYPE_ID; }
+  int getFactoryId() const override { return HAZELCAST_ENTRY_SERIALIZER_FACTORY_ID; }
 
   // hazelcast::client::PartitionAware
-  const int64_t* getPartitionKey() const { return &header_key_; }
+  const int64_t* getPartitionKey() const override { return &header_key_; }
 
   /** The same hash key with the corresponding header. */
   // Not stored in distributed map but used to store related bodies in the same
@@ -149,10 +149,10 @@ public:
 
 private:
   // hazelcast::client::serialization::IdentifiedDataSerializable
-  void writeData(ObjectDataOutput& writer) const;
-  void readData(ObjectDataInput& reader);
-  int getClassId() const { return HAZELCAST_RESPONSE_TYPE_ID; }
-  int getFactoryId() const { return HAZELCAST_ENTRY_SERIALIZER_FACTORY_ID; }
+  void writeData(ObjectDataOutput& writer) const override;
+  void readData(ObjectDataInput& reader) override;
+  int getClassId() const override { return HAZELCAST_RESPONSE_TYPE_ID; }
+  int getFactoryId() const override { return HAZELCAST_ENTRY_SERIALIZER_FACTORY_ID; }
 
   HazelcastHeaderEntry response_header_;
   HazelcastBodyEntry response_body_;
@@ -172,8 +172,8 @@ class HazelcastCacheEntrySerializableFactory : public DataSerializableFactory {
 public:
   static const int FACTORY_ID = HAZELCAST_ENTRY_SERIALIZER_FACTORY_ID;
 
-  virtual std::auto_ptr<IdentifiedDataSerializable> create(int32_t classId) {
-    switch (classId) {
+  std::auto_ptr<IdentifiedDataSerializable> create(int32_t class_id) override {
+    switch (class_id) {
     case HAZELCAST_BODY_TYPE_ID:
       return std::auto_ptr<IdentifiedDataSerializable>(new HazelcastBodyEntry());
     case HAZELCAST_HEADER_TYPE_ID:

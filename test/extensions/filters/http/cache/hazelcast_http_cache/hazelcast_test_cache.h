@@ -82,12 +82,12 @@ private:
     }
   }
 
-  std::unordered_map<int64_t, HazelcastHeaderPtr> headerMap;
-  std::unordered_map<std::string, HazelcastBodyPtr> bodyMap;
-  std::unordered_map<int64_t, HazelcastResponsePtr> responseMap;
+  std::unordered_map<int64_t, HazelcastHeaderPtr> header_map_;
+  std::unordered_map<std::string, HazelcastBodyPtr> body_map_;
+  std::unordered_map<int64_t, HazelcastResponsePtr> response_map_;
 
-  std::vector<uint64_t> headerLocks;
-  std::vector<uint64_t> responseLocks;
+  std::vector<uint64_t> header_locks_;
+  std::vector<uint64_t> response_locks_;
 
   bool connected_ = false;
   uint32_t random_counter_ = 0;

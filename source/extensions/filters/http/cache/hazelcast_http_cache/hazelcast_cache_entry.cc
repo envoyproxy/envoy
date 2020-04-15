@@ -74,7 +74,7 @@ HazelcastHeaderEntry::HazelcastHeaderEntry(const HazelcastHeaderEntry& other) {
   version_ = other.version_;
 }
 
-HazelcastHeaderEntry::HazelcastHeaderEntry(HazelcastHeaderEntry&& other)
+HazelcastHeaderEntry::HazelcastHeaderEntry(HazelcastHeaderEntry&& other) noexcept
     : header_map_(std::move(other.header_map_)), variant_key_(std::move(other.variant_key_)),
       body_size_(other.body_size_), version_(other.version_) {}
 
@@ -108,7 +108,7 @@ HazelcastBodyEntry::HazelcastBodyEntry(const HazelcastBodyEntry& other) {
   version_ = other.version_;
 }
 
-HazelcastBodyEntry::HazelcastBodyEntry(HazelcastBodyEntry&& other)
+HazelcastBodyEntry::HazelcastBodyEntry(HazelcastBodyEntry&& other) noexcept
     : header_key_(other.header_key_), version_(other.version_),
       body_buffer_(std::move(other.body_buffer_)) {}
 
