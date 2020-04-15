@@ -18,7 +18,7 @@ message Headers {
 
 message HttpBody {
   // The bytes that will be used as the request body.
-  repeated string data = 1 [(validate.rules).repeated.min_items = 1];
+  repeated string data = 1 [(validate.rules).repeated .min_items = 1];
 }
 
 // HttpBody cannot efficiently create serialized protos.
