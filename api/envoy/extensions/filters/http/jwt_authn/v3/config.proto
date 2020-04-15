@@ -117,6 +117,13 @@ message JwtProvider {
     //      inline_string: ACADADADADA
     //
     config.core.v3.DataSource local_jwks = 4;
+
+
+    // The two below fields define the amount of slack in seconds that will be used
+    // when determining if a JWT is valid or has expired. Validity is determined by
+    // the formula: VALID_FROM("iat") - nbf_slack_slack <= NOW <= VALID_TO("exp") + exp_slack.    
+    int64 nbf_slack = 0;
+    int64 exp_slack = 0;
   }
 
   // If false, the JWT is removed in the request after a success verification. If true, the JWT is

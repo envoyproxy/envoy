@@ -103,7 +103,6 @@ private:
 
   // allow 5 seconds of slack when determining token expery
   const uint64_t jwt_exp_slack = 5;
-  uint64_t now;
 };
 
 std::string AuthenticatorImpl::name() const {
@@ -160,22 +159,25 @@ void AuthenticatorImpl::startVerify() {
   }
 
   // Check "exp" claim.
-  // We use the current system time and allow for up to 5 seconds of slack.
+  // We use the current system time and allow for a configurable amount of slack.
   // Consider the following case:
   // AWS ALB receives a request and determines that the existing access token is valid 
   // (for another 1 seconds), forwards the request to Istio Ingressgateway and subsequently 
   // to some pod with an envoy sidecar. Meanwhile, 0.1 seconds have passed and when envoy checks 
   // the token it finds that it has expired.
-  now = absl::ToUnixSeconds(absl::Now());
+  const uint64_t now = absl::ToUnixSeconds(absl::Now());
+  const int64_t nbf_slack = jwks_data_->getJwtProvider().nbf_slack();
+  const int64_t exp_slack = jwks_data_->getJwtProvider().exp_slack();
+
   // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
   // to 0.
-  if (jwt_->nbf_ > now) {
+  if (jwt_->nbf_ - nbf_slack > now) {
     doneWithStatus(Status::JwtNotYetValid);
     return;
   }
   // If the exp claim does *not* appear in the JWT then the exp field is defaulted
   // to 0.
-  if (jwt_->exp_ > 0 && jwt_->exp_ < now - jwt_exp_slack) {
+  if (jwt_->exp_ > 0 && jwt_->exp_ - exp_slack < now) {
     doneWithStatus(Status::JwtExpired);
     return;
   }
@@ -243,7 +245,7 @@ void AuthenticatorImpl::onDestroy() {
 
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
-  const Status status = ::google::jwt_verify::verifyJwt(*jwt_, *jwks_data_->getJwksObj(), now - jwt_exp_slack);
+  const Status status = ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;

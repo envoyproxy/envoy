@@ -30,8 +30,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
-        "@com_google_absl//absl/time",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",        
     ],
 )
 
@@ -42,6 +41,7 @@ envoy_cc_library(
     deps = [
         ":extractor_lib",
         ":jwks_cache_lib",
+        "@com_google_absl//absl/time",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/http:message_lib",
