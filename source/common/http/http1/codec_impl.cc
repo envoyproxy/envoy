@@ -42,6 +42,15 @@ struct Http1HeaderTypesValues {
   const absl::string_view Trailers = "trailers";
 };
 
+// The following define special return values for http_parser callbacks. http_parser callbacks
+// should return non-zero to indicate an error and halt execution. The one exception is
+// on_headers_complete, where returning '1' will tell http_parser that it should not expect a body,
+// and returning '2' from on_headers_complete will tell http_parser that it should not expect a body
+// nor any further data on the connection.
+constexpr int kCallbackError = -1;
+constexpr int kNoBody = 1;
+constexpr int kNoBodyOrData = 2;
+
 using Http1ResponseCodeDetails = ConstSingleton<Http1ResponseCodeDetailValues>;
 using Http1HeaderTypes = ConstSingleton<Http1HeaderTypesValues>;
 
@@ -382,7 +391,8 @@ http_parser_settings ConnectionImpl::settings_{
     [](http_parser* parser, const char* at, size_t length) -> int {
       Envoy::StatusOr<int> statusor =
           static_cast<ConnectionImpl*>(parser->data)->onHeaderField(at, length);
-      return statusor.ok() ? statusor.value() : 1;
+      // Halt execution with a non-zero code if the callback returns an error.
+      return statusor.ok() ? statusor.value() : kCallbackError;
     },
     [](http_parser* parser, const char* at, size_t length) -> int {
       static_cast<ConnectionImpl*>(parser->data)->onHeaderValue(at, length);
@@ -393,7 +403,7 @@ http_parser_settings ConnectionImpl::settings_{
           static_cast<ConnectionImpl*>(parser->data)->onHeadersCompleteBase();
       // Halt execution with a non-zero code that is not 1 or 2. These have special meanings for
       // on_headers_complete.
-      return statusor.ok() ? statusor.value() : 3;
+      return statusor.ok() ? statusor.value() : kCallbackError;
     },
     [](http_parser* parser, const char* at, size_t length) -> int {
       static_cast<ConnectionImpl*>(parser->data)->bufferBody(at, length);
@@ -402,7 +412,8 @@ http_parser_settings ConnectionImpl::settings_{
     [](http_parser* parser) -> int {
       Envoy::StatusOr<int> statusor =
           static_cast<ConnectionImpl*>(parser->data)->onMessageCompleteBase();
-      return statusor.ok() ? statusor.value() : 1;
+      // Halt execution with a non-zero code if the callback returns an error.
+      return statusor.ok() ? statusor.value() : kCallbackError;
     },
     [](http_parser* parser) -> int {
       // A 0-byte chunk header is used to signal the end of the chunked body.
@@ -439,6 +450,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
 }
 
 Envoy::StatusOr<int> ConnectionImpl::completeLastHeader() {
+  ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
 
@@ -452,8 +464,6 @@ Envoy::StatusOr<int> ConnectionImpl::completeLastHeader() {
 
   // Check if the number of headers exceeds the limit.
   if (headers_or_trailers.size() > max_headers_count_) {
-    // Crash if not dispatching_, otherwise set error and exit early from the parser.
-    RELEASE_ASSERT(dispatching_, "CodecProtocolError occurred outside of dispatching");
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError(Http1ResponseCodeDetails::get().TooManyHeaders);
     const absl::string_view header_type =
@@ -553,6 +563,7 @@ Envoy::StatusOr<ssize_t> ConnectionImpl::dispatchSlice(const char* slice, size_t
 }
 
 Envoy::StatusOr<int> ConnectionImpl::onHeaderField(const char* data, size_t length) {
+  ASSERT(dispatching_);
   // We previously already finished up the headers, these headers are
   // now trailers.
   if (header_parsing_state_ == HeaderParsingState::Done) {
@@ -614,6 +625,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 }
 
 Envoy::StatusOr<int> ConnectionImpl::onHeadersCompleteBase() {
+  ASSERT(dispatching_);
   ASSERT(!processing_trailers_);
   ENVOY_CONN_LOG(trace, "onHeadersCompleteBase", connection_);
   auto statusor = completeLastHeader();
@@ -672,7 +684,7 @@ Envoy::StatusOr<int> ConnectionImpl::onHeadersCompleteBase() {
   header_parsing_state_ = HeaderParsingState::Done;
 
   // Returning 2 informs http_parser to not expect a body or further data on this connection.
-  return handling_upgrade_ ? 2 : rc;
+  return handling_upgrade_ ? kNoBodyOrData : rc;
 }
 
 void ConnectionImpl::bufferBody(const char* data, size_t length) {
@@ -696,6 +708,7 @@ void ConnectionImpl::onChunkHeader(bool is_final_chunk) {
 }
 
 Envoy::StatusOr<int> ConnectionImpl::onMessageCompleteBase() {
+  ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "message complete", connection_);
 
   dispatchBufferedBody();
@@ -1060,7 +1073,7 @@ int ClientConnectionImpl::onHeadersComplete() {
 
   // Here we deal with cases where the response cannot have a body, but http_parser does not deal
   // with it for us.
-  return cannotHaveBody() ? 1 : 0;
+  return cannotHaveBody() ? kNoBody : 0;
 }
 
 bool ClientConnectionImpl::upgradeAllowed() const {
