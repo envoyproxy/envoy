@@ -22,6 +22,7 @@ absl::string_view statusCodeToString(StatusCode code) {
   case StatusCode::CodecClientError:
     return "CodecClientError";
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 struct EnvoyStatusPayload {
