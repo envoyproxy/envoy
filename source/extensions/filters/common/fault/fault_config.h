@@ -36,7 +36,7 @@ using HeaderNames = ConstSingleton<HeaderNameValues>;
 class HeaderPercentageProvider {
 public:
   HeaderPercentageProvider(const Http::LowerCaseString& header_name,
-                           const envoy::type::v3::FractionalPercent percentage)
+                           const envoy::type::v3::FractionalPercent& percentage)
       : header_name_(header_name), percentage_(percentage) {}
 
   // Return the percentage. Optionally passed HTTP headers that may contain the percentage number,
@@ -81,7 +81,7 @@ private:
   // Delay provider that uses a fixed abort status code.
   class FixedAbortProvider : public AbortProvider {
   public:
-    FixedAbortProvider(uint64_t status_code, const envoy::type::v3::FractionalPercent percentage)
+    FixedAbortProvider(uint64_t status_code, const envoy::type::v3::FractionalPercent& percentage)
         : status_code_(status_code), percentage_(percentage) {}
 
     // AbortProvider
@@ -101,7 +101,7 @@ private:
   // Abort provider the reads a status code from an HTTP header.
   class HeaderAbortProvider : public AbortProvider, public HeaderPercentageProvider {
   public:
-    HeaderAbortProvider(const envoy::type::v3::FractionalPercent percentage)
+    HeaderAbortProvider(const envoy::type::v3::FractionalPercent& percentage)
         : HeaderPercentageProvider(HeaderNames::get().AbortRequestPercentage, percentage) {}
     // AbortProvider
     absl::optional<Http::Code>
@@ -157,7 +157,7 @@ private:
   class FixedDelayProvider : public DelayProvider {
   public:
     FixedDelayProvider(std::chrono::milliseconds delay,
-                       const envoy::type::v3::FractionalPercent percentage)
+                       const envoy::type::v3::FractionalPercent& percentage)
         : delay_(delay), percentage_(percentage) {}
 
     // DelayProvider
@@ -178,7 +178,7 @@ private:
   // Delay provider the reads a delay from an HTTP header.
   class HeaderDelayProvider : public DelayProvider, public HeaderPercentageProvider {
   public:
-    HeaderDelayProvider(const envoy::type::v3::FractionalPercent percentage)
+    HeaderDelayProvider(const envoy::type::v3::FractionalPercent& percentage)
         : HeaderPercentageProvider(HeaderNames::get().DelayRequestPercentage, percentage) {}
     // DelayProvider
     absl::optional<std::chrono::milliseconds>
@@ -188,9 +188,6 @@ private:
     percentage(const Http::RequestHeaderMap* request_headers) const override {
       return HeaderPercentageProvider::percentage(request_headers);
     }
-
-  private:
-    const envoy::type::v3::FractionalPercent percentage_;
   };
 
   using DelayProviderPtr = std::unique_ptr<DelayProvider>;
@@ -238,7 +235,7 @@ private:
   // Rate limit provider that uses a fixed rate limit.
   class FixedRateLimitProvider : public RateLimitProvider {
   public:
-    FixedRateLimitProvider(uint64_t fixed_rate_kbps, envoy::type::v3::FractionalPercent percentage)
+    FixedRateLimitProvider(uint64_t fixed_rate_kbps, const envoy::type::v3::FractionalPercent& percentage)
         : fixed_rate_kbps_(fixed_rate_kbps), percentage_(percentage) {}
     absl::optional<uint64_t> rateKbps(const Http::RequestHeaderMap*) const override {
       return fixed_rate_kbps_;
@@ -256,7 +253,7 @@ private:
   // Rate limit provider that reads the rate limit from an HTTP header.
   class HeaderRateLimitProvider : public RateLimitProvider, public HeaderPercentageProvider {
   public:
-    HeaderRateLimitProvider(envoy::type::v3::FractionalPercent percentage)
+    HeaderRateLimitProvider(const envoy::type::v3::FractionalPercent& percentage)
         : HeaderPercentageProvider(HeaderNames::get().ThroughputResponsePercentage, percentage) {}
     // RateLimitProvider
     absl::optional<uint64_t> rateKbps(const Http::RequestHeaderMap* request_headers) const override;
@@ -264,9 +261,6 @@ private:
     percentage(const Http::RequestHeaderMap* request_headers) const override {
       return HeaderPercentageProvider::percentage(request_headers);
     }
-
-  private:
-    const envoy::type::v3::FractionalPercent percentage_;
   };
 
   using RateLimitProviderPtr = std::unique_ptr<RateLimitProvider>;
