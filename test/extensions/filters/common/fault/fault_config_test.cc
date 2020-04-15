@@ -46,28 +46,25 @@ TEST(FaultConfigTest, FaultAbortPercentageHeaderConfig) {
   Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request-percentage", "abc"}};
   const auto bad_headers_percentage = config.percentage(&bad_headers);
   EXPECT_EQ(proto_config.percentage().numerator(), bad_headers_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, bad_headers_percentage.denominator());
+  EXPECT_EQ(proto_config.percentage().denominator(), bad_headers_percentage.denominator());
 
   // Out of range header, value too low - fallback to proto config.
   Http::TestRequestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-request-percentage", "-1"}};
   const auto too_low_headers_percentage = config.percentage(&too_low_headers);
   EXPECT_EQ(proto_config.percentage().numerator(), too_low_headers_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, too_low_headers_percentage.denominator());
+  EXPECT_EQ(proto_config.percentage().denominator(), too_low_headers_percentage.denominator());
 
-  // Out of range header, value too high - fallback to proto config.
-  Http::TestRequestHeaderMapImpl too_high_headers{
-      {"x-envoy-fault-abort-request-percentage", "101"}};
-  const auto too_high_headers_percentage = config.percentage(&too_high_headers);
-  EXPECT_EQ(proto_config.percentage().numerator(), too_high_headers_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, too_high_headers_percentage.denominator());
-
-  // Valid header.
-  Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-abort-request-percentage", "60"}};
-  envoy::type::v3::FractionalPercent expected_percent;
-  expected_percent.set_numerator(60);
+  // Valid header with value greater than the value of the numerator of default percentage - use proto config.
+  Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-abort-request-percentage", "90"}};
   const auto good_headers_percentage = config.percentage(&good_headers);
-  EXPECT_EQ(expected_percent.numerator(), good_headers_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, good_headers_percentage.denominator());
+  EXPECT_EQ(proto_config.percentage().numerator(), good_headers_percentage.numerator());
+  EXPECT_EQ(proto_config.percentage().denominator(), good_headers_percentage.denominator());
+
+  // Valid header with value lesser than the value of the numerator of default percentage.
+  Http::TestRequestHeaderMapImpl greater_numerator_headers{{"x-envoy-fault-abort-request-percentage", "60"}};
+  const auto greater_numerator_headers_percentage = config.percentage(&greater_numerator_headers);
+  EXPECT_EQ(60, greater_numerator_headers_percentage.numerator());
+  EXPECT_EQ(proto_config.percentage().denominator(), greater_numerator_headers_percentage.denominator());
 }
 
 TEST(FaultConfigTest, FaultDelayHeaderConfig) {
@@ -88,35 +85,32 @@ TEST(FaultConfigTest, FaultDelayPercentageHeaderConfig) {
   envoy::extensions::filters::common::fault::v3::FaultDelay proto_config;
   proto_config.mutable_header_delay();
   proto_config.mutable_percentage()->set_numerator(80);
-  proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+  proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
   FaultDelayConfig config(proto_config);
 
   // Header with bad data - fallback to proto config.
   Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-delay-request-percentage", "abc"}};
   const auto bad_headers_percentage = config.percentage(&bad_headers);
   EXPECT_EQ(proto_config.percentage().numerator(), bad_headers_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, bad_headers_percentage.denominator());
+  EXPECT_EQ(proto_config.percentage().denominator(), bad_headers_percentage.denominator());
 
   // Out of range header, value too low - fallback to proto config.
   Http::TestRequestHeaderMapImpl too_low_headers{{"x-envoy-fault-delay-request-percentage", "-1"}};
   const auto too_low_headers_percentage = config.percentage(&too_low_headers);
   EXPECT_EQ(proto_config.percentage().numerator(), too_low_headers_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, too_low_headers_percentage.denominator());
+  EXPECT_EQ(proto_config.percentage().denominator(), too_low_headers_percentage.denominator());
 
-  // Out of range header, value too high - fallback to proto config.
-  Http::TestRequestHeaderMapImpl too_high_headers{
-      {"x-envoy-fault-delay-request-percentage", "101"}};
-  const auto too_high_headers_percentage = config.percentage(&too_high_headers);
-  EXPECT_EQ(proto_config.percentage().numerator(), too_high_headers_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, too_high_headers_percentage.denominator());
-
-  // Valid header.
-  Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-delay-request-percentage", "60"}};
-  envoy::type::v3::FractionalPercent expected_percent;
-  expected_percent.set_numerator(60);
+  // Valid header with value greater than the value of the numerator of default percentage - use proto config.
+  Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-delay-request-percentage", "90"}};
   const auto good_headers_percentage = config.percentage(&good_headers);
-  EXPECT_EQ(expected_percent.numerator(), good_headers_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, good_headers_percentage.denominator());
+  EXPECT_EQ(proto_config.percentage().numerator(), good_headers_percentage.numerator());
+  EXPECT_EQ(proto_config.percentage().denominator(), good_headers_percentage.denominator());
+
+  // Valid header with value lesser than the value of the numerator of default percentage.
+  Http::TestRequestHeaderMapImpl greater_numerator_headers{{"x-envoy-fault-delay-request-percentage", "60"}};
+  const auto greater_numerator_headers_percentage = config.percentage(&greater_numerator_headers);
+  EXPECT_EQ(60, greater_numerator_headers_percentage.numerator());
+  EXPECT_EQ(proto_config.percentage().denominator(), greater_numerator_headers_percentage.denominator());
 }
 
 TEST(FaultConfigTest, FaultRateLimitHeaderConfig) {
@@ -141,7 +135,7 @@ TEST(FaultConfigTest, FaultRateLimitPercentageHeaderConfig) {
   envoy::extensions::filters::common::fault::v3::FaultRateLimit proto_config;
   proto_config.mutable_header_limit();
   proto_config.mutable_percentage()->set_numerator(80);
-  proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+  proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
   FaultRateLimitConfig config(proto_config);
 
   // Header with bad data - fallback to proto config.
@@ -149,30 +143,26 @@ TEST(FaultConfigTest, FaultRateLimitPercentageHeaderConfig) {
       {"x-envoy-fault-throughput-response-percentage", "abc"}};
   const auto bad_headers_percentage = config.percentage(&bad_headers);
   EXPECT_EQ(proto_config.percentage().numerator(), bad_headers_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, bad_headers_percentage.denominator());
+  EXPECT_EQ(proto_config.percentage().denominator(), bad_headers_percentage.denominator());
 
   // Out of range header, value too low - fallback to proto config.
   Http::TestRequestHeaderMapImpl too_low_headers{
       {"x-envoy-fault-throughput-response-percentage", "-1"}};
   const auto too_low_headers_percentage = config.percentage(&too_low_headers);
   EXPECT_EQ(proto_config.percentage().numerator(), too_low_headers_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, too_low_headers_percentage.denominator());
+  EXPECT_EQ(proto_config.percentage().denominator(), too_low_headers_percentage.denominator());
 
-  // Out of range header, value too high - fallback to proto config.
-  Http::TestRequestHeaderMapImpl too_high_headers{
-      {"x-envoy-fault-throughput-response-percentage", "101"}};
-  const auto too_high_headers_percentage = config.percentage(&too_high_headers);
-  EXPECT_EQ(proto_config.percentage().numerator(), too_high_headers_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, too_high_headers_percentage.denominator());
-
-  // Valid header.
-  Http::TestRequestHeaderMapImpl good_headers{
-      {"x-envoy-fault-throughput-response-percentage", "60"}};
-  envoy::type::v3::FractionalPercent expected_percent;
-  expected_percent.set_numerator(60);
+  // Valid header with value greater than the value of the numerator of default percentage - use proto config.
+  Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-throughput-response-percentage", "90"}};
   const auto good_headers_percentage = config.percentage(&good_headers);
-  EXPECT_EQ(expected_percent.numerator(), good_headers_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, good_headers_percentage.denominator());
+  EXPECT_EQ(proto_config.percentage().numerator(), good_headers_percentage.numerator());
+  EXPECT_EQ(proto_config.percentage().denominator(), good_headers_percentage.denominator());
+
+  // Valid header with value lesser than the value of the numerator of default percentage.
+  Http::TestRequestHeaderMapImpl greater_numerator_headers{{"x-envoy-fault-throughput-response-percentage", "60"}};
+  const auto greater_numerator_headers_percentage = config.percentage(&greater_numerator_headers);
+  EXPECT_EQ(60, greater_numerator_headers_percentage.numerator());
+  EXPECT_EQ(proto_config.percentage().denominator(), greater_numerator_headers_percentage.denominator());
 }
 
 } // namespace

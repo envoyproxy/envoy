@@ -23,10 +23,10 @@ HeaderPercentageProvider::percentage(const Http::RequestHeaderMap* request_heade
     return percentage_;
   }
 
-  envoy::type::v3::FractionalPercent header_percentage;
-  header_percentage.set_denominator(percentage_.denominator());
-  header_percentage.set_numerator(std::min(header_numerator, percentage_.numerator()));
-  return header_percentage;
+  envoy::type::v3::FractionalPercent result;
+  result.set_numerator(std::min(header_numerator, percentage_.numerator()));
+  result.set_denominator(percentage_.denominator());
+  return result;
 }
 
 FaultAbortConfig::FaultAbortConfig(
