@@ -689,10 +689,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     if (upstream_requests_.empty()) {
       cleanup();
       callbacks_->sendLocalReply(
-          Http::Code::ServiceUnavailable, "exceeded request buffer limit while retrying upstream",
+          Http::Code::InsufficientStorage, "exceeded request buffer limit while retrying upstream",
           modify_headers_, absl::nullopt,
-          StreamInfo::ResponseCodeDetails::get()
-              .RequestPayloadTooLarge /* TODO: better code than RequestPayloadTooLarge */);
+          StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   }
