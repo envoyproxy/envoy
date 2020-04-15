@@ -76,8 +76,9 @@ const envoy::extensions::filters::http::compressor::v3::Compressor
 GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip) {
   envoy::extensions::filters::http::compressor::v3::Compressor compressor = {};
 
-  // The deprecated gzip filter is using v2 Compressor field to avoid setting the
-  // compressor_library field which is mandatory in v3. Here we convert v2 Compressor to v3.
+  // The deprecated gzip filter is using a locally defined Compressor field to avoid setting the
+  // compressor_library field which is mandatory in v3. Here we convert gzip's Compressor to
+  // what is accepted by the generic compressor.
   if (gzip.has_compressor()) {
     compressor.set_allocated_content_length(
         new Protobuf::UInt32Value(gzip.compressor().content_length()));

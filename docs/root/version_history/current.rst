@@ -4,8 +4,8 @@
 Changes
 -------
 
-* compressor: generic :ref:`compressor <config_http_filters_compressor>` filter exposed to users.
 * access loggers: added GRPC_STATUS operator on logging format.
+* compressor: generic :ref:`compressor <config_http_filters_compressor>` filter exposed to users.
 * http: fixed a bug where the upgrade header was not cleared on responses to non-upgrade requests.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager

@@ -78,6 +78,9 @@ message Gzip {
   Compressor compressor = 10;
 }
 
+// A locally defined Compressor type to use in the gzip filter since the generic Compressor requires
+// setting the compressor_library field which doesn't make sense in the context of the deprecated
+// gzip filter.
 // [#next-free-field: 6]
 message Compressor {
   // Minimum response length, in bytes, which will trigger compression. The default value is 30.
