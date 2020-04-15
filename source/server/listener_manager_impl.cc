@@ -744,7 +744,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
     }
     worker->start(guard_dog);
     if (enable_dispatcher_stats_) {
-      worker->initializeStats(*scope_, fmt::format("worker_{}.", i));
+      worker->initializeStats(*scope_);
     }
     i++;
   }
