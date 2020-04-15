@@ -1,7 +1,37 @@
 #include "common/runtime/runtime_features.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Runtime {
+
+bool isRuntimeFeature(absl::string_view feature) {
+  return RuntimeFeaturesDefaults::get().enabledByDefault(feature) ||
+         RuntimeFeaturesDefaults::get().existsButDisabled(feature);
+}
+
+bool runtimeFeatureEnabled(absl::string_view feature) {
+  ASSERT(isRuntimeFeature(feature));
+  if (Runtime::LoaderSingleton::getExisting()) {
+    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
+        feature);
+  }
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+                      "Unable to use runtime singleton for feature {}", feature);
+  return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
+}
+
+uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
+  ASSERT(absl::StartsWith(feature, "envoy."));
+  if (Runtime::LoaderSingleton::getExisting()) {
+    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
+        std::string(feature), default_value);
+  }
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+                      "Unable to use runtime singleton for feature {}", feature);
+  return default_value;
+}
+
 
 // Add additional features here to enable the new code paths by default.
 //

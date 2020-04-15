@@ -9,6 +9,7 @@
 
 #include "common/config/runtime_utility.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
