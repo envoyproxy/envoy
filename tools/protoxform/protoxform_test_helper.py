@@ -135,7 +135,6 @@ if __name__ == "__main__":
     path, filename = PathAndFilename(target)
     messages += Run(cmd, path, filename, 'active_or_frozen')
     messages += Run(cmd, path, filename, 'next_major_version_candidate')
-    messages += Run(cmd, path, filename, 'next_major_version_candidate')
     messages += Run(cmd, path, filename, 'next_major_version_candidate.envoy_internal')
 
   if len(messages) == 0:
