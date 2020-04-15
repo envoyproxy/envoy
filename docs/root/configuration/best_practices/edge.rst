@@ -69,11 +69,14 @@ The following is a YAML example of the above recommendation.
       filter_chains:
       - filter_chain_match:
           server_names: ["example.com", "www.example.com"]
-        tls_context:
-          common_tls_context:
-            tls_certificates:
-            - certificate_chain: { filename: "example_com_cert.pem" }
-              private_key: { filename: "example_com_key.pem" }
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+            common_tls_context:
+              tls_certificates:
+              - certificate_chain: { filename: "example_com_cert.pem" }
+                private_key: { filename: "example_com_key.pem" }
         # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
         # use_proxy_proto: true
         filters:
@@ -104,10 +107,15 @@ The following is a YAML example of the above recommendation.
       name: service_foo
       connect_timeout: 15s
       per_connection_buffer_limit_bytes: 32768 # 32 KiB
-      hosts:
-        socket_address:
-          address: 127.0.0.1
-          port_value: 8080
+      load_assignment:
+        cluster_name: some_service
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 8080
       http2_protocol_options:
         initial_stream_window_size: 65536 # 64 KiB
         initial_connection_window_size: 1048576 # 1 MiB

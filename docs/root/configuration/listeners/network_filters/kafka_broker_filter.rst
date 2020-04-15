@@ -50,10 +50,15 @@ in the configuration snippet below:
     connect_timeout: 0.25s
     type: strict_dns
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: 127.0.0.1 # Kafka broker's host.
-        port_value: 9092   # Kafka broker's port.
+    load_assignment:
+      cluster_name: some_service
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1 # Kafka broker's host
+                  port_value: 9092 # Kafka broker's port.
 
 The Kafka broker needs to advertise the Envoy listener port instead of its own.
 

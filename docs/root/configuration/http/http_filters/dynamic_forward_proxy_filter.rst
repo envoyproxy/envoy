@@ -20,8 +20,8 @@ must be configured together and point to the same DNS cache parameters for Envoy
 HTTP dynamic forward proxy.
 
 This filter supports :ref:`host rewrite <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
-via the :ref:`virtual host's per_filter_config <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or the
-:ref:`route's per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`. This can be used to rewrite
+via the :ref:`virtual host's typed_per_filter_config <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or the
+:ref:`route's typed_per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`. This can be used to rewrite
 the host header with the provided value before DNS lookup, thus allowing to route traffic to the rewritten
 host when forwarding. See the example below within the configured routes.
 
@@ -65,9 +65,10 @@ host when forwarding. See the example below within the configured routes.
                     prefix: "/force-host-rewrite"
                   route:
                     cluster: dynamic_forward_proxy_cluster
-                  per_filter_config:
+                  typed_per_filter_config:
                     envoy.filters.http.dynamic_forward_proxy:
-                      host_rewrite: www.example.org
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig
+                      host_rewrite_literal: www.example.org
                 - match:
                     prefix: "/"
                   route:

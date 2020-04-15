@@ -106,16 +106,18 @@ In this example we add additional context on the virtual host, and disabled the 
     virtual_hosts:
     - name: local_service
       domains: ["*"]
-      per_filter_config:
+      typed_per_filter_config:
         envoy.filters.http.ext_authz:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
           check_settings:
             context_extensions:
               virtual_host: local_service
       routes:
       - match: { prefix: "/static" }
         route: { cluster: some_service }
-        per_filter_config:
+        typed_per_filter_config:
           envoy.filters.http.ext_authz:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
             disabled: true
       - match: { prefix: "/" }
         route: { cluster: some_service }

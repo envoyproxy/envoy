@@ -81,8 +81,9 @@ How to disable HTTP/1.1 reverse bridge filter per route
                     cluster: grpc
                     timeout: 5.00s
                   # per_filter_config disables the filter for this route
-                  per_filter_config:
+                  typed_per_filter_config:
                     envoy.filters.http.grpc_http1_reverse_bridge:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfigPerRoute
                       disabled: true
                 - match:
                     prefix: "/route-with-filter-enabled"
@@ -104,10 +105,15 @@ How to disable HTTP/1.1 reverse bridge filter per route
       type: LOGICAL_DNS
       dns_lookup_family: V4_ONLY
       lb_policy: ROUND_ROBIN
-      hosts:
-        - socket_address:
-            address: localhost
-            port_value: 4630
+      load_assignment:
+        cluster_name: some_service
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost
+                    port_value: 4630
     - name: grpc
       connect_timeout: 5.00s
       type: strict_dns
