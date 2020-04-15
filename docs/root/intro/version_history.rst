@@ -3,6 +3,7 @@ Version history
 
 1.15.0 (Pending)
 ================
+* fault: added support for specifying grpc_status code in abort faults with :ref:`HTTP header fault configuration <config_http_filters_fault_injection_http_header>` and :ref:`abort fault configuration <envoy_api_field_config.filter.http.fault.v2.FaultAbort>` to the HTTP fault filter.
 
 1.14.1 (April 8, 2020)
 ======================
