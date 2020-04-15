@@ -32,7 +32,6 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   return default_value;
 }
 
-
 // Add additional features here to enable the new code paths by default.
 //
 // Per documentation in CONTRIBUTING.md is expected that new high risk code paths be guarded
