@@ -59,9 +59,9 @@ protected:
 
   ActiveQuicListenerTest()
       : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
-        dispatcher_(api_->allocateDispatcher()), clock_(*dispatcher_),
+        dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
-        connection_handler_(*dispatcher_, "test_thread") {
+        connection_handler_(*dispatcher_) {
     Runtime::LoaderSingleton::initialize(&runtime_);
   }
 
@@ -74,7 +74,7 @@ protected:
     quic_listener_ = std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_,
                                                           listen_socket_, listener_config_,
                                                           quic_config_, nullptr, enabledFlag());
-    quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
+    quic_dispatcher_ = std::unique_ptr<EnvoyQuicDispatcher>(
         ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_));
     simulated_time_system_.advanceTimeWait(std::chrono::milliseconds(100));
   }

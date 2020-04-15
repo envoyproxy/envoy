@@ -297,12 +297,6 @@ TEST(OpenCensusTracerConfigTest, ShouldRejectSubsequentCreateAttemptsWithDiffere
                             "Opencensus has already been configured with a different config.");
 }
 
-TEST(OpenCensusTracerConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<OpenCensusTracerFactory, Server::Configuration::TracerFactory>()),
-      EnvoyException, "Double registration for name: 'envoy.tracers.opencensus'");
-}
-
 } // namespace OpenCensus
 } // namespace Tracers
 } // namespace Extensions
