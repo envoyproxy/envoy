@@ -261,3 +261,17 @@ envoy_cc_test_library(
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "encoder_decoder_buffer_filter_lib",
+    srcs = [
+        "encoder_decoder_buffer_filter.cc",
+    ],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
