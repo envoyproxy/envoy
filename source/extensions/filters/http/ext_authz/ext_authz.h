@@ -220,9 +220,11 @@ public:
 
 private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
-  void initiateCall(const Http::RequestHeaderMap& headers);
+  void initiateCall(const Http::RequestHeaderMap& headers,
+                    const Router::RouteConstSharedPtr& route);
   void continueDecoding();
-  bool isBufferFull();
+  bool isBufferFull() const;
+  bool skipCheckForRoute(const Router::RouteConstSharedPtr& route) const;
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
@@ -248,6 +250,7 @@ private:
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};
   bool buffer_data_{};
+  bool skip_check_{false};
   envoy::service::auth::v3::CheckRequest check_request_{};
 };
 

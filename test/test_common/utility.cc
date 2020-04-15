@@ -97,22 +97,19 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
   // Check whether the two buffers contain the same content. It is valid for the content
   // to be arranged differently in the buffers. For example, lhs could have one slice
   // containing 10 bytes while rhs has ten slices containing one byte each.
-  uint64_t lhs_num_slices = lhs.getRawSlices(nullptr, 0);
-  uint64_t rhs_num_slices = rhs.getRawSlices(nullptr, 0);
-  absl::FixedArray<Buffer::RawSlice> lhs_slices(lhs_num_slices);
-  lhs.getRawSlices(lhs_slices.begin(), lhs_num_slices);
-  absl::FixedArray<Buffer::RawSlice> rhs_slices(rhs_num_slices);
-  rhs.getRawSlices(rhs_slices.begin(), rhs_num_slices);
+  Buffer::RawSliceVector lhs_slices = lhs.getRawSlices();
+  Buffer::RawSliceVector rhs_slices = rhs.getRawSlices();
+
   size_t rhs_slice = 0;
   size_t rhs_offset = 0;
-  for (size_t lhs_slice = 0; lhs_slice < lhs_num_slices; lhs_slice++) {
-    for (size_t lhs_offset = 0; lhs_offset < lhs_slices[lhs_slice].len_; lhs_offset++) {
+  for (auto& lhs_slice : lhs_slices) {
+    for (size_t lhs_offset = 0; lhs_offset < lhs_slice.len_; lhs_offset++) {
       while (rhs_offset >= rhs_slices[rhs_slice].len_) {
         rhs_slice++;
-        ASSERT(rhs_slice < rhs_num_slices);
+        ASSERT(rhs_slice < rhs_slices.size());
         rhs_offset = 0;
       }
-      auto lhs_str = static_cast<const uint8_t*>(lhs_slices[lhs_slice].mem_);
+      auto lhs_str = static_cast<const uint8_t*>(lhs_slice.mem_);
       auto rhs_str = static_cast<const uint8_t*>(rhs_slices[rhs_slice].mem_);
       if (lhs_str[lhs_offset] != rhs_str[rhs_offset]) {
         return false;
@@ -147,28 +144,28 @@ Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::str
 void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
                                    Event::TestTimeSystem& time_system) {
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
-    time_system.sleep(std::chrono::milliseconds(10));
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
   }
 }
 
 void TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
                                    Event::TestTimeSystem& time_system) {
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
-    time_system.sleep(std::chrono::milliseconds(10));
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
   }
 }
 
 void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
                                  Event::TestTimeSystem& time_system) {
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
-    time_system.sleep(std::chrono::milliseconds(10));
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
   }
 }
 
 void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
                                  Event::TestTimeSystem& time_system) {
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
-    time_system.sleep(std::chrono::milliseconds(10));
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
   }
 }
 
@@ -330,22 +327,6 @@ void ConditionalInitializer::wait() {
 }
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
-
-namespace Http {
-
-// Satisfy linker
-const uint32_t Http2Settings::DEFAULT_HPACK_TABLE_SIZE;
-const uint32_t Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS;
-const uint32_t Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
-const uint32_t Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
-const uint32_t Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE;
-const uint32_t Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES;
-const uint32_t Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
-const uint32_t Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
-const uint32_t Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
-const uint32_t Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
-
-} // namespace Http
 
 namespace Api {
 

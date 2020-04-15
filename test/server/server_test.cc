@@ -17,6 +17,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -41,7 +42,7 @@ namespace {
 TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
-  Stats::IsolatedStoreImpl store;
+  Stats::TestUtil::TestStore store;
   Stats::Counter& c = store.counter("hello");
   c.inc();
   store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
@@ -254,7 +255,7 @@ protected:
 // Custom StatsSink that just increments a counter when flush is called.
 class CustomStatsSink : public Stats::Sink {
 public:
-  CustomStatsSink(Stats::Scope& scope) : stats_flushed_(scope.counter("stats.flushed")) {}
+  CustomStatsSink(Stats::Scope& scope) : stats_flushed_(scope.counterFromString("stats.flushed")) {}
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot&) override { stats_flushed_.inc(); }
@@ -286,13 +287,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-/**
- * Static registration for the custom sink factory. @see RegisterFactory.
- */
-REGISTER_FACTORY(CustomStatsSinkFactory, Server::Configuration::StatsSinkFactory);
-
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+
   auto server_thread =
       startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
 
@@ -321,9 +320,10 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
   // Validate that initialization_time histogram value has been set.
-  EXPECT_TRUE(
-      stats_store_.histogram("server.initialization_time_ms", Stats::Histogram::Unit::Milliseconds)
-          .used());
+  EXPECT_TRUE(stats_store_
+                  .histogramFromString("server.initialization_time_ms",
+                                       Stats::Histogram::Unit::Milliseconds)
+                  .used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }
 
@@ -488,7 +488,7 @@ protected:
       server_->flushStats();
     } else {
       // Default flush interval is 5 seconds.
-      simTime().sleep(std::chrono::seconds(6));
+      simTime().advanceTimeAsync(std::chrono::seconds(6));
     }
     server_->dispatcher().run(Event::Dispatcher::RunType::Block);
   }
@@ -512,8 +512,8 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(ServerStatsTest, FlushStats) {
   initialize("test/server/test_data/server/empty_bootstrap.yaml");
-  Stats::Gauge& recent_lookups =
-      stats_store_.gauge("server.stats_recent_lookups", Stats::Gauge::ImportMode::NeverImport);
+  Stats::Gauge& recent_lookups = stats_store_.gaugeFromString(
+      "server.stats_recent_lookups", Stats::Gauge::ImportMode::NeverImport);
   EXPECT_EQ(0, recent_lookups.value());
   flushStats();
   uint64_t strobed_recent_lookups = recent_lookups.value();
@@ -939,10 +939,10 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
               ProtoEq(server_->httpContext().defaultTracingConfig()));
 }
 
-TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(ZipkinHttpTracingEnabled)) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  EXPECT_NO_THROW(initialize("test/server/test_data/server/zipkin_tracing.yaml"));
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/zipkin_tracing_deprecated_config.yaml"));
   EXPECT_EQ("zipkin", server_->httpContext().defaultTracingConfig().http().name());
 }
 
@@ -1066,13 +1066,14 @@ public:
   std::string name() const override { return "envoy.callbacks_stats_sink"; }
 };
 
-REGISTER_FACTORY(CallbacksStatsSinkFactory, Server::Configuration::StatsSinkFactory);
-
 // This test ensures that a stats sink can use cluster update callbacks properly. Using only a
 // cluster update callback is insufficient to protect against double-free bugs, so a server
 // lifecycle callback is also used to ensure that the cluster update callback is freed during
 // Server::Instance's destruction. See issue #9292 for more details.
 TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
+  CallbacksStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+
   initialize("test/server/test_data/server/callbacks_stats_sink_bootstrap.yaml");
   // Necessary to trigger server lifecycle callbacks, otherwise only terminate() is called.
   server_->shutdown();

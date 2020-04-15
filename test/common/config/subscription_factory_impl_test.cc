@@ -155,9 +155,9 @@ TEST_F(SubscriptionFactoryTest, RestClusterMultiton) {
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillRepeatedly(Return(false));
   EXPECT_CALL(*cluster.info_, type())
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::STATIC));
-  EXPECT_THROW_WITH_REGEX(
-      subscriptionFromConfigSource(config), EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified:");
+  EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
+                          fmt::format("{} must have a singleton cluster name specified:",
+                                      config.mutable_api_config_source()->GetTypeName()));
 }
 
 TEST_F(SubscriptionFactoryTest, GrpcClusterMultiton) {
@@ -181,8 +181,9 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterMultiton) {
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::STATIC));
 
   EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
-                          "envoy::api::v2::core::ConfigSource::.DELTA_.GRPC must have a "
-                          "single gRPC service specified:");
+                          fmt::format("{}::.DELTA_.GRPC must have a "
+                                      "single gRPC service specified:",
+                                      config.mutable_api_config_source()->GetTypeName()));
 }
 
 TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {
@@ -331,10 +332,12 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   }
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"static_cluster"}), EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined "
-      "non-EDS cluster: 'static_cluster' does not exist, was added via api, or is an EDS cluster");
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"static_cluster"}),
+                            EnvoyException,
+                            fmt::format("{} must have a statically defined "
+                                        "non-EDS cluster: 'static_cluster' does not exist, was "
+                                        "added via api, or is an EDS cluster",
+                                        api_config_source->GetTypeName()));
 }
 
 TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
@@ -353,10 +356,12 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
-  EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"static_cluster"}), EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined "
-      "non-EDS cluster: 'static_cluster' does not exist, was added via api, or is an EDS cluster");
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"static_cluster"}),
+                            EnvoyException,
+                            fmt::format("{} must have a statically defined "
+                                        "non-EDS cluster: 'static_cluster' does not exist, was "
+                                        "added via api, or is an EDS cluster",
+                                        api_config_source->GetTypeName()));
 }
 
 TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
@@ -376,10 +381,12 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::config::cluster::v3::Cluster::EDS));
-  EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"static_cluster"}), EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined "
-      "non-EDS cluster: 'static_cluster' does not exist, was added via api, or is an EDS cluster");
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"static_cluster"}),
+                            EnvoyException,
+                            fmt::format("{} must have a statically defined "
+                                        "non-EDS cluster: 'static_cluster' does not exist, was "
+                                        "added via api, or is an EDS cluster",
+                                        api_config_source->GetTypeName()));
 }
 
 } // namespace

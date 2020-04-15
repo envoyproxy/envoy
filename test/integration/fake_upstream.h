@@ -69,6 +69,9 @@ public:
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::RequestTrailerMapPtr& trailers() { return trailers_; }
   bool receivedData() { return received_data_; }
+  Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
+    return encoder_.http1StreamEncoderOptions();
+  }
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -419,7 +422,9 @@ public:
 
   FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
                      Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
-                     uint32_t max_request_headers_count);
+                     uint32_t max_request_headers_count,
+                     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+                         headers_with_underscores_action);
 
   // By default waitForNewStream assumes the next event is a new stream and
   // returns AssertionFailure if an unexpected event occurs. If a caller truly
@@ -560,11 +565,13 @@ public:
 
   // Returns the new connection via the connection argument.
   ABSL_MUST_USE_RESULT
-  testing::AssertionResult
-  waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
-                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
-                        uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-                        uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT);
+  testing::AssertionResult waitForHttpConnection(
+      Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
+      uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+      uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT,
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -666,9 +673,7 @@ private:
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
-    std::chrono::milliseconds listenerFiltersTimeout() const override {
-      return std::chrono::milliseconds();
-    }
+    std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
     bool continueOnListenerFiltersTimeout() const override { return false; }
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
@@ -680,11 +685,15 @@ private:
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
+    const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+      return empty_access_logs_;
+    }
 
     FakeUpstream& parent_;
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     const Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
+    const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   };
 
   void threadRoutine();

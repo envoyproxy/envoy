@@ -12,7 +12,6 @@
 #include "common/config/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/runtime/uuid_util.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/common/upstream/utility.h"
@@ -23,6 +22,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -278,6 +278,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
+  Runtime::RandomGeneratorImpl random;
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   // Value is taken from random generator.
@@ -320,6 +321,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
+  Runtime::RandomGeneratorImpl random;
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   // Value is taken from random generator.
@@ -438,13 +440,6 @@ typed_config:
 
 TEST_F(AccessLogImplTest, RequestTracing) {
   Runtime::RandomGeneratorImpl random;
-  std::string not_traceable_guid = random.uuid();
-
-  std::string force_tracing_guid = random.uuid();
-  UuidUtils::setTraceableUuid(force_tracing_guid, UuidTraceStatus::Forced);
-
-  std::string sample_tracing_guid = random.uuid();
-  UuidUtils::setTraceableUuid(sample_tracing_guid, UuidTraceStatus::Sampled);
 
   const std::string yaml = R"EOF(
 name: accesslog
@@ -458,19 +453,22 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   {
-    Http::TestRequestHeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
+    Http::TestRequestHeaderMapImpl forced_header{{"x-request-id", random.uuid()}};
+    stream_info_.getRequestIDExtension()->setTraceStatus(forced_header, Http::TraceStatus::Forced);
     EXPECT_CALL(*file_, write(_));
     log->log(&forced_header, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestRequestHeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
+    Http::TestRequestHeaderMapImpl not_traceable{{"x-request-id", random.uuid()}};
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&not_traceable, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestRequestHeaderMapImpl sampled_header{{"x-request-id", sample_tracing_guid}};
+    Http::TestRequestHeaderMapImpl sampled_header{{"x-request-id", random.uuid()}};
+    stream_info_.getRequestIDExtension()->setTraceStatus(sampled_header,
+                                                         Http::TraceStatus::Sampled);
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&sampled_header, &response_headers_, &response_trailers_, stream_info_);
   }
@@ -1039,6 +1037,41 @@ typed_config:
       "}\n}\n");
 }
 
+TEST_F(AccessLogImplTest, ValidGrpcStatusMessage) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  path: /dev/null
+  format: "%GRPC_STATUS%\n"
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  {
+    EXPECT_CALL(*file_, write(_));
+    response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "0");
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    EXPECT_EQ("OK\n", output_);
+    response_trailers_.remove(Http::Headers::get().GrpcStatus);
+  }
+  {
+    InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+    EXPECT_CALL(*file_, write(_));
+    response_headers_.addCopy(Http::Headers::get().GrpcStatus, "1");
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    EXPECT_EQ("Canceled\n", output_);
+    response_headers_.remove(Http::Headers::get().GrpcStatus);
+  }
+  {
+    InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+    EXPECT_CALL(*file_, write(_));
+    response_headers_.addCopy(Http::Headers::get().GrpcStatus, "-1");
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    EXPECT_EQ("-1\n", output_);
+    response_headers_.remove(Http::Headers::get().GrpcStatus);
+  }
+}
+
 TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
   const std::string yaml_template = R"EOF(
 name: accesslog
@@ -1248,7 +1281,8 @@ public:
 };
 
 TEST_F(AccessLogImplTest, TestHeaderFilterPresence) {
-  Registry::RegisterFactory<TestHeaderFilterFactory, ExtensionFilterFactory> registered;
+  TestHeaderFilterFactory factory;
+  Registry::InjectFactory<ExtensionFilterFactory> registration(factory);
 
   const std::string yaml = R"EOF(
 name: accesslog
@@ -1324,7 +1358,8 @@ public:
 };
 
 TEST_F(AccessLogImplTest, SampleExtensionFilter) {
-  Registry::RegisterFactory<SampleExtensionFilterFactory, ExtensionFilterFactory> registered;
+  SampleExtensionFilterFactory factory;
+  Registry::InjectFactory<ExtensionFilterFactory> registration(factory);
 
   const std::string yaml = R"EOF(
 name: accesslog

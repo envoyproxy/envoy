@@ -144,15 +144,15 @@ public:
     return std::vector<ParentHistogramSharedPtr>{};
   }
 
-  Counter& counter(const std::string& name) override {
+  Counter& counterFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return counterFromStatName(storage.statName());
   }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName(), unit);
   }

@@ -8,16 +8,24 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
+
+envoy_proto_library(
+    name = "request_response",
+    srcs = ["request_response.proto"],
+)
 
 envoy_cc_library(
     name = "aws_lambda_filter_lib",
     srcs = ["aws_lambda_filter.cc"],
     hdrs = ["aws_lambda_filter.h"],
     deps = [
+        ":request_response_cc_proto",
         "//include/envoy/http:filter_interface",
+        "//source/common/common:base64_lib",
         "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:signer_impl_lib",
         "//source/extensions/filters/http:well_known_names",

@@ -18,6 +18,7 @@
 #include "common/common/fmt.h"
 #include "common/common/thread_annotations.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
@@ -38,6 +39,7 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
+using testing::Not;
 
 namespace Envoy {
 
@@ -102,6 +104,8 @@ TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
 
 // Change the default route to be restrictive, and send a request to an alternate route.
 TEST_P(ProtocolIntegrationTest, RouterNotFound) { testRouterNotFound(); }
+
+TEST_P(ProtocolIntegrationTest, RouterVirtualClusters) { testRouterVirtualClusters(); }
 
 // Change the default route to be restrictive, and send a POST to an alternate route.
 TEST_P(DownstreamProtocolIntegrationTest, RouterNotFoundBodyNoBuffer) {
@@ -225,7 +229,7 @@ typed_config:
 
 // Add a health check filter and verify correct behavior when draining.
 TEST_P(ProtocolIntegrationTest, DrainClose) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   test_server_->drainManager().draining_ = true;
@@ -631,6 +635,85 @@ TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
 
 TEST_P(ProtocolIntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
 
+// Verify that headers with underscores in their names are dropped from client requests
+// but remain in upstream responses.
+TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_common_http_protocol_options()->set_headers_with_underscores_action(
+            envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"foo_bar", "baz"}});
+  waitForNextUpstreamRequest();
+
+  EXPECT_THAT(upstream_request_->headers(), Not(HeaderHasValueRef("foo_bar", "baz")));
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"bar_baz", "fooz"}}, true);
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_THAT(response->headers(), HeaderHasValueRef("bar_baz", "fooz"));
+}
+
+// Verify that by default headers with underscores in their names remain in both requests and
+// responses when allowed in configuration.
+TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"foo_bar", "baz"}});
+  waitForNextUpstreamRequest();
+
+  EXPECT_THAT(upstream_request_->headers(), HeaderHasValueRef("foo_bar", "baz"));
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"bar_baz", "fooz"}}, true);
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_THAT(response->headers(), HeaderHasValueRef("bar_baz", "fooz"));
+}
+
+// Verify that request with headers containing underscores is rejected when configured.
+TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_common_http_protocol_options()->set_headers_with_underscores_action(
+            envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"foo_bar", "baz"}});
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    response->waitForReset();
+    codec_client_->close();
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
+  }
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
   initialize();
 
@@ -995,21 +1078,21 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, 1, false);
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
-  // Expect rejection.
-  // TODO(asraa): we shouldn't need this unexpected disconnect, but some tests hit unparented
-  // connections without it. Likely need to reconsider whether the waits/closes should be on
-  // client or upstream.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  response->waitForReset();
-  ASSERT_TRUE(fake_upstream_connection_->close());
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    codec_client_->waitForDisconnect();
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("431", response->headers().Status()->value().getStringView());
+  } else {
+    response->waitForReset();
+    codec_client_->close();
+  }
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
@@ -1213,7 +1296,7 @@ name: passthrough-filter
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
         hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
-            Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
+            ::Envoy::Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
       });
 
   initialize();
@@ -1351,7 +1434,7 @@ name: encode-headers-return-stop-all-filter
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
         hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
-            Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
+            ::Envoy::Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
       });
 
   initialize();
@@ -1495,6 +1578,25 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
+  config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
+  response->waitForReset();
+  EXPECT_FALSE(response->complete());
 }
 
 // Make sure that invalid authority headers get blocked at or before the HCM.

@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package envoy.extensions.filter.udp.dns_filter.v3alpha;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/data/dns/v3/dns_table.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filter.udp.dns_filter.v3alpha";
+option java_outer_classname = "DnsFilterProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: DNS Filter]
+// DNS Filter :ref:`configuration overview <config_udp_listener_filters_dns_filter>`.
+// [#extension: envoy.filters.udp_listener.dns_filter]
+
+// Configuration for the DNS filter.
+message DnsFilterConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig";
+
+  // This message contains the configuration for the Dns Filter operating
+  // in a server context. This message will contain the virtual hosts and
+  // associated addresses with which Envoy will respond to queries
+  message ServerContextConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig.ServerContextConfig";
+
+    oneof config_source {
+      option (validate.required) = true;
+
+      // Load the configuration specified from the control plane
+      data.dns.v3.DnsTable inline_dns_table = 1;
+
+      // Seed the filter configuration from an external path. This source
+      // is a yaml formatted file that contains the DnsTable driving Envoy's
+      // responses to DNS queries
+      config.core.v3.DataSource external_dns_table = 2;
+    }
+  }
+
+  // The stat prefix used when emitting DNS filter statistics
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Server context configuration
+  ServerContextConfig server_config = 2;
+}

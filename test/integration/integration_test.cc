@@ -8,6 +8,7 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -96,47 +97,7 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 }
 
 // Validates that the drain actually drains the listeners.
-TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
-  initialize();
-
-  uint32_t http_port = lookupPort("http");
-  codec_client_ = makeHttpConnection(http_port);
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "HEAD"},
-                                                 {":path", "/test/long/url"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "host"}};
-  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  waitForNextUpstreamRequest(0);
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-
-  // Invoke drain listeners endpoint and validate that we can still work on inflight requests.
-  BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
-  EXPECT_TRUE(admin_response->complete());
-  EXPECT_EQ("200", admin_response->headers().Status()->value().getStringView());
-  EXPECT_EQ("OK\n", admin_response->body());
-
-  upstream_request_->encodeData(512, true);
-
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-
-  // Wait for the response to be read by the codec client.
-  response->waitForEndStream();
-
-  ASSERT_TRUE(response->complete());
-  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
-
-  // Validate that the listeners have been stopped.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
-
-  // Validate that port is closed and can be bound by other sockets.
-  EXPECT_NO_THROW(Network::TcpListenSocket(
-      Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                           http_port),
-      nullptr, true));
-}
+TEST_P(IntegrationTest, AdminDrainDrainsListeners) { testAdminDrain(downstreamProtocol()); }
 
 TEST_P(IntegrationTest, RouterDirectResponse) {
   const std::string body = "Response body";
@@ -180,7 +141,7 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
 }
 
 TEST_P(IntegrationTest, ConnectionClose) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -197,12 +158,39 @@ TEST_P(IntegrationTest, ConnectionClose) {
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(1024, 512, false);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false);
+}
+
+TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
 }
 
 TEST_P(IntegrationTest, FlowControlOnAndGiantBody) {
   config_helper_.setBufferLimits(1024, 1024);
-  testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
+}
+
+TEST_P(IntegrationTest, LargeFlowControlOnAndGiantBody) {
+  config_helper_.setBufferLimits(128 * 1024, 128 * 1024);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
+}
+
+TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyAndContentLengthNoBuffer) {
+  testRouterRequestAndResponseWithBody(1024, 512, false, true);
+}
+
+TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyAndContentLengthNoBuffer) {
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
+}
+
+TEST_P(IntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
+  config_helper_.setBufferLimits(1024, 1024);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
+}
+
+TEST_P(IntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
+  config_helper_.setBufferLimits(128 * 1024, 128 * 1024);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
@@ -236,10 +224,8 @@ TEST_P(IntegrationTest, ResponseFramedByConnectionCloseWithReadLimits) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   // Disable chunk encoding to trigger framing by connection close.
-  // TODO: This request should be propagated to codecs via API, instead of using a pseudo-header.
-  //       See: https://github.com/envoyproxy/envoy/issues/9749
-  upstream_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "200"}, {":no-chunks", "1"}}, false);
+  upstream_request_->http1StreamEncoderOptions().value().get().disableChunkEncoding();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(512, true);
   ASSERT_TRUE(fake_upstream_connection_->close());
 
@@ -384,14 +370,13 @@ TEST_P(IntegrationTest, TestSmuggling) {
     EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
               response);
   }
-  // Make sure unsupported transfer encodings are rejected, lest they be abused.
   {
     std::string response;
     const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
                                 "identity,chunked \r\ncontent-length: 36\r\n\r\n" +
                                 smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
-    EXPECT_EQ("HTTP/1.1 501 Not Implemented\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
               response);
   }
 }
@@ -1209,6 +1194,49 @@ TEST_P(IntegrationTest, TestFlood) {
   EXPECT_EQ(1, test_server_->counter("http1.response_flood")->value());
 }
 
+TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Set an Upstream reply with an invalid content-length, which will be rejected by the Envoy.
+  auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "invalid"}}));
+  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+      ->setResponseHeaders(std::move(response_headers));
+
+  // Set up a raw connection to easily send requests without reading responses. Also, set a small
+  // TCP receive buffer to speed up connection backup while proxying the response flood.
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
+  Network::ClientConnectionPtr raw_connection =
+      makeClientConnectionWithOptions(lookupPort("http"), options);
+  raw_connection->connect();
+
+  // Read disable so responses will queue up.
+  uint32_t bytes_to_send = 0;
+  raw_connection->readDisable(true);
+  // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
+  raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
+
+  // Keep sending requests until flood protection kicks in and kills the connection.
+  while (raw_connection->state() == Network::Connection::State::Open) {
+    // The upstream response is invalid, and will trigger an internally generated error response
+    // from Envoy.
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nhost: foo.com\r\n\r\n");
+    bytes_to_send += buffer.length();
+    raw_connection->write(buffer, false);
+    // Loop until all bytes are sent.
+    while (bytes_to_send > 0 && raw_connection->state() == Network::Connection::State::Open) {
+      raw_connection->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+    }
+  }
+
+  // Verify the connection was closed due to flood protection.
+  EXPECT_EQ(1, test_server_->counter("http1.response_flood")->value());
+}
+
 // Make sure flood protection doesn't kick in with many requests sent serially.
 TEST_P(IntegrationTest, TestManyBadRequests) {
   initialize();
@@ -1217,13 +1245,39 @@ TEST_P(IntegrationTest, TestManyBadRequests) {
   Http::TestRequestHeaderMapImpl bad_request{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}};
 
-  for (int i = 0; i < 1; ++i) {
+  for (int i = 0; i < 1000; ++i) {
     IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(bad_request);
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());
     EXPECT_THAT(response->headers(), HttpStatusIs("400"));
   }
   EXPECT_EQ(0, test_server_->counter("http1.response_flood")->value());
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/10566
+TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\n"
+                                              "connection: upgrade\r\n"
+                                              "upgrade: h2\r\n"
+                                              "Transfer-encoding: chunked\r\n\r\n"
+                                              "b\r\nHello World\r\n0\r\n\r\n",
+                                              false));
+
+  response->waitForHeaders();
+  EXPECT_EQ(nullptr, response->headers().Upgrade());
+  EXPECT_EQ(nullptr, response->headers().Connection());
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("Hello World", response->body());
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace Envoy

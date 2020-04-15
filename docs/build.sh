@@ -16,10 +16,10 @@ then
     exit 1
   fi
   # Check the version_history.rst contains current release version.
-  grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst \
-    || (echo "Git tag not found in version_history.rst" && exit 1)
+  grep --fixed-strings "$VERSION_NUMBER" docs/root/version_history/current.rst \
+    || (echo "Git tag not found in version_history/current.rst" && exit 1)
 
-  # Now that we now there is a match, we can use the tag.
+  # Now that we know there is a match, we can use the tag.
   export ENVOY_DOCS_VERSION_STRING="tag-$CIRCLE_TAG"
   export ENVOY_DOCS_RELEASE_LEVEL=tagged
   export ENVOY_BLOB_SHA="$CIRCLE_TAG"
@@ -50,10 +50,11 @@ pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 # files still.
 rm -rf bazel-bin/external/envoy_api_canonical
 
-# This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
-BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all --strategy=protodoc=sandboxed,local"
-
 export EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
+
+# This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
+BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all --strategy=protodoc=sandboxed,local
+    --action_env=ENVOY_BLOB_SHA --action_env=EXTENSION_DB_PATH"
 
 # Generate extension database. This maps from extension name to extension
 # metadata, based on the envoy_cc_extension() Bazel target attributes.
@@ -70,12 +71,11 @@ function generate_api_rst() {
 
   # Generate the extensions docs
   bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api_canonical//:"${API_VERSION}"_protos --aspects \
-    tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED=1 \
-    --action_env=ENVOY_BLOB_SHA --action_env=EXTENSION_DB_PATH="${EXTENSION_DB_PATH}" --host_force_python=PY3
+    tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst
 
   # Fill in boiler plate for extensions that have google.protobuf.Empty as their
   # config.
-  bazel run ${BAZEL_BUILD_OPTIONS} //tools/protodoc:generate_empty -- \
+  bazel run ${BAZEL_BUILD_OPTIONS} //tools/protodoc:generate_empty \
     "${PWD}"/docs/empty_extensions.json "${PWD}/${GENERATED_RST_DIR}"/api-"${API_VERSION}"/config
 
   # We do ** matching below to deal with Bazel cache blah (source proto artifacts

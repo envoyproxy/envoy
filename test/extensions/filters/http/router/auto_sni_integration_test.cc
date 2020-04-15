@@ -97,7 +97,7 @@ TEST_P(AutoSniIntegrationTest, PassingNotDNS) {
   const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
       dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
           fake_upstream_connection_->connection().ssl().get());
-  EXPECT_STREQ(NULL, SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
+  EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
 }
 
 TEST_P(AutoSniIntegrationTest, PassingHostWithoutPort) {

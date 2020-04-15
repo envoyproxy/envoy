@@ -143,6 +143,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_envoyproxy_sqlparser()
     _com_googlesource_chromium_v8()
     _com_googlesource_quiche()
+    _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
@@ -507,6 +508,19 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/time:time",
     )
 
+    native.bind(
+        name = "abseil_algorithm",
+        actual = "@com_google_absl//absl/algorithm:algorithm",
+    )
+    native.bind(
+        name = "abseil_variant",
+        actual = "@com_google_absl//absl/types:variant",
+    )
+    native.bind(
+        name = "abseil_status",
+        actual = "@com_google_absl//absl/status",
+    )
+
 def _com_google_protobuf():
     _repository_impl("rules_python")
     _repository_impl(
@@ -590,6 +604,8 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
+        patches = ["@envoy//bazel/foreign_cc:curl-revert-cmake-minreqver.patch"],
+        patch_args = ["-p1"],
         **location
     )
     native.bind(
@@ -639,6 +655,15 @@ def _com_googlesource_quiche():
     native.bind(
         name = "quiche_quic_platform_base",
         actual = "@com_googlesource_quiche//:quic_platform_base",
+    )
+
+def _com_googlesource_googleurl():
+    _repository_impl(
+        name = "com_googlesource_googleurl",
+    )
+    native.bind(
+        name = "googleurl",
+        actual = "@com_googlesource_googleurl//url:url",
     )
 
 def _org_llvm_releases_compiler_rt():

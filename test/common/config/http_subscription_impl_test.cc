@@ -18,7 +18,7 @@ TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
       .Times(0);
-  http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
+  http_callbacks_->onFailure(http_request_, Http::AsyncClient::FailureReason::Reset);
   EXPECT_TRUE(statsAre(1, 0, 0, 1, 0, 0, 0));
   timerTick();
   EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0));
@@ -37,7 +37,7 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   EXPECT_CALL(*timer_, enableTimer(_, _));
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
-  http_callbacks_->onSuccess(std::move(message));
+  http_callbacks_->onSuccess(http_request_, std::move(message));
   EXPECT_TRUE(statsAre(1, 0, 1, 0, 0, 0, 0));
   request_in_progress_ = false;
   timerTick();

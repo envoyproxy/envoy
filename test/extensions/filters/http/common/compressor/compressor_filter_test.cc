@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
 #include "common/protobuf/utility.h"
@@ -90,7 +92,8 @@ protected:
   void setUpFilter(std::string&& json) {
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson(json, compressor);
-    config_.reset(new MockCompressorFilterConfig(compressor, "test.", stats_, runtime_, "test"));
+    config_ =
+        std::make_shared<MockCompressorFilterConfig>(compressor, "test.", stats_, runtime_, "test");
     filter_ = std::make_unique<CompressorFilter>(config_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -159,7 +162,7 @@ protected:
   std::unique_ptr<CompressorFilter> filter_;
   Buffer::OwnedImpl data_;
   std::string expected_str_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
@@ -174,7 +177,9 @@ TEST_F(CompressorFilterTest, DecodeHeadersWithRuntimeDisabled) {
   }
 }
 )EOF");
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillOnce(Return(false));
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
+      .Times(2)
+      .WillRepeatedly(Return(false));
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, test"}}, false);
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
 }
@@ -343,12 +348,13 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   {
     // Compressor "test2" from an independent filter chain should not overshadow "test".
     // The independence is simulated with a new instance DecoderFilterCallbacks set for "test2".
-    Stats::IsolatedStoreImpl stats;
+    Stats::TestUtil::TestStore stats;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
     CompressorFilterConfigSharedPtr config2;
-    config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "test2"));
+    config2 =
+        std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test2");
     std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter2->setDecoderFilterCallbacks(decoder_callbacks);
@@ -365,12 +371,14 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   }
   {
     // check if the legacy "header_gzip" counter is incremented for gzip compression filter
-    Stats::IsolatedStoreImpl stats;
+    Stats::TestUtil::TestStore stats;
+    ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
     CompressorFilterConfigSharedPtr config2;
-    config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "gzip"));
+    config2 =
+        std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "gzip");
     std::unique_ptr<CompressorFilter> gzip_filter = std::make_unique<CompressorFilter>(config2);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     gzip_filter->setDecoderFilterCallbacks(decoder_callbacks);
@@ -383,12 +391,14 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   }
   {
     // check if identity stat is increased twice (the second time via the cached path).
-    Stats::IsolatedStoreImpl stats;
+    Stats::TestUtil::TestStore stats;
+    ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
     CompressorFilterConfigSharedPtr config2;
-    config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "test"));
+    config2 =
+        std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test");
     std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter2->setDecoderFilterCallbacks(decoder_callbacks);
@@ -401,12 +411,14 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   }
   {
     // check if not_valid stat is increased twice (the second time via the cached path).
-    Stats::IsolatedStoreImpl stats;
+    Stats::TestUtil::TestStore stats;
+    ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
     CompressorFilterConfigSharedPtr config2;
-    config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "test"));
+    config2 =
+        std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test");
     std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter2->setDecoderFilterCallbacks(decoder_callbacks);
@@ -419,15 +431,18 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   }
   {
     // Test that encoding decision is cached when used by multiple filters.
-    Stats::IsolatedStoreImpl stats;
+    Stats::TestUtil::TestStore stats;
+    ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
     CompressorFilterConfigSharedPtr config1;
-    config1.reset(new MockCompressorFilterConfig(compressor, "test1.", stats, runtime, "test1"));
+    config1 =
+        std::make_shared<MockCompressorFilterConfig>(compressor, "test1.", stats, runtime, "test1");
     std::unique_ptr<CompressorFilter> filter1 = std::make_unique<CompressorFilter>(config1);
     CompressorFilterConfigSharedPtr config2;
-    config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "test2"));
+    config2 =
+        std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test2");
     std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter1->setDecoderFilterCallbacks(decoder_callbacks);
@@ -446,15 +461,18 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   }
   {
     // Test that first registered filter is used when handling wildcard.
-    Stats::IsolatedStoreImpl stats;
+    Stats::TestUtil::TestStore stats;
+    ;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
     CompressorFilterConfigSharedPtr config1;
-    config1.reset(new MockCompressorFilterConfig(compressor, "test1.", stats, runtime, "test1"));
+    config1 =
+        std::make_shared<MockCompressorFilterConfig>(compressor, "test1.", stats, runtime, "test1");
     std::unique_ptr<CompressorFilter> filter1 = std::make_unique<CompressorFilter>(config1);
     CompressorFilterConfigSharedPtr config2;
-    config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "test2"));
+    config2 =
+        std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test2");
     std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter1->setDecoderFilterCallbacks(decoder_callbacks);

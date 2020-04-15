@@ -1,5 +1,6 @@
 #pragma once
 
+#include <list>
 #include <string>
 
 #include "envoy/network/address.h"
@@ -186,6 +187,7 @@ public:
 
 private:
   const Network::SocketPtr socket_;
+  std::list<Network::UdpRecvData> received_datagrams_;
 };
 
 } // namespace Test

@@ -156,7 +156,7 @@ MockConnectionSocket::MockConnectionSocket()
 
 MockConnectionSocket::~MockConnectionSocket() = default;
 
-MockListener::MockListener() {}
+MockListener::MockListener() = default;
 
 MockListener::~MockListener() { onDestroy(); }
 
@@ -194,6 +194,9 @@ MockUdpListenerFilterManager::~MockUdpListenerFilterManager() = default;
 
 MockConnectionBalancer::MockConnectionBalancer() = default;
 MockConnectionBalancer::~MockConnectionBalancer() = default;
+
+MockListenerFilterMatcher::MockListenerFilterMatcher() = default;
+MockListenerFilterMatcher::~MockListenerFilterMatcher() = default;
 
 } // namespace Network
 } // namespace Envoy
