@@ -91,8 +91,8 @@ public:
 class EnvoyQuicClientSessionTest : public testing::TestWithParam<bool> {
 public:
   EnvoyQuicClientSessionTest()
-      : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()),
-        connection_helper_(*dispatcher_),
+      : api_(Api::createApiForTest(time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
