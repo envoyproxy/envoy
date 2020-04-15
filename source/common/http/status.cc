@@ -22,7 +22,7 @@ absl::string_view statusCodeToString(StatusCode code) {
   case StatusCode::CodecClientError:
     return "CodecClientError";
   default:
-    RELEASE_ASSERT(false, "Invalid StatusCode value");
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
