@@ -102,6 +102,8 @@ public:
   ~MockSplitRequest() override;
 
   MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, delayLatencyMetric, ());
+  MOCK_METHOD(void, completeLatency, ());
 };
 
 class MockSplitCallbacks : public SplitCallbacks {

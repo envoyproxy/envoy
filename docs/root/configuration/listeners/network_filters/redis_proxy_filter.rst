@@ -76,7 +76,7 @@ redis.drain_close_enabled
 .. _config_network_filters_redis_proxy_fault_injection:
 
 Fault Injection
--------------
+---------------
 
 The Redis filter can perform fault injection. Currently, Delay and Error faults are supported.
 Delay faults delay a request, and Error faults respond with an error. Moreover, errors can be delayed.

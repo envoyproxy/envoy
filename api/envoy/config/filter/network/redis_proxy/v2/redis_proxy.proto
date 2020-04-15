@@ -283,7 +283,7 @@ message RedisProxy {
   //        delay: 2s
   //
   // See the :ref:`fault injection section
-  // <_config_network_filters_redis_proxy_fault_injection>` for more information on how to configure this.
+  // <config_network_filters_redis_proxy_fault_injection>` for more information on how to configure this.
   repeated RedisFault faults = 7;
 }
 
