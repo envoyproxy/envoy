@@ -25,10 +25,10 @@ public:
 
   Extensions::Common::DynamicForwardProxy::DnsCache& cache() { return *dns_cache_; }
   Upstream::ClusterManager& clusterManager() { return cluster_manager_; }
-  uint16_t port() { return port_; }
+  uint32_t port() { return port_; }
 
 private:
-  const uint16_t port_;
+  const uint32_t port_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
   Upstream::ClusterManager& cluster_manager_;
