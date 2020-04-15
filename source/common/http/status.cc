@@ -21,9 +21,8 @@ absl::string_view statusCodeToString(StatusCode code) {
     return "PrematureResponseError";
   case StatusCode::CodecClientError:
     return "CodecClientError";
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 struct EnvoyStatusPayload {
