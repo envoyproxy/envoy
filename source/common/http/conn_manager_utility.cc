@@ -15,7 +15,6 @@
 #include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
-#include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_cat.h"
@@ -44,22 +43,24 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     ServerConnectionCallbacks& callbacks, Stats::Scope& scope, const Http1Settings& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-    uint32_t max_request_headers_kb, uint32_t max_request_headers_count) {
+    uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
-    return std::make_unique<Http2::ServerConnectionImpl>(connection, callbacks, scope,
-                                                         http2_options, max_request_headers_kb,
-                                                         max_request_headers_count);
+    return std::make_unique<Http2::ServerConnectionImpl>(
+        connection, callbacks, scope, http2_options, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   } else {
-    return std::make_unique<Http1::ServerConnectionImpl>(connection, scope, callbacks,
-                                                         http1_settings, max_request_headers_kb,
-                                                         max_request_headers_count);
+    return std::make_unique<Http1::ServerConnectionImpl>(
+        connection, scope, callbacks, http1_settings, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   }
 }
 
 Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
     RequestHeaderMap& request_headers, Network::Connection& connection,
     ConnectionManagerConfig& config, const Router::Config& route_config,
-    Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info) {
+    const LocalInfo::LocalInfo& local_info) {
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
   if (Utility::isUpgrade(request_headers)) {
@@ -217,12 +218,11 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
 
   // Generate x-request-id for all edge requests, or if there is none.
   if (config.generateRequestId()) {
-    // TODO(PiotrSikora) PERF: Write UUID directly to the header map.
-    if ((!config.preserveExternalRequestId() && edge_request) || !request_headers.RequestId()) {
-      const std::string uuid = random.uuid();
-      ASSERT(!uuid.empty());
-      request_headers.setRequestId(uuid);
-    }
+    auto rid_extension = config.requestIDExtension();
+    // Unconditionally set a request ID if we are allowed to override it from
+    // the edge. Otherwise just ensure it is set.
+    const bool force_set = !config.preserveExternalRequestId() && edge_request;
+    rid_extension->set(request_headers, force_set);
   }
 
   mutateXfccRequestHeader(request_headers, connection, config);
@@ -234,15 +234,14 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& requ
                                                           Runtime::Loader& runtime,
                                                           ConnectionManagerConfig& config,
                                                           const Router::Route* route) {
-  if (!config.tracingConfig() || !request_headers.RequestId()) {
+  if (!config.tracingConfig()) {
     return;
   }
 
-  // TODO(dnoe): Migrate uuidModBy and others below to take string_view (#6580)
-  std::string x_request_id(request_headers.RequestId()->value().getStringView());
+  auto rid_extension = config.requestIDExtension();
   uint64_t result;
-  // Skip if x-request-id is corrupted.
-  if (!UuidUtils::uuidModBy(x_request_id, result, 10000)) {
+  // Skip if request-id is corrupted, or non-existent
+  if (!rid_extension->modBy(request_headers, result, 10000)) {
     return;
   }
 
@@ -260,23 +259,21 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& requ
   }
 
   // Do not apply tracing transformations if we are currently tracing.
-  if (UuidTraceStatus::NoTrace == UuidUtils::isTraceableUuid(x_request_id)) {
+  if (TraceStatus::NoTrace == rid_extension->getTraceStatus(request_headers)) {
     if (request_headers.ClientTraceId() &&
         runtime.snapshot().featureEnabled("tracing.client_enabled", *client_sampling)) {
-      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
+      rid_extension->setTraceStatus(request_headers, TraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
-      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
+      rid_extension->setTraceStatus(request_headers, TraceStatus::Forced);
     } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", *random_sampling,
                                                  result)) {
-      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
+      rid_extension->setTraceStatus(request_headers, TraceStatus::Sampled);
     }
   }
 
   if (!runtime.snapshot().featureEnabled("tracing.global_enabled", *overall_sampling, result)) {
-    UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
+    rid_extension->setTraceStatus(request_headers, TraceStatus::NoTrace);
   }
-
-  request_headers.setRequestId(x_request_id);
 }
 
 void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request_headers,
@@ -365,9 +362,9 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
   }
 }
 
-void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
-                                                     const RequestHeaderMap* request_headers,
-                                                     const std::string& via) {
+void ConnectionManagerUtility::mutateResponseHeaders(
+    ResponseHeaderMap& response_headers, const RequestHeaderMap* request_headers,
+    const RequestIDExtensionSharedPtr& rid_extension, const std::string& via) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.
@@ -381,14 +378,16 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
     }
   } else {
     response_headers.removeConnection();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_upgrade_response")) {
+      response_headers.removeUpgrade();
+    }
   }
+
   response_headers.removeTransferEncoding();
 
-  if (request_headers != nullptr && request_headers->EnvoyForceTrace() &&
-      request_headers->RequestId()) {
-    response_headers.setRequestId(request_headers->RequestId()->value().getStringView());
+  if (request_headers != nullptr && request_headers->EnvoyForceTrace()) {
+    rid_extension->setInResponse(response_headers, *request_headers);
   }
-
   response_headers.removeKeepAlive();
   response_headers.removeProxyConnection();
 

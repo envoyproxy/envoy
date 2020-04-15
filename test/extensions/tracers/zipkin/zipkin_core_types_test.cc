@@ -78,7 +78,7 @@ TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep1(std::string("my_service"), addr);
-  Endpoint ep2(ep1);
+  Endpoint& ep2(ep1);
   Util::Replacements replacements;
 
   EXPECT_EQ("my_service", ep1.serviceName());
@@ -95,7 +95,7 @@ TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep1(std::string("my_service"), addr);
-  Endpoint ep2 = ep1;
+  Endpoint& ep2 = ep1;
   Util::Replacements replacements;
 
   EXPECT_EQ("my_service", ep1.serviceName());
@@ -227,7 +227,7 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
                            test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, CLIENT_SEND, ep);
-  Annotation ann2(ann);
+  Annotation& ann2(ann);
   Util::Replacements replacements;
 
   EXPECT_EQ(ann.value(), ann2.value());
@@ -246,7 +246,7 @@ TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
                            test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, CLIENT_SEND, ep);
-  Annotation ann2 = ann;
+  Annotation& ann2 = ann;
   Util::Replacements replacements;
 
   EXPECT_EQ(ann.value(), ann2.value());
@@ -329,7 +329,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, customConstructor) {
 
 TEST(ZipkinCoreTypesBinaryAnnotationTest, copyConstructor) {
   BinaryAnnotation ann("key", "value");
-  BinaryAnnotation ann2(ann);
+  BinaryAnnotation& ann2(ann);
   Util::Replacements replacements;
 
   EXPECT_EQ(ann.value(), ann2.value());
@@ -341,7 +341,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, copyConstructor) {
 
 TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
   BinaryAnnotation ann("key", "value");
-  BinaryAnnotation ann2 = ann;
+  BinaryAnnotation& ann2 = ann;
   Util::Replacements replacements;
 
   EXPECT_EQ(ann.value(), ann2.value());

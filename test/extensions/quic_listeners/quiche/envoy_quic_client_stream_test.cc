@@ -18,12 +18,11 @@ namespace Quic {
 
 using testing::_;
 using testing::Invoke;
-using testing::Return;
 
 class EnvoyQuicClientStreamTest : public testing::TestWithParam<bool> {
 public:
   EnvoyQuicClientStreamTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
@@ -111,6 +110,7 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientStreamTests, EnvoyQuicClientStreamTest,
                          testing::ValuesIn({true, false}));
 
 TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
+  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   quic_stream_->encodeHeaders(request_headers_, false);
   quic_stream_->encodeData(request_body_, true);
 

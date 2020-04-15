@@ -64,7 +64,7 @@ MockMetricSnapshot::~MockMetricSnapshot() = default;
 MockSink::MockSink() = default;
 MockSink::~MockSink() = default;
 
-MockStore::MockStore() : StoreImpl(*global_symbol_table_) {
+MockStore::MockStore() : TestUtil::TestStore(*global_symbol_table_) {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
   ON_CALL(*this, histogram(_, _))
       .WillByDefault(Invoke([this](const std::string& name, Histogram::Unit unit) -> Histogram& {
@@ -74,6 +74,11 @@ MockStore::MockStore() : StoreImpl(*global_symbol_table_) {
         histogram->store_ = this;
         histograms_.emplace_back(histogram);
         return *histogram;
+      }));
+
+  ON_CALL(*this, histogramFromString(_, _))
+      .WillByDefault(Invoke([this](const std::string& name, Histogram::Unit unit) -> Histogram& {
+        return TestUtil::TestStore::histogramFromString(name, unit);
       }));
 }
 MockStore::~MockStore() = default;

@@ -13,13 +13,14 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "BaseProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common types]
 
@@ -236,6 +237,17 @@ message RuntimeUInt32 {
 
   // Runtime key to get value for comparison. This value is used if defined.
   string runtime_key = 3 [(validate.rules).string = {min_bytes: 1}];
+}
+
+// Runtime derived double with a default when not specified.
+message RuntimeDouble {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RuntimeDouble";
+
+  // Default value if runtime value is not available.
+  double default_value = 1;
+
+  // Runtime key to get value for comparison. This value is used if defined.
+  string runtime_key = 2 [(validate.rules).string = {min_bytes: 1}];
 }
 
 // Runtime derived bool with a default when not specified.

@@ -39,3 +39,13 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:upstream_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "hystrix_integration_test",
+    srcs = ["hystrix_integration_test.cc"],
+    extension_name = "envoy.stat_sinks.hystrix",
+    deps = [
+        "//source/extensions/stat_sinks/hystrix:config",
+        "//test/integration:http_protocol_integration_lib",
+    ],
+)

@@ -225,8 +225,8 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
-      outlier_event_logger_.reset(
-          new Outlier::EventLoggerImpl(log_manager, event_log_file_path, time_source_));
+      outlier_event_logger_ = std::make_shared<Outlier::EventLoggerImpl>(
+          log_manager, event_log_file_path, time_source_);
     }
   }
 
@@ -264,23 +264,31 @@ ClusterManagerImpl::ClusterManagerImpl(
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
       ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats)
+                                                         dyn_resources.ads_config(), stats, false)
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v2.AggregatedDiscoveryService.DeltaAggregatedResources"),
+              dyn_resources.ads_config().transport_api_version() ==
+                      envoy::config::core::v3::ApiVersion::V3
+                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
+                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
+                  ? "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"
+                  : "envoy.service.discovery.v2.AggregatedDiscoveryService."
+                    "DeltaAggregatedResources"),
           dyn_resources.ads_config().transport_api_version(), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats)
+                                                         dyn_resources.ads_config(), stats, false)
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               dyn_resources.ads_config().transport_api_version() ==
                       envoy::config::core::v3::ApiVersion::V3
+                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
+                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
                   ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
                     "StreamAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
@@ -345,7 +353,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info, *this, stats,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
-                                                       stats)
+                                                       stats, false)
             ->create(),
         load_stats_config.transport_api_version(), main_thread_dispatcher);
   }

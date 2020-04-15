@@ -40,7 +40,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   ZipkinTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr zipkin_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
@@ -67,14 +67,8 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   ZipkinTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr zipkin_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, zipkin_tracer);
-}
-
-TEST(ZipkinTracerConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<ZipkinTracerFactory, Server::Configuration::TracerFactory>()),
-      EnvoyException, "Double registration for name: 'envoy.tracers.zipkin'");
 }
 
 // Test that the deprecated extension name still functions.
