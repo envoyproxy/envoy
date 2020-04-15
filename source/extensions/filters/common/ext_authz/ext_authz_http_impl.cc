@@ -10,7 +10,7 @@
 #include "common/common/matchers.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
-#include "common/runtime/runtime_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/str_cat.h"
 

@@ -376,7 +376,7 @@ envoy_cc_library(
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/runtime:runtime_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],

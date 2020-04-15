@@ -10,7 +10,6 @@
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
 #include "common/router/header_parser.h"
-#include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 

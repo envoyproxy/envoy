@@ -38,7 +38,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/http1:header_formatter_lib",
-        "//source/common/runtime:runtime_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -66,7 +66,7 @@ envoy_cc_library(
         "//source/common/http:conn_pool_base_legacy_lib",
         "//source/common/http:headers_lib",
         "//source/common/network:utility_lib",
-        "//source/common/runtime:runtime_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",
     ],
@@ -90,7 +90,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:conn_pool_base_lib",
         "//source/common/http:headers_lib",
-        "//source/common/runtime:runtime_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:upstream_lib",
     ],
 )

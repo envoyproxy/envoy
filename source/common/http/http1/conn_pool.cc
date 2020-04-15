@@ -14,7 +14,7 @@
 #include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/http/http1/conn_pool_legacy.h"
-#include "common/runtime/runtime_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 
