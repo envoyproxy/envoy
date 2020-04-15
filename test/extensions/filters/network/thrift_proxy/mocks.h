@@ -258,47 +258,28 @@ public:
   std::shared_ptr<Router::MockRoute> route_;
 };
 
-template <class ConfigProto> class MockFactoryBase : public NamedThriftFilterConfigFactory {
-public:
-  FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::FactoryContext& context) override {
-    const auto& typed_config = dynamic_cast<const ConfigProto&>(proto_config);
-    return createFilterFactoryFromProtoTyped(typed_config, stats_prefix, context);
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ConfigProto>();
-  }
-
-  std::string name() const override { return name_; }
-
-protected:
-  MockFactoryBase(const std::string& name) : name_(name) {}
-
-private:
-  virtual FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                    const std::string& stats_prefix,
-                                    Server::Configuration::FactoryContext& context) PURE;
-
-  const std::string name_;
-};
-
-class MockFilterConfigFactory : public MockFactoryBase<ProtobufWkt::Struct> {
+class MockFilterConfigFactory : public NamedThriftFilterConfigFactory {
 public:
   MockFilterConfigFactory();
   ~MockFilterConfigFactory() override;
 
-  ThriftFilters::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ProtobufWkt::Struct& proto_config,
-                                    const std::string& stat_prefix,
-                                    Server::Configuration::FactoryContext& context) override;
+  FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
+
+  std::string name() const override { return name_; }
 
   std::shared_ptr<MockDecoderFilter> mock_filter_;
   ProtobufWkt::Struct config_struct_;
   std::string config_stat_prefix_;
+
+private:
+  const std::string name_;
 };
 
 } // namespace ThriftFilters
