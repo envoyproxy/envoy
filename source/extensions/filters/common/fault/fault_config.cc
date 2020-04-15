@@ -18,17 +18,14 @@ HeaderPercentageProvider::percentage(const Http::RequestHeaderMap* request_heade
     return percentage_;
   }
 
-  uint64_t header_numerator;
+  uint32_t header_numerator;
   if (!absl::SimpleAtoi(header->value().getStringView(), &header_numerator)) {
     return percentage_;
   }
 
-  if (header_numerator > 100) {
-    return percentage_;
-  }
-
   envoy::type::v3::FractionalPercent header_percentage;
-  header_percentage.set_numerator(header_numerator);
+  header_percentage.set_denominator(percentage_.denominator());
+  header_percentage.set_numerator(std::min(header_numerator, percentage_.numerator()));
   return header_percentage;
 }
 

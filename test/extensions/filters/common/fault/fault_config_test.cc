@@ -38,7 +38,7 @@ TEST(FaultConfigTest, FaultAbortHeaderConfig) {
 TEST(FaultConfigTest, FaultAbortPercentageHeaderConfig) {
   envoy::extensions::filters::http::fault::v3::FaultAbort proto_config;
   proto_config.mutable_header_abort();
-  proto_config.mutable_percentage()->set_numerator(33);
+  proto_config.mutable_percentage()->set_numerator(80);
   proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   FaultAbortConfig config(proto_config);
 
@@ -87,7 +87,7 @@ TEST(FaultConfigTest, FaultDelayHeaderConfig) {
 TEST(FaultConfigTest, FaultDelayPercentageHeaderConfig) {
   envoy::extensions::filters::common::fault::v3::FaultDelay proto_config;
   proto_config.mutable_header_delay();
-  proto_config.mutable_percentage()->set_numerator(33);
+  proto_config.mutable_percentage()->set_numerator(80);
   proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   FaultDelayConfig config(proto_config);
 
@@ -140,7 +140,7 @@ TEST(FaultConfigTest, FaultRateLimitHeaderConfig) {
 TEST(FaultConfigTest, FaultRateLimitPercentageHeaderConfig) {
   envoy::extensions::filters::common::fault::v3::FaultRateLimit proto_config;
   proto_config.mutable_header_limit();
-  proto_config.mutable_percentage()->set_numerator(33);
+  proto_config.mutable_percentage()->set_numerator(80);
   proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   FaultRateLimitConfig config(proto_config);
 
