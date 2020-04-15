@@ -104,6 +104,8 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
 private:
+  friend class HeaderToMetadataTest;
+
   using StructMap = std::map<std::string, ProtobufWkt::Struct>;
 
   const ConfigSharedPtr config_;

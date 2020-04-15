@@ -25,6 +25,35 @@ namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 namespace {
 
+MATCHER_P(MapEq, rhs, "") {
+  const ProtobufWkt::Struct& obj = arg;
+  EXPECT_TRUE(!rhs.empty());
+  for (auto const& entry : rhs) {
+    EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
+  }
+  return true;
+}
+
+MATCHER_P(MapEqNum, rhs, "") {
+  const ProtobufWkt::Struct& obj = arg;
+  EXPECT_TRUE(!rhs.empty());
+  for (auto const& entry : rhs) {
+    EXPECT_EQ(obj.fields().at(entry.first).number_value(), entry.second);
+  }
+  return true;
+}
+
+MATCHER_P(MapEqValue, rhs, "") {
+  const ProtobufWkt::Struct& obj = arg;
+  EXPECT_TRUE(!rhs.empty());
+  for (auto const& entry : rhs) {
+    EXPECT_TRUE(TestUtility::protoEqual(obj.fields().at(entry.first), entry.second));
+  }
+  return true;
+}
+
+} // namespace
+
 class HeaderToMetadataTest : public testing::Test {
 public:
   const std::string request_config_yaml = R"EOF(
@@ -52,39 +81,14 @@ request_rules:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
+  const Config* getConfig() { return filter_->getConfig(); }
+
   ConfigSharedPtr config_;
   std::shared_ptr<HeaderToMetadataFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
 };
-
-MATCHER_P(MapEq, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
-  EXPECT_TRUE(!rhs.empty());
-  for (auto const& entry : rhs) {
-    EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
-  }
-  return true;
-}
-
-MATCHER_P(MapEqNum, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
-  EXPECT_TRUE(!rhs.empty());
-  for (auto const& entry : rhs) {
-    EXPECT_EQ(obj.fields().at(entry.first).number_value(), entry.second);
-  }
-  return true;
-}
-
-MATCHER_P(MapEqValue, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
-  EXPECT_TRUE(!rhs.empty());
-  for (auto const& entry : rhs) {
-    EXPECT_TRUE(TestUtility::protoEqual(obj.fields().at(entry.first), entry.second));
-  }
-  return true;
-}
 
 /**
  * Basic use-case.
@@ -130,6 +134,24 @@ TEST_F(HeaderToMetadataTest, PerRouteOverride) {
   Http::TestRequestTrailerMapImpl incoming_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(incoming_trailers));
   filter_->onDestroy();
+}
+
+TEST_F(HeaderToMetadataTest, ConfigIsCached) {
+  // Global config is empty.
+  initializeFilter("");
+  Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
+  std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
+
+  // Setup per route config.
+  envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
+  TestUtility::loadFromYaml(request_config_yaml, config_proto);
+  Config per_route_config(config_proto, true);
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
+              perFilterConfig(HttpFilterNames::get().HeaderToMetadata))
+      .WillOnce(testing::Return(&per_route_config));
+
+  EXPECT_TRUE(getConfig()->doRequest());
+  EXPECT_TRUE(getConfig()->doRequest());
 }
 
 /**
@@ -442,7 +464,6 @@ request_rules:
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
-} // namespace
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters
 } // namespace Extensions
