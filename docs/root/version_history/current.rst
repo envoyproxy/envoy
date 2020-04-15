@@ -7,7 +7,7 @@ Changes
 * access loggers: added GRPC_STATUS operator on logging format.
 * http: fixed a bug where the upgrade header was not cleared on responses to non-upgrade requests.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
-* router: allow retries of streaming or incomplete requests
+* router: allow retries of streaming or incomplete requests.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
   can now have a separate :ref:`tracing provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
 
