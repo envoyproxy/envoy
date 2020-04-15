@@ -111,10 +111,10 @@ envoy_cc_library(
     srcs = ["fault_impl.cc"],
     hdrs = ["fault_impl.h"],
     deps = [
-        ":fault_interface",
         ":codec_lib",
+        ":fault_interface",
         "//include/envoy/upstream:upstream_interface",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )

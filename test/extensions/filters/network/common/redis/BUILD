@@ -68,8 +68,8 @@ envoy_cc_test(
         ":redis_mocks",
         "//source/common/common:assert_lib",
         "//source/extensions/filters/network/common/redis:fault_lib",
-        "//test/test_common:utility_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
     ],
 )

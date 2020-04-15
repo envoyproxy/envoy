@@ -72,7 +72,6 @@ struct HandlerData {
 
 using HandlerDataPtr = std::shared_ptr<HandlerData>;
 
-
 class CommandHandlerBase {
 protected:
   CommandHandlerBase(Router& router) : router_(router) {}
@@ -85,16 +84,11 @@ protected:
   static void onWrongNumberOfArguments(SplitCallbacks& callbacks,
                                        const Common::Redis::RespValue& request);
   void updateStats(const bool success);
-  
+
   // To support delay faults, we allow faults to override the regular command latency
   // recording behavior.
-  void delayLatencyMetric() {
-    delay_command_latency_ = true;
-  }
-  void completeLatency() {
-    command_latency_->complete();
-  }
-
+  void delayLatencyMetric() { delay_command_latency_ = true; }
+  void completeLatency() { command_latency_->complete(); }
 
   SplitRequestBase(CommandStats& command_stats, TimeSource& time_source)
       : command_stats_(command_stats) {
@@ -139,13 +133,13 @@ public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source);
-  
+
 private:
   ErrorFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source)
       : SingleServerRequest(callbacks, command_stats, time_source) {}
 
 public:
-    const static std::string FAULT_INJECTED_ERROR;
+  const static std::string FAULT_INJECTED_ERROR;
 };
 
 /**
@@ -153,13 +147,14 @@ public:
  */
 class DelayFaultRequest : public SplitRequestBase, public SplitCallbacks {
 public:
-  static std::unique_ptr<DelayFaultRequest> create(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, 
-    Event::Dispatcher& dispatcher, std::chrono::milliseconds delay);
-  
-  DelayFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, 
-    Event::Dispatcher& dispatcher, std::chrono::milliseconds delay)
-    : SplitRequestBase(command_stats, time_source), callbacks_(callbacks), dispatcher_(dispatcher),
-      delay_(delay) {}
+  static std::unique_ptr<DelayFaultRequest>
+  create(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+         Event::Dispatcher& dispatcher, std::chrono::milliseconds delay);
+
+  DelayFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                    Event::Dispatcher& dispatcher, std::chrono::milliseconds delay)
+      : SplitRequestBase(command_stats, time_source), callbacks_(callbacks),
+        dispatcher_(dispatcher), delay_(delay) {}
 
   // SplitCallbacks
   bool connectionAllowed() override { return callbacks_.connectionAllowed(); }
@@ -172,7 +167,6 @@ public:
   SplitRequestPtr wrapped_request_ptr_;
 
 private:
-
   void onDelayResponse();
 
   SplitCallbacks& callbacks_;
@@ -339,7 +333,6 @@ struct InstanceStats {
   ALL_COMMAND_SPLITTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
   InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
@@ -351,7 +344,6 @@ public:
                               SplitCallbacks& callbacks) override;
 
 private:
-
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
                   bool latency_in_micros, CommandHandler& handler);
   void onInvalidRequest(SplitCallbacks& callbacks);
@@ -368,7 +360,7 @@ private:
   TimeSource& time_source_;
   Event::Dispatcher& dispatcher_;
 
-  Common::Redis::FaultManagerPtr fault_manager_; // TODO: Should this just live on the config?
+  Common::Redis::FaultManagerPtr fault_manager_;
 
   const std::string ERROR_FAULT = "error_fault";
 };

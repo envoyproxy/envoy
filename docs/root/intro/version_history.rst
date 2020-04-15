@@ -3,6 +3,7 @@ Version history
 
 1.15.0 (Pending)
 ================
+* redis fault injection: added :ref:`fault injection for redis proxy <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.faults>`, described further in :ref:`configuration documentation <config_network_filters_redis_proxy>`. 
 
 1.14.1 (April 8, 2020)
 ======================

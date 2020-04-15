@@ -55,10 +55,11 @@ public:
 class MockFaultManager : public Common::Redis::FaultManager {
 public:
   MockFaultManager();
-  MockFaultManager(const MockFaultManager &other);
+  MockFaultManager(const MockFaultManager& other);
   ~MockFaultManager();
 
-  MOCK_METHOD((absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>>), getFaultForCommand, (std::string));
+  MOCK_METHOD((absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>>),
+              getFaultForCommand, (std::string));
   MOCK_METHOD(int, numberOfFaults, ());
 };
 

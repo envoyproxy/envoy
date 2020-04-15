@@ -16,8 +16,6 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "test/mocks/runtime/mocks.h"
-
 using testing::_;
 using testing::DoAll;
 using testing::InSequence;
@@ -61,13 +59,16 @@ public:
       new NiceMock<MockRoute>(ConnPool::InstanceSharedPtr{conn_pool_})};
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  std::shared_ptr<NiceMock<MockFaultManager>> fault_manager_{
-    new NiceMock<MockFaultManager>()
-  };
+  std::shared_ptr<NiceMock<MockFaultManager>> fault_manager_{new NiceMock<MockFaultManager>()};
 
   Event::SimulatedTimeSystem time_system_;
-  InstanceImpl splitter_{std::make_unique<NiceMock<MockRouter>>(route_), store_, "redis.foo.",
-                         time_system_, latency_in_micros_, dispatcher_, fault_manager_};
+  InstanceImpl splitter_{std::make_unique<NiceMock<MockRouter>>(route_),
+                         store_,
+                         "redis.foo.",
+                         time_system_,
+                         latency_in_micros_,
+                         dispatcher_,
+                         fault_manager_};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -356,18 +357,19 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
 };
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestTest, RedisSingleServerRequestTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::testCommands()));
+                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
 
 INSTANTIATE_TEST_SUITE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
                          RedisSingleServerRequestTest, testing::Values("INCR", "inCrBY"));
 
 class RedisSingleServerRequestWithFaultTest : public RedisSingleServerRequestTest {
 public:
-  void makeRequest(const std::string& hash_key, Common::Redis::RespValuePtr&& request, int delay_ms) {
+  void makeRequest(const std::string& hash_key, Common::Redis::RespValuePtr&& request,
+                   int delay_ms) {
     EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
     EXPECT_CALL(*conn_pool_, makeRequest_(hash_key, RespVariantEq(*request), _))
         .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
-    
+
     if (delay_ms > 0) {
       timer_ = new NiceMock<Event::MockTimer>();
       EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
@@ -388,7 +390,7 @@ TEST_P(RedisSingleServerRequestWithFaultTest, ErrorFault) {
 
   // Fault injection
   int delay_ms = 0;
-  absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>> fault = 
+  absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>> fault =
       std::make_pair(Common::Redis::FaultType::Error, std::chrono::milliseconds(delay_ms));
   ON_CALL(*fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault));
 
@@ -396,7 +398,7 @@ TEST_P(RedisSingleServerRequestWithFaultTest, ErrorFault) {
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {GetParam(), "hello"});
-  
+
   // Error fault calls onResponse immediately, so latency is zero.
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(store_, deliverHistogramToSinks(
@@ -409,7 +411,8 @@ TEST_P(RedisSingleServerRequestWithFaultTest, ErrorFault) {
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.error", lower_command)).value());
-  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.error_fault", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.error_fault", lower_command)).value());
 };
 
 TEST_P(RedisSingleServerRequestWithFaultTest, ErrorWithDelayFault) {
@@ -417,7 +420,7 @@ TEST_P(RedisSingleServerRequestWithFaultTest, ErrorWithDelayFault) {
 
   // Fault injection
   int delay_ms = 13;
-  absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>> fault = 
+  absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>> fault =
       std::make_pair(Common::Redis::FaultType::Error, std::chrono::milliseconds(delay_ms));
   ON_CALL(*fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault));
 
@@ -425,7 +428,7 @@ TEST_P(RedisSingleServerRequestWithFaultTest, ErrorWithDelayFault) {
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {GetParam(), "hello"});
-  
+
   // As error faults have zero latency, recorded latency is equal to the delay.
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   if (delay_ms > 0) {
@@ -449,7 +452,8 @@ TEST_P(RedisSingleServerRequestWithFaultTest, ErrorWithDelayFault) {
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.error", lower_command)).value());
-  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.error_fault", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.error_fault", lower_command)).value());
 };
 
 TEST_P(RedisSingleServerRequestWithFaultTest, DelayFault) {
@@ -457,7 +461,7 @@ TEST_P(RedisSingleServerRequestWithFaultTest, DelayFault) {
 
   // Fault injection
   int delay_ms = 15;
-  absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>> fault = 
+  absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>> fault =
       std::make_pair(Common::Redis::FaultType::Delay, std::chrono::milliseconds(delay_ms));
   ON_CALL(*fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault));
 
@@ -470,9 +474,9 @@ TEST_P(RedisSingleServerRequestWithFaultTest, DelayFault) {
   EXPECT_NE(nullptr, handle_);
 
   EXPECT_CALL(store_, deliverHistogramToSinks(
-                        Property(&Stats::Metric::name,
-                                  fmt::format("redis.foo.command.{}.latency", lower_command)),
-                        delay_ms));
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          delay_ms));
   respond();
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(delay_ms));
@@ -485,7 +489,8 @@ TEST_P(RedisSingleServerRequestWithFaultTest, DelayFault) {
             store_.counter(fmt::format("redis.foo.command.{}.delay_fault", lower_command)).value());
 };
 
-INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithFaultTest, RedisSingleServerRequestWithFaultTest,
+INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithFaultTest,
+                         RedisSingleServerRequestWithFaultTest,
                          testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
 
 TEST_F(RedisSingleServerRequestTest, PingSuccess) {

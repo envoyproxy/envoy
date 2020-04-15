@@ -87,7 +87,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   auto router =
       std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams), context.runtime());
 
-  auto fault_manager = std::make_shared<Common::Redis::FaultManagerImpl>(context.random(), context.runtime(), proto_config.faults());
+  auto fault_manager = std::make_shared<Common::Redis::FaultManagerImpl>(
+      context.random(), context.runtime(), proto_config.faults());
 
   std::shared_ptr<CommandSplitter::Instance> splitter =
       std::make_shared<CommandSplitter::InstanceImpl>(
@@ -98,7 +99,6 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(
         factory, Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()}, *splitter,
         filter_config));
-        // TODO: Add dispatcher to proxy filter proper, allowing us to perform delays there
   };
 }
 

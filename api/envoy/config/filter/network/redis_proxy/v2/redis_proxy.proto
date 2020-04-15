@@ -192,7 +192,6 @@ message RedisProxy {
 
     // Delay for all faults. If not set, defaults to zero
     google.protobuf.Duration delay = 3;
-    // TODO: Make this runtime-tuneable? Do we care- most delays aren't tuneable.
 
     // Commands fault is restricted to, if any.
     repeated string commands = 4;
