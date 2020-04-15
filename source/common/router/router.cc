@@ -70,7 +70,7 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
   }
 
   Http::Utility::Url absolute_url;
-  if (!absolute_url.initialize(internal_redirect.value().getStringView())) {
+  if (!absolute_url.initialize(internal_redirect.value().getStringView(), false)) {
     return false;
   }
 

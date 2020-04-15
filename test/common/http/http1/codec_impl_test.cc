@@ -1595,6 +1595,7 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithTEChunked) {
   // Connect with body is technically illegal, but Envoy does not inspect the
   // body to see if there is a non-zero byte chunk. It will instead pass it
   // through.
+  // TODO(alyssawilk) track connect payload and block if this happens.
   Buffer::OwnedImpl expected_data("12345abcd");
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
@@ -2027,18 +2028,6 @@ TEST_F(Http1ClientConnectionImplTest, ConnectRejected) {
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl response("HTTP/1.1 400 OK\r\n\r\n12345abcd");
   codec_->dispatch(response);
-}
-
-TEST_F(Http1ClientConnectionImplTest, ConnectWithoutHost) {
-  initialize();
-
-  InSequence s;
-
-  NiceMock<MockResponseDecoder> response_decoder;
-  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":path", "/"}};
-  EXPECT_THROW_WITH_MESSAGE(request_encoder.encodeHeaders(headers, true), CodecClientException,
-                            "Host must be specified for CONNECT requests");
 }
 
 TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {

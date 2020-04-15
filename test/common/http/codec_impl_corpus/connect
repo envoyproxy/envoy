@@ -6,7 +6,7 @@ actions {
         value: "CONNECT"
       }
       headers {
-        key: ":path"
+        key: ":authority"
         value: "foo.com:80"
       }
     }
