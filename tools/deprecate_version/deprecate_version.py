@@ -47,26 +47,6 @@ class DeprecateVersionError(Exception):
   pass
 
 
-# Figure out map from version to set of commits.
-def GetHistory():
-  """Obtain mapping from release version to docs/root/intro/deprecated.rst PRs.
-
-  Returns:
-    A dictionary mapping from release version to a set of git commit objects.
-  """
-  repo = Repo(os.getcwd())
-  version = None
-  history = defaultdict(set)
-  for commit, lines in repo.blame('HEAD', 'docs/root/intro/deprecated.rst'):
-    for line in lines:
-      sr = re.match('## Version (.*) \(.*\)', line)
-      if sr:
-        version = sr.group(1)
-        continue
-      history[version].add(commit)
-  return history
-
-
 def GetConfirmation():
   """Obtain stdin confirmation to create issues in GH."""
   return input('Creates issues? [yN] ').strip().lower() in ('y', 'yes')
