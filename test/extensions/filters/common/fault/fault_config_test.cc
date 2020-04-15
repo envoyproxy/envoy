@@ -18,9 +18,6 @@ TEST(FaultConfigTest, FaultAbortHeaderConfig) {
   proto_config.mutable_header_abort();
   FaultAbortConfig config(proto_config);
 
-  // No header.
-  EXPECT_EQ(absl::nullopt, config.statusCode(nullptr));
-
   // Header with bad data.
   Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request", "abc"}};
   EXPECT_EQ(absl::nullopt, config.statusCode(&bad_headers));
@@ -44,11 +41,6 @@ TEST(FaultConfigTest, FaultAbortPercentageHeaderConfig) {
   proto_config.mutable_percentage()->set_numerator(33);
   proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   FaultAbortConfig config(proto_config);
-
-  // No header - fallback to proto config.
-  const auto no_header_percentage = config.percentage(nullptr);
-  EXPECT_EQ(proto_config.percentage().numerator(), no_header_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, no_header_percentage.denominator());
 
   // Header with bad data - fallback to proto config.
   Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request-percentage", "abc"}};
@@ -83,9 +75,6 @@ TEST(FaultConfigTest, FaultDelayHeaderConfig) {
   proto_config.mutable_header_delay();
   FaultDelayConfig config(proto_config);
 
-  // No header.
-  EXPECT_EQ(absl::nullopt, config.duration(nullptr));
-
   // Header with bad data.
   Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-delay-request", "abc"}};
   EXPECT_EQ(absl::nullopt, config.duration(&bad_headers));
@@ -101,11 +90,6 @@ TEST(FaultConfigTest, FaultDelayPercentageHeaderConfig) {
   proto_config.mutable_percentage()->set_numerator(33);
   proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   FaultDelayConfig config(proto_config);
-
-  // No header - fallback to proto config.
-  const auto no_header_percentage = config.percentage(nullptr);
-  EXPECT_EQ(proto_config.percentage().numerator(), no_header_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, no_header_percentage.denominator());
 
   // Header with bad data - fallback to proto config.
   Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-delay-request-percentage", "abc"}};
@@ -140,9 +124,6 @@ TEST(FaultConfigTest, FaultRateLimitHeaderConfig) {
   proto_config.mutable_header_limit();
   FaultRateLimitConfig config(proto_config);
 
-  // No header.
-  EXPECT_EQ(absl::nullopt, config.rateKbps(nullptr));
-
   // Header with bad data.
   Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-throughput-response", "abc"}};
   EXPECT_EQ(absl::nullopt, config.rateKbps(&bad_headers));
@@ -162,11 +143,6 @@ TEST(FaultConfigTest, FaultRateLimitPercentageHeaderConfig) {
   proto_config.mutable_percentage()->set_numerator(33);
   proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   FaultRateLimitConfig config(proto_config);
-
-  // No header - fallback to proto config.
-  const auto no_header_percentage = config.percentage(nullptr);
-  EXPECT_EQ(proto_config.percentage().numerator(), no_header_percentage.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED, no_header_percentage.denominator());
 
   // Header with bad data - fallback to proto config.
   Http::TestRequestHeaderMapImpl bad_headers{
