@@ -1544,7 +1544,11 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestNoContentLength) {
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  TestHeaderMapImpl expected_headers{
+      {":authority", "host:80"},
+      {":method", "CONNECT"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\n\r\n");
   codec_->dispatch(buffer);
 
@@ -1552,6 +1556,19 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestNoContentLength) {
   Buffer::OwnedImpl connect_payload("abcd");
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
   codec_->dispatch(connect_payload);
+}
+
+// We use the absolute URL parsing code for CONNECT requests, but it does not
+// actually allow absolute URLs.
+TEST_F(Http1ServerConnectionImplTest, ConnectRequestAbsoluteURLNotallowed) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer("CONNECT http://host:80 HTTP/1.1\r\n\r\n");
+  EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
 }
 
 TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithEarlyData) {
@@ -2010,6 +2027,18 @@ TEST_F(Http1ClientConnectionImplTest, ConnectRejected) {
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl response("HTTP/1.1 400 OK\r\n\r\n12345abcd");
   codec_->dispatch(response);
+}
+
+TEST_F(Http1ClientConnectionImplTest, ConnectWithoutHost) {
+  initialize();
+
+  InSequence s;
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":path", "/"}};
+  EXPECT_THROW_WITH_MESSAGE(request_encoder.encodeHeaders(headers, true), CodecClientException,
+                            "Host must be specified for CONNECT requests");
 }
 
 TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {

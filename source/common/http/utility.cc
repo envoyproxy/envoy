@@ -185,9 +185,8 @@ namespace Http {
 
 static const char kDefaultPath[] = "/";
 
-bool Utility::Url::initialize(absl::string_view absolute_url) {
+bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   struct http_parser_url u;
-  const bool is_connect = false;
   http_parser_url_init(&u);
   const int result =
       http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
@@ -216,7 +215,7 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
   if (path_len > 0) {
     uint64_t path_beginning = u.field_data[UF_HOST].off + host_and_port().length();
     path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_len);
-  } else {
+  } else if (!is_connect) {
     path_and_query_params_ = absl::string_view(kDefaultPath, 1);
   }
   return true;

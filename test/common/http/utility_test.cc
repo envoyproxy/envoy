@@ -1082,6 +1082,8 @@ TEST(Url, ParsingFails) {
   EXPECT_FALSE(url.initialize("foo"));
   EXPECT_FALSE(url.initialize("http://"));
   EXPECT_FALSE(url.initialize("random_scheme://host.com/path"));
+  EXPECT_FALSE(url.initialize("http://www.foo.com", true));
+  EXPECT_FALSE(url.initialize("foo.com", true));
 }
 
 void ValidateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
@@ -1091,6 +1093,14 @@ void ValidateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
   EXPECT_EQ(url.scheme(), expected_scheme);
   EXPECT_EQ(url.host_and_port(), expected_host_port);
   EXPECT_EQ(url.path_and_query_params(), expected_path);
+}
+
+void ValidateConnectUrl(absl::string_view raw_url, absl::string_view expected_host_port) {
+  Utility::Url url;
+  ASSERT_TRUE(url.initialize(raw_url, true)) << "Failed to initialize " << raw_url;
+  EXPECT_TRUE(url.scheme().empty());
+  EXPECT_TRUE(url.path_and_query_params().empty());
+  EXPECT_EQ(url.host_and_port(), expected_host_port);
 }
 
 TEST(Url, ParsingTest) {
@@ -1144,6 +1154,11 @@ TEST(Url, ParsingTest) {
               "www.host.com:80", "/path?query=param&query2=param2#fragment");
   ValidateUrl("http://www.host.com/path?query=param&query2=param2#fragment", "http", "www.host.com",
               "/path?query=param&query2=param2#fragment");
+}
+
+TEST(Url, ParsingForConnectTest) {
+  ValidateConnectUrl("host.com:443", "host.com:443");
+  ValidateConnectUrl("host.com:80", "host.com:80");
 }
 
 void validatePercentEncodingEncodeDecode(absl::string_view source,

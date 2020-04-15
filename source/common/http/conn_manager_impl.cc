@@ -760,6 +760,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
 
+  // TODO(alyssawilk) remove this synthetic path in a follow-up PR, including
+  // auditing of empty path headers.
+  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) {
+    request_headers_->setPath("/");
+  }
+
   // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
   if (connection_manager_.config_.isRoutable()) {
     if (connection_manager_.config_.routeConfigProvider() != nullptr) {
@@ -857,11 +863,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // Verify header sanity checks which should have been performed by the codec.
   ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
-  // TODO(alyssawilk) remove this synthetic path in a follow-up PR, including
-  // auditing of empty path headers, and make sure the CONNECT firstline is a host:port.
-  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) {
-    request_headers_->setPath("/");
-  }
   // Currently we only support relative paths at the application layer. We expect the codec to have
   // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does this
   // when the allow_absolute_url flag is enabled on the HCM.
@@ -929,9 +930,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   if (hasCachedRoute()) {
     if (upgrade_rejected) { // Do not allow upgrades if the route does not support it.
       // While downstream servers should not send upgrade payload without the upgrade being
-      // accepeted, err on the side of caution and refuse to process any further requests on this
+      // accepted, err on the side of caution and refuse to process any further requests on this
       // connection, to avoid a class of HTTP/1.1 smuggling bugs where Upgrade or CONNECT payload
-      // contians a smuggled HTTP request.
+      // contains a smuggled HTTP request.
       state_.saw_connection_close_ = true;
       // TODO(alyssawilk) can we rename this or should we just comment that it's
       // for all upgrades?

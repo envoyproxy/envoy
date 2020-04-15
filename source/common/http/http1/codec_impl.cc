@@ -358,8 +358,12 @@ static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
+  const HeaderEntry* host = headers.Host();
+  bool is_connect = HeaderUtility::isConnect(headers);
 
-  if (!method || !path) {
+  if (is_connect && !host) {
+    throw CodecClientException("Host must be specified for CONNECT requests");
+  } else if (!method || (!path && !is_connect)) {
     throw CodecClientException(":method and :path must be specified");
   }
   if (method->value() == Headers::get().MethodValues.Head) {
@@ -374,7 +378,11 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
 
   connection_.copyToBuffer(method->value().getStringView().data(), method->value().size());
   connection_.addCharToBuffer(' ');
-  connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());
+  if (is_connect) {
+    connection_.copyToBuffer(host->value().getStringView().data(), host->value().size());
+  } else {
+    connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());
+  }
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
   encodeHeadersBase(headers, end_stream);
@@ -743,7 +751,7 @@ void ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int me
 
   // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
   auto& active_request = active_request_.value();
-  if (!active_request.request_url_.getStringView().empty() &&
+  if (!is_connect && !active_request.request_url_.getStringView().empty() &&
       (active_request.request_url_.getStringView()[0] == '/' ||
        ((method == HTTP_OPTIONS) && active_request.request_url_.getStringView()[0] == '*'))) {
     headers.addViaMove(std::move(path), std::move(active_request.request_url_));
@@ -752,18 +760,15 @@ void ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int me
 
   // If absolute_urls and/or connect are not going be handled, copy the url and return.
   // This forces the behavior to be backwards compatible with the old codec behavior.
-  if (!codec_settings_.allow_absolute_url_) {
-    headers.addViaMove(std::move(path), std::move(active_request.request_url_));
-    return;
-  }
-
-  if (is_connect) {
+  // CONNECT "urls" are actually host:port so look like absolute URLs to the above checks.
+  // Absolute URLS in CONNECT requests will be rejected below by the URL class validation.
+  if (!codec_settings_.allow_absolute_url_ && !is_connect) {
     headers.addViaMove(std::move(path), std::move(active_request.request_url_));
     return;
   }
 
   Utility::Url absolute_url;
-  if (!absolute_url.initialize(active_request.request_url_.getStringView())) {
+  if (!absolute_url.initialize(active_request.request_url_.getStringView(), is_connect)) {
     sendProtocolError(Http1ResponseCodeDetails::get().InvalidUrl);
     throw CodecProtocolException("http/1.1 protocol error: invalid url in request line");
   }
@@ -776,7 +781,9 @@ void ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int me
   // forward the received Host field-value.
   headers.setHost(absolute_url.host_and_port());
 
-  headers.setPath(absolute_url.path_and_query_params());
+  if (!absolute_url.path_and_query_params().empty()) {
+    headers.setPath(absolute_url.path_and_query_params());
+  }
   active_request.request_url_.clear();
 }
 

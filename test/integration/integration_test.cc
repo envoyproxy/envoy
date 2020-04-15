@@ -1291,14 +1291,14 @@ TEST_P(IntegrationTest, ConnectWithNoBody) {
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("CONNECT / HTTP/1.1\r\nHost: host\r\n\r\n", false);
+  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\nHost: host\r\n\r\n", false);
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
-  EXPECT_TRUE(absl::StartsWith(data, "CONNECT / HTTP/1.1"));
+  EXPECT_TRUE(absl::StartsWith(data, "CONNECT host.com:80 HTTP/1.1"));
   // No transfer-encoding: chunked or connection: close
   EXPECT_FALSE(absl::StrContains(data, "hunked")) << data;
   EXPECT_FALSE(absl::StrContains(data, "onnection")) << data;
@@ -1318,7 +1318,7 @@ TEST_P(IntegrationTest, ConnectWithNoBody) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
-TEST_P(IntegrationTest, DISABLED_ConnectWithChunkedBody) {
+TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1328,14 +1328,13 @@ TEST_P(IntegrationTest, DISABLED_ConnectWithChunkedBody) {
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("CONNECT / HTTP/1.1\r\nHost: host\r\n\r\n", false);
+  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\nHost: host\r\n\r\n", false);
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
-  EXPECT_TRUE(absl::StartsWith(data, "CONNECT / HTTP/1.1"));
   // No transfer-encoding: chunked or connection: close
   EXPECT_FALSE(absl::StrContains(data, "hunked")) << data;
   EXPECT_FALSE(absl::StrContains(data, "onnection")) << data;
