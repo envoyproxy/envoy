@@ -351,6 +351,9 @@ The following command operators are supported:
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
     Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
 
+%GRPC_STATUS%
+  gRPC status code which is easy to interpret with text message corresponding with number.
+
 %DOWNSTREAM_LOCAL_PORT%
     Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
 
