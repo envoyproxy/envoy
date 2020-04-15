@@ -182,7 +182,7 @@ public:
                                                   {":path", "/"},
                                                   {":protocol", "bytestream"},
                                                   {":scheme", "https"},
-                                                  {":authority", "host"}};
+                                                  {":authority", "host:80"}};
   IntegrationStreamDecoderPtr response_;
 };
 
@@ -190,7 +190,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, ProxyingConnectIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(ProxyingConnectIntegrationTest, DISABLED_ProxyConnect) {
+TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   initialize();
 
   // Send request headers.
