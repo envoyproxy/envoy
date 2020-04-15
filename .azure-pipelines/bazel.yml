@@ -5,10 +5,14 @@ parameters:
     default: bazel.release
 
 steps:
-  - task: CacheBeta@1
+  - task: Cache@2
     inputs:
       key: '"${{ parameters.ciTarget }}" | ./WORKSPACE | **/*.bzl'
       path: $(Build.StagingDirectory)/repository_cache
+    continueOnError: true
+
+  - bash: .azure-pipelines/cleanup.sh
+    displayName: "Removing tools from agent"
 
   - bash: |
       echo "disk space at beginning of build:"

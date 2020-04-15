@@ -17,6 +17,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -286,13 +287,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-/**
- * Static registration for the custom sink factory. @see RegisterFactory.
- */
-REGISTER_FACTORY(CustomStatsSinkFactory, Server::Configuration::StatsSinkFactory);
-
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+
   auto server_thread =
       startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
 
@@ -489,7 +488,7 @@ protected:
       server_->flushStats();
     } else {
       // Default flush interval is 5 seconds.
-      simTime().sleep(std::chrono::seconds(6));
+      simTime().advanceTimeAsync(std::chrono::seconds(6));
     }
     server_->dispatcher().run(Event::Dispatcher::RunType::Block);
   }
@@ -940,10 +939,10 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
               ProtoEq(server_->httpContext().defaultTracingConfig()));
 }
 
-TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(ZipkinHttpTracingEnabled)) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  EXPECT_NO_THROW(initialize("test/server/test_data/server/zipkin_tracing.yaml"));
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/zipkin_tracing_deprecated_config.yaml"));
   EXPECT_EQ("zipkin", server_->httpContext().defaultTracingConfig().http().name());
 }
 
@@ -1067,13 +1066,14 @@ public:
   std::string name() const override { return "envoy.callbacks_stats_sink"; }
 };
 
-REGISTER_FACTORY(CallbacksStatsSinkFactory, Server::Configuration::StatsSinkFactory);
-
 // This test ensures that a stats sink can use cluster update callbacks properly. Using only a
 // cluster update callback is insufficient to protect against double-free bugs, so a server
 // lifecycle callback is also used to ensure that the cluster update callback is freed during
 // Server::Instance's destruction. See issue #9292 for more details.
 TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
+  CallbacksStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+
   initialize("test/server/test_data/server/callbacks_stats_sink_bootstrap.yaml");
   // Necessary to trigger server lifecycle callbacks, otherwise only terminate() is called.
   server_->shutdown();

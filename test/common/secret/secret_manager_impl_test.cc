@@ -33,7 +33,7 @@ namespace {
 class SecretManagerImplTest : public testing::Test, public Logger::Loggable<Logger::Id::secret> {
 protected:
   SecretManagerImplTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void checkConfigDump(const std::string& expected_dump_yaml) {
     auto message_ptr = config_tracker_.config_tracker_callbacks_["secrets"]();

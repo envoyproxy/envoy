@@ -1606,7 +1606,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
-  test_time_.sleep(std::chrono::milliseconds(80));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(80));
   response_decoder->decodeData(data, true);
 }
 
@@ -1649,7 +1649,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatFailure) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "500"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
-  test_time_.sleep(std::chrono::milliseconds(80));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(80));
   response_decoder->decodeData(data, true);
 }
 
@@ -1689,7 +1689,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
-  test_time_.sleep(std::chrono::milliseconds(80));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(80));
   response_decoder->decodeData(data, true);
 }
 
@@ -1730,7 +1730,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
       .Times(0);
 
   // Per-try timeout.
-  test_time_.sleep(std::chrono::milliseconds(100));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(100));
   router_.retry_state_->expectHeadersRetry();
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "504"}});
@@ -1772,7 +1772,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   EXPECT_CALL(encoder2.stream_, resetStream(Http::StreamResetReason::LocalReset));
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
-  test_time_.sleep(std::chrono::milliseconds(100));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(100));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(1);
@@ -1829,7 +1829,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
-  test_time_.sleep(std::chrono::milliseconds(160));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(160));
   response_decoder1->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -1868,7 +1868,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
   EXPECT_CALL(encoder2.stream_, resetStream(Http::StreamResetReason::LocalReset));
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
-  test_time_.sleep(std::chrono::milliseconds(240));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(240));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
@@ -4391,7 +4391,7 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
 
-  test_time_.sleep(std::chrono::milliseconds(32));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(32));
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
   EXPECT_EQ(1U,
@@ -4400,7 +4400,7 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
-  test_time_.sleep(std::chrono::milliseconds(43));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(43));
 
   // Confirm we still have no upstream timing data. It won't be set until after the
   // stream has ended.
@@ -4451,13 +4451,13 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
 
   router_.retry_state_->expectHeadersRetry();
 
-  test_time_.sleep(std::chrono::milliseconds(32));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(32));
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
-  test_time_.sleep(std::chrono::milliseconds(43));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(43));
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke(
@@ -4485,7 +4485,7 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(good_response_headers), false);
 
-  test_time_.sleep(std::chrono::milliseconds(153));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(153));
 
   response_decoder->decodeData(data, true);
 
@@ -4530,7 +4530,7 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   expectResponseTimerCreate();
-  test_time_.sleep(std::chrono::milliseconds(10));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(10));
 
   // Check that upstream timing is updated after the first request.
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "50"}};
@@ -4538,19 +4538,19 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
   router_.decodeHeaders(headers, false);
   EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived().has_value());
 
-  test_time_.sleep(std::chrono::milliseconds(13));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(13));
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
-  test_time_.sleep(std::chrono::milliseconds(33));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(33));
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
 
-  test_time_.sleep(std::chrono::milliseconds(99));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(99));
   response_timeout_->invokeCallback();
 
   EXPECT_TRUE(stream_info.firstUpstreamTxByteSent().has_value());
