@@ -13,6 +13,7 @@ actions {
     end_stream: false
   }
 }
+actions { quiesce_drain {} }
 actions {
   stream_action {
     stream_id: 0
