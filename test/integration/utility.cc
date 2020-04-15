@@ -68,7 +68,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Event::GlobalTimeSystem time_system;
   Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
                 Filesystem::fileSystemForTest());
-  Event::DispatcherPtr dispatcher(api.allocateDispatcher());
+  Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{
       Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80")};
@@ -117,7 +117,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
                                          Network::Address::IpVersion version) {
   api_ = Api::createApiForTest(stats_store_);
   Event::GlobalTimeSystem time_system;
-  dispatcher_ = api_->allocateDispatcher();
+  dispatcher_ = api_->allocateDispatcher("test_thread");
   callbacks_ = std::make_unique<ConnectionCallbacks>();
   client_ = dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
