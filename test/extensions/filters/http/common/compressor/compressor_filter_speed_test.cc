@@ -57,7 +57,9 @@ Buffer::OwnedImpl generateTestData() {
   return data;
 }
 
-const Buffer::OwnedImpl& testData() { CONSTRUCT_ON_FIRST_USE(Buffer::OwnedImpl, generateTestData()); }
+const Buffer::OwnedImpl& testData() {
+  CONSTRUCT_ON_FIRST_USE(Buffer::OwnedImpl, generateTestData());
+}
 
 static std::vector<Buffer::OwnedImpl> generateChunks(const uint64_t chunk_count,
                                                      const uint64_t chunk_size) {
