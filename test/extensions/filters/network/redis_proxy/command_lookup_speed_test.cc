@@ -11,9 +11,10 @@
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/supported_commands.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
+
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "benchmark/benchmark.h"
 
@@ -71,8 +72,8 @@ public:
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<NiceMock<MockFaultManager>> fault_manager_{new NiceMock<MockFaultManager>()};
-  CommandSplitter::InstanceImpl splitter_{RouterPtr{router_}, store_, "redis.foo.", time_system_,
-                                          false, dispatcher_, fault_manager_};
+  CommandSplitter::InstanceImpl splitter_{
+      RouterPtr{router_}, store_, "redis.foo.", time_system_, false, dispatcher_, fault_manager_};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
 };
