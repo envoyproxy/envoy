@@ -2,8 +2,9 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
-    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -80,6 +81,7 @@ envoy_cc_test(
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -338,7 +340,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_binary(
+envoy_cc_benchmark_binary(
     name = "load_balancer_benchmark",
     srcs = ["load_balancer_benchmark.cc"],
     external_deps = [
@@ -354,6 +356,12 @@ envoy_cc_test_binary(
         "//test/test_common:printers_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
+)
+
+envoy_benchmark_test(
+    name = "load_balancer_benchmark_test",
+    timeout = "long",
+    benchmark_binary = "load_balancer_benchmark",
 )
 
 envoy_cc_test(
@@ -414,6 +422,7 @@ envoy_cc_test(
         "//source/common/upstream:strict_dns_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
@@ -465,6 +474,7 @@ envoy_cc_test_library(
         "//source/common/upstream:subset_lb_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/integration/clusters:custom_static_cluster",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",

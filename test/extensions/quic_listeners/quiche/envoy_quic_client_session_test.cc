@@ -31,7 +31,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Quic {
@@ -116,7 +115,7 @@ public:
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
     EXPECT_EQ(Http::Protocol::Http3, http_connection_.protocol());
 
-    time_system_.sleep(std::chrono::milliseconds(1));
+    time_system_.advanceTimeWait(std::chrono::milliseconds(1));
     ON_CALL(writer_, WritePacket(_, _, _, _, _))
         .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
   }

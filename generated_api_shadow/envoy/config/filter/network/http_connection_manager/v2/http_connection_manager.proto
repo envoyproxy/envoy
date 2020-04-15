@@ -26,7 +26,7 @@ option java_outer_classname = "HttpConnectionManagerProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.http_connection_manager.v3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
@@ -161,9 +161,15 @@ message HttpConnectionManager {
     repeated type.tracing.v2.CustomTag custom_tags = 8;
 
     // Configuration for an external tracing provider.
-    // If not specified, Envoy will fall back to using tracing provider configuration
-    // from the bootstrap config.
-    // [#not-implemented-hide:]
+    // If not specified, no tracing will be performed.
+    //
+    // .. attention::
+    //   Please be aware that *envoy.tracers.opencensus* provider can only be configured once
+    //   in Envoy lifetime.
+    //   Any attempts to reconfigure it or to use different configurations for different HCM filters
+    //   will be rejected.
+    //   Such a constraint is inherent to OpenCensus itself. It cannot be overcome without changes
+    //   on OpenCensus side.
     trace.v2.Tracing.Http provider = 9;
   }
 

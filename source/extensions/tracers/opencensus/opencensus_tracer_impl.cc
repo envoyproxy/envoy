@@ -290,7 +290,8 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       opts.address = oc_config.ocagent_address();
     } else if (oc_config.has_ocagent_grpc_service() &&
                oc_config.ocagent_grpc_service().has_google_grpc()) {
-      envoy::config::core::v3::GrpcService ocagent_service = oc_config.ocagent_grpc_service();
+      const envoy::config::core::v3::GrpcService& ocagent_service =
+          oc_config.ocagent_grpc_service();
       auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(ocagent_service, api);
       opts.trace_service_stub =
           ::opencensus::proto::agent::trace::v1::TraceService::NewStub(channel);

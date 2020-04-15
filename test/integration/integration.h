@@ -152,15 +152,15 @@ public:
   // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
   // provided IP |version|.
   BaseIntegrationTest(Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+                      const std::string& config = ConfigHelper::httpProxyConfig());
   BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+                      const std::string& config = ConfigHelper::httpProxyConfig())
       : BaseIntegrationTest(version, config) {}
   // Creates a test fixture with a specified |upstream_address| function that provides the IP and
   // port to use.
   BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+                      const std::string& config = ConfigHelper::httpProxyConfig());
 
   virtual ~BaseIntegrationTest() = default;
 
@@ -328,7 +328,7 @@ public:
       resource->set_name(TestUtility::xdsResourceName(temp_any));
       resource->set_version(version);
       resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
-      for (const auto alias : aliases) {
+      for (const auto& alias : aliases) {
         resource->add_aliases(alias);
       }
     }

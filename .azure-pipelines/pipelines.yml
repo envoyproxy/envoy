@@ -2,6 +2,7 @@ trigger:
   branches:
     include:
       - "master"
+      - "release/v*"
   tags:
     include:
       - "v*"
@@ -40,6 +41,7 @@ jobs:
     dependsOn: ["format"]
     # For master builds, continue even if format fails
     condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
+    timeoutInMinutes: 360
     pool:
       vmImage: "ubuntu-16.04"
     steps:
@@ -91,13 +93,11 @@ jobs:
       - bash: |
           set -e
           tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz
-          ci/docker_build.sh
-          ci/docker_push.sh
-          ci/docker_tag.sh
+          ci/docker_ci.sh
         workingDirectory: $(Build.SourcesDirectory)
         env:
           AZP_BRANCH: $(Build.SourceBranch)
-          CIRCLE_SHA1: $(Build.SourceVersion)
+          AZP_SHA1: $(Build.SourceVersion)
           DOCKERHUB_USERNAME: $(DockerUsername)
           DOCKERHUB_PASSWORD: $(DockerPassword)
 

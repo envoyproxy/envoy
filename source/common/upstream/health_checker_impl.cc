@@ -1,5 +1,7 @@
 #include "common/upstream/health_checker_impl.h"
 
+#include <memory>
+
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/server/health_checker_config.h"
@@ -24,6 +26,33 @@
 
 namespace Envoy {
 namespace Upstream {
+
+namespace {
+
+// Helper functions to get the correct hostname for an L7 health check.
+const std::string& getHostname(const HostSharedPtr& host, const std::string& config_hostname,
+                               const ClusterInfoConstSharedPtr& cluster) {
+  if (!host->hostnameForHealthChecks().empty()) {
+    return host->hostnameForHealthChecks();
+  }
+
+  if (!config_hostname.empty()) {
+    return config_hostname;
+  }
+
+  return cluster->name();
+}
+
+const std::string& getHostname(const HostSharedPtr& host,
+                               const absl::optional<std::string>& config_hostname,
+                               const ClusterInfoConstSharedPtr& cluster) {
+  if (config_hostname.has_value()) {
+    return getHostname(host, config_hostname.value(), cluster);
+  }
+  return getHostname(host, EMPTY_STRING, cluster);
+}
+
+} // namespace
 
 class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
 public:
@@ -181,8 +210,7 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecClient::Type codec_client_ty
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent),
-      hostname_(parent_.host_value_.empty() ? parent_.cluster_.info()->name()
-                                            : parent_.host_value_),
+      hostname_(getHostname(host, parent_.host_value_, parent_.cluster_.info())),
       protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)),
       local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
@@ -479,7 +507,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
     client_ =
         host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions())
             .connection_;
-    session_callbacks_.reset(new TcpSessionCallbacks(*this));
+    session_callbacks_ = std::make_shared<TcpSessionCallbacks>(*this);
     client_->addConnectionCallbacks(*session_callbacks_);
     client_->addReadFilter(session_callbacks_);
 
@@ -640,9 +668,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   request_encoder_ = &client_->newStream(*this);
   request_encoder_->getStream().addCallbacks(*this);
 
-  const std::string& authority = parent_.authority_value_.has_value()
-                                     ? parent_.authority_value_.value()
-                                     : parent_.cluster_.info()->name();
+  const std::string& authority =
+      getHostname(host_, parent_.authority_value_, parent_.cluster_.info());
   auto headers_message =
       Grpc::Common::prepareHeaders(authority, parent_.service_method_.service()->full_name(),
                                    parent_.service_method_.name(), absl::nullopt);

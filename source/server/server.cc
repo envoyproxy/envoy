@@ -122,7 +122,9 @@ InstanceImpl::~InstanceImpl() {
   // RdsRouteConfigSubscription is an Init::Target, ~RdsRouteConfigSubscription triggers a callback
   // set at initialization, which goes to unregister it from the top-level InitManager, which has
   // already been destructed (use-after-free) causing a segfault.
+  ENVOY_LOG(debug, "destroying listener manager");
   listener_manager_.reset();
+  ENVOY_LOG(debug, "destroyed listener manager");
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }
@@ -418,7 +420,7 @@ void InstanceImpl::initialize(const Options& options,
     hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
         stats_store_,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                       stats_store_)
+                                                       stats_store_, false)
             ->create(),
         hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
         stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
@@ -498,7 +500,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     });
 
     sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
-      ENVOY_LOG(warn, "caught SIGUSR1");
+      ENVOY_LOG(info, "caught SIGUSR1. Reopening access logs.");
       access_log_manager.reopen();
     });
 

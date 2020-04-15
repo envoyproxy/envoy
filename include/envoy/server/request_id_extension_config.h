@@ -17,7 +17,7 @@ namespace Configuration {
  */
 class RequestIDExtensionFactory : public Envoy::Config::TypedFactory {
 public:
-  virtual ~RequestIDExtensionFactory() = default;
+  ~RequestIDExtensionFactory() override = default;
 
   /**
    * Create a Request ID Extension instance from the provided config proto.

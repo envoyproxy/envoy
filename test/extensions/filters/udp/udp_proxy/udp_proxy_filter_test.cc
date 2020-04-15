@@ -125,7 +125,7 @@ public:
         .WillRepeatedly(Return(Upstream::Host::Health::Healthy));
   }
 
-  ~UdpProxyFilterTest() { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
+  ~UdpProxyFilterTest() override { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
 
   void setup(const std::string& yaml, bool has_cluster = true) {
     envoy::config::filter::udp::udp_proxy::v2alpha::UdpProxyConfig config;

@@ -11,6 +11,7 @@ namespace ProxyProtocol {
 
 // See https://github.com/haproxy/haproxy/blob/master/doc/proxy-protocol.txt for definitions
 
+// TODO(wez470): Refactor listener filter to use common proxy proto constants
 constexpr char PROXY_PROTO_V1_SIGNATURE[] = "PROXY ";
 constexpr uint32_t PROXY_PROTO_V1_SIGNATURE_LEN = 6;
 constexpr char PROXY_PROTO_V2_SIGNATURE[] = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a";
