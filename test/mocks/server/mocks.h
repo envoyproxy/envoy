@@ -343,7 +343,7 @@ public:
   MOCK_METHOD(void, removeListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
   MOCK_METHOD(void, start, (GuardDog & guard_dog));
-  MOCK_METHOD(void, initializeStats, (Stats::Scope & scope, const std::string& prefix));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope & scope));
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(void, stopListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
@@ -636,6 +636,21 @@ class MockFilterChainFactoryContext : public MockFactoryContext, public FilterCh
 public:
   MockFilterChainFactoryContext();
   ~MockFilterChainFactoryContext() override;
+};
+
+class MockTracerFactory : public TracerFactory {
+public:
+  explicit MockTracerFactory(const std::string& name);
+  ~MockTracerFactory() override;
+
+  std::string name() const override { return name_; }
+
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
+  MOCK_METHOD(Tracing::HttpTracerSharedPtr, createHttpTracer,
+              (const Protobuf::Message& config, TracerFactoryContext& context));
+
+private:
+  std::string name_;
 };
 
 class MockTracerFactoryContext : public TracerFactoryContext {

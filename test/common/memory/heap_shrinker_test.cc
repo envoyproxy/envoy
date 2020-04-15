@@ -21,7 +21,8 @@ namespace {
 class HeapShrinkerTest : public testing::Test {
 protected:
   HeapShrinkerTest()
-      : api_(Api::createApiForTest(stats_, time_system_)), dispatcher_(*api_, time_system_) {}
+      : api_(Api::createApiForTest(stats_, time_system_)),
+        dispatcher_("test_thread", *api_, time_system_) {}
 
   void step() {
     time_system_.advanceTimeAsync(std::chrono::milliseconds(10000));

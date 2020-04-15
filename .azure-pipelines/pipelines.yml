@@ -16,10 +16,11 @@ jobs:
     pool:
       vmImage: "ubuntu-16.04"
     steps:
-      - task: CacheBeta@1
+      - task: Cache@2
         inputs:
           key: "format | ./WORKSPACE | **/*.bzl"
           path: $(Build.StagingDirectory)/repository_cache
+        continueOnError: true
 
       - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
         workingDirectory: $(Build.SourcesDirectory)
