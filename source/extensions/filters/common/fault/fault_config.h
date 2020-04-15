@@ -235,7 +235,8 @@ private:
   // Rate limit provider that uses a fixed rate limit.
   class FixedRateLimitProvider : public RateLimitProvider {
   public:
-    FixedRateLimitProvider(uint64_t fixed_rate_kbps, const envoy::type::v3::FractionalPercent& percentage)
+    FixedRateLimitProvider(uint64_t fixed_rate_kbps,
+                           const envoy::type::v3::FractionalPercent& percentage)
         : fixed_rate_kbps_(fixed_rate_kbps), percentage_(percentage) {}
     absl::optional<uint64_t> rateKbps(const Http::RequestHeaderMap*) const override {
       return fixed_rate_kbps_;
