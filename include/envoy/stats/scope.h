@@ -146,6 +146,7 @@ public:
   TextReadout& textReadoutFromStatName(const StatName& name) {
     return textReadoutFromStatNameWithTags(name, absl::nullopt);
   }
+
   /**
    * Creates a TextReadout from the stat name and tags. If tags are not provided, tag extraction
    * will be performed on the name.
