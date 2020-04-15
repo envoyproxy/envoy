@@ -24,6 +24,7 @@ absl::string_view statusCodeToString(StatusCode code) {
   default:
     RELEASE_ASSERT(false, "Invalid StatusCode value");
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 struct EnvoyStatusPayload {
