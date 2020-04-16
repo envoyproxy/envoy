@@ -101,7 +101,7 @@ ratelimit.http_filter_enabled
   % of requests that will call the rate limit service. Defaults to 100.
 
 ratelimit.http_filter_enforcing
-  % of requests that will call the rate limit service and enforce the decision. Defaults to 100.
+  % of requests that that will have the rate limit service decision enforced. Defaults to 100.
   This can be used to test what would happen before fully enforcing the outcome.
 
 ratelimit.<route_key>.http_filter_enabled

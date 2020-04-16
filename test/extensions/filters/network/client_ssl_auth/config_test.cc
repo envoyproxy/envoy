@@ -96,14 +96,6 @@ TEST(ClientSslAuthConfigFactoryTest, ValidateFail) {
       ProtoValidationException);
 }
 
-TEST(ClientSslAuthConfigFactoryTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<ClientSslAuthConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>()),
-      EnvoyException,
-      fmt::format("Double registration for name: '{}'", NetworkFilterNames::get().ClientSslAuth));
-}
-
 // Test that the deprecated extension name still functions.
 TEST(ClientSslAuthConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.client_ssl_auth";
