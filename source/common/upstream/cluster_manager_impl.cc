@@ -30,6 +30,7 @@
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/network/resolver_impl.h"
+#include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
@@ -1255,10 +1256,40 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     option->hashKey(hash_key);
   }
 
-  bool have_transport_socket_options = false;
-  if (context && context->upstreamTransportSocketOptions()) {
-    context->upstreamTransportSocketOptions()->hashKey(hash_key);
-    have_transport_socket_options = true;
+  Network::TransportSocketOptionsSharedPtr transport_socket_options =
+      context ? context->upstreamTransportSocketOptions() : nullptr;
+
+  // If configured to do so, we override the ALPN to use for the upstream connection to match the
+  // selected protocol.
+  if (cluster_info_->features() &
+      ClusterInfo::Features::PIN_UPSTREAM_ALPN_TO_SELECTED_HTTP_PROTOCOL) {
+    std::vector<std::string> alpn;
+    switch (protocol) {
+    case Http::Protocol::Http10:
+      alpn.push_back("http/1.0");
+      break;
+    case Http::Protocol::Http11:
+      alpn.push_back("http/1.1");
+      break;
+    case Http::Protocol::Http2:
+      alpn.push_back("h2");
+      break;
+    case Http::Protocol::Http3:
+      alpn.push_back("h3");
+      break;
+    }
+
+    if (transport_socket_options) {
+      transport_socket_options = std::make_shared<Network::AlpnDecoratingTransportSocketOptions>(
+          std::move(alpn), transport_socket_options);
+    } else {
+      transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::move(alpn));
+    }
+  }
+
+  if (transport_socket_options) {
+    transport_socket_options->hashKey(hash_key);
   }
 
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
@@ -1269,8 +1300,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, protocol,
-            !upstream_options->empty() ? upstream_options : nullptr,
-            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
+            !upstream_options->empty() ? upstream_options : nullptr, transport_socket_options);
       });
 
   if (pool.has_value()) {

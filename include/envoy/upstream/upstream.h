@@ -684,6 +684,8 @@ public:
     static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
     // Whether connections should be immediately closed upon health failure.
     static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
+    // Whether we should pin the upstream ALPN to match the selected protocol.
+    static const uint64_t PIN_UPSTREAM_ALPN_TO_SELECTED_HTTP_PROTOCOL = 0x8;
   };
 
   virtual ~ClusterInfo() = default;

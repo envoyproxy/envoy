@@ -7,9 +7,11 @@
 #include "test/common/upstream/test_cluster_manager.h"
 
 using testing::_;
+using testing::ElementsAre;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
+using testing::IsEmpty;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
@@ -786,6 +788,126 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
 
   EXPECT_THROW(cluster_manager_->httpAsyncClientForCluster("hello"), EnvoyException);
   factory_.tls_.shutdownThread();
+}
+
+TEST_F(ClusterManagerImplTest, UpstreamAlpnFromProtocolNoLbContextProvidedOptions) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: some_cluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      common_http_protocol_options:
+        upstream_alpn_from_selected_protocol: true
+  )EOF";
+  create(parseBootstrapFromV2Yaml(yaml));
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+      .WillOnce(Invoke([](auto, auto, Network::TransportSocketOptionsSharedPtr options)
+                           -> Http::ConnectionPool::Instance* {
+        EXPECT_FALSE(options->serverNameOverride());
+        EXPECT_THAT(options->verifySubjectAltNameListOverride(), IsEmpty());
+        EXPECT_THAT(options->applicationProtocolListOverride(), ElementsAre("http/1.1"));
+        return nullptr;
+      }));
+  EXPECT_EQ(nullptr,
+            cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
+                                                     Http::Protocol::Http11, nullptr));
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+      .WillOnce(Invoke([](auto, auto, Network::TransportSocketOptionsSharedPtr options)
+                           -> Http::ConnectionPool::Instance* {
+        EXPECT_FALSE(options->serverNameOverride());
+        EXPECT_THAT(options->verifySubjectAltNameListOverride(), IsEmpty());
+        EXPECT_THAT(options->applicationProtocolListOverride(), ElementsAre("h2"));
+        return nullptr;
+      }));
+  EXPECT_EQ(nullptr,
+            cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
+                                                     Http::Protocol::Http2, nullptr));
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+      .WillOnce(Invoke([](auto, auto, Network::TransportSocketOptionsSharedPtr options)
+                           -> Http::ConnectionPool::Instance* {
+        EXPECT_FALSE(options->serverNameOverride());
+        EXPECT_THAT(options->verifySubjectAltNameListOverride(), IsEmpty());
+        EXPECT_THAT(options->applicationProtocolListOverride(), ElementsAre("h3"));
+        return nullptr;
+      }));
+  EXPECT_EQ(nullptr,
+            cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
+                                                     Http::Protocol::Http3, nullptr));
+}
+
+TEST_F(ClusterManagerImplTest, UpstreamAlpnFromProtocolLbContextProvidedOptions) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: some_cluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      common_http_protocol_options:
+        upstream_alpn_from_selected_protocol: true
+  )EOF";
+  create(parseBootstrapFromV2Yaml(yaml));
+
+  const auto original_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+      "sni", std::vector<std::string>{"san"}, std::vector<std::string>{"alpn"});
+  NiceMock<MockLoadBalancerContext> lb_context;
+  ON_CALL(lb_context, upstreamTransportSocketOptions()).WillByDefault(Return(original_options));
+
+  EXPECT_TRUE(cluster_manager_->get("some_cluster") != nullptr);
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+      .WillOnce(Invoke([](auto, auto, Network::TransportSocketOptionsSharedPtr options)
+                           -> Http::ConnectionPool::Instance* {
+        EXPECT_THAT(options->serverNameOverride(), Eq("sni"));
+        EXPECT_THAT(options->verifySubjectAltNameListOverride(), ElementsAre("san"));
+        EXPECT_THAT(options->applicationProtocolListOverride(), ElementsAre("http/1.1"));
+        return nullptr;
+      }));
+  EXPECT_EQ(nullptr,
+            cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
+                                                     Http::Protocol::Http11, &lb_context));
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+      .WillOnce(Invoke([](auto, auto, Network::TransportSocketOptionsSharedPtr options)
+                           -> Http::ConnectionPool::Instance* {
+        EXPECT_THAT(options->serverNameOverride(), Eq("sni"));
+        EXPECT_THAT(options->verifySubjectAltNameListOverride(), ElementsAre("san"));
+        EXPECT_THAT(options->applicationProtocolListOverride(), ElementsAre("h2"));
+        return nullptr;
+      }));
+  EXPECT_EQ(nullptr,
+            cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
+                                                     Http::Protocol::Http2, &lb_context));
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+      .WillOnce(Invoke([](auto, auto, Network::TransportSocketOptionsSharedPtr options)
+                           -> Http::ConnectionPool::Instance* {
+        EXPECT_THAT(options->serverNameOverride(), Eq("sni"));
+        EXPECT_THAT(options->verifySubjectAltNameListOverride(), ElementsAre("san"));
+        EXPECT_THAT(options->applicationProtocolListOverride(), ElementsAre("h3"));
+        return nullptr;
+      }));
+  EXPECT_EQ(nullptr,
+            cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
+                                                     Http::Protocol::Http3, &lb_context));
 }
 
 /**

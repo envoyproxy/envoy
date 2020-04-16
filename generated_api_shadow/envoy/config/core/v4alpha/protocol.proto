@@ -38,7 +38,7 @@ message UpstreamHttpProtocolOptions {
   bool auto_san_validation = 2;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.HttpProtocolOptions";
@@ -100,6 +100,13 @@ message HttpProtocolOptions {
   // If this setting is not specified, the value defaults to ALLOW.
   // Note: upstream responses are not affected by this setting.
   HeadersWithUnderscoresAction headers_with_underscores_action = 5;
+
+  // If true, the upstreams will attempt to negotiate ALPN based on the protocol selected by
+  // :ref:`protocol_selection <envoy_api_field_config.cluster.v4alpha.Cluster.protocol_selection>`.
+  // If HTTP/2 is selected, the upstream connection will negotiate "h2", while if HTTP/1.1 is
+  // selected the upstream connection will negotiate "http/1.1". This has no effect if TLS is not
+  // used for the upstream connection.
+  bool upstream_alpn_from_selected_protocol = 6;
 }
 
 // [#next-free-field: 6]
