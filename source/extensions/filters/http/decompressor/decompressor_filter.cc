@@ -39,7 +39,7 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
 
   // Two responsibilities on the request side:
   //   1. If request decompression is enabled, then decompress the request.
-  //   2. If response decompression is enabled (and advertisement is enabled?), then adversite to
+  //   2. If response decompression is enabled (and advertisement is enabled?), then advertise to
   //   the upstream that this hop is able to decompress responses via the AcceptEncoding header.
   maybeInitDecompress(config_->requestDirectionConfig(), request_decompressor_, *decoder_callbacks_,
                       headers);
@@ -163,7 +163,7 @@ void DecompressorFilter::removeContentEncoding(Http::RequestOrResponseHeaderMap&
 void DecompressorFilter::injectAcceptEncoding(Http::RequestOrResponseHeaderMap& headers) const {
   // FIX ME(junr03): the code here in rojkov's original branch prepended the current filter's
   // content enconding. However, my read of the content encoding spec leads me to think that we
-  // should apend. Discuss in code review.
+  // should append. Discuss in code review.
   // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Encoding
   headers.appendContentEncoding(config_->contentEncoding(), ",");
 }
