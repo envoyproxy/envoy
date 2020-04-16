@@ -36,7 +36,7 @@ ExtensionConfigBase::ExtensionConfigBase(
       throw EnvoyException(
           fmt::format("Error: Specifying admin streaming output without configuring admin."));
     }
-    newTapConfig(envoy::config::tap::v3::TapConfig(proto_config_.static_config()), nullptr);
+    installNewTap(envoy::config::tap::v3::TapConfig(proto_config_.static_config()), nullptr);
     ENVOY_LOG(debug, "initializing tap extension with static config");
     break;
   }
@@ -66,12 +66,17 @@ void ExtensionConfigBase::clearTapConfig() {
   tls_slot_->runOnAllThreads([this] { tls_slot_->getTyped<TlsFilterConfig>().config_ = nullptr; });
 }
 
-void ExtensionConfigBase::newTapConfig(envoy::config::tap::v3::TapConfig&& proto_config,
-                                       Sink* admin_streamer) {
+void ExtensionConfigBase::installNewTap(envoy::config::tap::v3::TapConfig&& proto_config,
+                                        Sink* admin_streamer) {
   TapConfigSharedPtr new_config =
       config_factory_->createConfigFromProto(std::move(proto_config), admin_streamer);
   tls_slot_->runOnAllThreads(
       [this, new_config] { tls_slot_->getTyped<TlsFilterConfig>().config_ = new_config; });
+}
+
+void ExtensionConfigBase::newTapConfig(envoy::config::tap::v3::TapConfig&& proto_config,
+                                       Sink* admin_streamer) {
+  installNewTap(envoy::config::tap::v3::TapConfig(proto_config), admin_streamer);
 }
 
 } // namespace Tap
