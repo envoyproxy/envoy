@@ -92,22 +92,21 @@ MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
 }
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() = default;
 
-MockFilterConfigFactory::MockFilterConfigFactory()
-    : FactoryBase("envoy.filters.thrift.mock_filter") {
+MockFilterConfigFactory::MockFilterConfigFactory() : name_("envoy.filters.thrift.mock_filter") {
   mock_filter_ = std::make_shared<NiceMock<MockDecoderFilter>>();
 }
 
 MockFilterConfigFactory::~MockFilterConfigFactory() = default;
 
-FilterFactoryCb MockFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const ProtobufWkt::Struct& proto_config, const std::string& stat_prefix,
+FilterFactoryCb MockFilterConfigFactory::createFilterFactoryFromProto(
+    const Protobuf::Message& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
   UNREFERENCED_PARAMETER(context);
 
-  config_struct_ = proto_config;
-  config_stat_prefix_ = stat_prefix;
+  config_struct_ = dynamic_cast<const ProtobufWkt::Struct&>(proto_config);
+  config_stat_prefix_ = stats_prefix;
 
-  return [this](ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [this](FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(mock_filter_);
   };
 }
