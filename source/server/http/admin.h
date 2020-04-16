@@ -116,6 +116,7 @@ public:
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() const override { return false; }
   bool preserveExternalRequestId() const override { return false; }
+  bool alwaysSetRequestIdInResponse() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return false; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
