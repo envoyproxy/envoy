@@ -105,7 +105,7 @@ private:
   bool hasCacheControlNoTransform(Http::RequestOrResponseHeaderMap& headers) const;
   bool contentEncodingMatches(Http::RequestOrResponseHeaderMap& headers) const;
   void removeContentEncoding(Http::RequestOrResponseHeaderMap& headers) const;
-  void injectAcceptEncoding(Http::RequestOrResponseHeaderMap& headers) const;
+  void injectAcceptEncoding(Http::RequestHeaderMap& headers) const;
   void sanitizeTransferEncoding(Http::RequestOrResponseHeaderMap& headers) const;
 
   DecompressorFilterConfigSharedPtr config_;

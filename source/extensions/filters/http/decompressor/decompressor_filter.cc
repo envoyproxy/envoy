@@ -161,12 +161,12 @@ void DecompressorFilter::removeContentEncoding(Http::RequestOrResponseHeaderMap&
 }
 
 // TODO(junr03): inject encoding with configurable qvalue with q=1 by default.
-void DecompressorFilter::injectAcceptEncoding(Http::RequestOrResponseHeaderMap& headers) const {
+void DecompressorFilter::injectAcceptEncoding(Http::RequestHeaderMap& headers) const {
   // FIX ME(junr03): the code here in rojkov's original branch prepended the current filter's
   // content enconding. However, my read of the content encoding spec leads me to think that we
   // should append. Discuss in code review.
   // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Encoding
-  headers.appendContentEncoding(config_->contentEncoding(), ",");
+  headers.appendAcceptEncoding(config_->contentEncoding(), ",");
 }
 
 /**
