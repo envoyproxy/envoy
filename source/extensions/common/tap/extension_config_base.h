@@ -38,7 +38,7 @@ protected:
   }
 
 private:
-  // Holds the functionality of intsalling a new tap config. This is the underlying method to the
+  // Holds the functionality of installing a new tap config. This is the underlying method to the
   // virtual method newTapConfig.
   void installNewTap(envoy::config::tap::v3::TapConfig&& proto_config, Sink* admin_streamer);
 
