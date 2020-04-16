@@ -220,17 +220,17 @@ const Config* HeaderToMetadataFilter::getRouteConfig() const {
 // TODO(rgs1): this belongs in one of the filter interfaces, see issue #10164.
 const Config* HeaderToMetadataFilter::getConfig() const {
   // Cached config pointer.
-  if (per_route_config_) {
-    return per_route_config_;
+  if (effective_config_) {
+    return effective_config_;
   }
 
-  per_route_config_ = getRouteConfig();
-  if (per_route_config_) {
-    return per_route_config_;
+  effective_config_ = getRouteConfig();
+  if (effective_config_) {
+    return effective_config_;
   }
 
-  per_route_config_ = config_.get();
-  return per_route_config_;
+  effective_config_ = config_.get();
+  return effective_config_;
 }
 
 } // namespace HeaderToMetadataFilter

@@ -109,7 +109,7 @@ private:
   using StructMap = std::map<std::string, ProtobufWkt::Struct>;
 
   const ConfigSharedPtr config_;
-  mutable const Config* per_route_config_{nullptr};
+  mutable const Config* effective_config_{nullptr};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 
