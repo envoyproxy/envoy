@@ -17,17 +17,27 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.trace.v2";
 option java_outer_classname = "TraceProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Tracing]
 // Tracing :ref:`architecture overview <arch_overview_tracing>`.
 
-// The tracing configuration specifies global
-// settings for the HTTP tracer used by Envoy. The configuration is defined by
-// the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` :ref:`tracing
-// <envoy_api_field_config.bootstrap.v2.Bootstrap.tracing>` field. Envoy may support other tracers
-// in the future, but right now the HTTP tracer is the only one supported.
+// The tracing configuration specifies settings for an HTTP tracer provider used by Envoy.
+//
+// Envoy may support other tracers in the future, but right now the HTTP tracer is the only one
+// supported.
+//
+// .. attention::
+//
+//   Use of this message type has been deprecated in favor of direct use of
+//   :ref:`Tracing.Http <envoy_api_msg_config.trace.v2.Tracing.Http>`.
 message Tracing {
+  // Configuration for an HTTP tracer provider used by Envoy.
+  //
+  // The configuration is defined by the
+  // :ref:`HttpConnectionManager.Tracing <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing>`
+  // :ref:`provider <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing.provider>`
+  // field.
   message Http {
     // The name of the HTTP trace driver to instantiate. The name must match a
     // supported HTTP trace driver. Built-in trace drivers:
@@ -63,12 +73,31 @@ message Tracing {
 // Configuration for the LightStep tracer.
 // [#extension: envoy.tracers.lightstep]
 message LightstepConfig {
+  // Available propagation modes
+  enum PropagationMode {
+    // Propagate trace context in the single header x-ot-span-context.
+    ENVOY = 0;
+
+    // Propagate trace context using LightStep's native format.
+    LIGHTSTEP = 1;
+
+    // Propagate trace context using the b3 format.
+    B3 = 2;
+
+    // Propagation trace context using the w3 trace-context standard.
+    TRACE_CONTEXT = 3;
+  }
+
   // The cluster manager cluster that hosts the LightStep collectors.
   string collector_cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // File containing the access token to the `LightStep
   // <https://lightstep.com/>`_ API.
   string access_token_file = 2 [(validate.rules).string = {min_bytes: 1}];
+
+  // Propagation modes to use by LightStep's tracer.
+  repeated PropagationMode propagation_modes = 3
+      [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 }
 
 // Configuration for the Zipkin tracer.

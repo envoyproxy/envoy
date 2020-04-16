@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <list>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -120,8 +121,8 @@ void LogicalDnsCluster::startResolve() {
                                                    Network::Utility::portFromTcpUrl(dns_url_));
 
           if (!logical_host_) {
-            logical_host_.reset(new LogicalHost(info_, hostname_, new_address, localityLbEndpoint(),
-                                                lbEndpoint(), nullptr));
+            logical_host_ = std::make_shared<LogicalHost>(
+                info_, hostname_, new_address, localityLbEndpoint(), lbEndpoint(), nullptr);
 
             const auto& locality_lb_endpoint = localityLbEndpoint();
             PriorityStateManager priority_state_manager(*this, local_info_, nullptr);

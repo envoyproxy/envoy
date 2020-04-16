@@ -118,14 +118,21 @@ public:
   }
 
 private:
-  // Allow RegisterFactory to register a category, but no-one else.
-  // This enforces correct use of the registration machinery.
+  // Allow RegisterFactory and the test helper InjectFactoryCategory to register a category, but
+  // no-one else. This enforces correct use of the registration machinery.
   template <class T, class Base> friend class RegisterFactory;
+  template <class Base> friend class InjectFactoryCategory;
 
-  static void registerCategory(const std::string& category, FactoryRegistryProxy* factoryNames) {
-    auto result = factories().emplace(std::make_pair(category, factoryNames));
+  static void registerCategory(const std::string& category, FactoryRegistryProxy* factory_names) {
+    auto result = factories().emplace(std::make_pair(category, factory_names));
     RELEASE_ASSERT(result.second == true,
                    fmt::format("Double registration for category: '{}'", category));
+  }
+
+  static void deregisterCategoryForTest(const std::string& category) {
+    factories().erase(category);
+    RELEASE_ASSERT(factories().find(category) == factories().end(),
+                   fmt::format("Deregistration for category '{}' failed", category));
   }
 };
 
@@ -198,44 +205,7 @@ public:
    */
   static absl::flat_hash_map<std::string, Base*>& factoriesByType() {
     static absl::flat_hash_map<std::string, Base*>* factories_by_type =
-        [] {
-          auto mapping = std::make_unique<absl::flat_hash_map<std::string, Base*>>();
-
-          for (const auto& factory : factories()) {
-            if (factory.second == nullptr) {
-              continue;
-            }
-
-            // Skip untyped factories.
-            std::string config_type = factory.second->configType();
-            if (config_type.empty()) {
-              continue;
-            }
-
-            // Register config types in the mapping and traverse the deprecated message type chain.
-            while (true) {
-              auto it = mapping->find(config_type);
-              if (it != mapping->end() && it->second != factory.second) {
-                // Mark double-registered types with a nullptr.
-                // See issue https://github.com/envoyproxy/envoy/issues/9643.
-                ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
-                          factory.second->name(), it->second ? it->second->name() : "");
-                it->second = nullptr;
-              } else {
-                mapping->emplace(std::make_pair(config_type, factory.second));
-              }
-
-              const Protobuf::Descriptor* previous =
-                  Config::ApiTypeOracle::getEarlierVersionDescriptor(config_type);
-              if (previous == nullptr) {
-                break;
-              }
-              config_type = previous->full_name();
-            }
-          }
-          return mapping;
-        }()
-            .release();
+        buildFactoriesByType().release();
 
     return *factories_by_type;
   }
@@ -369,43 +339,151 @@ private:
   // Allow factory injection only in tests.
   friend class InjectFactory<Base>;
 
-  /**
-   * Replaces a factory by name. This method should only be used for testing purposes.
-   * @param factory is the factory to inject.
-   * @return Base* a pointer to the previously registered value.
-   */
-  static Base* replaceFactoryForTest(Base& factory) {
-    auto it = factories().find(factory.name());
-    Base* displaced = nullptr;
-    if (it != factories().end()) {
-      displaced = it->second;
-      factories().erase(it);
+  static std::unique_ptr<absl::flat_hash_map<std::string, Base*>> buildFactoriesByType() {
+    auto mapping = std::make_unique<absl::flat_hash_map<std::string, Base*>>();
+
+    for (const auto& factory : factories()) {
+      if (factory.second == nullptr) {
+        continue;
+      }
+
+      // Skip untyped factories.
+      std::string config_type = factory.second->configType();
+      if (config_type.empty()) {
+        continue;
+      }
+
+      // Register config types in the mapping and traverse the deprecated message type chain.
+      while (true) {
+        auto it = mapping->find(config_type);
+        if (it != mapping->end() && it->second != factory.second) {
+          // Mark double-registered types with a nullptr.
+          // See issue https://github.com/envoyproxy/envoy/issues/9643.
+          ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
+                    factory.second->name(), it->second ? it->second->name() : "");
+          it->second = nullptr;
+        } else {
+          mapping->emplace(std::make_pair(config_type, factory.second));
+        }
+
+        const Protobuf::Descriptor* previous =
+            Config::ApiTypeOracle::getEarlierVersionDescriptor(config_type);
+        if (previous == nullptr) {
+          break;
+        }
+        config_type = previous->full_name();
+      }
     }
 
-    factories().emplace(factory.name(), &factory);
-    RELEASE_ASSERT(getFactory(factory.name()) == &factory, "");
+    return mapping;
+  }
 
-    auto config_type = factory.configType();
-    Base* prev = getFactoryByType(config_type);
-    if (prev != nullptr) {
-      factoriesByType().emplace(config_type, &factory);
-    }
+  // Rebuild the factories-by-type map based on the current factories.
+  static void rebuildFactoriesByTypeForTest() {
+    auto& mapping = factoriesByType();
+    auto updated_mapping = buildFactoriesByType();
 
-    return displaced;
+    // Copy the updated mapping over the old one.
+    mapping = *updated_mapping;
   }
 
   /**
-   * Remove a factory by name. This method should only be used for testing purposes.
-   * @param name is the name of the factory to remove.
+   * Replaces a factory by name. This method should only be used for testing purposes.
+   * @param factory is the factory to inject.
+   * @param deprecated_names install the given deprecated names for this factory.
+   * @return std::function<void()> a function that will restore the previously registered factories
+   *         (by name or type).
    */
-  static void removeFactoryForTest(absl::string_view name, absl::string_view config_type) {
-    auto result = factories().erase(name);
-    RELEASE_ASSERT(result == 1, "");
+  static std::function<void()>
+  replaceFactoryForTest(Base& factory,
+                        std::initializer_list<absl::string_view> deprecated_names = {}) {
+    using DeprecatedNamesVector = std::vector<std::pair<std::string, std::string>>;
 
-    Base* prev = getFactoryByType(config_type);
-    if (prev != nullptr) {
-      factoriesByType().erase(config_type);
+    // If an existing factory is registered with this name, track it for later restoration.
+    Base* prev_by_name = nullptr;
+    auto it = factories().find(factory.name());
+    if (it != factories().end()) {
+      prev_by_name = it->second;
+      factories().erase(it);
+
+      ENVOY_LOG(
+          info, "Factory '{}' (type '{}') displaced-by-name with test factory '{}' (type '{}')",
+          prev_by_name->name(), prev_by_name->configType(), factory.name(), factory.configType());
+    } else {
+      ENVOY_LOG(info, "Factory '{}' (type '{}') registered for tests", factory.name(),
+                factory.configType());
     }
+
+    factories().emplace(factory.name(), &factory);
+    RELEASE_ASSERT(getFactory(factory.name()) == &factory,
+                   "test factory by-name registration failed");
+
+    DeprecatedNamesVector prev_deprecated_names;
+    if (deprecated_names.size() > 0) {
+      for (auto deprecated_name : deprecated_names) {
+        auto it = deprecatedFactoryNames().find(deprecated_name);
+        if (it != deprecatedFactoryNames().end()) {
+          prev_deprecated_names.emplace_back(std::make_pair(it->first, it->second));
+          deprecatedFactoryNames().erase(it);
+
+          ENVOY_LOG(
+              info,
+              "Deprecated name '{}' (mapped to '{}') displaced with test factory '{}' (type '{}')",
+              it->first, it->second, factory.name(), factory.configType());
+        } else {
+          // Name not previously mapped, remember to remove it.
+          prev_deprecated_names.emplace_back(std::make_pair(deprecated_name, ""));
+
+          ENVOY_LOG(info, "Deprecated name '{}' (mapped to '{}')", deprecated_name, factory.name());
+        }
+
+        // Register the replacement factory with a deprecated name.
+        factories().emplace(deprecated_name, &factory);
+        RELEASE_ASSERT(getFactory(deprecated_name) == &factory,
+                       "test factory registration by deprecated name failed");
+
+        // Register the replacement factory's deprecated name.
+        deprecatedFactoryNames().emplace(std::make_pair(deprecated_name, factory.name()));
+      }
+    }
+
+    rebuildFactoriesByTypeForTest();
+
+    return [replacement = &factory, prev_by_name, prev_deprecated_names]() {
+      // Unregister the replacement factory by name.
+      factories().erase(replacement->name());
+
+      ENVOY_LOG(info, "Removed test factory '{}' (type '{}')", replacement->name(),
+                replacement->configType());
+
+      if (prev_by_name) {
+        // Restore any factory displaced by name, but only register the type if it's non-empty.
+        factories().emplace(prev_by_name->name(), prev_by_name);
+
+        ENVOY_LOG(info, "Restored factory '{}' (type '{}'), formerly displaced-by-name",
+                  prev_by_name->name(), prev_by_name->configType());
+      }
+
+      for (auto mapping : prev_deprecated_names) {
+        deprecatedFactoryNames().erase(mapping.first);
+
+        ENVOY_LOG(info, "Removed deprecated name '{}'", mapping.first);
+
+        if (!mapping.second.empty()) {
+          deprecatedFactoryNames().emplace(std::make_pair(mapping.first, mapping.second));
+
+          auto* deprecated_factory = getFactory(mapping.second);
+          RELEASE_ASSERT(deprecated_factory != nullptr,
+                         "failed to restore deprecated factory name");
+          factories().emplace(mapping.second, deprecated_factory);
+
+          ENVOY_LOG(info, "Restored deprecated name '{}' (mapped to '{}'", mapping.first,
+                    mapping.second);
+        }
+      }
+
+      rebuildFactoriesByTypeForTest();
+    };
   }
 };
 

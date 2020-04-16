@@ -11,7 +11,7 @@ sources of latency. Envoy supports three features related to system wide tracing
 
 * **Request ID generation**: Envoy will generate UUIDs when needed and populate the
   :ref:`config_http_conn_man_headers_x-request-id` HTTP header. Applications can forward the
-  x-request-id header for unified logging as well as tracing.
+  x-request-id header for unified logging as well as tracing. The behavior can be configured on per :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_id_extension>` basis using an extension.
 * **Client trace ID joining**: The :ref:`config_http_conn_man_headers_x-client-trace-id` header can
   be used to join untrusted request IDs to the trusted internal
   :ref:`config_http_conn_man_headers_x-request-id`.

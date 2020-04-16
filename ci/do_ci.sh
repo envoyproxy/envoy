@@ -58,6 +58,11 @@ function cp_binary_for_image_build() {
 
   # Copy for azp which doesn't preserve permissions, creating a tar archive
   tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_SRCDIR}" build_"$1" build_"$1"_stripped
+
+  # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
+  [[ -z "${BUILD_REASON}" ]] || \
+    rm -rf "${ENVOY_SRCDIR}"/build_"$1" "${ENVOY_SRCDIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy \
+      bazel-bin/"${ENVOY_BIN}"
 }
 
 function bazel_binary_build() {
@@ -316,7 +321,7 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   echo "check_format..."
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
-  ./tools/proto_format/proto_format.sh check
+  ./tools/proto_format/proto_format.sh check --test
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."

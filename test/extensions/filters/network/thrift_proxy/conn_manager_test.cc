@@ -12,6 +12,7 @@
 #include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
 #include "extensions/filters/network/thrift_proxy/header_transport_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
@@ -96,7 +97,7 @@ public:
 
     proto_config_.set_stat_prefix("test");
 
-    decoder_filter_.reset(new NiceMock<ThriftFilters::MockDecoderFilter>());
+    decoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockDecoderFilter>>();
 
     config_ = std::make_unique<TestConfigImpl>(proto_config_, context_, decoder_filter_, stats_);
     if (custom_transport_) {
@@ -294,7 +295,7 @@ public:
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<ThriftFilters::MockDecoderFilter> decoder_filter_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   ThriftFilterStats stats_;
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config_;
 

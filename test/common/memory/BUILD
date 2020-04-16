@@ -21,7 +21,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/memory:heap_shrinker_lib",
         "//source/common/memory:stats_lib",
-        "//source/common/stats:isolated_store_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:simulated_time_system_lib",

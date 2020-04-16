@@ -5,7 +5,7 @@
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
-#include "test/test_common/test_time.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -18,17 +18,19 @@ namespace {
 
 TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   Endpoint ep;
+  Util::Replacements replacements;
 
   EXPECT_EQ("", ep.serviceName());
-  EXPECT_TRUE(TestUtility::protoEqual(
-      TestUtility::jsonToStruct(R"({"ipv4":"","port":0,"serviceName":""})"), ep.toStruct()));
+  EXPECT_TRUE(
+      TestUtility::protoEqual(TestUtility::jsonToStruct(R"({"ipv4":"","port":0,"serviceName":""})"),
+                              ep.toStruct(replacements)));
 
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddress("127.0.0.1");
   ep.setAddress(addr);
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":0,"serviceName":""})"),
-      ep.toStruct()));
+      ep.toStruct(replacements)));
 
   addr = Network::Utility::parseInternetAddressAndPort(
       "[2001:0db8:85a3:0000:0000:8a2e:0370:4444]:7334");
@@ -36,7 +38,8 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(
           R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":""})"),
-      ep.toStruct()));
+      ep.toStruct(replacements)));
+  EXPECT_TRUE(replacements.empty());
 
   ep.setServiceName("my_service");
   EXPECT_EQ("my_service", ep.serviceName());
@@ -44,18 +47,21 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(
           R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})"),
-      ep.toStruct()));
+      ep.toStruct(replacements)));
+  EXPECT_TRUE(replacements.empty());
 }
 
 TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
+  Util::Replacements replacements;
 
   EXPECT_EQ("my_service", ep.serviceName());
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"),
-      ep.toStruct()));
+      ep.toStruct(replacements)));
+  EXPECT_TRUE(replacements.empty());
 
   addr = Network::Utility::parseInternetAddressAndPort(
       "[2001:0db8:85a3:0000:0000:8a2e:0370:4444]:7334");
@@ -64,47 +70,53 @@ TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(
           R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})"),
-      ep.toStruct()));
+      ep.toStruct(replacements)));
+  EXPECT_TRUE(replacements.empty());
 }
 
 TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep1(std::string("my_service"), addr);
-  Endpoint ep2(ep1);
+  Endpoint& ep2(ep1);
+  Util::Replacements replacements;
 
   EXPECT_EQ("my_service", ep1.serviceName());
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"),
-      ep1.toStruct()));
+      ep1.toStruct(replacements)));
 
   EXPECT_EQ(ep1.serviceName(), ep2.serviceName());
-  EXPECT_TRUE(TestUtility::protoEqual(ep1.toStruct(), ep2.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(ep1.toStruct(replacements), ep2.toStruct(replacements)));
+  EXPECT_TRUE(replacements.empty());
 }
 
 TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep1(std::string("my_service"), addr);
-  Endpoint ep2 = ep1;
+  Endpoint& ep2 = ep1;
+  Util::Replacements replacements;
 
   EXPECT_EQ("my_service", ep1.serviceName());
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"),
-      ep1.toStruct()));
+      ep1.toStruct(replacements)));
 
   EXPECT_EQ(ep1.serviceName(), ep2.serviceName());
-  EXPECT_TRUE(TestUtility::protoEqual(ep1.toStruct(), ep2.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(ep1.toStruct(replacements), ep2.toStruct(replacements)));
+  EXPECT_TRUE(replacements.empty());
 }
 
 TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   Annotation ann;
+  Util::Replacements replacements;
 
   EXPECT_EQ(0ULL, ann.timestamp());
   EXPECT_EQ("", ann.value());
   EXPECT_FALSE(ann.isSetEndpoint());
 
-  DangerousDeprecatedTestTime test_time;
+  Event::SimulatedTimeSystem test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                            test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
@@ -114,10 +126,13 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   ann.setValue(CLIENT_SEND);
   EXPECT_EQ(CLIENT_SEND, ann.value());
 
-  std::string expected_json =
-      R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" + CLIENT_SEND + R"("})";
-  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
+  std::string expected_json = R"({"timestamp":")" + std::to_string(timestamp) + R"(")" +
+                              R"(,"value":")" + CLIENT_SEND + R"("})";
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json),
+                                      ann.toStruct(replacements)));
+  EXPECT_EQ(1, replacements.size());
 
+  replacements.clear();
   // Test the copy-semantics flavor of setEndpoint
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
@@ -127,13 +142,18 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"),
-      (const_cast<Endpoint&>(ann.endpoint())).toStruct()));
+      (const_cast<Endpoint&>(ann.endpoint())).toStruct(replacements)));
 
-  expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" + CLIENT_SEND +
+  expected_json = R"({"timestamp":")" + std::to_string(timestamp) + R"(")" + R"(,"value":")" +
+                  CLIENT_SEND +
                   R"(","endpoint":{"ipv4":)"
                   R"("127.0.0.1","port":3306,"serviceName":"my_service"}})";
-  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json),
+                                      ann.toStruct(replacements)));
 
+  EXPECT_EQ(1, replacements.size());
+
+  replacements.clear();
   // Test the move-semantics flavor of setEndpoint
   addr = Network::Utility::parseInternetAddressAndPort("192.168.1.1:5555");
   Endpoint ep2(std::string("my_service_2"), addr);
@@ -143,31 +163,41 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(
           R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})"),
-      (const_cast<Endpoint&>(ann.endpoint())).toStruct()));
+      (const_cast<Endpoint&>(ann.endpoint())).toStruct(replacements)));
+  EXPECT_TRUE(replacements.empty());
 
-  expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" + CLIENT_SEND +
+  replacements.clear();
+  expected_json = R"({"timestamp":")" + std::to_string(timestamp) + R"(")" + R"(,"value":")" +
+                  CLIENT_SEND +
                   R"(","endpoint":{"ipv4":"192.168.1.1",)"
                   R"("port":5555,"serviceName":"my_service_2"}})";
-  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json),
+                                      ann.toStruct(replacements)));
+  EXPECT_EQ(1, replacements.size());
 
+  replacements.clear();
   // Test change endpoint service name.
   ann.changeEndpointServiceName("NEW_SERVICE_NAME");
   EXPECT_EQ("NEW_SERVICE_NAME", ann.endpoint().serviceName());
-  expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" + CLIENT_SEND +
+  expected_json = R"({"timestamp":")" + std::to_string(timestamp) + R"(")" + R"(,"value":")" +
+                  CLIENT_SEND +
                   R"(","endpoint":{"ipv4":"192.168.1.1",)"
                   R"("port":5555,"serviceName":"NEW_SERVICE_NAME"}})";
-  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json),
+                                      ann.toStruct(replacements)));
+  EXPECT_EQ(1, replacements.size());
 }
 
 TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
-  DangerousDeprecatedTestTime test_time;
+  Event::SimulatedTimeSystem test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                            test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, CLIENT_SEND, ep);
+  Util::Replacements replacements;
 
   EXPECT_EQ(timestamp, ann.timestamp());
   EXPECT_EQ(CLIENT_SEND, ann.value());
@@ -176,30 +206,34 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"),
-      (const_cast<Endpoint&>(ann.endpoint())).toStruct()));
+      (const_cast<Endpoint&>(ann.endpoint())).toStruct(replacements)));
+  EXPECT_TRUE(replacements.empty());
 
-  std::string expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
-                              CLIENT_SEND +
+  std::string expected_json = R"({"timestamp":")" + std::to_string(timestamp) + R"(")" +
+                              R"(,"value":")" + CLIENT_SEND +
                               R"(","endpoint":{"ipv4":"127.0.0.1",)"
                               R"("port":3306,"serviceName":"my_service"}})";
-  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json),
+                                      ann.toStruct(replacements)));
+  EXPECT_EQ(1, replacements.size());
 }
 
 TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
-  DangerousDeprecatedTestTime test_time;
+  Event::SimulatedTimeSystem test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                            test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, CLIENT_SEND, ep);
-  Annotation ann2(ann);
+  Annotation& ann2(ann);
+  Util::Replacements replacements;
 
   EXPECT_EQ(ann.value(), ann2.value());
   EXPECT_EQ(ann.timestamp(), ann2.timestamp());
   EXPECT_EQ(ann.isSetEndpoint(), ann2.isSetEndpoint());
-  EXPECT_TRUE(TestUtility::protoEqual(ann.toStruct(), ann2.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(ann.toStruct(replacements), ann2.toStruct(replacements)));
   EXPECT_EQ(ann.endpoint().serviceName(), ann2.endpoint().serviceName());
 }
 
@@ -207,22 +241,24 @@ TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
-  DangerousDeprecatedTestTime test_time;
+  Event::SimulatedTimeSystem test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                            test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, CLIENT_SEND, ep);
-  Annotation ann2 = ann;
+  Annotation& ann2 = ann;
+  Util::Replacements replacements;
 
   EXPECT_EQ(ann.value(), ann2.value());
   EXPECT_EQ(ann.timestamp(), ann2.timestamp());
   EXPECT_EQ(ann.isSetEndpoint(), ann2.isSetEndpoint());
-  EXPECT_TRUE(TestUtility::protoEqual(ann.toStruct(), ann2.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(ann.toStruct(replacements), ann2.toStruct(replacements)));
   EXPECT_EQ(ann.endpoint().serviceName(), ann2.endpoint().serviceName());
 }
 
 TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   BinaryAnnotation ann;
+  Util::Replacements replacements;
 
   EXPECT_EQ("", ann.key());
   EXPECT_EQ("", ann.value());
@@ -236,7 +272,8 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   EXPECT_EQ("value", ann.value());
 
   std::string expected_json = R"({"key":"key","value":"value"})";
-  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json),
+                                      ann.toStruct(replacements)));
 
   // Test the copy-semantics flavor of setEndpoint
 
@@ -248,14 +285,15 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"),
-      (const_cast<Endpoint&>(ann.endpoint())).toStruct()));
+      (const_cast<Endpoint&>(ann.endpoint())).toStruct(replacements)));
 
   expected_json = "{"
                   R"("key":"key","value":"value",)"
                   R"("endpoint":)"
                   R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"
                   "}";
-  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json),
+                                      ann.toStruct(replacements)));
 
   // Test the move-semantics flavor of setEndpoint
   addr = Network::Utility::parseInternetAddressAndPort("192.168.1.1:5555");
@@ -266,51 +304,57 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(
           R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})"),
-      (const_cast<Endpoint&>(ann.endpoint())).toStruct()));
+      (const_cast<Endpoint&>(ann.endpoint())).toStruct(replacements)));
   expected_json = "{"
                   R"("key":"key","value":"value",)"
                   R"("endpoint":)"
                   R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})"
                   "}";
-  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json),
+                                      ann.toStruct(replacements)));
 }
 
 TEST(ZipkinCoreTypesBinaryAnnotationTest, customConstructor) {
   BinaryAnnotation ann("key", "value");
+  Util::Replacements replacements;
 
   EXPECT_EQ("key", ann.key());
   EXPECT_EQ("value", ann.value());
   EXPECT_FALSE(ann.isSetEndpoint());
   EXPECT_EQ(AnnotationType::STRING, ann.annotationType());
   std::string expected_json = R"({"key":"key","value":"value"})";
-  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json),
+                                      ann.toStruct(replacements)));
 }
 
 TEST(ZipkinCoreTypesBinaryAnnotationTest, copyConstructor) {
   BinaryAnnotation ann("key", "value");
-  BinaryAnnotation ann2(ann);
+  BinaryAnnotation& ann2(ann);
+  Util::Replacements replacements;
 
   EXPECT_EQ(ann.value(), ann2.value());
   EXPECT_EQ(ann.key(), ann2.key());
   EXPECT_EQ(ann.isSetEndpoint(), ann2.isSetEndpoint());
-  EXPECT_TRUE(TestUtility::protoEqual(ann.toStruct(), ann2.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(ann.toStruct(replacements), ann2.toStruct(replacements)));
   EXPECT_EQ(ann.annotationType(), ann2.annotationType());
 }
 
 TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
   BinaryAnnotation ann("key", "value");
-  BinaryAnnotation ann2 = ann;
+  BinaryAnnotation& ann2 = ann;
+  Util::Replacements replacements;
 
   EXPECT_EQ(ann.value(), ann2.value());
   EXPECT_EQ(ann.key(), ann2.key());
   EXPECT_EQ(ann.isSetEndpoint(), ann2.isSetEndpoint());
-  EXPECT_TRUE(TestUtility::protoEqual(ann.toStruct(), ann2.toStruct()));
+  EXPECT_TRUE(TestUtility::protoEqual(ann.toStruct(replacements), ann2.toStruct(replacements)));
   EXPECT_EQ(ann.annotationType(), ann2.annotationType());
 }
 
 TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
-  DangerousDeprecatedTestTime test_time;
+  Event::SimulatedTimeSystem test_time;
   Span span(test_time.timeSystem());
+  Util::Replacements replacements;
 
   EXPECT_EQ(0ULL, span.id());
   EXPECT_EQ(0ULL, span.traceId());
@@ -329,7 +373,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(
           R"({"traceId":"0000000000000000","name":"","id":"0000000000000000"})"),
-      span.toStruct()));
+      span.toStruct(replacements)));
 
   uint64_t id = Util::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
@@ -410,16 +454,19 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
       TestUtility::jsonToStruct(
           R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
           span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
-          R"(","timestamp":)" + std::to_string(span.timestamp()) +
-          R"(,"duration":3000,)"
+          R"(","timestamp":")" + std::to_string(span.timestamp()) +
+          R"(")"
+          R"(,"duration":"3000",)"
           R"("annotations":[)"
-          R"({"timestamp":)" +
+          R"({"timestamp":")" +
           std::to_string(span.timestamp()) +
+          R"(")"
           R"(,"value":"cs","endpoint":)"
           R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}],)"
           R"("binaryAnnotations":[{"key":"lc","value":"my_component_name","endpoint":)"
           R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}]})"),
-      span.toStruct()));
+      span.toStruct(replacements)));
+  EXPECT_EQ(3, replacements.size());
 
   // Test the copy-semantics flavor of addAnnotation and addBinaryAnnotation
 
@@ -444,24 +491,29 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_EQ(3ULL, span.annotations().size());
   EXPECT_EQ(3ULL, span.binaryAnnotations().size());
 
+  replacements.clear();
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(
           R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
           span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
-          R"(","timestamp":)" + std::to_string(span.timestamp()) +
-          R"(,"duration":3000,)"
+          R"(","timestamp":")" + std::to_string(span.timestamp()) +
+          R"(")"
+          R"(,"duration":"3000",)"
           R"("annotations":[)"
-          R"({"timestamp":)" +
+          R"({"timestamp":")" +
           std::to_string(timestamp) +
+          R"(")"
           R"(,"value":"cs","endpoint":)"
           R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}},)"
-          R"({"timestamp":)" +
+          R"({"timestamp":")" +
           std::to_string(timestamp) +
+          R"(")"
           R"(,"value":"ss",)"
           R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
           R"("serviceName":"my_service_name"}},)"
-          R"({"timestamp":)" +
+          R"({"timestamp":")" +
           std::to_string(timestamp) +
+          R"(")"
           R"(,"value":"sr","endpoint":{"ipv4":"192.168.1.2","port":3306,)"
           R"("serviceName":"my_service_name"}}],)"
           R"("binaryAnnotations":[{"key":"lc","value":"my_component_name",)"
@@ -473,35 +525,42 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
           R"({"key":"http.return_code","value":"400",)"
           R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
           R"("serviceName":"my_service_name"}}]})"),
-      span.toStruct()));
+      span.toStruct(replacements)));
+  EXPECT_EQ(5, replacements.size());
 
   // Test setSourceServiceName and setDestinationServiceName
 
   ann_copy.setValue(CLIENT_RECV);
   span.addAnnotation(ann_copy);
   span.setServiceName("NEW_SERVICE_NAME");
+  replacements.clear();
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(
           R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
           span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
-          R"(","timestamp":)" + std::to_string(span.timestamp()) +
-          R"(,"duration":3000,)"
+          R"(","timestamp":")" + std::to_string(span.timestamp()) +
+          R"(")"
+          R"(,"duration":"3000",)"
           R"("annotations":[)"
-          R"({"timestamp":)" +
+          R"({"timestamp":")" +
           std::to_string(timestamp) +
+          R"(")"
           R"(,"value":"cs","endpoint":)"
           R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"NEW_SERVICE_NAME"}},)"
-          R"({"timestamp":)" +
+          R"({"timestamp":")" +
           std::to_string(timestamp) +
+          R"(")"
           R"(,"value":"ss",)"
           R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
           R"("serviceName":"NEW_SERVICE_NAME"}},)"
-          R"({"timestamp":)" +
+          R"({"timestamp":")" +
           std::to_string(timestamp) +
+          R"(")"
           R"(,"value":"sr","endpoint":{"ipv4":"192.168.1.2","port":3306,)"
           R"("serviceName":"NEW_SERVICE_NAME"}},)"
-          R"({"timestamp":)" +
+          R"({"timestamp":")" +
           std::to_string(timestamp) +
+          R"(")"
           R"(,"value":"cr","endpoint":)"
           R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"NEW_SERVICE_NAME"}}],)"
           R"("binaryAnnotations":[{"key":"lc","value":"my_component_name",)"
@@ -513,12 +572,14 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
           R"({"key":"http.return_code","value":"400",)"
           R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
           R"("serviceName":"my_service_name"}}]})"),
-      span.toStruct()));
+      span.toStruct(replacements)));
+  EXPECT_EQ(6, replacements.size());
 }
 
 TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
-  DangerousDeprecatedTestTime test_time;
+  Event::SimulatedTimeSystem test_time;
   Span span(test_time.timeSystem());
+  Util::Replacements replacements;
 
   uint64_t id = Util::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
@@ -554,8 +615,9 @@ TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
-  DangerousDeprecatedTestTime test_time;
+  Event::SimulatedTimeSystem test_time;
   Span span(test_time.timeSystem());
+  Util::Replacements replacements;
 
   uint64_t id = Util::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
@@ -591,7 +653,7 @@ TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, setTag) {
-  DangerousDeprecatedTestTime test_time;
+  Event::SimulatedTimeSystem test_time;
   Span span(test_time.timeSystem());
 
   span.setTag("key1", "value1");

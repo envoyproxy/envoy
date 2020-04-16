@@ -19,7 +19,7 @@ namespace Address {
  */
 class Resolver : public Config::UntypedFactory {
 public:
-  virtual ~Resolver() = default;
+  ~Resolver() override = default;
 
   /**
    * Resolve a custom address string and port to an Address::Instance.
