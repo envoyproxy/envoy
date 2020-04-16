@@ -26,6 +26,6 @@ external components or extensions. This filter provides valuable observability
 information, without impacting the performance of the upstream Postgres
 server or requiring the installation of any software.
 
-PostreSQL proxy filter :ref:`configuration reference <config_network_filters_postgres_proxy>`.
+Postgres proxy filter :ref:`configuration reference <config_network_filters_postgres_proxy>`.
 
-.. _Postgres frontend/backend protocol: https://www.postgres.org/docs/current/protocol.html
+.. _Postgres frontend/backend protocol: https://www.postgresql.org/docs/current/protocol.html
