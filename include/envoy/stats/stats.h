@@ -168,7 +168,7 @@ public:
     Default, // No particular meaning.
   };
 
-  virtual ~TextReadout() override = default;
+  ~TextReadout() override = default;
 
   /**
    * Sets the value of this TextReadout by moving the input |value| to minimize
