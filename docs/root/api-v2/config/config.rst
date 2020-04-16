@@ -16,4 +16,5 @@ Extensions
   listener/listener
   grpc_credential/grpc_credential
   retry/retry
+  trace/trace
   wasm/wasm
