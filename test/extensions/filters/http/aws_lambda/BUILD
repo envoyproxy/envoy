@@ -32,6 +32,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/aws_lambda:aws_lambda_filter_lib",
         "//source/extensions/filters/http/aws_lambda:config",
         "//test/integration:http_integration_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
