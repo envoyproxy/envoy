@@ -47,7 +47,6 @@ jobs:
 
    coverage:
      executor: ubuntu-build
-     resource_class: 2xlarge
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
