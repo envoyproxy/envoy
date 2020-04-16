@@ -30,7 +30,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",        
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
