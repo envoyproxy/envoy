@@ -54,16 +54,17 @@ class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVers
                           protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest(stats_store_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
-        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
-        name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_)), name_("proxy"),
+        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
     EXPECT_CALL(socket_factory_, socketType())
         .WillOnce(Return(Network::Address::SocketType::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
-    connection_handler_->addListener(*this);
+    connection_handler_->addListener(absl::nullopt, *this);
     conn_ = dispatcher_->createClientConnection(socket_->localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
@@ -991,19 +992,20 @@ class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address
                                   protected Logger::Loggable<Logger::Id::main> {
 public:
   WildcardProxyProtocolTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest(stats_store_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
                                                            nullptr, true)),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_->localAddress()->ip()->port())),
-        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
-        name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_)), name_("proxy"),
+        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
     EXPECT_CALL(socket_factory_, socketType())
         .WillOnce(Return(Network::Address::SocketType::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
-    connection_handler_->addListener(*this);
+    connection_handler_->addListener(absl::nullopt, *this);
     conn_ = dispatcher_->createClientConnection(local_dst_address_,
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);

@@ -45,7 +45,7 @@ ValidationInstance::ValidationInstance(
                                              !options.rejectUnknownDynamicFields()),
       stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system)),
-      dispatcher_(api_->allocateDispatcher()),
+      dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),

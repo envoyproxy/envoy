@@ -47,7 +47,8 @@ protected:
 class GradientControllerTest : public testing::Test {
 public:
   GradientControllerTest()
-      : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()) {}
+      : api_(Api::createApiForTest(time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   GradientControllerSharedPtr makeController(const std::string& yaml_config) {
     return std::make_shared<GradientController>(makeConfig(yaml_config, runtime_), *dispatcher_,
