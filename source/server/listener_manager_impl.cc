@@ -245,8 +245,8 @@ DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
-DrainingFilterChainsImpl::DrainingFilterChainsImpl(ListenerImplPtr&& draining_listener,
-                                                   uint64_t workers_pending_removal)
+DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
+                                                         uint64_t workers_pending_removal)
     : draining_listener_(std::move(draining_listener)),
       workers_pending_removal_(workers_pending_removal) {}
 
@@ -696,8 +696,9 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
 
 void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener) {
   // First add the listener to the draining list.
-  std::list<DrainingFilterChainsImpl>::iterator draining_group = draining_filter_groups_.emplace(
-      draining_filter_groups_.begin(), std::move(listener), workers_.size());
+  std::list<DrainingFilterChainsManager>::iterator draining_group =
+      draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(),
+                                              std::move(listener), workers_.size());
   int filter_chain_size = draining_group->getDrainingFilterChains().size();
 
   // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
@@ -705,7 +706,7 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener) {
   // TODO(lambdai): Currently the number of DrainFilterChains objects are tracked:
   // len(filter_chains). What we really need is accumulate(filter_chains, filter_chains:
   // len(filter_chains))
-  stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
+  stats_.total_filter_chains_draining_.set(draining_filter_chains_manager_.size());
 
   draining_group->getDrainingListener().debugLog(
       absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
@@ -732,8 +733,9 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener) {
                     draining_group->getDrainingListener().debugLog(
                         absl::StrCat("draining filter chains from listener ",
                                      draining_group->getDrainingListener().name(), " complete"));
-                    draining_filter_groups_.erase(draining_group);
-                    stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
+                    draining_filter_chains_manager_.erase(draining_group);
+                    stats_.total_filter_chains_draining_.set(
+                        draining_filter_chains_manager_.size());
                   }
                 });
               });

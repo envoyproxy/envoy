@@ -131,9 +131,10 @@ struct ListenerManagerStats {
 /**
  * Provides the draining filter chains and the functionality to schedule listener destroy.
  */
-class DrainingFilterChainsImpl {
+class DrainingFilterChainsManager {
 public:
-  DrainingFilterChainsImpl(ListenerImplPtr&& draining_listener, uint64_t workers_pending_removal);
+  DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
+                              uint64_t workers_pending_removal);
   uint64_t getDrainingListenerTag() const { return draining_listener_->listenerTag(); }
   const std::list<const Network::FilterChain*>& getDrainingFilterChains() const {
     return draining_filter_chains_;
@@ -302,7 +303,7 @@ private:
   // connections are drained. Then after that time period the listener is removed from all workers
   // and any remaining connections are closed.
   std::list<DrainingListener> draining_listeners_;
-  std::list<DrainingFilterChainsImpl> draining_filter_groups_;
+  std::list<DrainingFilterChainsManager> draining_filter_chains_manager_;
 
   std::list<WorkerPtr> workers_;
   bool workers_started_{};

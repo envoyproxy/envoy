@@ -72,19 +72,22 @@ void ConnectionHandlerImpl::removeFilterChains(
   for (auto& listener : listeners_) {
     // Optimistic path: The listener tag provided by arg is not stale.
     if (listener.second.listener_->listenerTag() == listener_tag) {
-      ASSERT(listener.second.tcp_listener_.has_value());
       listener.second.tcp_listener_->get().removeFilterChains(filter_chains);
+      // Completion is deferred because the above removeFilterChains() may defer delete connection.
       Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
       return;
     }
   }
   // Fallback to iterate over all listeners. The reason is that the target listener might have began
   // another update and the previous tag is lost.
+  // TODO(lambdai): Remove this once we decide to use the same listener tag during intelligent
+  // update.
   for (auto& listener : listeners_) {
     if (listener.second.tcp_listener_.has_value()) {
       listener.second.tcp_listener_->get().removeFilterChains(filter_chains);
     }
   }
+  // Completion is deferred because the above removeFilterChains() may defer delete connection.
   Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
 }
 
