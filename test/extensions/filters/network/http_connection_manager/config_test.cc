@@ -1,4 +1,7 @@
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
+#include "envoy/config/trace/v3/opencensus.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/server/request_id_extension_config.h"

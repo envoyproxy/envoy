@@ -1,4 +1,4 @@
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/config/trace/v3/xray.pb.h"
 #include "envoy/config/trace/v3/xray.pb.validate.h"
 #include "envoy/registry/registry.h"

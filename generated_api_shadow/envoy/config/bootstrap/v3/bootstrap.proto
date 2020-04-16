@@ -11,7 +11,7 @@ import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/listener.proto";
 import "envoy/config/metrics/v3/stats.proto";
 import "envoy/config/overload/v3/overload.proto";
-import "envoy/config/trace/v3/trace.proto";
+import "envoy/config/trace/v3/http_tracer.proto";
 import "envoy/extensions/transport_sockets/tls/v3/cert.proto";
 
 import "google/protobuf/duration.proto";

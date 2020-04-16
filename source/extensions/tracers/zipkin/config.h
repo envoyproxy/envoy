@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.validate.h"
 
 #include "extensions/tracers/common/factory_base.h"
 

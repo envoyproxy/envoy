@@ -7,7 +7,7 @@ import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/protocol.proto";
 import "envoy/config/route/v4alpha/route.proto";
 import "envoy/config/route/v4alpha/scoped_route.proto";
-import "envoy/config/trace/v4alpha/trace.proto";
+import "envoy/config/trace/v4alpha/http_tracer.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 

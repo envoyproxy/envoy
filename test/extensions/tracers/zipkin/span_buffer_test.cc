@@ -1,4 +1,4 @@
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"

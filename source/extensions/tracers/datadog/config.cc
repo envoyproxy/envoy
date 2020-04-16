@@ -1,7 +1,7 @@
 #include "extensions/tracers/datadog/config.h"
 
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/datadog.pb.h"
+#include "envoy/config/trace/v3/datadog.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"

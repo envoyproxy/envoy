@@ -3,7 +3,7 @@
 #include <sstream>
 #include <string>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/lightstep.pb.h"
 
 #include "common/common/base64.h"
 #include "common/grpc/common.h"

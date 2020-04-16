@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "common/protobuf/protobuf.h"
 

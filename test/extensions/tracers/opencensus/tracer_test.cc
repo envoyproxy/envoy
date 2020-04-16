@@ -5,7 +5,7 @@
 #include <iostream>
 #include <vector>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/opencensus.pb.h"
 
 #include "common/common/base64.h"
 

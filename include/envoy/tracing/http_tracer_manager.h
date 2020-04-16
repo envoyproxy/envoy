@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/tracing/http_tracer.h"
 
 namespace Envoy {

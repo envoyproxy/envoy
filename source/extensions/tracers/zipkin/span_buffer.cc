@@ -1,6 +1,6 @@
 #include "extensions/tracers/zipkin/span_buffer.h"
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "common/protobuf/utility.h"
 
