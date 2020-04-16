@@ -199,8 +199,8 @@ message JwtProvider {
   // existing access token is valid (for another 1 second). It forwards the request to Istio Ingressgateway 
   // and subsequently to some pod with an envoy sidecar. Meanwhile, 1 second has passed and when envoy checks 
   // the token it finds that it has expired.   
-  uint32 nbf_slack = 0;
-  uint32 exp_slack = 0;
+  uint32 nbf_slack = 10;
+  uint32 exp_slack = 11;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.
