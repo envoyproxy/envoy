@@ -62,9 +62,34 @@ TEST_F(DecompressorFilterTest, ResponseDecompressionActive) {
   auto decompressor = std::make_unique<Compression::Decompressor::MockDecompressor>();
   auto* decompressor_ptr = decompressor.get();
   EXPECT_CALL(*decompressor_factory_, createDecompressor()).WillOnce(Return(ByMove(std::move(decompressor))));
-  Http::TestResponseHeaderMapImpl headers{{"content-encoding", "mock, br"}, {"content-length", "256"}};
+  Http::TestResponseHeaderMapImpl headers{{"content-encoding", "mock"}, {"content-length", "256"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_EQ(nullptr, headers.ContentEncoding());
+
+  // FIX ME(junr03): pending decision on this.
+  EXPECT_EQ(nullptr, headers.ContentLength());
+  EXPECT_EQ("chunked", headers.TransferEncoding()->value().getStringView());
+
+  EXPECT_CALL(*decompressor_ptr, decompress(_, _)).Times(2).WillRepeatedly(Invoke([&](const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) {
+    TestUtility::feedBufferWithRandomCharacters(output_buffer, 2 * input_buffer.length());
+  }));
+
+  Buffer::OwnedImpl buffer;
+  TestUtility::feedBufferWithRandomCharacters(buffer, 10);
+  EXPECT_EQ(10, buffer.length());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, false));
+  EXPECT_EQ(20, buffer.length());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
+  EXPECT_EQ(40, buffer.length());
+}
+
+TEST_F(DecompressorFilterTest, ResponseDecompressionActiveMultipleEncodings) {
+  auto decompressor = std::make_unique<Compression::Decompressor::MockDecompressor>();
+  auto* decompressor_ptr = decompressor.get();
+  EXPECT_CALL(*decompressor_factory_, createDecompressor()).WillOnce(Return(ByMove(std::move(decompressor))));
+  Http::TestResponseHeaderMapImpl headers{{"content-encoding", "mock, br"}, {"content-length", "256"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_EQ("br", headers.ContentEncoding()->value().getStringView());
 
   // FIX ME(junr03): pending decision on this.
   EXPECT_EQ(nullptr, headers.ContentLength());

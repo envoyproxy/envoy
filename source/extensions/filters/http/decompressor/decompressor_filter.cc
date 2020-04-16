@@ -151,11 +151,12 @@ void DecompressorFilter::removeContentEncoding(Http::RequestOrResponseHeaderMap&
   // FIX ME(junr03): there should be a general HeaderString method to remove a value from the comma
   // delimited list.
   const auto all_codings = headers.ContentEncoding()->value().getStringView();
-  const auto remaining_codings = StringUtil::cropLeft(all_codings, ",");
+  const auto remaining_codings = StringUtil::trim(StringUtil::cropLeft(all_codings, ","));
 
-  headers.removeContentEncoding();
   if (remaining_codings != all_codings) {
     headers.setContentEncoding(remaining_codings);
+  } else {
+    headers.removeContentEncoding();
   }
 }
 
