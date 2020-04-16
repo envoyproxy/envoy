@@ -892,7 +892,8 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
         retry_state_->shouldHedgeRetryPerTryTimeout([this]() -> void { doRetry(); });
 
     if (retry_status == RetryStatus::Yes) {
-      setupRetry();
+      pending_retries_++;
+
       // Don't increment upstream_host->stats().rq_error_ here, we'll do that
       // later if 1) we hit global timeout or 2) we get bad response headers
       // back.
@@ -1019,7 +1020,8 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
   const RetryStatus retry_status =
       retry_state_->shouldRetryReset(reset_reason, [this]() -> void { doRetry(); });
   if (retry_status == RetryStatus::Yes) {
-    setupRetry();
+    pending_retries_++;
+
     if (upstream_request.upstreamHost()) {
       upstream_request.upstreamHost()->stats().rq_error_.inc();
     }
@@ -1208,16 +1210,17 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       const RetryStatus retry_status =
           retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
       if (retry_status == RetryStatus::Yes) {
+        pending_retries_++;
         upstream_request.upstreamHost()->stats().rq_error_.inc();
-        setupRetry();
+        Http::CodeStats& code_stats = httpContext().codeStats();
+        code_stats.chargeBasicResponseStat(cluster_->statsScope(), config_.retry_,
+                                           static_cast<Http::Code>(response_code));
+
         if (!end_stream) {
           upstream_request.resetStream();
         }
         upstream_request.removeFromList(upstream_requests_);
 
-        Http::CodeStats& code_stats = httpContext().codeStats();
-        code_stats.chargeBasicResponseStat(cluster_->statsScope(), config_.retry_,
-                                           static_cast<Http::Code>(response_code));
         return;
       } else if (retry_status == RetryStatus::NoOverflow) {
         callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
@@ -1396,12 +1399,6 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   cleanup();
 }
 
-void Filter::setupRetry() {
-  pending_retries_++;
-
-  ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
-}
-
 bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
                            UpstreamRequest& upstream_request) {
   ENVOY_STREAM_LOG(debug, "attempting internal redirect", *callbacks_);
@@ -1442,6 +1439,8 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
 }
 
 void Filter::doRetry() {
+  ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
+
   is_retry_ = true;
   attempt_count_++;
   ASSERT(pending_retries_ > 0);
