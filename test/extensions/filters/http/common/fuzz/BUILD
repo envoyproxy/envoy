@@ -27,7 +27,6 @@ envoy_cc_test_library(
     name = "uber_filter_lib",
     hdrs = ["uber_filter.h"],
     data = [
-        "//test/proto:bookstore.proto",
         "//test/proto:bookstore_proto_descriptor",
     ],
     deps = [

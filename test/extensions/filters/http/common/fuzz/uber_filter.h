@@ -63,15 +63,16 @@ public:
     ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
   }
 
-  void addProtoDescriptor(absl::string_view filter_name, Protobuf::Message* message) {
+  static void addProtoDescriptor(absl::string_view filter_name, Protobuf::Message* message) {
     if (filter_name.find("grpc_json_transcoder") != absl::string_view::npos) {
       envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder& config =
           dynamic_cast<
               envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&>(
               *message);
+      config.clear_services();
       config.add_services("bookstore.Bookstore");
-      config.set_proto_descriptor(absl::StrCat(std::getenv("TEST_SRCDIR"), "/test/proto/bookstore.descriptor"));
-      ENVOY_LOG_MISC(info, "{}", std::getenv("TEST_SRCDIR"));
+      config.set_proto_descriptor(
+          absl::StrCat(std::getenv("TEST_SRCDIR"), "/test/proto/bookstore.descriptor"));
     }
   }
 
@@ -129,8 +130,8 @@ public:
           Server::Configuration::NamedHttpFilterConfigFactory>(proto_config.name());
       ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
           proto_config, factory_context_.messageValidationVisitor(), factory);
-      // To get more coverage over gRPC transcoder filter, use a fixed test service.
-      addProtoDescriptor(proto_config.name(), message.get());
+      // Add a valid service and proto descriptor.
+      UberFilterFuzzer::addProtoDescriptor(proto_config.name(), message.get());
       cb_ = factory.createFilterFactoryFromProto(*message, "stats", factory_context_);
       cb_(filter_callback_);
     } catch (const EnvoyException& e) {
