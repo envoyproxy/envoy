@@ -144,7 +144,7 @@ following are the command line options that Envoy supports.
 .. option:: --log-format-prefix-with-location <1|0>
 
    *(optional)* This temporary flag allows replacing all entries of ``"%v"`` in the log format by
-   ``"[%g:%#] "``. This flag is provided for migration purposes only. If this is not set, a
+   ``"[%g:%#] %v"``. This flag is provided for migration purposes only. If this is not set, a
    default value 1 is used.
 
    **NOTE**: The default value will be changed to 0 at 1.16.0 release and the flag will be
