@@ -120,6 +120,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "runtime_handler_lib",
+    srcs = ["runtime_handler.cc"],
+    hdrs = ["runtime_handler.h"],
+    deps = [
+        ":utils_lib",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/server:instance_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "utils_lib",
     srcs = ["utils.cc"],
     hdrs = ["utils.h"],
