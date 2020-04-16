@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.filter.udp.dns_filter.v3alpha;
+package envoy.extensions.filters.udp.dns_filter.v3alpha;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/data/dns/v3/dns_table.proto";
@@ -11,7 +11,7 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filter.udp.dns_filter.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.udp.dns_filter.v3alpha";
 option java_outer_classname = "DnsFilterProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).work_in_progress = true;

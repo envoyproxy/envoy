@@ -32,7 +32,7 @@ envoy_cc_library(
         "//source/common/config:config_provider_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/extensions/filter/udp/dns_filter/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/udp/dns_filter/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
@@ -47,6 +47,6 @@ envoy_cc_extension(
         ":dns_filter_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "@envoy_api//envoy/extensions/filter/udp/dns_filter/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/udp/dns_filter/v3alpha:pkg_cc_proto",
     ],
 )

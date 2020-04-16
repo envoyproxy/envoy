@@ -12,9 +12,9 @@ namespace DnsFilter {
 
 DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     Server::Configuration::ListenerFactoryContext& context,
-    const envoy::extensions::filter::udp::dns_filter::v3alpha::DnsFilterConfig& config)
+    const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig& config)
     : root_scope_(context.scope()), stats_(generateStats(config.stat_prefix(), root_scope_)) {
-  using envoy::extensions::filter::udp::dns_filter::v3alpha::DnsFilterConfig;
+  using envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig;
 
   const auto& server_config = config.server_config();
 

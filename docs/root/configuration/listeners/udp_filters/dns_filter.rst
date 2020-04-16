@@ -29,7 +29,7 @@ Example Configuration
   listener_filters:
     name: "envoy.filters.udp.dns_filter"
     typed_config:
-      "@type": "type.googleapis.com/envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig"
+      "@type": "type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig"
       stat_prefix: "dns_filter_prefix"
       server_config:
         inline_dns_table:

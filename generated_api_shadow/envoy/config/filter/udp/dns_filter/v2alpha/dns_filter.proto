@@ -15,7 +15,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.udp.dns_filter.v2alpha"
 option java_outer_classname = "DnsFilterProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filter.udp.dns_filter.v3alpha";
+    "envoy.extensions.filters.udp.dns_filter.v3alpha";
 option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
