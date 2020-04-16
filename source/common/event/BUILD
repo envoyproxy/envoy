@@ -123,3 +123,12 @@ envoy_cc_library(
         "//source/common/common:scope_tracker",
     ],
 )
+
+envoy_cc_library(
+    name = "deferred_task",
+    hdrs = ["deferred_task.h"],
+    deps = [
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/event:dispatcher_interface",
+    ],
+)
