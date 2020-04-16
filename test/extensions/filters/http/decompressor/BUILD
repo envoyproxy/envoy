@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/decompressor:config",
+        "//source/common/http:headers_lib",
         "//test/mocks/compression/decompressor:decompressor_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
