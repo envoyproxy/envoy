@@ -1207,10 +1207,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     } else {
       const RetryStatus retry_status =
           retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
-      // Capture upstream_host since setupRetry() in the following line will clear
-      // upstream_request.
-      const auto upstream_host = upstream_request.upstreamHost();
       if (retry_status == RetryStatus::Yes) {
+        upstream_request.upstreamHost()->stats().rq_error_.inc();
         setupRetry();
         if (!end_stream) {
           upstream_request.resetStream();
@@ -1220,7 +1218,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         Http::CodeStats& code_stats = httpContext().codeStats();
         code_stats.chargeBasicResponseStat(cluster_->statsScope(), config_.retry_,
                                            static_cast<Http::Code>(response_code));
-        upstream_host->stats().rq_error_.inc();
         return;
       } else if (retry_status == RetryStatus::NoOverflow) {
         callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
