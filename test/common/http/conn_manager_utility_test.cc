@@ -765,16 +765,35 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
 // Make sure we don't remove connection headers on all Upgrade responses.
 TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketResponses) {
   TestRequestHeaderMapImpl request_headers{{"connection", "UpGrAdE"}, {"upgrade", "foo"}};
-  TestResponseHeaderMapImpl response_headers{
-      {"connection", "upgrade"}, {"transfer-encoding", "foo"}, {"upgrade", "bar"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "101"},
+                                             {"connection", "upgrade"},
+                                             {"transfer-encoding", "foo"},
+                                             {"upgrade", "bar"}};
   EXPECT_TRUE(Utility::isUpgrade(request_headers));
   EXPECT_TRUE(Utility::isUpgrade(response_headers));
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
                                                   config_.requestIDExtension(), "");
 
-  EXPECT_EQ(2UL, response_headers.size()) << response_headers;
+  EXPECT_EQ(3UL, response_headers.size()) << response_headers;
   EXPECT_EQ("upgrade", response_headers.get_("connection"));
   EXPECT_EQ("bar", response_headers.get_("upgrade"));
+  EXPECT_EQ("101", response_headers.get_(":status"));
+}
+
+// Make sure we don't add a content-length header on Upgrade responses.
+TEST_F(ConnectionManagerUtilityTest, DoNotAddConnectionLengthForWebSocket101Responses) {
+  TestRequestHeaderMapImpl request_headers{{"connection", "UpGrAdE"}, {"upgrade", "foo"}};
+  TestResponseHeaderMapImpl response_headers{
+      {":status", "101"}, {"connection", "upgrade"}, {"upgrade", "bar"}};
+  EXPECT_TRUE(Utility::isUpgrade(request_headers));
+  EXPECT_TRUE(Utility::isUpgrade(response_headers));
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                  config_.requestIDExtension(), "");
+
+  EXPECT_EQ(3UL, response_headers.size()) << response_headers;
+  EXPECT_EQ("upgrade", response_headers.get_("connection"));
+  EXPECT_EQ("bar", response_headers.get_("upgrade"));
+  EXPECT_EQ("101", response_headers.get_(":status"));
 }
 
 TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
