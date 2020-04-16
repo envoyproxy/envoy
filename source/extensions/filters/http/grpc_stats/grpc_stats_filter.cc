@@ -135,8 +135,8 @@ struct Config {
     }
   }
   Grpc::Context& context_;
-  bool emit_filter_state_;
-  bool enable_upstream_stats_;
+  const bool emit_filter_state_;
+  const bool enable_upstream_stats_;
   bool stats_for_all_methods_{false};
   absl::optional<GrpcServiceMethodToRequestNamesMap> allowlist_;
 };
