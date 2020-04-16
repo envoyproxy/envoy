@@ -25,7 +25,6 @@
 using Envoy::Http::Headers;
 using Envoy::Http::HeaderValueOf;
 using Envoy::Http::HttpStatusIs;
-using testing::Contains;
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::Not;

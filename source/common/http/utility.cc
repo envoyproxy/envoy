@@ -205,18 +205,16 @@ bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
     authority_len = authority_len + u.field_data[UF_PORT].len + 1;
   }
-  host_and_port_ =
-      absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
+  hostAndPort_ = absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
 
   // RFC allows the absolute-uri to not end in /, but the absolute path form
   // must start with
-  uint64_t path_len =
-      absolute_url.length() - (u.field_data[UF_HOST].off + host_and_port().length());
+  uint64_t path_len = absolute_url.length() - (u.field_data[UF_HOST].off + hostAndPort().length());
   if (path_len > 0) {
-    uint64_t path_beginning = u.field_data[UF_HOST].off + host_and_port().length();
-    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_len);
+    uint64_t path_beginning = u.field_data[UF_HOST].off + hostAndPort().length();
+    pathAndQueryParams_ = absl::string_view(absolute_url.data() + path_beginning, path_len);
   } else if (!is_connect) {
-    path_and_query_params_ = absl::string_view(kDefaultPath, 1);
+    pathAndQueryParams_ = absl::string_view(kDefaultPath, 1);
   }
   return true;
 }
