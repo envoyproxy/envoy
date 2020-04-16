@@ -38,6 +38,12 @@ public:
 
   /**
    * @param headers the headers to parse.
+   * @return bool indicating whether the header is a gRPC request header.
+   */
+  static bool isGrpcRequestHeader(const Http::RequestHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
    * @param bool indicating whether the header is at end_stream.
    * @return bool indicating whether the header is a gRPC response header
    */

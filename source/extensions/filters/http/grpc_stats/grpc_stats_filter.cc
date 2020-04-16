@@ -145,7 +145,7 @@ public:
   GrpcStatsFilter(ConfigConstSharedPtr config) : config_(config) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+    grpc_request_ = Grpc::Common::isGrpcRequestHeader(headers);
     if (grpc_request_) {
       cluster_ = decoder_callbacks_->clusterInfo();
       if (cluster_) {

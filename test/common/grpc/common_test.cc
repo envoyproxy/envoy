@@ -285,6 +285,15 @@ TEST(GrpcContextTest, HasGrpcContentType) {
   EXPECT_FALSE(isGrpcContentType("application/grpc-web+foo"));
 }
 
+TEST(GrpcContextTest, IsGrpcRequestHeader) {
+  Http::TestRequestHeaderMapImpl is{
+      {":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
+  EXPECT_TRUE(Common::isGrpcRequestHeader(is));
+  Http::TestRequestHeaderMapImpl is_not{{":method", "CONNECT"},
+                                        {"content-type", "application/grpc"}};
+  EXPECT_FALSE(Common::isGrpcRequestHeader(is_not));
+}
+
 TEST(GrpcContextTest, IsGrpcResponseHeader) {
   Http::TestResponseHeaderMapImpl grpc_status_only{{":status", "500"}, {"grpc-status", "14"}};
   EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_status_only, true));

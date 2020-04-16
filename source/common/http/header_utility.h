@@ -124,6 +124,11 @@ public:
   static bool isEnvoyInternalRequest(const RequestHeaderMap& headers);
 
   /**
+   * @brief a helper function to determine if the headers represent a CONNECT request.
+   */
+  static bool isConnect(const RequestHeaderMap& headers);
+
+  /**
    * Determines if request headers pass Envoy validity checks.
    * @param headers to validate
    * @return details of the error if an error is present, otherwise absl::nullopt

@@ -176,6 +176,10 @@ bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
 }
 
+bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
+  return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
+}
+
 absl::optional<std::reference_wrapper<const absl::string_view>>
 HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   // Make sure the host is valid.

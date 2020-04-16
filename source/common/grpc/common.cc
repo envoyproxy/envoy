@@ -14,6 +14,7 @@
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
@@ -35,6 +36,13 @@ bool Common::hasGrpcContentType(const Http::RequestOrResponseHeaderMap& headers)
          (content_type->value().size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
           content_type->value()
                   .getStringView()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
+}
+
+bool Common::isGrpcRequestHeader(const Http::RequestHeaderMap& headers) {
+  if (!headers.Path()) {
+    return false;
+  }
+  return hasGrpcContentType(headers);
 }
 
 bool Common::isGrpcResponseHeader(const Http::ResponseHeaderMap& headers, bool end_stream) {

@@ -399,7 +399,9 @@ void ConnectionManagerUtility::mutateResponseHeaders(
 
 bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config) {
-  ASSERT(request_headers.Path());
+  if (!request_headers.Path()) {
+    return true; // It's as valid as it is going to get.
+  }
   bool is_valid_path = true;
   if (config.shouldNormalizePath()) {
     is_valid_path = PathUtil::canonicalPath(request_headers);
