@@ -18,6 +18,7 @@
 
 using testing::_;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -122,7 +123,7 @@ TEST_F(HeaderToMetadataTest, PerRouteOverride) {
   Config per_route_config(config_proto, true);
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
               perFilterConfig(HttpFilterNames::get().HeaderToMetadata))
-      .WillOnce(testing::Return(&per_route_config));
+      .WillOnce(Return(&per_route_config));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -148,7 +149,7 @@ TEST_F(HeaderToMetadataTest, ConfigIsCached) {
   Config per_route_config(config_proto, true);
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
               perFilterConfig(HttpFilterNames::get().HeaderToMetadata))
-      .WillOnce(testing::Return(&per_route_config));
+      .WillOnce(Return(&per_route_config));
 
   EXPECT_TRUE(getConfig()->doRequest());
   EXPECT_TRUE(getConfig()->doRequest());
