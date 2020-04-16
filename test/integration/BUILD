@@ -645,7 +645,7 @@ envoy_cc_test(
         # Uncomment this line to run this test repeatedly in exclusive mode if not using docker-sandbox,
         # or RBE, see comments in AddRemoveListener.
         # "exclusive",
-        # TODO(wrowe,sunjayBhatia): Skipping this on Windows as MSVC does allow invoking
+        # TODO(wrowe,sunjayBhatia): Skipping this on Windows as MSVC does not allow invoking
         # connection.close() from within the lambda that is passed to the RawConnectionDriver
         # constructor
         "skip_on_windows",
