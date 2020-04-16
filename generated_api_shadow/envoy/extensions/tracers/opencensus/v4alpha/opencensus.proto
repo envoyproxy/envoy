@@ -44,7 +44,7 @@ message OpenCensusConfig {
   reserved 7;
 
   // Configures tracing, e.g. the sampler, max number of annotations, etc.
-  opencensus.proto.trace.v1.TraceConfig trace_config = 1;
+  .opencensus.proto.trace.v1.TraceConfig trace_config = 1;
 
   // Enables the stdout exporter if set to true. This is intended for debugging
   // purposes.
