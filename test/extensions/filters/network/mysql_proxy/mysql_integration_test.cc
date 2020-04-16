@@ -1,4 +1,7 @@
+#ifndef WIN32
 #include <pthread.h>
+
+#endif
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"

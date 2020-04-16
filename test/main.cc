@@ -13,10 +13,32 @@
 
 #include "tools/cpp/runfiles/runfiles.h"
 
+#if defined(WIN32)
+static void noop_invalid_parameter_handler(const wchar_t* expression, const wchar_t* function,
+                                           const wchar_t* file, unsigned int line,
+                                           uintptr_t pReserved) {
+  return;
+}
+#endif
+
 using bazel::tools::cpp::runfiles::Runfiles;
 // The main entry point (and the rest of this file) should have no logic in it,
 // this allows overriding by site specific versions of main.cc.
 int main(int argc, char** argv) {
+#if defined(WIN32)
+  _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+
+  _set_invalid_parameter_handler(noop_invalid_parameter_handler);
+
+  WORD wVersionRequested;
+  WSADATA wsaData;
+  int err;
+
+  wVersionRequested = MAKEWORD(2, 2);
+
+  RELEASE_ASSERT(WSAStartup(wVersionRequested, &wsaData) == 0, "");
+#endif
+
 #ifndef __APPLE__
   absl::InitializeSymbolizer(argv[0]);
 #endif
