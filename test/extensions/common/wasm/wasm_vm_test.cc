@@ -6,6 +6,7 @@
 #include "extensions/common/wasm/wasm_vm.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -37,7 +38,6 @@ public:
 };
 
 TestNullVmPlugin* test_null_vm_plugin_ = nullptr;
-Envoy::Registry::RegisterFactory<PluginFactory, Null::NullVmPluginFactory> register_;
 
 std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
   auto result = std::make_unique<TestNullVmPlugin>();
@@ -47,9 +47,12 @@ std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
 
 class BaseVmTest : public testing::Test {
 public:
-  BaseVmTest() : scope_(Stats::ScopeSharedPtr(stats_store.createScope("wasm."))) {}
+  BaseVmTest()
+      : registration_(factory_), scope_(Stats::ScopeSharedPtr(stats_store.createScope("wasm."))) {}
 
 protected:
+  PluginFactory factory_;
+  Envoy::Registry::InjectFactory<Null::NullVmPluginFactory> registration_;
   Stats::IsolatedStoreImpl stats_store;
   Stats::ScopeSharedPtr scope_;
 };
@@ -114,10 +117,10 @@ MockHostFunctions* g_host_functions;
 
 void pong(void*, Word value) { g_host_functions->pong(convertWordToUint32(value)); }
 
-Word random(void*) { return Word(g_host_functions->random()); }
+Word random(void*) { return {g_host_functions->random()}; }
 
 // pong() with wrong number of arguments.
-void bad_pong1(void*) { return; }
+void bad_pong1(void*) {}
 
 // pong() with wrong return type.
 Word bad_pong2(void*, Word) { return 2; }

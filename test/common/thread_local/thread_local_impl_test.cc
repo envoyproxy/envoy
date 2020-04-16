@@ -49,8 +49,8 @@ public:
   int freeSlotIndexesListSize() { return tls_.free_slot_indexes_.size(); }
   InstanceImpl tls_;
 
-  Event::MockDispatcher main_dispatcher_;
-  Event::MockDispatcher thread_dispatcher_;
+  Event::MockDispatcher main_dispatcher_{"test_main_thread"};
+  Event::MockDispatcher thread_dispatcher_{"test_worker_thread"};
 };
 
 TEST_F(ThreadLocalInstanceImplTest, All) {
@@ -199,8 +199,8 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
   Api::ApiPtr api = Api::createApiForTest();
-  Event::DispatcherPtr main_dispatcher(api->allocateDispatcher());
-  Event::DispatcherPtr thread_dispatcher(api->allocateDispatcher());
+  Event::DispatcherPtr main_dispatcher(api->allocateDispatcher("test_main_thread"));
+  Event::DispatcherPtr thread_dispatcher(api->allocateDispatcher("test_worker_thread"));
 
   tls.registerThread(*main_dispatcher, true);
   tls.registerThread(*thread_dispatcher, false);

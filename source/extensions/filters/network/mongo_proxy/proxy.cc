@@ -401,8 +401,10 @@ absl::optional<std::chrono::milliseconds> ProxyFilter::delayDuration() {
     return result;
   }
 
+  // Use a default percentage
+  const auto percentage = fault_config_->percentage(nullptr);
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().FixedDelayPercent,
-                                          fault_config_->percentage())) {
+                                          percentage)) {
     return result;
   }
 

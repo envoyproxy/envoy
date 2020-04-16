@@ -7,7 +7,7 @@ import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/route/v3/route.proto";
 import "envoy/config/route/v3/scoped_route.proto";
-import "envoy/config/trace/v3/trace.proto";
+import "envoy/config/trace/v3/http_tracer.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 
@@ -24,7 +24,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.http_connection_manager.v3";
 option java_outer_classname = "HttpConnectionManagerProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
@@ -148,9 +148,15 @@ message HttpConnectionManager {
     repeated type.tracing.v3.CustomTag custom_tags = 8;
 
     // Configuration for an external tracing provider.
-    // If not specified, Envoy will fall back to using tracing provider configuration
-    // from the bootstrap config.
-    // [#not-implemented-hide:]
+    // If not specified, no tracing will be performed.
+    //
+    // .. attention::
+    //   Please be aware that *envoy.tracers.opencensus* provider can only be configured once
+    //   in Envoy lifetime.
+    //   Any attempts to reconfigure it or to use different configurations for different HCM filters
+    //   will be rejected.
+    //   Such a constraint is inherent to OpenCensus itself. It cannot be overcome without changes
+    //   on OpenCensus side.
     config.trace.v3.Tracing.Http provider = 9;
   }
 

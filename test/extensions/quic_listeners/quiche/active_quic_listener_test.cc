@@ -55,9 +55,9 @@ protected:
 
   ActiveQuicListenerTest()
       : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
-        dispatcher_(api_->allocateDispatcher()), clock_(*dispatcher_),
+        dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
-        connection_handler_(*dispatcher_, "test_thread") {}
+        connection_handler_(*dispatcher_) {}
 
   void SetUp() override {
     listen_socket_ =
@@ -67,10 +67,10 @@ protected:
 
     quic_listener_ = std::make_unique<ActiveQuicListener>(
         *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_, nullptr);
-    simulated_time_system_.sleep(std::chrono::milliseconds(100));
+    simulated_time_system_.advanceTimeWait(std::chrono::milliseconds(100));
   }
 
-  void ConfigureMocks(int connection_count) {
+  void configureMocks(int connection_count) {
     EXPECT_CALL(listener_config_, filterChainManager())
         .Times(connection_count)
         .WillRepeatedly(ReturnRef(filter_chain_manager_));
@@ -228,7 +228,7 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
 }
 
 TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
-  ConfigureMocks(/* connection_count = */ 1);
+  configureMocks(/* connection_count = */ 1);
   SendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   ReadFromClientSockets();
@@ -240,7 +240,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
 
-  ConfigureMocks(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2);
+  configureMocks(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2);
 
   // Generate one more CHLO than can be processed immediately.
   for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerLoop + 1; ++i) {

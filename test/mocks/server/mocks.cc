@@ -213,6 +213,7 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
+  ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 
@@ -274,6 +275,13 @@ MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 
 MockFilterChainFactoryContext::MockFilterChainFactoryContext() = default;
 MockFilterChainFactoryContext::~MockFilterChainFactoryContext() = default;
+
+MockTracerFactory::MockTracerFactory(const std::string& name) : name_(name) {
+  ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Invoke([] {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }));
+}
+MockTracerFactory::~MockTracerFactory() = default;
 
 MockTracerFactoryContext::MockTracerFactoryContext() {
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));

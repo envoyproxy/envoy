@@ -15,6 +15,7 @@
 #include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_cat.h"
@@ -43,15 +44,17 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     ServerConnectionCallbacks& callbacks, Stats::Scope& scope, const Http1Settings& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-    uint32_t max_request_headers_kb, uint32_t max_request_headers_count) {
+    uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
-    return std::make_unique<Http2::ServerConnectionImpl>(connection, callbacks, scope,
-                                                         http2_options, max_request_headers_kb,
-                                                         max_request_headers_count);
+    return std::make_unique<Http2::ServerConnectionImpl>(
+        connection, callbacks, scope, http2_options, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   } else {
-    return std::make_unique<Http1::ServerConnectionImpl>(connection, scope, callbacks,
-                                                         http1_settings, max_request_headers_kb,
-                                                         max_request_headers_count);
+    return std::make_unique<Http1::ServerConnectionImpl>(
+        connection, scope, callbacks, http1_settings, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   }
 }
 
@@ -376,7 +379,11 @@ void ConnectionManagerUtility::mutateResponseHeaders(
     }
   } else {
     response_headers.removeConnection();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_upgrade_response")) {
+      response_headers.removeUpgrade();
+    }
   }
+
   response_headers.removeTransferEncoding();
 
   if (request_headers != nullptr && request_headers->EnvoyForceTrace()) {

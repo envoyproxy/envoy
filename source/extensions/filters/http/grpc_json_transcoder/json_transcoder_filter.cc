@@ -26,8 +26,6 @@
 #include "grpc_transcoding/response_to_json_translator.h"
 
 using Envoy::Protobuf::FileDescriptorSet;
-using Envoy::Protobuf::io::CodedOutputStream;
-using Envoy::Protobuf::io::StringOutputStream;
 using Envoy::Protobuf::io::ZeroCopyInputStream;
 using Envoy::ProtobufUtil::Status;
 using Envoy::ProtobufUtil::error::Code;

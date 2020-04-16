@@ -132,20 +132,22 @@ private:
 };
 
 /**
- * Perform a match against an IP CIDR range. This rule can be applied to either the source
- * (remote) or the destination (local) IP.
+ * Perform a match against an IP CIDR range. This rule can be applied to connection remote,
+ * downstream local address, downstream direct remote address or downstream remote address.
  */
 class IPMatcher : public Matcher {
 public:
-  IPMatcher(const envoy::config::core::v3::CidrRange& range, bool destination)
-      : range_(Network::Address::CidrRange::create(range)), destination_(destination) {}
+  enum Type { ConnectionRemote = 0, DownstreamLocal, DownstreamDirectRemote, DownstreamRemote };
+
+  IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type)
+      : range_(Network::Address::CidrRange::create(range)), type_(type) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
-               const StreamInfo::StreamInfo&) const override;
+               const StreamInfo::StreamInfo& info) const override;
 
 private:
   const Network::Address::CidrRange range_;
-  const bool destination_;
+  const Type type_;
 };
 
 /**
@@ -155,8 +157,8 @@ class PortMatcher : public Matcher {
 public:
   PortMatcher(const uint32_t port) : port_(port) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
-               const StreamInfo::StreamInfo&) const override;
+  bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+               const StreamInfo::StreamInfo& info) const override;
 
 private:
   const uint32_t port_;

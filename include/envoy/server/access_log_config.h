@@ -18,7 +18,7 @@ namespace Configuration {
  */
 class AccessLogInstanceFactory : public Config::TypedFactory {
 public:
-  virtual ~AccessLogInstanceFactory() = default;
+  ~AccessLogInstanceFactory() override = default;
 
   /**
    * Create a particular AccessLog::Instance implementation from a config proto. If the

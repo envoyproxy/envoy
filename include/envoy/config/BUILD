@@ -53,6 +53,7 @@ envoy_cc_library(
     hdrs = ["subscription.h"],
     deps = [
         "//include/envoy/stats:stats_macros",
+        "//source/common/config:api_type_oracle_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -72,16 +73,6 @@ envoy_cc_library(
     hdrs = ["typed_metadata.h"],
     deps = [
         ":typed_config_interface",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
-    name = "discovery_service_base_interface",
-    hdrs = ["discovery_service_base.h"],
-    deps = [
-        ":subscription_interface",
-        "//source/common/config:api_type_oracle_lib",
         "//source/common/protobuf",
     ],
 )
