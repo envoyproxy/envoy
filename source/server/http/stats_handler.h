@@ -19,6 +19,10 @@ namespace Server {
 class StatsHandlerImpl {
 
 public:
+  static Http::Code handlerResetCounters(absl::string_view path_and_query,
+                                         Http::ResponseHeaderMap& response_headers,
+                                         Buffer::Instance& response, AdminStream&,
+                                         Server::Instance& server);
   static Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
                                               Http::ResponseHeaderMap& response_headers,
                                               Buffer::Instance& response, AdminStream&,

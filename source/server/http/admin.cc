@@ -766,16 +766,6 @@ Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::Respons
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::ResponseHeaderMap&,
-                                           Buffer::Instance& response, AdminStream&) {
-  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    counter->reset();
-  }
-  server_.stats().symbolTable().clearRecentLookups();
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::ResponseHeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   const std::time_t current_time =
@@ -1029,8 +1019,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            false, false},
           {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
            true},
-          {"/reset_counters", "reset all counters to zero",
-           MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
+          {"/reset_counters", "reset all counters to zero", StatsHandlerImpl::handlerResetCounters,
+           false, true},
           {"/drain_listeners", "drain listeners", MAKE_ADMIN_HANDLER(handlerDrainListeners), false,
            true},
           {"/server_info", "print server version/status information",

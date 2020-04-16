@@ -342,9 +342,6 @@ private:
   Http::Code handlerDrainListeners(absl::string_view path_and_query,
                                    Http::ResponseHeaderMap& response_headers,
                                    Buffer::Instance& response, AdminStream&);
-  Http::Code handlerResetCounters(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
-                                  Buffer::Instance& response, AdminStream&);
   Http::Code handlerServerInfo(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);

@@ -13,6 +13,17 @@ const uint64_t RecentLookupsCapacity = 100;
 
 const std::regex PromRegex("[^a-zA-Z0-9_]");
 
+Http::Code StatsHandlerImpl::handlerResetCounters(absl::string_view, Http::ResponseHeaderMap&,
+                                                  Buffer::Instance& response, AdminStream&,
+                                                  Server::Instance& server) {
+  for (const Stats::CounterSharedPtr& counter : server.stats().counters()) {
+    counter->reset();
+  }
+  server.stats().symbolTable().clearRecentLookups();
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
 Http::Code StatsHandlerImpl::handlerStatsRecentLookups(absl::string_view, Http::ResponseHeaderMap&,
                                                        Buffer::Instance& response, AdminStream&,
                                                        Server::Instance& server) {
