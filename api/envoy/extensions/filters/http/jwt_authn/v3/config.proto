@@ -117,13 +117,6 @@ message JwtProvider {
     //      inline_string: ACADADADADA
     //
     config.core.v3.DataSource local_jwks = 4;
-
-
-    // The two below fields define the amount of slack in seconds that will be used
-    // when determining if a JWT is valid or has expired. Validity is determined by
-    // the formula: VALID_FROM("iat") - nbf_slack_slack <= NOW <= VALID_TO("exp") + exp_slack.    
-    int64 nbf_slack = 0;
-    int64 exp_slack = 0;
   }
 
   // If false, the JWT is removed in the request after a success verification. If true, the JWT is
@@ -197,6 +190,17 @@ message JwtProvider {
   //       exp: 1501281058
   //
   string payload_in_metadata = 9;
+
+  // The two below fields define the amount of slack in seconds that will be used
+  // when determining if a JWT is valid or has expired. Validity is determined by
+  // the formula: VALID_FROM("iat") + nbf_slack <= NOW <= VALID_TO("exp") + exp_slack
+  // which aims to provide a remedy in the following case:
+  // Some load balancer performinc OIDC authentication receives a request and determines that the 
+  // existing access token is valid (for another 1 second). It forwards the request to Istio Ingressgateway 
+  // and subsequently to some pod with an envoy sidecar. Meanwhile, 1 second has passed and when envoy checks 
+  // the token it finds that it has expired.   
+  uint32 nbf_slack = 0;
+  uint32 exp_slack = 0;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.

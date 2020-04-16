@@ -158,35 +158,37 @@ void AuthenticatorImpl::startVerify() {
     return;
   }
 
-  // Check "exp" claim.
-  // We use the current system time and allow for a configurable amount of slack.
-  // Consider the following case:
-  // AWS ALB receives a request and determines that the existing access token is valid 
-  // (for another 1 seconds), forwards the request to Istio Ingressgateway and subsequently 
-  // to some pod with an envoy sidecar. Meanwhile, 0.1 seconds have passed and when envoy checks 
-  // the token it finds that it has expired.
-  const uint64_t now = absl::ToUnixSeconds(absl::Now());
-  const int64_t nbf_slack = jwks_data_->getJwtProvider().nbf_slack();
-  const int64_t exp_slack = jwks_data_->getJwtProvider().exp_slack();
-
-  // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
-  // to 0.
-  if (jwt_->nbf_ - nbf_slack > now) {
-    doneWithStatus(Status::JwtNotYetValid);
-    return;
-  }
-  // If the exp claim does *not* appear in the JWT then the exp field is defaulted
-  // to 0.
-  if (jwt_->exp_ > 0 && jwt_->exp_ - exp_slack < now) {
-    doneWithStatus(Status::JwtExpired);
-    return;
-  }
-
   // Check the issuer is configured or not.
   jwks_data_ = provider_ ? jwks_cache_.findByProvider(provider_.value())
                          : jwks_cache_.findByIssuer(jwt_->iss_);
   // isIssuerSpecified() check already make sure the issuer is in the cache.
   ASSERT(jwks_data_ != nullptr);
+
+  // Check "exp" claim.
+  // The two below fields define the amount of slack in seconds that will be used
+  // when determining if a JWT is valid or has expired. Validity is determined by
+  // the formula: VALID_FROM("iat") + nbf_slack <= NOW <= VALID_TO("exp") + exp_slack
+  // which aims to provide a remedy in the following case:
+  // Some load balancer performinc OIDC authentication receives a request and determines that the 
+  // existing access token is valid (for another 1 second). It forwards the request to Istio Ingressgateway 
+  // and subsequently to some pod with an envoy sidecar. Meanwhile, 1 second has passed and when envoy checks 
+  // the token it finds that it has expired.   
+  const uint64_t now = absl::ToUnixSeconds(absl::Now());
+  const uint32_t nbf_slack = jwks_data_->getJwtProvider().nbf_slack();
+  const uint32_t exp_slack = jwks_data_->getJwtProvider().exp_slack();
+
+  // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
+  // to 0.
+  if (now < jwt_->nbf_ + nbf_slack) {
+    doneWithStatus(Status::JwtNotYetValid);
+    return;
+  }
+  // If the exp claim does *not* appear in the JWT then the exp field is defaulted
+  // to 0.
+  if (0 < jwt_->exp_ && now > jwt_->exp_ + exp_slack) {
+    doneWithStatus(Status::JwtExpired);
+    return;
+  }
 
   // Check if audience is allowed
   bool is_allowed = check_audience_ ? check_audience_->areAudiencesAllowed(jwt_->audiences_)
