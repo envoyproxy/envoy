@@ -60,7 +60,7 @@ private:
   // Delay provider that uses a fixed abort status code.
   class FixedAbortProvider : public AbortProvider {
   public:
-    FixedAbortProvider(absl::optional<Http::Code> http_status_code,
+    FixedAbortProvider(Http::Code http_status_code,
                        absl::optional<Grpc::Status::GrpcStatus> grpc_status_code)
         : http_status_code_(http_status_code), grpc_status_code_(grpc_status_code) {}
 

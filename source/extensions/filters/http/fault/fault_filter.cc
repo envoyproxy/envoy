@@ -166,10 +166,12 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  const auto abort_code = abortHttpStatus(headers);
-  if (abort_code.has_value()) {
-    abortWithStatus(abort_code.value(), abortGrpcStatus(headers));
+  absl::optional<Http::Code> http_status;
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+  std::tie(http_status, grpc_status) = abortStatus(headers);
 
+  if (http_status.has_value()) {
+    abortWithStatus(http_status.value(), grpc_status);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -284,44 +286,47 @@ FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
   return ret;
 }
 
-absl::optional<Http::Code>
-FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
+AbortHttpAndGrpcStatus FaultFilter::abortStatus(const Http::RequestHeaderMap& request_headers) {
   if (!isAbortEnabled()) {
-    return absl::nullopt;
+    return std::make_pair(absl::nullopt, absl::nullopt);
   }
+
+  auto grpc_status = abortGrpcStatus(request_headers);
 
   // If gRPC status code is set, then HTTP will be set to 200
-  if (abortGrpcStatus(request_headers).has_value()) {
-    return Http::Code::OK;
-  }
+  return grpc_status.has_value() ? std::make_pair(Http::Code::OK, grpc_status)
+                                 : std::make_pair(abortHttpStatus(request_headers), grpc_status);
+}
 
+absl::optional<Http::Code>
+FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
   // See if the configured abort provider has a default status code, if not there is no abort status
   // code (e.g., header configuration and no/invalid header).
-  const auto config_abort = fault_settings_->requestAbort()->httpStatusCode(
+  auto http_status = fault_settings_->requestAbort()->httpStatusCode(
       request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortRequest));
-  if (!config_abort.has_value()) {
+  if (!http_status.has_value()) {
     return absl::nullopt;
   }
 
-  auto status_code = static_cast<uint64_t>(config_abort.value());
-  auto code = static_cast<Http::Code>(config_->runtime().snapshot().getInteger(
-      fault_settings_->abortHttpStatusRuntime(), status_code));
+  auto default_http_status_code = static_cast<uint64_t>(http_status.value());
+  auto runtime_http_status_code = static_cast<Http::Code>(config_->runtime().snapshot().getInteger(
+      fault_settings_->abortHttpStatusRuntime(), default_http_status_code));
 
   if (!downstream_cluster_abort_http_status_key_.empty()) {
-    code = static_cast<Http::Code>(config_->runtime().snapshot().getInteger(
-        downstream_cluster_abort_http_status_key_, status_code));
+    runtime_http_status_code = static_cast<Http::Code>(config_->runtime().snapshot().getInteger(
+        downstream_cluster_abort_http_status_key_, default_http_status_code));
   }
 
-  return code;
+  return runtime_http_status_code;
 }
 
 absl::optional<Grpc::Status::GrpcStatus>
 FaultFilter::abortGrpcStatus(const Http::RequestHeaderMap& request_headers) {
-  auto grpc_status_code = fault_settings_->requestAbort()->grpcStatusCode(
+  auto grpc_status = fault_settings_->requestAbort()->grpcStatusCode(
       request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortGrpcRequest));
 
-  auto default_grpc_status_code = grpc_status_code.has_value()
-                                      ? static_cast<uint64_t>(grpc_status_code.value())
+  auto default_grpc_status_code = grpc_status.has_value()
+                                      ? static_cast<uint64_t>(grpc_status.value())
                                       : std::numeric_limits<uint64_t>::max();
 
   auto runtime_grpc_status_code = config_->runtime().snapshot().getInteger(
@@ -400,9 +405,12 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
   resetTimerState();
 
   // Delays can be followed by aborts
-  const auto abort_code = abortHttpStatus(request_headers);
-  if (abort_code.has_value()) {
-    abortWithStatus(abort_code.value(), abortGrpcStatus(request_headers));
+  absl::optional<Http::Code> http_status;
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+  std::tie(http_status, grpc_status) = abortStatus(request_headers);
+
+  if (http_status.has_value()) {
+    abortWithStatus(http_status.value(), grpc_status);
   } else {
     // Continue request processing.
     decoder_callbacks_->continueDecoding();

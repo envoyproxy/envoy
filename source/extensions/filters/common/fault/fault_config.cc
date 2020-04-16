@@ -20,8 +20,9 @@ FaultAbortConfig::FaultAbortConfig(
         static_cast<Http::Code>(abort_config.http_status()), absl::nullopt);
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kGrpcStatus:
+    // If gRPC status code is set, then HTTP will be set to 200
     provider_ = std::make_unique<FixedAbortProvider>(
-        absl::nullopt, static_cast<Grpc::Status::GrpcStatus>(abort_config.grpc_status()));
+        Http::Code::OK, static_cast<Grpc::Status::GrpcStatus>(abort_config.grpc_status()));
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHeaderAbort:
     provider_ = std::make_unique<HeaderAbortProvider>();
@@ -62,7 +63,7 @@ FaultAbortConfig::HeaderAbortProvider::grpcStatusCode(const Http::HeaderEntry* h
     return ret;
   }
 
-  if (code >= 0 && code <= 16) {
+  if (code <= 16) {
     ret = static_cast<Grpc::Status::GrpcStatus>(code);
   }
 

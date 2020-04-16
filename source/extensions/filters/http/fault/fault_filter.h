@@ -206,6 +206,8 @@ private:
   Buffer::WatermarkBuffer buffer_;
 };
 
+using AbortHttpAndGrpcStatus =
+    std::pair<absl::optional<Http::Code>, absl::optional<Grpc::Status::GrpcStatus>>;
 /**
  * A filter that is capable of faulting an entire request before dispatching it upstream.
  */
@@ -256,6 +258,7 @@ private:
   bool isDelayEnabled();
   absl::optional<std::chrono::milliseconds>
   delayDuration(const Http::RequestHeaderMap& request_headers);
+  AbortHttpAndGrpcStatus abortStatus(const Http::RequestHeaderMap& request_headers);
   absl::optional<Http::Code> abortHttpStatus(const Http::RequestHeaderMap& request_headers);
   absl::optional<Grpc::Status::GrpcStatus>
   abortGrpcStatus(const Http::RequestHeaderMap& request_headers);
