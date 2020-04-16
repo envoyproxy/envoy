@@ -22,20 +22,6 @@ namespace HttpFilters {
 namespace Decompressor {
 namespace {
 
-class MockDecompressorFilterConfig : public DecompressorFilterConfig {
-public:
-  MockDecompressorFilterConfig(
-      const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
-      const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-      Compression::Decompressor::DecompressorFactoryPtr decompressor_factory)
-      : DecompressorFilterConfig(proto_config, stats_prefix, scope, runtime,
-                                 std::move(decompressor_factory)) {}
-
-  Compression::Decompressor::DecompressorPtr makeDecompressor() {
-    return std::make_unique<Compression::Decompressor::MockDecompressor>();
-  }
-};
-
 class DecompressorFilterTest : public testing::Test {
 public:
   DecompressorFilterTest() {}
@@ -52,8 +38,10 @@ decompressor_library:
   void setUpFilter(std::string&& yaml) {
     envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor;
     TestUtility::loadFromYaml(yaml, decompressor);
-    config_ = std::make_shared<MockDecompressorFilterConfig>(decompressor, "test.", stats_,
-                                                             runtime_, nullptr);
+    auto decompressor_factory = std::make_unique<NiceMock<Compression::Decompressor::MockDecompressorFactory>>();
+    decompressor_factory_ = decompressor_factory.get();
+    config_ = std::make_shared<DecompressorFilterConfig>(decompressor, "test.", stats_,
+                                                             runtime_, std::move(decompressor_factory));
     filter_ = std::make_unique<DecompressorFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -120,6 +108,7 @@ decompressor_library:
   //   EXPECT_EQ(1, stats_.counter("test.test.not_compressed").value());
   // }
 
+  Compression::Decompressor::MockDecompressorFactory* decompressor_factory_{};
   DecompressorFilterConfigSharedPtr config_;
   std::unique_ptr<DecompressorFilter> filter_;
   MockBuffer data_;
@@ -131,6 +120,8 @@ decompressor_library:
 };
 
 TEST_F(DecompressorFilterTest, ResponseDecompressionActive) {
+  auto decompressor = std::make_unique<Compression::Decompressor::MockDecompressor>();
+  EXPECT_CALL(*decompressor_factory_, createDecompressor()).WillOnce(Return(std::move(decompressor)));
   Http::TestResponseHeaderMapImpl headers{{"content-encoding", "gzip"}, {"content-length", "256"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
 }

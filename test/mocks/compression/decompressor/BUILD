@@ -14,5 +14,6 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//include/envoy/compression/decompressor:decompressor_interface",
+        "//include/envoy/compression/decompressor:config_interface",
     ],
 )
