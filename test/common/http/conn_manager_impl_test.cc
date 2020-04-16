@@ -348,6 +348,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
+  bool shouldRemovePort() const override { return remove_port_; }
   RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
@@ -409,6 +410,7 @@ public:
   Http::Http1Settings http1_settings_;
   bool normalize_path_ = false;
   bool merge_slashes_ = false;
+  bool remove_port_ = false;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
@@ -887,6 +889,78 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
       .WillOnce(Invoke(
           [&](const Http::RequestHeaderMap& header_map, const StreamInfo::StreamInfo&, uint64_t) {
             EXPECT_EQ(normalized_path, header_map.Path()->value().getStringView());
+            return route;
+          }));
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks&) -> void {}));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// Filters observe host header w/o port's part when port's removal is configured
+TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
+  setup(false, "");
+  // Enable port removal
+  remove_port_ = true;
+  const std::string original_host = "host:443";
+  const std::string normalized_host = "host";
+
+  auto* filter = new MockStreamFilter();
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
+      }));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap& header_map, bool) -> FilterHeadersStatus {
+        EXPECT_EQ(normalized_host, header_map.Host()->value().getStringView());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+  }));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// The router observes host header w/o port, not the original host, when
+// remove_port is configured
+TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
+  setup(false, "");
+  // Enable port removal
+  remove_port_ = true;
+  const std::string original_host = "host:443";
+  const std::string normalized_host = "host";
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+  }));
+
+  const std::string fake_cluster_name = "fake_cluster";
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  std::shared_ptr<Router::MockRoute> route = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(route->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster_name));
+
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _))
+      .WillOnce(Invoke(
+          [&](const Http::RequestHeaderMap& header_map, const StreamInfo::StreamInfo&, uint64_t) {
+            EXPECT_EQ(normalized_host, header_map.Host()->value().getStringView());
             return route;
           }));
   EXPECT_CALL(filter_factory_, createFilterChain(_))

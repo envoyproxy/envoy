@@ -18,6 +18,10 @@ public:
     headers_.setPath(path_value);
     return *headers_.Path();
   }
+  const HeaderEntry& hostHeaderEntry(const std::string& host_value) {
+    headers_.setHost(host_value);
+    return *headers_.Host();
+  }
   RequestHeaderMapImpl headers_;
 };
 
@@ -61,6 +65,22 @@ TEST_F(PathUtilityTest, NormalizeValidPaths) {
     EXPECT_TRUE(result) << "original path: " << path_pair.first;
     EXPECT_EQ(path_header.value().getStringView(), path_pair.second)
         << "original path: " << path_pair.second;
+  }
+}
+
+// Port's part from host header get removed
+TEST_F(PathUtilityTest, RemovePortsFromHost) {
+  const std::vector<std::pair<std::string, std::string>> host_headers{
+      {"localhost", "localhost"},     // w/o port part
+      {"localhost:443", "localhost"}, // reserved characters
+      {"", ""},                       // empty
+      {":443", ""}                    // just port
+  };
+
+  for (const auto& host_pair : host_headers) {
+    auto& host_header = hostHeaderEntry(host_pair.first);
+    PathUtil::removePortsFromHost(headers_);
+    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
   }
 }
 

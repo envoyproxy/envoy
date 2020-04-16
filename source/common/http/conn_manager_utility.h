@@ -69,6 +69,9 @@ public:
   static bool maybeNormalizePath(RequestHeaderMap& request_headers,
                                  const ConnectionManagerConfig& config);
 
+  static void maybeNormalizeHost(RequestHeaderMap& request_headers,
+                                 const ConnectionManagerConfig& config);
+
   /**
    * Mutate request headers if request needs to be traced.
    */

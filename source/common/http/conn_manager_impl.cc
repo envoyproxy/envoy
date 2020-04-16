@@ -896,6 +896,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     return;
   }
 
+  ConnectionManagerUtility::maybeNormalizeHost(*request_headers_, connection_manager_.config_);
+
   if (protocol == Protocol::Http11 && request_headers_->Connection() &&
       absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
                              Http::Headers::get().ConnectionValues.Close)) {

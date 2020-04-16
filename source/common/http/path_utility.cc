@@ -71,6 +71,13 @@ void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
                                path_suffix, query));
 }
 
+void PathUtil::removePortsFromHost(RequestHeaderMap& headers) {
+  const auto original_host = headers.Host()->value().getStringView();
+  const absl::string_view::size_type port_start = original_host.find(':');
+  const absl::string_view host = original_host.substr(0, port_start);
+  headers.setHost(host);
+}
+
 absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path) {
   absl::string_view ret = path;
   // Trim query parameters and/or fragment if present.

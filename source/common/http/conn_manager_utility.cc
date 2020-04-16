@@ -420,5 +420,18 @@ bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_head
   return is_valid_path;
 }
 
+void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
+                                                  const ConnectionManagerConfig& config) {
+  //
+  if (!request_headers.Host()) {
+    // request w/o Host header. such requests are allowed in http 1.0
+    return;
+  }
+
+  if (config.shouldRemovePort()) {
+    PathUtil::removePortsFromHost(request_headers);
+  }
+}
+
 } // namespace Http
 } // namespace Envoy
