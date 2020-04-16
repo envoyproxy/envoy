@@ -55,9 +55,9 @@ public:
         proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
 
-    config_.reset(new Config(proto_config, local_info_, stats_store_, runtime_, cm_));
+    config_ = std::make_shared<Config>(proto_config, local_info_, stats_store_, runtime_, cm_);
 
-    request_metadata_.reset(new ThriftProxy::MessageMetadata());
+    request_metadata_ = std::make_shared<ThriftProxy::MessageMetadata>();
 
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});

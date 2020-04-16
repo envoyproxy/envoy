@@ -49,7 +49,7 @@ class EnvoyQuicDispatcherTest : public testing::TestWithParam<Network::Address::
 public:
   EnvoyQuicDispatcherTest()
       : version_(GetParam()), api_(Api::createApiForTest(time_system_)),
-        dispatcher_(api_->allocateDispatcher()),
+        dispatcher_(api_->allocateDispatcher("test_thread")),
         listen_socket_(std::make_unique<Network::NetworkListenSocket<
                            Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
             Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true)),
@@ -64,7 +64,7 @@ public:
         per_worker_stats_({ALL_PER_HANDLER_LISTENER_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "worker."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "worker."))}),
-        connection_handler_(*dispatcher_, "test_thread"),
+        connection_handler_(*dispatcher_),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
@@ -80,7 +80,7 @@ public:
 
   void SetUp() override {
     // Advance time a bit because QuicTime regards 0 as uninitialized timestamp.
-    time_system_.sleep(std::chrono::milliseconds(100));
+    time_system_.advanceTimeWait(std::chrono::milliseconds(100));
     EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes())
         .WillRepeatedly(Return(1024 * 1024));
   }

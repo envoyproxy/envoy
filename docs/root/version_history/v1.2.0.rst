@@ -1,0 +1,31 @@
+1.2.0 (March 7, 2017)
+=====================
+
+Changes
+-------
+
+* :ref:`Cluster discovery service (CDS) API <config_cluster_manager_cds>`.
+* :ref:`Outlier detection <arch_overview_outlier_detection>` (passive health checking).
+* Envoy configuration is now checked against a JSON schema.
+* :ref:`Ring hash <arch_overview_load_balancing_types>` consistent load balancer, as well as HTTP
+  consistent hash routing based on a policy.
+* Vastly :ref:`enhanced global rate limit configuration <arch_overview_global_rate_limit>` via the HTTP
+  rate limiting filter.
+* HTTP routing to a cluster retrieved from a header.
+* Weighted cluster HTTP routing.
+* Auto host rewrite during HTTP routing.
+* Regex header matching during HTTP routing.
+* HTTP access log runtime filter.
+* LightStep tracer :ref:`parent/child span association <arch_overview_tracing>`.
+* :ref:`Route discovery service (RDS) API <config_http_conn_man_rds>`.
+* HTTP router :ref:`x-envoy-upstream-rq-timeout-alt-response header
+  <config_http_filters_router_x-envoy-upstream-rq-timeout-alt-response>` support.
+* *use_original_dst* and *bind_to_port* :ref:`listener options <config_listeners>` (useful for
+  iptables based transparent proxy support).
+* TCP proxy filter :ref:`route table support <config_network_filters_tcp_proxy>`.
+* Configurable stats flush interval.
+* Various :ref:`third party library upgrades <install_requirements>`, including using BoringSSL as
+  the default SSL provider.
+* No longer maintain closed HTTP/2 streams for priority calculations. Leads to substantial memory
+  savings for large meshes.
+* Numerous small changes and fixes not listed here.

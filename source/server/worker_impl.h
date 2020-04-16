@@ -39,7 +39,7 @@ class WorkerImpl : public Worker, Logger::Loggable<Logger::Id::main> {
 public:
   WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks, Event::DispatcherPtr&& dispatcher,
              Network::ConnectionHandlerPtr handler, OverloadManager& overload_manager,
-             Api::Api& api, const std::string& worker_name);
+             Api::Api& api);
 
   // Server::Worker
   void addListener(absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
@@ -51,7 +51,7 @@ public:
                           const std::list<const Network::FilterChain*>& filter_chains,
                           std::function<void()> completion) override;
   void start(GuardDog& guard_dog) override;
-  void initializeStats(Stats::Scope& scope, const std::string& prefix) override;
+  void initializeStats(Stats::Scope& scope) override;
   void stop() override;
   void stopListener(Network::ListenerConfig& listener, std::function<void()> completion) override;
 
@@ -65,7 +65,6 @@ private:
   Network::ConnectionHandlerPtr handler_;
   Api::Api& api_;
   Thread::ThreadPtr thread_;
-  const std::string worker_name_;
   WatchDogSharedPtr watch_dog_;
 };
 

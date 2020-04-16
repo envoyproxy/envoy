@@ -13,7 +13,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::ContainerEq;
 using testing::Return;
 
 namespace Envoy {

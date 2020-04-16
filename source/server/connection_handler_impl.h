@@ -61,7 +61,7 @@ class ConnectionHandlerImpl : public Network::ConnectionHandler,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, const std::string& per_handler_stat_prefix);
+  ConnectionHandlerImpl(Event::Dispatcher& dispatcher);
 
   // Network::ConnectionHandler
   uint64_t numConnections() const override { return num_handler_connections_; }
@@ -181,7 +181,7 @@ private:
   class ActiveConnections : public Event::DeferredDeletable {
   public:
     ActiveConnections(ActiveTcpListener& listener, const Network::FilterChain& filter_chain);
-    ~ActiveConnections();
+    ~ActiveConnections() override;
 
     // listener filter chain pair is the owner of the connections
     ActiveTcpListener& listener_;

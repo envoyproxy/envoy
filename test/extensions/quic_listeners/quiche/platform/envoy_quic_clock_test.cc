@@ -15,7 +15,7 @@ namespace Quic {
 TEST(EnvoyQuicClockTest, TestNow) {
   Event::SimulatedTimeSystemHelper time_system;
   Api::ApiPtr api = Api::createApiForTest(time_system);
-  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   EnvoyQuicClock clock(*dispatcher);
   uint64_t mono_time = std::chrono::duration_cast<std::chrono::microseconds>(
                            time_system.monotonicTime().time_since_epoch())
@@ -24,17 +24,17 @@ TEST(EnvoyQuicClockTest, TestNow) {
                           time_system.systemTime().time_since_epoch())
                           .count();
   // Advance time by 1000000us.
-  time_system.sleep(std::chrono::microseconds(1000000));
+  time_system.advanceTimeWait(std::chrono::microseconds(1000000));
   EXPECT_EQ(mono_time + 1000000, (clock.Now() - quic::QuicTime::Zero()).ToMicroseconds());
   EXPECT_EQ(sys_time + 1000000, clock.WallNow().ToUNIXMicroseconds());
 
   // Advance time by 10us.
-  time_system.sleep(std::chrono::microseconds(10));
+  time_system.advanceTimeWait(std::chrono::microseconds(10));
   EXPECT_EQ(mono_time + 1000000 + 10, (clock.Now() - quic::QuicTime::Zero()).ToMicroseconds());
   EXPECT_EQ(sys_time + 1000000 + 10, clock.WallNow().ToUNIXMicroseconds());
 
   // Advance time by 2ms.
-  time_system.sleep(std::chrono::milliseconds(2));
+  time_system.advanceTimeWait(std::chrono::milliseconds(2));
   EXPECT_EQ(mono_time + 1000000 + 10 + 2 * 1000,
             (clock.Now() - quic::QuicTime::Zero()).ToMicroseconds());
   EXPECT_EQ(sys_time + 1000000 + 10 + 2 * 1000, clock.WallNow().ToUNIXMicroseconds());
@@ -44,7 +44,7 @@ TEST(EnvoyQuicClockTest, TestNow) {
 TEST(EnvoyQuicClockTest, TestMonotonicityWithReadTimeSystem) {
   Event::TestRealTimeSystem time_system;
   Api::ApiPtr api = Api::createApiForTest(time_system);
-  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   EnvoyQuicClock clock(*dispatcher);
   quic::QuicTime last_now = clock.Now();
   for (int i = 0; i < 1000; ++i) {
@@ -57,13 +57,13 @@ TEST(EnvoyQuicClockTest, TestMonotonicityWithReadTimeSystem) {
 TEST(EnvoyQuicClockTest, ApproximateNow) {
   Event::SimulatedTimeSystemHelper time_system;
   Api::ApiPtr api = Api::createApiForTest(time_system);
-  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   EnvoyQuicClock clock(*dispatcher);
 
   // ApproximateTime() is cached, it not change only because time passes.
   const int kDeltaMicroseconds = 10;
   quic::QuicTime approximate_now1 = clock.ApproximateNow();
-  time_system.sleep(std::chrono::microseconds(kDeltaMicroseconds));
+  time_system.advanceTimeWait(std::chrono::microseconds(kDeltaMicroseconds));
   quic::QuicTime approximate_now2 = clock.ApproximateNow();
   EXPECT_EQ(approximate_now1, approximate_now2);
 

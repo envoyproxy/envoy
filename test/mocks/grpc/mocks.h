@@ -74,7 +74,7 @@ public:
 class MockAsyncClient : public RawAsyncClient {
 public:
   MockAsyncClient();
-  ~MockAsyncClient();
+  ~MockAsyncClient() override;
 
   MOCK_METHOD(AsyncRequest*, sendRaw,
               (absl::string_view service_full_name, absl::string_view method_name,
