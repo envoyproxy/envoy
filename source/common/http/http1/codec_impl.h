@@ -384,7 +384,7 @@ private:
 
   static http_parser_settings settings_;
 
-  bool dispatching_{false};
+  bool dispatching_ : 1;
   // Codec errors found in callbacks are overridden within the http_parser library. This holds those
   // errors to propagate them through to dispatch() where we can handle the error.
   Envoy::Http::Status codec_status_;
