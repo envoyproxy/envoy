@@ -1095,7 +1095,7 @@ void validateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
   EXPECT_EQ(url.pathAndQueryParams(), expected_path);
 }
 
-void ValidateConnectUrl(absl::string_view raw_url, absl::string_view expected_host_port) {
+void validateConnectUrl(absl::string_view raw_url, absl::string_view expected_host_port) {
   Utility::Url url;
   ASSERT_TRUE(url.initialize(raw_url, true)) << "Failed to initialize " << raw_url;
   EXPECT_TRUE(url.scheme().empty());
@@ -1157,8 +1157,8 @@ TEST(Url, ParsingTest) {
 }
 
 TEST(Url, ParsingForConnectTest) {
-  ValidateConnectUrl("host.com:443", "host.com:443");
-  ValidateConnectUrl("host.com:80", "host.com:80");
+  validateConnectUrl("host.com:443", "host.com:443");
+  validateConnectUrl("host.com:80", "host.com:80");
 }
 
 void validatePercentEncodingEncodeDecode(absl::string_view source,
