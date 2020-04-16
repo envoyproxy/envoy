@@ -271,11 +271,11 @@ most_specific_header_mutations_wins: {0}
 class RouteMatcherTest : public testing::Test, public ConfigImplTestBase {};
 
 // When removing legacy fields this test can be removed.
-// TODO(alyssawilk) remove DISABLED once this doesn't break the build.
-TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(DISABLED_TestLegacyRoutes)) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(TestLegacyRoutes)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: regex
+  domains:
   - bat.com
   routes:
   - match:
@@ -309,18 +309,6 @@ virtual_hosts:
       regex: ".*"
     route:
       cluster: regex_default
-- name: connect
-  domains:
-  - bat3.com
-  routes:
-  - match:
-      connect_matcher:
-    route:
-      cluster: connect_match
-  - match:
-      regex: ".*"
-    route:
-      cluster: connect_fallthrough
 - name: default
   domains:
   - "*"
@@ -380,12 +368,6 @@ virtual_hosts:
             config.route(genHeaders("bat2.com", "/foo", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("regex_default",
             config.route(genHeaders("bat2.com", " ", "GET"), 0)->routeEntry()->clusterName());
-
-  // Connect matching
-  EXPECT_EQ("connect_match",
-            config.route(genHeaders("bat3.com", " ", "CONNECT"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("connect_fallthrough",
-            config.route(genHeaders("bat3.com", " ", "GET"), 0)->routeEntry()->clusterName());
 
   // Regular Expression matching with query string params
   EXPECT_EQ(
@@ -447,6 +429,63 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/something/else", "GET");
     EXPECT_EQ("other", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
+  }
+}
+
+TEST_F(RouteMatcherTest, TestConnectRoutes) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: connect
+  domains:
+  - bat3.com
+  routes:
+  - match:
+        connect_matcher:
+          {}
+    route:
+      cluster: connect_match
+      prefix_rewrite: "/rewrote"
+  - match:
+      safe_regex:
+        google_re2: {}
+        regex: ".*"
+    route:
+      cluster: connect_fallthrough
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: instant-server
+      timeout: 30s
+  virtual_clusters:
+  - headers:
+    - name: ":path"
+      safe_regex_match:
+        google_re2: {}
+        regex: "^/users/\\d+/location$"
+    - name: ":method"
+      exact_match: POST
+    name: ulu
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  // Connect matching
+  EXPECT_EQ("connect_match",
+            config.route(genHeaders("bat3.com", " ", "CONNECT"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("connect_fallthrough",
+            config.route(genHeaders("bat3.com", " ", "GET"), 0)->routeEntry()->clusterName());
+
+  // Prefix rewrite for CONNECT with path (for HTTP/2)
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("bat3.com", "/api/locations?works=true", "CONNECT");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("/rewrote?works=true", headers.get_(Http::Headers::get().Path));
   }
 }
 
@@ -705,7 +744,6 @@ virtual_hosts:
       exact_match: POST
     name: ulu
   )EOF";
-
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
@@ -1013,15 +1051,6 @@ virtual_hosts:
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/four/6472/endpoint/xx/yy?test=foo", headers.get_(Http::Headers::get().Path));
     EXPECT_EQ("/xx/yy/6472?test=foo", headers.get_(Http::Headers::get().EnvoyOriginalPath));
-  }
-
-  // Prefix rewrite for CONNECT with path (for HTTP/2)
-  {
-    Http::TestRequestHeaderMapImpl headers =
-        genHeaders("bat3.com", "/api/locations?works=true", "CONNECT");
-    const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    route->finalizeRequestHeaders(headers, stream_info, true);
-    EXPECT_EQ("/rewrote?works=true", headers.get_(Http::Headers::get().Path));
   }
 
   // Virtual cluster testing.
