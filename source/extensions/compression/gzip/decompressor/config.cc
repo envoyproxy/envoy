@@ -29,7 +29,7 @@ GzipDecompressorLibraryFactory::createDecompressorLibraryFromProtoTyped(
 }
 
 /**
- * Static registration for the gzip filter. @see NamedDecompressorLibraryConfigFactory.
+ * Static registration for the gzip decompressor. @see NamedDecompressorLibraryConfigFactory.
  */
 REGISTER_FACTORY(GzipDecompressorLibraryFactory,
                  Envoy::Compression::Decompressor::NamedDecompressorLibraryConfigFactory);
