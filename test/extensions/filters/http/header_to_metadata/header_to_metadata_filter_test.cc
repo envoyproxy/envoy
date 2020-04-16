@@ -73,9 +73,7 @@ request_rules:
 
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::header_to_metadata::v3::Config config;
-    if (!yaml.empty()) {
-      TestUtility::loadFromYaml(yaml, config);
-    }
+    TestUtility::loadFromYaml(yaml, config);
     config_ = std::make_shared<Config>(config);
     filter_ = std::make_shared<HeaderToMetadataFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -113,7 +111,7 @@ TEST_F(HeaderToMetadataTest, BasicRequestTest) {
 
 TEST_F(HeaderToMetadataTest, PerRouteOverride) {
   // Global config is empty.
-  initializeFilter("");
+  initializeFilter("{}");
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
   std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
 
@@ -139,7 +137,7 @@ TEST_F(HeaderToMetadataTest, PerRouteOverride) {
 
 TEST_F(HeaderToMetadataTest, ConfigIsCached) {
   // Global config is empty.
-  initializeFilter("");
+  initializeFilter("{}");
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
   std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
 
