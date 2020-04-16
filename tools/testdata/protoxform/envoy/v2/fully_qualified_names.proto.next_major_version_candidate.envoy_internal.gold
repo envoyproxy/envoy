@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package envoy.external.v3;
+
+import "envoy/api/v2/core/base.proto";
+
+import "google/protobuf/any.proto";
+
+import "tools/testdata/protoxform/external/package_type.proto";
+import "tools/testdata/protoxform/external/root_type.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.external.v3";
+option java_outer_classname = "FullyQualifiedNamesProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+
+// Verifies normalization of fully-qualified type names.
+// [#next-free-field: 8]
+message UsesFullyQualifiedTypeNames {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.v2.UsesFullyQualifiedTypeNames";
+
+  api.v2.core.Locality another_envoy_type = 1;
+
+  api.v2.core.Locality another_envoy_type_fqn = 2;
+
+  google.protobuf.Any google_protobuf_any = 3;
+
+  google.protobuf.Any google_protobuf_any_fqn = 4;
+
+  .external.PackageLevelType external_package_level_type = 5;
+
+  .external.PackageLevelType external_package_level_type_fqn = 6;
+
+  .RootLevelType external_root_level_type_fqn = 7;
+}
