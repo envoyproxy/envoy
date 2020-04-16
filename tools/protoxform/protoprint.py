@@ -315,6 +315,33 @@ def NormalizeFieldTypeName(type_context, field_fqn):
     remaining_field_fqn_splits = deque(field_fqn_splits[:-1])
     normalized_splits = deque([field_fqn_splits[-1]])
 
+    if list(remaining_field_fqn_splits)[:1] != type_context_splits[:1] and (
+        len(remaining_field_fqn_splits) == 0 or
+        remaining_field_fqn_splits[0] in type_context_splits[1:]):
+      # Notice that in some cases it is error-prone to normalize a type name.
+      # E.g., it would be an error to replace ".external.Type" with "external.Type"
+      # in the context of "envoy.extensions.type.external.vX.Config".
+      # In such a context protoc resolves "external.Type" into
+      # "envoy.extensions.type.external.Type", which is exactly what the use of a
+      # fully-qualified name ".external.Type" was meant to prevent.
+      #
+      # A type SHOULD remain fully-qualified under the following conditions:
+      # 1. its root package is different from the root package of the context type
+      # 2. EITHER the type doesn't belong to any package at all
+      #    OR     its root package has a name that collides with one of the packages
+      #           of the context type
+      #
+      # E.g.,
+      # a) although ".some.Type" has a different root package than the context type
+      #    "TopLevelType", it is still safe to normalize it into "some.Type"
+      # b) although ".google.protobuf.Any" has a different root package than the context type
+      #    "envoy.api.v2.Cluster", it still safe to normalize it into "google.protobuf.Any"
+      # c) it is error-prone to normalize ".TopLevelType" in the context of "some.Type"
+      #    into "TopLevelType"
+      # d) it is error-prone to normalize ".external.Type" in the context of
+      #    "envoy.extensions.type.external.vX.Config" into "external.Type"
+      return field_fqn
+
     def EquivalentInTypeContext(splits):
       type_context_splits_tmp = deque(type_context_splits)
       while type_context_splits_tmp:

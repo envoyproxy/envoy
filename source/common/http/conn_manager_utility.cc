@@ -15,6 +15,7 @@
 #include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_cat.h"
@@ -378,7 +379,11 @@ void ConnectionManagerUtility::mutateResponseHeaders(
     }
   } else {
     response_headers.removeConnection();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_upgrade_response")) {
+      response_headers.removeUpgrade();
+    }
   }
+
   response_headers.removeTransferEncoding();
 
   if (request_headers != nullptr && request_headers->EnvoyForceTrace()) {

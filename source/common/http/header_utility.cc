@@ -6,7 +6,7 @@
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"

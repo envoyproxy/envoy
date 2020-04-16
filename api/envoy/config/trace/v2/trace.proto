@@ -22,12 +22,22 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // [#protodoc-title: Tracing]
 // Tracing :ref:`architecture overview <arch_overview_tracing>`.
 
-// The tracing configuration specifies global
-// settings for the HTTP tracer used by Envoy. The configuration is defined by
-// the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` :ref:`tracing
-// <envoy_api_field_config.bootstrap.v2.Bootstrap.tracing>` field. Envoy may support other tracers
-// in the future, but right now the HTTP tracer is the only one supported.
+// The tracing configuration specifies settings for an HTTP tracer provider used by Envoy.
+//
+// Envoy may support other tracers in the future, but right now the HTTP tracer is the only one
+// supported.
+//
+// .. attention::
+//
+//   Use of this message type has been deprecated in favor of direct use of
+//   :ref:`Tracing.Http <envoy_api_msg_config.trace.v2.Tracing.Http>`.
 message Tracing {
+  // Configuration for an HTTP tracer provider used by Envoy.
+  //
+  // The configuration is defined by the
+  // :ref:`HttpConnectionManager.Tracing <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing>`
+  // :ref:`provider <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing.provider>`
+  // field.
   message Http {
     // The name of the HTTP trace driver to instantiate. The name must match a
     // supported HTTP trace driver. Built-in trace drivers:

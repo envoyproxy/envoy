@@ -36,7 +36,7 @@ private:
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
   Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher());
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   ReadyWatcher watcher1;
 
   dispatcher->deferredDelete(
@@ -66,7 +66,8 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 
 class DispatcherImplTest : public testing::Test {
 protected:
-  DispatcherImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {
+  DispatcherImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {
     dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
@@ -246,7 +247,7 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
 class NotStartedDispatcherImplTest : public testing::Test {
 protected:
   NotStartedDispatcherImplTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   Api::ApiPtr api_;
   DispatcherPtr dispatcher_;
@@ -261,7 +262,7 @@ TEST_F(NotStartedDispatcherImplTest, IsThreadSafe) {
 class DispatcherMonotonicTimeTest : public testing::Test {
 protected:
   DispatcherMonotonicTimeTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
   ~DispatcherMonotonicTimeTest() override = default;
 
   Api::ApiPtr api_;
@@ -303,7 +304,7 @@ TEST_F(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
 
 TEST(TimerImplTest, TimerEnabledDisabled) {
   Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher());
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   Event::TimerPtr timer = dispatcher->createTimer([] {});
   EXPECT_FALSE(timer->enabled());
   timer->enableTimer(std::chrono::milliseconds(0));
@@ -325,7 +326,7 @@ public:
     while (true) {
       dispatcher.run(Dispatcher::RunType::NonBlock);
       if (timer.enabled()) {
-        time_system.sleep(std::chrono::microseconds(1));
+        time_system.advanceTimeAsync(std::chrono::microseconds(1));
       } else {
         break;
       }
@@ -341,7 +342,7 @@ public:
 TEST_F(TimerImplTimingTest, TheoreticalTimerTiming) {
   Event::SimulatedTimeSystem time_system;
   Api::ApiPtr api = Api::createApiForTest(time_system);
-  DispatcherPtr dispatcher(api->allocateDispatcher());
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   Event::TimerPtr timer = dispatcher->createTimer([&dispatcher] { dispatcher->exit(); });
 
   const uint64_t timings[] = {0, 10, 50, 1234};
