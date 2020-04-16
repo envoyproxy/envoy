@@ -523,19 +523,19 @@ public:
   // Strict variants of Protobuf::MessageUtil
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            bool preserve_original_type = false) {
-    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
+    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor(), absl::nullopt);
     if (!preserve_original_type) {
       Config::VersionConverter::eraseOriginalTypeInformation(message);
     }
   }
 
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
-    MessageUtil::loadFromJson(json, message);
+    MessageUtil::loadFromJson(json, message, absl::nullopt);
   }
 
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            bool preserve_original_type = false) {
-    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
+    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor(), absl::nullopt);
     if (!preserve_original_type) {
       Config::VersionConverter::eraseOriginalTypeInformation(message);
     }
@@ -543,7 +543,7 @@ public:
 
   static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api,
                            bool preserve_original_type = false) {
-    MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
+    MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api, absl::nullopt);
     if (!preserve_original_type) {
       Config::VersionConverter::eraseOriginalTypeInformation(message);
     }
@@ -581,7 +581,7 @@ public:
 
   static ProtobufWkt::Struct jsonToStruct(const std::string& json) {
     ProtobufWkt::Struct message;
-    MessageUtil::loadFromJson(json, message);
+    MessageUtil::loadFromJson(json, message, absl::nullopt);
     return message;
   }
 };

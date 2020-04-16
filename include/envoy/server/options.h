@@ -10,6 +10,7 @@
 #include "envoy/network/address.h"
 
 #include "spdlog/spdlog.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -84,6 +85,11 @@ public:
    * that merges into the config last, after configYaml and configPath.
    */
   virtual const envoy::config::bootstrap::v3::Bootstrap& configProto() const PURE;
+
+  /**
+   * @return const absl::optional<std::string>& the bootstrap version to use, if specifed.
+   */
+  virtual const absl::optional<std::string>& bootstrapVersion() const PURE; 
 
   /**
    * @return bool allow unknown fields in the static configuration?

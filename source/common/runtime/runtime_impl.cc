@@ -340,7 +340,7 @@ void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
   envoy::type::v3::FractionalPercent converted_fractional_percent;
   try {
     MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
-                                         ProtobufMessage::getStrictValidationVisitor());
+                                         ProtobufMessage::getStrictValidationVisitor(), absl::nullopt);
   } catch (const ProtoValidationException& ex) {
     ENVOY_LOG(error, "unable to validate fraction percent runtime proto: {}", ex.what());
     return;

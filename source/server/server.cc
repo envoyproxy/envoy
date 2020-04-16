@@ -233,12 +233,20 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
                          "should be non-empty");
   }
 
+  absl::optional<MessageVersion> version;
+
+  if (options.bootstrapVersion() && options.bootstrapVersion() == "v3") {
+    version = MessageVersion::LATEST;
+  } else {
+    version = MessageVersion::EARLIER;
+  }
+
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
+    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api, version);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor, version);
     bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSize() != 0) {

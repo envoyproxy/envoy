@@ -1029,7 +1029,7 @@ TEST_F(ProtobufUtilityTest, ValueUtilHash) {
 
 TEST_F(ProtobufUtilityTest, MessageUtilLoadYamlDouble) {
   ProtobufWkt::DoubleValue v;
-  MessageUtil::loadFromYaml("value: 1.0", v, ProtobufMessage::getNullValidationVisitor());
+  MessageUtil::loadFromYaml("value: 1.0", v, ProtobufMessage::getNullValidationVisitor(), absl::nullopt);
   EXPECT_DOUBLE_EQ(1.0, v.value());
 }
 
@@ -1168,7 +1168,7 @@ TEST_F(ProtobufUtilityTest, UnpackToNextVersion) {
 TEST_F(ProtobufUtilityTest, LoadFromJsonGarbage) {
   envoy::config::cluster::v3::Cluster dst;
   EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromJson("{drain_connections_on_host_removal: true", dst,
-                                                    ProtobufMessage::getNullValidationVisitor()),
+                                                    ProtobufMessage::getNullValidationVisitor(), absl::nullopt),
                           EnvoyException, "Unable to parse JSON as proto.*after key:value pair.");
 }
 
@@ -1177,25 +1177,25 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonSameVersion) {
   {
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
     MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
-                              ProtobufMessage::getNullValidationVisitor());
+                              ProtobufMessage::getNullValidationVisitor(), absl::nullopt);
     EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
     MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
-                              ProtobufMessage::getStrictValidationVisitor());
+                              ProtobufMessage::getStrictValidationVisitor(), absl::nullopt);
     EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{ignore_health_on_host_removal: true}", dst,
-                              ProtobufMessage::getNullValidationVisitor());
+                              ProtobufMessage::getNullValidationVisitor(), absl::nullopt);
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{ignore_health_on_host_removal: true}", dst,
-                              ProtobufMessage::getStrictValidationVisitor());
+                              ProtobufMessage::getStrictValidationVisitor(), absl::nullopt);
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
 }
@@ -1205,25 +1205,25 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonNextVersion) {
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{use_tcp_for_dns_lookups: true}", dst,
-                              ProtobufMessage::getNullValidationVisitor());
+                              ProtobufMessage::getNullValidationVisitor(), absl::nullopt);
     EXPECT_TRUE(dst.use_tcp_for_dns_lookups());
   }
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{use_tcp_for_dns_lookups: true}", dst,
-                              ProtobufMessage::getStrictValidationVisitor());
+                              ProtobufMessage::getStrictValidationVisitor(), absl::nullopt);
     EXPECT_TRUE(dst.use_tcp_for_dns_lookups());
   }
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
-                              ProtobufMessage::getNullValidationVisitor());
+                              ProtobufMessage::getNullValidationVisitor(), absl::nullopt);
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
-                              ProtobufMessage::getStrictValidationVisitor());
+                              ProtobufMessage::getStrictValidationVisitor(), absl::nullopt);
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
 }

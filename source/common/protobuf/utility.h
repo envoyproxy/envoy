@@ -185,6 +185,13 @@ public:
   ProtoValidationException(const std::string& validation_error, const Protobuf::Message& message);
 };
 
+enum class MessageVersion {
+  // This is an earlier version of a message, a later one exists.
+  EARLIER_VERSION,
+  // This is the latest version of a message.
+  LATEST_VERSION,
+};
+
 class MessageUtil {
 public:
   // std::hash
@@ -216,13 +223,13 @@ public:
   static std::size_t hash(const Protobuf::Message& message);
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor);
-  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
+                           ProtobufMessage::ValidationVisitor& validation_visitor, absl::optional<MessageVersion> version);
+  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message, absl::optional<MessageVersion> version);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor);
-  static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message);
+                           ProtobufMessage::ValidationVisitor& validation_visitor, absl::optional<MessageVersion> version);
+  static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message, absl::optional<MessageVersion> version);
   static void loadFromFile(const std::string& path, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api, absl::optional<MessageVersion> version);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
@@ -257,8 +264,8 @@ public:
 
   template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
-    loadFromYaml(yaml, message, validation_visitor);
+                                      ProtobufMessage::ValidationVisitor& validation_visitor, absl::optional<MessageVersion> version) {
+    loadFromYaml(yaml, message, validation_visitor, version);
     validate(message, validation_visitor);
   }
 

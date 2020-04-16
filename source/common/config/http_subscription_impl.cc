@@ -79,7 +79,7 @@ void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) 
   disableInitFetchTimeoutTimer();
   envoy::service::discovery::v3::DiscoveryResponse message;
   try {
-    MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_);
+    MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_, absl::nullopt);
   } catch (const EnvoyException& e) {
     handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     return;
