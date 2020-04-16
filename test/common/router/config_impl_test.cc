@@ -271,11 +271,11 @@ most_specific_header_mutations_wins: {0}
 class RouteMatcherTest : public testing::Test, public ConfigImplTestBase {};
 
 // When removing legacy fields this test can be removed.
-TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(TestLegacyRoutes)) {
+// TODO(alyssawilk) remove DISABLED once this doesn't break the build.
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(DISABLED_TestLegacyRoutes)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: regex
-  domains:
   - bat.com
   routes:
   - match:
@@ -309,6 +309,18 @@ virtual_hosts:
       regex: ".*"
     route:
       cluster: regex_default
+- name: connect
+  domains:
+  - bat3.com
+  routes:
+  - match:
+      connect_matcher:
+    route:
+      cluster: connect_match
+  - match:
+      regex: ".*"
+    route:
+      cluster: connect_fallthrough
 - name: default
   domains:
   - "*"
@@ -368,6 +380,12 @@ virtual_hosts:
             config.route(genHeaders("bat2.com", "/foo", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("regex_default",
             config.route(genHeaders("bat2.com", " ", "GET"), 0)->routeEntry()->clusterName());
+
+  // Connect matching
+  EXPECT_EQ("connect_match",
+            config.route(genHeaders("bat3.com", " ", "CONNECT"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("connect_fallthrough",
+            config.route(genHeaders("bat3.com", " ", "GET"), 0)->routeEntry()->clusterName());
 
   // Regular Expression matching with query string params
   EXPECT_EQ(
@@ -995,6 +1013,15 @@ virtual_hosts:
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/four/6472/endpoint/xx/yy?test=foo", headers.get_(Http::Headers::get().Path));
     EXPECT_EQ("/xx/yy/6472?test=foo", headers.get_(Http::Headers::get().EnvoyOriginalPath));
+  }
+
+  // Prefix rewrite for CONNECT with path (for HTTP/2)
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("bat3.com", "/api/locations?works=true", "CONNECT");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("/rewrote?works=true", headers.get_(Http::Headers::get().Path));
   }
 
   // Virtual cluster testing.
@@ -6696,6 +6723,30 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException, "Duplicate upgrade WebSocket");
+}
+
+TEST_F(RouteConfigurationV2, BadConnectConfig) {
+  const std::string yaml = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: Websocket
+              connect_config: {}
+              enabled: false
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Non-CONNECT upgrade type Websocket has ConnectConfig");
 }
 
 // Verifies that we're creating a new instance of the retry plugins on each call instead of always

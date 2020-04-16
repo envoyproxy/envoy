@@ -497,7 +497,6 @@ protected:
   bool include_vh_rate_limits_;
   absl::optional<ConnectConfig> connect_config_;
 
-
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
 
   /**
@@ -836,8 +835,8 @@ private:
 class ConnectRouteEntryImpl : public RouteEntryImplBase {
 public:
   ConnectRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
-                      Server::Configuration::ServerFactoryContext& factory_context,
-                      ProtobufMessage::ValidationVisitor& validator);
+                        Server::Configuration::ServerFactoryContext& factory_context,
+                        ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return EMPTY_STRING; }

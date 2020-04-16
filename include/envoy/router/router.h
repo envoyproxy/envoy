@@ -826,10 +826,7 @@ public:
    */
   virtual const UpgradeMap& upgradeMap() const PURE;
 
-  // TODO(alyssar) rename alias, and interface from proxy to connect.
-  // TODO(alyssar) validate this is only used on routes with the CONNECT action.
   using ConnectConfig = envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig;
-
   /**
    * If present, informs how to handle proxying CONNECT requests on this route.
    */

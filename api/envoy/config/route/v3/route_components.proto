@@ -408,13 +408,6 @@ message RouteMatch {
     // exactly match the *:path* header once the query string is removed.
     string path = 2;
 
-    // [#not-implemented-hide:]
-    // If this is used as the matcher, the matcher will only match CONNECT requests.
-    // Note that this will not match HTTP/2 upgrade-style CONNECT requests
-    // (WebSocket and the like) as they are normalized in Envoy HTTP/1.1 style
-    // upgrades.
-    ConnectMatcher connect_matcher = 12;
-
     // If specified, the route is a regular expression rule meaning that the
     // regex must match the *:path* header once the query string is removed. The entire path
     // (without the query string) must match the regex. The rule will not match if only a
@@ -428,6 +421,16 @@ message RouteMatch {
     // on :path, etc. The issue with that is it is unclear how to generically deal with query string
     // stripping. This needs more thought.]
     type.matcher.v3.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
+
+    // [#not-implemented-hide:]
+    // If this is used as the matcher, the matcher will only match CONNECT requests.
+    // Note that this will not match HTTP/2 upgrade-style CONNECT requests
+    // (WebSocket and the like) as they are normalized in Envoy as HTTP/1.1 style
+    // upgrades.
+    // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2,
+    // where CONNECT requests may have a path, the path matchers will work if
+    // there is a path present.
+    ConnectMatcher connect_matcher = 12;
   }
 
   // Indicates that prefix/path matching should be case insensitive. The default
@@ -716,8 +719,6 @@ message RouteAction {
     // [#not-implemented-hide:]
     // Configuration for sending data upstream as a raw data payload. This is used for
     // CONNECT requests, when forwarding CONNECT payload as raw TCP.
-    // This may ONLY be used on routes which are selected via a ConnectMatcher
-    // and is only valid if the upgrade type is "CONNECT"
     message ConnectConfig {
       // TODO(alyssawilk) add proxy proto configuration here.
     }
@@ -731,6 +732,9 @@ message RouteAction {
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
 
+    // [#not-implemented-hide:]
+    // Configuration for sending data upstream as a raw data payload. This is used for
+    // CONNECT requests, when forwarding CONNECT payload as raw TCP.
     ConnectConfig connect_config = 3;
   }
 
