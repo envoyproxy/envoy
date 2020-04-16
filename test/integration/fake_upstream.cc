@@ -502,7 +502,9 @@ AssertionResult FakeUpstream::waitForHttpConnection(
         max_request_headers_count, headers_with_underscores_action);
   }
   VERIFY_ASSERTION(connection->initialize());
-  VERIFY_ASSERTION(connection->readDisable(false));
+  if (read_disable_on_new_connection_) {
+    VERIFY_ASSERTION(connection->readDisable(false));
+  }
   return AssertionSuccess();
 }
 
