@@ -17,7 +17,7 @@
 #include "common/http/headers.h"
 #include "common/http/http1/header_formatter.h"
 #include "common/http/utility.h"
-#include "common/runtime/runtime_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/ascii.h"
