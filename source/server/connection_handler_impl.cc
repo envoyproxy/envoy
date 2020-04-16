@@ -71,7 +71,7 @@ void ConnectionHandlerImpl::removeFilterChains(
   for (auto& listener : listeners_) {
     // Optimistic path: The listener tag provided by arg is not stale.
     if (listener.second.listener_->listenerTag() == listener_tag) {
-      listener.second.tcp_listener_->get().removeFilterChains(filter_chains);
+      listener.second.tcp_listener_->get().deferredRemoveFilterChains(filter_chains);
       // Completion is deferred because the above removeFilterChains() may defer delete connection.
       Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
       return;
@@ -83,7 +83,7 @@ void ConnectionHandlerImpl::removeFilterChains(
   // update.
   for (auto& listener : listeners_) {
     if (listener.second.tcp_listener_.has_value()) {
-      listener.second.tcp_listener_->get().removeFilterChains(filter_chains);
+      listener.second.tcp_listener_->get().deferredRemoveFilterChains(filter_chains);
     }
   }
   // Completion is deferred because the above removeFilterChains() may defer delete connection.
@@ -427,7 +427,7 @@ ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(
   return *connections;
 }
 
-void ConnectionHandlerImpl::ActiveTcpListener::removeFilterChains(
+void ConnectionHandlerImpl::ActiveTcpListener::deferredRemoveFilterChains(
     const std::list<const Network::FilterChain*>& draining_filter_chains) {
   // Need to recover the original deleting state.
   const bool was_deleting = is_deleting_;

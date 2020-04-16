@@ -154,7 +154,8 @@ private:
      * Schedule to remove and destroy the active connections which are not tracked by listener
      * config. Caution: The connection are not destroyed yet when function returns.
      */
-    void removeFilterChains(const std::list<const Network::FilterChain*>& draining_filter_chains);
+    void deferredRemoveFilterChains(
+        const std::list<const Network::FilterChain*>& draining_filter_chains);
 
     /**
      * Update the listener config. The follow up connections will see the new config. The existing
