@@ -136,6 +136,11 @@ build:rbe-toolchain-gcc --config=rbe-toolchain
 build:rbe-toolchain-gcc --crosstool_top=@rbe_ubuntu_gcc//cc:toolchain
 build:rbe-toolchain-gcc --extra_toolchains=@rbe_ubuntu_gcc//config:cc-toolchain
 
+build:rbe-toolchain-msvc-cl --host_platform=@rbe_windows_msvc_cl//config:platform
+build:rbe-toolchain-msvc-cl --platforms=@rbe_windows_msvc_cl//config:platform
+build:rbe-toolchain-msvc-cl --crosstool_top=@rbe_windows_msvc_cl//cc:toolchain
+build:rbe-toolchain-msvc-cl --extra_toolchains=@rbe_windows_msvc_cl//config:cc-toolchain
+
 build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
@@ -143,6 +148,15 @@ build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --remote_timeout=7200
 build:remote --auth_enabled=true
 build:remote --remote_download_toplevel
+
+# Windows bazel does not allow sandboxed as a spawn strategy
+build:remote-windows --spawn_strategy=remote,local
+build:remote-windows --strategy=Javac=remote,local
+build:remote-windows --strategy=Closure=remote,local
+build:remote-windows --strategy=Genrule=remote,local
+build:remote-windows --remote_timeout=7200
+build:remote-windows --auth_enabled=true
+build:remote-windows --remote_download_toplevel
 
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
@@ -156,6 +170,9 @@ build:remote-gcc --config=rbe-toolchain-gcc
 build:remote-msan --config=remote
 build:remote-msan --config=rbe-toolchain-clang-libc++
 build:remote-msan --config=rbe-toolchain-msan
+
+build:remote-msvc-cl --config=remote-windows
+build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8

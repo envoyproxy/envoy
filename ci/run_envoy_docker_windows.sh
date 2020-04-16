@@ -17,7 +17,8 @@ ENVOY_SOURCE_DIR=$(echo "${PWD}" | sed -E "s#/([a-zA-Z])/#\1:/#")
 
 [[ -t 1 ]] && DOCKER_TTY_OPTION=-it
 
-export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
+# export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
+export ENVOY_BUILD_IMAGE="gcr.io/cf-envoy-windows-basilisk/envoy-build-windows@sha256:2fd061c9c0ae340cb125c42631ac6d91caa3d07e45f08af5a1df2e8b0f62d3ef"
 
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
 docker run --rm ${DOCKER_TTY_OPTION} -e HTTP_PROXY=${http_proxy} -e HTTPS_PROXY=${https_proxy} \
