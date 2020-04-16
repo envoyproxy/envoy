@@ -32,6 +32,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/transport_sockets/tls @PiotrSikora @lizan
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
+# sni_dynamic_forward_proxy extension
+/*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @lizan
 # tracers.datadog extension
 /*/extensions/tracers/datadog @cgilmour @palazzem @mattklein123
 # tracers.xray extension

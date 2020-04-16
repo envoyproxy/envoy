@@ -28,7 +28,7 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
   config.set_filename(TestEnvironment::temporaryPath("injected_resource"));
   Api::ApiPtr api = Api::createApiForTest();
-  Event::DispatcherPtr dispatcher(api->allocateDispatcher());
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       *dispatcher, *api, ProtobufMessage::getStrictValidationVisitor());
   Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);
