@@ -9,7 +9,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/proto/bookstore.pb.h"
-#include "test/test_common/environment.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -71,8 +70,8 @@ public:
               envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&>(
               *message);
       config.add_services("bookstore.Bookstore");
-      config.set_proto_descriptor(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"));
-      ENVOY_LOG_MISC(info, "{}", message->DebugString());
+      config.set_proto_descriptor(absl::StrCat(std::getenv("TEST_SRCDIR"), "/test/proto/bookstore.descriptor"));
+      ENVOY_LOG_MISC(info, "{}", std::getenv("TEST_SRCDIR"));
     }
   }
 

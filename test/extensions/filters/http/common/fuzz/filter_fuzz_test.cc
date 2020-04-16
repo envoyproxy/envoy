@@ -7,7 +7,6 @@
 #include "test/extensions/filters/http/common/fuzz/filter_fuzz.pb.validate.h"
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 #include "test/fuzz/fuzz_runner.h"
-#include "test/test_common/environment.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,6 +32,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
       absl::string_view filter_name = filter_names[seed % filter_names.size()];
       input->mutable_config()->set_name(std::string(filter_name));
     }
+    input->mutable_config()->set_name("envoy.filters.http.grpc_json_transcoder");
     // Set the corresponding type_url for Any.
     auto& factory = factories.at(input->config().name());
     input->mutable_config()->mutable_typed_config()->set_type_url(absl::StrCat(

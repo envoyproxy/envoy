@@ -47,16 +47,6 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
   static auto* logging_context =
       new Logger::Context(log_level_, TestEnvironment::getOptions().logFormat(), *lock, false);
   UNREFERENCED_PARAMETER(logging_context);
-
-  // Create a Runfiles object for runfiles lookup.
-  // https://github.com/bazelbuild/bazel/blob/master/tools/cpp/runfiles/runfiles_src.h#L32
-  std::string error;
-  std::unique_ptr<Runfiles> runfiles(Runfiles::Create(argv[0], &error));
-  RELEASE_ASSERT(Envoy::TestEnvironment::getOptionalEnvVar("NORUNFILES").has_value() ||
-                     runfiles != nullptr,
-                 error);
-
-  Envoy::TestEnvironment::setRunfiles(runfiles.get());
 }
 
 } // namespace Fuzz

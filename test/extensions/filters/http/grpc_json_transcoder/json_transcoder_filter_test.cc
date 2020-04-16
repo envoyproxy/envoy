@@ -133,7 +133,6 @@ TEST_F(GrpcJsonTranscoderConfigTest, ParseBinaryConfig) {
   proto_config.set_proto_descriptor_bin(api_->fileSystem().fileReadToEnd(
       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   proto_config.add_services("bookstore.Bookstore");
-  ENVOY_LOG_MISC(info, "{}", proto_config.DebugString());
   EXPECT_NO_THROW(JsonTranscoderConfig config(proto_config, *api_));
 }
 
