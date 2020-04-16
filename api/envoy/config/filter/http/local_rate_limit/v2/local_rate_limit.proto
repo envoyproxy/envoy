@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.local_rate_limit.v2;
+
+import "envoy/api/v2/core/base.proto";
+import "envoy/type/http_status.proto";
+import "envoy/type/token_bucket.proto";
+
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.local_rate_limit.v2";
+option java_outer_classname = "LocalRateLimitProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.filters.http.local_ratelimit.v3";
+option (udpa.annotations.file_status).package_version_status = FROZEN;
+
+// [#protodoc-title: Local Rate limit]
+// Local Rate limit :ref:`configuration overview <config_http_filters_local_rate_limit>`.
+// [#extension: envoy.filters.http.local_ratelimit]
+
+message LocalRateLimit {
+  // This field allows to send a HTTP response status code to the downstream client other
+  // than 429 (TooManyRequests) when the request has been rate limited.
+  type.HttpStatus status = 1;
+
+  // The token bucket configuration to use for rate limiting requests that are processed by this
+  // filter. Each request processed by the filter consumes a single token. If the token is available,
+  // the request will be allowed. If no tokens are available, the request will receive the configured
+  // rate limit status.
+  //
+  // .. note::
+  //   It's fine for the token bucket to not be set for the global configuration, but it must be set
+  //   for the per route configuration.
+  //
+  // .. note::
+  //   When using per route configuration, the bucket becomes unique to that route.
+  //
+  // .. note::
+  //   In the current implementation the token bucket's :ref:`fill_interval
+  //   <envoy_api_field_type.v3.TokenBucket.fill_interval>` must be >= 50ms to avoid too aggressive
+  //   refills.
+  type.TokenBucket token_bucket = 2;
+
+  // This uniquely identifies a specific local rate limit configuration (e.g.: when using per route
+  // rate limiters). It will be used to construct the
+  // :ref:`runtime keys <config_http_filters_local_rate_limit_runtime>` that enable and enforce
+  // the corresponding local rate limiter.
+  string route_key = 3 [(validate.rules).string = {min_bytes: 1}];
+
+  // Specifies a list of HTTP headers that should be added to each response for requests that
+  // have been rate limited.
+  repeated api.v2.core.HeaderValueOption response_headers_to_add = 4
+      [(validate.rules).repeated = {max_items: 10}];
+}
