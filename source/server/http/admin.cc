@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <fstream>
 #include <string>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -18,7 +17,6 @@
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/filesystem/filesystem.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -50,6 +48,7 @@
 #include "common/upstream/host_utility.h"
 
 #include "server/http/listeners_handler.h"
+#include "server/http/runtime_handler.h"
 #include "server/http/stats_handler.h"
 #include "server/http/utils.h"
 
@@ -898,8 +897,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            StatsHandler::handlerStatsRecentLookupsEnable, false, true},
           {"/listeners", "print listener info", ListenersHandlerImpl::handlerListenerInfo, false,
            false},
-          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
-          {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
+          {"/runtime", "print runtime values", RuntimeHandlerImpl::handlerRuntime, false, false},
+          {"/runtime_modify", "modify runtime values", RuntimeHandlerImpl::handlerRuntimeModify,
            false, true},
           {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false,
            true},

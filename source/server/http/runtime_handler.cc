@@ -1,5 +1,9 @@
 #include "server/http/runtime_handler.h"
 
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "common/common/empty_string.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
