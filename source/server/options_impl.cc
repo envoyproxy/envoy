@@ -95,7 +95,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                       cmd, false);
   TCLAP::ValueArg<bool> log_format_prefix_with_location(
       "", "log-format-prefix-with-location",
-      "Prefix all occurences of '%v' in log format with with '[%g:%#] ' ('[path/to/file.cc:99] ').",
+      "Prefix all entrancies of '%v' in log format with with '[%g:%#] ' ('[path/to/file.cc:99] ').",
       false, true, "bool", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
