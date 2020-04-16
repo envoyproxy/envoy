@@ -83,7 +83,7 @@ TEST_P(DecompressorFilterTest, DecompressionActive) {
     headers = std::move(response_headers);
   }
 
-  EXPECT_EQ("br", headers->ContentEncoding()->value().getStringView());
+  EXPECT_EQ(nullptr, headers->ContentEncoding());
 
   // FIX ME(junr03): pending decision on this.
   EXPECT_EQ(nullptr, headers->ContentLength());
@@ -167,6 +167,9 @@ TEST_P(DecompressorFilterTest, DecompressionActiveMultipleEncodings) {
 TEST_P(DecompressorFilterTest, DecompressionDisabled) {
   setUpFilter(R"EOF(
 response_decompression_enabled:
+  default_value: false
+  runtime_key: does_not_exist
+request_decompression_enabled:
   default_value: false
   runtime_key: does_not_exist
 decompressor_library:
