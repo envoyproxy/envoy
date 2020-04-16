@@ -100,9 +100,6 @@ private:
   const bool is_allow_failed_;
   const bool is_allow_missing_;
   TimeSource& time_source_;
-
-  // allow 5 seconds of slack when determining token expery
-  const uint64_t jwt_exp_slack = 5;
 };
 
 std::string AuthenticatorImpl::name() const {
