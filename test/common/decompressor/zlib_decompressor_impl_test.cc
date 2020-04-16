@@ -53,9 +53,9 @@ protected:
     ASSERT_EQ(0, decompressor.decompression_error_);
   }
 
-  static const int64_t gzip_window_bits{31};
-  static const int64_t memory_level{8};
-  static const uint64_t default_input_size{796};
+  static constexpr int64_t gzip_window_bits{31};
+  static constexpr int64_t memory_level{8};
+  static constexpr uint64_t default_input_size{796};
 };
 
 class ZlibDecompressorImplFailureTest : public ZlibDecompressorImplTest {
