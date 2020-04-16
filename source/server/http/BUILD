@@ -15,6 +15,7 @@ envoy_cc_library(
     deps = [
         ":admin_filter_lib",
         ":config_tracker_lib",
+        ":listeners_handler_lib",
         ":stats_handler_lib",
         ":utils_lib",
         "//include/envoy/filesystem:filesystem_interface",
@@ -99,6 +100,22 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stats:histogram_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "listeners_handler_lib",
+    srcs = ["listeners_handler.cc"],
+    hdrs = ["listeners_handler.h"],
+    deps = [
+        ":utils_lib",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/server:instance_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )
 

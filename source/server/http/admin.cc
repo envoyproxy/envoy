@@ -12,7 +12,6 @@
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/listeners.pb.h"
 #include "envoy/admin/v3/memory.pb.h"
 #include "envoy/admin/v3/metrics.pb.h"
 #include "envoy/admin/v3/mutex_stats.pb.h"
@@ -50,6 +49,7 @@
 #include "common/router/config_impl.h"
 #include "common/upstream/host_utility.h"
 
+#include "server/http/listeners_handler.h"
 #include "server/http/stats_handler.h"
 #include "server/http/utils.h"
 
@@ -488,24 +488,6 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
   }
 }
 
-void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
-  envoy::admin::v3::Listeners listeners;
-  for (const auto& listener : server_.listenerManager().listeners()) {
-    envoy::admin::v3::ListenerStatus& listener_status = *listeners.add_listener_statuses();
-    listener_status.set_name(listener.get().name());
-    Network::Utility::addressToProtobufAddress(*listener.get().listenSocketFactory().localAddress(),
-                                               *listener_status.mutable_local_address());
-  }
-  response.add(MessageUtil::getJsonStringFromMessage(listeners, true)); // pretty-print
-}
-
-void AdminImpl::writeListenersAsText(Buffer::Instance& response) {
-  for (const auto& listener : server_.listenerManager().listeners()) {
-    response.add(fmt::format("{}::{}\n", listener.get().name(),
-                             listener.get().listenSocketFactory().localAddress()->asString()));
-  }
-}
-
 Http::Code AdminImpl::handlerClusters(absl::string_view url,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&) {
@@ -757,17 +739,6 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::ResponseHeaderMap& 
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::ResponseHeaderMap&,
-                                            Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  ListenerManager::StopListenersType stop_listeners_type =
-      params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
-                                                 : ListenerManager::StopListenersType::All;
-  server_.listenerManager().stopListeners(stop_listeners_type);
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::ResponseHeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   const std::time_t current_time =
@@ -809,21 +780,6 @@ Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::ResponseHeade
                                           Buffer::Instance& response, AdminStream&) {
   server_.shutdown();
   response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerListenerInfo(absl::string_view url,
-                                          Http::ResponseHeaderMap& response_headers,
-                                          Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  const auto format_value = Utility::formatParam(query_params);
-
-  if (format_value.has_value() && format_value.value() == "json") {
-    writeListenersAsJson(response);
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  } else {
-    writeListenersAsText(response);
-  }
   return Http::Code::OK;
 }
 
@@ -1023,8 +979,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            true},
           {"/reset_counters", "reset all counters to zero", StatsHandler::handlerResetCounters,
            false, true},
-          {"/drain_listeners", "drain listeners", MAKE_ADMIN_HANDLER(handlerDrainListeners), false,
-           true},
+          {"/drain_listeners", "drain listeners", ListenersHandlerImpl::handlerDrainListeners,
+           false, true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
@@ -1040,7 +996,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            StatsHandler::handlerStatsRecentLookupsDisable, false, true},
           {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
            StatsHandler::handlerStatsRecentLookupsEnable, false, true},
-          {"/listeners", "print listener info", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
+          {"/listeners", "print listener info", ListenersHandlerImpl::handlerListenerInfo, false,
            false},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),

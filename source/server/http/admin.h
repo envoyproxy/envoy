@@ -269,12 +269,6 @@ private:
   void writeClustersAsText(Buffer::Instance& response);
 
   /**
-   * Helper methods for the /listeners url handler.
-   */
-  void writeListenersAsJson(Buffer::Instance& response);
-  void writeListenersAsText(Buffer::Instance& response);
-
-  /**
    * Helper methods for the /config_dump url handler.
    */
   void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
@@ -326,9 +320,6 @@ private:
   Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&);
-  Http::Code handlerListenerInfo(absl::string_view path_and_query,
-                                 Http::ResponseHeaderMap& response_headers,
-                                 Buffer::Instance& response, AdminStream&);
   Http::Code handlerLogging(absl::string_view path_and_query,
                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                             AdminStream&);
@@ -339,9 +330,6 @@ private:
   Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, AdminStream&);
-  Http::Code handlerDrainListeners(absl::string_view path_and_query,
-                                   Http::ResponseHeaderMap& response_headers,
-                                   Buffer::Instance& response, AdminStream&);
   Http::Code handlerServerInfo(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
