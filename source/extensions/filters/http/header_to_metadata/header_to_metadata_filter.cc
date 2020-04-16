@@ -214,7 +214,7 @@ const Config* HeaderToMetadataFilter::getRouteConfig() const {
   const auto* per_filter_config =
       entry->virtualHost().perFilterConfig(HttpFilterNames::get().HeaderToMetadata);
 
-  return !per_filter_config ? nullptr : dynamic_cast<const Config*>(per_filter_config);
+  return dynamic_cast<const Config*>(per_filter_config);
 }
 
 // TODO(rgs1): this belongs in one of the filter interfaces, see issue #10164.
