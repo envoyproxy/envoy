@@ -16,28 +16,13 @@
 #include "server/options_impl_platform.h"
 
 #include "absl/strings/str_split.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
 namespace Envoy {
 namespace {
-std::string prefixLogFormatWithLocation(const std::string& log_format) {
-  std::string result;
-  for (size_t i = 0; i < log_format.size(); ++i) {
-    if (i + 1 < log_format.size() && log_format[i] == '%') {
-      if (log_format[i + 1] == 'v') {
-        result += "[%g:%#] ";
-      }
-      // Print '%' and go directly to the next character.
-      result += '%';
-      i++;
-    }
-    result += log_format[i];
-  }
-  return result;
-}
-
 std::vector<std::string> toArgsVector(int argc, const char* const* argv) {
   std::vector<std::string> args;
   args.reserve(argc);
@@ -110,7 +95,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                       cmd, false);
   TCLAP::ValueArg<bool> log_format_prefix_with_location(
       "", "log-format-prefix-with-location",
-      "Prefix all logged messages with '[path/to/file.cc:99] '.", false, true, "bool", cmd);
+      "Prefix all occurences of '%v' in log format with with '[%g:%#] ' ('[path/to/file.cc:99] ').",
+      false, true, "bool", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
@@ -186,10 +172,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
     log_level_ = default_log_level;
   }
 
+  log_format_ = log_format.getValue();
   if (log_format_prefix_with_location.getValue()) {
-    log_format_ = prefixLogFormatWithLocation(log_format.getValue());
-  } else {
-    log_format_ = log_format.getValue();
+    log_format_ = absl::StrReplaceAll(log_format_, {{"%%", "%%"}, {"%v", "[%g:%#] %v"}});
   }
   log_format_escaped_ = log_format_escaped.getValue();
 
