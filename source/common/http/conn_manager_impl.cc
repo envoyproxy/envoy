@@ -761,7 +761,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   request_headers_ = std::move(headers);
 
   // TODO(alyssawilk) remove this synthetic path in a follow-up PR, including
-  // auditing of empty path headers.
+  // auditing of empty path headers.  We check for path because HTTP/2 connect requests may have a
+  // path.
   if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) {
     request_headers_->setPath("/");
   }
@@ -928,7 +929,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
   if (hasCachedRoute()) {
-    if (upgrade_rejected) { // Do not allow upgrades if the route does not support it.
+    // Do not allow upgrades if the route does not support it.
+    if (upgrade_rejected) {
       // While downstream servers should not send upgrade payload without the upgrade being
       // accepted, err on the side of caution and refuse to process any further requests on this
       // connection, to avoid a class of HTTP/1.1 smuggling bugs where Upgrade or CONNECT payload

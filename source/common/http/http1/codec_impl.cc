@@ -361,9 +361,7 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   const HeaderEntry* host = headers.Host();
   bool is_connect = HeaderUtility::isConnect(headers);
 
-  if (is_connect && !host) {
-    throw CodecClientException("Host must be specified for CONNECT requests");
-  } else if (!method || (!path && !is_connect)) {
+  if (!method || (!path && !is_connect)) {
     throw CodecClientException(":method and :path must be specified");
   }
   if (method->value() == Headers::get().MethodValues.Head) {
