@@ -34,7 +34,7 @@ MockTextReadout::MockTextReadout() {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
 }
-MockTextReadout::~MockTextReadout() {}
+MockTextReadout::~MockTextReadout() = default;
 
 MockHistogram::MockHistogram() {
   ON_CALL(*this, unit()).WillByDefault(ReturnPointee(&unit_));

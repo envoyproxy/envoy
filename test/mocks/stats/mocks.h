@@ -248,7 +248,7 @@ private:
 class MockTextReadout : public MockMetric<TextReadout> {
 public:
   MockTextReadout();
-  ~MockTextReadout();
+  ~MockTextReadout() override;
 
   MOCK_METHOD1(set, void(std::string&& value));
   MOCK_CONST_METHOD0(used, bool());
