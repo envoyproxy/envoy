@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"

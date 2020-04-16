@@ -1576,7 +1576,7 @@ void AdminImpl::closeSocket() {
 
 void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
-    handler->addListener(*listener_);
+    handler->addListener(absl::nullopt, *listener_);
   }
 }
 

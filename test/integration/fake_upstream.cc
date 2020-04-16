@@ -463,7 +463,7 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 }
 
 void FakeUpstream::threadRoutine() {
-  handler_->addListener(listener_);
+  handler_->addListener(absl::nullopt, listener_);
   server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();
@@ -502,7 +502,9 @@ AssertionResult FakeUpstream::waitForHttpConnection(
         max_request_headers_count, headers_with_underscores_action);
   }
   VERIFY_ASSERTION(connection->initialize());
-  VERIFY_ASSERTION(connection->readDisable(false));
+  if (read_disable_on_new_connection_) {
+    VERIFY_ASSERTION(connection->readDisable(false));
+  }
   return AssertionSuccess();
 }
 
