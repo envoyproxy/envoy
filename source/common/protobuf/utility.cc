@@ -133,22 +133,25 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message, absl::opti
   const Protobuf::Descriptor* earlier_version_desc =
       Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
   // If there is no earlier version of a message or we only accept the latest version, just apply f directly.
-  if (earlier_version_desc == nullptr && version == MessageVersion::LATEST_VERSION) {
+  if (earlier_version_desc == nullptr || version == MessageVersion::LATEST_VERSION) {
     f(message, MessageVersion::LATEST_VERSION);
     return;
   }
 
   Protobuf::DynamicMessageFactory dmf;
-  auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
-  ASSERT(earlier_message != nullptr);
   // Only try the earlier version if version is specified as such.
   if (version == MessageVersion::EARLIER_VERSION) {
+    auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
+    ASSERT(earlier_message != nullptr);
     f(*earlier_message, MessageVersion::EARLIER_VERSION);
+    Config::VersionConverter::upgrade(*earlier_message, message);
     return;
   }
 
   // Fall back to trying the earlier version first, followed by the latest version.
   try {
+    auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
+    ASSERT(earlier_message != nullptr);
     // Try apply f with an earlier version of the message, then upgrade the
     // result.
     f(*earlier_message, MessageVersion::EARLIER_VERSION);

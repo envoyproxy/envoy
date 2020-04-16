@@ -1,0 +1,5 @@
+static_resources {
+  clusters {
+      ignore_health_on_host_removal: true
+  }
+}

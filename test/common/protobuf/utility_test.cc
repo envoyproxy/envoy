@@ -257,6 +257,24 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
+TEST_F(ProtobufUtilityTest, LoadJsonFromFileNoBoosting) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  bootstrap.mutable_cluster_manager()
+      ->mutable_upstream_bind_config()
+      ->mutable_source_address()
+      ->set_address("1.1.1.1");
+
+  std::string bootstrap_text;
+  ASSERT_TRUE(Protobuf::TextFormat::PrintToString(bootstrap, &bootstrap_text));
+  const std::string filename =
+      TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
+
+  envoy::config::bootstrap::v3::Bootstrap proto_from_file;
+  TestUtility::loadFromFile(filename, proto_from_file, *api_);
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
+
+}
+
 TEST_F(ProtobufUtilityTest, DEPRECATED_FEATURE_TEST(LoadV2TextProtoFromFile)) {
   API_NO_BOOST(envoy::config::bootstrap::v2::Bootstrap) bootstrap;
   bootstrap.mutable_node()->set_build_version("foo");
@@ -1199,6 +1217,32 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonSameVersion) {
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
 }
+
+// MessageUtility::loadFromJson() avoids boosting when version specified.
+TEST_F(ProtobufUtilityTest, LoadFromJsonSpecifiedVersion) {
+  {
+    envoy::config::cluster::v3::Cluster dst;
+    MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
+                              ProtobufMessage::getNullValidationVisitor(), MessageVersion::EARLIER_VERSION);
+    EXPECT_TRUE(dst.ignore_health_on_host_removal());
+  }
+  {
+    // With boosting this would try v3, which would ignore the field completely.
+    envoy::config::cluster::v3::Cluster dst;
+    EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromJson("{drain_connections_on_host_removal: 123}",
+                                                      dst,
+                                                      ProtobufMessage::getNullValidationVisitor(),
+                                                      MessageVersion::EARLIER_VERSION),
+                            EnvoyException, "Unable to parse JSON as proto");
+  }
+  {
+    envoy::config::cluster::v3::Cluster dst;
+    MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
+                              ProtobufMessage::getNullValidationVisitor(), MessageVersion::LATEST_VERSION);
+    EXPECT_FALSE(dst.ignore_health_on_host_removal());
+  }
+}
+
 
 // MessageUtility::loadFromJson() with API message works across version.
 TEST_F(ProtobufUtilityTest, LoadFromJsonNextVersion) {

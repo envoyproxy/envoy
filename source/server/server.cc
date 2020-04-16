@@ -235,10 +235,12 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 
   absl::optional<MessageVersion> version;
 
-  if (options.bootstrapVersion() && options.bootstrapVersion() == "v3") {
-    version = MessageVersion::LATEST;
-  } else {
-    version = MessageVersion::EARLIER;
+  if (options.bootstrapVersion()) {
+    if (options.bootstrapVersion() == "v3") {
+      version = MessageVersion::LATEST_VERSION;
+    } else {
+      version = MessageVersion::EARLIER_VERSION;
+    }
   }
 
   if (!config_path.empty()) {

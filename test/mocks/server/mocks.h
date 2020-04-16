@@ -104,6 +104,7 @@ public:
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
   std::string config_yaml_;
+  absl::optional<std::string> bootstrap_version_;
   bool allow_unknown_static_fields_{};
   bool reject_unknown_dynamic_fields_{};
   std::string admin_address_path_;

@@ -642,6 +642,24 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2BootstrapFromPbTex
   EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
 }
 
+// Validate that bootstrap v3 pb_text with new fields loads fails if V2 config is specified.
+TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromPbText) {
+  options_.bootstrap_version_ = "v2";
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text"), EnvoyException,
+      "Failed to parse at earlier version, trying again at later version.");
+}
+
+// Validate that bootstrap v2 pb_text with deprecated fields loads fails if V3 config is specified.
+TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromPbText) {
+  options_.bootstrap_version_ = "v3";
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"), EnvoyException,
+      "Unable to parse file");
+}
+
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
   options_.config_proto_.mutable_node()->set_id("foo");
   initialize("test/server/test_data/server/node_bootstrap.yaml");
