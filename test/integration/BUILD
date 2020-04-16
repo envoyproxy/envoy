@@ -127,8 +127,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "eds_integration_test",
     srcs = ["eds_integration_test.cc"],
-    # Times out on Windows
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/upstream:load_balancer_lib",
@@ -230,8 +228,6 @@ envoy_sh_test(
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
     ],
-    # Hot restart does not apply on Windows, skipping
-    tags = ["skip_on_windows"],
 )
 
 envoy_sh_test(
@@ -242,8 +238,6 @@ envoy_sh_test(
         "//source/exe:envoy-static",
         "//test/config/integration:server_config_files",
     ],
-    # TODO: This script invocation does not work on Windows, see: https://github.com/bazelbuild/bazel/issues/10959
-    tags = ["fails_on_windows"],
 )
 
 envoy_cc_test(
@@ -583,8 +577,6 @@ envoy_cc_test(
         "integration_test.cc",
         "integration_test.h",
     ],
-    # Times out on Windows
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
@@ -623,8 +615,6 @@ envoy_cc_test(
         "websocket_integration_test.cc",
         "websocket_integration_test.h",
     ],
-    # Times out on Windows
-    tags = ["fails_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -641,15 +631,9 @@ envoy_cc_test(
     srcs = [
         "echo_integration_test.cc",
     ],
-    tags = [
-        # Uncomment this line to run this test repeatedly in exclusive mode if not using docker-sandbox,
-        # or RBE, see comments in AddRemoveListener.
-        # "exclusive",
-        # TODO(wrowe,sunjayBhatia): Skipping this on Windows as MSVC does not allow invoking
-        # connection.close() from within the lambda that is passed to the RawConnectionDriver
-        # constructor
-        "skip_on_windows",
-    ],
+    # Uncomment this line to run this test repeatedly in exclusive mode if not using docker-sandbox,
+    # or RBE, see comments in AddRemoveListener.
+    # tags = ["exclusive"],
     deps = [
         ":integration_lib",
         "//source/extensions/filters/network/echo:config",

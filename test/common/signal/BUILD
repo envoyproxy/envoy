@@ -11,11 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "signals_test",
     srcs = ["signals_test.cc"],
-    # Posix signal tests are irrelevant to Windows
-    tags = [
-        "backtrace",
-        "skip_on_windows",
-    ],
+    tags = ["backtrace"],
     deps = [
         "//source/common/signal:sigaction_lib",
         "//test/test_common:utility_lib",
