@@ -44,7 +44,7 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
   maybeInitDecompress(config_->requestDirectionConfig(), request_decompressor_, *decoder_callbacks_,
                       headers);
 
-  if (config_->requestDirectionConfig().decompressionEnabled()) {
+  if (config_->responseDirectionConfig().decompressionEnabled()) {
     // FIX ME(junr03): discuss this unconditional addition. Should this be optional and
     // configurable? i.e even if response decompression is enabled the filter could chose to
     // advertise or not.
