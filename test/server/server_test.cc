@@ -647,8 +647,8 @@ TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromPbText) {
   options_.bootstrap_version_ = "v2";
 
   EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text"), EnvoyException,
-      "Failed to parse at earlier version, trying again at later version.");
+      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text"),
+      EnvoyException, "Failed to parse at earlier version, trying again at later version.");
 }
 
 // Validate that bootstrap v2 pb_text with deprecated fields loads fails if V3 config is specified.
@@ -656,8 +656,8 @@ TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromPbText) {
   options_.bootstrap_version_ = "v3";
 
   EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"), EnvoyException,
-      "Unable to parse file");
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
+      EnvoyException, "Unable to parse file");
 }
 
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {

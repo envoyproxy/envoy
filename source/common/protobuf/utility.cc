@@ -129,10 +129,12 @@ public:
 // This relies on the property that any v3 configuration that is readable as
 // v2 has the same semantics in v2/v3, which holds due to the highly structured
 // vN/v(N+1) mechanical transforms.
-void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message, absl::optional<MessageVersion> version) {
+void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message,
+                        absl::optional<MessageVersion> version) {
   const Protobuf::Descriptor* earlier_version_desc =
       Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
-  // If there is no earlier version of a message or we only accept the latest version, just apply f directly.
+  // If there is no earlier version of a message or we only accept the latest version, just apply f
+  // directly.
   if (earlier_version_desc == nullptr || version == MessageVersion::LATEST_VERSION) {
     f(message, MessageVersion::LATEST_VERSION);
     return;
@@ -274,7 +276,8 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
 }
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor, absl::optional<MessageVersion> version) {
+                               ProtobufMessage::ValidationVisitor& validation_visitor,
+                               absl::optional<MessageVersion> version) {
   tryWithApiBoosting(
       [&json, &validation_visitor](Protobuf::Message& message, MessageVersion message_version) {
         Protobuf::util::JsonParseOptions options;
@@ -313,14 +316,16 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
       message, version);
 }
 
-void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message, absl::optional<MessageVersion> version) {
+void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message,
+                               absl::optional<MessageVersion> version) {
   // No need to validate if converting to a Struct, since there are no unknown
   // fields possible.
   loadFromJson(json, message, ProtobufMessage::getNullValidationVisitor(), version);
 }
 
 void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor, absl::optional<MessageVersion> version) {
+                               ProtobufMessage::ValidationVisitor& validation_visitor,
+                               absl::optional<MessageVersion> version) {
   ProtobufWkt::Value value = ValueUtil::loadFromYaml(yaml);
   if (value.kind_case() == ProtobufWkt::Value::kStructValue ||
       value.kind_case() == ProtobufWkt::Value::kListValue) {
@@ -330,7 +335,8 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
 }
 
-void MessageUtil::loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message, absl::optional<MessageVersion> version) {
+void MessageUtil::loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message,
+                               absl::optional<MessageVersion> version) {
   // No need to validate if converting to a Struct, since there are no unknown
   // fields possible.
   return loadFromYaml(yaml, message, ProtobufMessage::getNullValidationVisitor(), version);
@@ -681,13 +687,15 @@ bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
                 const Protobuf::FieldDescriptor* field_descriptor) {
         // To unpack a `TypedStruct`, convert the struct from JSON.
         jsonConvertInternal(reflection->GetMessage(*message, field_descriptor),
-                            ProtobufMessage::getNullValidationVisitor(), *typed_message, absl::nullopt);
+                            ProtobufMessage::getNullValidationVisitor(), *typed_message,
+                            absl::nullopt);
       },
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
         // To repack a `TypedStruct`, convert the message back to JSON.
         jsonConvertInternal(*typed_message, ProtobufMessage::getNullValidationVisitor(),
-                            *(reflection->MutableMessage(message, field_descriptor)), absl::nullopt);
+                            *(reflection->MutableMessage(message, field_descriptor)),
+                            absl::nullopt);
       });
 }
 

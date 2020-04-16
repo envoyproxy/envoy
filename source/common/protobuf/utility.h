@@ -223,13 +223,18 @@ public:
   static std::size_t hash(const Protobuf::Message& message);
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, absl::optional<MessageVersion> version = absl::nullopt);
-  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message, absl::optional<MessageVersion> version = absl::nullopt);
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           absl::optional<MessageVersion> version = absl::nullopt);
+  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message,
+                           absl::optional<MessageVersion> version = absl::nullopt);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, absl::optional<MessageVersion> version = absl::nullopt);
-  static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message, absl::optional<MessageVersion> version = absl::nullopt);
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           absl::optional<MessageVersion> version = absl::nullopt);
+  static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message,
+                           absl::optional<MessageVersion> version = absl::nullopt);
   static void loadFromFile(const std::string& path, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api, absl::optional<MessageVersion> version);
+                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                           absl::optional<MessageVersion> version);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
@@ -264,7 +269,8 @@ public:
 
   template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor, absl::optional<MessageVersion> version = absl::nullopt) {
+                                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                                      absl::optional<MessageVersion> version = absl::nullopt) {
     loadFromYaml(yaml, message, validation_visitor, version);
     validate(message, validation_visitor);
   }
