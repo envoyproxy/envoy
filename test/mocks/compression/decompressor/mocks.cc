@@ -1,7 +1,7 @@
 #include "test/mocks/compression/decompressor/mocks.h"
 
-using testing::ReturnRef;
 using testing::Invoke;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Compression {

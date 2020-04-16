@@ -16,16 +16,15 @@ envoy_extension_cc_test(
     srcs = ["decompressor_filter_test.cc"],
     extension_name = "envoy.filters.http.decompressor",
     deps = [
+        "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/decompressor:config",
-        "//source/common/http:headers_lib",
         "//test/mocks/compression/decompressor:decompressor_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/decompressor/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/compression/gzip/decompressor/v3:pkg_cc_proto",
     ],
 )
