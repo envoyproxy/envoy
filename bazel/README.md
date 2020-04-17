@@ -686,7 +686,7 @@ that the Go toolchain can find the necessary dependencies):
 go run github.com/buchgr/bazel-remote --dir ${HOME}/bazel_cache --host 127.0.0.1 --port 28080 --max_size 64
 ```
 
-See [Bazel remote cache](github.com/buchgr/bazel-remote) for more information on the parameters.
+See [Bazel remote cache](https://github.com/buchgr/bazel-remote) for more information on the parameters.
 The command above will setup a maximum 64 GiB cache at `~/bazel_cache` on port 28080. You might
 want to setup a larger cache if you run ASAN builds.
 
