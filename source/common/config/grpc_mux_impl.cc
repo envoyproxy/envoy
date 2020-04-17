@@ -216,7 +216,16 @@ void GrpcMuxImpl::onStreamEstablished() {
 }
 
 void GrpcMuxImpl::onEstablishmentFailure() {
-  for (const auto& api_state : api_state_) {
+  for (auto& api_state : api_state_) {
+    if (api_state.second.pending_) {
+      ENVOY_LOG(trace, "API {} pending during onEstablishmentFailure(), unsetting pending.", api_state.first);
+      api_state.second.pending_ = false;
+    }
+    if (api_state.second.paused_) {
+      ENVOY_LOG(trace, "API {} paused during onEstablishmentFailure(), unpausing.", api_state.first);
+      api_state.second.paused_ = false;
+    }
+
     for (auto watch : api_state.second.watches_) {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
