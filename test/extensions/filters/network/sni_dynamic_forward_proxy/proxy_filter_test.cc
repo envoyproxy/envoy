@@ -11,6 +11,7 @@
 
 using testing::AtLeast;
 using testing::Eq;
+using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -60,7 +61,7 @@ public:
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;
   Network::MockReadFilterCallbacks callbacks_;
-  Network::MockConnection connection_;
+  NiceMock<Network::MockConnection> connection_;
 };
 
 // No SNI handling.
