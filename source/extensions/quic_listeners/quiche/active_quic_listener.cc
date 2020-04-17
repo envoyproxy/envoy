@@ -96,7 +96,7 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
 
 void ActiveQuicListener::onReadReady() {
   if (!enabled()) {
-    ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_.name());
+    ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_->name());
     return;
   }
   quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerLoop);
