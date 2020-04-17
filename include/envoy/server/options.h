@@ -87,7 +87,7 @@ public:
   virtual const envoy::config::bootstrap::v3::Bootstrap& configProto() const PURE;
 
   /**
-   * @return const absl::optional<uint32_t>& the bootstrap version to use, if specifed.
+   * @return const absl::optional<uint32_t>& the bootstrap version to use, if specified.
    */
   virtual const absl::optional<uint32_t>& bootstrapVersion() const PURE;
 
