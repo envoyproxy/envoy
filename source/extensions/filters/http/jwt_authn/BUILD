@@ -41,7 +41,6 @@ envoy_cc_library(
     deps = [
         ":extractor_lib",
         ":jwks_cache_lib",
-        "@com_google_absl//absl/time",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/http:message_lib",

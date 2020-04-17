@@ -13,8 +13,6 @@
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
 
-#include "absl/time/clock.h"
-
 using ::google::jwt_verify::CheckAudience;
 using ::google::jwt_verify::Status;
 
@@ -170,7 +168,7 @@ void AuthenticatorImpl::startVerify() {
   // existing access token is valid (for another 1 second). It forwards the request to Istio Ingressgateway 
   // and subsequently to some pod with an envoy sidecar. Meanwhile, 1 second has passed and when envoy checks 
   // the token it finds that it has expired.   
-  const uint64_t now = absl::ToUnixSeconds(absl::Now());
+  const uint64_t now = timeSource().systemTime();
   const uint32_t nbf_slack = jwks_data_->getJwtProvider().nbf_slack();
   const uint32_t exp_slack = jwks_data_->getJwtProvider().exp_slack();
 
