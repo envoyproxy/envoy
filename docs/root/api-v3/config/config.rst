@@ -16,3 +16,4 @@ Extensions
   cluster/cluster
   grpc_credential/grpc_credential
   retry/retry
+  trace/trace
