@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -304,8 +305,7 @@ public:
     callbacks_.streamInfo().filterState()->setData(
         "num_internal_redirects",
         std::make_shared<StreamInfo::UInt32AccessorImpl>(num_previous_redirects),
-        StreamInfo::FilterState::StateType::Mutable,
-        StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
   }
 
   void setIncludeAttemptCountInRequest(bool include) {
@@ -4373,6 +4373,58 @@ TEST_F(RouterTest, DirectResponseWithoutLocation) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
+}
+
+// Allows verifying the state of the upstream StreamInfo
+class TestAccessLog : public AccessLog::Instance {
+public:
+  explicit TestAccessLog(std::function<void(const StreamInfo::StreamInfo&)> func) : func_(func) {}
+
+  void log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
+           const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& info) override {
+    func_(info);
+  }
+
+private:
+  std::function<void(const StreamInfo::StreamInfo&)> func_;
+};
+
+// Verifies that we propagate the upstream connection filter state to the upstream request filter
+// state.
+TEST_F(RouterTest, PropagatesUpstreamFilterState) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+
+  // This pattern helps ensure that we're actually invoking the callback.
+  bool filter_state_verified = false;
+  router_.config().upstream_logs_.push_back(
+      std::make_shared<TestAccessLog>([&](const auto& stream_info) {
+        filter_state_verified = stream_info.upstreamFilterState()->hasDataWithName("upstream data");
+      }));
+
+  upstream_stream_info_.filterState()->setData(
+      "upstream data", std::make_unique<StreamInfo::UInt32AccessorImpl>(123),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+  expectResponseTimerCreate();
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+
+  Http::TestRequestHeaderMapImpl headers{};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+
+  EXPECT_TRUE(filter_state_verified);
 }
 
 TEST_F(RouterTest, UpstreamSSLConnection) {
