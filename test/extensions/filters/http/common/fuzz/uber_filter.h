@@ -66,6 +66,19 @@ public:
     ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
   }
 
+  void addFileDescriptorsRecursively(const Protobuf::FileDescriptor* descriptor,
+                                     Protobuf::FileDescriptorSet* set,
+                                     absl::flat_hash_set<absl::string_view>* added_descriptors) {
+    if (!added_descriptors->insert(descriptor->name()).second) {
+      // Already added.
+      return;
+    }
+    for (int i = 0; i < descriptor->dependency_count(); i++) {
+      addFileDescriptorsRecursively(descriptor->dependency(i), set, added_descriptors);
+    }
+    descriptor->CopyTo(set->add_file());
+  }
+
   void addProtoDescriptor(absl::string_view filter_name, Protobuf::Message* message) {
     if (filter_name.find("grpc_json_transcoder") != absl::string_view::npos) {
       envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder& config =
@@ -76,15 +89,11 @@ public:
       config.add_services("bookstore.Bookstore");
 
       Protobuf::FileDescriptorSet descriptor_set;
-      for (const auto& file : {"google/api/http.proto", "google/protobuf/descriptor.proto",
-                               "google/api/annotations.proto", "google/protobuf/any.proto",
-                               "google/api/httpbody.proto", "google/protobuf/empty.proto",
-                               "google/protobuf/struct.proto", "test/proto/bookstore.proto"}) {
-        const auto* file_descriptor =
-            Protobuf::DescriptorPool::generated_pool()->FindFileByName(file);
-        ASSERT(file_descriptor != nullptr);
-        file_descriptor->CopyTo(descriptor_set.add_file());
-      }
+      const auto* file_descriptor =
+          Protobuf::DescriptorPool::generated_pool()->FindFileByName("test/proto/bookstore.proto");
+      ASSERT(file_descriptor != nullptr);
+      absl::flat_hash_set<absl::string_view> added_descriptors;
+      addFileDescriptorsRecursively(file_descriptor, &descriptor_set, &added_descriptors);
       descriptor_set.SerializeToString(config.mutable_proto_descriptor_bin());
     }
   }
