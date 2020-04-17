@@ -429,3 +429,11 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "statusor_lib",
+    hdrs = ["statusor.h"],
+    deps = [
+        "//third_party/statusor:statusor_lib",
+    ],
+)

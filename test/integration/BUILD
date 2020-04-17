@@ -91,7 +91,6 @@ py_binary(
     name = "capture_fuzz_gen",
     srcs = ["capture_fuzz_gen.py"],
     licenses = ["notice"],  # Apache 2
-    python_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         ":capture_fuzz_proto_py_proto",
@@ -175,9 +174,9 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//include/envoy/network:filter_interface",
-        "//include/envoy/registry",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/config:utility_lib",
+        "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -271,7 +270,6 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
-        "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
@@ -358,8 +356,8 @@ envoy_cc_test(
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
-        "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -379,8 +377,8 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/access_loggers/grpc:http_config",
         "//source/extensions/filters/http/buffer:config",
-        "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -584,10 +582,10 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/filters/http/cors:config",
-        "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:clear_route_cache_filter_lib",
+        "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:process_context_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
@@ -633,8 +631,9 @@ envoy_cc_test(
     srcs = [
         "echo_integration_test.cc",
     ],
-    # This test must be run in exclusive mode: see comments in AddRemoveListener
-    tags = ["exclusive"],
+    # Uncomment this line to run this test repeatedly in exclusive mode if not using docker-sandbox,
+    # or RBE, see comments in AddRemoveListener.
+    # tags = ["exclusive"],
     deps = [
         ":integration_lib",
         "//source/extensions/filters/network/echo:config",
@@ -839,6 +838,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//include/envoy/registry",
         "//source/common/grpc:common_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

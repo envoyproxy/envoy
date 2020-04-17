@@ -79,29 +79,45 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
 * Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
   particularly risky PRs until after the release is tagged. This is because we aim for master to be
   at release candidate quality at all times.
-* Do a final check of the [release notes](docs/root/intro/version_history.rst) and make any needed
-  corrections.
-* Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
-  "1.6.0". Also remove the "Pending" tags and add dates to the top of the [release notes](docs/root/intro/version_history.rst)
-  and [deprecated log](docs/root/intro/deprecated.rst). Get a review and merge.
-* **Wait for tests to pass on
-  [master](https://circleci.com/gh/envoyproxy/envoy/tree/master).**
+* Do a final check of the [release notes](docs/root/version_history/current.rst):
+  * Make any needed corrections (grammar, punctuation, formatting, etc.).
+  * Check to see if any security/stable version release notes are duplicated in
+    the major version release notes. These should not be duplicated.
+  * If the "Deprecated" section is empty, delete it.
+  * Remove the "Pending" tags and add dates to the top of the [release notes for this version](docs/root/version_history/current.rst).
+  * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
+    "1.6.0".
+  * Get a review and merge.
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
   start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
   [VERSION](VERSION).**
 * Create a branch from the tagged release, e.g. "release/v1.6". It will be used for the
   [stable releases](RELEASES.md#stable-releases).
-* Monitor the CircleCI tag build to make sure that the final docker images get pushed along with
+* Monitor the AZP tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
   [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
-* Contact rdl@ on Slack so that the website can be updated for the new release.
+* Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the
   Envoy account post).
-* Do a new PR to update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". At
-  the same time, also add a new empty "pending" section to the [release
-  notes](docs/root/intro/version_history.rst) and to [deprecated log](docs/root/intro/deprecated.rst) for the
-  following version. E.g., "1.7.0 (pending)".
+* Do a new PR to setup the next version
+  * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". 
+  * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
+    release version number in the filename, and add an entry for the new file in the `toctree` in 
+    [version_history.rst](docs/root/version_history/version_history.rst).
+  * Create a new "current" version history file at the [release
+  notes](docs/root/version_history/current.rst) for the following version. E.g., "1.7.0 (pending)". Use
+  this text as the template for the new file:
+```
+1.7.0 (Pending)
+===============
+
+Changes
+-------
+
+Deprecated
+----------
+```
 * Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh`)
   to file tracking issues for code which can be removed.
 * Run the deprecate_features.py script (e.g. `sh tools/deprecate_features/deprecate_features.sh`)

@@ -54,10 +54,10 @@ N/A if there were no documentation changes.
 ### <a name="relnotes"></a>Release notes
 
 If this change is user impacting OR extension developer impacting (filter API, etc.) you **must**
-add a release note to [version_history.rst](docs/root/intro/version_history.rst). Please include
-any relevant links. Each release note should be prefixed with the relevant subsystem in
-**alphabetical order** (see existing examples as a guide) and include links to relevant parts of the
-documentation. Thank you! Please write in N/A if there are no release notes.
+add a release note to the [version history](docs/root/version_history/current.rst) for the
+current version. Please include any relevant links. Each release note should be prefixed with the
+relevant subsystem in **alphabetical order** (see existing examples as a guide) and include links
+to relevant parts of the documentation. Thank you! Please write in N/A if there are no release notes.
 
 ### <a name="issues"></a>Issues
 
@@ -73,11 +73,10 @@ you may instead just tag the PR with the issue:
 
 ### <a name="deprecated"></a>Deprecated
 
-If this PR deprecates existing Envoy APIs or code, it should include
-an update to the [deprecated file](docs/root/intro/deprecated.rst) and a one line note in the PR
-description.
+If this PR deprecates existing Envoy APIs or code, it should include an update to the deprecated
+section of the [version history](docs/root/version_history/current.rst) and a one line note in the
+PR description.
 
 If you mark existing APIs or code as deprecated, when the next release is cut, the
 deprecation script will create and assign an issue to you for
 cleaning up the deprecated code path.
-

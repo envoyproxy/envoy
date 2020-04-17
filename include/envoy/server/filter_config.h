@@ -251,7 +251,7 @@ public:
  */
 class ListenerFilterConfigFactoryBase : public Config::TypedFactory {
 public:
-  virtual ~ListenerFilterConfigFactoryBase() = default;
+  ~ListenerFilterConfigFactoryBase() override = default;
 };
 
 /**
@@ -309,7 +309,7 @@ public:
  */
 class ProtocolOptionsFactory : public Config::TypedFactory {
 public:
-  virtual ~ProtocolOptionsFactory() = default;
+  ~ProtocolOptionsFactory() override = default;
 
   /**
    * Create a particular filter's protocol specific options implementation. If the factory

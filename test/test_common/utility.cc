@@ -102,14 +102,14 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
 
   size_t rhs_slice = 0;
   size_t rhs_offset = 0;
-  for (size_t lhs_slice = 0; lhs_slice < lhs_slices.size(); lhs_slice++) {
-    for (size_t lhs_offset = 0; lhs_offset < lhs_slices[lhs_slice].len_; lhs_offset++) {
+  for (auto& lhs_slice : lhs_slices) {
+    for (size_t lhs_offset = 0; lhs_offset < lhs_slice.len_; lhs_offset++) {
       while (rhs_offset >= rhs_slices[rhs_slice].len_) {
         rhs_slice++;
         ASSERT(rhs_slice < rhs_slices.size());
         rhs_offset = 0;
       }
-      auto lhs_str = static_cast<const uint8_t*>(lhs_slices[lhs_slice].mem_);
+      auto lhs_str = static_cast<const uint8_t*>(lhs_slice.mem_);
       auto rhs_str = static_cast<const uint8_t*>(rhs_slices[rhs_slice].mem_);
       if (lhs_str[lhs_offset] != rhs_str[rhs_offset]) {
         return false;
@@ -141,31 +141,36 @@ Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::str
   return findByName(store.gauges(), name);
 }
 
+Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
+                                                         const std::string& name) {
+  return findByName(store.textReadouts(), name);
+}
+
 void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
                                    Event::TestTimeSystem& time_system) {
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
-    time_system.sleep(std::chrono::milliseconds(10));
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
   }
 }
 
 void TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
                                    Event::TestTimeSystem& time_system) {
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
-    time_system.sleep(std::chrono::milliseconds(10));
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
   }
 }
 
 void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
                                  Event::TestTimeSystem& time_system) {
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
-    time_system.sleep(std::chrono::milliseconds(10));
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
   }
 }
 
 void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
                                  Event::TestTimeSystem& time_system) {
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
-    time_system.sleep(std::chrono::milliseconds(10));
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
   }
 }
 

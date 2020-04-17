@@ -12,7 +12,7 @@ namespace Http {
 class MockHttp1StreamEncoderOptions : public Http1StreamEncoderOptions {
 public:
   MockHttp1StreamEncoderOptions();
-  ~MockHttp1StreamEncoderOptions();
+  ~MockHttp1StreamEncoderOptions() override;
 
   MOCK_METHOD(void, disableChunkEncoding, ());
 };
@@ -34,7 +34,7 @@ public:
 class MockRequestEncoder : public MockStreamEncoder, public RequestEncoder {
 public:
   MockRequestEncoder();
-  ~MockRequestEncoder();
+  ~MockRequestEncoder() override;
 
   // Http::RequestEncoder
   MOCK_METHOD(void, encodeHeaders, (const RequestHeaderMap& headers, bool end_stream));
@@ -44,7 +44,7 @@ public:
 class MockResponseEncoder : public MockStreamEncoder, public ResponseEncoder {
 public:
   MockResponseEncoder();
-  ~MockResponseEncoder();
+  ~MockResponseEncoder() override;
 
   // Http::ResponseEncoder
   MOCK_METHOD(void, encode100ContinueHeaders, (const ResponseHeaderMap& headers));
