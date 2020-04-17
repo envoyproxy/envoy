@@ -39,7 +39,7 @@ void AllocatorImpl::debugPrint() {
 }
 #endif
 
-// Counter and Gauge both inherit from from RefcountInterface and
+// Counter, Gauge and TextReadout inherit from RefcountInterface and
 // Metric. MetricImpl takes care of most of the Metric API, but we need to cover
 // symbolTable() here, which we don't store directly, but get it via the alloc,
 // which we need in order to clean up the counter and gauge maps in that class
@@ -101,10 +101,6 @@ public:
 protected:
   AllocatorImpl& alloc_;
 
-  // Holds backing store shared by both CounterImpl and GaugeImpl. CounterImpl
-  // adds another field, pending_increment_, that is not used in Gauge.
-  std::atomic<uint64_t> value_{0};
-
   // ref_count_ can be incremented as an atomic, without taking a new lock, as
   // the critical 0->1 transition occurs in makeCounter and makeGauge, which
   // already hold the lock. Increment also occurs when copying shared pointers,
@@ -144,6 +140,7 @@ public:
   uint64_t value() const override { return value_; }
 
 private:
+  std::atomic<uint64_t> value_{0};
   std::atomic<uint64_t> pending_increment_{0};
 };
 
@@ -226,12 +223,42 @@ public:
       break;
     }
   }
+
+private:
+  std::atomic<uint64_t> value_{0};
+};
+
+class TextReadoutImpl : public StatsSharedImpl<TextReadout> {
+public:
+  TextReadoutImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
+                  const StatNameTagVector& stat_name_tags)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
+
+  void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
+    const size_t count = alloc_.text_readouts_.erase(statName());
+    ASSERT(count == 1);
+  }
+
+  // Stats::TextReadout
+  void set(std::string&& value) override {
+    absl::MutexLock lock(&mutex_);
+    value_ = std::move(value);
+  }
+  std::string value() const override {
+    absl::MutexLock lock(&mutex_);
+    return value_;
+  }
+
+private:
+  mutable absl::Mutex mutex_;
+  std::string value_ ABSL_GUARDED_BY(mutex_);
 };
 
 CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracted_name,
                                             const StatNameTagVector& stat_name_tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
+  ASSERT(text_readouts_.find(name) == text_readouts_.end());
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
     return CounterSharedPtr(*iter);
@@ -246,6 +273,7 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
                                         Gauge::ImportMode import_mode) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
+  ASSERT(text_readouts_.find(name) == text_readouts_.end());
   auto iter = gauges_.find(name);
   if (iter != gauges_.end()) {
     return GaugeSharedPtr(*iter);
@@ -254,6 +282,21 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
       GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags, import_mode));
   gauges_.insert(gauge.get());
   return gauge;
+}
+
+TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_extracted_name,
+                                                    const StatNameTagVector& stat_name_tags) {
+  Thread::LockGuard lock(mutex_);
+  ASSERT(counters_.find(name) == counters_.end());
+  ASSERT(gauges_.find(name) == gauges_.end());
+  auto iter = text_readouts_.find(name);
+  if (iter != text_readouts_.end()) {
+    return TextReadoutSharedPtr(*iter);
+  }
+  auto text_readout =
+      TextReadoutSharedPtr(new TextReadoutImpl(name, *this, tag_extracted_name, stat_name_tags));
+  text_readouts_.insert(text_readout.get());
+  return text_readout;
 }
 
 bool AllocatorImpl::isMutexLockedForTest() {

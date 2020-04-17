@@ -384,6 +384,7 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
                            resource_manager.retries().max()));
 }
 
+// TODO(efimki): Add support of text readouts stats.
 void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
   envoy::admin::v3::Clusters clusters;
   for (auto& cluster_pair : server_.clusterManager().clusters()) {
@@ -461,6 +462,7 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
   response.add(MessageUtil::getJsonStringFromMessage(clusters, true)); // pretty-print
 }
 
+// TODO(efimki): Add support of text readouts stats.
 void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
   for (auto& cluster : server_.clusterManager().clusters()) {
     addOutlierInfo(cluster.second.get().info()->name(), cluster.second.get().outlierDetector(),
@@ -914,11 +916,18 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::ResponseHeaderMa
     }
   }
 
+  std::map<std::string, std::string> text_readouts;
+  for (const auto& text_readout : server_.stats().textReadouts()) {
+    if (shouldShowMetric(*text_readout, used_only, regex)) {
+      text_readouts.emplace(text_readout->name(), text_readout->value());
+    }
+  }
+
   if (const auto format_value = formatParam(params)) {
     if (format_value.value() == "json") {
       response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-      response.add(
-          AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), used_only, regex));
+      response.add(AdminImpl::statsAsJson(all_stats, text_readouts, server_.stats().histograms(),
+                                          used_only, regex));
     } else if (format_value.value() == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {
@@ -927,6 +936,10 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::ResponseHeaderMa
       rc = Http::Code::NotFound;
     }
   } else { // Display plain stats if format query param is not there.
+    for (const auto& text_readout : text_readouts) {
+      response.add(fmt::format("{}: \"{}\"\n", text_readout.first,
+                               Html::Utility::sanitize(text_readout.second)));
+    }
     for (const auto& stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
     }
@@ -988,6 +1001,7 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extracted_na
   return sanitizeName(fmt::format("envoy_{0}", extracted_name));
 }
 
+// TODO(efimki): Add support of text readouts stats.
 uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
@@ -1062,12 +1076,20 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
 
 std::string
 AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+                       const std::map<std::string, std::string>& text_readouts,
                        const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                        const bool used_only, const absl::optional<std::regex> regex,
                        const bool pretty_print) {
 
   ProtobufWkt::Struct document;
   std::vector<ProtobufWkt::Value> stats_array;
+  for (const auto& text_readout : text_readouts) {
+    ProtobufWkt::Struct stat_obj;
+    auto* stat_obj_fields = stat_obj.mutable_fields();
+    (*stat_obj_fields)["name"] = ValueUtil::stringValue(text_readout.first);
+    (*stat_obj_fields)["value"] = ValueUtil::stringValue(text_readout.second);
+    stats_array.push_back(ValueUtil::structValue(stat_obj));
+  }
   for (const auto& stat : all_stats) {
     ProtobufWkt::Struct stat_obj;
     auto* stat_obj_fields = stat_obj.mutable_fields();

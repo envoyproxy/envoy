@@ -98,6 +98,13 @@ public:
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogramFromStatNameWithTags(name, tags, unit);
   }
+
+  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptConstRef tags) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->textReadoutFromStatNameWithTags(name, tags);
+  }
+
   NullGaugeImpl& nullGauge(const std::string& str) override {
     return wrapped_scope_->nullGauge(str);
   }
@@ -114,6 +121,10 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName(), unit);
   }
+  TextReadout& textReadoutFromString(const std::string& name) override {
+    StatNameManagedStorage storage(name, symbolTable());
+    return textReadoutFromStatName(storage.statName());
+  }
 
   CounterOptConstRef findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
@@ -126,6 +137,10 @@ public:
   HistogramOptConstRef findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findHistogram(name);
+  }
+  TextReadoutOptConstRef findTextReadout(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->findTextReadout(name);
   }
 
   const SymbolTable& constSymbolTable() const override {
@@ -178,6 +193,15 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogramFromString(name, unit);
   }
+  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptConstRef tags) override {
+    Thread::LockGuard lock(lock_);
+    return store_.textReadoutFromStatNameWithTags(name, tags);
+  }
+  TextReadout& textReadoutFromString(const std::string& name) override {
+    Thread::LockGuard lock(lock_);
+    return store_.textReadoutFromString(name);
+  }
   CounterOptConstRef findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findCounter(name);
@@ -189,6 +213,10 @@ public:
   HistogramOptConstRef findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findHistogram(name);
+  }
+  TextReadoutOptConstRef findTextReadout(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.findTextReadout(name);
   }
   const SymbolTable& constSymbolTable() const override { return store_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
@@ -202,10 +230,13 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauges();
   }
-
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     Thread::LockGuard lock(lock_);
     return store_.histograms();
+  }
+  std::vector<TextReadoutSharedPtr> textReadouts() const override {
+    Thread::LockGuard lock(lock_);
+    return store_.textReadouts();
   }
 
   // Stats::StoreRoot

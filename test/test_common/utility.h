@@ -237,6 +237,14 @@ public:
                              Event::TestTimeSystem& time_system);
 
   /**
+   * Find a readout in a stats store.
+   * @param store supplies the stats store.
+   * @param name supplies the name to search for.
+   * @return Stats::TextReadoutSharedPtr the readout or nullptr if there is none.
+   */
+  static Stats::TextReadoutSharedPtr findTextReadout(Stats::Store& store, const std::string& name);
+
+  /**
    * Convert a string list of IP addresses into a list of network addresses usable for DNS
    * response testing.
    */

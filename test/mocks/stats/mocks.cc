@@ -30,6 +30,12 @@ MockGauge::MockGauge() : used_(false), value_(0), import_mode_(ImportMode::Accum
 }
 MockGauge::~MockGauge() = default;
 
+MockTextReadout::MockTextReadout() {
+  ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
+  ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
+}
+MockTextReadout::~MockTextReadout() = default;
+
 MockHistogram::MockHistogram() {
   ON_CALL(*this, unit()).WillByDefault(ReturnPointee(&unit_));
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
