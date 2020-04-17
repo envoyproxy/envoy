@@ -438,6 +438,13 @@ public:
   static ProtobufWkt::Value boolValue(bool b);
 
   /**
+   * Wrap double into ProtobufWkt::Value string value.
+   * @param d double to be wrapped.
+   * @return wrapped double.
+   */
+  static ProtobufWkt::Value numberValue(const double str);
+
+  /**
    * Wrap ProtobufWkt::Struct into ProtobufWkt::Value struct value.
    * @param obj struct to be wrapped.
    * @return wrapped struct.
