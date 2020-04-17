@@ -381,12 +381,13 @@ void InstanceImpl::initialize(const Options& options,
 
   // The broad order of initialization from this point on is the following:
   // 1. Statically provisioned configuration (bootstrap) are loaded.
-  // 2. Cluster manager is created and all primary (i.e. with endpoint assignments not provisioned
-  //    through xDS) clusters are initialized.
+  // 2. Cluster manager is created and all primary clusters (i.e. with endpoint assignments
+  //    provisioned statically in bootstrap, discovered through DNS or file based CDS) are
+  //    initialized.
   // 3. Various services are initialized and configured using the bootstrap config.
   // 4. RTDS is initialized using primary clusters. This  allows runtime overrides to be fully
   //    configured before the rest of xDS configuration is provisioned.
-  // 5. Secondary clusters are initialized.
+  // 5. Secondary clusters (with endpoint assignments provisioned by xDS servers) are initialized.
   // 6. The rest of the dynamic configuration is provisioned.
   //
   // Please note: this order requires that RTDS is provisioned using a primary cluster. If RTDS is

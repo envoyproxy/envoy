@@ -74,12 +74,12 @@ class ClusterManagerFactory;
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
  * persistent and shared among multiple ongoing requests/connections.
  * Cluster manager is initialized in two phases. In the first phase which begins at the construction
- * all primary (i.e. with endpoint assignments not provisioned through xDS) clusters are
- * initialized.
+ * all primary clusters (i.e. with endpoint assignments provisioned statically in bootstrap,
+ * discovered through DNS or file based CDS) are initialized.
  * After the first phase has completed the server instance initializes services (i.e. RTDS) needed
  * to successfully deploy the rest of dynamic configuration.
- * In the second phase all secondary clusters are initialized and then the rest of the configuration
- * provisioned through xDS.
+ * In the second phase all secondary clusters (with endpoint assignments provisioned by xDS servers)
+ * are initialized and then the rest of the configuration provisioned through xDS.
  */
 class ClusterManager {
 public:
