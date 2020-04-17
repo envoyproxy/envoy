@@ -10,8 +10,10 @@ load(
     "envoy_package",
     "envoy_select_hot_restart",
 )
-load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
-load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load(
+    "//source/extensions:all_extensions.bzl",
+    "envoy_all_extensions",
+)
 
 envoy_package()
 
@@ -313,11 +315,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:test_time_lib",
-    ] + select({
-        "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
-        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
-        "//conditions:default": envoy_all_extensions(),
-    }),
+    ] + envoy_all_extensions(),
 )
 
 filegroup(
