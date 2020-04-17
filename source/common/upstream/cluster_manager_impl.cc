@@ -150,14 +150,9 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // avoid double pause ClusterLoadAssignment.
       if (cm_.adsMux() == nullptr) {
         initializeSecondaryClusters();
-        return;
       } else {
         for (auto&& type_url : target_type_urls) {
-          bool cluster_load_assignment_paused = false;
-          cluster_load_assignment_paused =
-              cluster_load_assignment_paused || cm_.adsMux()->paused(type_url);
-
-          if (!cluster_load_assignment_paused) {
+          if (!cm_.adsMux()->paused(type_url)) {
             cm_.adsMux()->pause(type_url);
             Cleanup eds_resume([this, type_url] { cm_.adsMux()->resume(type_url); });
           }

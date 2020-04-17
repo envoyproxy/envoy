@@ -112,5 +112,6 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
 struct SubscriptionStats {
   ALL_SUBSCRIPTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
+
 } // namespace Config
 } // namespace Envoy

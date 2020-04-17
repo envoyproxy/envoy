@@ -6,7 +6,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -69,11 +68,10 @@ void CdsApiImpl::onConfigUpdate(
     const std::string& system_version_info) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
-    const auto target_type_urls =
-        Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-    cm_.adsMux()->pause(target_type_urls);
-    maybe_eds_resume = std::make_unique<Cleanup>(
-        [this, target_type_urls] { cm_.adsMux()->resume(target_type_urls); });
+    const auto type_url = Grpc::Common::typeUrl(getResourceName());
+    cm_.adsMux()->pause(type_url);
+    maybe_eds_resume =
+        std::make_unique<Cleanup>([this, type_url] { cm_.adsMux()->resume(type_url); });
   }
 
   ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),
