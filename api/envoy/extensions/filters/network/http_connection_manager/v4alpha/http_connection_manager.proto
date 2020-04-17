@@ -7,7 +7,7 @@ import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/protocol.proto";
 import "envoy/config/route/v4alpha/route.proto";
 import "envoy/config/route/v4alpha/scoped_route.proto";
-import "envoy/config/trace/v4alpha/trace.proto";
+import "envoy/config/trace/v4alpha/http_tracer.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 
@@ -148,9 +148,15 @@ message HttpConnectionManager {
     repeated type.tracing.v3.CustomTag custom_tags = 8;
 
     // Configuration for an external tracing provider.
-    // If not specified, Envoy will fall back to using tracing provider configuration
-    // from the bootstrap config.
-    // [#not-implemented-hide:]
+    // If not specified, no tracing will be performed.
+    //
+    // .. attention::
+    //   Please be aware that *envoy.tracers.opencensus* provider can only be configured once
+    //   in Envoy lifetime.
+    //   Any attempts to reconfigure it or to use different configurations for different HCM filters
+    //   will be rejected.
+    //   Such a constraint is inherent to OpenCensus itself. It cannot be overcome without changes
+    //   on OpenCensus side.
     config.trace.v4alpha.Tracing.Http provider = 9;
   }
 

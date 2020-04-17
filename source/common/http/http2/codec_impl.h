@@ -22,7 +22,6 @@
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
 #include "common/http/utility.h"
-#include "common/runtime/runtime_impl.h"
 
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
@@ -76,6 +75,39 @@ public:
                                           HeaderString& cookies);
 };
 
+class ConnectionImpl;
+
+// Abstract nghttp2_session factory. Used to enable injection of factories for testing.
+class Nghttp2SessionFactory {
+public:
+  virtual ~Nghttp2SessionFactory() = default;
+
+  // Returns a new nghttp2_session to be used with |connection|.
+  virtual nghttp2_session* create(const nghttp2_session_callbacks* callbacks,
+                                  ConnectionImpl* connection, const nghttp2_option* options) PURE;
+
+  // Initializes the |session|.
+  virtual void init(nghttp2_session* session, ConnectionImpl* connection,
+                    const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
+};
+
+class ProdNghttp2SessionFactory : public Nghttp2SessionFactory {
+public:
+  nghttp2_session* create(const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
+                          const nghttp2_option* options) override;
+
+  void init(nghttp2_session* session, ConnectionImpl* connection,
+            const envoy::config::core::v3::Http2ProtocolOptions& options) override;
+
+  // Returns a global factory instance. Note that this is possible because no internal state is
+  // maintained; the thread safety of create() and init()'s side effects is guaranteed by Envoy's
+  // worker based threading model.
+  static ProdNghttp2SessionFactory& get() {
+    static ProdNghttp2SessionFactory* instance = new ProdNghttp2SessionFactory();
+    return *instance;
+  }
+};
+
 /**
  * Base class for HTTP/2 client and server codecs.
  */
@@ -107,6 +139,8 @@ public:
   }
 
 protected:
+  friend class ProdNghttp2SessionFactory;
+
   /**
    * Wrapper for static nghttp2 callback dispatchers.
    */
@@ -335,6 +369,9 @@ protected:
   using ServerStreamImplPtr = std::unique_ptr<ServerStreamImpl>;
 
   ConnectionImpl* base() { return this; }
+  // NOTE: Always use non debug nullptr checks against the return value of this function. There are
+  // edge cases (such as for METADATA frames) where nghttp2 will issue a callback for a stream_id
+  // that is not associated with an existing stream.
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
   void sendPendingFrames();
@@ -424,6 +461,13 @@ protected:
   // from corresponding http2_protocol_options. Default value is 10.
   const uint32_t max_inbound_window_update_frames_per_data_frame_sent_;
 
+  // For the flood mitigation to work the onSend callback must be called once for each outbound
+  // frame. This is what the nghttp2 library is doing, however this is not documented. The
+  // Http2FloodMitigationTest.* tests in test/integration/http2_integration_test.cc will break if
+  // this changes in the future. Also it is important that onSend does not do partial writes, as the
+  // nghttp2 library will keep calling this callback to write the rest of the frame.
+  ssize_t onSend(const uint8_t* data, size_t length);
+
 private:
   virtual ConnectionCallbacks& callbacks() PURE;
   virtual int onBeginHeaders(const nghttp2_frame* frame) PURE;
@@ -435,12 +479,6 @@ private:
   virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
 
-  // For the flood mitigation to work the onSend callback must be called once for each outbound
-  // frame. This is what the nghttp2 library is doing, however this is not documented. The
-  // Http2FloodMitigationTest.* tests in test/integration/http2_integration_test.cc will break if
-  // this changes in the future. Also it is important that onSend does not do partial writes, as the
-  // nghttp2 library will keep calling this callback to write the rest of the frame.
-  ssize_t onSend(const uint8_t* data, size_t length);
   int onStreamClose(int32_t stream_id, uint32_t error_code);
   int onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len);
   int onMetadataFrameComplete(int32_t stream_id, bool end_metadata);
@@ -471,7 +509,8 @@ public:
                        Stats::Scope& stats,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
-                       const uint32_t max_response_headers_count);
+                       const uint32_t max_response_headers_count,
+                       Nghttp2SessionFactory& http2_session_factory);
 
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;

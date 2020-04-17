@@ -4,6 +4,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
+#include "common/event/deferred_task.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/stats/isolated_store_impl.h"
@@ -36,7 +37,7 @@ private:
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
   Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher());
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   ReadyWatcher watcher1;
 
   dispatcher->deferredDelete(
@@ -64,9 +65,31 @@ TEST(DeferredDeleteTest, DeferredDelete) {
   dispatcher->clearDeferredDeleteList();
 }
 
+TEST(DeferredTaskTest, DeferredTask) {
+  InSequence s;
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  ReadyWatcher watcher1;
+
+  DeferredTaskUtil::deferredRun(*dispatcher, [&watcher1]() -> void { watcher1.ready(); });
+  // The first one will get deleted inline.
+  EXPECT_CALL(watcher1, ready());
+  dispatcher->clearDeferredDeleteList();
+
+  // Deferred task is scheduled FIFO.
+  ReadyWatcher watcher2;
+  ReadyWatcher watcher3;
+  DeferredTaskUtil::deferredRun(*dispatcher, [&watcher2]() -> void { watcher2.ready(); });
+  DeferredTaskUtil::deferredRun(*dispatcher, [&watcher3]() -> void { watcher3.ready(); });
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher3, ready());
+  dispatcher->clearDeferredDeleteList();
+}
+
 class DispatcherImplTest : public testing::Test {
 protected:
-  DispatcherImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {
+  DispatcherImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {
     dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
@@ -246,7 +269,7 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
 class NotStartedDispatcherImplTest : public testing::Test {
 protected:
   NotStartedDispatcherImplTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   Api::ApiPtr api_;
   DispatcherPtr dispatcher_;
@@ -261,7 +284,7 @@ TEST_F(NotStartedDispatcherImplTest, IsThreadSafe) {
 class DispatcherMonotonicTimeTest : public testing::Test {
 protected:
   DispatcherMonotonicTimeTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
   ~DispatcherMonotonicTimeTest() override = default;
 
   Api::ApiPtr api_;
@@ -303,7 +326,7 @@ TEST_F(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
 
 TEST(TimerImplTest, TimerEnabledDisabled) {
   Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher());
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   Event::TimerPtr timer = dispatcher->createTimer([] {});
   EXPECT_FALSE(timer->enabled());
   timer->enableTimer(std::chrono::milliseconds(0));
@@ -341,7 +364,7 @@ public:
 TEST_F(TimerImplTimingTest, TheoreticalTimerTiming) {
   Event::SimulatedTimeSystem time_system;
   Api::ApiPtr api = Api::createApiForTest(time_system);
-  DispatcherPtr dispatcher(api->allocateDispatcher());
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   Event::TimerPtr timer = dispatcher->createTimer([&dispatcher] { dispatcher->exit(); });
 
   const uint64_t timings[] = {0, 10, 50, 1234};
