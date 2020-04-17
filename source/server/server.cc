@@ -224,7 +224,7 @@ void InstanceImpl::flushStatsInternal() {
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
 namespace {
-// Loads a bootstrap object, potentially at a speficic (upgradig if necessary).
+// Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
 void loadBootsrap(absl::optional<uint32_t> bootstrap_version,
                   envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                   std::function<void(Protobuf::Message&, bool)> load_function) {
