@@ -31,19 +31,12 @@ Http::TestRequestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = 
 }
 
 Http::TestResponseHeaderMapImpl upgradeResponseHeaders(const char* upgrade_type = "websocket") {
-  return Http::TestResponseHeaderMapImpl{{":status", "101"},
-                                         {"connection", "upgrade"},
-                                         {"upgrade", upgrade_type},
-                                         {"content-length", "0"}};
+  return Http::TestResponseHeaderMapImpl{
+      {":status", "101"}, {"connection", "upgrade"}, {"upgrade", upgrade_type}};
 }
 
 template <class ProxiedHeaders, class OriginalHeaders>
 void commonValidate(ProxiedHeaders& proxied_headers, const OriginalHeaders& original_headers) {
-  // 0 byte content lengths may be stripped on the H2 path - ignore that as a difference by adding
-  // it back to the proxied headers.
-  if (original_headers.ContentLength() && proxied_headers.ContentLength() == nullptr) {
-    proxied_headers.setContentLength(size_t(0));
-  }
   // If no content length is specified, the HTTP1 codec will add a chunked encoding header.
   if (original_headers.ContentLength() == nullptr &&
       proxied_headers.TransferEncoding() != nullptr) {
@@ -80,6 +73,13 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
     ASSERT_EQ(proxied_request_headers.Scheme()->value().getStringView(), "http");
   } else {
     proxied_request_headers.setScheme("http");
+  }
+
+  // 0 byte content lengths may be stripped on the H2 path - ignore that as a difference by adding
+  // it back to the proxied headers.
+  if (original_request_headers.ContentLength() &&
+      proxied_request_headers.ContentLength() == nullptr) {
+    proxied_request_headers.setContentLength(size_t(0));
   }
 
   commonValidate(proxied_request_headers, original_request_headers);

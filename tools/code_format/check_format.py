@@ -664,8 +664,9 @@ def checkSourceLine(line, file_path, reportError):
 
   if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
      ('.counterFromString(' in line or '.gaugeFromString(' in line or \
-      '.histogramFromString(' in line or '->counterFromString(' in line or \
-      '->gaugeFromString(' in line or '->histogramFromString(' in line):
+      '.histogramFromString(' in line or '.textReadoutFromString(' in line or \
+      '->counterFromString(' in line or '->gaugeFromString(' in line or \
+      '->histogramFromString(' in line or '->textReadoutFromString(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
   if re.search("envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}", line):
