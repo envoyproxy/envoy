@@ -16,8 +16,8 @@ envoy_cc_extension(
     deps = [
         "//source/common/compressor:compressor_lib",
         "//source/common/http:headers_lib",
+        "//source/extensions/compression/common:compressor_factory_base_lib",
         "//source/extensions/filters/http:well_known_names",
-        "//source/extensions/filters/http/compressor:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/compressor/gzip/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/compression/gzip/compressor/v3:pkg_cc_proto",
     ],
 )

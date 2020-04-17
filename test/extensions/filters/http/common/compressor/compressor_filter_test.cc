@@ -50,7 +50,7 @@ protected:
 {
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -185,7 +185,7 @@ TEST_F(CompressorFilterTest, DecodeHeadersWithRuntimeDisabled) {
   },
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -368,7 +368,7 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
 {
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -401,7 +401,7 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
 {
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -430,7 +430,7 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
 {
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -459,7 +459,7 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
 {
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -488,7 +488,7 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
 {
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -527,7 +527,7 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
 {
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -589,7 +589,7 @@ TEST_F(CompressorFilterTest, IsMinimumContentLength) {
   "content_length": 500,
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -621,7 +621,7 @@ TEST_F(CompressorFilterTest, ContentLengthCompression) {
   "content_length": 500,
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -691,7 +691,7 @@ TEST_F(CompressorFilterTest, IsContentTypeAllowed) {
       ],
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
     }
@@ -734,7 +734,7 @@ TEST_F(CompressorFilterTest, ContentTypeNoCompression) {
       ],
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
     }
@@ -798,7 +798,7 @@ TEST_F(CompressorFilterTest, IsEtagAllowed) {
   "disable_on_etag_header": true,
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -827,7 +827,7 @@ TEST_F(CompressorFilterTest, EtagNoCompression) {
   "disable_on_etag_header": true,
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -1004,7 +1004,7 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
   "remove_accept_encoding_header": true,
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }
@@ -1018,7 +1018,7 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
 {
   "compressor_library": {
      "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip"
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
      }
   }
 }

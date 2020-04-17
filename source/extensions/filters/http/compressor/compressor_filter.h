@@ -1,9 +1,9 @@
 #pragma once
 
+#include "envoy/compression/compressor/factory.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
 #include "extensions/filters/http/common/compressor/compressor.h"
-#include "extensions/filters/http/compressor/compressor_factory.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,12 +21,12 @@ public:
   CompressorFilterConfig(
       const envoy::extensions::filters::http::compressor::v3::Compressor& genereic_compressor,
       const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-      CompressorFactoryPtr compressor_factory);
+      Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory);
 
   Envoy::Compressor::CompressorPtr makeCompressor() override;
 
 private:
-  const CompressorFactoryPtr compressor_factory_;
+  const Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory_;
 };
 
 } // namespace Compressor

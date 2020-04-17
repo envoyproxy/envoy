@@ -3,8 +3,8 @@
 #include "common/common/hex.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
 
+#include "extensions/compression/gzip/compressor/config.h"
 #include "extensions/filters/http/compressor/compressor_filter.h"
-#include "extensions/filters/http/compressor/gzip/config.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -18,8 +18,9 @@ class GzipCompressorFilterTest : public testing::Test {
 protected:
   void SetUp() override {
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
-    envoy::extensions::filters::http::compressor::gzip::v3::Gzip gzip;
-    CompressorFactoryPtr gzip_factory = std::make_unique<Gzip::GzipCompressorFactory>(gzip);
+    envoy::extensions::compression::gzip::compressor::v3::Gzip gzip;
+    Envoy::Compression::Compressor::CompressorFactoryPtr gzip_factory =
+        std::make_unique<Compression::Gzip::Compressor::GzipCompressorFactory>(gzip);
     config_ = std::make_shared<CompressorFilterConfig>(compressor, "test.", stats_, runtime_,
                                                        std::move(gzip_factory));
     filter_ = std::make_unique<Common::Compressors::CompressorFilter>(config_);

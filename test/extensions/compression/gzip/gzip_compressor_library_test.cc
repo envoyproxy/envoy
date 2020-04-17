@@ -1,4 +1,4 @@
-#include "extensions/filters/http/compressor/gzip/config.h"
+#include "extensions/compression/gzip/compressor/config.h"
 
 #include "test/test_common/utility.h"
 
@@ -6,9 +6,9 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
-namespace Compressor {
+namespace Compression {
 namespace Gzip {
+namespace Compressor {
 
 class GzipTest : public testing::Test {
 protected:
@@ -16,7 +16,7 @@ protected:
 
   // GzipTest Helpers
   void setUpGzip(std::string&& json) {
-    envoy::extensions::filters::http::compressor::gzip::v3::Gzip gzip;
+    envoy::extensions::compression::gzip::compressor::v3::Gzip gzip;
     TestUtility::loadFromJson(json, gzip);
     factory_ = std::make_unique<GzipCompressorFactory>(gzip);
   }
@@ -102,8 +102,8 @@ TEST_F(GzipTest, AvailableCombinationCompressionStrategyAndLevelConfig) {
       Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level9, "COMPRESSION_LEVEL_9");
 }
 
-} // namespace Gzip
 } // namespace Compressor
-} // namespace HttpFilters
+} // namespace Gzip
+} // namespace Compression
 } // namespace Extensions
 } // namespace Envoy

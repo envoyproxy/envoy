@@ -3,8 +3,7 @@
 #include "envoy/compressor/compressor.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
+namespace Compression {
 namespace Compressor {
 
 class CompressorFactory {
@@ -19,6 +18,5 @@ public:
 using CompressorFactoryPtr = std::unique_ptr<CompressorFactory>;
 
 } // namespace Compressor
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace Compression
 } // namespace Envoy

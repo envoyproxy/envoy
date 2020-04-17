@@ -1,32 +1,33 @@
 #pragma once
 
-#include "envoy/extensions/filters/http/compressor/gzip/v3/gzip.pb.h"
-#include "envoy/extensions/filters/http/compressor/gzip/v3/gzip.pb.validate.h"
+#include "envoy/compression/compressor/factory.h"
+#include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
+#include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.validate.h"
 
 #include "common/compressor/zlib_compressor_impl.h"
 #include "common/http/headers.h"
 
-#include "extensions/filters/http/compressor/factory_base.h"
+#include "extensions/compression/common/compressor_factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
-namespace Compressor {
+namespace Compression {
 namespace Gzip {
+namespace Compressor {
 
 namespace {
 
 const std::string& gzipStatsPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "gzip."); }
 const std::string& gzipExtensionName() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.http.compressor.gzip");
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.compression.gzip.compressor");
 }
 
 } // namespace
 
-class GzipCompressorFactory : public Compressor::CompressorFactory {
+class GzipCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
-  GzipCompressorFactory(const envoy::extensions::filters::http::compressor::gzip::v3::Gzip& gzip);
+  GzipCompressorFactory(const envoy::extensions::compression::gzip::compressor::v3::Gzip& gzip);
 
   Envoy::Compressor::CompressorPtr createCompressor() override;
   const std::string& statsPrefix() const override { return gzipStatsPrefix(); }
@@ -37,11 +38,11 @@ public:
 private:
   friend class GzipTest;
 
-  static Envoy::Compressor::ZlibCompressorImpl::CompressionLevel compressionLevelEnum(
-      envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionLevel
-          compression_level);
+  static Envoy::Compressor::ZlibCompressorImpl::CompressionLevel
+  compressionLevelEnum(envoy::extensions::compression::gzip::compressor::v3::Gzip::CompressionLevel
+                           compression_level);
   static Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
-      envoy::extensions::filters::http::compressor::gzip::v3::Gzip::CompressionStrategy
+      envoy::extensions::compression::gzip::compressor::v3::Gzip::CompressionStrategy
           compression_strategy);
 
   Envoy::Compressor::ZlibCompressorImpl::CompressionLevel compression_level_;
@@ -53,20 +54,20 @@ private:
 };
 
 class GzipCompressorLibraryFactory
-    : public CompressorLibraryFactoryBase<
-          envoy::extensions::filters::http::compressor::gzip::v3::Gzip> {
+    : public Common::CompressorLibraryFactoryBase<
+          envoy::extensions::compression::gzip::compressor::v3::Gzip> {
 public:
   GzipCompressorLibraryFactory() : CompressorLibraryFactoryBase(gzipExtensionName()) {}
 
 private:
-  Compressor::CompressorFactoryPtr createCompressorFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::compressor::gzip::v3::Gzip& config) override;
+  Envoy::Compression::Compressor::CompressorFactoryPtr createCompressorFactoryFromProtoTyped(
+      const envoy::extensions::compression::gzip::compressor::v3::Gzip& config) override;
 };
 
 DECLARE_FACTORY(GzipCompressorLibraryFactory);
 
-} // namespace Gzip
 } // namespace Compressor
-} // namespace HttpFilters
+} // namespace Gzip
+} // namespace Compression
 } // namespace Extensions
 } // namespace Envoy

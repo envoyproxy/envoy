@@ -1,13 +1,11 @@
 #pragma once
 
+#include "envoy/compression/compressor/factory.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/compressor/compressor_factory.h"
-
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
+namespace Compression {
 namespace Compressor {
 
 class NamedCompressorLibraryConfigFactory : public Config::TypedFactory {
@@ -20,6 +18,5 @@ public:
 };
 
 } // namespace Compressor
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace Compression
 } // namespace Envoy

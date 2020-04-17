@@ -76,7 +76,7 @@ public:
           - application/json
         compressor_library:
           typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip
+            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
             memory_level: 3
             window_bits: 10
             compression_level: best_compression
@@ -89,7 +89,7 @@ public:
         "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
         compressor_library:
           typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip
+            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
     )EOF"};
 
   const uint64_t window_bits{15 | 16};
