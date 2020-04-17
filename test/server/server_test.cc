@@ -644,20 +644,29 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2BootstrapFromPbTex
 
 // Validate that bootstrap v3 pb_text with new fields loads fails if V2 config is specified.
 TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromPbText) {
-  options_.bootstrap_version_ = "v2";
+  options_.bootstrap_version_ = 2;
 
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text"),
-      EnvoyException, "Failed to parse at earlier version, trying again at later version.");
+      EnvoyException, "Unable to parse file");
 }
 
 // Validate that bootstrap v2 pb_text with deprecated fields loads fails if V3 config is specified.
 TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromPbText) {
-  options_.bootstrap_version_ = "v3";
+  options_.bootstrap_version_ = 3;
 
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
       EnvoyException, "Unable to parse file");
+}
+
+// Validate that we blow up on invalid version number.
+TEST_P(ServerInstanceImplTest, InvalidBootstrapVersion) {
+  options_.bootstrap_version_ = 1;
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
+      EnvoyException, "Unknown bootstrap version 1.");
 }
 
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {

@@ -8,6 +8,9 @@
 #include <unordered_set>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
@@ -25,6 +28,7 @@
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/http/codes.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
@@ -219,6 +223,26 @@ void InstanceImpl::flushStatsInternal() {
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
+namespace {
+// Loads a bootstrap object, potentially at a speficic (upgradig if necessary).
+void loadBootsrap(absl::optional<uint32_t> bootstrap_version,
+                  envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                  std::function<void(Protobuf::Message&, bool)> load_function) {
+
+  if (!bootstrap_version.has_value()) {
+    load_function(bootstrap, true);
+  } else if (*bootstrap_version == 3) {
+    load_function(bootstrap, false);
+  } else if (*bootstrap_version == 2) {
+    envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
+    load_function(bootstrap_v2, false);
+    Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
+  } else {
+    throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
+  }
+}
+} // namespace
+
 void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                        const Options& options,
                                        ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -233,22 +257,19 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
                          "should be non-empty");
   }
 
-  absl::optional<MessageVersion> version;
-
-  if (options.bootstrapVersion()) {
-    if (options.bootstrapVersion() == "v3") {
-      version = MessageVersion::LATEST_VERSION;
-    } else {
-      version = MessageVersion::EARLIER_VERSION;
-    }
-  }
-
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api, version);
+    loadBootsrap(
+        options.bootstrapVersion(), bootstrap, [&](Protobuf::Message& message, bool do_boosting) {
+          MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
+        });
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor, version);
+    loadBootsrap(options.bootstrapVersion(), bootstrap_override,
+                 [&](Protobuf::Message& message, bool do_boosting) {
+                   MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
+                 });
+    // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSize() != 0) {

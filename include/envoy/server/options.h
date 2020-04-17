@@ -87,9 +87,9 @@ public:
   virtual const envoy::config::bootstrap::v3::Bootstrap& configProto() const PURE;
 
   /**
-   * @return const absl::optional<std::string>& the bootstrap version to use, if specifed.
+   * @return const absl::optional<uint32_t>& the bootstrap version to use, if specifed.
    */
-  virtual const absl::optional<std::string>& bootstrapVersion() const PURE;
+  virtual const absl::optional<uint32_t>& bootstrapVersion() const PURE;
 
   /**
    * @return bool allow unknown fields in the static configuration?

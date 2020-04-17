@@ -103,7 +103,7 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
 
 void jsonConvertInternal(const Protobuf::Message& source,
                          ProtobufMessage::ValidationVisitor& validation_visitor,
-                         Protobuf::Message& dest, absl::optional<MessageVersion> version) {
+                         Protobuf::Message& dest, bool do_boosting = true) {
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
   std::string json;
@@ -112,7 +112,7 @@ void jsonConvertInternal(const Protobuf::Message& source,
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
                                      status.ToString(), source.DebugString()));
   }
-  MessageUtil::loadFromJson(json, dest, validation_visitor, version);
+  MessageUtil::loadFromJson(json, dest, validation_visitor, do_boosting);
 }
 
 using MessageXformFn = std::function<void(Protobuf::Message&, MessageVersion)>;
@@ -129,29 +129,19 @@ public:
 // This relies on the property that any v3 configuration that is readable as
 // v2 has the same semantics in v2/v3, which holds due to the highly structured
 // vN/v(N+1) mechanical transforms.
-void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message,
-                        absl::optional<MessageVersion> version) {
+void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   const Protobuf::Descriptor* earlier_version_desc =
       Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
   // If there is no earlier version of a message or we only accept the latest version, just apply f
   // directly.
-  if (earlier_version_desc == nullptr || version == MessageVersion::LATEST_VERSION) {
+  if (earlier_version_desc == nullptr) {
     f(message, MessageVersion::LATEST_VERSION);
-    return;
-  }
-
-  Protobuf::DynamicMessageFactory dmf;
-  // Only try the earlier version if version is specified as such.
-  if (version == MessageVersion::EARLIER_VERSION) {
-    auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
-    ASSERT(earlier_message != nullptr);
-    f(*earlier_message, MessageVersion::EARLIER_VERSION);
-    Config::VersionConverter::upgrade(*earlier_message, message);
     return;
   }
 
   // Fall back to trying the earlier version first, followed by the latest version.
   try {
+    Protobuf::DynamicMessageFactory dmf;
     auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
     ASSERT(earlier_message != nullptr);
     // Try apply f with an earlier version of the message, then upgrade the
@@ -277,75 +267,77 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
-                               absl::optional<MessageVersion> version) {
-  tryWithApiBoosting(
-      [&json, &validation_visitor](Protobuf::Message& message, MessageVersion message_version) {
-        Protobuf::util::JsonParseOptions options;
-        options.case_insensitive_enum_parsing = true;
-        // Let's first try and get a clean parse when checking for unknown fields;
-        // this should be the common case.
-        options.ignore_unknown_fields = false;
-        const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
-        if (strict_status.ok()) {
-          // Success, no need to do any extra work.
-          return;
-        }
-        // If we fail, we see if we get a clean parse when allowing unknown fields.
-        // This is essentially a workaround
-        // for https://github.com/protocolbuffers/protobuf/issues/5967.
-        // TODO(htuch): clean this up when protobuf supports JSON/YAML unknown field
-        // detection directly.
-        options.ignore_unknown_fields = true;
-        const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
-        // If we still fail with relaxed unknown field checking, the error has nothing
-        // to do with unknown fields.
-        if (!relaxed_status.ok()) {
-          throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
-                               "): " + json);
-        }
-        // We know it's an unknown field at this point. If we're at the latest
-        // version, then it's definitely an unknown field, otherwise we try to
-        // load again at a later version.
-        if (message_version == MessageVersion::LATEST_VERSION) {
-          validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                            strict_status.ToString());
-        } else {
-          throw ApiBoostRetryException("Unknown field, possibly a rename, try again.");
-        }
-      },
-      message, version);
+                               bool do_boosting) {
+  auto load_json = [&json, &validation_visitor](Protobuf::Message& message,
+                                                MessageVersion message_version) {
+    Protobuf::util::JsonParseOptions options;
+    options.case_insensitive_enum_parsing = true;
+    // Let's first try and get a clean parse when checking for unknown fields;
+    // this should be the common case.
+    options.ignore_unknown_fields = false;
+    const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
+    if (strict_status.ok()) {
+      // Success, no need to do any extra work.
+      return;
+    }
+    // If we fail, we see if we get a clean parse when allowing unknown fields.
+    // This is essentially a workaround
+    // for https://github.com/protocolbuffers/protobuf/issues/5967.
+    // TODO(htuch): clean this up when protobuf supports JSON/YAML unknown field
+    // detection directly.
+    options.ignore_unknown_fields = true;
+    const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
+    // If we still fail with relaxed unknown field checking, the error has nothing
+    // to do with unknown fields.
+    if (!relaxed_status.ok()) {
+      throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
+                           "): " + json);
+    }
+    // We know it's an unknown field at this point. If we're at the latest
+    // version, then it's definitely an unknown field, otherwise we try to
+    // load again at a later version.
+    if (message_version == MessageVersion::LATEST_VERSION) {
+      validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
+                                        strict_status.ToString());
+    } else {
+      throw ApiBoostRetryException("Unknown field, possibly a rename, try again.");
+    }
+  };
+
+  if (do_boosting) {
+    tryWithApiBoosting(load_json, message);
+  } else {
+    load_json(message, MessageVersion::LATEST_VERSION);
+  }
 }
 
-void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message,
-                               absl::optional<MessageVersion> version) {
+void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
   // No need to validate if converting to a Struct, since there are no unknown
   // fields possible.
-  loadFromJson(json, message, ProtobufMessage::getNullValidationVisitor(), version);
+  loadFromJson(json, message, ProtobufMessage::getNullValidationVisitor());
 }
 
 void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
-                               absl::optional<MessageVersion> version) {
+                               bool do_boosting) {
   ProtobufWkt::Value value = ValueUtil::loadFromYaml(yaml);
   if (value.kind_case() == ProtobufWkt::Value::kStructValue ||
       value.kind_case() == ProtobufWkt::Value::kListValue) {
-    jsonConvertInternal(value, validation_visitor, message, version);
+    jsonConvertInternal(value, validation_visitor, message, do_boosting);
     return;
   }
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
 }
 
-void MessageUtil::loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message,
-                               absl::optional<MessageVersion> version) {
+void MessageUtil::loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message) {
   // No need to validate if converting to a Struct, since there are no unknown
   // fields possible.
-  return loadFromYaml(yaml, message, ProtobufMessage::getNullValidationVisitor(), version);
+  return loadFromYaml(yaml, message, ProtobufMessage::getNullValidationVisitor());
 }
 
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Api::Api& api,
-                               absl::optional<MessageVersion> version = absl::nullopt) {
+                               Api::Api& api, bool do_boosting) {
   const std::string contents = api.fileSystem().fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
@@ -359,26 +351,31 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
-    tryWithApiBoosting(
-        [&contents, &path](Protobuf::Message& message, MessageVersion message_version) {
-          if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
-            return;
-          }
-          if (message_version == MessageVersion::LATEST_VERSION) {
-            throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
-                                 message.GetTypeName() + ")");
-          } else {
-            throw ApiBoostRetryException(
-                "Failed to parse at earlier version, trying again at later version.");
-          }
-        },
-        message, version);
+    auto read_proto_text = [&contents, &path](Protobuf::Message& message,
+                                              MessageVersion message_version) {
+      if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
+        return;
+      }
+      if (message_version == MessageVersion::LATEST_VERSION) {
+        throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
+                             message.GetTypeName() + ")");
+      } else {
+        throw ApiBoostRetryException(
+            "Failed to parse at earlier version, trying again at later version.");
+      }
+    };
+
+    if (do_boosting) {
+      tryWithApiBoosting(read_proto_text, message);
+    } else {
+      read_proto_text(message, MessageVersion::LATEST_VERSION);
+    }
     return;
   }
   if (absl::EndsWith(path, FileExtensions::get().Yaml)) {
-    loadFromYaml(contents, message, validation_visitor, version);
+    loadFromYaml(contents, message, validation_visitor, do_boosting);
   } else {
-    loadFromJson(contents, message, validation_visitor, version);
+    loadFromJson(contents, message, validation_visitor, do_boosting);
   }
 }
 
@@ -572,17 +569,17 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, ProtobufWkt::Stru
   // Any proto3 message can be transformed to Struct, so there is no need to check for unknown
   // fields. There is one catch; Duration/Timestamp etc. which have non-object canonical JSON
   // representations don't work.
-  jsonConvertInternal(source, ProtobufMessage::getNullValidationVisitor(), dest, absl::nullopt);
+  jsonConvertInternal(source, ProtobufMessage::getNullValidationVisitor(), dest);
 }
 
 void MessageUtil::jsonConvert(const ProtobufWkt::Struct& source,
                               ProtobufMessage::ValidationVisitor& validation_visitor,
                               Protobuf::Message& dest) {
-  jsonConvertInternal(source, validation_visitor, dest, absl::nullopt);
+  jsonConvertInternal(source, validation_visitor, dest);
 }
 
 void MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
-  jsonConvertInternal(source, ProtobufMessage::getNullValidationVisitor(), dest, absl::nullopt);
+  jsonConvertInternal(source, ProtobufMessage::getNullValidationVisitor(), dest);
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
@@ -687,15 +684,13 @@ bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
                 const Protobuf::FieldDescriptor* field_descriptor) {
         // To unpack a `TypedStruct`, convert the struct from JSON.
         jsonConvertInternal(reflection->GetMessage(*message, field_descriptor),
-                            ProtobufMessage::getNullValidationVisitor(), *typed_message,
-                            absl::nullopt);
+                            ProtobufMessage::getNullValidationVisitor(), *typed_message);
       },
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
         // To repack a `TypedStruct`, convert the message back to JSON.
         jsonConvertInternal(*typed_message, ProtobufMessage::getNullValidationVisitor(),
-                            *(reflection->MutableMessage(message, field_descriptor)),
-                            absl::nullopt);
+                            *(reflection->MutableMessage(message, field_descriptor)));
       });
 }
 

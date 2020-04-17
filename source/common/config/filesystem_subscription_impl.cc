@@ -49,7 +49,7 @@ void FilesystemSubscriptionImpl::refresh() {
   bool config_update_available = false;
   envoy::service::discovery::v3::DiscoveryResponse message;
   try {
-    MessageUtil::loadFromFile(path_, message, validation_visitor_, api_, absl::nullopt);
+    MessageUtil::loadFromFile(path_, message, validation_visitor_, api_);
     config_update_available = true;
     callbacks_.onConfigUpdate(message.resources(), message.version_info());
     stats_.update_time_.set(DateUtil::nowToMilliseconds(api_.timeSource()));

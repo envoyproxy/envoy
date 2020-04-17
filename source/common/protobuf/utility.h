@@ -224,17 +224,15 @@ public:
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
-                           absl::optional<MessageVersion> version = absl::nullopt);
-  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message,
-                           absl::optional<MessageVersion> version = absl::nullopt);
+                           bool do_boosting = true);
+  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
-                           absl::optional<MessageVersion> version = absl::nullopt);
-  static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message,
-                           absl::optional<MessageVersion> version = absl::nullopt);
+                           bool do_boosting = true);
+  static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                           absl::optional<MessageVersion> version);
+                           bool do_boosting = true);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
@@ -269,9 +267,8 @@ public:
 
   template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                      absl::optional<MessageVersion> version = absl::nullopt) {
-    loadFromYaml(yaml, message, validation_visitor, version);
+                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
+    loadFromYaml(yaml, message, validation_visitor);
     validate(message, validation_visitor);
   }
 

@@ -1218,28 +1218,11 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonSameVersion) {
 }
 
 // MessageUtility::loadFromJson() avoids boosting when version specified.
-TEST_F(ProtobufUtilityTest, LoadFromJsonSpecifiedVersion) {
+TEST_F(ProtobufUtilityTest, LoadFromJsonNoBoosting) {
   {
     envoy::config::cluster::v3::Cluster dst;
     MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
-                              ProtobufMessage::getNullValidationVisitor(),
-                              MessageVersion::EARLIER_VERSION);
-    EXPECT_TRUE(dst.ignore_health_on_host_removal());
-  }
-  {
-    // With boosting this would try v3, which would ignore the field completely.
-    envoy::config::cluster::v3::Cluster dst;
-    EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromJson("{drain_connections_on_host_removal: 123}",
-                                                      dst,
-                                                      ProtobufMessage::getNullValidationVisitor(),
-                                                      MessageVersion::EARLIER_VERSION),
-                            EnvoyException, "Unable to parse JSON as proto");
-  }
-  {
-    envoy::config::cluster::v3::Cluster dst;
-    MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
-                              ProtobufMessage::getNullValidationVisitor(),
-                              MessageVersion::LATEST_VERSION);
+                              ProtobufMessage::getNullValidationVisitor(), false);
     EXPECT_FALSE(dst.ignore_health_on_host_removal());
   }
 }
