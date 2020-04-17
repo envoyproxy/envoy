@@ -13,6 +13,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -46,10 +47,10 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
   constexpr auto expected_http_method = "POST";
   constexpr auto expected_http_url = "/first/second";
   constexpr auto expected_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X)";
-  constexpr auto expected_status_code = "202";
-  constexpr auto expected_content_length = "1337";
+  constexpr uint32_t expected_status_code = 202;
+  constexpr uint32_t expected_content_length = 1337;
   constexpr auto expected_client_ip = "10.0.0.100";
-  constexpr auto expected_x_forwarded_for = "false";
+  constexpr auto expected_x_forwarded_for = false;
   constexpr auto expected_upstream_address = "10.0.0.200";
 
   auto on_send = [](const std::string& json) {
@@ -61,13 +62,19 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
     ASSERT_EQ(1, s.annotations().size());
     ASSERT_TRUE(s.parent_id().empty());
     ASSERT_STREQ(expected_span_name, s.name().c_str());
-    ASSERT_STREQ(expected_http_method, s.http().request().at("method").c_str());
-    ASSERT_STREQ(expected_http_url, s.http().request().at("url").c_str());
-    ASSERT_STREQ(expected_user_agent, s.http().request().at("user_agent").c_str());
-    ASSERT_STREQ(expected_status_code, s.http().response().at("status").c_str());
-    ASSERT_STREQ(expected_content_length, s.http().response().at("content_length").c_str());
-    ASSERT_STREQ(expected_client_ip, s.http().request().at("client_ip").c_str());
-    ASSERT_STREQ(expected_x_forwarded_for, s.http().request().at("x_forwarded_for").c_str());
+    ASSERT_STREQ(expected_http_method,
+                 s.http().request().fields().at("method").string_value().c_str());
+    ASSERT_STREQ(expected_http_url, s.http().request().fields().at("url").string_value().c_str());
+    ASSERT_STREQ(expected_user_agent,
+                 s.http().request().fields().at("user_agent").string_value().c_str());
+    ASSERT_DOUBLE_EQ(expected_status_code,
+                     s.http().response().fields().at("status").number_value());
+    ASSERT_DOUBLE_EQ(expected_content_length,
+                     s.http().response().fields().at("content_length").number_value());
+    ASSERT_STREQ(expected_client_ip,
+                 s.http().request().fields().at("client_ip").string_value().c_str());
+    ASSERT_EQ(expected_x_forwarded_for,
+              s.http().request().fields().at("x_forwarded_for").bool_value());
     ASSERT_STREQ(expected_upstream_address, s.annotations().at("upstream_address").c_str());
   };
 
@@ -78,8 +85,8 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
   span->setTag("http.method", expected_http_method);
   span->setTag("http.url", expected_http_url);
   span->setTag("user_agent", expected_user_agent);
-  span->setTag("http.status_code", expected_status_code);
-  span->setTag("response_size", expected_content_length);
+  span->setTag("http.status_code", absl::StrFormat("%d", expected_status_code));
+  span->setTag("response_size", absl::StrFormat("%d", expected_content_length));
   span->setTag("peer.address", expected_client_ip);
   span->setTag("upstream_address", expected_upstream_address);
   span->finishSpan();
