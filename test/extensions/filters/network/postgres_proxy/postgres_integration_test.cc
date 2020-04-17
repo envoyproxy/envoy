@@ -51,12 +51,12 @@ TEST_P(PostgresIntegrationTest, Login) {
 
   // Send the startup message.
   Buffer::OwnedImpl data;
-  uint32_t length = htonl(12);
   std::string rcvd;
   char buf[32];
 
   memset(buf, 0, sizeof(buf));
-  data.add(&length, sizeof(length));
+  // Add length.
+  data.writeBEInt<uint32_t>(12);
   // Add 8 bytes of some data.
   data.add(buf, 8);
   tcp_client->write(data.toString());
@@ -65,8 +65,8 @@ TEST_P(PostgresIntegrationTest, Login) {
 
   // TCP session is up. Just send the AuthenticationOK downstream.
   data.add("R");
-  length = htonl(8);
-  data.add(&length, sizeof(length));
+  // Add length.
+  data.writeBEInt<uint32_t>(8);
   uint32_t code = 0;
   data.add(&code, sizeof(code));
 

@@ -9,66 +9,67 @@ namespace PostgresProxy {
 
 void DecoderImpl::initialize() {
   // Special handler for first message of the transaction.
-  first_ = Message{"Startup", {}};
+  first_ = MsgProcessor{"Startup", {}};
 
   // Frontend messages.
-  std::get<0>(FE_messages_) = "Frontend";
+  FE_messages_.direction_ = "Frontend";
 
   // Setup handlers for known messages.
-  absl::flat_hash_map<char, Message>& FE_known_msgs = std::get<1>(FE_messages_);
+  absl::flat_hash_map<char, MsgProcessor>& FE_known_msgs = FE_messages_.messages_;
 
   // Handler for know messages.
-  FE_known_msgs['B'] = Message{"Bind", {}};
-  FE_known_msgs['C'] = Message{"Close", {}};
-  FE_known_msgs['d'] = Message{"CopyData", {}};
-  FE_known_msgs['c'] = Message{"CopyDone", {}};
-  FE_known_msgs['f'] = Message{"CopyFail", {}};
-  FE_known_msgs['D'] = Message{"Describe", {}};
-  FE_known_msgs['E'] = Message{"Execute", {}};
-  FE_known_msgs['H'] = Message{"Flush", {}};
-  FE_known_msgs['F'] = Message{"FunctionCall", {}};
-  FE_known_msgs['p'] = Message{"PasswordMessage/GSSResponse/SASLInitialResponse/SASLResponse", {}};
-  FE_known_msgs['P'] = Message{"Parse", {}};
-  FE_known_msgs['Q'] = Message{"Query", {}};
-  FE_known_msgs['S'] = Message{"Sync", {}};
-  FE_known_msgs['X'] = Message{"Terminate", {&DecoderImpl::decodeFrontendTerminate}};
+  FE_known_msgs['B'] = MsgProcessor{"Bind", {}};
+  FE_known_msgs['C'] = MsgProcessor{"Close", {}};
+  FE_known_msgs['d'] = MsgProcessor{"CopyData", {}};
+  FE_known_msgs['c'] = MsgProcessor{"CopyDone", {}};
+  FE_known_msgs['f'] = MsgProcessor{"CopyFail", {}};
+  FE_known_msgs['D'] = MsgProcessor{"Describe", {}};
+  FE_known_msgs['E'] = MsgProcessor{"Execute", {}};
+  FE_known_msgs['H'] = MsgProcessor{"Flush", {}};
+  FE_known_msgs['F'] = MsgProcessor{"FunctionCall", {}};
+  FE_known_msgs['p'] =
+      MsgProcessor{"PasswordMessage/GSSResponse/SASLInitialResponse/SASLResponse", {}};
+  FE_known_msgs['P'] = MsgProcessor{"Parse", {}};
+  FE_known_msgs['Q'] = MsgProcessor{"Query", {}};
+  FE_known_msgs['S'] = MsgProcessor{"Sync", {}};
+  FE_known_msgs['X'] = MsgProcessor{"Terminate", {&DecoderImpl::decodeFrontendTerminate}};
 
   // Handler for unknown messages.
-  std::get<2>(FE_messages_) = Message{"Other", {&DecoderImpl::incMessagesUnknown}};
+  FE_messages_.unknown_ = MsgProcessor{"Other", {&DecoderImpl::incMessagesUnknown}};
 
   // Backend messages.
-  std::get<0>(BE_messages_) = "Backend";
+  BE_messages_.direction_ = "Backend";
 
   // Setup handlers for known messages.
-  absl::flat_hash_map<char, Message>& BE_known_msgs = std::get<1>(BE_messages_);
+  absl::flat_hash_map<char, MsgProcessor>& BE_known_msgs = BE_messages_.messages_;
 
   // Handler for know messages.
-  BE_known_msgs['R'] = Message{"Authentication", {&DecoderImpl::decodeAuthentication}};
-  BE_known_msgs['K'] = Message{"BackendKeyData", {}};
-  BE_known_msgs['2'] = Message{"BindComplete", {}};
-  BE_known_msgs['3'] = Message{"CloseComplete", {}};
-  BE_known_msgs['C'] = Message{"CommandComplete", {&DecoderImpl::decodeBackendStatements}};
-  BE_known_msgs['d'] = Message{"CopyData", {}};
-  BE_known_msgs['c'] = Message{"CopyDone", {}};
-  BE_known_msgs['G'] = Message{"CopyInResponse", {}};
-  BE_known_msgs['H'] = Message{"CopyOutResponse", {}};
-  BE_known_msgs['D'] = Message{"DataRow", {}};
-  BE_known_msgs['I'] = Message{"EmptyQueryResponse", {}};
-  BE_known_msgs['E'] = Message{"ErrorResponse", {&DecoderImpl::decodeBackendErrorResponse}};
-  BE_known_msgs['V'] = Message{"FunctionCallResponse", {}};
-  BE_known_msgs['v'] = Message{"NegotiateProtocolVersion", {}};
-  BE_known_msgs['n'] = Message{"NoData", {}};
-  BE_known_msgs['N'] = Message{"NoticeResponse", {&DecoderImpl::decodeBackendNoticeResponse}};
-  BE_known_msgs['A'] = Message{"NotificationResponse", {}};
-  BE_known_msgs['t'] = Message{"ParameterDescription", {}};
-  BE_known_msgs['S'] = Message{"ParameterStatus", {}};
-  BE_known_msgs['1'] = Message{"ParseComplete", {}};
-  BE_known_msgs['s'] = Message{"PortalSuspend", {}};
-  BE_known_msgs['Z'] = Message{"ReadyForQuery", {}};
-  BE_known_msgs['T'] = Message{"RowDescription", {}};
+  BE_known_msgs['R'] = MsgProcessor{"Authentication", {&DecoderImpl::decodeAuthentication}};
+  BE_known_msgs['K'] = MsgProcessor{"BackendKeyData", {}};
+  BE_known_msgs['2'] = MsgProcessor{"BindComplete", {}};
+  BE_known_msgs['3'] = MsgProcessor{"CloseComplete", {}};
+  BE_known_msgs['C'] = MsgProcessor{"CommandComplete", {&DecoderImpl::decodeBackendStatements}};
+  BE_known_msgs['d'] = MsgProcessor{"CopyData", {}};
+  BE_known_msgs['c'] = MsgProcessor{"CopyDone", {}};
+  BE_known_msgs['G'] = MsgProcessor{"CopyInResponse", {}};
+  BE_known_msgs['H'] = MsgProcessor{"CopyOutResponse", {}};
+  BE_known_msgs['D'] = MsgProcessor{"DataRow", {}};
+  BE_known_msgs['I'] = MsgProcessor{"EmptyQueryResponse", {}};
+  BE_known_msgs['E'] = MsgProcessor{"ErrorResponse", {&DecoderImpl::decodeBackendErrorResponse}};
+  BE_known_msgs['V'] = MsgProcessor{"FunctionCallResponse", {}};
+  BE_known_msgs['v'] = MsgProcessor{"NegotiateProtocolVersion", {}};
+  BE_known_msgs['n'] = MsgProcessor{"NoData", {}};
+  BE_known_msgs['N'] = MsgProcessor{"NoticeResponse", {&DecoderImpl::decodeBackendNoticeResponse}};
+  BE_known_msgs['A'] = MsgProcessor{"NotificationResponse", {}};
+  BE_known_msgs['t'] = MsgProcessor{"ParameterDescription", {}};
+  BE_known_msgs['S'] = MsgProcessor{"ParameterStatus", {}};
+  BE_known_msgs['1'] = MsgProcessor{"ParseComplete", {}};
+  BE_known_msgs['s'] = MsgProcessor{"PortalSuspend", {}};
+  BE_known_msgs['Z'] = MsgProcessor{"ReadyForQuery", {}};
+  BE_known_msgs['T'] = MsgProcessor{"RowDescription", {}};
 
   // Handler for unknown messages.
-  std::get<2>(BE_messages_) = Message{"Other", {&DecoderImpl::incMessagesUnknown}};
+  BE_messages_.unknown_ = MsgProcessor{"Other", {&DecoderImpl::incMessagesUnknown}};
 
   // Setup hash map for handling backend statements.
   BE_statements_["BEGIN"] = [this](DecoderImpl*) -> void {
@@ -113,40 +114,40 @@ void DecoderImpl::initialize() {
   };
 
   // Setup hash map for handling backend ErrorResponse messages.
-  std::get<0>(BE_errors_)["ERROR"] = [this](DecoderImpl*) -> void {
+  BE_errors_.keywords_["ERROR"] = [this](DecoderImpl*) -> void {
     callbacks_->incErrors(DecoderCallbacks::ErrorType::Error);
   };
-  std::get<0>(BE_errors_)["FATAL"] = [this](DecoderImpl*) -> void {
+  BE_errors_.keywords_["FATAL"] = [this](DecoderImpl*) -> void {
     callbacks_->incErrors(DecoderCallbacks::ErrorType::Fatal);
   };
-  std::get<0>(BE_errors_)["PANIC"] = [this](DecoderImpl*) -> void {
+  BE_errors_.keywords_["PANIC"] = [this](DecoderImpl*) -> void {
     callbacks_->incErrors(DecoderCallbacks::ErrorType::Panic);
   };
   // Setup handler which is called when decoder cannot decode the message and treats it as Unknown
   // Error message.
-  std::get<1>(BE_errors_) = [this](DecoderImpl*) -> void {
+  BE_errors_.unknown_ = [this](DecoderImpl*) -> void {
     callbacks_->incErrors(DecoderCallbacks::ErrorType::Unknown);
   };
 
   // Setup hash map for handling backend NoticeResponse messages.
-  std::get<0>(BE_notices_)["WARNING"] = [this](DecoderImpl*) -> void {
+  BE_notices_.keywords_["WARNING"] = [this](DecoderImpl*) -> void {
     callbacks_->incNotices(DecoderCallbacks::NoticeType::Warning);
   };
-  std::get<0>(BE_notices_)["NOTICE"] = [this](DecoderImpl*) -> void {
+  BE_notices_.keywords_["NOTICE"] = [this](DecoderImpl*) -> void {
     callbacks_->incNotices(DecoderCallbacks::NoticeType::Notice);
   };
-  std::get<0>(BE_notices_)["DEBUG"] = [this](DecoderImpl*) -> void {
+  BE_notices_.keywords_["DEBUG"] = [this](DecoderImpl*) -> void {
     callbacks_->incNotices(DecoderCallbacks::NoticeType::Debug);
   };
-  std::get<0>(BE_notices_)["INFO"] = [this](DecoderImpl*) -> void {
+  BE_notices_.keywords_["INFO"] = [this](DecoderImpl*) -> void {
     callbacks_->incNotices(DecoderCallbacks::NoticeType::Info);
   };
-  std::get<0>(BE_notices_)["LOG"] = [this](DecoderImpl*) -> void {
+  BE_notices_.keywords_["LOG"] = [this](DecoderImpl*) -> void {
     callbacks_->incNotices(DecoderCallbacks::NoticeType::Log);
   };
   // Setup handler which is called when decoder cannot decode the message and treats it as Unknown
   // Notice message.
-  std::get<1>(BE_notices_) = [this](DecoderImpl*) -> void {
+  BE_notices_.unknown_ = [this](DecoderImpl*) -> void {
     callbacks_->incNotices(DecoderCallbacks::NoticeType::Unknown);
   };
 }
@@ -168,9 +169,7 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   // The 1 byte message type and message length should be in the buffer
   // Check if the entire message has been read.
   std::string message;
-  uint32_t length;
-  data.copyOut(startup_ ? 0 : 1, 4, &length);
-  length = ntohl(length);
+  uint32_t length = data.peekBEInt<uint32_t>(startup_ ? 0 : 1);
   if (data.length() < (length + (startup_ ? 0 : 1))) {
     ENVOY_LOG(trace, "postgres_proxy: cannot parse message. Need {} bytes in buffer",
               length + (startup_ ? 0 : 1));
@@ -179,9 +178,7 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   }
 
   if (startup_) {
-    uint32_t code;
-    data.copyOut(4, 4, &code);
-    code = ntohl(code);
+    uint32_t code = data.peekBEInt<uint32_t>(4);
     // Startup message with 1234 in the most significant 16 bits
     // indicate request to encrypt.
     if (code >= 0x04d20000) {
@@ -223,18 +220,19 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
     return false;
   }
 
-  std::tuple<std::string, absl::flat_hash_map<char, Message>, Message>& msg_processor =
-      std::ref(frontend ? FE_messages_ : BE_messages_);
+  MsgGroup& msg_processor = std::ref(frontend ? FE_messages_ : BE_messages_);
   frontend ? callbacks_->incMessagesFrontend() : callbacks_->incMessagesBackend();
 
-  std::reference_wrapper<Message> msg = std::get<2>(msg_processor);
+  // Set processing to the handler of unknown messages.
+  // If message is found, the processing will be updated.
+  std::reference_wrapper<MsgProcessor> msg = msg_processor.unknown_;
 
   if (startup_) {
     msg = std::ref(first_);
     startup_ = false;
   } else {
-    auto it = std::get<1>(msg_processor).find(command_);
-    if (it != std::get<1>(msg_processor).end()) {
+    auto it = msg_processor.messages_.find(command_);
+    if (it != msg_processor.messages_.end()) {
       msg = std::ref((*it).second);
     }
   }
@@ -244,10 +242,10 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
     action(this);
   }
 
-  ENVOY_LOG(debug, "({}) command = {} ({})", std::get<0>(msg_processor), command_,
+  ENVOY_LOG(debug, "({}) command = {} ({})", msg_processor.direction_, command_,
             std::get<0>(msg.get()));
-  ENVOY_LOG(debug, "({}) length = {}", std::get<0>(msg_processor), getMessageLength());
-  ENVOY_LOG(debug, "({}) message = {}", std::get<0>(msg_processor), getMessage());
+  ENVOY_LOG(debug, "({}) length = {}", msg_processor.direction_, getMessageLength());
+  ENVOY_LOG(debug, "({}) message = {}", msg_processor.direction_, getMessage());
 
   ENVOY_LOG(trace, "postgres_proxy: {} bytes remaining in buffer", data.length());
 
@@ -296,15 +294,14 @@ void DecoderImpl::decodeAuthentication() {
 
 // Method is used to parse Error and Notice messages. Their syntax is the same, but they
 // use different keywords inside the message and statistics fields are different.
-void DecoderImpl::decodeErrorNotice(
-    std::tuple<absl::flat_hash_map<std::string, MsgAction>, MsgAction>& types) {
+void DecoderImpl::decodeErrorNotice(MsgParserDict& types) {
   // Error/Notice message should start with character "S".
   if (message_[0] != 'S') {
-    std::get<1>(types)(this);
+    types.unknown_(this);
     return;
   }
 
-  for (const auto& it : std::get<0>(types)) {
+  for (const auto& it : types.keywords_) {
     // Try to find a keyword with S prefix or V prefix.
     // Postgres versions prior to 9.6 use only S prefix while
     // versions higher than 9.6 use S and V prefixes.
@@ -316,7 +313,7 @@ void DecoderImpl::decodeErrorNotice(
   }
 
   // Keyword was not found in the message. Count is as Unknown.
-  std::get<1>(types)(this);
+  types.unknown_(this);
 }
 
 // Method parses E (Error) message and looks for string

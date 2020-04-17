@@ -71,6 +71,40 @@ public:
   bool encrypted() const { return encrypted_; }
 
 protected:
+  // Message action defines the Decoder's method which will be invoked
+  // when a specific message has been decoded.
+  using MsgAction = std::function<void(DecoderImpl*)>;
+
+  // MsgProcessor has two fields:
+  // first - string with message description
+  // second - vector of Decoder's methods which are invoked when the message
+  // is processed.
+  using MsgProcessor = std::pair<std::string, std::vector<MsgAction>>;
+
+  // Frontend and Backend messages.
+  using MsgGroup = struct {
+    // String describing direction (Frontend or Backend).
+    std::string direction_;
+    // Hash map indexed by messages' 1st byte points to handlers used for processing messages.
+    absl::flat_hash_map<char, MsgProcessor> messages_;
+    // Handler used for processing messages not found in hash map.
+    MsgProcessor unknown_;
+  };
+
+  // Hash map binding keyword found in a message to an
+  // action to be executed when the keyword is found.
+  using KeywordProcessor = absl::flat_hash_map<std::string, MsgAction>;
+
+  // Structure is used for grouping keywords found in a specific message.
+  // Known keywords are dispatched via hash map and unknown keywords
+  // are handled by unknown_.
+  using MsgParserDict = struct {
+    // Handler for known keywords.
+    KeywordProcessor keywords_;
+    // Handler invoked when a keyword is not found in hash map.
+    MsgAction unknown_;
+  };
+
   bool parseMessage(Buffer::Instance& data);
   void decode(Buffer::Instance& data);
   void decodeAuthentication();
@@ -78,55 +112,38 @@ protected:
   void decodeBackendErrorResponse();
   void decodeBackendNoticeResponse();
   void decodeFrontendTerminate();
+  void decodeErrorNotice(MsgParserDict& types);
 
   void incMessagesUnknown() { callbacks_->incMessagesUnknown(); }
-
   void incSessionsEncrypted() { callbacks_->incSessionsEncrypted(); }
   void incSessionsUnencrypted() { callbacks_->incSessionsUnencrypted(); }
 
-  DecoderCallbacks* callbacks_;
-  PostgresSession session_;
+  DecoderCallbacks* callbacks_{};
+  PostgresSession session_{};
 
-  // the following fields store result of message parsing
-  char command_;
+  // The following fields store result of message parsing.
+  char command_{};
   std::string message_;
-  uint32_t message_len_;
+  uint32_t message_len_{};
 
   bool startup_{true};    // startup stage does not have 1st byte command
-  bool encrypted_{false}; // tells is exchange is encrypted
+  bool encrypted_{false}; // tells if exchange is encrypted
 
-  // Message action defines the Decoder's method which will be invoked
-  // when a specific message has been decoded.
-  using MsgAction = std::function<void(DecoderImpl*)>;
-
-  // Message has two fields:
-  // field 0 - string with message description
-  // field 1 - vector of Decoder's methods which are invoked when the message
-  // is processed.
-  using Message = std::tuple<std::string, std::vector<MsgAction>>;
-
-  // Frontend and Backend messages
-  // Class could be used to group those values, but tuple is used until
-  // functionality requires a switch.
-  // field 0 - string describing direction (Frontend or Backend)
-  // field 1 - hash map indexed by messages'1 1st byte points to data used for processing messages
-  // field 2 - data used for processing messages not found in hash map
-  std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> FE_messages_;
-  std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> BE_messages_;
+  // Dispatchers for Backend (BE) and Frontend (FE) messages.
+  MsgGroup FE_messages_;
+  MsgGroup BE_messages_;
 
   // Handler for startup postgres message.
   // Startup message message which does not start with 1 byte TYPE.
   // It starts with message length and must be therefore handled
   // differently.
-  Message first_;
+  MsgProcessor first_;
 
   // hash map for dispatching backend transaction messages
-  absl::flat_hash_map<std::string, MsgAction> BE_statements_;
+  KeywordProcessor BE_statements_;
 
-  // hash map for dispatching backend errors and notice messages
-  std::tuple<absl::flat_hash_map<std::string, MsgAction>, MsgAction> BE_errors_;
-  std::tuple<absl::flat_hash_map<std::string, MsgAction>, MsgAction> BE_notices_;
-  void decodeErrorNotice(std::tuple<absl::flat_hash_map<std::string, MsgAction>, MsgAction>& types);
+  MsgParserDict BE_errors_;
+  MsgParserDict BE_notices_;
 };
 
 } // namespace PostgresProxy

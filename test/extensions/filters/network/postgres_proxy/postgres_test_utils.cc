@@ -10,8 +10,7 @@ void createPostgresMsg(Buffer::Instance& data, std::string type, std::string pay
   data.drain(data.length());
   ASSERT(1 == type.length());
   data.add(type);
-  uint32_t msg_length = htonl(4 + payload.length());
-  data.add(&msg_length, 4);
+  data.writeBEInt<uint32_t>(4 + payload.length());
   data.add(payload);
 }
 

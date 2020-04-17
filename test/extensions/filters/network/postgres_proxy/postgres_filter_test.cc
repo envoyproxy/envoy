@@ -16,7 +16,7 @@ namespace PostgresProxy {
 using ::testing::WithArgs;
 
 // Decoder mock.
-class DecoderTest : public Decoder {
+class MockDecoderTest : public Decoder {
 public:
   MOCK_METHOD(bool, onData, (Buffer::Instance&, bool), (override));
   MOCK_METHOD(PostgresSession&, getSession, (), (override));
@@ -54,11 +54,16 @@ TEST_F(PostgresFilterTest, NewConnection) {
 // or decoder indicates that there is not enough data in a buffer
 // to process a message.
 TEST_P(PostgresFilterTest, ReadData) {
-  filter_->setDecoder(std::make_unique<DecoderTest>());
+  // Create mock decoder, obtain raw pointer to it (required for EXPECT_CALL)
+  // and pass the decoder to filter.
+  std::unique_ptr<MockDecoderTest> decoder = std::make_unique<MockDecoderTest>();
+  MockDecoderTest* decoderPtr = decoder.get();
+  filter_->setDecoder(std::move(decoder));
+
   data_.add(buf_, 256);
 
   // Simulate reading entire buffer.
-  EXPECT_CALL(*(reinterpret_cast<DecoderTest*>(filter_->getDecoder())), onData)
+  EXPECT_CALL(*decoderPtr, onData)
       .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> bool {
         data.drain(data.length());
         return true;
@@ -67,7 +72,7 @@ TEST_P(PostgresFilterTest, ReadData) {
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 0);
 
   // Simulate reading entire data in two steps.
-  EXPECT_CALL(*(reinterpret_cast<DecoderTest*>(filter_->getDecoder())), onData)
+  EXPECT_CALL(*decoderPtr, onData)
       .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> bool {
         data.drain(100);
         return true;
@@ -82,7 +87,7 @@ TEST_P(PostgresFilterTest, ReadData) {
   // Simulate reading 3 packets. The first two were processed correctly and
   // for the third one there was not enough data. There should be 56 bytes
   // of unprocessed data.
-  EXPECT_CALL(*(reinterpret_cast<DecoderTest*>(filter_->getDecoder())), onData)
+  EXPECT_CALL(*decoderPtr, onData)
       .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> bool {
         data.drain(100);
         return true;
@@ -225,12 +230,9 @@ TEST_F(PostgresFilterTest, NoticeMsgsStats) {
 
 // Encrypted sessions are detected based on the first received message.
 TEST_F(PostgresFilterTest, EncryptedSessionStats) {
-  uint32_t length = htonl(8);
-
-  data_.add(&length, 4);
+  data_.writeBEInt<uint32_t>(8);
   // 1234 in the most significant 16 bits and some code in the least significant 16 bits.
-  uint32_t code = htonl(80877103); // SSL code.
-  data_.add(&code, sizeof(code));
+  data_.writeBEInt<uint32_t>(80877103); // SSL code.
   filter_->onData(data_, false);
   ASSERT_THAT(filter_->getStats().sessions_.value(), 1);
   ASSERT_THAT(filter_->getStats().sessions_encrypted_.value(), 1);

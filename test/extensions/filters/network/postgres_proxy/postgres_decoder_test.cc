@@ -40,7 +40,6 @@ protected:
 
   // fields often used
   Buffer::OwnedImpl data_;
-  uint32_t length_;
   char buf_[256];
   std::string payload_;
 };
@@ -77,8 +76,7 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   decoder_->setStartup(true);
 
   // Start with length.
-  length_ = htonl(12);
-  data_.add(&length_, sizeof(length_));
+  data_.writeBEInt<uint32_t>(12);
   // Add 8 bytes of some data.
   data_.add(buf_, 8);
   decoder_->onData(data_, true);
@@ -86,8 +84,8 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
 
   // Now feed normal message with 1bytes as command.
   data_.add("P");
-  length_ = htonl(6); // 4 bytes of length + 2 bytes of data.
-  data_.add(&length_, sizeof(length_));
+  // Add length.
+  data_.writeBEInt<uint32_t>(6); // 4 bytes of length + 2 bytes of data.
   data_.add("AB");
   decoder_->onData(data_, true);
   ASSERT_THAT(data_.length(), 0);
@@ -109,15 +107,14 @@ TEST_F(PostgresProxyDecoderTest, ReadingBufferSingleMessages) {
 
   // Add length of 4 bytes. It would mean completely empty message.
   // but it should be consumed.
-  length_ = htonl(4);
-  data_.add(&length_, sizeof(length_));
+  data_.writeBEInt<uint32_t>(4);
   decoder_->onData(data_, true);
   ASSERT_THAT(data_.length(), 0);
 
   // Create a message with 5 additional bytes.
   data_.add("P");
-  length_ = htonl(9); // 4 bytes of length field + 5 of data.
-  data_.add(&length_, sizeof(length_));
+  // Add length.
+  data_.writeBEInt<uint32_t>(9); // 4 bytes of length field + 5 of data.
   data_.add(buf_, 5);
   decoder_->onData(data_, true);
   ASSERT_THAT(data_.length(), 0);
@@ -131,8 +128,8 @@ TEST_F(PostgresProxyDecoderTest, ReadingBufferLargeMessages) {
   // but the buffer contains only 98 bytes.
   // It should not be processed.
   data_.add("P");
-  length_ = htonl(100); // This also includes length field
-  data_.add(&length_, sizeof(length_));
+  // Add length.
+  data_.writeBEInt<uint32_t>(100); // This also includes length field
   data_.add(buf_, 94);
   decoder_->onData(data_, true);
   // The buffer contains command (1 byte), length (4 bytes) and 94 bytes of message.
@@ -150,14 +147,14 @@ TEST_F(PostgresProxyDecoderTest, ReadingBufferLargeMessages) {
 TEST_F(PostgresProxyDecoderTest, TwoMessagesInOneBuffer) {
   // Create the first message of 50 bytes long (+1 for command).
   data_.add("P");
-  length_ = htonl(50);
-  data_.add(&length_, sizeof(length_));
+  // Add length.
+  data_.writeBEInt<uint32_t>(50);
   data_.add(buf_, 46);
 
   // Create the second message of 50 + 46 bytes (+1 for command).
   data_.add("P");
-  length_ = htonl(96);
-  data_.add(&length_, sizeof(length_));
+  // Add length.
+  data_.writeBEInt<uint32_t>(96);
   data_.add(buf_, 46);
   data_.add(buf_, 46);
 
@@ -322,10 +319,10 @@ TEST_F(PostgresProxyBackendDecoderTest, AuthenticationMsg) {
   // authentication completed successfully.
   EXPECT_CALL(callbacks_, incSessionsUnencrypted());
   data_.add("R");
-  length_ = htonl(8);
-  data_.add(&length_, sizeof(length_));
-  uint32_t code = 0;
-  data_.add(&code, sizeof(code));
+  // Add length.
+  data_.writeBEInt<uint32_t>(8);
+  // Add 4-byte code.
+  data_.writeBEInt<uint32_t>(0);
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 }
@@ -388,11 +385,11 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
 
   // Create SSLRequest.
   EXPECT_CALL(callbacks_, incSessionsEncrypted());
-  length_ = htonl(8);
-  data_.add(&length_, sizeof(length_));
+  // Add length.
+  data_.writeBEInt<uint32_t>(8);
   // 1234 in the most significant 16 bits, and some code in the least significant 16 bits.
-  uint32_t code = htonl(GetParam());
-  data_.add(&code, sizeof(code));
+  // Add 4 bytes long code
+  data_.writeBEInt<uint32_t>(GetParam());
   decoder_->onData(data_, false);
   ASSERT_TRUE(decoder_->encrypted());
   // Decoder should drain data.
