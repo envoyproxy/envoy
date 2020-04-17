@@ -67,8 +67,12 @@ public:
   uint64_t numConnections() const override { return num_handler_connections_; }
   void incNumConnections() override;
   void decNumConnections() override;
-  void addListener(Network::ListenerConfig& config) override;
+  void addListener(absl::optional<uint64_t> overridden_listener,
+                   Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
+  void removeFilterChains(uint64_t listener_tag,
+                          const std::list<const Network::FilterChain*>& filter_chains,
+                          std::function<void()> completion) override;
   void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
   void disableListeners() override;
@@ -80,14 +84,14 @@ public:
    */
   class ActiveListenerImplBase : public Network::ConnectionHandler::ActiveListener {
   public:
-    ActiveListenerImplBase(Network::ConnectionHandler& parent, Network::ListenerConfig& config);
+    ActiveListenerImplBase(Network::ConnectionHandler& parent, Network::ListenerConfig* config);
 
     // Network::ConnectionHandler::ActiveListener.
-    uint64_t listenerTag() override { return config_.listenerTag(); }
+    uint64_t listenerTag() override { return config_->listenerTag(); }
 
     ListenerStats stats_;
     PerHandlerListenerStats per_worker_stats_;
-    Network::ListenerConfig& config_;
+    Network::ListenerConfig* config_{};
   };
 
 private:
@@ -141,7 +145,23 @@ private:
      */
     void newConnection(Network::ConnectionSocketPtr&& socket);
 
+    /**
+     * Return the active connections container attached with the given filter chain.
+     */
     ActiveConnections& getOrCreateActiveConnections(const Network::FilterChain& filter_chain);
+
+    /**
+     * Schedule to remove and destroy the active connections which are not tracked by listener
+     * config. Caution: The connection are not destroyed yet when function returns.
+     */
+    void deferredRemoveFilterChains(
+        const std::list<const Network::FilterChain*>& draining_filter_chains);
+
+    /**
+     * Update the listener config. The follow up connections will see the new config. The existing
+     * connections are not impacted.
+     */
+    void updateListenerConfig(Network::ListenerConfig& config);
 
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;
