@@ -55,7 +55,7 @@ TEST(ActiveQuicListenerConfigTest, CreateActiveQuicListenerFactory) {
   EXPECT_EQ("foo_key", runtime_enabled.runtime_key());
 }
 
-TEST(ActiveQuicListenerConfigTest, QuicListenerEnabledByDefault) {
+TEST(ActiveQuicListenerConfigTest, QuicListenerDisabledByDefault) {
   std::string listener_name = QuicListenerName;
   auto& config_factory =
       Config::Utility::getAndCheckFactoryByName<Server::ActiveUdpListenerConfigFactory>(
@@ -75,8 +75,8 @@ TEST(ActiveQuicListenerConfigTest, QuicListenerEnabledByDefault) {
   envoy::config::core::v3::RuntimeFeatureFlag& runtime_enabled =
       ActiveQuicListenerFactoryPeer::runtimeEnabled(
           dynamic_cast<ActiveQuicListenerFactory&>(*listener_factory));
-  EXPECT_EQ(true, runtime_enabled.default_value().value());
-  EXPECT_EQ("foo_key", runtime_enabled.runtime_key());
+  EXPECT_EQ(false, runtime_enabled.default_value().value());
+  EXPECT_EQ("", runtime_enabled.runtime_key());
 }
 
 } // namespace Quic
