@@ -26,6 +26,7 @@ HTTP filters
   header_to_metadata_filter
   ip_tagging_filter
   jwt_authn_filter
+  local_rate_limit_filter
   lua_filter
   on_demand_updates_filter
   original_src_filter

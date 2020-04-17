@@ -70,6 +70,8 @@ public:
   const std::string AwsRequestSigning = "envoy.filters.http.aws_request_signing";
   // AWS Lambda filter
   const std::string AwsLambda = "envoy.filters.http.aws_lambda";
+  // Local Rate limit filter
+  const std::string LocalRateLimit = "envoy.filters.http.local_ratelimit";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;
