@@ -286,7 +286,7 @@ TEST_F(CodecClientTest, SSLConnectionInfo) {
 class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource()) {
-    dispatcher_ = api_->allocateDispatcher();
+    dispatcher_ = api_->allocateDispatcher("test_thread");
     auto socket = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getAnyAddress(GetParam()), nullptr, true);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
