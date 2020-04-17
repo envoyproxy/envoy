@@ -33,7 +33,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        const quic::QuicConfig& quic_config,
                                        Network::Socket::OptionsSharedPtr options,
                                        const envoy::config::core::v3::RuntimeFeatureFlag enabled)
-    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, listener_config),
+    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       listen_socket_(*listen_socket), enabled_(enabled, Runtime::LoaderSingleton::get()) {
   if (options != nullptr) {
@@ -61,7 +61,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
-      std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, config_, stats_,
+      std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_);
   quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(listen_socket_));
 }
@@ -69,7 +69,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
 ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
 
 void ActiveQuicListener::onListenerShutdown() {
-  ENVOY_LOG(info, "Quic listener {} shutdown.", config_.name());
+  ENVOY_LOG(info, "Quic listener {} shutdown.", config_->name());
   quic_dispatcher_->Shutdown();
   udp_listener_.reset();
 }
