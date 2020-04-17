@@ -24,6 +24,18 @@
 namespace Envoy {
 namespace Server {
 
+class ListenerMessageUtil {
+public:
+  /**
+   * This function is used by determine if the lhs config could be updated to rhs config by
+   * upgrading the ListenerConfig at ConnectionHandler. It depends on the implementation of
+   * ConnectionHandler.
+   * @return true if listener update from lhs to rhs could go through fast path.
+   */
+  static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener&,
+                                    const envoy::config::listener::v3::Listener&);
+};
+
 class ListenerManagerImpl;
 
 class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
@@ -216,7 +228,34 @@ public:
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                bool workers_started, uint64_t hash, uint32_t concurrency);
+  /**
+   * Create a new listener from an existing listener and the new config message. This should be
+   * called only if the new config differs among filter chains.
+   */
+  ListenerImpl(const ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
+               const std::string& version_info, ListenerManagerImpl& parent,
+               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
+               uint32_t concurrency);
   ~ListenerImpl() override;
+
+  /**
+   * Execute in place filter chain update. The filter chain update is less expensive than full
+   * listener update.
+   */
+  std::unique_ptr<ListenerImpl>
+  newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
+                             bool workers_started, uint64_t hash);
+  /**
+   * Determine if in place filter chain update could be executed at this moment.
+   */
+  bool supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
+                                bool worker_started);
+
+  /**
+   * Run the callback on each filter chain exists in this listener but not in another listener.
+   */
+  void diffFilterChain(const ListenerImpl& listener,
+                       std::function<void(Network::DrainableFilterChain&)> callback);
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
@@ -296,6 +335,19 @@ public:
   SystemTime last_updated_;
 
 private:
+  // Helpers for constructor.
+  ListenerImpl* buildAccessLog();
+  ListenerImpl* buildUdpListenerFactory(Network::Address::SocketType socket_type,
+                                        uint32_t concurrency);
+  ListenerImpl* buildListenSocketOptions(Network::Address::SocketType socket_type);
+  ListenerImpl* createListenerFilterFactories(Network::Address::SocketType socket_type);
+  ListenerImpl* validateFilterChains(Network::Address::SocketType socket_type);
+  ListenerImpl* buildFilterChains();
+  ListenerImpl* buildSocketOptions();
+  ListenerImpl* buildOriginalDstListenerFilter();
+  ListenerImpl* buildProxyProtocolListenerFilter();
+  ListenerImpl* buildTlsInspectorListenerFilter();
+
   void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
     ensureSocketOptions();
     listen_socket_options_->emplace_back(std::move(option));

@@ -133,6 +133,29 @@ protected:
     return raw_listener;
   }
 
+  ListenerHandle* expectListenerOverridden(bool need_init) {
+    auto raw_listener = new ListenerHandle(false);
+    // Overridden listener is always added by api.
+    EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
+    EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
+
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillOnce(Invoke(
+            [raw_listener, need_init](
+                const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
+                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                -> std::vector<Network::FilterFactoryCb> {
+              std::shared_ptr<ListenerHandle> notifier(raw_listener);
+              raw_listener->context_ = &filter_chain_factory_context;
+              if (need_init) {
+                filter_chain_factory_context.initManager().add(notifier->target_);
+              }
+              return {[notifier](Network::FilterManager&) -> void {}};
+            }));
+
+    return raw_listener;
+  }
+
   const Network::FilterChain*
   findFilterChain(uint16_t destination_port, const std::string& destination_address,
                   const std::string& server_name, const std::string& transport_protocol,
@@ -216,6 +239,15 @@ protected:
                             .gauge("listener_manager.total_listeners_draining",
                                    Stats::Gauge::ImportMode::NeverImport)
                             .value());
+  }
+
+  void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t warming,
+                  uint64_t active, uint64_t draining, uint64_t draining_filter_chains) {
+    checkStats(added, modified, removed, warming, active, draining);
+    EXPECT_EQ(draining_filter_chains, server_.stats_store_
+                                          .gauge("listener_manager.total_filter_chains_draining",
+                                                 Stats::Gauge::ImportMode::NeverImport)
+                                          .value());
   }
 
   void checkConfigDump(const std::string& expected_dump_yaml) {

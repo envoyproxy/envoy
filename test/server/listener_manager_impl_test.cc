@@ -44,6 +44,12 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::Throw;
 
+#define CHECKSTATS(...)                                                                            \
+  {                                                                                                \
+    SCOPED_TRACE(__LINE__);                                                                        \
+    checkStats(__VA_ARGS__);                                                                       \
+  }
+
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
 protected:
   ListenerManagerImplWithDispatcherStatsTest() { enable_dispatcher_stats_ = true; }
@@ -324,7 +330,7 @@ listener_filters:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
-                          EnvoyException, "Only 1 UDP filter per listener supported");
+                          EnvoyException, "Only 1 UDP listener filter per listener supported");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
@@ -1591,10 +1597,9 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
+per_connection_buffer_limit_bytes: 999    
 filter_chains:
-- filters:
-  - name: fake
-    config: {}
+- filters: []
   )EOF";
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
@@ -1802,10 +1807,9 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
+per_connection_buffer_limit_bytes: 999
 filter_chains:
-- filters:
-  - name: fake
-    config: {}
+- filters: []
   )EOF";
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
@@ -4062,6 +4066,285 @@ api_listener:
   // The original ApiListener is there.
   ASSERT_TRUE(manager_->apiListener().has_value());
   EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
+}
+
+TEST_F(ListenerManagerImplTest, StopInplaceWarmingListener) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into warming.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  CHECKSTATS(1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  filter_chain_match:
+    destination_port: 1234
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerOverridden(true);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+
+  // Stop foo which should remove warming listener.
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
+  EXPECT_CALL(*listener_foo, onDestroy());
+  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
+}
+
+TEST_F(ListenerManagerImplTest, RemoveInplaceUpdatingListener) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into warming.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  CHECKSTATS(1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  filter_chain_match:
+    destination_port: 1234
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerOverridden(true);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  CHECKSTATS(1, 1, 0, 1, 1, 0, 0);
+
+  // Remove foo which should remove both warming and active.
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+  CHECKSTATS(1, 1, 1, 0, 0, 1, 0);
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+  CHECKSTATS(1, 1, 1, 0, 0, 1, 0);
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+  EXPECT_EQ(0UL, manager_->listeners().size());
+  CHECKSTATS(1, 1, 1, 0, 0, 0, 0);
+}
+
+TEST_F(ListenerManagerImplTest, UpdateInplaceWarmingListener) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into warming.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  CHECKSTATS(1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  filter_chain_match:
+    destination_port: 1234
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerOverridden(true);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  CHECKSTATS(1, 1, 0, 1, 1, 0, 0);
+
+  // Listener warmed up.
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  listener_foo_update1->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+}
+
+TEST_F(ListenerManagerImplTest, DrainageDuringInplaceUpdate) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into warming.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  CHECKSTATS(1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  filter_chain_match:
+    destination_port: 1234
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerOverridden(true);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  CHECKSTATS(1, 1, 0, 1, 1, 0, 0);
+
+  // The warmed up starts the drain timer.
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_CALL(server_.options_, drainTime()).WillOnce(Return(std::chrono::seconds(600)));
+  Event::MockTimer* filter_chain_drain_timer = new Event::MockTimer(&server_.dispatcher_);
+  EXPECT_CALL(*filter_chain_drain_timer, enableTimer(std::chrono::milliseconds(600000), _));
+  listener_foo_update1->target_.ready();
+  CHECKSTATS(1, 1, 0, 0, 1, 0, draining_filter_chains_manager_1);
+
+  // Timer expires, worker close connections if any.
+  EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
+  filter_chain_drain_timer->invokeCallback();
+
+  // Once worker clean up is done, it's safe for the master thread to remove the original listener.
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callDrainFilterChainsComplete();
+  CHECKSTATS(1, 1, 0, 0, 1, 0, draining_filter_chains_manager_0);
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+}
+
+TEST(ListenerMessageUtilTest, ListenerMessageSameAreEquivalent) {
+  envoy::config::listener::v3::Listener listener1;
+  envoy::config::listener::v3::Listener listener2;
+  EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+}
+
+TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentNameNotEquivalent) {
+  envoy::config::listener::v3::Listener listener1;
+  listener1.set_name("listener1");
+  envoy::config::listener::v3::Listener listener2;
+  listener2.set_name("listener2");
+  EXPECT_FALSE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+}
+
+TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentFilterChainsAreEquivalent) {
+  envoy::config::listener::v3::Listener listener1;
+  listener1.set_name("common");
+  auto add_filter_chain_1 = listener1.add_filter_chains();
+  add_filter_chain_1->set_name("127.0.0.1");
+
+  envoy::config::listener::v3::Listener listener2;
+  listener2.set_name("common");
+  auto add_filter_chain_2 = listener2.add_filter_chains();
+  add_filter_chain_2->set_name("127.0.0.2");
+
+  EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
 }
 
 } // namespace

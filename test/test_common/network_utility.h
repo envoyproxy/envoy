@@ -38,19 +38,22 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
                                                     Address::SocketType type);
 
 /**
- * Get a URL ready IP loopback address as a string.
+ * Get a URL ready IP loopback address as a string. Notes ipv4 loopback address is not unique.
  * @param version IP address version of loopback address.
+ * @param host_id additional parameter to generate series of loopback addresses for ipv4.
  * @return std::string URL ready loopback address as a string.
  */
-const std::string getLoopbackAddressUrlString(const Address::IpVersion version);
+const std::string getLoopbackAddressUrlString(const Address::IpVersion version,
+                                              uint8_t host_id = 1);
 
 /**
  * Get a IP loopback address as a string. There are no square brackets around IPv6 addresses, this
  * is what inet_ntop() gives.
  * @param version IP address version of loopback address.
+ * @param host_id additional parameter to generate series of loopback addresses for ipv4.
  * @return std::string loopback address as a string.
  */
-const std::string getLoopbackAddressString(const Address::IpVersion version);
+const std::string getLoopbackAddressString(const Address::IpVersion version, uint8_t host_id = 1);
 
 /**
  * Get a URL ready IP any address as a string.

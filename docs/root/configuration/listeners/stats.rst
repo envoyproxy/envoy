@@ -70,6 +70,7 @@ statistics. Any ``:`` character in the stats name is replaced with ``_``.
    listener_stopped, Counter, Total listeners stopped
    listener_create_success, Counter, Total listener objects successfully added to workers
    listener_create_failure, Counter, Total failed listener object additions to workers
+   total_filter_chains_draining, Gauge, Number of currently draining filter chains
    total_listeners_warming, Gauge, Number of currently warming listeners
    total_listeners_active, Gauge, Number of currently active listeners
    total_listeners_draining, Gauge, Number of currently draining listeners

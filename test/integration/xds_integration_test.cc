@@ -126,5 +126,149 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
                              "Didn't find a registered implementation for name: 'grewgragra'");
 }
 
+using LdsIpv4OnlyIntegrationTest = HttpProtocolIntegrationTest;
+
+// The LDS code path supports both ipv4 and ipv6. We run the tests only on ipv4 supported platform
+// because ipv4 stack naturally provides multiple loopback ip addresses.
+INSTANTIATE_TEST_SUITE_P(
+    LdsInplaceUpdate, LdsIpv4OnlyIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getIpv4OnlyProtocolTestParams(
+        {Http::CodecClient::Type::HTTP1}, {FakeHttpConnection::Type::HTTP1})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// This test case confirms a new listener config with additional filter chains doesn't impact the
+// existing filter chain and connection.
+TEST_P(LdsIpv4OnlyIntegrationTest, ReloadConfigAddingFilterChain) {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_http_protocol_options()->set_accept_http_10(true);
+        hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
+      });
+  // Set dst ip to all.
+  initialize();
+  // Given we're using LDS in this test, initialize() will not complete until
+  // the initial LDS file has loaded.
+  EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
+
+  // Verify the first (and the only) filter chain is working correctly.
+  std::string response;
+  auto conn1 = sendRawHttpAndWaitForHeader(1, lookupPort("http"),
+                                           "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n", &response,
+                                           /*disconnect_after_headers_complete=*/false);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  ConfigHelper new_config_helper(version_, *api_,
+                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  // Add filter chain: dst ip = 127.0.0.2
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        auto* standard_filter_chain = listener->mutable_filter_chains(0);
+        auto* add_filter_chain = listener->add_filter_chains();
+        add_filter_chain->CopyFrom(*standard_filter_chain);
+        add_filter_chain->set_name("127.0.0.2");
+        auto* src_ip = add_filter_chain->mutable_filter_chain_match()->add_source_prefix_ranges();
+        src_ip->set_address_prefix("127.0.0.2");
+        src_ip->mutable_prefix_len()->set_value(32);
+      });
+
+  // Create an LDS response with the new config, and reload config.
+  new_config_helper.setLds("1");
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
+
+  // Verify the new filter chain is adopted.
+  std::string response2;
+  auto conn2 = sendRawHttpAndWaitForHeader(2, lookupPort("http"),
+                                           "GET / HTTP/1.1\r\nHost: 127.0.0.2\r\n\r\n", &response2,
+                                           /*disconnect_after_headers_complete=*/false);
+  EXPECT_THAT(response2, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  // Verify the opened connection on first filter chain is not impacted by the listener
+  // update.
+  conn1->clearShouldExit();
+  response.clear();
+  conn1->write("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+  conn1->runUntil();
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  conn1->close();
+  conn2->close();
+}
+
+// Test that a new listener config with one fewer filter chain will drain the connections on that
+// filter chain.
+TEST_P(LdsIpv4OnlyIntegrationTest, ReloadConfigDeletingFilterChain) {
+  autonomous_upstream_ = true;
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_http_protocol_options()->set_accept_http_10(true);
+        hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
+      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* standard_filter_chain = listener->mutable_filter_chains(0);
+    auto* add_filter_chain = listener->add_filter_chains();
+    add_filter_chain->CopyFrom(*standard_filter_chain);
+    add_filter_chain->set_name("127.0.0.2");
+    auto* src_ip = add_filter_chain->mutable_filter_chain_match()->add_source_prefix_ranges();
+    src_ip->set_address_prefix("127.0.0.2");
+    src_ip->mutable_prefix_len()->set_value(32);
+  });
+
+  initialize();
+  // Given we're using LDS in this test, initialize() will not complete until
+  // the initial LDS file has loaded.
+  EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
+
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  // Verify the both filter chains are working correctly.
+  std::string response1;
+  auto conn1 = sendRawHttpAndWaitForHeader(1, lookupPort("http"),
+                                           "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n", &response1,
+                                           /*disconnect_after_headers_complete=*/false);
+  EXPECT_THAT(response1, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  std::string response2;
+  auto conn2 = sendRawHttpAndWaitForHeader(2, lookupPort("http"),
+                                           "GET / HTTP/1.1\r\nHost: 127.0.0.2\r\n\r\n", &response2,
+                                           /*disconnect_after_headers_complete=*/false);
+  EXPECT_THAT(response2, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  // Delete the 2nd filter chain.
+  ConfigHelper new_config_helper(version_, *api_,
+                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  // Delete the filter chain matching dst ip = 127.0.0.2
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        listener->mutable_filter_chains()->RemoveLast();
+      });
+
+  // Create an LDS response with the new config, and reload config.
+  new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
+
+  // Verify the first connection is alive.
+  response1.clear();
+  conn1->clearShouldExit();
+  conn1->write("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+  conn1->runUntil();
+  EXPECT_THAT(response1, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  // Verify the second connection is closed along with the second filter chain.
+  conn2->clearShouldExit();
+  conn2->write("GET / HTTP/1.1\r\nHost: 127.0.0.2\r\n\r\n");
+  conn2->run();
+  // We could reach here only because conn2 is no longer registered in the dispatcher.
+
+  conn1->close();
+  conn2->close();
+}
+
 } // namespace
 } // namespace Envoy

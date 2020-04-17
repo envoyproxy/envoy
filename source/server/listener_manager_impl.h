@@ -152,6 +152,12 @@ public:
     drain_timer_->enableTimer(drain_time);
   }
 
+  void insertFilterChain(const Network::FilterChain* filter_chain) {
+    draining_filter_chains_.push_back(filter_chain);
+  }
+
+  uint32_t numDrainingFilterChains() const { return draining_filter_chains_.size(); }
+
 private:
   ListenerImplPtr draining_listener_;
   std::list<const Network::FilterChain*> draining_filter_chains_;
@@ -170,6 +176,7 @@ public:
                       WorkerFactory& worker_factory, bool enable_dispatcher_stats);
 
   void onListenerWarmed(ListenerImpl& listener);
+  void onIntelligentListenerWarmed(ListenerImpl& listener);
 
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
@@ -204,10 +211,10 @@ public:
                                return ptr != nullptr && ptr.get() == listener_raw_ptr;
                              });
     ASSERT(iter != active_listeners_.end());
-
+    auto& new_listener_ref = *listener_raw_ptr;
     ListenerImplPtr listener_impl_ptr = std::move(*iter);
     active_listeners_.erase(iter);
-    drainFilterChains(std::move(listener_impl_ptr));
+    drainFilterChains(std::move(listener_impl_ptr), new_listener_ref);
   }
 
   Instance& server_;
@@ -267,8 +274,9 @@ private:
    * Mark filter chains which owned by listener for draining. The new listener should have taken
    * over the listener socket and partial of the filter chains from listener.
    * @param listener supplies the listener to drain.
+   * @param new_listener supplies the new listener which co-owns partial of the filter chains.
    */
-  void drainFilterChains(ListenerImplPtr&& listener);
+  void drainFilterChains(ListenerImplPtr&& listener, ListenerImpl& new_listener);
 
   /**
    * Stop a listener. The listener will stop accepting new connections and its socket will be

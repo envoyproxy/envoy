@@ -532,6 +532,32 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
   connection.run();
 }
 
+std::unique_ptr<RawConnectionDriver>
+BaseIntegrationTest::sendRawHttpAndWaitForHeader(uint8_t host_id, int port, const char* raw_http,
+                                                 std::string* response,
+                                                 bool disconnect_after_headers_complete) {
+  Buffer::OwnedImpl buffer(raw_http);
+  auto connection = std::make_unique<RawConnectionDriver>(
+      host_id, port, buffer,
+      [disconnect_after_headers_complete, response](Network::ClientConnection& client,
+                                                    const Buffer::Instance& data) -> bool {
+        response->append(data.toString());
+        ENVOY_LOG(debug, "lambdai response: {}", *response);
+        if (response->find("\r\n\r\n") != std::string::npos) {
+          if (!disconnect_after_headers_complete) {
+            ENVOY_LOG(debug, "lambdai return true");
+
+            return true;
+          }
+          client.close(Network::ConnectionCloseType::NoFlush);
+        }
+        return false;
+      },
+      version_);
+  connection->runUntil();
+  return connection;
+}
+
 IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
     const std::string& bootstrap_path,
     std::function<void(IntegrationTestServer&)> on_server_ready_function,
