@@ -135,14 +135,14 @@ TEST_P(HazelcastHttpCacheTest, Miss) {
 
 TEST_P(HazelcastHttpCacheTest, Fresh) {
   insert("/", getResponseHeaders(), "");
-  time_source_.sleep(std::chrono::seconds(3600));
+  time_source_.advanceTimeWait(std::chrono::seconds(3600));
   lookup("/");
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 }
 
 TEST_P(HazelcastHttpCacheTest, Stale) {
   insert("/", getResponseHeaders(), "");
-  time_source_.sleep(std::chrono::seconds(3601));
+  time_source_.advanceTimeWait(std::chrono::seconds(3601));
   lookup("/");
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 }
