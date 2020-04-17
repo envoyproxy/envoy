@@ -8,7 +8,7 @@ All existing v2 boostrap and xDS configuration should continue to work seamlessl
 duration of 2020. Envoy internally operates at v3+, but does so by transparently upgrading
 configuration from v2 at ingestion time.
 
-Since EOQ1 2020, we have freeze the v2 API and no new features will be added. To consume these
+Since EOQ1 2020, we have frozen the v2 API and no new features will be added. To consume these
 newer features, you will need to migrate to the v3 API.
 
 It is highly recommend that operators with self-managed and/or self-developed control planes migrate
