@@ -38,6 +38,9 @@ public:
   void chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
                                  const absl::optional<RequestStatNames>& request_names,
                                  uint64_t amount) override;
+  void chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
+                          const absl::optional<RequestStatNames>& request_names,
+                          std::chrono::milliseconds duration) override;
 
   /**
    * Resolve the gRPC service and method from the HTTP2 :path header.
@@ -83,6 +86,7 @@ private:
   const Stats::StatName zero_;
   const Stats::StatName request_message_count_;
   const Stats::StatName response_message_count_;
+  const Stats::StatName upstream_rq_time_;
 
   StatNames stat_names_;
 };
