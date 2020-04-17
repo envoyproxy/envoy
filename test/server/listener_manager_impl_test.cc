@@ -4305,7 +4305,7 @@ filter_chains:
   Event::MockTimer* filter_chain_drain_timer = new Event::MockTimer(&server_.dispatcher_);
   EXPECT_CALL(*filter_chain_drain_timer, enableTimer(std::chrono::milliseconds(600000), _));
   listener_foo_update1->target_.ready();
-  CHECKSTATS(1, 1, 0, 0, 1, 0, draining_filter_chains_manager_1);
+  CHECKSTATS(1, 1, 0, 0, 1, 0, 1);
 
   // Timer expires, worker close connections if any.
   EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
@@ -4314,7 +4314,7 @@ filter_chains:
   // Once worker clean up is done, it's safe for the master thread to remove the original listener.
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callDrainFilterChainsComplete();
-  CHECKSTATS(1, 1, 0, 0, 1, 0, draining_filter_chains_manager_0);
+  CHECKSTATS(1, 1, 0, 0, 1, 0, 0);
 
   EXPECT_CALL(*listener_foo_update1, onDestroy());
 }
