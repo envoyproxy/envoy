@@ -11,6 +11,7 @@
 
 using testing::AtLeast;
 using testing::Eq;
+using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -24,10 +25,11 @@ using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCa
 using MockLoadDnsCacheEntryResult =
     Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult;
 
-class ProxyFilterTest : public testing::Test,
-                        public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
+class SniDynamicProxyFilterTest
+    : public testing::Test,
+      public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
 public:
-  ProxyFilterTest() {
+  SniDynamicProxyFilterTest() {
     FilterConfig proto_config;
     proto_config.set_port_value(443);
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
@@ -44,7 +46,7 @@ public:
     cm_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 1, 0, 0, 0);
   }
 
-  ~ProxyFilterTest() override {
+  ~SniDynamicProxyFilterTest() override {
     EXPECT_TRUE(
         cm_.thread_local_cluster_.cluster_.info_->resource_manager_->pendingRequests().canCreate());
   }
@@ -59,16 +61,16 @@ public:
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;
   Network::MockReadFilterCallbacks callbacks_;
-  Network::MockConnection connection_;
+  NiceMock<Network::MockConnection> connection_;
 };
 
 // No SNI handling.
-TEST_F(ProxyFilterTest, NoSNI) {
+TEST_F(SniDynamicProxyFilterTest, NoSNI) {
   EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return(""));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 }
 
-TEST_F(ProxyFilterTest, LoadDnsCache) {
+TEST_F(SniDynamicProxyFilterTest, LoadDnsCache) {
   EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return("foo"));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
@@ -82,7 +84,7 @@ TEST_F(ProxyFilterTest, LoadDnsCache) {
   EXPECT_CALL(*handle, onDestroy());
 }
 
-TEST_F(ProxyFilterTest, LoadDnsInCache) {
+TEST_F(SniDynamicProxyFilterTest, LoadDnsInCache) {
   EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return("foo"));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
       .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr}));
@@ -91,7 +93,7 @@ TEST_F(ProxyFilterTest, LoadDnsInCache) {
 }
 
 // Cache overflow.
-TEST_F(ProxyFilterTest, CacheOverflow) {
+TEST_F(SniDynamicProxyFilterTest, CacheOverflow) {
   EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return("foo"));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
       .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr}));

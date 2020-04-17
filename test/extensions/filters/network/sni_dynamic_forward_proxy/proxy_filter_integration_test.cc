@@ -12,13 +12,14 @@
 namespace Envoy {
 namespace {
 
-class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                   public Event::TestUsingSimulatedTime,
-                                   public HttpIntegrationTest {
+class SniDynamicProxyFilterIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public Event::TestUsingSimulatedTime,
+      public HttpIntegrationTest {
 public:
   // This test is using HTTP integration test to use the utilities to pass SNI from downstream
   // to upstream. The config being tested is tcp_proxy.
-  ProxyFilterIntegrationTest()
+  SniDynamicProxyFilterIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(),
                             ConfigHelper::tcpProxyConfig()) {}
 
@@ -99,12 +100,12 @@ typed_config:
   envoy::config::cluster::v3::Cluster cluster_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, SniDynamicProxyFilterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 // Verify that upstream TLS works with auto verification for SAN as well as auto setting SNI.
-TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
+TEST_P(SniDynamicProxyFilterIntegrationTest, UpstreamTls) {
   setup();
   fake_upstreams_[0]->setReadDisableOnNewConnection(false);
 
