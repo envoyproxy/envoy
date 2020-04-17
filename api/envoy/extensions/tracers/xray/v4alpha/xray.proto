@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.config.trace.v4alpha;
+package envoy.extensions.tracers.xray.v4alpha;
 
 import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
@@ -9,7 +9,7 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.trace.v4alpha";
+option java_package = "io.envoyproxy.envoy.extensions.tracers.xray.v4alpha";
 option java_outer_classname = "XrayProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
@@ -22,7 +22,7 @@ message XRayConfig {
 
   // The UDP endpoint of the X-Ray Daemon where the spans will be sent.
   // If this value is not set, the default value of 127.0.0.1:2000 will be used.
-  core.v4alpha.SocketAddress daemon_endpoint = 1;
+  config.core.v4alpha.SocketAddress daemon_endpoint = 1;
 
   // The name of the X-Ray segment.
   string segment_name = 2 [(validate.rules).string = {min_len: 1}];
@@ -31,5 +31,5 @@ message XRayConfig {
   // For an example of the sampling rules see:
   // `X-Ray SDK documentation
   // <https://docs.aws.amazon.com/xray/latest/devguide/xray-sdk-go-configuration.html#xray-sdk-go-configuration-sampling>`_
-  core.v4alpha.DataSource sampling_rule_manifest = 3;
+  config.core.v4alpha.DataSource sampling_rule_manifest = 3;
 }
