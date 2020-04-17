@@ -91,7 +91,7 @@ public:
       }
       Buffer::OwnedImpl buffer(data.data().Get(i));
       ENVOY_LOG_MISC(debug, "Decoding data: {} ", buffer.toString());
-      if (filter->decodeData(buffer, end_stream) != Http::FilterDataStatus::Continue) {
+      if (filter->decodeData(buffer, end_stream) == Http::FilterDataStatus::StopIterationNoBuffer) {
         return;
       }
     }
