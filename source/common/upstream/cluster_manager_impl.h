@@ -110,17 +110,18 @@ public:
       : cm_(cm), per_cluster_init_callback_(per_cluster_init_callback) {}
 
   enum class State {
-    // Initial state. During this state all static clusters are loaded. Any phase 1 clusters
+    // Initial state. During this state all static clusters are loaded. Any primary clusters
     // are immediately initialized.
     Loading,
-    // During this state we wait to start initializing secondary clusters. In this state all
-    // phase 1 clusters have completed initialization. Initialization of the secondary clusters
+    // During this state cluster manager waits to start initializing secondary clusters. In this
+    // state all
+    // primary clusters have completed initialization. Initialization of the secondary clusters
     // is started by the `initializeSecondaryClusters` method.
-    WaitingForSecondaryInitialize,
+    WaitingToStartSecondaryInitialization,
     // In this state cluster manager waits for all secondary clusters (if configured) to finish
     // initialization. Then, if CDS is configured, this state tracks waiting for the first CDS
     // response to populate dynamically configured clusters.
-    WaitingForCdsInitialize,
+    WaitingToStartCdsInitialization,
     // During this state, all CDS populated clusters are undergoing either phase 1 or phase 2
     // initialization.
     CdsInitialized,

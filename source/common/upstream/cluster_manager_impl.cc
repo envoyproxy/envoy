@@ -124,12 +124,12 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   // Do not do anything if we are still doing the initial static load or if we are waiting for
   // CDS initialize.
   ENVOY_LOG(debug, "maybe finish initialize state: {}", enumToInt(state_));
-  if (state_ == State::Loading || state_ == State::WaitingForCdsInitialize) {
+  if (state_ == State::Loading || state_ == State::WaitingToStartCdsInitialization) {
     return;
   }
 
   // If we are still waiting for primary clusters to initialize, do nothing.
-  ASSERT(state_ == State::WaitingForSecondaryInitialize || state_ == State::CdsInitialized);
+  ASSERT(state_ == State::WaitingToStartSecondaryInitialization || state_ == State::CdsInitialized);
   ENVOY_LOG(debug, "maybe finish initialize primary init clusters empty: {}",
             primary_init_clusters_.empty());
   if (!primary_init_clusters_.empty()) {
@@ -163,9 +163,9 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   // directly to initialized.
   started_secondary_initialize_ = false;
   ENVOY_LOG(debug, "maybe finish initialize cds api ready: {}", cds_ != nullptr);
-  if (state_ == State::WaitingForSecondaryInitialize && cds_) {
+  if (state_ == State::WaitingToStartSecondaryInitialization && cds_) {
     ENVOY_LOG(info, "cm init: initializing cds");
-    state_ = State::WaitingForCdsInitialize;
+    state_ = State::WaitingToStartCdsInitialization;
     cds_->initialize();
   } else {
     ENVOY_LOG(info, "cm init: all clusters initialized");
@@ -180,11 +180,11 @@ void ClusterManagerInitHelper::onStaticLoadComplete() {
   ASSERT(state_ == State::Loading);
   // After initialization of primary clusters has completed, transition to
   // waiting for signal to initialize secondary clusters and then CDS.
-  state_ = State::WaitingForSecondaryInitialize;
+  state_ = State::WaitingToStartSecondaryInitialization;
 }
 
 void ClusterManagerInitHelper::startInitializingSecondaryClusters() {
-  ASSERT(state_ == State::WaitingForSecondaryInitialize);
+  ASSERT(state_ == State::WaitingToStartSecondaryInitialization);
   ENVOY_LOG(debug, "continue initializing secondary clusters");
   maybeFinishInitialize();
 }
@@ -194,7 +194,7 @@ void ClusterManagerInitHelper::setCds(CdsApi* cds) {
   cds_ = cds;
   if (cds_) {
     cds_->setInitializedCb([this]() -> void {
-      ASSERT(state_ == State::WaitingForCdsInitialize);
+      ASSERT(state_ == State::WaitingToStartCdsInitialization);
       state_ = State::CdsInitialized;
       maybeFinishInitialize();
     });
