@@ -171,8 +171,8 @@ void AuthenticatorImpl::startVerify() {
   // and subsequently to some pod with an envoy sidecar. Meanwhile, 1 second has passed and when envoy checks 
   // the token it finds that it has expired.   
   const uint64_t now = absl::ToUnixSeconds(absl::Now());
-  const uint32_t nbf_slack = jwks_data_->nbf_slack();
-  const uint32_t exp_slack = jwks_data_->exp_slack();
+  const uint32_t nbf_slack = jwks_data_->getJwtProvider().nbf_slack();
+  const uint32_t exp_slack = jwks_data_->getJwtProvider().exp_slack();
 
   // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
   // to 0.
