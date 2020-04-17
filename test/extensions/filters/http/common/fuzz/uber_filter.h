@@ -2,6 +2,8 @@
 
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/http/message_impl.h"
+#include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
 #include "test/fuzz/utility.h"
@@ -9,6 +11,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/proto/bookstore.pb.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -63,7 +66,7 @@ public:
     ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
   }
 
-  static void addProtoDescriptor(absl::string_view filter_name, Protobuf::Message* message) {
+  void addProtoDescriptor(absl::string_view filter_name, Protobuf::Message* message) {
     if (filter_name.find("grpc_json_transcoder") != absl::string_view::npos) {
       envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder& config =
           dynamic_cast<
@@ -71,8 +74,18 @@ public:
               *message);
       config.clear_services();
       config.add_services("bookstore.Bookstore");
-      config.set_proto_descriptor(
-          absl::StrCat(std::getenv("TEST_SRCDIR"), "/test/proto/bookstore.descriptor"));
+
+      Protobuf::FileDescriptorSet descriptor_set;
+      for (const auto& file : {"google/api/http.proto", "google/protobuf/descriptor.proto",
+                               "google/api/annotations.proto", "google/protobuf/any.proto",
+                               "google/api/httpbody.proto", "google/protobuf/empty.proto",
+                               "google/protobuf/struct.proto", "test/proto/bookstore.proto"}) {
+        const auto* file_descriptor =
+            Protobuf::DescriptorPool::generated_pool()->FindFileByName(file);
+        ASSERT(file_descriptor != nullptr);
+        file_descriptor->CopyTo(descriptor_set.add_file());
+      }
+      descriptor_set.SerializeToString(config.mutable_proto_descriptor_bin());
     }
   }
 
@@ -131,7 +144,7 @@ public:
       ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
           proto_config, factory_context_.messageValidationVisitor(), factory);
       // Add a valid service and proto descriptor.
-      UberFilterFuzzer::addProtoDescriptor(proto_config.name(), message.get());
+      addProtoDescriptor(proto_config.name(), message.get());
       cb_ = factory.createFilterFactoryFromProto(*message, "stats", factory_context_);
       cb_(filter_callback_);
     } catch (const EnvoyException& e) {
