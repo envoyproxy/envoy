@@ -1611,7 +1611,7 @@ protected:
 
   // Format tags into the name to create a unique stat_name for each name:tag combination.
   // If the same stat_name is passed to makeGauge() or makeCounter(), even with different
-  // tags, a copy of hte previous metric will be returned.
+  // tags, a copy of the previous metric will be returned.
   std::string baseName(const std::string& name, Stats::StatNameTagVector cluster_tags) {
     std::string result = name;
     for (const auto& name_tag : cluster_tags) {
