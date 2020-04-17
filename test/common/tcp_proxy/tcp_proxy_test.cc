@@ -751,8 +751,7 @@ TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
   NiceMock<Network::MockConnection> connection;
   connection.stream_info_.filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-      StreamInfo::FilterState::StateType::Mutable,
-      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   const auto route = config_obj.getRouteFromEntries(connection);
   EXPECT_NE(nullptr, route);
@@ -1719,8 +1718,7 @@ TEST_F(TcpProxyTest, ShareFilterState) {
 
   upstream_connections_.at(0)->streamInfo().filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-      StreamInfo::FilterState::StateType::Mutable,
-      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   raiseEventUpstreamConnected(0);
   EXPECT_EQ("filter_state_cluster",
             filter_callbacks_.connection_.streamInfo()
@@ -1828,8 +1826,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
 
   connection_.streamInfo().filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-      StreamInfo::FilterState::StateType::Mutable,
-      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,
@@ -1846,8 +1843,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
 
   connection_.streamInfo().filterState()->setData(
       "envoy.network.upstream_server_name", std::make_unique<UpstreamServerName>("www.example.com"),
-      StreamInfo::FilterState::StateType::ReadOnly,
-      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-server-name
@@ -1878,8 +1874,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   connection_.streamInfo().filterState()->setData(
       Network::ApplicationProtocols::key(),
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
-      StreamInfo::FilterState::StateType::ReadOnly,
-      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-application-protocol

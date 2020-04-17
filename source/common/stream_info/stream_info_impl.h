@@ -36,7 +36,7 @@ struct StreamInfoImpl : public StreamInfo {
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
         filter_state_(std::make_shared<FilterStateImpl>(
             FilterStateImpl::LazyCreateAncestor(parent_filter_state,
-                                                FilterState::LifeSpan::DownstreamConnection),
+                                                FilterState::LifeSpan::Connection),
             FilterState::LifeSpan::FilterChain)),
         request_id_extension_(Http::RequestIDExtensionFactory::noopInstance()) {}
 
