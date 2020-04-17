@@ -218,11 +218,13 @@ void GrpcMuxImpl::onStreamEstablished() {
 void GrpcMuxImpl::onEstablishmentFailure() {
   for (auto& api_state : api_state_) {
     if (api_state.second.pending_) {
-      ENVOY_LOG(trace, "API {} pending during onEstablishmentFailure(), unsetting pending.", api_state.first);
+      ENVOY_LOG(trace, "API {} pending during onEstablishmentFailure(), unsetting pending.",
+                api_state.first);
       api_state.second.pending_ = false;
     }
     if (api_state.second.paused_) {
-      ENVOY_LOG(trace, "API {} paused during onEstablishmentFailure(), unpausing.", api_state.first);
+      ENVOY_LOG(trace, "API {} paused during onEstablishmentFailure(), unpausing.",
+                api_state.first);
       api_state.second.paused_ = false;
     }
 
