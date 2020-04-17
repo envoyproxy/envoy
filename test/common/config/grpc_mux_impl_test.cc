@@ -262,36 +262,34 @@ TEST_F(GrpcMuxImplTest, RpcErrorMessageTruncated) {
 
 // Validate behavior when watches has an unknown resource name.
 TEST_F(GrpcMuxImplTest, WildcardWatch) {
+  setup();
+
+  InSequence s;
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_);
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {}, "", true);
+  grpc_mux_->start();
+
   {
-    setup();
-
-    InSequence s;
-    const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-    auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_);
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-    expectSendMessage(type_url, {}, "", true);
-    grpc_mux_->start();
-
-    {
-      auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
-      response->set_type_url(type_url);
-      response->set_version_info("1");
-      envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
-      load_assignment.set_cluster_name("x");
-      response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment));
-      EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-          .WillOnce(Invoke(
-              [&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                 const std::string&) {
-                EXPECT_EQ(1, resources.size());
-                envoy::config::endpoint::v3::ClusterLoadAssignment expected_assignment =
-                    MessageUtil::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-                        resources[0]);
-                EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
-              }));
-      expectSendMessage(type_url, {}, "1");
-      grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
-    }
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_version_info("1");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("x");
+    response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment));
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
+        .WillOnce(
+            Invoke([&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                      const std::string&) {
+              EXPECT_EQ(1, resources.size());
+              envoy::config::endpoint::v3::ClusterLoadAssignment expected_assignment =
+                  MessageUtil::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+                      resources[0]);
+              EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
+            }));
+    expectSendMessage(type_url, {}, "1");
+    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
 }
 
