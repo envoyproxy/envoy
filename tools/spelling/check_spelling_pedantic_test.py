@@ -57,12 +57,16 @@ def checkFileExpectingErrors(filename, expected_substrings):
   return expectError(filename, status, stdout, expected_substrings)
 
 
-def checkFileExpectingOK(filename):
-  command, status, stdout = runCheckFormat("check", getInputFile(filename))
+def checkFilePathExpectingOK(filename):
+  command, status, stdout = runCheckFormat("check", filename)
   if status != 0:
     logging.error("Expected %s to have no errors; status=%d, output:\n" % (filename, status))
     emitStdoutAsError(stdout)
   return status
+
+
+def checkFileExpectingOK(filename):
+  return checkFilePathExpectingOK(getInputFile(filename))
 
 
 def runChecks():
@@ -71,6 +75,9 @@ def runChecks():
   errors += checkFileExpectingOK("valid")
   errors += checkFileExpectingOK("skip_file")
   errors += checkFileExpectingOK("exclusions")
+
+  errors += checkFileExpectingOK("third_party/something/file.cc")
+  errors += checkFileExpectingOK("./third_party/something/file.cc")
 
   errors += checkFileExpectingErrors("typos",
                                      ["spacific", "reelistic", "Awwful", "combeenations", "woork"])
