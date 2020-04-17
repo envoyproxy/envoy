@@ -1584,16 +1584,18 @@ protected:
   ~PrometheusStatsFormatterTest() override { clearStorage(); }
 
   void addCounter(const std::string& name, Stats::StatNameTagVector cluster_tags) {
-    Stats::StatNameManagedStorage storage(name, *symbol_table_);
-    Stats::StatName stat_name = storage.statName();
-    counters_.push_back(alloc_.makeCounter(stat_name, stat_name, cluster_tags));
+    Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
+    Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
+    counters_.push_back(alloc_.makeCounter(name_storage.statName(),
+                                           tag_extracted_name_storage.statName(), cluster_tags));
   }
 
   void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags) {
-    Stats::StatNameManagedStorage storage(name, *symbol_table_);
-    Stats::StatName stat_name = storage.statName();
-    gauges_.push_back(
-        alloc_.makeGauge(stat_name, stat_name, cluster_tags, Stats::Gauge::ImportMode::Accumulate));
+    Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
+    Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
+    gauges_.push_back(alloc_.makeGauge(name_storage.statName(),
+                                       tag_extracted_name_storage.statName(), cluster_tags,
+                                       Stats::Gauge::ImportMode::Accumulate));
   }
 
   void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {
@@ -1606,6 +1608,19 @@ protected:
   }
 
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
+
+  // Format tags into the name to create a unique stat_name for each name:tag combination.
+  // If the same stat_name is passed to makeGauge() or makeCounter(), even with different
+  // tags, a copy of hte previous metric will be returned.
+  std::string baseName(const std::string& name, Stats::StatNameTagVector cluster_tags) {
+    std::string result = name;
+    for (const auto& name_tag : cluster_tags) {
+      // It's difficult to get a raw string out of a StatName, so just use the hash value. It just
+      // needs to be unique; this string is never output or compared in the test.
+      result.append(fmt::format("<{}:{}>", name_tag.first.hash(), name_tag.second.hash()));
+    }
+    return result;
+  }
 
   void clearStorage() {
     pool_.clear();
@@ -1738,6 +1753,7 @@ envoy_histogram1_bucket{le="3600000"} 0
 envoy_histogram1_bucket{le="+Inf"} 0
 envoy_histogram1_sum{} 0
 envoy_histogram1_count{} 0
+
 )EOF";
 
   EXPECT_EQ(expected_output, response.toString());
@@ -1791,6 +1807,7 @@ envoy_histogram1_bucket{le="3600000"} 101100000
 envoy_histogram1_bucket{le="+Inf"} 101100000
 envoy_histogram1_sum{} 105105105000
 envoy_histogram1_count{} 101100000
+
 )EOF";
 
   EXPECT_EQ(expected_output, response.toString());
@@ -1827,12 +1844,16 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
 envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
+
 # TYPE envoy_cluster_test_2_upstream_cx_total counter
 envoy_cluster_test_2_upstream_cx_total{another_tag_name="another_tag-value"} 0
+
 # TYPE envoy_cluster_test_3_upstream_cx_total gauge
 envoy_cluster_test_3_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
+
 # TYPE envoy_cluster_test_4_upstream_cx_total gauge
 envoy_cluster_test_4_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
+
 # TYPE envoy_cluster_test_1_upstream_rq_time histogram
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="0.5"} 0
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1"} 0
@@ -1856,6 +1877,205 @@ envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="360
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="+Inf"} 7
 envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
 envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
+
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+// Test that output groups all metrics of the same name (with different tags) together,
+// as required by the Prometheus exposition format spec. Additionally, groups of metrics
+// should be sorted by their tags; the format specifies that it is preferred that metrics
+// are always grouped in the same order, and sorting is an easy way to ensure this.
+TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
+  const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(h1_values);
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  // Create the 3 clusters in non-sorted order to exercise the sorting.
+  // Create two of each metric type (counter, gauge, histogram) so that
+  // the output for each needs to be collected together.
+  for (const char* cluster : {"ccc", "aaa", "bbb"}) {
+    const Stats::StatNameTagVector tags{{makeStat("cluster"), makeStat(cluster)}};
+    addCounter("cluster.upstream_cx_total", tags);
+    addCounter("cluster.upstream_cx_connect_fail", tags);
+    addGauge("cluster.upstream_cx_active", tags);
+    addGauge("cluster.upstream_rq_active", tags);
+
+    for (const char* hist_name : {"cluster.upstream_rq_time", "cluster.upstream_response_time"}) {
+      auto histogram1 = makeHistogram();
+      histogram1->name_ = hist_name;
+      histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
+      histogram1->used_ = true;
+      histogram1->setTags({Stats::Tag{"cluster", cluster}});
+      addHistogram(histogram1);
+      EXPECT_CALL(*histogram1, cumulativeStatistics())
+          .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+    }
+  }
+
+  Buffer::OwnedImpl response;
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          false, absl::nullopt);
+  EXPECT_EQ(6UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_cluster_upstream_cx_connect_fail counter
+envoy_cluster_upstream_cx_connect_fail{cluster="aaa"} 0
+envoy_cluster_upstream_cx_connect_fail{cluster="bbb"} 0
+envoy_cluster_upstream_cx_connect_fail{cluster="ccc"} 0
+
+# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="aaa"} 0
+envoy_cluster_upstream_cx_total{cluster="bbb"} 0
+envoy_cluster_upstream_cx_total{cluster="ccc"} 0
+
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="aaa"} 0
+envoy_cluster_upstream_cx_active{cluster="bbb"} 0
+envoy_cluster_upstream_cx_active{cluster="ccc"} 0
+
+# TYPE envoy_cluster_upstream_rq_active gauge
+envoy_cluster_upstream_rq_active{cluster="aaa"} 0
+envoy_cluster_upstream_rq_active{cluster="bbb"} 0
+envoy_cluster_upstream_rq_active{cluster="ccc"} 0
+
+# TYPE envoy_cluster_upstream_response_time histogram
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="0.5"} 0
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="1"} 0
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="5"} 0
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="10"} 0
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="25"} 1
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="50"} 2
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="100"} 4
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="250"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="500"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="1000"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="2500"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="5000"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="10000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="30000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="60000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="300000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="600000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="1800000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="3600000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="+Inf"} 7
+envoy_cluster_upstream_response_time_sum{cluster="aaa"} 5532
+envoy_cluster_upstream_response_time_count{cluster="aaa"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="0.5"} 0
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="1"} 0
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="5"} 0
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="10"} 0
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="25"} 1
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="50"} 2
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="100"} 4
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="250"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="500"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="1000"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="2500"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="5000"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="10000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="30000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="60000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="300000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="600000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="1800000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="3600000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="+Inf"} 7
+envoy_cluster_upstream_response_time_sum{cluster="bbb"} 5532
+envoy_cluster_upstream_response_time_count{cluster="bbb"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="0.5"} 0
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="1"} 0
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="5"} 0
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="10"} 0
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="25"} 1
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="50"} 2
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="100"} 4
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="250"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="500"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="1000"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="2500"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="5000"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="10000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="30000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="60000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="300000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="600000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="1800000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="3600000"} 7
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="+Inf"} 7
+envoy_cluster_upstream_response_time_sum{cluster="ccc"} 5532
+envoy_cluster_upstream_response_time_count{cluster="ccc"} 7
+
+# TYPE envoy_cluster_upstream_rq_time histogram
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="0.5"} 0
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="1"} 0
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="5"} 0
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="10"} 0
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="25"} 1
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="50"} 2
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="100"} 4
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="250"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="500"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="1000"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="2500"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="5000"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="10000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="30000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="60000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="300000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="600000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="1800000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="3600000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="+Inf"} 7
+envoy_cluster_upstream_rq_time_sum{cluster="aaa"} 5532
+envoy_cluster_upstream_rq_time_count{cluster="aaa"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="0.5"} 0
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="1"} 0
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="5"} 0
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="10"} 0
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="25"} 1
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="50"} 2
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="100"} 4
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="250"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="500"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="1000"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="2500"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="5000"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="10000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="30000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="60000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="300000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="600000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="1800000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="3600000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="+Inf"} 7
+envoy_cluster_upstream_rq_time_sum{cluster="bbb"} 5532
+envoy_cluster_upstream_rq_time_count{cluster="bbb"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="0.5"} 0
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="1"} 0
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="5"} 0
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="10"} 0
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="25"} 1
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="50"} 2
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="100"} 4
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="250"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="500"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="1000"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="2500"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="5000"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="10000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="30000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="60000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="300000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="600000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="1800000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="3600000"} 7
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="+Inf"} 7
+envoy_cluster_upstream_rq_time_sum{cluster="ccc"} 5532
+envoy_cluster_upstream_rq_time_count{cluster="ccc"} 7
+
 )EOF";
 
   EXPECT_EQ(expected_output, response.toString());
@@ -1913,6 +2133,7 @@ envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="360
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="+Inf"} 7
 envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
 envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
+
 )EOF";
 
   EXPECT_EQ(expected_output, response.toString());
@@ -1983,6 +2204,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
   const std::string expected_output =
       R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
 envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
+
 )EOF";
 
   EXPECT_EQ(expected_output, response.toString());

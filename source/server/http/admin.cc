@@ -1007,52 +1007,65 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::GaugeSharedPtr>& gauges,
     const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
     const bool used_only, const absl::optional<std::regex>& regex) {
-  std::unordered_set<std::string> metric_type_tracker;
-  for (const auto& counter : counters) {
-    if (!shouldShowMetric(*counter, used_only, regex)) {
-      continue;
+
+  // From
+  // https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#grouping-and-sorting:
+  //
+  // All lines for a given metric must be provided as one single group, with the optional HELP and
+  // TYPE lines first (in no particular order). Beyond that, reproducible sorting in repeated
+  // expositions is preferred but not required, i.e. do not sort if the computational cost is
+  // prohibitive.
+
+  // Processes a metric type (counter, gauge, histogram) by generating all output lines, sorting
+  // them by metric name, and then outputting them in the correct sorted order into response.
+  auto process_type = [&](const auto& metrics, const auto& generate_name_and_output,
+                          absl::string_view type) -> uint64_t {
+    // This is a sorted collection to satisfy the "preferred" ordering from the prometheus
+    // spec: metrics will be sorted by their tags' textual representation, which will be consistent
+    // across calls.
+    std::map<std::string, std::set<std::string>> groups;
+    for (const auto& metric : metrics) {
+      if (!shouldShowMetric(*metric, used_only, regex)) {
+        continue;
+      }
+
+      const auto name_output_pair = generate_name_and_output(*metric);
+      groups[name_output_pair.first].emplace(std::move(name_output_pair.second));
     }
 
-    const std::string tags = formattedTags(counter->tags());
-    const std::string metric_name = metricName(counter->tagExtractedName());
-    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
-      metric_type_tracker.insert(metric_name);
-      response.add(fmt::format("# TYPE {0} counter\n", metric_name));
+    for (const auto& group : groups) {
+      response.add(fmt::format("# TYPE {0} {1}\n", group.first, type));
+      for (const auto& output : group.second) {
+        response.add(output);
+      }
+      response.add("\n");
     }
-    response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, counter->value()));
-  }
+    return groups.size();
+  };
 
-  for (const auto& gauge : gauges) {
-    if (!shouldShowMetric(*gauge, used_only, regex)) {
-      continue;
-    }
+  // Returns a pair of metric_name and prometheus output line for a counter or a gauge.
+  auto generate_counter_and_gauge_output =
+      [](const auto& metric) -> std::pair<std::string, std::string> {
+    const std::string tags = formattedTags(metric.tags());
+    const std::string metric_name = metricName(metric.tagExtractedName());
+    return std::make_pair(metric_name,
+                          fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, metric.value()));
+  };
 
-    const std::string tags = formattedTags(gauge->tags());
-    const std::string metric_name = metricName(gauge->tagExtractedName());
-    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
-      metric_type_tracker.insert(metric_name);
-      response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
-    }
-    response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
-  }
+  // Returns a pair of metric_name and prometheus output for a histogram. The output is
+  // a multi-line string (with embedded newlines) that contains all the individual bucket counts
+  // and sum/count for a single histogram (metric_name plus all tags).
+  auto generate_histogram_output =
+      [](const Stats::ParentHistogram& histogram) -> std::pair<std::string, std::string> {
+    const std::string tags = formattedTags(histogram.tags());
+    const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
 
-  for (const auto& histogram : histograms) {
-    if (!shouldShowMetric(*histogram, used_only, regex)) {
-      continue;
-    }
+    const std::string metric_name = metricName(histogram.tagExtractedName());
 
-    const std::string tags = formattedTags(histogram->tags());
-    const std::string hist_tags = histogram->tags().empty() ? EMPTY_STRING : (tags + ",");
-
-    const std::string metric_name = metricName(histogram->tagExtractedName());
-    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
-      metric_type_tracker.insert(metric_name);
-      response.add(fmt::format("# TYPE {0} histogram\n", metric_name));
-    }
-
-    const Stats::HistogramStatistics& stats = histogram->cumulativeStatistics();
+    const Stats::HistogramStatistics& stats = histogram.cumulativeStatistics();
     const std::vector<double>& supported_buckets = stats.supportedBuckets();
     const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
+    std::string output;
     for (size_t i = 0; i < supported_buckets.size(); ++i) {
       double bucket = supported_buckets[i];
       uint64_t value = computed_buckets[i];
@@ -1061,17 +1074,24 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
       // 'g' operator which prints the number in general fixed point format or scientific format
       // with precision 50 to round the number up to 32 significant digits in fixed point format
       // which should cover pretty much all cases
-      response.add(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n", metric_name, hist_tags,
-                               bucket, value));
+      output.append(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n", metric_name, hist_tags,
+                                bucket, value));
     }
 
-    response.add(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", metric_name, hist_tags,
-                             stats.sampleCount()));
-    response.add(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", metric_name, tags, stats.sampleSum()));
-    response.add(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
-  }
+    output.append(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", metric_name, hist_tags,
+                              stats.sampleCount()));
+    output.append(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", metric_name, tags, stats.sampleSum()));
+    output.append(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
 
-  return metric_type_tracker.size();
+    return std::make_pair(metric_name, output);
+  };
+
+  uint64_t metric_name_count = 0;
+  metric_name_count += process_type(counters, generate_counter_and_gauge_output, "counter");
+  metric_name_count += process_type(gauges, generate_counter_and_gauge_output, "gauge");
+  metric_name_count += process_type(histograms, generate_histogram_output, "histogram");
+
+  return metric_name_count;
 }
 
 std::string
