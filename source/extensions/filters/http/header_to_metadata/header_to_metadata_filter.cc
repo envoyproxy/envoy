@@ -26,7 +26,8 @@ Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::C
   //       route level. At the virtual or route level, it makes no sense to have an empty
   //       config so we throw an error.
   if (per_route && !response_set_ && !request_set_) {
-    throw EnvoyException("Must at least specify either response or request config");
+    throw EnvoyException("header_to_metadata_filter: Per filter configs must at least specify "
+                         "either request or response rules");
   }
 }
 
