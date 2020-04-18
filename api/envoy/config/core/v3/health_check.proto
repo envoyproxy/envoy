@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.core.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/event_service_config.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http.proto";
 import "envoy/type/v3/range.proto";
@@ -12,14 +13,15 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/versioning.proto";
-
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "HealthCheckProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Health check]
 // * Health checking :ref:`architecture overview <arch_overview_health_checking>`.
@@ -52,7 +54,7 @@ enum HealthStatus {
   DEGRADED = 5;
 }
 
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -83,7 +85,8 @@ message HealthCheck {
 
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
-    // with will be used.
+    // with will be used. The host header can be customized for a specific endpoint by setting the
+    // :ref:`hostname <envoy_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
     string host = 1;
 
     // Specifies the HTTP path that will be requested during health checking. For example
@@ -164,7 +167,8 @@ message HealthCheck {
 
     // The value of the :authority header in the gRPC health check request. If
     // left empty (default value), the name of the cluster this health check is associated
-    // with will be used.
+    // with will be used. The authority header can be customized for a specific endpoint by setting
+    // the :ref:`hostname <envoy_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
     string authority = 2;
   }
 
@@ -301,6 +305,11 @@ message HealthCheck {
   // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
   // If empty, no event log will be written.
   string event_log_path = 17;
+
+  // [#not-implemented-hide:]
+  // The gRPC service for the health check event service.
+  // If empty, health check events won't be sent to a remote endpoint.
+  EventServiceConfig event_service = 22;
 
   // If set to true, health check failure events will always be logged. If set to false, only the
   // initial health check failure event will be logged.

@@ -1,7 +1,7 @@
 namespace Envoy {
 
 void init(Stats::Scope& scope) {
-  scope.gauge("hello");
+  scope.gaugeFromString("hello");
 }
 
 } // namespace Envoy

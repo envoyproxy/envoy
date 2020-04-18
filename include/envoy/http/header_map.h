@@ -274,7 +274,6 @@ private:
   HEADER_FUNC(AccessControlRequestMethod)                                                          \
   HEADER_FUNC(Authorization)                                                                       \
   HEADER_FUNC(ClientTraceId)                                                                       \
-  HEADER_FUNC(EnvoyAttemptCount)                                                                   \
   HEADER_FUNC(EnvoyDownstreamServiceCluster)                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceNode)                                                          \
   HEADER_FUNC(EnvoyExpectedRequestTimeoutMs)                                                       \
@@ -344,9 +343,9 @@ private:
   HEADER_FUNC(Connection)                                                                          \
   HEADER_FUNC(ContentLength)                                                                       \
   HEADER_FUNC(ContentType)                                                                         \
+  HEADER_FUNC(EnvoyAttemptCount)                                                                   \
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(KeepAlive)                                                                           \
-  HEADER_FUNC(NoChunks)                                                                            \
   HEADER_FUNC(ProxyConnection)                                                                     \
   HEADER_FUNC(RequestId)                                                                           \
   HEADER_FUNC(TransferEncoding)                                                                    \

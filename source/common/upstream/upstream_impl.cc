@@ -244,7 +244,8 @@ HostDescriptionImpl::HostDescriptionImpl(
     const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority)
-    : cluster_(cluster), hostname_(hostname), address_(dest_address),
+    : cluster_(cluster), hostname_(hostname),
+      health_checks_hostname_(health_check_config.hostname()), address_(dest_address),
       canary_(Config::Metadata::metadataValue(metadata.get(),
                                               Config::MetadataFilters::get().ENVOY_LB,
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
@@ -677,7 +678,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                                 : absl::nullopt),
       features_(parseFeatures(config)),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
-      http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
+      http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
       extension_protocol_options_(parseExtensionProtocolOptions(config, validation_visitor)),
       resource_managers_(config, runtime, name_, *stats_scope_),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),

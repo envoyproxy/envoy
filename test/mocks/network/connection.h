@@ -67,6 +67,7 @@ public:
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));
   MOCK_METHOD(bool, readEnabled, (), (const));
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, remoteAddress, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directRemoteAddress, (), (const));
   MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,
               unixSocketPeerCredentials, (), (const));
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));
@@ -112,6 +113,7 @@ public:
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));
   MOCK_METHOD(bool, readEnabled, (), (const));
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, remoteAddress, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directRemoteAddress, (), (const));
   MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,
               unixSocketPeerCredentials, (), (const));
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));
@@ -160,6 +162,7 @@ public:
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));
   MOCK_METHOD(bool, readEnabled, (), (const));
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, remoteAddress, (), (const));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directRemoteAddress, (), (const));
   MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,
               unixSocketPeerCredentials, (), (const));
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));

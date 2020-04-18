@@ -21,6 +21,19 @@ namespace Http {
 class AsyncClient {
 public:
   /**
+   * An in-flight HTTP request.
+   */
+  class Request {
+  public:
+    virtual ~Request() = default;
+
+    /**
+     * Signals that the request should be cancelled.
+     */
+    virtual void cancel() PURE;
+  };
+
+  /**
    * Async Client failure reasons.
    */
   enum class FailureReason {
@@ -30,6 +43,9 @@ public:
 
   /**
    * Notifies caller of async HTTP request status.
+   *
+   * To support a use case where a caller makes multiple requests in parallel,
+   * individual callback methods provide request context corresponding to that response.
    */
   class Callbacks {
   public:
@@ -37,14 +53,23 @@ public:
 
     /**
      * Called when the async HTTP request succeeds.
+     * @param request  request handle.
+     *                 NOTE: request handle is passed for correlation purposes only, e.g.
+     *                 for client code to be able to exclude that handle from a list of
+     *                 requests in progress.
      * @param response the HTTP response
      */
-    virtual void onSuccess(ResponseMessagePtr&& response) PURE;
+    virtual void onSuccess(const Request& request, ResponseMessagePtr&& response) PURE;
 
     /**
      * Called when the async HTTP request fails.
+     * @param request request handle.
+     *                NOTE: request handle is passed for correlation purposes only, e.g.
+     *                for client code to be able to exclude that handle from a list of
+     *                requests in progress.
+     * @param reason  failure reason
      */
-    virtual void onFailure(FailureReason reason) PURE;
+    virtual void onFailure(const Request& request, FailureReason reason) PURE;
   };
 
   /**
@@ -90,19 +115,6 @@ public:
      * Called when the async HTTP stream is reset.
      */
     virtual void onReset() PURE;
-  };
-
-  /**
-   * An in-flight HTTP request.
-   */
-  class Request {
-  public:
-    virtual ~Request() = default;
-
-    /**
-     * Signals that the request should be cancelled.
-     */
-    virtual void cancel() PURE;
   };
 
   /**
@@ -224,11 +236,15 @@ public:
       child_span_name_ = child_span_name;
       return *this;
     }
+    RequestOptions& setSampled(bool sampled) {
+      sampled_ = sampled;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const RequestOptions& src) const {
       return StreamOptions::operator==(src) && parent_span_ == src.parent_span_ &&
-             child_span_name_ == src.child_span_name_;
+             child_span_name_ == src.child_span_name_ && sampled_ == src.sampled_;
     }
 
     // The parent span that child spans are created under to trace egress requests/responses.
@@ -238,6 +254,8 @@ public:
     // If left empty and parent_span_ is set, then the default name will have the cluster name.
     // Only used if parent_span_ is set.
     std::string child_span_name_{""};
+    // Sampling decision for the tracing span. The span is sampled by default.
+    bool sampled_{true};
   };
 
   /**

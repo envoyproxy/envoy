@@ -87,21 +87,18 @@ public:
   // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                       Network::Address::IpVersion version, TestTimeSystemPtr,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+                      const std::string& config = ConfigHelper::httpProxyConfig())
       : HttpIntegrationTest(downstream_protocol, version, config) {}
 
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                       Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+                      const std::string& config = ConfigHelper::httpProxyConfig());
 
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                       const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+                      const std::string& config = ConfigHelper::httpProxyConfig());
   ~HttpIntegrationTest() override;
-
-  // Waits for the first access log entry.
-  std::string waitForAccessLog(const std::string& filename);
 
 protected:
   void useAccessLog(absl::string_view format = "");
@@ -173,9 +170,10 @@ protected:
                                                     const std::string& authority = "host");
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
+  void testRouterVirtualClusters();
 
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
-                                            bool big_header,
+                                            bool big_header, bool set_content_length_header = false,
                                             ConnectionCreationFunction* creator = nullptr);
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0,
@@ -220,6 +218,8 @@ protected:
   // makes sure they were dropped.
   void testTrailers(uint64_t request_size, uint64_t response_size, bool request_trailers_present,
                     bool response_trailers_present);
+  // Test /drain_listener from admin portal.
+  void testAdminDrain(Http::CodecClient::Type admin_request_type);
 
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   // Prefix listener stat with IP:port, including IP version dependent loopback address.

@@ -114,9 +114,11 @@ public:
    * @param error_prefix supplies the prefix to use in error messages.
    * @param cluster_name supplies the cluster name to check.
    * @param cm supplies the cluster manager.
+   * @param allow_added_via_api indicates whether a cluster is allowed to be added via api
+   *                            rather than be a static resource from the bootstrap config.
    */
   static void checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
-                           Upstream::ClusterManager& cm);
+                           Upstream::ClusterManager& cm, bool allow_added_via_api = false);
 
   /**
    * Check cluster/local info for API config sanity. Throws on error.
@@ -156,11 +158,13 @@ public:
   /**
    * Check the validity of a cluster backing an api config source. Throws on error.
    * @param clusters the clusters currently loaded in the cluster manager.
-   * @param api_config_source the config source to validate.
+   * @param cluster_name the cluster name to validate.
+   * @param config_source the config source typed name.
    * @throws EnvoyException when an API config doesn't have a statically defined non-EDS cluster.
    */
   static void validateClusterName(const Upstream::ClusterManager::ClusterInfoMap& clusters,
-                                  const std::string& cluster_name);
+                                  const std::string& cluster_name,
+                                  const std::string& config_source);
 
   /**
    * Potentially calls Utility::validateClusterName, if a cluster name can be found.
@@ -242,7 +246,6 @@ public:
 
   /**
    * Translate a nested config into a proto message provided by the implementation factory.
-   * @param extension_name name of extension corresponding to config.
    * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
    * provided because for statically registered implementations, a custom config is generally
    * optional, which means the conversion must be done conditionally.
@@ -270,6 +273,30 @@ public:
   }
 
   /**
+   * Translate the typed any field into a proto message provided by the implementation factory.
+   * @param typed_config typed configuration.
+   * @param validation_visitor message validation visitor instance.
+   * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a
+   * proto to be filled with the translated configuration.
+   */
+  template <class Factory>
+  static ProtobufTypes::MessagePtr
+  translateAnyToFactoryConfig(const ProtobufWkt::Any& typed_config,
+                              ProtobufMessage::ValidationVisitor& validation_visitor,
+                              Factory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
+    // Fail in an obvious way if a plugin does not return a proto.
+    RELEASE_ASSERT(config != nullptr, "");
+
+    // Check that the config type is not google.protobuf.Empty
+    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+
+    translateOpaqueConfig(typed_config, ProtobufWkt::Struct(), validation_visitor, *config);
+    return config;
+  }
+
+  /**
    * Truncates the message to a length less than default GRPC trailers size limit (by default 8KiB).
    */
   static std::string truncateGrpcStatusMessage(absl::string_view error_message);
@@ -292,13 +319,14 @@ public:
   /**
    * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
-   * @param api_config_source envoy::api::v2::core::ApiConfigSource. Must have config type GRPC.
+   * @param api_config_source envoy::api::v3::core::ApiConfigSource. Must have config type GRPC.
+   * @param skip_cluster_check whether to skip cluster validation.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
   static Grpc::AsyncClientFactoryPtr
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
-                                Stats::Scope& scope);
+                                Stats::Scope& scope, bool skip_cluster_check);
 
   /**
    * Translate a set of cluster's hosts into a load assignment configuration.
@@ -324,20 +352,23 @@ public:
   /**
    * Verify that any filter designed to be terminal is configured to be terminal, and vice versa.
    * @param name the name of the filter.
-   * @param name the type of filter.
+   * @param filter_type the type of filter.
+   * @param filter_chain_type the type of filter chain.
    * @param is_terminal_filter true if the filter is designed to be terminal.
    * @param last_filter_in_current_config true if the filter is last in the configuration.
    * @throws EnvoyException if there is a mismatch between design and configuration.
    */
-  static void validateTerminalFilters(const std::string& name, const char* filter_type,
-                                      bool is_terminal_filter, bool last_filter_in_current_config) {
+  static void validateTerminalFilters(const std::string& name, const std::string& filter_type,
+                                      const char* filter_chain_type, bool is_terminal_filter,
+                                      bool last_filter_in_current_config) {
     if (is_terminal_filter && !last_filter_in_current_config) {
-      throw EnvoyException(
-          fmt::format("Error: {} must be the terminal {} filter.", name, filter_type));
+      throw EnvoyException(fmt::format("Error: terminal filter named {} of type {} must be the "
+                                       "last filter in a {} filter chain.",
+                                       name, filter_type, filter_chain_type));
     } else if (!is_terminal_filter && last_filter_in_current_config) {
-      throw EnvoyException(
-          fmt::format("Error: non-terminal filter {} is the last filter in a {} filter chain.",
-                      name, filter_type));
+      throw EnvoyException(fmt::format(
+          "Error: non-terminal filter named {} of type {} is the last filter in a {} filter chain.",
+          name, filter_type, filter_chain_type));
     }
   }
 

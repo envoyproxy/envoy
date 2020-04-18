@@ -16,6 +16,7 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
@@ -60,14 +61,18 @@ class ConnectionHandlerImpl : public Network::ConnectionHandler,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, const std::string& per_handler_stat_prefix);
+  ConnectionHandlerImpl(Event::Dispatcher& dispatcher);
 
   // Network::ConnectionHandler
   uint64_t numConnections() const override { return num_handler_connections_; }
   void incNumConnections() override;
   void decNumConnections() override;
-  void addListener(Network::ListenerConfig& config) override;
+  void addListener(absl::optional<uint64_t> overridden_listener,
+                   Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
+  void removeFilterChains(uint64_t listener_tag,
+                          const std::list<const Network::FilterChain*>& filter_chains,
+                          std::function<void()> completion) override;
   void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
   void disableListeners() override;
@@ -79,14 +84,14 @@ public:
    */
   class ActiveListenerImplBase : public Network::ConnectionHandler::ActiveListener {
   public:
-    ActiveListenerImplBase(Network::ConnectionHandler& parent, Network::ListenerConfig& config);
+    ActiveListenerImplBase(Network::ConnectionHandler& parent, Network::ListenerConfig* config);
 
     // Network::ConnectionHandler::ActiveListener.
-    uint64_t listenerTag() override { return config_.listenerTag(); }
+    uint64_t listenerTag() override { return config_->listenerTag(); }
 
     ListenerStats stats_;
     PerHandlerListenerStats per_worker_stats_;
-    Network::ListenerConfig& config_;
+    Network::ListenerConfig* config_{};
   };
 
 private:
@@ -120,7 +125,9 @@ private:
 
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }
-    void destroy() override { listener_.reset(); }
+    void pauseListening() override { listener_->disable(); }
+    void resumeListening() override { listener_->enable(); }
+    void shutdownListener() override { listener_.reset(); }
 
     // Network::BalancedConnectionHandler
     uint64_t numConnections() const override { return num_listener_connections_; }
@@ -138,7 +145,23 @@ private:
      */
     void newConnection(Network::ConnectionSocketPtr&& socket);
 
+    /**
+     * Return the active connections container attached with the given filter chain.
+     */
     ActiveConnections& getOrCreateActiveConnections(const Network::FilterChain& filter_chain);
+
+    /**
+     * Schedule to remove and destroy the active connections which are not tracked by listener
+     * config. Caution: The connection are not destroyed yet when function returns.
+     */
+    void deferredRemoveFilterChains(
+        const std::list<const Network::FilterChain*>& draining_filter_chains);
+
+    /**
+     * Update the listener config. The follow up connections will see the new config. The existing
+     * connections are not impacted.
+     */
+    void updateListenerConfig(Network::ListenerConfig& config);
 
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;
@@ -159,7 +182,7 @@ private:
   class ActiveConnections : public Event::DeferredDeletable {
   public:
     ActiveConnections(ActiveTcpListener& listener, const Network::FilterChain& filter_chain);
-    ~ActiveConnections();
+    ~ActiveConnections() override;
 
     // listener filter chain pair is the owner of the connections
     ActiveTcpListener& listener_;
@@ -175,7 +198,9 @@ private:
                                public Event::DeferredDeletable,
                                public Network::ConnectionCallbacks {
     ActiveTcpConnection(ActiveConnections& active_connections,
-                        Network::ConnectionPtr&& new_connection, TimeSource& time_system);
+                        Network::ConnectionPtr&& new_connection, TimeSource& time_system,
+                        Network::ListenerConfig& config,
+                        std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
     ~ActiveTcpConnection() override;
 
     // Network::ConnectionCallbacks
@@ -189,9 +214,11 @@ private:
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
+    std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
     ActiveConnections& active_connections_;
     Network::ConnectionPtr connection_;
     Stats::TimespanPtr conn_length_;
+    Network::ListenerConfig& config_;
   };
 
   /**
@@ -229,9 +256,40 @@ private:
     void unlink();
     void newConnection();
 
+    class GenericListenerFilter : public Network::ListenerFilter {
+    public:
+      GenericListenerFilter(const Network::ListenerFilterMatcherSharedPtr& matcher,
+                            Network::ListenerFilterPtr listener_filter)
+          : listener_filter_(std::move(listener_filter)), matcher_(std::move(matcher)) {}
+      Network::FilterStatus onAccept(ListenerFilterCallbacks& cb) override {
+        if (isDisabled(cb)) {
+          return Network::FilterStatus::Continue;
+        }
+        return listener_filter_->onAccept(cb);
+      }
+      /**
+       * Check if this filter filter should be disabled on the incoming socket.
+       * @param cb the callbacks the filter instance can use to communicate with the filter chain.
+       **/
+      bool isDisabled(ListenerFilterCallbacks& cb) {
+        if (matcher_ == nullptr) {
+          return false;
+        } else {
+          return matcher_->matches(cb);
+        }
+      }
+
+    private:
+      const Network::ListenerFilterPtr listener_filter_;
+      const Network::ListenerFilterMatcherSharedPtr matcher_;
+    };
+    using ListenerFilterWrapperPtr = std::unique_ptr<GenericListenerFilter>;
+
     // Network::ListenerFilterManager
-    void addAcceptFilter(Network::ListenerFilterPtr&& filter) override {
-      accept_filters_.emplace_back(std::move(filter));
+    void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+                         Network::ListenerFilterPtr&& filter) override {
+      accept_filters_.emplace_back(
+          std::make_unique<GenericListenerFilter>(listener_filter_matcher, std::move(filter)));
     }
 
     // Network::ListenerFilterCallbacks
@@ -242,8 +300,8 @@ private:
     ActiveTcpListener& listener_;
     Network::ConnectionSocketPtr socket_;
     const bool hand_off_restored_destination_connections_;
-    std::list<Network::ListenerFilterPtr> accept_filters_;
-    std::list<Network::ListenerFilterPtr>::iterator iter_;
+    std::list<ListenerFilterWrapperPtr> accept_filters_;
+    std::list<ListenerFilterWrapperPtr>::iterator iter_;
     Event::TimerPtr timer_;
   };
 
@@ -287,7 +345,9 @@ public:
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
-  void destroy() override { udp_listener_.reset(); }
+  void pauseListening() override { udp_listener_->disable(); }
+  void resumeListening() override { udp_listener_->enable(); }
+  void shutdownListener() override { udp_listener_.reset(); }
 
   // Network::UdpListenerFilterManager
   void addReadFilter(Network::UdpListenerReadFilterPtr&& filter) override;

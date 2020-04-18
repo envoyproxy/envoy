@@ -28,6 +28,8 @@ public:
   GaugeSharedPtr makeGauge(StatName name, StatName tag_extracted_name,
                            const StatNameTagVector& stat_name_tags,
                            Gauge::ImportMode import_mode) override;
+  TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
+                                       const StatNameTagVector& stat_name_tags) override;
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
@@ -49,6 +51,7 @@ private:
   template <class BaseClass> friend class StatsSharedImpl;
   friend class CounterImpl;
   friend class GaugeImpl;
+  friend class TextReadoutImpl;
 
   struct HeapStatHash {
     using is_transparent = void; // NOLINT(readability-identifier-naming)
@@ -66,6 +69,7 @@ private:
 
   void removeCounterFromSetLockHeld(Counter* counter) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void removeGaugeFromSetLockHeld(Gauge* gauge) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeTextReadoutFromSetLockHeld(Counter* counter) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher, which key off of the
@@ -74,6 +78,7 @@ private:
   using StatSet = absl::flat_hash_set<StatType*, HeapStatHash, HeapStatCompare>;
   StatSet<Counter> counters_ GUARDED_BY(mutex_);
   StatSet<Gauge> gauges_ GUARDED_BY(mutex_);
+  StatSet<TextReadout> text_readouts_ GUARDED_BY(mutex_);
 
   SymbolTable& symbol_table_;
 

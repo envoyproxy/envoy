@@ -209,6 +209,23 @@ public:
 };
 
 /**
+ * FormatterProvider for grpc-status
+ */
+class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
+public:
+  GrpcStatusFormatter(const std::string& main_header, const std::string& alternative_header,
+                      absl::optional<size_t> max_length);
+
+  // FormatterProvider
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
+                     const Http::ResponseTrailerMap& response_trailers,
+                     const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
+                                 const StreamInfo::StreamInfo&) const override;
+};
+
+/**
  * FormatterProvider based on StreamInfo fields.
  */
 class StreamInfoFormatter : public FormatterProvider {
@@ -230,6 +247,8 @@ public:
     virtual ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const PURE;
   };
   using FieldExtractorPtr = std::unique_ptr<FieldExtractor>;
+
+  enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort };
 
 private:
   FieldExtractorPtr field_extractor_;

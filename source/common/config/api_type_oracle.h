@@ -2,6 +2,8 @@
 
 #include "common/protobuf/protobuf.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -17,6 +19,9 @@ public:
    *         corresponding to message, if any, otherwise nullptr.
    */
   static const Protobuf::Descriptor* getEarlierVersionDescriptor(const std::string& message_type);
+
+  static const absl::optional<std::string>
+  getEarlierVersionMessageTypeName(const std::string& message_type);
 };
 
 } // namespace Config

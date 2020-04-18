@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["ext_authz.h"],
     deps = [
         "//include/envoy/http:codes_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],

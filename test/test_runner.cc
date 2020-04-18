@@ -10,6 +10,8 @@
 
 #include "exe/process_wide.h"
 
+#include "server/backtrace.h"
+
 #include "test/common/runtime/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
@@ -103,10 +105,22 @@ int TestRunner::RunTests(int argc, char** argv) {
     listeners.Append(new RuntimeManagingListener(runtime_override));
   }
 
+#ifdef ENVOY_CONFIG_COVERAGE
+  // Coverage tests are run with -l trace --log-path /dev/null, in order to
+  // ensure that all of the code-paths from the maximum level of tracing are
+  // covered in tests, but we don't wind up filling up CI with useless detailed
+  // artifacts.
+  //
+  // The downside of this is that if there's a crash, the backtrace is lost, as
+  // the backtracing mechanism uses logging, so force the backtraces to stderr.
+  BackwardsTrace::setLogToStderr(true);
+#endif
+
   TestEnvironment::initializeOptions(argc, argv);
   Thread::MutexBasicLockable lock;
-  Logger::Context logging_state(TestEnvironment::getOptions().logLevel(),
-                                TestEnvironment::getOptions().logFormat(), lock, false);
+
+  Server::Options& options = TestEnvironment::getOptions();
+  Logger::Context logging_state(options.logLevel(), options.logFormat(), lock, false);
 
   // Allocate fake log access manager.
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;

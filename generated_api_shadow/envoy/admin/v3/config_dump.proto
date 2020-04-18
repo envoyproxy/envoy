@@ -7,11 +7,13 @@ import "envoy/config/bootstrap/v3/bootstrap.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.admin.v3";
 option java_outer_classname = "ConfigDumpProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: ConfigDump]
 
@@ -201,10 +203,10 @@ message ClustersConfigDump {
 }
 
 // Envoy's RDS implementation fills this message with all currently loaded routes, as described by
-// their RouteConfiguration objects. Static routes configured in the bootstrap configuration are
-// separated from those configured dynamically via RDS. Route configuration information can be used
-// to recreate an Envoy configuration by populating all routes as static routes or by returning them
-// in RDS responses.
+// their RouteConfiguration objects. Static routes that are either defined in the bootstrap configuration
+// or defined inline while configuring listeners are separated from those configured dynamically via RDS.
+// Route configuration information can be used to recreate an Envoy configuration by populating all routes
+// as static routes or by returning them in RDS responses.
 message RoutesConfigDump {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.RoutesConfigDump";

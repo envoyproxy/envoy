@@ -20,7 +20,6 @@
 
 using testing::_;
 using testing::Invoke;
-using testing::Return;
 
 namespace Envoy {
 namespace Quic {
@@ -28,7 +27,7 @@ namespace Quic {
 class EnvoyQuicServerStreamTest : public testing::TestWithParam<bool> {
 public:
   EnvoyQuicServerStreamTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
@@ -174,6 +173,7 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
 }
 
 TEST_P(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
+  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   sendRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }

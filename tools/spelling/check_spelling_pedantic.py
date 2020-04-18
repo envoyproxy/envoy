@@ -803,6 +803,13 @@ if __name__ == "__main__":
   if not paths:
     paths = ['./api', './include', './source', './test', './tools']
 
+  # Exclude ./third_party/ directory from spell checking, even when requested through arguments.
+  # Otherwise git pre-push hook checks it for merged commits.
+  paths = [
+      path for path in paths
+      if not path.startswith('./third_party/') and not path.startswith('./third_party/')
+  ]
+
   exts = ['.cc', '.h', '.proto']
   if args.test_ignore_exts:
     exts = None

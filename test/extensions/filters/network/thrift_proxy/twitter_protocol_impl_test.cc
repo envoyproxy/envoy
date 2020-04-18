@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/common/exception.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -38,7 +40,7 @@ public:
 
 class TwitterProtocolTest : public testing::Test {
 public:
-  void clearMetadata() { metadata_.reset(new MessageMetadata()); }
+  void clearMetadata() { metadata_ = std::make_shared<MessageMetadata>(); }
 
   void resetMetadata() {
     clearMetadata();

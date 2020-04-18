@@ -137,19 +137,14 @@ Http::FilterTrailersStatus DynamoFilter::encodeTrailers(Http::ResponseTrailerMap
 std::string DynamoFilter::buildBody(const Buffer::Instance* buffered,
                                     const Buffer::Instance& last) {
   std::string body;
+  body.reserve((buffered ? buffered->length() : 0) + last.length());
   if (buffered) {
-    uint64_t num_slices = buffered->getRawSlices(nullptr, 0);
-    absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-    buffered->getRawSlices(slices.begin(), num_slices);
-    for (const Buffer::RawSlice& slice : slices) {
+    for (const Buffer::RawSlice& slice : buffered->getRawSlices()) {
       body.append(static_cast<const char*>(slice.mem_), slice.len_);
     }
   }
 
-  uint64_t num_slices = last.getRawSlices(nullptr, 0);
-  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-  last.getRawSlices(slices.begin(), num_slices);
-  for (const Buffer::RawSlice& slice : slices) {
+  for (const Buffer::RawSlice& slice : last.getRawSlices()) {
     body.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 
