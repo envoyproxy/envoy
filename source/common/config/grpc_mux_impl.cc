@@ -222,8 +222,7 @@ void GrpcMuxImpl::onEstablishmentFailure() {
           Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
     }
     if (api_state.second.paused_) {
-      ENVOY_LOG(trace, "API {} paused during onEstablishmentFailure(), resuming.",
-                api_state.first);
+      ENVOY_LOG(trace, "API {} paused during onEstablishmentFailure(), resuming.", api_state.first);
       resume(api_state.first);
     }
   }
