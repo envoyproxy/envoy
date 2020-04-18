@@ -149,3 +149,5 @@ jobs:
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          MSYS2_ARG_CONV_EXCL: "*"
+          TMPDIR: $(Agent.TempDirectory)
