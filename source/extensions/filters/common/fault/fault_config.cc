@@ -33,13 +33,15 @@ FaultAbortConfig::FaultAbortConfig(
     const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config) {
   switch (abort_config.error_type_case()) {
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
-    provider_ = std::make_unique<FixedAbortProvider>(
-        static_cast<Http::Code>(abort_config.http_status()), absl::nullopt, abort_config.percentage());
+    provider_ =
+        std::make_unique<FixedAbortProvider>(static_cast<Http::Code>(abort_config.http_status()),
+                                             absl::nullopt, abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kGrpcStatus:
     // If gRPC status code is set, then HTTP will be set to 200
     provider_ = std::make_unique<FixedAbortProvider>(
-        Http::Code::OK, static_cast<Grpc::Status::GrpcStatus>(abort_config.grpc_status()), abort_config.percentage());
+        Http::Code::OK, static_cast<Grpc::Status::GrpcStatus>(abort_config.grpc_status()),
+        abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHeaderAbort:
     provider_ = std::make_unique<HeaderAbortProvider>(abort_config.percentage());

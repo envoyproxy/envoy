@@ -94,7 +94,8 @@ private:
     FixedAbortProvider(Http::Code http_status_code,
                        absl::optional<Grpc::Status::GrpcStatus> grpc_status_code,
                        const envoy::type::v3::FractionalPercent& percentage)
-        : http_status_code_(http_status_code), grpc_status_code_(grpc_status_code), percentage_(percentage) {}
+        : http_status_code_(http_status_code), grpc_status_code_(grpc_status_code),
+          percentage_(percentage) {}
 
     absl::optional<Http::Code> httpStatusCode(const Http::HeaderEntry*) const override {
       return http_status_code_;
