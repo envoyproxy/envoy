@@ -51,7 +51,8 @@ decompressor_library:
 
   bool requestDirection() { return GetParam(); }
 
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> doHeaders(const Http::HeaderMap& rhs, const bool end_stream = false) {
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> doHeaders(const Http::HeaderMap& rhs,
+                                                              const bool end_stream = false) {
     if (requestDirection()) {
       auto request_headers = Http::createHeaderMap<Http::TestRequestHeaderMapImpl>(rhs);
       EXPECT_EQ(Http::FilterHeadersStatus::Continue,
@@ -155,7 +156,8 @@ TEST_P(DecompressorFilterTest, DecompressionActiveTransferEncodingPresentAlready
   EXPECT_CALL(*decompressor_factory_, createDecompressor())
       .WillOnce(Return(ByMove(std::move(decompressor))));
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock, br"},
-                                                {"content-length", "256"}, {"transfer-encoding", "chunked"}};
+                                                {"content-length", "256"},
+                                                {"transfer-encoding", "chunked"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter);
 
