@@ -167,8 +167,9 @@ void AuthenticatorImpl::startVerify() {
   // Some load balancer performinc OIDC authentication receives a request and determines that the 
   // existing access token is valid (for another 1 second). It forwards the request to Istio Ingressgateway 
   // and subsequently to some pod with an envoy sidecar. Meanwhile, 1 second has passed and when envoy checks 
-  // the token it finds that it has expired.   
-  const uint64_t now = timeSource().systemTime();
+  // the token it finds that it has expired.
+  const uint64_t now = std::chrono::time_point_cast<std::chrono::seconds>(timeSource().systemTime()).time_since_epoch().count();
+  
   const uint32_t nbf_slack = jwks_data_->getJwtProvider().nbf_slack();
   const uint32_t exp_slack = jwks_data_->getJwtProvider().exp_slack();
 
