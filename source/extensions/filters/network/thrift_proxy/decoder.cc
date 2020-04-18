@@ -116,7 +116,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::listValue(Buffer::Instan
     return {popReturnState(), FilterStatus::Continue};
   }
   DecoderStatus status = handleValue(buffer, frame.elem_type_, ProtocolState::ListValue);
-  if(status.next_state_ != ProtocolState::WaitForData) {
+  if (status.next_state_ != ProtocolState::WaitForData) {
     frame.remaining_--;
   }
 
@@ -165,7 +165,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::mapValue(Buffer::Instanc
   Frame& frame = stack_.back();
   ASSERT(frame.remaining_ != 0);
   DecoderStatus status = handleValue(buffer, frame.value_type_, ProtocolState::MapKey);
-  if(status.next_state_ != ProtocolState::WaitForData) {
+  if (status.next_state_ != ProtocolState::WaitForData) {
     frame.remaining_--;
   }
 
