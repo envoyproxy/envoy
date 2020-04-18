@@ -51,7 +51,7 @@ typed_config:
       R"EOF(
 name: fault
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
+  "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
   abort:
     percentage:
       numerator: 100

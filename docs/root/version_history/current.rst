@@ -4,6 +4,9 @@
 Changes
 -------
 
+* fault: added support for specifying grpc_status code in abort faults using
+  :ref:`HTTP header <config_http_filters_fault_injection_http_header>` to the HTTP fault filter or
+  :ref:`abort fault configuration <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort>`.
 * access loggers: added GRPC_STATUS operator on logging format.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
 * fault: added support for controlling the percentage of requests that abort, delay and response rate limits faults 
