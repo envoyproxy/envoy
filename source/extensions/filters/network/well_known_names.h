@@ -44,6 +44,8 @@ public:
   const std::string Rbac = "envoy.filters.network.rbac";
   // SNI Cluster filter
   const std::string SniCluster = "envoy.filters.network.sni_cluster";
+  // SNI Dynamic forward proxy filter
+  const std::string SniDynamicForwardProxy = "envoy.filters.network.sni_dynamic_forward_proxy";
   // ZooKeeper proxy filter
   const std::string ZooKeeperProxy = "envoy.filters.network.zookeeper_proxy";
 };

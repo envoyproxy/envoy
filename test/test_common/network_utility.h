@@ -101,6 +101,12 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version,
 bool supportsIpVersion(const Address::IpVersion version);
 
 /**
+ * Returns the DNS family for the specified IP version.
+ * @param version the IP version of the DNS lookup family.
+ */
+std::string ipVersionToDnsFamily(Network::Address::IpVersion version);
+
+/**
  * Bind a socket to a free port on a loopback address, and return the socket's fd and bound address.
  * Enables a test server to reliably "select" a port to listen on. Note that the socket option
  * SO_REUSEADDR has NOT been set on the socket.

@@ -11,21 +11,38 @@ namespace Filters {
 namespace Common {
 namespace Fault {
 
+envoy::type::v3::FractionalPercent
+HeaderPercentageProvider::percentage(const Http::RequestHeaderMap* request_headers) const {
+  const auto header = request_headers->get(header_name_);
+  if (header == nullptr) {
+    return percentage_;
+  }
+
+  uint32_t header_numerator;
+  if (!absl::SimpleAtoi(header->value().getStringView(), &header_numerator)) {
+    return percentage_;
+  }
+
+  envoy::type::v3::FractionalPercent result;
+  result.set_numerator(std::min(header_numerator, percentage_.numerator()));
+  result.set_denominator(percentage_.denominator());
+  return result;
+}
+
 FaultAbortConfig::FaultAbortConfig(
-    const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config)
-    : percentage_(abort_config.percentage()) {
+    const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config) {
   switch (abort_config.error_type_case()) {
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
     provider_ = std::make_unique<FixedAbortProvider>(
-        static_cast<Http::Code>(abort_config.http_status()), absl::nullopt);
+        static_cast<Http::Code>(abort_config.http_status()), absl::nullopt, abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kGrpcStatus:
     // If gRPC status code is set, then HTTP will be set to 200
     provider_ = std::make_unique<FixedAbortProvider>(
-        Http::Code::OK, static_cast<Grpc::Status::GrpcStatus>(abort_config.grpc_status()));
+        Http::Code::OK, static_cast<Grpc::Status::GrpcStatus>(abort_config.grpc_status()), abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHeaderAbort:
-    provider_ = std::make_unique<HeaderAbortProvider>();
+    provider_ = std::make_unique<HeaderAbortProvider>(abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::ERROR_TYPE_NOT_SET:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -71,17 +88,17 @@ FaultAbortConfig::HeaderAbortProvider::grpcStatusCode(const Http::HeaderEntry* h
 }
 
 FaultDelayConfig::FaultDelayConfig(
-    const envoy::extensions::filters::common::fault::v3::FaultDelay& delay_config)
-    : percentage_(delay_config.percentage()) {
+    const envoy::extensions::filters::common::fault::v3::FaultDelay& delay_config) {
   switch (delay_config.fault_delay_secifier_case()) {
   case envoy::extensions::filters::common::fault::v3::FaultDelay::FaultDelaySecifierCase::
       kFixedDelay:
     provider_ = std::make_unique<FixedDelayProvider>(
-        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(delay_config, fixed_delay)));
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(delay_config, fixed_delay)),
+        delay_config.percentage());
     break;
   case envoy::extensions::filters::common::fault::v3::FaultDelay::FaultDelaySecifierCase::
       kHeaderDelay:
-    provider_ = std::make_unique<HeaderDelayProvider>();
+    provider_ = std::make_unique<HeaderDelayProvider>(delay_config.percentage());
     break;
   case envoy::extensions::filters::common::fault::v3::FaultDelay::FaultDelaySecifierCase::
       FAULT_DELAY_SECIFIER_NOT_SET:
@@ -89,8 +106,9 @@ FaultDelayConfig::FaultDelayConfig(
   }
 }
 
-absl::optional<std::chrono::milliseconds>
-FaultDelayConfig::HeaderDelayProvider::duration(const Http::HeaderEntry* header) const {
+absl::optional<std::chrono::milliseconds> FaultDelayConfig::HeaderDelayProvider::duration(
+    const Http::RequestHeaderMap* request_headers) const {
+  const auto header = request_headers->get(HeaderNames::get().DelayRequest);
   if (header == nullptr) {
     return absl::nullopt;
   }
@@ -104,15 +122,14 @@ FaultDelayConfig::HeaderDelayProvider::duration(const Http::HeaderEntry* header)
 }
 
 FaultRateLimitConfig::FaultRateLimitConfig(
-    const envoy::extensions::filters::common::fault::v3::FaultRateLimit& rate_limit_config)
-    : percentage_(rate_limit_config.percentage()) {
+    const envoy::extensions::filters::common::fault::v3::FaultRateLimit& rate_limit_config) {
   switch (rate_limit_config.limit_type_case()) {
   case envoy::extensions::filters::common::fault::v3::FaultRateLimit::LimitTypeCase::kFixedLimit:
-    provider_ =
-        std::make_unique<FixedRateLimitProvider>(rate_limit_config.fixed_limit().limit_kbps());
+    provider_ = std::make_unique<FixedRateLimitProvider>(
+        rate_limit_config.fixed_limit().limit_kbps(), rate_limit_config.percentage());
     break;
   case envoy::extensions::filters::common::fault::v3::FaultRateLimit::LimitTypeCase::kHeaderLimit:
-    provider_ = std::make_unique<HeaderRateLimitProvider>();
+    provider_ = std::make_unique<HeaderRateLimitProvider>(rate_limit_config.percentage());
     break;
   case envoy::extensions::filters::common::fault::v3::FaultRateLimit::LimitTypeCase::
       LIMIT_TYPE_NOT_SET:
@@ -120,8 +137,9 @@ FaultRateLimitConfig::FaultRateLimitConfig(
   }
 }
 
-absl::optional<uint64_t>
-FaultRateLimitConfig::HeaderRateLimitProvider::rateKbps(const Http::HeaderEntry* header) const {
+absl::optional<uint64_t> FaultRateLimitConfig::HeaderRateLimitProvider::rateKbps(
+    const Http::RequestHeaderMap* request_headers) const {
+  const auto header = request_headers->get(HeaderNames::get().ThroughputResponse);
   if (header == nullptr) {
     return absl::nullopt;
   }
