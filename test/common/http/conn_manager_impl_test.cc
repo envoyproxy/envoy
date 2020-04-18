@@ -5389,11 +5389,11 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
           decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_request", std::make_unique<SimpleType>(2),
               StreamInfo::FilterState::StateType::ReadOnly,
-              StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+              StreamInfo::FilterState::LifeSpan::Request);
           decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_connection", std::make_unique<SimpleType>(3),
               StreamInfo::FilterState::StateType::ReadOnly,
-              StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+              StreamInfo::FilterState::LifeSpan::Connection);
           return FilterHeadersStatus::StopIteration;
         }));
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))

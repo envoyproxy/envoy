@@ -2386,7 +2386,7 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   // store any objects with a LifeSpan at or above DownstreamRequest. This is to avoid unnecessary
   // heap allocation.
   if (parent_.stream_info_.filter_state_->hasDataAtOrAboveLifeSpan(
-          StreamInfo::FilterState::LifeSpan::DownstreamRequest)) {
+          StreamInfo::FilterState::LifeSpan::Request)) {
     (*parent_.connection_manager_.streams_.begin())->stream_info_.filter_state_ =
         std::make_shared<StreamInfo::FilterStateImpl>(
             parent_.stream_info_.filter_state_->parent(),
