@@ -31,7 +31,7 @@ struct StreamInfoImpl : public StreamInfo {
       : StreamInfoImpl(protocol, time_source,
                        std::make_shared<FilterStateImpl>(
                            FilterStateImpl::LazyCreateAncestor(
-                               parent_filter_state, FilterState::LifeSpan::DownstreamConnection),
+                               parent_filter_state, FilterState::LifeSpan::Connection),
                            FilterState::LifeSpan::FilterChain)) {}
 
   SystemTime startTime() const override { return start_time_; }
