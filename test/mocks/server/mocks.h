@@ -336,20 +336,31 @@ public:
     remove_listener_completion_ = nullptr;
   }
 
+  void callDrainFilterChainsComplete() {
+    EXPECT_NE(nullptr, remove_filter_chains_completion_);
+    remove_filter_chains_completion_();
+    remove_filter_chains_completion_ = nullptr;
+  }
+
   // Server::Worker
   MOCK_METHOD(void, addListener,
-              (Network::ListenerConfig & listener, AddListenerCompletion completion));
+              (absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
+               AddListenerCompletion completion));
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, removeListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
   MOCK_METHOD(void, start, (GuardDog & guard_dog));
-  MOCK_METHOD(void, initializeStats, (Stats::Scope & scope, const std::string& prefix));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope & scope));
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(void, stopListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
+  MOCK_METHOD(void, removeFilterChains,
+              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
+               std::function<void()> completion));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;
+  std::function<void()> remove_filter_chains_completion_;
 };
 
 class MockOverloadManager : public OverloadManager {
@@ -636,6 +647,21 @@ class MockFilterChainFactoryContext : public MockFactoryContext, public FilterCh
 public:
   MockFilterChainFactoryContext();
   ~MockFilterChainFactoryContext() override;
+};
+
+class MockTracerFactory : public TracerFactory {
+public:
+  explicit MockTracerFactory(const std::string& name);
+  ~MockTracerFactory() override;
+
+  std::string name() const override { return name_; }
+
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
+  MOCK_METHOD(Tracing::HttpTracerSharedPtr, createHttpTracer,
+              (const Protobuf::Message& config, TracerFactoryContext& context));
+
+private:
+  std::string name_;
 };
 
 class MockTracerFactoryContext : public TracerFactoryContext {

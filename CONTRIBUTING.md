@@ -52,7 +52,7 @@ versioning guidelines:
   cause a configuration load failure, unless the feature in question is
   explicitly overridden in
   [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime#using-runtime-overrides-for-deprecated-features)
-  config ([example](configs/using_deprecated_config.v2.yaml)). Finally, following the deprecation 
+  config ([example](configs/using_deprecated_config.v2.yaml)). Finally, following the deprecation
   of the API major version where the field was first
   marked deprecated, the entire implementation code will be removed from the Envoy implementation.
 * This policy means that organizations deploying master should have some time to get ready for
@@ -63,7 +63,7 @@ versioning guidelines:
   deprecation window. Within this window, a warning of deprecation should be carefully logged (some
   features might need rate limiting for logging this). We make no guarantees about code or deployments
   that rely on undocumented behavior.
-* All deprecations/breaking changes will be clearly listed in the [deprecated log](docs/root/intro/deprecated.rst).
+* All deprecations/breaking changes will be clearly listed in the [version history](docs/root/version_history/).
 * High risk deprecations/breaking changes may be announced to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list but by default
   it is expected the multi-phase warn-by-default/fail-by-default is sufficient to warn users to move
@@ -88,7 +88,7 @@ versioning guidelines:
   build. If your PR cannot have 100% coverage for some reason please clearly explain why when you
   open it.
 * Any PR that changes user-facing behavior **must** have associated documentation in [docs](docs) as
-  well as [release notes](docs/root/intro/version_history.rst). API changes should be documented
+  well as [release notes](docs/root/version_history/current.rst). API changes should be documented
   inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md).
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
@@ -109,8 +109,8 @@ versioning guidelines:
   changes for 7 days. Obviously PRs that are closed due to lack of activity can be reopened later.
   Closing stale PRs helps us to keep on top of all of the work currently in flight.
 * If a commit deprecates a feature, the commit message must mention what has been deprecated.
-  Additionally, the [deprecated log](docs/root/intro/deprecated.rst) must be updated with relevant
-  RST links for fields and messages as part of the commit.
+  Additionally, the [version history](docs/root/version_history/current.rst) must be updated with
+  relevant RST links for fields and messages as part of the commit.
 * Please consider joining the [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev)
   mailing list.
 * If your PR involves any changes to
@@ -167,7 +167,7 @@ There are four suggested options for testing new runtime features:
 3. Set up integration tests with custom runtime defaults as documented in the
    [integration test README](https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md)
 4. Run a given unit test with the new runtime value explicitly set true as done
-   for [runtime_flag_override_test](https://github.com/envoyproxy/envoy/blob/master/test/common/runtime/BUILD) 
+   for [runtime_flag_override_test](https://github.com/envoyproxy/envoy/blob/master/test/common/runtime/BUILD)
 
 Runtime code is held to the same standard as regular Envoy code, so both the old
 path and the new should have 100% coverage both with the feature defaulting true

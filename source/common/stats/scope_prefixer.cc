@@ -49,6 +49,13 @@ Histogram& ScopePrefixer::histogramFromStatNameWithTags(const StatName& name,
   return scope_.histogramFromStatNameWithTags(StatName(stat_name_storage.get()), tags, unit);
 }
 
+TextReadout& ScopePrefixer::textReadoutFromStatNameWithTags(const StatName& name,
+                                                            StatNameTagVectorOptConstRef tags) {
+  Stats::SymbolTable::StoragePtr stat_name_storage =
+      scope_.symbolTable().join({prefix_.statName(), name});
+  return scope_.textReadoutFromStatNameWithTags(StatName(stat_name_storage.get()), tags);
+}
+
 CounterOptConstRef ScopePrefixer::findCounter(StatName name) const {
   return scope_.findCounter(name);
 }
@@ -57,6 +64,10 @@ GaugeOptConstRef ScopePrefixer::findGauge(StatName name) const { return scope_.f
 
 HistogramOptConstRef ScopePrefixer::findHistogram(StatName name) const {
   return scope_.findHistogram(name);
+}
+
+TextReadoutOptConstRef ScopePrefixer::findTextReadout(StatName name) const {
+  return scope_.findTextReadout(name);
 }
 
 void ScopePrefixer::deliverHistogramToSinks(const Histogram& histograms, uint64_t val) {
