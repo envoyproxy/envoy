@@ -34,7 +34,14 @@ FaultAbortConfig::FaultAbortConfig(
   switch (abort_config.error_type_case()) {
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
     provider_ =
-        std::make_unique<FixedAbortProvider>(abort_config.http_status(), abort_config.percentage());
+        std::make_unique<FixedAbortProvider>(static_cast<Http::Code>(abort_config.http_status()),
+                                             absl::nullopt, abort_config.percentage());
+    break;
+  case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kGrpcStatus:
+    // If gRPC status code is set, then HTTP will be set to 200
+    provider_ = std::make_unique<FixedAbortProvider>(
+        Http::Code::OK, static_cast<Grpc::Status::GrpcStatus>(abort_config.grpc_status()),
+        abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHeaderAbort:
     provider_ = std::make_unique<HeaderAbortProvider>(abort_config.percentage());
@@ -44,10 +51,9 @@ FaultAbortConfig::FaultAbortConfig(
   }
 }
 
-absl::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::statusCode(
-    const Http::RequestHeaderMap* request_headers) const {
-  absl::optional<Http::Code> ret;
-  const auto header = request_headers->get(HeaderNames::get().AbortRequest);
+absl::optional<Http::Code>
+FaultAbortConfig::HeaderAbortProvider::httpStatusCode(const Http::HeaderEntry* header) const {
+  absl::optional<Http::Code> ret = absl::nullopt;
   if (header == nullptr) {
     return ret;
   }
@@ -59,6 +65,25 @@ absl::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::statusCode(
 
   if (code >= 200 && code < 600) {
     ret = static_cast<Http::Code>(code);
+  }
+
+  return ret;
+}
+
+absl::optional<Grpc::Status::GrpcStatus>
+FaultAbortConfig::HeaderAbortProvider::grpcStatusCode(const Http::HeaderEntry* header) const {
+  absl::optional<Grpc::Status::GrpcStatus> ret = absl::nullopt;
+  if (header == nullptr) {
+    return ret;
+  }
+
+  uint64_t code;
+  if (!absl::SimpleAtoi(header->value().getStringView(), &code)) {
+    return ret;
+  }
+
+  if (code <= 16) {
+    ret = static_cast<Grpc::Status::GrpcStatus>(code);
   }
 
   return ret;
