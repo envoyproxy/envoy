@@ -150,7 +150,8 @@ protected:
                               Network::DnsResolver::ResolutionStatus status =
                                   Network::DnsResolver::ResolutionStatus::Success) {
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, dns_lookup_family, _))
-        .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+        .WillOnce(Invoke([status, resolved_addresses](
+                             const std::string&, Network::DnsLookupFamily,
                              Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
           cb(status, TestUtility::makeDnsResponse(resolved_addresses));
           return nullptr;
