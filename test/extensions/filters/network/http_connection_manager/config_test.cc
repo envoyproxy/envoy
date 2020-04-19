@@ -1,4 +1,7 @@
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
+#include "envoy/config/trace/v3/opencensus.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/server/request_id_extension_config.h"
@@ -17,6 +20,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1509,9 +1513,9 @@ TEST_F(HttpConnectionManagerConfigTest, CustomRequestIDExtension) {
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
-  Registry::RegisterFactory<TestRequestIDExtensionFactory,
-                            Server::Configuration::RequestIDExtensionFactory>
-      registered;
+
+  TestRequestIDExtensionFactory factory;
+  Registry::InjectFactory<Server::Configuration::RequestIDExtensionFactory> registration(factory);
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
