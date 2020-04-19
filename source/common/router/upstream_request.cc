@@ -32,7 +32,6 @@
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/router.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -328,6 +327,8 @@ void UpstreamRequest::onPoolReady(
 
   onUpstreamHostSelected(host);
 
+  stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
+      info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
   stream_info_.setUpstreamLocalAddress(upstream_local_address);
   parent_.callbacks()->streamInfo().setUpstreamLocalAddress(upstream_local_address);
 

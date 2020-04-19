@@ -346,6 +346,7 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
                            resource_manager.retries().max()));
 }
 
+// TODO(efimki): Add support of text readouts stats.
 void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
   envoy::admin::v3::Clusters clusters;
   for (auto& cluster_pair : server_.clusterManager().clusters()) {
@@ -423,6 +424,7 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
   response.add(MessageUtil::getJsonStringFromMessage(clusters, true)); // pretty-print
 }
 
+// TODO(efimki): Add support of text readouts stats.
 void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
   for (auto& cluster : server_.clusterManager().clusters()) {
     addOutlierInfo(cluster.second.get().info()->name(), cluster.second.get().outlierDetector(),
@@ -1251,7 +1253,7 @@ void AdminImpl::closeSocket() {
 
 void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
-    handler->addListener(*listener_);
+    handler->addListener(absl::nullopt, *listener_);
   }
 }
 
