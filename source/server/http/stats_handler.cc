@@ -1,6 +1,7 @@
 #include "server/http/stats_handler.h"
 
 #include "common/common/empty_string.h"
+#include "common/html/utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
@@ -100,7 +101,7 @@ Http::Code StatsHandlerImpl::handlerStats(absl::string_view url,
   }
 
   std::map<std::string, std::string> text_readouts;
-  for (const auto& text_readout : server_.stats().textReadouts()) {
+  for (const auto& text_readout : server.stats().textReadouts()) {
     if (shouldShowMetric(*text_readout, used_only, regex)) {
       text_readouts.emplace(text_readout->name(), text_readout->value());
     }
@@ -109,8 +110,8 @@ Http::Code StatsHandlerImpl::handlerStats(absl::string_view url,
   if (const auto format_value = Utility::formatParam(params)) {
     if (format_value.value() == "json") {
       response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-      response.add(AdminImpl::statsAsJson(all_stats, text_readouts, server_.stats().histograms(),
-                                          used_only, regex));
+      response.add(
+          statsAsJson(all_stats, text_readouts, server.stats().histograms(), used_only, regex));
     } else if (format_value.value() == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream, server);
     } else {

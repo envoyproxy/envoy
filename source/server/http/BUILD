@@ -95,6 +95,7 @@ envoy_cc_library(
         "//include/envoy/server:admin_interface",
         "//include/envoy/server:instance_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/html:utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stats:histogram_lib",

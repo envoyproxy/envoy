@@ -30,8 +30,8 @@ public:
                      std::map<std::string, std::string>& all_text_readouts,
                      const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                      const bool used_only, const absl::optional<std::regex> regex = absl::nullopt) {
-    return AdminImpl::statsAsJson(all_stats, all_text_readouts, all_histograms, used_only, regex,
-                                  true /*pretty_print*/);
+    return StatsHandlerImpl::statsAsJson(all_stats, all_text_readouts, all_histograms, used_only,
+                                         regex, true /*pretty_print*/);
   }
 
   Stats::SymbolTablePtr symbol_table_;
