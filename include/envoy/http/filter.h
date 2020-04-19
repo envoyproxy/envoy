@@ -162,6 +162,7 @@ public:
    * This method will clear any cached route upon invocation.
    */
   virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
+
   /**
    * Returns the clusterInfo for the cached route.
    * This method is to avoid multiple look ups in the filter chain, it also provides a consistent

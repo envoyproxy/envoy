@@ -1111,24 +1111,15 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
   // bails early (as it rejects a request), so there is no routing is going to happen anyway.
   const auto* forwarded_proto_header = headers.ForwardedProto();
   if (forwarded_proto_header == nullptr) {
-    if (cb) {
-      cb(nullptr, RouteEvalStatus::NoMoreRoutes);
-    }
     return nullptr;
   }
 
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::All && forwarded_proto_header->value() != "https") {
-    if (cb) {
-      cb(SSL_REDIRECT_ROUTE, RouteEvalStatus::NoMoreRoutes);
-    }
     return SSL_REDIRECT_ROUTE;
   } else if (ssl_requirements_ == SslRequirements::ExternalOnly &&
              forwarded_proto_header->value() != "https" &&
              !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
-    if (cb) {
-      cb(SSL_REDIRECT_ROUTE, RouteEvalStatus::NoMoreRoutes);
-    }
     return SSL_REDIRECT_ROUTE;
   }
 
@@ -1157,9 +1148,6 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     return route_entry;
   }
 
-  if (cb) {
-    cb(nullptr, RouteEvalStatus::NoMoreRoutes);
-  }
   return nullptr;
 }
 
@@ -1211,9 +1199,6 @@ RouteConstSharedPtr RouteMatcher::route(const RouteCallback& cb,
   if (virtual_host) {
     return virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
   } else {
-    if (cb) {
-      cb(nullptr, RouteEvalStatus::NoMoreRoutes);
-    }
     return nullptr;
   }
 }

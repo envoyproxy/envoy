@@ -974,15 +974,17 @@ enum class RouteEvalStatus {
 
 /**
  * RouteCallback can be used to override routing decision made by the Route::Config::route,
- * this callback is passed the RouteConstSharedPtr, which can be null if no matching route
- * was found, and RouteEvalStatus indicating whether there are more routes available for evaluation.
+ * this callback is passed the RouteConstSharedPtr, when a matching route is found, and
+ * RouteEvalStatus indicating whether there are more routes available for evaluation.
  *
- * RouteCallback will be called back at least once, RouteCallback can return
- * one of the RouteMatchStatus enum to indicate if the match has been accepted or should the route
- * match evaluation continue.
+ * RouteCallback will be called back only when at least one matching route is found, if no matching
+ * routes are found RouteCallback will not be invoked. RouteCallback can return one of the
+ * RouteMatchStatus enum to indicate if the match has been accepted or should the route match
+ * evaluation continue.
  *
  * Returning RouteMatchStatus::Continue, when no more routes available for evaluation will result in
- * no further callbacks.
+ * no further callbacks and no route is deemed to be accepted and nullptr is returned to the caller
+ * of Route::Config::route.
  */
 using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteEvalStatus)>;
 
@@ -1020,7 +1022,6 @@ public:
    * @return the route accepted by the callback or nullptr if no match found or none of route is
    * accepted by the callback.
    */
-
   virtual RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const PURE;

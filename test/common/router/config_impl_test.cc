@@ -113,6 +113,7 @@ Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::st
       {":method", method},         {"x-safe", "safe"},
       {"x-global-nope", "global"}, {"x-vhost-nope", "vhost"},
       {"x-route-nope", "route"},   {"x-forwarded-proto", forwarded_proto}};
+
   if (forwarded_proto.empty()) {
     hdrs.remove("x-forwarded-proto");
   }
@@ -7140,12 +7141,12 @@ virtual_hosts:
         EXPECT_FALSE(clusters.empty());
         EXPECT_EQ(clusters[clusters.size() - 1], route->routeEntry()->clusterName());
         clusters.pop_back();
-        if (!clusters.empty()) {
-          EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
-          return RouteMatchStatus::Continue;
+        if (clusters.empty()) {
+          EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
+          return RouteMatchStatus::Accept;
         }
-        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
-        return RouteMatchStatus::Accept;
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
+        return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/foo/bar/baz", "GET"));
   EXPECT_EQ(accepted_route->routeEntry()->clusterName(), "default");
@@ -7183,10 +7184,10 @@ virtual_hosts:
         clusters.pop_back();
         EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
 
-        if (!clusters.empty()) {
-          return RouteMatchStatus::Continue;
+        if (clusters.empty()) {
+          return RouteMatchStatus::Accept; // Do not match default route
         }
-        return RouteMatchStatus::Accept; // Do not match default route
+        return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/foo/bar", "GET"));
   EXPECT_EQ(accepted_route->routeEntry()->clusterName(), "foo");
@@ -7223,10 +7224,10 @@ virtual_hosts:
         EXPECT_EQ(clusters[clusters.size() - 1], route->routeEntry()->clusterName());
         clusters.pop_back();
 
-        if (!clusters.empty()) {
-          EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
-        } else {
+        if (clusters.empty()) {
           EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
+        } else {
+          EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
         }
         // Returning continue when no more routes are available will be ignored by ConfigImpl::route
         return RouteMatchStatus::Continue;
@@ -7253,14 +7254,11 @@ virtual_hosts:
           cluster: foo
 )EOF";
 
-  int ctr = 0;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
   RouteConstSharedPtr accepted_route = config.route(
-      [&ctr](RouteConstSharedPtr route, RouteEvalStatus route_eval_status) -> RouteMatchStatus {
-        EXPECT_EQ(ctr++, 0);
-        EXPECT_EQ(route, nullptr);
-        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
-        // Returning continue when no more routes are available will be ignored by ConfigImpl::route
+      [](RouteConstSharedPtr, RouteEvalStatus) -> RouteMatchStatus {
+        ADD_FAILURE()
+            << "RouteCallback should not be invoked since there are no matching route to override";
         return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/", "GET"));
@@ -7285,14 +7283,11 @@ virtual_hosts:
           cluster: default
 )EOF";
 
-  int ctr = 0;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
   RouteConstSharedPtr accepted_route = config.route(
-      [&ctr](RouteConstSharedPtr route, RouteEvalStatus route_eval_status) -> RouteMatchStatus {
-        EXPECT_EQ(ctr++, 0);
-        EXPECT_EQ(route, nullptr);
-        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
-        // Returning continue when no more routes are available will be ignored by ConfigImpl::route
+      [](RouteConstSharedPtr, RouteEvalStatus) -> RouteMatchStatus {
+        ADD_FAILURE()
+            << "RouteCallback should not be invoked since there are no matching route to override";
         return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/", "GET"));
@@ -7317,14 +7312,11 @@ virtual_hosts:
           cluster: default
 )EOF";
 
-  int ctr = 0;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
   RouteConstSharedPtr accepted_route = config.route(
-      [&ctr](RouteConstSharedPtr route, RouteEvalStatus route_eval_status) -> RouteMatchStatus {
-        EXPECT_EQ(ctr++, 0);
-        EXPECT_EQ(route, nullptr);
-        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
-        // Returning continue when no more routes are available will be ignored by ConfigImpl::route
+      [](RouteConstSharedPtr, RouteEvalStatus) -> RouteMatchStatus {
+        ADD_FAILURE()
+            << "RouteCallback should not be invoked since there are no matching route to override";
         return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/", "GET", ""));
@@ -7350,14 +7342,11 @@ virtual_hosts:
     require_tls: ALL
 )EOF";
 
-  int ctr = 0;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
   RouteConstSharedPtr accepted_route = config.route(
-      [&ctr](RouteConstSharedPtr route, RouteEvalStatus route_eval_status) -> RouteMatchStatus {
-        EXPECT_EQ(ctr++, 0);
-        EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(route.get()));
-        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
-        // Returning continue when no more routes are available will be ignored by ConfigImpl::route
+      [](RouteConstSharedPtr, RouteEvalStatus) -> RouteMatchStatus {
+        ADD_FAILURE()
+            << "RouteCallback should not be invoked since there are no matching route to override";
         return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/", "GET"));
@@ -7383,14 +7372,11 @@ virtual_hosts:
     require_tls: EXTERNAL_ONLY
 )EOF";
 
-  int ctr = 0;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
   RouteConstSharedPtr accepted_route = config.route(
-      [&ctr](RouteConstSharedPtr route, RouteEvalStatus route_eval_status) -> RouteMatchStatus {
-        EXPECT_EQ(ctr++, 0);
-        EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(route.get()));
-        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
-        // Returning continue when no more routes are available will be ignored by ConfigImpl::route
+      [](RouteConstSharedPtr, RouteEvalStatus) -> RouteMatchStatus {
+        ADD_FAILURE()
+            << "RouteCallback should not be invoked since there are no matching route to override";
         return RouteMatchStatus::Continue;
       },
       genHeaders("bat.com", "/", "GET"));

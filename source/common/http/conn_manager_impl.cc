@@ -2226,19 +2226,19 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBas
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.has_value()) {
-    parent_.refreshCachedRoute();
-  }
-
-  return parent_.cached_route_.value();
+  return route(nullptr);
 }
 
 Router::RouteConstSharedPtr
 ConnectionManagerImpl::ActiveStreamFilterBase::route(const Router::RouteCallback& cb) {
-  if (parent_.cached_route_.has_value()) {
+  if (cb && parent_.cached_route_.has_value()) {
     clearRouteCache();
   }
-  parent_.refreshCachedRoute(cb);
+
+  if (!parent_.cached_route_.has_value()) {
+    parent_.refreshCachedRoute(cb);
+  }
+
   return parent_.cached_route_.value();
 }
 

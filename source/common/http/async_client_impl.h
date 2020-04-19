@@ -164,11 +164,9 @@ private:
       return nullptr;
     }
 
-    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb,
-                                      const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
-                                      uint64_t) const override {
-      cb(nullptr, Router::RouteEvalStatus::NoMoreRoutes);
-      return nullptr;
+    Router::RouteConstSharedPtr route(const Router::RouteCallback&, const Http::RequestHeaderMap&,
+                                      const StreamInfo::StreamInfo&, uint64_t) const override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
     const std::list<LowerCaseString>& internalOnlyHeaders() const override {
