@@ -207,6 +207,17 @@ public:
     if (doStatTracking()) {
       config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
                                    headers.GrpcStatus());
+      if (end_stream) {
+        if (config_->enable_upstream_stats_ &&
+            decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().has_value() &&
+            decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().has_value()) {
+          std::chrono::milliseconds chrono_duration =
+              std::chrono::duration_cast<std::chrono::milliseconds>(
+                  decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().value() -
+                  decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().value());
+          config_->context_.chargeUpstreamStat(*cluster_, request_names_, chrono_duration);
+        }
+      }
     }
     return Http::FilterHeadersStatus::Continue;
   }
