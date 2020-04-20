@@ -75,6 +75,23 @@ private:
   ProtobufWkt::Duration duration_;
 };
 
+// Class used to test serializeAsString and serializeAsProto of FilterState
+class TestSerializedStringFilterState : public StreamInfo::FilterState::Object {
+public:
+  TestSerializedStringFilterState(std::string str) : raw_string_(str) {}
+  absl::optional<std::string> serializeAsString() const override {
+    return raw_string_ + " By PLAIN";
+  }
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    message->set_value(raw_string_ + " By TYPED");
+    return message;
+  }
+
+private:
+  std::string raw_string_;
+};
+
 TEST(AccessLogFormatUtilsTest, protocolToString) {
   EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(Http::Protocol::Http10));
   EXPECT_EQ("HTTP/1.1", AccessLogFormatUtils::protocolToString(Http::Protocol::Http11));
@@ -1241,10 +1258,13 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
       "key-serialization-error",
       std::make_unique<TestSerializedStructFilterState>(std::chrono::seconds(-281474976710656)),
       StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData(
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
+      StreamInfo::FilterState::StateType::ReadOnly);
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   {
-    FilterStateFormatter formatter("key", absl::optional<size_t>());
+    FilterStateFormatter formatter("key", absl::optional<size_t>(), false);
 
     EXPECT_EQ("\"test_value\"",
               formatter.format(request_headers, response_headers, response_trailers, stream_info));
@@ -1253,7 +1273,7 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
         ProtoEq(ValueUtil::stringValue("test_value")));
   }
   {
-    FilterStateFormatter formatter("key-struct", absl::optional<size_t>());
+    FilterStateFormatter formatter("key-struct", absl::optional<size_t>(), false);
 
     EXPECT_EQ("{\"inner_key\":\"inner_value\"}",
               formatter.format(request_headers, response_headers, response_trailers, stream_info));
@@ -1269,7 +1289,7 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
 
   // not found case
   {
-    FilterStateFormatter formatter("key-not-found", absl::optional<size_t>());
+    FilterStateFormatter formatter("key-not-found", absl::optional<size_t>(), false);
 
     EXPECT_EQ("-",
               formatter.format(request_headers, response_headers, response_trailers, stream_info));
@@ -1280,7 +1300,7 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
 
   // no serialization case
   {
-    FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>());
+    FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>(), false);
 
     EXPECT_EQ("-",
               formatter.format(request_headers, response_headers, response_trailers, stream_info));
@@ -1291,7 +1311,7 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
 
   // serialization error case
   {
-    FilterStateFormatter formatter("key-serialization-error", absl::optional<size_t>());
+    FilterStateFormatter formatter("key-serialization-error", absl::optional<size_t>(), false);
 
     EXPECT_EQ("-",
               formatter.format(request_headers, response_headers, response_trailers, stream_info));
@@ -1302,7 +1322,7 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
 
   // size limit
   {
-    FilterStateFormatter formatter("key", absl::optional<size_t>(5));
+    FilterStateFormatter formatter("key", absl::optional<size_t>(5), false);
 
     EXPECT_EQ("\"test",
               formatter.format(request_headers, response_headers, response_trailers, stream_info));
@@ -1311,6 +1331,33 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
     EXPECT_THAT(
         formatter.formatValue(request_headers, response_headers, response_trailers, stream_info),
         ProtoEq(ValueUtil::stringValue("test_value")));
+  }
+
+  // serializeAsString case
+  {
+    FilterStateFormatter formatter("test_key", absl::optional<size_t>(), true);
+
+    EXPECT_EQ("test_value By PLAIN",
+              formatter.format(request_headers, response_headers, response_trailers, stream_info));
+  }
+
+  // size limit for serializeAsString
+  {
+    FilterStateFormatter formatter("test_key", absl::optional<size_t>(10), true);
+
+    EXPECT_EQ("test_value",
+              formatter.format(request_headers, response_headers, response_trailers, stream_info));
+  }
+
+  // no serialization case for serializeAsString
+  {
+    FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>(), true);
+
+    EXPECT_EQ("-",
+              formatter.format(request_headers, response_headers, response_trailers, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_headers, response_headers, response_trailers, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
   }
 }
 
@@ -1569,7 +1616,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
             fields.at("test_obj").struct_value().fields().at("inner_key").string_value());
 }
 
-TEST(AccessLogFormatterTets, JsonFormatterFilterStateTest) {
+TEST(AccessLogFormatterTest, JsonFormatterFilterStateTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1595,7 +1642,7 @@ TEST(AccessLogFormatterTets, JsonFormatterFilterStateTest) {
       expected_json_map);
 }
 
-TEST(AccessLogFormatterTets, JsonFormatterTypedFilterStateTest) {
+TEST(AccessLogFormatterTest, JsonFormatterTypedFilterStateTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1622,6 +1669,82 @@ TEST(AccessLogFormatterTets, JsonFormatterTypedFilterStateTest) {
   EXPECT_EQ("test_value", fields.at("test_key").string_value());
   EXPECT_EQ("inner_value",
             fields.at("test_obj").struct_value().fields().at("inner_key").string_value());
+}
+
+// Test new specifier (PLAIN/TYPED) of FilterState. Ensure that after adding additional specifier,
+// the FilterState can call the serializeAsProto or serializeAsString methods correctly.
+TEST(AccessLogFormatterTest, FilterStateSpeciferTest) {
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  stream_info.filter_state_->setData(
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
+      StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+
+  std::unordered_map<std::string, std::string> expected_json_map = {
+      {"test_key_plain", "test_value By PLAIN"},
+      {"test_key_typed", "\"test_value By TYPED\""},
+  };
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"test_key_plain", "%FILTER_STATE(test_key:PLAIN)%"},
+      {"test_key_typed", "%FILTER_STATE(test_key:TYPED)%"}};
+
+  JsonFormatterImpl formatter(key_mapping, false);
+
+  verifyJsonOutput(
+      formatter.format(request_headers, response_headers, response_trailers, stream_info),
+      expected_json_map);
+}
+
+// Test new specifier (PLAIN/TYPED) of FilterState and convert the output log string to proto
+// and then verify the result.
+TEST(AccessLogFormatterTest, TypedFilterStateSpeciferTest) {
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  stream_info.filter_state_->setData(
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
+      StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"test_key_plain", "%FILTER_STATE(test_key:PLAIN)%"},
+      {"test_key_typed", "%FILTER_STATE(test_key:TYPED)%"}};
+
+  JsonFormatterImpl formatter(key_mapping, true);
+
+  std::string json =
+      formatter.format(request_headers, response_headers, response_trailers, stream_info);
+
+  ProtobufWkt::Struct output;
+  MessageUtil::loadFromJson(json, output);
+
+  const auto& fields = output.fields();
+  EXPECT_EQ("test_value By PLAIN", fields.at("test_key_plain").string_value());
+  EXPECT_EQ("test_value By TYPED", fields.at("test_key_typed").string_value());
+}
+
+// Error specifier will cause an exception to be thrown.
+TEST(AccessLogFormatterTest, FilterStateErrorSpeciferTest) {
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  stream_info.filter_state_->setData(
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  // 'ABCDE' is error specifier.
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"test_key_plain", "%FILTER_STATE(test_key:ABCDE)%"},
+      {"test_key_typed", "%FILTER_STATE(test_key:TYPED)%"}};
+
+  EXPECT_THROW_WITH_MESSAGE(JsonFormatterImpl formatter(key_mapping, false), EnvoyException,
+                            "Invalid filter state serialize type, only support PLAIN/TYPED.");
 }
 
 TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
