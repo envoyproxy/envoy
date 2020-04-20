@@ -6,6 +6,10 @@ load(
     "envoy_cc_test",
     "envoy_package",
 )
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
+)
 
 envoy_package()
 
@@ -16,8 +20,8 @@ envoy_cc_fuzz_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
-        "//source/common/compressor:compressor_lib",
-        "//source/common/decompressor:decompressor_lib",
+        "//source/extensions/compression/gzip/compressor:compressor_lib",
+        "//source/extensions/compression/gzip/decompressor:decompressor_lib",
     ],
 )
 
@@ -27,7 +31,17 @@ envoy_cc_test(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
-        "//source/common/compressor:compressor_lib",
+        "//source/extensions/compression/gzip/compressor:compressor_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "gzip_compressor_library_test",
+    srcs = ["gzip_compressor_library_test.cc"],
+    extension_name = "envoy.compression.gzip.compressor",
+    deps = [
+        "//source/extensions/compression/gzip/compressor:config",
         "//test/test_common:utility_lib",
     ],
 )

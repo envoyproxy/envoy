@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/compressor/compressor.h"
+#include "envoy/compression/compressor/compressor.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -62,7 +62,7 @@ public:
   CompressorFilterConfig() = delete;
   virtual ~CompressorFilterConfig() = default;
 
-  virtual Envoy::Compressor::CompressorPtr makeCompressor() PURE;
+  virtual Envoy::Compression::Compressor::CompressorPtr makeCompressor() PURE;
 
   bool enabled() const { return enabled_.enabled(); }
   const CompressorStats& stats() { return stats_; }
@@ -149,7 +149,7 @@ private:
   bool shouldCompress(const EncodingDecision& decision) const;
 
   bool skip_compression_;
-  Envoy::Compressor::CompressorPtr compressor_;
+  Envoy::Compression::Compressor::CompressorPtr compressor_;
   const CompressorFilterConfigSharedPtr config_;
   std::unique_ptr<std::string> accept_encoding_;
 };

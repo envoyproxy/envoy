@@ -4,10 +4,10 @@
 #include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
 #include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.validate.h"
 
-#include "common/compressor/zlib_compressor_impl.h"
 #include "common/http/headers.h"
 
-#include "extensions/compression/common/compressor_factory_base.h"
+#include "extensions/compression/common/compressor/factory_base.h"
+#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -29,7 +29,7 @@ class GzipCompressorFactory : public Envoy::Compression::Compressor::CompressorF
 public:
   GzipCompressorFactory(const envoy::extensions::compression::gzip::compressor::v3::Gzip& gzip);
 
-  Envoy::Compressor::CompressorPtr createCompressor() override;
+  Envoy::Compression::Compressor::CompressorPtr createCompressor() override;
   const std::string& statsPrefix() const override { return gzipStatsPrefix(); }
   const std::string& contentEncoding() const override {
     return Http::Headers::get().ContentEncodingValues.Gzip;
@@ -38,15 +38,15 @@ public:
 private:
   friend class GzipTest;
 
-  static Envoy::Compressor::ZlibCompressorImpl::CompressionLevel
+  static ZlibCompressorImpl::CompressionLevel
   compressionLevelEnum(envoy::extensions::compression::gzip::compressor::v3::Gzip::CompressionLevel
                            compression_level);
-  static Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
+  static ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
       envoy::extensions::compression::gzip::compressor::v3::Gzip::CompressionStrategy
           compression_strategy);
 
-  Envoy::Compressor::ZlibCompressorImpl::CompressionLevel compression_level_;
-  Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy compression_strategy_;
+  ZlibCompressorImpl::CompressionLevel compression_level_;
+  ZlibCompressorImpl::CompressionStrategy compression_strategy_;
 
   const int32_t memory_level_;
   const int32_t window_bits_;
@@ -54,7 +54,7 @@ private:
 };
 
 class GzipCompressorLibraryFactory
-    : public Common::CompressorLibraryFactoryBase<
+    : public Compression::Common::Compressor::CompressorLibraryFactoryBase<
           envoy::extensions::compression::gzip::compressor::v3::Gzip> {
 public:
   GzipCompressorLibraryFactory() : CompressorLibraryFactoryBase(gzipExtensionName()) {}

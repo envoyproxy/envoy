@@ -8,6 +8,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Compression {
 namespace Common {
+namespace Compressor {
 
 template <class ConfigProto>
 class CompressorLibraryFactoryBase
@@ -38,6 +39,7 @@ private:
   const std::string name_;
 };
 
+} // namespace Compressor
 } // namespace Common
 } // namespace Compression
 } // namespace Extensions

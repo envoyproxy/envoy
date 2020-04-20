@@ -1,18 +1,21 @@
 #pragma once
 
-#include "envoy/compressor/compressor.h"
+#include "envoy/compression/compressor/compressor.h"
 
-#include "common/common/zlib/base.h"
+#include "extensions/compression/gzip/common/base.h"
 
 #include "zlib.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Compression {
+namespace Gzip {
 namespace Compressor {
 
 /**
  * Implementation of compressor's interface.
  */
-class ZlibCompressorImpl : public Zlib::Base, public Compressor {
+class ZlibCompressorImpl : public Common::Base, public Envoy::Compression::Compressor::Compressor {
 public:
   ZlibCompressorImpl();
 
@@ -80,7 +83,7 @@ public:
             uint64_t memory_level);
 
   // Compressor
-  void compress(Buffer::Instance& buffer, State state) override;
+  void compress(Buffer::Instance& buffer, Envoy::Compression::Compressor::State state) override;
 
 private:
   bool deflateNext(int64_t flush_state);
@@ -88,4 +91,7 @@ private:
 };
 
 } // namespace Compressor
+} // namespace Gzip
+} // namespace Compression
+} // namespace Extensions
 } // namespace Envoy

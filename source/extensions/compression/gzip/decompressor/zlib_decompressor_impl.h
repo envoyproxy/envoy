@@ -1,20 +1,24 @@
 #pragma once
 
-#include "envoy/decompressor/decompressor.h"
+#include "envoy/compression/decompressor/decompressor.h"
 
 #include "common/common/logger.h"
-#include "common/common/zlib/base.h"
+
+#include "extensions/compression/gzip/common/base.h"
 
 #include "zlib.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Compression {
+namespace Gzip {
 namespace Decompressor {
 
 /**
  * Implementation of decompressor's interface.
  */
-class ZlibDecompressorImpl : public Zlib::Base,
-                             public Decompressor,
+class ZlibDecompressorImpl : public Common::Base,
+                             public Envoy::Compression::Decompressor::Decompressor,
                              public Logger::Loggable<Logger::Id::decompression> {
 public:
   ZlibDecompressorImpl();
@@ -49,4 +53,7 @@ private:
 };
 
 } // namespace Decompressor
+} // namespace Gzip
+} // namespace Compression
+} // namespace Extensions
 } // namespace Envoy

@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 
 namespace Envoy {
+namespace Compression {
 namespace Compressor {
 
 /**
@@ -29,4 +30,5 @@ public:
 using CompressorPtr = std::unique_ptr<Compressor>;
 
 } // namespace Compressor
+} // namespace Compression
 } // namespace Envoy

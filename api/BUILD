@@ -163,6 +163,7 @@ proto_library(
         "//envoy/extensions/common/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/common/ratelimit/v3:pkg",
         "//envoy/extensions/common/tap/v3:pkg",
+        "//envoy/extensions/compression/common/compressor/v3:pkg",
         "//envoy/extensions/compression/gzip/compressor/v3:pkg",
         "//envoy/extensions/filter/udp/dns_filter/v3alpha:pkg",
         "//envoy/extensions/filters/common/fault/v3:pkg",

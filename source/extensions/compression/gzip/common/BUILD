@@ -9,9 +9,11 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "compressor_interface",
-    hdrs = ["compressor.h"],
+    name = "gzip_base_lib",
+    srcs = ["base.cc"],
+    hdrs = ["base.h"],
+    external_deps = ["zlib"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
     ],
 )

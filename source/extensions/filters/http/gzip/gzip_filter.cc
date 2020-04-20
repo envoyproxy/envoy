@@ -32,35 +32,37 @@ GzipFilterConfig::GzipFilterConfig(const envoy::extensions::filters::http::gzip:
       memory_level_(memoryLevelUint(gzip.memory_level().value())),
       window_bits_(windowBitsUint(gzip.window_bits().value())) {}
 
-Compressor::CompressorPtr GzipFilterConfig::makeCompressor() {
-  auto compressor = std::make_unique<Compressor::ZlibCompressorImpl>();
+Envoy::Compression::Compressor::CompressorPtr GzipFilterConfig::makeCompressor() {
+  auto compressor = std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>();
   compressor->init(compressionLevel(), compressionStrategy(), windowBits(), memoryLevel());
   return compressor;
 }
 
-Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLevelEnum(
+Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel
+GzipFilterConfig::compressionLevelEnum(
     envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::Enum compression_level) {
   switch (compression_level) {
   case envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::BEST:
-    return Compressor::ZlibCompressorImpl::CompressionLevel::Best;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Best;
   case envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::SPEED:
-    return Compressor::ZlibCompressorImpl::CompressionLevel::Speed;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Speed;
   default:
-    return Compressor::ZlibCompressorImpl::CompressionLevel::Standard;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Standard;
   }
 }
 
-Compressor::ZlibCompressorImpl::CompressionStrategy GzipFilterConfig::compressionStrategyEnum(
+Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy
+GzipFilterConfig::compressionStrategyEnum(
     envoy::extensions::filters::http::gzip::v3::Gzip::CompressionStrategy compression_strategy) {
   switch (compression_strategy) {
   case envoy::extensions::filters::http::gzip::v3::Gzip::RLE:
-    return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
   case envoy::extensions::filters::http::gzip::v3::Gzip::FILTERED:
-    return Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered;
   case envoy::extensions::filters::http::gzip::v3::Gzip::HUFFMAN:
-    return Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
   default:
-    return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
   }
 }
 

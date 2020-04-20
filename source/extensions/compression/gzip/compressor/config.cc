@@ -29,53 +29,52 @@ GzipCompressorFactory::GzipCompressorFactory(
                    GzipHeaderValue),
       chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, chunk_size, DefaultChunkSize)) {}
 
-Envoy::Compressor::ZlibCompressorImpl::CompressionLevel GzipCompressorFactory::compressionLevelEnum(
+ZlibCompressorImpl::CompressionLevel GzipCompressorFactory::compressionLevelEnum(
     envoy::extensions::compression::gzip::compressor::v3::Gzip::CompressionLevel
         compression_level) {
   switch (compression_level) {
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::BEST_SPEED:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Speed;
+    return ZlibCompressorImpl::CompressionLevel::Speed;
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::COMPRESSION_LEVEL_2:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level2;
+    return ZlibCompressorImpl::CompressionLevel::Level2;
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::COMPRESSION_LEVEL_3:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level3;
+    return ZlibCompressorImpl::CompressionLevel::Level3;
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::COMPRESSION_LEVEL_4:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level4;
+    return ZlibCompressorImpl::CompressionLevel::Level4;
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::COMPRESSION_LEVEL_5:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level5;
+    return ZlibCompressorImpl::CompressionLevel::Level5;
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::COMPRESSION_LEVEL_6:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level6;
+    return ZlibCompressorImpl::CompressionLevel::Level6;
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::COMPRESSION_LEVEL_7:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level7;
+    return ZlibCompressorImpl::CompressionLevel::Level7;
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::COMPRESSION_LEVEL_8:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Level8;
+    return ZlibCompressorImpl::CompressionLevel::Level8;
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::BEST_COMPRESSION:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best;
+    return ZlibCompressorImpl::CompressionLevel::Best;
   default:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard;
+    return ZlibCompressorImpl::CompressionLevel::Standard;
   }
 }
 
-Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy
-GzipCompressorFactory::compressionStrategyEnum(
+ZlibCompressorImpl::CompressionStrategy GzipCompressorFactory::compressionStrategyEnum(
     envoy::extensions::compression::gzip::compressor::v3::Gzip::CompressionStrategy
         compression_strategy) {
   switch (compression_strategy) {
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::FILTERED:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered;
+    return ZlibCompressorImpl::CompressionStrategy::Filtered;
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::FIXED:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Fixed;
+    return ZlibCompressorImpl::CompressionStrategy::Fixed;
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::HUFFMAN_ONLY:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
+    return ZlibCompressorImpl::CompressionStrategy::Huffman;
   case envoy::extensions::compression::gzip::compressor::v3::Gzip::RLE:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
+    return ZlibCompressorImpl::CompressionStrategy::Rle;
   default:
-    return Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
+    return ZlibCompressorImpl::CompressionStrategy::Standard;
   }
 }
 
-Envoy::Compressor::CompressorPtr GzipCompressorFactory::createCompressor() {
-  auto compressor = std::make_unique<Envoy::Compressor::ZlibCompressorImpl>(chunk_size_);
+Envoy::Compression::Compressor::CompressorPtr GzipCompressorFactory::createCompressor() {
+  auto compressor = std::make_unique<ZlibCompressorImpl>(chunk_size_);
   compressor->init(compression_level_, compression_strategy_, window_bits_, memory_level_);
   return compressor;
 }

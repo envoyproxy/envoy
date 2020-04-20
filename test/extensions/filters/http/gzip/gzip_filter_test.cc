@@ -3,10 +3,10 @@
 #include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 
 #include "common/common/hex.h"
-#include "common/compressor/zlib_compressor_impl.h"
-#include "common/decompressor/zlib_decompressor_impl.h"
 #include "common/protobuf/utility.h"
 
+#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
+#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 #include "extensions/filters/http/gzip/config.h"
 #include "extensions/filters/http/gzip/gzip_filter.h"
 
@@ -123,8 +123,10 @@ protected:
   }
 
   void expectValidCompressionStrategyAndLevel(
-      Compressor::ZlibCompressorImpl::CompressionStrategy strategy, absl::string_view strategy_name,
-      Compressor::ZlibCompressorImpl::CompressionLevel level, absl::string_view level_name) {
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy,
+      absl::string_view strategy_name,
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel level,
+      absl::string_view level_name) {
     setUpFilter(fmt::format(R"EOF({{"compression_strategy": "{}", "compression_level": "{}"}})EOF",
                             strategy_name, level_name));
     EXPECT_EQ(strategy, config_->compressionStrategy());
@@ -157,7 +159,7 @@ protected:
   std::shared_ptr<GzipFilterConfig> config_;
   std::unique_ptr<Common::Compressors::CompressorFilter> filter_;
   Buffer::OwnedImpl data_;
-  Decompressor::ZlibDecompressorImpl decompressor_;
+  Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_;
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
   Stats::TestUtil::TestStore stats_;
@@ -192,26 +194,26 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
   EXPECT_EQ(28, config_->windowBits());
   EXPECT_EQ(false, config_->disableOnEtagHeader());
   EXPECT_EQ(false, config_->removeAcceptEncodingHeader());
-  EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
+  EXPECT_EQ(Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
             config_->compressionStrategy());
-  EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
+  EXPECT_EQ(Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
             config_->compressionLevel());
   EXPECT_EQ(18, config_->contentTypeValues().size());
 }
 
 TEST_F(GzipFilterTest, AvailableCombinationCompressionStrategyAndLevelConfig) {
   expectValidCompressionStrategyAndLevel(
-      Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered, "FILTERED",
-      Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered, "FILTERED",
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
   expectValidCompressionStrategyAndLevel(
-      Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman, "HUFFMAN",
-      Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman, "HUFFMAN",
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
   expectValidCompressionStrategyAndLevel(
-      Compressor::ZlibCompressorImpl::CompressionStrategy::Rle, "RLE",
-      Compressor::ZlibCompressorImpl::CompressionLevel::Speed, "SPEED");
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Rle, "RLE",
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Speed, "SPEED");
   expectValidCompressionStrategyAndLevel(
-      Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, "DEFAULT",
-      Compressor::ZlibCompressorImpl::CompressionLevel::Standard, "DEFAULT");
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, "DEFAULT",
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Standard, "DEFAULT");
 }
 
 // Acceptance Testing with default configuration.

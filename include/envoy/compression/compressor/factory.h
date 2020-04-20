@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/compressor/compressor.h"
+#include "envoy/compression/compressor/compressor.h"
 
 namespace Envoy {
 namespace Compression {
@@ -10,7 +10,7 @@ class CompressorFactory {
 public:
   virtual ~CompressorFactory() = default;
 
-  virtual Envoy::Compressor::CompressorPtr createCompressor() PURE;
+  virtual CompressorPtr createCompressor() PURE;
   virtual const std::string& statsPrefix() const PURE;
   virtual const std::string& contentEncoding() const PURE;
 };

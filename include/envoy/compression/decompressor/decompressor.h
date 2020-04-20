@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 
 namespace Envoy {
+namespace Compression {
 namespace Decompressor {
 
 /**
@@ -22,4 +23,5 @@ public:
 };
 
 } // namespace Decompressor
+} // namespace Compression
 } // namespace Envoy

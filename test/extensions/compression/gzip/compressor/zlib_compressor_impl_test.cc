@@ -1,6 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/hex.h"
-#include "common/compressor/zlib_compressor_impl.h"
+
+#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -8,6 +9,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Compression {
+namespace Gzip {
 namespace Compressor {
 namespace {
 
@@ -70,8 +74,12 @@ class ZlibCompressorImplTester : public ZlibCompressorImpl {
 public:
   ZlibCompressorImplTester() = default;
   ZlibCompressorImplTester(uint64_t chunk_size) : ZlibCompressorImpl(chunk_size) {}
-  void compressThenFlush(Buffer::OwnedImpl& buffer) { compress(buffer, State::Flush); }
-  void finish(Buffer::OwnedImpl& buffer) { compress(buffer, State::Finish); }
+  void compressThenFlush(Buffer::OwnedImpl& buffer) {
+    compress(buffer, Envoy::Compression::Compressor::State::Flush);
+  }
+  void finish(Buffer::OwnedImpl& buffer) {
+    compress(buffer, Envoy::Compression::Compressor::State::Finish);
+  }
 };
 
 class ZlibCompressorImplDeathTest : public ZlibCompressorImplTest {
@@ -121,9 +129,9 @@ TEST_F(ZlibCompressorImplTest, CallingChecksum) {
   ZlibCompressorImplTester compressor;
   EXPECT_EQ(0, compressor.checksum());
 
-  compressor.init(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
-                  Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
-                  gzip_window_bits, memory_level);
+  compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
+                  ZlibCompressorImpl::CompressionStrategy::Standard, gzip_window_bits,
+                  memory_level);
   EXPECT_EQ(0, compressor.checksum());
 
   TestUtility::feedBufferWithRandomCharacters(buffer, 4096);
@@ -139,9 +147,9 @@ TEST_F(ZlibCompressorImplTest, CallingFinishOnly) {
   Buffer::OwnedImpl buffer;
 
   ZlibCompressorImplTester compressor;
-  compressor.init(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
-                  Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
-                  gzip_window_bits, memory_level);
+  compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
+                  ZlibCompressorImpl::CompressionStrategy::Standard, gzip_window_bits,
+                  memory_level);
   EXPECT_EQ(0, compressor.checksum());
 
   TestUtility::feedBufferWithRandomCharacters(buffer, 4096);
@@ -204,4 +212,7 @@ TEST_F(ZlibCompressorImplTest, CompressWithNotCommonParams) {
 
 } // namespace
 } // namespace Compressor
+} // namespace Gzip
+} // namespace Compression
+} // namespace Extensions
 } // namespace Envoy

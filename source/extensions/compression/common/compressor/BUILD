@@ -10,7 +10,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "compressor_factory_base_lib",
-    hdrs = ["compressor_factory_base.h"],
+    hdrs = ["factory_base.h"],
     deps = [
         "//include/envoy/compression/compressor:compressor_factory_interface",
         "//include/envoy/compression/compressor:compressor_library_config_interface",

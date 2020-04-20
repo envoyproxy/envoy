@@ -22,8 +22,8 @@ namespace HttpFilters {
 namespace Common {
 namespace Compressors {
 
-class MockCompressor : public Compressor::Compressor {
-  void compress(Buffer::Instance&, ::Envoy::Compressor::State) override {}
+class MockCompressor : public Envoy::Compression::Compressor::Compressor {
+  void compress(Buffer::Instance&, Envoy::Compression::Compressor::State) override {}
 };
 
 class MockCompressorFilterConfig : public CompressorFilterConfig {
@@ -35,7 +35,9 @@ public:
       : CompressorFilterConfig(compressor, stats_prefix + compressor_name + ".", scope, runtime,
                                compressor_name) {}
 
-  Compressor::CompressorPtr makeCompressor() override { return std::make_unique<MockCompressor>(); }
+  Envoy::Compression::Compressor::CompressorPtr makeCompressor() override {
+    return std::make_unique<MockCompressor>();
+  }
 };
 
 class CompressorFilterTest : public testing::Test {

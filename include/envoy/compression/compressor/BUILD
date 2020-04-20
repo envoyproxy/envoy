@@ -9,10 +9,18 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "compressor_interface",
+    hdrs = ["compressor.h"],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "compressor_factory_interface",
     hdrs = ["factory.h"],
     deps = [
-        "//include/envoy/compressor:compressor_interface",
+        ":compressor_interface",
     ],
 )
 

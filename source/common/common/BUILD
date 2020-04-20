@@ -421,16 +421,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "zlib_base_lib",
-    srcs = ["zlib/base.cc"],
-    hdrs = ["zlib/base.h"],
-    external_deps = ["zlib"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "statusor_lib",
     hdrs = ["statusor.h"],
     deps = [

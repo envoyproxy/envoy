@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.compressor.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/extensions/compression/common/compressor/v3/compressor.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
@@ -54,11 +55,6 @@ message Compressor {
   // A compressor library to use for compression. Currently only
   // :ref:`envoy.filters.http.compressor.gzip<envoy_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
   // is included in Envoy.
-  CompressorLibrary compressor_library = 6 [(validate.rules).message = {required: true}];
-}
-
-message CompressorLibrary {
-  // Compressor library specific configuration. See the supported libraries for further
-  // documentation.
-  google.protobuf.Any typed_config = 1;
+  compression.common.compressor.v3.CompressorLibrary compressor_library = 6
+      [(validate.rules).message = {required: true}];
 }

@@ -14,7 +14,7 @@ CompressorFilterConfig::CompressorFilterConfig(
           compressor_factory->contentEncoding()),
       compressor_factory_(std::move(compressor_factory)) {}
 
-Envoy::Compressor::CompressorPtr CompressorFilterConfig::makeCompressor() {
+Envoy::Compression::Compressor::CompressorPtr CompressorFilterConfig::makeCompressor() {
   return compressor_factory_->createCompressor();
 }
 
