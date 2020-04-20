@@ -231,6 +231,7 @@ public:
     case Tcp::ConnectionPool::PoolFailureReason::Timeout:
       return Http::ConnectionPool::PoolFailureReason::ConnectionFailure;
     }
+    return Http::ConnectionPool::PoolFailureReason::ConnectionFailure;
   }
 
   // Tcp::ConnectionPool::Callbacks
