@@ -14,9 +14,9 @@ const uint64_t RecentLookupsCapacity = 100;
 
 const std::regex PromRegex("[^a-zA-Z0-9_]");
 
-Http::Code StatsHandlerImpl::handlerResetCounters(absl::string_view, Http::ResponseHeaderMap&,
-                                                  Buffer::Instance& response, AdminStream&,
-                                                  Server::Instance& server) {
+Http::Code StatsHandler::handlerResetCounters(absl::string_view, Http::ResponseHeaderMap&,
+                                              Buffer::Instance& response, AdminStream&,
+                                              Server::Instance& server) {
   for (const Stats::CounterSharedPtr& counter : server.stats().counters()) {
     counter->reset();
   }
@@ -25,9 +25,9 @@ Http::Code StatsHandlerImpl::handlerResetCounters(absl::string_view, Http::Respo
   return Http::Code::OK;
 }
 
-Http::Code StatsHandlerImpl::handlerStatsRecentLookups(absl::string_view, Http::ResponseHeaderMap&,
-                                                       Buffer::Instance& response, AdminStream&,
-                                                       Server::Instance& server) {
+Http::Code StatsHandler::handlerStatsRecentLookups(absl::string_view, Http::ResponseHeaderMap&,
+                                                   Buffer::Instance& response, AdminStream&,
+                                                   Server::Instance& server) {
   Stats::SymbolTable& symbol_table = server.stats().symbolTable();
   std::string table;
   const uint64_t total =
@@ -43,40 +43,36 @@ Http::Code StatsHandlerImpl::handlerStatsRecentLookups(absl::string_view, Http::
   return Http::Code::OK;
 }
 
-Http::Code StatsHandlerImpl::handlerStatsRecentLookupsClear(absl::string_view,
-                                                            Http::ResponseHeaderMap&,
-                                                            Buffer::Instance& response,
-                                                            AdminStream&,
-                                                            Server::Instance& server) {
+Http::Code StatsHandler::handlerStatsRecentLookupsClear(absl::string_view, Http::ResponseHeaderMap&,
+                                                        Buffer::Instance& response, AdminStream&,
+                                                        Server::Instance& server) {
   server.stats().symbolTable().clearRecentLookups();
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code StatsHandlerImpl::handlerStatsRecentLookupsDisable(absl::string_view,
-                                                              Http::ResponseHeaderMap&,
-                                                              Buffer::Instance& response,
-                                                              AdminStream&,
-                                                              Server::Instance& server) {
+Http::Code StatsHandler::handlerStatsRecentLookupsDisable(absl::string_view,
+                                                          Http::ResponseHeaderMap&,
+                                                          Buffer::Instance& response, AdminStream&,
+                                                          Server::Instance& server) {
   server.stats().symbolTable().setRecentLookupCapacity(0);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code StatsHandlerImpl::handlerStatsRecentLookupsEnable(absl::string_view,
-                                                             Http::ResponseHeaderMap&,
-                                                             Buffer::Instance& response,
-                                                             AdminStream&,
-                                                             Server::Instance& server) {
+Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
+                                                         Http::ResponseHeaderMap&,
+                                                         Buffer::Instance& response, AdminStream&,
+                                                         Server::Instance& server) {
   server.stats().symbolTable().setRecentLookupCapacity(RecentLookupsCapacity);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code StatsHandlerImpl::handlerStats(absl::string_view url,
-                                          Http::ResponseHeaderMap& response_headers,
-                                          Buffer::Instance& response, AdminStream& admin_stream,
-                                          Server::Instance& server) {
+Http::Code StatsHandler::handlerStats(absl::string_view url,
+                                      Http::ResponseHeaderMap& response_headers,
+                                      Buffer::Instance& response, AdminStream& admin_stream,
+                                      Server::Instance& server) {
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
 
@@ -143,10 +139,10 @@ Http::Code StatsHandlerImpl::handlerStats(absl::string_view url,
   return rc;
 }
 
-Http::Code StatsHandlerImpl::handlerPrometheusStats(absl::string_view path_and_query,
-                                                    Http::ResponseHeaderMap&,
-                                                    Buffer::Instance& response, AdminStream&,
-                                                    Server::Instance& server) {
+Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
+                                                Http::ResponseHeaderMap&,
+                                                Buffer::Instance& response, AdminStream&,
+                                                Server::Instance& server) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
   absl::optional<std::regex> regex;
@@ -260,11 +256,11 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
 }
 
 std::string
-StatsHandlerImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                              const std::map<std::string, std::string>& text_readouts,
-                              const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                              const bool used_only, const absl::optional<std::regex> regex,
-                              const bool pretty_print) {
+StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+                          const std::map<std::string, std::string>& text_readouts,
+                          const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
+                          const bool used_only, const absl::optional<std::regex> regex,
+                          const bool pretty_print) {
 
   ProtobufWkt::Struct document;
   std::vector<ProtobufWkt::Value> stats_array;

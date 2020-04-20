@@ -16,7 +16,7 @@
 namespace Envoy {
 namespace Server {
 
-class StatsHandlerImpl {
+class StatsHandler {
 
 public:
   static Http::Code handlerResetCounters(absl::string_view path_and_query,
