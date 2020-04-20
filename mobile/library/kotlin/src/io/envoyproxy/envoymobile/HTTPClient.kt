@@ -12,7 +12,6 @@ interface HTTPClient {
    */
   fun send(request: Request, responseHandler: ResponseHandler): StreamEmitter
 
-
   /**
    * Convenience function for sending a unary request.
    *
@@ -22,8 +21,7 @@ interface HTTPClient {
    * @param responseHandler the callback for receiving stream events.
    * @return CancelableStream, a cancelable request.
    */
-  fun send(request: Request, body: ByteBuffer?, trailers: Map<String, List<String>>,
-                responseHandler: ResponseHandler): CancelableStream
+  fun send(request: Request, body: ByteBuffer?, trailers: Map<String, List<String>>, responseHandler: ResponseHandler): CancelableStream
 
   /**
    * Convenience function for sending a unary request.
@@ -33,6 +31,5 @@ interface HTTPClient {
    * @param responseHandler the callback for receiving stream events.
    * @return CancelableStream, a cancelable request.
    */
-  fun send(request: Request, body: ByteBuffer?,
-                responseHandler: ResponseHandler): CancelableStream
+  fun send(request: Request, body: ByteBuffer?, responseHandler: ResponseHandler): CancelableStream
 }
