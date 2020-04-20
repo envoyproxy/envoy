@@ -123,7 +123,7 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
   configured to adjust the priority load used when selecting a priority for retries.
 
 Note that Envoy retries requests when :ref:`x-envoy-overloaded
-<config_http_filters_router_x-envoy-overloaded_set>` is present.  It is recommended to configure
+<config_http_filters_router_x-envoy-overloaded_set>` is present. It is recommended to configure
 :ref:`maximum active retries circuit breaker <arch_overview_circuit_break>` to avoid retry storms.
 
 .. _arch_overview_http_routing_hedging:
