@@ -523,7 +523,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     }
 
     const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
-        envoy::config::core::v3::ApiVersion::V3);
+        envoy::config::core::v3::ApiVersion::V2);
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.

@@ -111,10 +111,9 @@ public:
   void verifyGrpcServiceMethod() {
     EXPECT_TRUE(xds_stream_->waitForHeadersComplete());
     Envoy::Http::LowerCaseString path_string(":path");
-    std::string expected_method(
-        sotwOrDelta() == Grpc::SotwOrDelta::Sotw
-            ? "/envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters"
-            : "/envoy.service.cluster.v3.ClusterDiscoveryService/DeltaClusters");
+    std::string expected_method(sotwOrDelta() == Grpc::SotwOrDelta::Sotw
+                                    ? "/envoy.api.v2.ClusterDiscoveryService/StreamClusters"
+                                    : "/envoy.api.v2.ClusterDiscoveryService/DeltaClusters");
     EXPECT_EQ(xds_stream_->headers().get(path_string)->value(), expected_method);
   }
 

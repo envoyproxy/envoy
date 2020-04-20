@@ -289,7 +289,7 @@ public:
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
-      discovery_response.add_resources()->PackFrom(message);
+      discovery_response.add_resources()->PackFrom(API_DOWNGRADE(message));
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
@@ -324,10 +324,10 @@ public:
     for (const auto& message : added_or_updated) {
       auto* resource = response.add_resources();
       ProtobufWkt::Any temp_any;
-      temp_any.PackFrom(message);
+      temp_any.PackFrom(API_DOWNGRADE(message));
       resource->set_name(TestUtility::xdsResourceName(temp_any));
       resource->set_version(version);
-      resource->mutable_resource()->PackFrom(message);
+      resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
       for (const auto& alias : aliases) {
         resource->add_aliases(alias);
       }

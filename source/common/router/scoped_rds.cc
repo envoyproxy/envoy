@@ -237,7 +237,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
     const auto type_url = Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
-        envoy::config::core::v3::ApiVersion::V3);
+        envoy::config::core::v3::ApiVersion::V2);
     noop_init_manager =
         std::make_unique<Init::ManagerImpl>(fmt::format("SRDS {}:{}", name_, version_info));
     // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.

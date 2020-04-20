@@ -68,7 +68,7 @@ void CdsApiImpl::onConfigUpdate(
   std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        envoy::config::core::v3::ApiVersion::V3);
+        envoy::config::core::v3::ApiVersion::V2);
     cm_.adsMux()->pause(type_url);
     maybe_eds_resume =
         std::make_unique<Cleanup>([this, type_url] { cm_.adsMux()->resume(type_url); });

@@ -142,7 +142,7 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
       const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          envoy::config::core::v3::ApiVersion::V3);
+          envoy::config::core::v3::ApiVersion::V2);
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
@@ -752,7 +752,7 @@ void ClusterManagerImpl::updateClusterCounts() {
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   if (ads_mux_) {
     const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
-        envoy::config::core::v3::ApiVersion::V3);
+        envoy::config::core::v3::ApiVersion::V2);
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
       ads_mux_->pause(type_url);
