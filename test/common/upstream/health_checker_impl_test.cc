@@ -4452,6 +4452,20 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcFailUnknown) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
+// Test SERVICE_UNKNOWN health status is considered unhealthy.
+TEST_F(GrpcHealthCheckerImplTest, GrpcFailServiceUnknown) {
+  setupHC();
+  expectSingleHealthcheck(HealthTransition::Changed);
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVICE_UNKNOWN);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
 // Test receiving GOAWAY is interpreted as connection close event.
 TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgress) {
   // FailureType::Network will be issued, it will render host unhealthy only if unhealthy_threshold
