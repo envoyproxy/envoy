@@ -5,6 +5,7 @@ Changes
 -------
 
 * access loggers: added GRPC_STATUS operator on logging format.
+* access loggers: extened specifier for FilterStateFormatter to output :ref:`unstructured log string <config_access_log_format_filter_state>`.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
 * fault: added support for controlling the percentage of requests that abort, delay and response rate limits faults 
   are applied to using :ref:`HTTP headers <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.

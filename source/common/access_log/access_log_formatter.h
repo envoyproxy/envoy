@@ -293,7 +293,8 @@ public:
  */
 class FilterStateFormatter : public FormatterProvider {
 public:
-  FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length);
+  FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length,
+                       bool serialize_as_string);
 
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -303,10 +304,13 @@ public:
                                  const StreamInfo::StreamInfo&) const override;
 
 private:
-  ProtobufTypes::MessagePtr filterState(const StreamInfo::StreamInfo& stream_info) const;
+  const Envoy::StreamInfo::FilterState::Object*
+  filterState(const StreamInfo::StreamInfo& stream_info) const;
 
   std::string key_;
   absl::optional<size_t> max_length_;
+
+  bool serialize_as_string_;
 };
 
 /**
