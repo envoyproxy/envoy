@@ -37,6 +37,36 @@ void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& h
   header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
 }
 
+// Helper method to get filter parameter, or report an error for an invalid regex.
+bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
+                 absl::optional<std::regex>& regex) {
+  auto p = params.find("filter");
+  if (p != params.end()) {
+    const std::string& pattern = p->second;
+    try {
+      regex = std::regex(pattern);
+    } catch (std::regex_error& error) {
+      // Include the offending pattern in the log, but not the error message.
+      response.add(fmt::format("Invalid regex: \"{}\"\n", error.what()));
+      ENVOY_LOG_MISC(error, "admin: Invalid regex: \"{}\": {}", error.what(), pattern);
+      return false;
+    }
+  }
+  return true;
+}
+
+// Helper method to get the format parameter.
+absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params) {
+  return queryParam(params, "format");
+}
+
+// Helper method to get a query parameter.
+absl::optional<std::string> queryParam(const Http::Utility::QueryParams& params,
+                                       const std::string& key) {
+  return (params.find(key) != params.end()) ? absl::optional<std::string>{params.at(key)}
+                                            : absl::nullopt;
+}
+
 } // namespace Utility
 } // namespace Server
 } // namespace Envoy

@@ -15,6 +15,7 @@ envoy_cc_library(
     deps = [
         ":admin_filter_lib",
         ":config_tracker_lib",
+        ":stats_handler_lib",
         ":utils_lib",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
@@ -27,7 +28,6 @@ envoy_cc_library(
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:options_interface",
-        "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:resource_manager_interface",
         "//include/envoy/upstream:upstream_interface",
@@ -59,9 +59,7 @@ envoy_cc_library(
         "//source/common/profiler:profiler_lib",
         "//source/common/router:config_lib",
         "//source/common/router:scoped_config_lib",
-        "//source/common/stats:histogram_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/common/stats:stats_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -84,6 +82,23 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "stats_handler_lib",
+    srcs = ["stats_handler.cc"],
+    hdrs = ["stats_handler.h"],
+    deps = [
+        ":utils_lib",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/server:instance_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/html:utility_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/stats:histogram_lib",
     ],
 )
 
