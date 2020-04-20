@@ -110,6 +110,7 @@ envoy_cc_test(
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
@@ -317,5 +318,15 @@ envoy_cc_test(
     deps = [
         "//source/common/network:transport_socket_options_lib",
         "//source/common/stream_info:filter_state_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "filter_matcher_test",
+    srcs = ["filter_matcher_test.cc"],
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/network:filter_matcher_lib",
+        "//test/mocks/network:network_mocks",
     ],
 )

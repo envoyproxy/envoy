@@ -267,7 +267,7 @@ void AsyncRequestImpl::onComplete() {
                                                    response_->trailers(), streamInfo(),
                                                    Tracing::EgressConfig::get());
 
-  callbacks_.onSuccess(std::move(response_));
+  callbacks_.onSuccess(*this, std::move(response_));
 }
 
 void AsyncRequestImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
@@ -302,7 +302,7 @@ void AsyncRequestImpl::onReset() {
 
   if (!cancelled_) {
     // In this case we don't have a valid response so we do need to raise a failure.
-    callbacks_.onFailure(AsyncClient::FailureReason::Reset);
+    callbacks_.onFailure(*this, AsyncClient::FailureReason::Reset);
   }
 }
 

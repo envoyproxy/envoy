@@ -118,9 +118,11 @@ MockWorkerFactory::MockWorkerFactory() = default;
 MockWorkerFactory::~MockWorkerFactory() = default;
 
 MockWorker::MockWorker() {
-  ON_CALL(*this, addListener(_, _))
+  ON_CALL(*this, addListener(_, _, _))
       .WillByDefault(
-          Invoke([this](Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
+          Invoke([this](absl::optional<uint64_t> overridden_listener,
+                        Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
+            UNREFERENCED_PARAMETER(overridden_listener);
             config.listenSocketFactory().getListenSocket();
             EXPECT_EQ(nullptr, add_listener_completion_);
             add_listener_completion_ = completion;
@@ -138,6 +140,13 @@ MockWorker::MockWorker() {
         if (completion != nullptr) {
           completion();
         }
+      }));
+
+  ON_CALL(*this, removeFilterChains(_, _, _))
+      .WillByDefault(Invoke([this](uint64_t, const std::list<const Network::FilterChain*>&,
+                                   std::function<void()> completion) -> void {
+        EXPECT_EQ(nullptr, remove_filter_chains_completion_);
+        remove_filter_chains_completion_ = completion;
       }));
 }
 MockWorker::~MockWorker() = default;
@@ -213,6 +222,7 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
+  ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 
@@ -274,6 +284,13 @@ MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 
 MockFilterChainFactoryContext::MockFilterChainFactoryContext() = default;
 MockFilterChainFactoryContext::~MockFilterChainFactoryContext() = default;
+
+MockTracerFactory::MockTracerFactory(const std::string& name) : name_(name) {
+  ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Invoke([] {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }));
+}
+MockTracerFactory::~MockTracerFactory() = default;
 
 MockTracerFactoryContext::MockTracerFactoryContext() {
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));

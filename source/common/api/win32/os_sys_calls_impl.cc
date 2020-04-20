@@ -160,6 +160,16 @@ SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags
   return {bytes_received, 0};
 }
 
+SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen,
+                                          int flags, struct timespec* timeout) {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+
+bool OsSysCallsImpl::supportsMmsg() const {
+  // Windows doesn't support it.
+  return false;
+}
+
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::_chsize_s(fd, length);
   return {rc, rc == 0 ? 0 : errno};

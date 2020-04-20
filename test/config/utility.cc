@@ -30,7 +30,8 @@
 
 namespace Envoy {
 
-const std::string ConfigHelper::BASE_CONFIG = R"EOF(
+std::string ConfigHelper::baseConfig() {
+  return R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -68,8 +69,10 @@ static_resources:
         address: 127.0.0.1
         port_value: 0
 )EOF";
+}
 
-const std::string ConfigHelper::BASE_UDP_LISTENER_CONFIG = R"EOF(
+std::string ConfigHelper::baseUdpListenerConfig() {
+  return R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -96,8 +99,10 @@ static_resources:
         port_value: 0
         protocol: udp
 )EOF";
+}
 
-const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
+std::string ConfigHelper::tcpProxyConfig() {
+  return absl::StrCat(baseConfig(), R"EOF(
     filter_chains:
       filters:
         name: tcp
@@ -105,9 +110,18 @@ const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
           "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
-)EOF";
+)EOF");
+}
 
-const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
+std::string ConfigHelper::tlsInspectorFilter() {
+  return R"EOF(
+name: "envoy.filters.listener.tls_inspector"
+typed_config:
+)EOF";
+}
+
+std::string ConfigHelper::httpProxyConfig() {
+  return absl::StrCat(baseConfig(), R"EOF(
     filter_chains:
       filters:
         name: http
@@ -134,12 +148,14 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
                   prefix: "/"
               domains: "*"
             name: route_config_0
-)EOF";
+)EOF");
+}
 
 // TODO(danzh): For better compatibility with HTTP integration test framework,
 // it's better to combine with HTTP_PROXY_CONFIG, and use config modifiers to
 // specify quic specific things.
-const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFIG + R"EOF(
+std::string ConfigHelper::quicHttpProxyConfig() {
+  return absl::StrCat(baseUdpListenerConfig(), R"EOF(
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
@@ -170,34 +186,38 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
             name: route_config_0
     udp_listener_config:
       udp_listener_name: "quiche_quic_listener"
-)EOF";
+)EOF");
+}
 
-const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
-    R"EOF(
+std::string ConfigHelper::defaultBufferFilter() {
+  return R"EOF(
 name: buffer
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 5242880
 )EOF";
+}
 
-const std::string ConfigHelper::SMALL_BUFFER_FILTER =
-    R"EOF(
+std::string ConfigHelper::smallBufferFilter() {
+  return R"EOF(
 name: buffer
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 1024
 )EOF";
+}
 
-const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
-    R"EOF(
+std::string ConfigHelper::defaultHealthCheckFilter() {
+  return R"EOF(
 name: health_check
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
 )EOF";
+}
 
-const std::string ConfigHelper::DEFAULT_SQUASH_FILTER =
-    R"EOF(
+std::string ConfigHelper::defaultSquashFilter() {
+  return R"EOF(
 name: squash
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.squash.v2.Squash
@@ -217,6 +237,7 @@ typed_config:
     seconds: 1
     nanos: 0
 )EOF";
+}
 
 // TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
 //               work restores it here.
@@ -388,6 +409,27 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
         }
       }
     }
+  }
+}
+
+void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
+                                            absl::string_view cluster_name) {
+  RELEASE_ASSERT(!finalized_, "");
+  ProtobufWkt::Struct cluster_metadata;
+  TestUtility::loadFromYaml(std::string(metadata_yaml), cluster_metadata);
+
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  for (int i = 0; i < static_resources->clusters_size(); ++i) {
+    auto* cluster = static_resources->mutable_clusters(i);
+    if (cluster->name() != cluster_name) {
+      continue;
+    }
+    for (const auto& kvp : cluster_metadata.fields()) {
+      ASSERT_TRUE(kvp.second.kind_case() == ProtobufWkt::Value::KindCase::kStructValue);
+      cluster->mutable_metadata()->mutable_filter_metadata()->insert(
+          {kvp.first, kvp.second.struct_value()});
+    }
+    break;
   }
 }
 
@@ -712,6 +754,24 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   return true;
 }
 
+bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::string_view format) {
+  RELEASE_ASSERT(!finalized_, "");
+  if (bootstrap_.mutable_static_resources()->listeners_size() == 0) {
+    return false;
+  }
+  envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+  if (!format.empty()) {
+    access_log_config.set_format(std::string(format));
+  }
+  access_log_config.set_path(filename);
+  bootstrap_.mutable_static_resources()
+      ->mutable_listeners(0)
+      ->add_access_log()
+      ->mutable_typed_config()
+      ->PackFrom(access_log_config);
+  return true;
+}
+
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
     envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
@@ -780,6 +840,18 @@ void ConfigHelper::addNetworkFilter(const std::string& filter_yaml) {
   // Now move it to the front.
   for (int i = filter_chain->filters_size() - 1; i > 0; --i) {
     filter_chain->mutable_filters()->SwapElements(i, i - 1);
+  }
+}
+
+void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  auto* filter_list_back = listener->add_listener_filters();
+  TestUtility::loadFromYaml(filter_yaml, *filter_list_back);
+
+  // Now move it to the front.
+  for (int i = listener->listener_filters_size() - 1; i > 0; --i) {
+    listener->mutable_listener_filters()->SwapElements(i, i - 1);
   }
 }
 

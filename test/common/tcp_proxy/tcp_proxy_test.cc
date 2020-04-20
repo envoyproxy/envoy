@@ -39,7 +39,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::MatchesRegex;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -752,8 +751,7 @@ TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
   NiceMock<Network::MockConnection> connection;
   connection.stream_info_.filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-      StreamInfo::FilterState::StateType::Mutable,
-      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   const auto route = config_obj.getRouteFromEntries(connection);
   EXPECT_NE(nullptr, route);
@@ -841,7 +839,7 @@ public:
   }
 
   void configure(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
-    config_.reset(new Config(config, factory_context_));
+    config_ = std::make_shared<Config>(config, factory_context_);
   }
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy defaultConfig() {
@@ -914,6 +912,12 @@ public:
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
+      filter_callbacks_.connection_.streamInfo().setDownstreamSslConnection(
+          filter_callbacks_.connection_.ssl());
+      filter_callbacks_.connection_.streamInfo().setDownstreamLocalAddress(
+          filter_callbacks_.connection_.localAddress());
+      filter_callbacks_.connection_.streamInfo().setDownstreamRemoteAddress(
+          filter_callbacks_.connection_.remoteAddress());
       EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
       EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
@@ -1299,7 +1303,7 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
         k0: v0
 )EOF";
 
-  config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+  config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
 
   ProtobufWkt::Value v0, v1, v2;
   v0.set_string_value("v0");
@@ -1586,34 +1590,6 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogDownstreamAddress)) {
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }
 
-// Test that access log fields %BYTES_RECEIVED%, %BYTES_SENT%, %START_TIME%, %DURATION% are
-// all correctly logged.
-TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogBytesRxTxDuration)) {
-  setup(1, accessLogConfig("bytesreceived=%BYTES_RECEIVED% bytessent=%BYTES_SENT% "
-                           "datetime=%START_TIME% nonzeronum=%DURATION%"));
-
-  raiseEventUpstreamConnected(0);
-  Buffer::OwnedImpl buffer("a");
-  filter_->onData(buffer, false);
-  Buffer::OwnedImpl response("bb");
-  upstream_callbacks_->onUpstreamData(response, false);
-
-  timeSystem().sleep(std::chrono::milliseconds(1));
-  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
-  filter_.reset();
-
-#ifndef GTEST_USES_SIMPLE_RE
-  EXPECT_THAT(access_log_data_,
-              MatchesRegex(
-                  "bytesreceived=1 bytessent=2 datetime=[0-9-]+T[0-9:.]+Z nonzeronum=[1-9][0-9]*"));
-#else
-  EXPECT_THAT(access_log_data_,
-              MatchesRegex("bytesreceived=1 bytessent=2 "
-                           "datetime=\\d+-\\d+-\\d+T\\d+:\\d+:\\d+\\.\\d+Z nonzeronum=\\d+"));
-  EXPECT_THAT(access_log_data_, Not(MatchesRegex("nonzeronum=0")));
-#endif
-}
-
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogUpstreamSSLConnection)) {
   setup(1);
 
@@ -1742,8 +1718,7 @@ TEST_F(TcpProxyTest, ShareFilterState) {
 
   upstream_connections_.at(0)->streamInfo().filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-      StreamInfo::FilterState::StateType::Mutable,
-      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   raiseEventUpstreamConnected(0);
   EXPECT_EQ("filter_state_cluster",
             filter_callbacks_.connection_.streamInfo()
@@ -1783,7 +1758,7 @@ public:
         cluster: fake_cluster
     )EOF";
 
-    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+    config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 
   void initializeFilter() {
@@ -1851,8 +1826,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
 
   connection_.streamInfo().filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-      StreamInfo::FilterState::StateType::Mutable,
-      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,
@@ -1869,8 +1843,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
 
   connection_.streamInfo().filterState()->setData(
       "envoy.network.upstream_server_name", std::make_unique<UpstreamServerName>("www.example.com"),
-      StreamInfo::FilterState::StateType::ReadOnly,
-      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-server-name
@@ -1901,8 +1874,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   connection_.streamInfo().filterState()->setData(
       Network::ApplicationProtocols::key(),
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
-      StreamInfo::FilterState::StateType::ReadOnly,
-      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-application-protocol
@@ -1937,7 +1909,7 @@ public:
     cluster: fake_cluster
     )EOF";
 
-    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+    config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 };
 
@@ -1978,7 +1950,7 @@ public:
     - source_ip: {}
     )EOF";
 
-    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+    config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 
   void initializeFilter() {

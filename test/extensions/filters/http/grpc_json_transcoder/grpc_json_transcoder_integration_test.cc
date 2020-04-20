@@ -12,7 +12,6 @@
 #include "gtest/gtest.h"
 
 using Envoy::Protobuf::TextFormat;
-using Envoy::Protobuf::util::MessageDifferencer;
 using Envoy::ProtobufUtil::Status;
 using Envoy::ProtobufUtil::error::Code;
 using Envoy::ProtobufWkt::Empty;
@@ -326,6 +325,20 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetHttpBody) {
                                       {"content-length", "15"},
                                       {"grpc-status", "0"}},
       R"(<h1>Hello!</h1>)");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBody) {
+  HttpIntegrationTest::initialize();
+
+  testTranscoding<Empty, google::api::HttpBody>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/indexStream"}, {":authority", "host"}},
+      "", {""},
+      {R"(content_type: "text/html" data: "<h1>Hello!</h1>")",
+       R"(content_type: "text/plain" data: "Hello!")"},
+      Status(), Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}},
+      R"(<h1>Hello!</h1>)"
+      R"(Hello!)");
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryEchoHttpBody) {

@@ -252,7 +252,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
                                          const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
-      dispatcher_(api_->allocateDispatcher(Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
+      dispatcher_(api_->allocateDispatcher("test_thread",
+                                           Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       version_(version), upstream_address_fn_(upstream_address_fn),
       config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
@@ -262,7 +263,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // notification and clear the pool connection if necessary. A real fix would require adding fairly
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
-  timeSystem().sleep(std::chrono::milliseconds(10));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, create_(_, _))
       .WillByDefault(Invoke([](std::function<void()> below_low,
                                std::function<void()> above_high) -> Buffer::Instance* {
@@ -281,10 +282,15 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
           version, config) {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
+  return makeClientConnectionWithOptions(port, nullptr);
+}
+
+Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOptions(
+    uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
 
   connection->enableHalfClose(enable_half_close_);
   return connection;
@@ -410,9 +416,20 @@ void BaseIntegrationTest::setUpstreamAddress(
 }
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
-  auto port_it = port_names.cbegin();
-  auto listeners = test_server_->server().listenerManager().listeners();
+  bool listeners_ready = false;
+  absl::Mutex l;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  test_server_->server().dispatcher().post([this, &listeners, &listeners_ready, &l]() {
+    listeners = test_server_->server().listenerManager().listeners();
+    l.Lock();
+    listeners_ready = true;
+    l.Unlock();
+  });
+  l.LockWhen(absl::Condition(&listeners_ready));
+  l.Unlock();
+
   auto listener_it = listeners.cbegin();
+  auto port_it = port_names.cbegin();
   for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
     const auto listen_addr = listener_it->get().listenSocketFactory().localAddress();
     if (listen_addr->type() == Network::Address::Type::Ip) {
@@ -463,7 +480,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
                        absl::StrCat("Lds update failed. Details\n",
                                     getListenerDetails(test_server_->server())));
       }
-      time_system_.sleep(std::chrono::milliseconds(10));
+      time_system_.advanceTimeWait(std::chrono::milliseconds(10));
     }
 
     registerTestServerPorts(port_names);
@@ -522,6 +539,24 @@ IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
   return IntegrationTestServer::create(bootstrap_path, version_, on_server_ready_function,
                                        on_server_init_function, deterministic_, time_system, *api_,
                                        defer_listener_finalization_);
+}
+
+void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
+  listener_access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
+}
+
+std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename) {
+  // Wait a max of 1s for logs to flush to disk.
+  for (int i = 0; i < 1000; ++i) {
+    std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
+    if (contents.length() > 0) {
+      return contents;
+    }
+    absl::SleepFor(absl::Milliseconds(1));
+  }
+  RELEASE_ASSERT(0, "Timed out waiting for access log");
+  return "";
 }
 
 void BaseIntegrationTest::createXdsUpstream() {

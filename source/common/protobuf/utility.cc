@@ -198,12 +198,7 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
   if (warn_only) {
     ENVOY_LOG_MISC(warn, "{}", with_overridden);
   } else {
-    // this is just to make param message usable
-    if (false) {
-      message.GetTypeName();
-    }
-    // todo (nezdolik) make use of message
-    validation_visitor.onDeprecatedField(with_overridden);
+    validation_visitor.onDeprecatedField("type " + message.GetTypeName() + " " + with_overridden);
   }
 }
 

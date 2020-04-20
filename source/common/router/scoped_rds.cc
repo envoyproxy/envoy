@@ -99,13 +99,15 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     ScopedRoutesConfigProviderManager& config_provider_manager)
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
+      Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration>(
+          rds_config_source.resource_api_version()),
       factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
       rds_config_source_(std::move(rds_config_source)),
       validation_visitor_(factory_context.messageValidationContext().dynamicValidationVisitor()),
       stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager) {
-  const auto resource_name = getResourceName(rds_config_source_.resource_api_version());
+  const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,

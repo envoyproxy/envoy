@@ -152,15 +152,15 @@ public:
   // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
   // provided IP |version|.
   BaseIntegrationTest(Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+                      const std::string& config = ConfigHelper::httpProxyConfig());
   BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+                      const std::string& config = ConfigHelper::httpProxyConfig())
       : BaseIntegrationTest(version, config) {}
   // Creates a test fixture with a specified |upstream_address| function that provides the IP and
   // port to use.
   BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+                      const std::string& config = ConfigHelper::httpProxyConfig());
 
   virtual ~BaseIntegrationTest() = default;
 
@@ -197,7 +197,10 @@ public:
   void setUpstreamAddress(uint32_t upstream_index,
                           envoy::config::endpoint::v3::LbEndpoint& endpoint) const;
 
-  virtual Network::ClientConnectionPtr makeClientConnection(uint32_t port);
+  Network::ClientConnectionPtr makeClientConnection(uint32_t port);
+  virtual Network::ClientConnectionPtr
+  makeClientConnectionWithOptions(uint32_t port,
+                                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
@@ -216,6 +219,13 @@ public:
   Api::ApiPtr api_;
   Api::ApiPtr api_for_server_stat_store_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
+
+  // Enable the listener access log
+  void useListenerAccessLog(absl::string_view format = "");
+  // Waits for the first access log entry.
+  std::string waitForAccessLog(const std::string& filename);
+
+  std::string listener_access_log_name_;
 
   // Functions for testing reloadable config (xDS)
   void createXdsUpstream();
@@ -318,7 +328,7 @@ public:
       resource->set_name(TestUtility::xdsResourceName(temp_any));
       resource->set_version(version);
       resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
-      for (const auto alias : aliases) {
+      for (const auto& alias : aliases) {
         resource->add_aliases(alias);
       }
     }

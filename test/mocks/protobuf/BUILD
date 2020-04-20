@@ -12,5 +12,9 @@ envoy_cc_mock(
     name = "protobuf_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    deps = ["//include/envoy/protobuf:message_validator_interface"],
+    deps = [
+        "//include/envoy/protobuf:message_validator_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+    ],
 )

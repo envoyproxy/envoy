@@ -3,8 +3,7 @@
 build --action_env=PATH
 build --action_env=TMPDIR
 
-# see top-level .bazelrc for explanation
-startup --host_jvm_args=-Xmx2g
+build --experimental_local_memory_estimate
 
 build --define signal_trace=disabled
 build --define hot_restart=disabled
@@ -23,7 +22,9 @@ build --define absl=1
 
 # Should not be required after upstream fix, see issue;
 # https://github.com/bazelbuild/rules_foreign_cc/issues/301
+build --copt="-DCARES_STATICLIB"
 build --copt="-DNGHTTP2_STATICLIB"
+build --copt="-DCURL_STATICLIB"
 
 # Required to work around quiche build defect
 # Unguarded gcc pragmas are not recognized by MSVC

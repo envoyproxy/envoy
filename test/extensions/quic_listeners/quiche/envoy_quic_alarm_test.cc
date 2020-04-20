@@ -31,11 +31,12 @@ private:
 class EnvoyQuicAlarmTest : public ::testing::Test {
 public:
   EnvoyQuicAlarmTest()
-      : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()),
-        clock_(*dispatcher_), alarm_factory_(*dispatcher_, clock_) {}
+      : api_(Api::createApiForTest(time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
+        alarm_factory_(*dispatcher_, clock_) {}
 
   void advanceMsAndLoop(int64_t delay_ms) {
-    time_system_.sleep(std::chrono::milliseconds(delay_ms));
+    time_system_.advanceTimeAsync(std::chrono::milliseconds(delay_ms));
     dispatcher_->run(Dispatcher::RunType::NonBlock);
   }
 

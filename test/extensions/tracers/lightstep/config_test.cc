@@ -1,5 +1,6 @@
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
+#include "envoy/config/trace/v3/lightstep.pb.h"
+#include "envoy/config/trace/v3/lightstep.pb.validate.h"
 
 #include "extensions/tracers/lightstep/config.h"
 
@@ -41,7 +42,7 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
   LightstepTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr lightstep_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, lightstep_tracer);
 }
 

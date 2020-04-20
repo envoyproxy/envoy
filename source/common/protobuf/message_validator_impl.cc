@@ -28,7 +28,7 @@ void WarningValidationVisitorImpl::onUnknownField(absl::string_view description)
 }
 
 void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view description) {
-  std::string message = absl::StrCat(ValidationError::deprecation_error, description);
+  std::string message = absl::StrCat(description, ValidationError::deprecation_error);
   onUnexpectedField(description, deprecated_counter_, ValidationType::DeprecatedFields);
 }
 
@@ -64,7 +64,7 @@ void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) 
 
 void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description) {
   throw ValidationError::DeprecatedProtoFieldException(
-      absl::StrCat(ValidationError::deprecation_error, description));
+      absl::StrCat(description, ValidationError::deprecation_error));
 }
 
 ValidationVisitor& getNullValidationVisitor() {

@@ -256,19 +256,6 @@ HttpIntegrationTest::~HttpIntegrationTest() {
   fake_upstreams_.clear();
 }
 
-std::string HttpIntegrationTest::waitForAccessLog(const std::string& filename) {
-  // Wait a max of 1s for logs to flush to disk.
-  for (int i = 0; i < 1000; ++i) {
-    std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
-    if (contents.length() > 0) {
-      return contents;
-    }
-    absl::SleepFor(absl::Milliseconds(1));
-  }
-  RELEASE_ASSERT(0, "Timed out waiting for access log");
-  return "";
-}
-
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
   downstream_protocol_ = downstream_protocol;
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
@@ -411,7 +398,7 @@ void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_si
 }
 
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
-    uint64_t request_size, uint64_t response_size, bool big_header,
+    uint64_t request_size, uint64_t response_size, bool big_header, bool set_content_length_header,
     ConnectionCreationFunction* create_connection) {
   initialize();
   codec_client_ = makeHttpConnection(
@@ -419,11 +406,16 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  if (set_content_length_header) {
+    request_headers.setContentLength(request_size);
+    response_headers.setContentLength(response_size);
+  }
   if (big_header) {
     request_headers.addCopy("big", std::string(4096, 'a'));
   }
-  auto response = sendRequestAndWaitForResponse(request_headers, request_size,
-                                                default_response_headers_, response_size);
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, request_size, response_headers, response_size);
   checkSimpleRequestSuccess(request_size, response_size, response.get());
 }
 
@@ -474,6 +466,51 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
       lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+}
+
+// Make sure virtual cluster stats are charged to the appropriate virtual cluster.
+void HttpIntegrationTest::testRouterVirtualClusters() {
+  const std::string matching_header = "x-use-test-vcluster";
+  config_helper_.addConfigModifier(
+      [matching_header](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        auto* route_config = hcm.mutable_route_config();
+        ASSERT_EQ(1, route_config->virtual_hosts_size());
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        {
+          auto* virtual_cluster = virtual_host->add_virtual_clusters();
+          virtual_cluster->set_name("test_vcluster");
+          auto* headers = virtual_cluster->add_headers();
+          headers->set_name(matching_header);
+          headers->set_present_match(true);
+        }
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {matching_header, "true"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  checkSimpleRequestSuccess(0, 0, response.get());
+
+  test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
+  test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 0);
+
+  Http::TestRequestHeaderMapImpl request_headers2{{":method", "POST"},
+                                                  {":path", "/test/long/url"},
+                                                  {":scheme", "http"},
+                                                  {":authority", "host"}};
+
+  auto response2 = sendRequestAndWaitForResponse(request_headers2, 0, default_response_headers_, 0);
+  checkSimpleRequestSuccess(0, 0, response2.get());
+
+  test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
+  test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 1);
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
@@ -1128,6 +1165,48 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
   } else {
     EXPECT_EQ(response->trailers(), nullptr);
   }
+}
+
+void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_type) {
+  initialize();
+
+  uint32_t http_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(http_port);
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "HEAD"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(0);
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Invoke drain listeners endpoint and validate that we can still work on inflight requests.
+  BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", admin_request_type, version_);
+  EXPECT_TRUE(admin_response->complete());
+  EXPECT_EQ("200", admin_response->headers().Status()->value().getStringView());
+  EXPECT_EQ("OK\n", admin_response->body());
+
+  upstream_request_->encodeData(512, true);
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Wait for the response to be read by the codec client.
+  response->waitForEndStream();
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+
+  // Validate that the listeners have been stopped.
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+
+  // Validate that port is closed and can be bound by other sockets.
+  EXPECT_NO_THROW(Network::TcpListenSocket(
+      Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
+                                           http_port),
+      nullptr, true));
 }
 
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {

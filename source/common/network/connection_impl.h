@@ -46,7 +46,8 @@ public:
 class ConnectionImpl : public ConnectionImplBase, public TransportSocketCallbacks {
 public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                 TransportSocketPtr&& transport_socket, bool connected);
+                 TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
+                 bool connected);
 
   ~ConnectionImpl() override;
 
@@ -131,7 +132,7 @@ protected:
 
   TransportSocketPtr transport_socket_;
   ConnectionSocketPtr socket_;
-  StreamInfo::StreamInfoImpl stream_info_;
+  StreamInfo::StreamInfo& stream_info_;
   FilterManagerImpl filter_manager_;
 
   Buffer::OwnedImpl read_buffer_;
@@ -197,6 +198,9 @@ public:
 
   // Network::ClientConnection
   void connect() override;
+
+private:
+  StreamInfo::StreamInfoImpl stream_info_;
 };
 
 } // namespace Network

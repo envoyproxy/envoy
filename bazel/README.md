@@ -6,14 +6,17 @@ It is recommended to use [Bazelisk](https://github.com/bazelbuild/bazelisk) inst
 On Linux, run the following commands:
 
 ```
-sudo wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v0.0.8/bazelisk-linux-amd64
+sudo wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
 sudo chmod +x /usr/local/bin/bazel
 ```
 
-On macOS, run the follwing command:
+On macOS, run the following command:
 ```
 brew install bazelbuild/tap/bazelisk
 ```
+
+On Windows, download [bazelisk-windows-amd64.exe](https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-windows-amd64.exe)
+and save this binary in a directory on the PATH as `bazel.exe`.
 
 If you're building from an revision of Envoy prior to August 2019, which doesn't contains a `.bazelversion` file, run `ci/run_envoy_docker.sh "bazel version"`
 to find the right version of Bazel and set the version to `USE_BAZEL_VERSION` environment variable to build.
@@ -93,6 +96,37 @@ for how to update or override dependencies.
     Having the binutils keg installed in Brew is known to cause issues due to putting an incompatible
     version of `ar` on the PATH, so if you run into issues building third party code like luajit
     consider uninstalling binutils.
+
+    On Windows, additional dependencies are required:
+
+    Install the [MSYS2 shell](https://msys2.github.io/) and install the `diffutils`, `patch`,
+    `unzip`, and `zip` packages using `pacman`. Set the `BAZEL_SH` environment variable to the path
+    of the installed MSYS2 `bash.exe` executable. Setting the `MSYS2_ARG_CONV_EXCL` environment
+    variable to a value of `*` is often advisable to ensure argument parsing in the MSYS2 shell
+    behaves as expected.
+
+    `Git` is required. The version installable via MSYS2 is sufficient.
+
+    Install the Windows-native [python3](https://www.python.org/downloads/), the POSIX flavor
+    available via MSYS2 will not work.
+    
+    For building with MSVC (the `msvc-cl` config option), you must install at least the VC++
+    workload from the
+    [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019). 
+    You may also download Visual Studio 2019 and use the Build Tools packaged with that
+    installation. Earlier versions of VC++ Build Tools/Visual Studio are not recommended at this
+    time. If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC`
+    environment variable to the path of the VC++ package to allow Bazel to find your installation
+    of VC++. Use caution to ensure the `link.exe` that resolves on your PATH is from VC++ Build Tools and
+    not MSYS2.
+
+    Ensure `CMake` and `ninja` binaries are on the PATH. The versions packaged with VC++ Build
+    Tools are sufficient.
+
+    In addition, because of the behavior of the `rules_foreign_cc` component of Bazel, set the
+    `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
+    `C:\Windows\TEMP`). This variable is used frequently by `mktemp` from MSYS2 in the Envoy Bazel
+    build and can cause problems if not set to a value outside the MSYS2 filesystem.
 
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
@@ -591,11 +625,19 @@ Sometimes it's useful to see real system paths in bazel error message output (vs
 
 Run `tools/gen_compilation_database.py` to generate
 a [JSON Compilation Database](https://clang.llvm.org/docs/JSONCompilationDatabase.html). This could be used
-with any tools (e.g. clang-tidy) compatible with the format.
+with any tools (e.g. clang-tidy) compatible with the format. It is recommended to run this script
+with `TEST_TMPDIR` set, so the Bazel artifacts doesn't get cleaned up in next `bazel build` or `bazel test`.
 
 The compilation database could also be used to setup editors with cross reference, code completion.
 For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
-[cquery](https://github.com/cquery-project/cquery) with supported editors.
+[clangd](https://clangd.llvm.org/) with supported editors.
+
+For example, use following command to prepare a compilation database:
+
+```
+TEST_TMPDIR=/tmp tools/gen_compilation_database.py --run_bazel_build
+```
+
 
 # Running clang-format without docker
 
@@ -644,7 +686,7 @@ that the Go toolchain can find the necessary dependencies):
 go run github.com/buchgr/bazel-remote --dir ${HOME}/bazel_cache --host 127.0.0.1 --port 28080 --max_size 64
 ```
 
-See [Bazel remote cache](github.com/buchgr/bazel-remote) for more information on the parameters.
+See [Bazel remote cache](https://github.com/buchgr/bazel-remote) for more information on the parameters.
 The command above will setup a maximum 64 GiB cache at `~/bazel_cache` on port 28080. You might
 want to setup a larger cache if you run ASAN builds.
 

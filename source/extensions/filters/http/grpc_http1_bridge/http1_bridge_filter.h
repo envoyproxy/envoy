@@ -47,7 +47,7 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-  bool doStatTracking() const { return request_names_.has_value(); }
+  bool doStatTracking() const { return request_stat_names_.has_value(); }
 
 private:
   void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
@@ -58,7 +58,7 @@ private:
   Http::ResponseHeaderMap* response_headers_{};
   bool do_bridging_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  absl::optional<Grpc::Context::RequestNames> request_names_;
+  absl::optional<Grpc::Context::RequestStatNames> request_stat_names_;
   Grpc::Context& context_;
 };
 
