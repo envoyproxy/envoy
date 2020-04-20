@@ -1,11 +1,14 @@
 #include <vector>
 
+#include "envoy/server/filter_config.h"
+
 #include "server/config_validation/server.h"
 
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 
 namespace Envoy {
 namespace Server {
@@ -51,6 +54,60 @@ public:
   }
 };
 
+// RuntimeFeatureValidationServerTest is used to test validation with non-default runtime
+// values.
+class RuntimeFeatureValidationServerTest : public ValidationServerTest {
+public:
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    SetupTestDirectory();
+  }
+
+  static void SetupTestDirectory() {
+    directory_ =
+        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+  }
+
+  static const std::vector<std::string> GetAllConfigFiles() {
+    SetupTestDirectory();
+
+    auto files = TestUtility::listFiles(ValidationServerTest::directory_, false);
+
+    // Strip directory part. options_ adds it for each test.
+    for (auto& file : files) {
+      file = file.substr(directory_.length() + 1);
+    }
+    return files;
+  }
+
+  class TestConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
+  public:
+    virtual std::string name() const override { return "envoy.filters.network.test"; }
+
+    virtual Network::FilterFactoryCb
+    createFilterFactoryFromProto(const Protobuf::Message&,
+                                 Configuration::FactoryContext&) override {
+      // Validate that the validation server loaded the runtime data and installed the singleton.
+      auto* runtime = Runtime::LoaderSingleton::getExisting();
+      if (runtime == nullptr) {
+        throw EnvoyException("Runtime::LoaderSingleton == nullptr");
+      }
+
+      if (!runtime->threadsafeSnapshot()->getBoolean("test.runtime.loaded", false)) {
+        throw EnvoyException(
+            "Found Runtime::LoaderSingleton, got wrong value for test.runtime.loaded");
+      }
+
+      return [](Network::FilterManager&) {};
+    }
+
+    virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return ProtobufTypes::MessagePtr{new ProtobufWkt::Struct()};
+    }
+
+    virtual bool isTerminalFilter() override { return true; }
+  };
+};
+
 TEST_P(ValidationServerTest, Validate) {
   EXPECT_TRUE(validateConfig(options_, Network::Address::InstanceConstSharedPtr(),
                              component_factory_, Thread::threadFactoryForTest(),
@@ -92,6 +149,22 @@ TEST_P(ValidationServerTest_1, RunWithoutCrash) {
 
 INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest_1,
                          ::testing::ValuesIn(ValidationServerTest_1::GetAllConfigFiles()));
+
+TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoaderSingleton) {
+  TestConfigFactory factory;
+  Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registration(factory);
+
+  auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+
+  // If this fails, it's likely because TestConfigFactory threw an exception related to the
+  // runtime loader.
+  ASSERT_TRUE(validateConfig(options_, local_address, component_factory_,
+                             Thread::threadFactoryForTest(), Filesystem::fileSystemForTest()));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AllConfigs, RuntimeFeatureValidationServerTest,
+    ::testing::ValuesIn(RuntimeFeatureValidationServerTest::GetAllConfigFiles()));
 
 } // namespace
 } // namespace Server
