@@ -44,6 +44,7 @@ envoy_mobile_kt_library(
         "GRPCResponseHandler.kt",
         "GRPCStreamEmitter.kt",
         "HTTPClient.kt",
+        "LogLevel.kt",
         "Request.kt",
         "RequestBuilder.kt",
         "RequestMapper.kt",

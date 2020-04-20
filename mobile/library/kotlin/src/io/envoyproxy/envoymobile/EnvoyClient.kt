@@ -5,19 +5,6 @@ import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import java.nio.ByteBuffer
 
 /**
- * Available logging levels for an Envoy instance. Note some levels may be compiled out.
- */
-enum class LogLevel(internal val level: String) {
-  TRACE("trace"),
-  DEBUG("debug"),
-  INFO("info"),
-  WARN("warn"),
-  ERROR("error"),
-  CRITICAL("critical"),
-  OFF("off");
-}
-
-/**
  * Wrapper class that allows for easy calling of Envoy's JNI interface in native Java.
  */
 class Envoy private constructor(
