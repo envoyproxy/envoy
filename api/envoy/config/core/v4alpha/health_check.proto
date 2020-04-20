@@ -87,11 +87,13 @@ message HealthCheck {
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used. The host header can be customized for a specific endpoint by setting the
     // :ref:`hostname <envoy_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
-    string host = 1;
+    string host = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Specifies the HTTP path that will be requested during health checking. For example
     // */healthcheck*.
-    string path = 2 [(validate.rules).string = {min_bytes: 1}];
+    string path = 2 [
+      (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}
+    ];
 
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
@@ -108,7 +110,9 @@ message HealthCheck {
 
     // Specifies a list of HTTP headers that should be removed from each request that is sent to the
     // health checked cluster.
-    repeated string request_headers_to_remove = 8;
+    repeated string request_headers_to_remove = 8 [(validate.rules).repeated = {
+      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+    }];
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
     // 200-only policy - 200 must be included explicitly as needed. Ranges follow half-open
@@ -169,7 +173,8 @@ message HealthCheck {
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used. The authority header can be customized for a specific endpoint by setting
     // the :ref:`hostname <envoy_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
-    string authority = 2;
+    string authority = 2
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
   }
 
   // Custom health check.

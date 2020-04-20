@@ -1,6 +1,6 @@
 #include "common/http/utility.h"
 
-#include "test/common/http/utility_fuzz.pb.h"
+#include "test/common/http/utility_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/test_common/utility.h"

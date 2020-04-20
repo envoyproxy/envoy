@@ -171,7 +171,8 @@ message JwtProvider {
   //    base64url_encoded(jwt_payload_in_JSON)
   //
   // If it is not specified, the payload will not be forwarded.
-  string forward_payload_header = 8;
+  string forward_payload_header = 8
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // If non empty, successfully verified JWT payloads will be written to StreamInfo DynamicMetadata
   // in the format as: *namespace* is the jwt_authn filter name as **envoy.filters.http.jwt_authn**
@@ -218,12 +219,14 @@ message JwtHeader {
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtHeader";
 
   // The HTTP header name.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1
+      [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // The value prefix. The value format is "value_prefix<token>"
   // For example, for "Authorization: Bearer <token>", value_prefix="Bearer " with a space at the
   // end.
-  string value_prefix = 2;
+  string value_prefix = 2
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 }
 
 // Specify a required provider with audiences.
