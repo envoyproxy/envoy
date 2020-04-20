@@ -71,17 +71,16 @@ HISTOGRAM_WITH_SI_SUFFIX_WHITELIST = ("downstream_cx_length_ms", "downstream_cx_
                                       "upstream_cx_length_ms")
 
 # Files in these paths can use std::regex
-STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/common/regex.h",
-                       "./source/common/common/regex.cc",
-                       "./source/common/stats/tag_extractor_impl.h",
-                       "./source/common/stats/tag_extractor_impl.cc",
-                       "./source/common/access_log/access_log_formatter.cc",
-                       "./source/extensions/filters/http/squash/squash_filter.h",
-                       "./source/extensions/filters/http/squash/squash_filter.cc",
-                       "./source/server/http/admin.h", "./source/server/http/admin.cc",
-                       "./tools/clang_tools/api_booster/main.cc",
-                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc",
-                       "./source/common/common/version.cc")
+STD_REGEX_WHITELIST = (
+    "./source/common/common/utility.cc", "./source/common/common/regex.h",
+    "./source/common/common/regex.cc", "./source/common/stats/tag_extractor_impl.h",
+    "./source/common/stats/tag_extractor_impl.cc",
+    "./source/common/access_log/access_log_formatter.cc",
+    "./source/extensions/filters/http/squash/squash_filter.h",
+    "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/http/utils.h",
+    "./source/server/http/utils.cc", "./source/server/http/stats_handler.h",
+    "./source/server/http/stats_handler.cc", "./tools/clang_tools/api_booster/main.cc",
+    "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/common/version.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
