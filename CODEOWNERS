@@ -86,6 +86,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/listener/tls_inspector @piotrsikora @htuch
 /*/extensions/grpc_credentials/example @wozz @htuch
 /*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
+/*/extensions/internal_redirect @alyssawilk @penguingao
 /*/extensions/stat_sinks/dog_statsd @taiki45 @jmarantz
 /*/extensions/stat_sinks/hystrix @trabetti @jmarantz
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz

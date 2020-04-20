@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package envoy.extensions.internal_redirect.whitelisted_routes.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.internal_redirect.whitelisted_routes.v3";
+option java_outer_classname = "WhitelistedRoutesConfigProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Whitelisted routes internal redirect predicate]
+
+// An internal redirect predicat that accepts only whitelisted target routes.
+// [#extension: envoy.internal_redirect_predicates.whitelisted_routes]
+message WhitelistedRoutesConfig {
+  repeated string whitelisted_route_names = 1;
+}
