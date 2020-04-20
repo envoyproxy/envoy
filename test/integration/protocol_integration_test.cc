@@ -1739,12 +1739,12 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
 TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host.com:80"}});
 
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
     response->waitForEndStream();
-    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("403", response->headers().Status()->value().getStringView());
     EXPECT_TRUE(response->complete());
   } else {
     response->waitForReset();

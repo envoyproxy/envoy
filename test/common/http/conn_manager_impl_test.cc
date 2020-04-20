@@ -2564,6 +2564,29 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
   conn_manager_->onData(fake_input, false);
 }
 
+// Make sure CONNECT requests hit the upgrade filter path.
+TEST_F(HttpConnectionManagerImplTest, ConnectAsUpgrade) {
+  setup(false, "envoy-custom-server", false);
+
+  NiceMock<MockResponseEncoder> encoder;
+  RequestDecoder* decoder = nullptr;
+
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
+      .WillRepeatedly(Return(true));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "CONNECT"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+    data.drain(4);
+  }));
+
+  // Kick off the incoming data. Use extra data which should cause a redispatch.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/10138
 TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   InSequence s;

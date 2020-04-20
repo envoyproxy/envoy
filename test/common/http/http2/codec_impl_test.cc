@@ -1786,6 +1786,26 @@ TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
   EXPECT_NO_THROW(server_wrapper_.dispatch(data, *server_));
 }
 
+// CONNECT without upgrade type gets tagged with "bytestream"
+TEST_P(Http2CodecImplTest, ConnectTest) {
+  client_http2_options_.set_allow_connect(true);
+  server_http2_options_.set_allow_connect(true);
+  initialize();
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setReferenceKey(Headers::get().Method, Http::Headers::get().MethodValues.Connect);
+  TestRequestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  expected_headers.setReferenceKey(Headers::get().Method,
+                                   Http::Headers::get().MethodValues.Connect);
+  expected_headers.setReferenceKey(Headers::get().Protocol, "bytestream");
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  request_encoder_->encodeHeaders(request_headers, false);
+}
+
 class TestNghttp2SessionFactory;
 
 // Test client for H/2 METADATA frame edge cases.

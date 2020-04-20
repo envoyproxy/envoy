@@ -240,6 +240,11 @@ public:
   } MethodValues;
 
   struct {
+    // per https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
+    const std::string Bytestream{"bytestream"};
+  } ProtocolValues;
+
+  struct {
     const std::string Http{"http"};
     const std::string Https{"https"};
   } SchemeValues;
