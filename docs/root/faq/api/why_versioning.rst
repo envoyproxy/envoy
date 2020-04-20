@@ -4,8 +4,8 @@ Why are the Envoy xDS APIs versioned? What is the benefit?
 Envoy is a platform and needs to allow its APIs to grow and evolve to encompass new features,
 improve ergonomics and address new use cases. At the same time, we need a disciplined approach to
 turning down stale functionality and removing APIs and their supporting code that are no longer
-maintained. If we don't do this, we lose the ability long term to provide a reliable, maintainable,
-scalable code base and set of APIs for our users.
+maintained. If we don't do this, we lose the ability in the long term to provide a reliable,
+maintainable, scalable code base and set of APIs for our users.
 
 We had previously put in place policies around :repo:`breaking changes
 <CONTRIBUTING.md#breaking-change-policy>` across releases, the :repo:`API versioning policy
