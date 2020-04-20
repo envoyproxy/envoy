@@ -157,7 +157,7 @@ public:
     tcp_upstream_ =
         std::make_unique<TcpUpstream>(mock_router_filter_.requests_.front().get(), std::move(data));
   }
-  ~TcpUpstreamTest() { EXPECT_CALL(mock_router_filter_, config()).Times(AnyNumber()); }
+  ~TcpUpstreamTest() override { EXPECT_CALL(mock_router_filter_, config()).Times(AnyNumber()); }
 
 protected:
   NiceMock<Network::MockClientConnection> connection_;
