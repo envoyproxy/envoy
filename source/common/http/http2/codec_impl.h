@@ -22,7 +22,6 @@
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
 #include "common/http/utility.h"
-#include "common/runtime/runtime_impl.h"
 
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"

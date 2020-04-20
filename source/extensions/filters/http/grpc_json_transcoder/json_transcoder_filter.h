@@ -149,10 +149,7 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
-    doTrailers(trailers);
-    return Http::FilterTrailersStatus::Continue;
-  }
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
     return Http::FilterMetadataStatus::Continue;
   }
@@ -189,8 +186,8 @@ private:
   std::string content_type_;
 
   bool error_{false};
-  bool has_http_body_response_{false};
   bool has_body_{false};
+  bool http_body_response_headers_set_{false};
 };
 
 } // namespace GrpcJsonTranscoder
