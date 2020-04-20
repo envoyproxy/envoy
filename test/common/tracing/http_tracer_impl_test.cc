@@ -248,7 +248,6 @@ TEST_F(HttpConnManFinalizerImplTest, Connect) {
                                             &response_trailers, stream_info, config);
 }
 
-
 TEST_F(HttpConnManFinalizerImplTest, NullRequestHeadersAndNullRouteEntry) {
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));

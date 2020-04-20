@@ -89,10 +89,10 @@ public:
 
 Http::TestRequestHeaderMapImpl genPathlessHeaders(const std::string& host,
                                                   const std::string& method) {
-  return Http::TestRequestHeaderMapImpl{{":authority", host},
-                                        {":method", method},         {"x-safe", "safe"},
-                                        {"x-global-nope", "global"}, {"x-vhost-nope", "vhost"},
-                                        {"x-route-nope", "route"},   {"x-forwarded-proto", "http"}};
+  return Http::TestRequestHeaderMapImpl{{":authority", host},         {":method", method},
+                                        {"x-safe", "safe"},           {"x-global-nope", "global"},
+                                        {"x-vhost-nope", "vhost"},    {"x-route-nope", "route"},
+                                        {"x-forwarded-proto", "http"}};
 }
 
 Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
