@@ -53,7 +53,7 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
   constexpr auto expected_x_forwarded_for = false;
   constexpr auto expected_upstream_address = "10.0.0.200";
 
-  auto on_send = [](const std::string& json) {
+  auto on_send = [&](const std::string& json) {
     ASSERT_FALSE(json.empty());
     daemon::Segment s;
     MessageUtil::loadFromJson(json, s, ProtobufMessage::getNullValidationVisitor());
