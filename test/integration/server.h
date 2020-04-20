@@ -37,7 +37,8 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
                                   Network::Address::IpVersion ip_version,
                                   bool allow_unknown_static_fields = false,
                                   bool reject_unknown_dynamic_fields = false,
-                                  uint32_t concurrency = 1);
+                                  uint32_t concurrency = 1,
+                                  std::chrono::seconds drain_time = std::chrono::seconds(1));
 
 class TestComponentFactory : public ComponentFactory {
 public:
@@ -266,7 +267,7 @@ public:
       std::function<void()> on_server_init_function, bool deterministic,
       Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
       ProcessObjectOptRef process_object = absl::nullopt, bool allow_unknown_static_fields = false,
-      bool reject_unknown_dynamic_fields = false, uint32_t concurrency = 1);
+      bool reject_unknown_dynamic_fields = false, uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1));
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -289,7 +290,7 @@ public:
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization, ProcessObjectOptRef process_object,
              bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
-             uint32_t concurrency);
+             uint32_t concurrency, std::chrono::seconds drain_time);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
     TestUtility::waitForCounterEq(stat_store(), name, value, time_system_);
@@ -369,7 +370,8 @@ private:
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
                      ProcessObjectOptRef process_object, bool allow_unknown_static_fields,
-                     bool reject_unknown_dynamic_fields, uint32_t concurrency);
+                     bool reject_unknown_dynamic_fields, uint32_t concurrency,
+                     std::chrono::seconds drain_time);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;

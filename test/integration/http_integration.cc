@@ -1214,41 +1214,50 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_t
 }
 
 void HttpIntegrationTest::testGracefulDrain(Http::CodecClient::Type admin_request_type) {
+  drain_time_ = std::chrono::seconds(999);
   initialize();
-
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   uint32_t http_port = lookupPort("http");
   codec_client_ = makeHttpConnection(http_port);
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "HEAD"},
-                                                 {":path", "/test/long/url"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "host"}};
-  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-
-  // Invoke drain listeners endpoint and validate that we can still work on inflight requests.
-  BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "POST", "/drain_listeners", "", admin_request_type, version_);
-  EXPECT_TRUE(admin_response->complete());
-  EXPECT_EQ("200", admin_response->headers().Status()->value().getStringView());
-  EXPECT_EQ("OK\n", admin_response->body());
-
-  upstream_request_->encodeData(512, true);
-
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-
-  // Wait for the response to be read by the codec client.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
-
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  // The request is completed but the connection remains open.
+  EXPECT_TRUE(codec_client_->connected());
 
-  // Validate that the listeners have been stopped.
+  // Invoke /drain_listeners with graceful drain
+  BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners?graceful", "", admin_request_type, version_);
+  EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
+
+  // With a 999s graceful drain period, the listener should still be open.
+  EXPECT_EQ(test_server_->counter("listener_manager.listener_stopped")->value(), 0);
+
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  // Drain manager doesn't currently affect the HTTP connection manager, so
+  // connections are not terminated on request completion.
+  EXPECT_TRUE(codec_client_->connected());
+
+  // New connections can still be made.
+  auto second_codec_client_ = makeRawHttpConnection(makeClientConnection(http_port));
+  EXPECT_TRUE(second_codec_client_->connected());
+
+  // Invoke /drain_listeners and shut down listeners.
+  second_codec_client_->rawConnection().close(Network::ConnectionCloseType::NoFlush);
+  admin_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", admin_request_type, version_);
+  EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
+
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
-
-  // Validate that port is closed and can be bound by other sockets.
   EXPECT_NO_THROW(Network::TcpListenSocket(
       Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
                                            http_port),

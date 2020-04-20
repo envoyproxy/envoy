@@ -418,6 +418,9 @@ protected:
   // The number of worker threads that the test server uses.
   uint32_t concurrency_{1};
 
+  // The duration of the drain manager graceful drain period.
+  std::chrono::seconds drain_time_{1};
+
   // Member variables for xDS testing.
   FakeUpstream* xds_upstream_{};
   FakeHttpConnectionPtr xds_connection_;
