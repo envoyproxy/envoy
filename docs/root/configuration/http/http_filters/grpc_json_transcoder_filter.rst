@@ -82,7 +82,10 @@ as its output message type. The implementation needs to set
 (which sets the value of the HTTP response `Content-Type` header) and
 `data <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L71>`_
 (which sets the HTTP response body) accordingly.
-
+Multiple `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_
+can be send by the gRPC server in the server streaming case.
+In this case, HTTP response header `Content-Type` will use the `content-type` from the first
+`google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`.
 
 Sample Envoy configuration
 --------------------------

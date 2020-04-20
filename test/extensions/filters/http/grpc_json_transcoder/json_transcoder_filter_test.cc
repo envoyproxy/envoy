@@ -847,6 +847,47 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
   EXPECT_THAT(request, ProtoEq(expected_request));
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamWithHttpBodyAsOutput) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/indexStream"}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/indexStream", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("/bookstore.Bookstore/GetIndexStream", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                                   {":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+
+  // "Send" 1st gRPC message
+  google::api::HttpBody response;
+  response.set_content_type("text/html");
+  response.set_data("<h1>Message 1!</h1>");
+  auto response_data = Grpc::Common::serializeToGrpcFrame(response);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(*response_data, false));
+  // Content type set to HttpBody.content_type / no content-length
+  EXPECT_EQ("text/html", response_headers.get_("content-type"));
+  EXPECT_EQ(nullptr, response_headers.ContentLength());
+  EXPECT_EQ(response.data(), response_data->toString());
+
+  // "Send" 2nd message with different context type
+  response.set_content_type("text/plain");
+  response.set_data("Message2");
+  response_data = Grpc::Common::serializeToGrpcFrame(response);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(*response_data, false));
+  // Content type unchanged
+  EXPECT_EQ("text/html", response_headers.get_("content-type"));
+  EXPECT_EQ(nullptr, response_headers.ContentLength());
+  EXPECT_EQ(response.data(), response_data->toString());
+
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+}
+
 class GrpcJsonTranscoderFilterGrpcStatusTest : public GrpcJsonTranscoderFilterTest {
 public:
   GrpcJsonTranscoderFilterGrpcStatusTest(
