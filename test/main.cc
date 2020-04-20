@@ -14,9 +14,9 @@
 #include "tools/cpp/runfiles/runfiles.h"
 
 #if defined(WIN32)
-static void noop_invalid_parameter_handler(const wchar_t* expression, const wchar_t* function,
-                                           const wchar_t* file, unsigned int line,
-                                           uintptr_t pReserved) {
+static void noopInvalidParameterHandler(const wchar_t* expression, const wchar_t* function,
+                                        const wchar_t* file, unsigned int line,
+                                        uintptr_t pReserved) {
   return;
 }
 #endif
@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
 #if defined(WIN32)
   _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
 
-  _set_invalid_parameter_handler(noop_invalid_parameter_handler);
+  _set_invalid_parameter_handler(noopInvalidParameterHandler);
 
   WORD wVersionRequested;
   WSADATA wsaData;
