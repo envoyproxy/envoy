@@ -2618,8 +2618,7 @@ virtual_hosts:
     route->routeEntry()->maxGrpcTimeout();
     route->routeEntry()->grpcTimeoutOffset();
     route->routeEntry()->upgradeMap();
-    route->routeEntry()->internalRedirectAction();
-    route->routeEntry()->maxInternalRedirects();
+    route->routeEntry()->internalRedirectPolicy();
   }
 }
 

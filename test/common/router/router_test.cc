@@ -287,16 +287,15 @@ public:
     router_.decodeHeaders(default_request_headers_, end_stream);
   }
 
-  void enableRedirects() {
-    ON_CALL(callbacks_.route_->route_entry_, internalRedirectAction())
-        .WillByDefault(Return(InternalRedirectAction::Handle));
-    ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
-    setMaxInternalRedirects(1);
-  }
-
-  void setMaxInternalRedirects(uint32_t max_internal_redirects) {
-    ON_CALL(callbacks_.route_->route_entry_, maxInternalRedirects())
+  void enableRedirects(uint32_t max_internal_redirects = 1) {
+    ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, enabled())
+        .WillByDefault(Return(true));
+    ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
+            shouldRedirectForCode(_))
+        .WillByDefault(Return(true));
+    ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, maxInternalRedirects())
         .WillByDefault(Return(max_internal_redirects));
+    ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
   }
 
   void setNumPreviousRedirect(uint32_t num_previous_redirects) {
@@ -3941,8 +3940,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxInternalRedirect) {
-  enableRedirects();
-  setMaxInternalRedirects(3);
+  enableRedirects(3);
   setNumPreviousRedirect(3);
   sendRequest();
 
@@ -4038,8 +4036,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
 }
 
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
-  enableRedirects();
-  setMaxInternalRedirects(3);
+  enableRedirects(3);
   setNumPreviousRedirect(2);
   default_request_headers_.setForwardedProto("http");
   sendRequest();
@@ -4061,8 +4058,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 
 TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
-  enableRedirects();
-  setMaxInternalRedirects(3);
+  enableRedirects(3);
   setNumPreviousRedirect(1);
 
   sendRequest();

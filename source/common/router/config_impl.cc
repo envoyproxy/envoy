@@ -45,18 +45,6 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-InternalRedirectAction
-convertInternalRedirectAction(const envoy::config::route::v3::RouteAction& route) {
-  switch (route.internal_redirect_action()) {
-  case envoy::config::route::v3::RouteAction::PASS_THROUGH_INTERNAL_REDIRECT:
-    return InternalRedirectAction::PassThrough;
-  case envoy::config::route::v3::RouteAction::HANDLE_INTERNAL_REDIRECT:
-    return InternalRedirectAction::Handle;
-  default:
-    return InternalRedirectAction::PassThrough;
-  }
-}
-
 const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
 } // namespace
@@ -150,6 +138,67 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
 
   return retry_priority_config_.first->createRetryPriority(*retry_priority_config_.second,
                                                            *validation_visitor_, num_retries_);
+}
+
+InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
+    const envoy::config::route::v3::InternalRedirectPolicy& policy_config)
+    : enabled_(internalRedirectEnabled(policy_config)),
+      redirect_response_codes_(buildRedirectResponseCodes(policy_config)),
+      max_internal_redirects_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(policy_config, max_internal_redirects, 1)),
+      allowed_scheme_pairs_(buildAllowedSchemePairs(policy_config)), policy_config_(policy_config) {
+}
+
+std::vector<InternalRedirectTargetRoutePredicateSharedPtr>
+InternalRedirectPolicyImpl::targetRoutePredicates() const {
+  return std::vector<InternalRedirectTargetRoutePredicateSharedPtr>{};
+}
+
+bool InternalRedirectPolicyImpl::isDownstreamAndRedirectTargetSchemePairAllowed(
+    bool downstream_is_https, bool target_is_https) const {
+  return allowed_scheme_pairs_.contains(compactSchemePair(downstream_is_https, target_is_https));
+}
+
+bool InternalRedirectPolicyImpl::internalRedirectEnabled(
+    const envoy::config::route::v3::InternalRedirectPolicy& policy_config) const {
+  switch (policy_config.internal_redirect_action()) {
+  case envoy::config::route::v3::InternalRedirectPolicy::PASS_THROUGH_INTERNAL_REDIRECT:
+    return false;
+  case envoy::config::route::v3::InternalRedirectPolicy::HANDLE_INTERNAL_REDIRECT:
+    return true;
+  default:
+    return false;
+  }
+}
+
+absl::flat_hash_set<Http::Code> InternalRedirectPolicyImpl::buildRedirectResponseCodes(
+    const envoy::config::route::v3::InternalRedirectPolicy& policy_config) const {
+  if (policy_config.redirect_response_codes_size() == 0) {
+    return absl::flat_hash_set<Http::Code>{Http::Code::Found};
+  }
+  absl::flat_hash_set<Http::Code> ret;
+  std::for_each(policy_config.redirect_response_codes().begin(),
+                policy_config.redirect_response_codes().end(), [&ret](uint32_t response_code) {
+                  ret.insert(static_cast<Http::Code>(response_code));
+                });
+  return ret;
+}
+
+absl::flat_hash_set<uint8_t> InternalRedirectPolicyImpl::buildAllowedSchemePairs(
+    const envoy::config::route::v3::InternalRedirectPolicy& policy_config) const {
+  if (policy_config.allowed_downstream_and_target_scheme_pairs_size() == 0) {
+    return absl::flat_hash_set<uint8_t>{compactSchemePair(true, true),
+                                        compactSchemePair(true, false),
+                                        compactSchemePair(false, false)};
+  }
+  return absl::flat_hash_set<uint8_t>(
+      policy_config.allowed_downstream_and_target_scheme_pairs().begin(),
+      policy_config.allowed_downstream_and_target_scheme_pairs().end());
+}
+
+uint8_t InternalRedirectPolicyImpl::compactSchemePair(bool downstream_is_https,
+                                                      bool target_is_https) const {
+  return (downstream_is_https ? 0x2 : 0x0) | (target_is_https ? 0x1 : 0x0);
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& config,
@@ -274,6 +323,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
       retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route(), validator)),
+      internal_redirect_policy_(buildInternalRedirectPolicy(route.route())),
       rate_limit_policy_(route.route().rate_limits()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
@@ -293,10 +343,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       per_filter_configs_(route.typed_per_filter_config(),
                           route.hidden_envoy_deprecated_per_filter_config(), factory_context,
                           validator),
-      route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()),
-      internal_redirect_action_(convertInternalRedirectAction(route.route())),
-      max_internal_redirects_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), max_internal_redirects, 1)) {
+      route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -705,6 +752,31 @@ RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
 
   // Otherwise, an empty policy will do.
   return RetryPolicyImpl();
+}
+
+InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
+    const envoy::config::route::v3::RouteAction& route_config) const {
+  if (route_config.has_internal_redirect_policy()) {
+    return InternalRedirectPolicyImpl(route_config.internal_redirect_policy());
+  }
+  envoy::config::route::v3::InternalRedirectPolicy policy_config;
+  switch(route_config.internal_redirect_action()) {
+    case envoy::config::route::v3::RouteAction::HANDLE_INTERNAL_REDIRECT:
+      policy_config.set_internal_redirect_action(
+          envoy::config::route::v3::InternalRedirectPolicy::HANDLE_INTERNAL_REDIRECT);
+      break;
+    case envoy::config::route::v3::RouteAction::PASS_THROUGH_INTERNAL_REDIRECT:
+      policy_config.set_internal_redirect_action(
+          envoy::config::route::v3::InternalRedirectPolicy::PASS_THROUGH_INTERNAL_REDIRECT);
+      break;
+    default:
+      policy_config.set_internal_redirect_action(
+          envoy::config::route::v3::InternalRedirectPolicy::PASS_THROUGH_INTERNAL_REDIRECT);
+  }
+  if (route_config.has_max_internal_redirects()) {
+    *policy_config.mutable_max_internal_redirects() = route_config.max_internal_redirects();
+  }
+  return InternalRedirectPolicyImpl(policy_config);
 }
 
 DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::config::route::v3::Route& route) {

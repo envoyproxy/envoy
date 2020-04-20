@@ -528,7 +528,7 @@ message CorsPolicy {
   }
 }
 
-// [#next-free-field: 34]
+// [#next-free-field: 35]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -541,6 +541,7 @@ message RouteAction {
   }
 
   // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
+  // [#next-major-version: remove this definition - it's defined in the InternalRedirectPolicy message.]
   enum InternalRedirectAction {
     PASS_THROUGH_INTERNAL_REDIRECT = 0;
     HANDLE_INTERNAL_REDIRECT = 1;
@@ -902,7 +903,7 @@ message RouteAction {
   // limits. By default, if the route configured rate limits, the virtual host
   // :ref:`rate_limits <envoy_api_field_config.route.v3.VirtualHost.rate_limits>` are not applied to the
   // request.
-  InternalRedirectAction internal_redirect_action = 26;
+  InternalRedirectPolicy internal_redirect_policy = 34;
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
   // hash policy is evaluated individually and the combined result is used to
@@ -916,10 +917,10 @@ message RouteAction {
   // backend). If a hash policy has the "terminal" attribute set to true, and
   // there is already a hash generated, the hash is returned immediately,
   // ignoring the rest of the hash policy list.
-  google.protobuf.UInt32Value max_internal_redirects = 31;
+  InternalRedirectAction internal_redirect_action = 26 [deprecated = true];
 
   // Indicates that the route has a CORS policy.
-  HedgePolicy hedge_policy = 27;
+  google.protobuf.UInt32Value max_internal_redirects = 31 [deprecated = true];
 
   // If present, and the request is a gRPC request, use the
   // `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_,
@@ -940,18 +941,20 @@ message RouteAction {
   //    :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`,
   //    :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`, and the
   //    :ref:`retry overview <arch_overview_http_routing_retry>`.
+  HedgePolicy hedge_policy = 27;
+
+  // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting
+  // the provided duration from the header. This is useful in allowing Envoy to set its global
+  // timeout to be less than that of the deadline imposed by the calling client, which makes it more
+  // likely that Envoy will handle the timeout instead of having the call canceled by the client.
+  // The offset will only be applied if the provided grpc_timeout is greater than the offset. This
+  // ensures that the offset will only ever decrease the timeout and never set it to 0 (meaning
+  // infinity).
   RequestMirrorPolicy hidden_envoy_deprecated_request_mirror_policy = 10 [deprecated = true];
 
   oneof cluster_specifier {
     option (validate.required) = true;
 
-    // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting
-    // the provided duration from the header. This is useful in allowing Envoy to set its global
-    // timeout to be less than that of the deadline imposed by the calling client, which makes it more
-    // likely that Envoy will handle the timeout instead of having the call canceled by the client.
-    // The offset will only be applied if the provided grpc_timeout is greater than the offset. This
-    // ensures that the offset will only ever decrease the timeout and never set it to 0 (meaning
-    // infinity).
     string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
     string cluster_header = 2
@@ -1577,4 +1580,39 @@ message QueryParameterMatcher {
 
     bool present_match = 6;
   }
+}
+
+// HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
+// [#next-free-field: 6]
+message InternalRedirectPolicy {
+  enum InternalRedirectAction {
+    PASS_THROUGH_INTERNAL_REDIRECT = 0;
+    HANDLE_INTERNAL_REDIRECT = 1;
+  }
+
+  enum DownstreamAndRedirectTargetSchemePair {
+    HTTP_HTTP = 0;
+    HTTP_HTTPS = 1;
+    HTTPS_HTTP = 2;
+    HTTPS_HTTPS = 3;
+  }
+
+  // pengg: useful ones
+  // no_previous_route (loop prevention)
+  // route_whitelist (only whitelisted route)
+  message TargetRoutePredicate {
+    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    google.protobuf.Any typed_config = 2;
+  }
+
+  InternalRedirectAction internal_redirect_action = 1;
+
+  google.protobuf.UInt32Value max_internal_redirects = 2;
+
+  repeated uint32 redirect_response_codes = 3;
+
+  repeated TargetRoutePredicate target_route_predicates = 4;
+
+  repeated DownstreamAndRedirectTargetSchemePair allowed_downstream_and_target_scheme_pairs = 5;
 }

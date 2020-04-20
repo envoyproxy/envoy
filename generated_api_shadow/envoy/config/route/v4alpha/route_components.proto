@@ -517,7 +517,7 @@ message CorsPolicy {
   core.v4alpha.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 34]
+// [#next-free-field: 35]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RouteAction";
 
@@ -530,6 +530,7 @@ message RouteAction {
   }
 
   // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
+  // [#next-major-version: remove this definition - it's defined in the InternalRedirectPolicy message.]
   enum InternalRedirectAction {
     PASS_THROUGH_INTERNAL_REDIRECT = 0;
     HANDLE_INTERNAL_REDIRECT = 1;
@@ -954,7 +955,9 @@ message RouteAction {
 
   repeated UpgradeConfig upgrade_configs = 25;
 
-  InternalRedirectAction internal_redirect_action = 26;
+  InternalRedirectPolicy internal_redirect_policy = 34;
+
+  InternalRedirectAction hidden_envoy_deprecated_internal_redirect_action = 26 [deprecated = true];
 
   // An internal redirect is handled, iff the number of previous internal redirects that a
   // downstream request has encountered is lower than this value, and
@@ -970,7 +973,8 @@ message RouteAction {
   // will pass the redirect back to downstream.
   //
   // If not specified, at most one redirect will be followed.
-  google.protobuf.UInt32Value max_internal_redirects = 31;
+  google.protobuf.UInt32Value hidden_envoy_deprecated_max_internal_redirects = 31
+      [deprecated = true];
 
   // Indicates that the route has a hedge policy. Note that if this is set,
   // it'll take precedence over the virtual host level hedge policy entirely
@@ -1563,4 +1567,45 @@ message QueryParameterMatcher {
     // Specifies whether a query parameter should be present.
     bool present_match = 6;
   }
+}
+
+// HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
+// [#next-free-field: 6]
+message InternalRedirectPolicy {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.route.v3.InternalRedirectPolicy";
+
+  enum InternalRedirectAction {
+    PASS_THROUGH_INTERNAL_REDIRECT = 0;
+    HANDLE_INTERNAL_REDIRECT = 1;
+  }
+
+  enum DownstreamAndRedirectTargetSchemePair {
+    HTTP_HTTP = 0;
+    HTTP_HTTPS = 1;
+    HTTPS_HTTP = 2;
+    HTTPS_HTTPS = 3;
+  }
+
+  // pengg: useful ones
+  // no_previous_route (loop prevention)
+  // route_whitelist (only whitelisted route)
+  message TargetRoutePredicate {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.route.v3.InternalRedirectPolicy.TargetRoutePredicate";
+
+    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    google.protobuf.Any typed_config = 2;
+  }
+
+  InternalRedirectAction internal_redirect_action = 1;
+
+  google.protobuf.UInt32Value max_internal_redirects = 2;
+
+  repeated uint32 redirect_response_codes = 3;
+
+  repeated TargetRoutePredicate target_route_predicates = 4;
+
+  repeated DownstreamAndRedirectTargetSchemePair allowed_downstream_and_target_scheme_pairs = 5;
 }

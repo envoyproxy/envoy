@@ -1209,8 +1209,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     }
   }
 
-  if (static_cast<Http::Code>(response_code) == Http::Code::Found &&
-      route_entry_->internalRedirectAction() == InternalRedirectAction::Handle &&
+  if (route_entry_->internalRedirectPolicy().enabled() &&
+      route_entry_->internalRedirectPolicy().shouldRedirectForCode(
+          static_cast<Http::Code>(response_code)) &&
       setupRedirect(*headers, upstream_request)) {
     return;
     // If the redirect could not be handled, fail open and let it pass to the
@@ -1416,9 +1417,10 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
   if (downstream_end_stream_ &&
       !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
       location != nullptr &&
-      convertRequestHeadersForInternalRedirect(*downstream_headers_, *filter_state,
-                                               route_entry_->maxInternalRedirects(), *location,
-                                               *callbacks_->connection()) &&
+      convertRequestHeadersForInternalRedirect(
+          *downstream_headers_, *filter_state,
+          route_entry_->internalRedirectPolicy().maxInternalRedirects(), *location,
+          *callbacks_->connection()) &&
       callbacks_->recreateStream()) {
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;

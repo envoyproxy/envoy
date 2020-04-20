@@ -1565,25 +1565,12 @@ message QueryParameterMatcher {
 }
 
 // HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
+// [#next-free-field: 6]
 message InternalRedirectPolicy {
   enum InternalRedirectAction {
     PASS_THROUGH_INTERNAL_REDIRECT = 0;
     HANDLE_INTERNAL_REDIRECT = 1;
   }
-  InternalRedirectAction internal_redirect_action = 1;
-  google.protobuf.UInt32Value max_internal_redirects = 2;
-
-  repeated uint32 redirect_response_codes = 3;
-
-  // pengg: useful ones
-  // no_previous_route (loop prevention)
-  // route_whitelist (only whitelisted route)
-  message TargetRoutePredicate {
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
-    google.protobuf.Any typed_config = 2;
-  }
-
-  repeated TargetRoutePredicate target_route_predicates = 4;
 
   enum DownstreamAndRedirectTargetSchemePair {
     HTTP_HTTP = 0;
@@ -1591,6 +1578,23 @@ message InternalRedirectPolicy {
     HTTPS_HTTP = 2;
     HTTPS_HTTPS = 3;
   }
+
+  // pengg: useful ones
+  // no_previous_route (loop prevention)
+  // route_whitelist (only whitelisted route)
+  message TargetRoutePredicate {
+    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    google.protobuf.Any typed_config = 2;
+  }
+
+  InternalRedirectAction internal_redirect_action = 1;
+
+  google.protobuf.UInt32Value max_internal_redirects = 2;
+
+  repeated uint32 redirect_response_codes = 3;
+
+  repeated TargetRoutePredicate target_route_predicates = 4;
 
   repeated DownstreamAndRedirectTargetSchemePair allowed_downstream_and_target_scheme_pairs = 5;
 }

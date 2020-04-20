@@ -131,6 +131,18 @@ public:
   absl::optional<std::chrono::milliseconds> max_interval_{};
 };
 
+class MockInternalRedirectPolicy : public InternalRedirectPolicy {
+public:
+  MockInternalRedirectPolicy();
+  MOCK_METHOD(bool, enabled, (), (const));
+  MOCK_METHOD(bool, shouldRedirectForCode, (const Http::Code& response_code), (const));
+  MOCK_METHOD(std::vector<InternalRedirectTargetRoutePredicateSharedPtr>, targetRoutePredicates, (),
+              (const));
+  MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));
+  MOCK_METHOD(bool, isDownstreamAndRedirectTargetSchemePairAllowed,
+              (bool downstream_is_https, bool target_is_https), (const));
+};
+
 class MockRetryState : public RetryState {
 public:
   MockRetryState();
@@ -334,6 +346,7 @@ public:
   MOCK_METHOD(Upstream::ResourcePriority, priority, (), (const));
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
+  MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
@@ -354,8 +367,6 @@ public:
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
-  MOCK_METHOD(InternalRedirectAction, internalRedirectAction, (), (const));
-  MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
 
   std::string cluster_name_{"fake_cluster"};
@@ -363,6 +374,7 @@ public:
   std::multimap<std::string, std::string> opaque_config_;
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
+  testing::NiceMock<MockInternalRedirectPolicy> internal_redirect_policy_;
   TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
