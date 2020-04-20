@@ -4,7 +4,6 @@
 #include "envoy/stats/scope.h"
 
 #include "common/config/protobuf_link_hacks.h"
-#include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -13,6 +12,7 @@
 #include "test/integration/utility.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -111,9 +111,10 @@ public:
   void verifyGrpcServiceMethod() {
     EXPECT_TRUE(xds_stream_->waitForHeadersComplete());
     Envoy::Http::LowerCaseString path_string(":path");
-    std::string expected_method(sotwOrDelta() == Grpc::SotwOrDelta::Sotw
-                                    ? "/envoy.api.v2.ClusterDiscoveryService/StreamClusters"
-                                    : "/envoy.api.v2.ClusterDiscoveryService/DeltaClusters");
+    std::string expected_method(
+        sotwOrDelta() == Grpc::SotwOrDelta::Sotw
+            ? "/envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters"
+            : "/envoy.service.cluster.v3.ClusterDiscoveryService/DeltaClusters");
     EXPECT_EQ(xds_stream_->headers().get(path_string)->value(), expected_method);
   }
 
