@@ -282,10 +282,7 @@ private:
   findFilterChainForSourceIpAndPort(const SourceIPsTrie& source_ips_trie,
                                     const Network::ConnectionSocket& socket) const;
 
-  const FilterChainManagerImpl* getOriginFilterChainManager() {
-    ASSERT(origin_.has_value());
-    return origin_.value();
-  }
+  const FilterChainManagerImpl* getOriginFilterChainManager() { return origin_.value(); }
   // Duplicate the inherent factory context if any.
   std::shared_ptr<Network::DrainableFilterChain>
   findExistingFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain_message);

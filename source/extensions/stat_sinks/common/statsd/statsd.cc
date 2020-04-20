@@ -62,6 +62,7 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
                                 buildTagStr(gauge.get().tags())));
     }
   }
+  // TODO(efimki): Add support of text readouts stats.
 }
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
@@ -128,6 +129,7 @@ void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
       tls_sink.flushGauge(gauge.get().name(), gauge.get().value());
     }
   }
+  // TODO(efimki): Add support of text readouts stats.
   tls_sink.endFlush(true);
 }
 
