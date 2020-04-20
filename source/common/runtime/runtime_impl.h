@@ -24,6 +24,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/config/subscription_base.h"
+#include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
 #include "common/singleton/threadsafe_singleton.h"
 
@@ -242,15 +243,16 @@ class LoaderImpl : public Loader, Logger::Loggable<Logger::Id::runtime> {
 public:
   LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
              const envoy::config::bootstrap::v3::LayeredRuntime& config,
-             const LocalInfo::LocalInfo& local_info, Init::Manager& init_manager,
-             Stats::Store& store, RandomGenerator& generator,
-             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+             const LocalInfo::LocalInfo& local_info, Stats::Store& store,
+             RandomGenerator& generator, ProtobufMessage::ValidationVisitor& validation_visitor,
+             Api::Api& api);
 
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;
   const Snapshot& snapshot() override;
   std::shared_ptr<const Snapshot> threadsafeSnapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
+  void startRtdsSubscriptions(ReadyCallback on_done) override;
 
 private:
   friend RtdsSubscription;
@@ -260,6 +262,7 @@ private:
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
+  void onRdtsReady();
 
   RandomGenerator& generator_;
   RuntimeStats stats_;
@@ -269,6 +272,9 @@ private:
   const std::string service_cluster_;
   Filesystem::WatcherPtr watcher_;
   Api::Api& api_;
+  ReadyCallback on_rtds_initialized_;
+  Init::WatcherImpl init_watcher_;
+  Init::ManagerImpl init_manager_{"RTDS"};
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   Upstream::ClusterManager* cm_{};
 
