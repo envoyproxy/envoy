@@ -57,7 +57,7 @@ is specified as part of the configuration. A `FilterState::Object` implements
 HTTP Per-Route Filter Configuration
 -----------------------------------
 
-In HTTP routes, :ref:`per_filter_config
+In HTTP routes, :ref:`typed_per_filter_config
 <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` allows HTTP filters
 to have virtualhost/route-specific configuration in addition to a global
 filter config common to all virtual hosts. This configuration is converted
