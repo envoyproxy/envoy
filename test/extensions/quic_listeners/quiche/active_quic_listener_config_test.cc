@@ -55,7 +55,7 @@ TEST(ActiveQuicListenerConfigTest, CreateActiveQuicListenerFactory) {
   EXPECT_EQ("foo_key", runtime_enabled.runtime_key());
 }
 
-TEST(ActiveQuicListenerConfigTest, QuicListenerDisabledByDefault) {
+TEST(ActiveQuicListenerConfigTest, QuicListenerFlagNotConfigured) {
   std::string listener_name = QuicListenerName;
   auto& config_factory =
       Config::Utility::getAndCheckFactoryByName<Server::ActiveUdpListenerConfigFactory>(
