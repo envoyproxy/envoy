@@ -21,12 +21,12 @@ extension EnvoyStreamEmitter: StreamEmitter {
     return self
   }
 
-  func close(trailers: [String: [String]]?) {
-    if let trailers = trailers {
-      self.stream.sendTrailers(trailers)
-    } else {
-      self.stream.send(Data(), close: true)
-    }
+  func close(trailers: [String: [String]]) {
+    self.stream.sendTrailers(trailers)
+  }
+
+  func close(data: Data) {
+    self.stream.send(data, close: true)
   }
 
   func cancel() {

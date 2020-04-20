@@ -97,7 +97,7 @@ class EnvoyClientTest {
             .build(),
         ResponseHandler(Executor {}))
 
-    emitter.close(null)
+    emitter.close(ByteBuffer.allocate(0))
 
     verify(stream).sendData(ByteBuffer.allocate(0), true)
   }

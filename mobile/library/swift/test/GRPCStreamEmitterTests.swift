@@ -6,13 +6,13 @@ private let kMessageData = Data([1, 2, 3, 4])
 
 private final class MockEmitter: StreamEmitter {
   private let onSendData: (_ data: Data) -> Void
-  private let onClose: ((_ trailers: [String: [String]]?) -> Void)?
+  private let onCloseWithData: (_ data: Data) -> Void
 
   init(onSendData: @escaping (_ data: Data) -> Void,
-       onClose: ((_ trailers: [String: [String]]?) -> Void)? = nil)
+       onCloseWithData: @escaping (_ data: Data) -> Void = { _ in })
   {
     self.onSendData = onSendData
-    self.onClose = onClose
+    self.onCloseWithData = onCloseWithData
   }
 
   func sendData(_ data: Data) -> StreamEmitter {
@@ -24,8 +24,10 @@ private final class MockEmitter: StreamEmitter {
     return self
   }
 
-  func close(trailers: [String: [String]]?) {
-    self.onClose?(trailers)
+  func close(trailers: [String: [String]]) {}
+
+  func close(data: Data) {
+    self.onCloseWithData(data)
   }
 
   func cancel() {}
@@ -67,11 +69,12 @@ final class GRPCStreamEmitterTests: XCTestCase {
     XCTAssertEqual(kMessageData, sentData.subdata(in: 5..<sentData.count))
   }
 
-  func testCloseIsCalledWithNilTrailersInOrderToCloseWithEmptyDataFrame() {
-    var sentTrailers: [String: [String]]? = ["x": ["invalid"]]
-    let mockEmitter = MockEmitter(onSendData: { _ in }, onClose: { sentTrailers = $0 })
+  func testCloseIsCalledWithEmptyDataFrame() {
+    var closedData: Data?
+    let mockEmitter = MockEmitter(onSendData: { _ in },
+                                  onCloseWithData: { closedData = $0 })
     GRPCStreamEmitter(emitter: mockEmitter)
       .close()
-    XCTAssertNil(sentTrailers)
+    XCTAssertEqual(Data(), closedData)
   }
 }

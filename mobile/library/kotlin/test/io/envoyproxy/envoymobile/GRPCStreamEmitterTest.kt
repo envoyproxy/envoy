@@ -15,12 +15,11 @@ class GRPCStreamEmitterTest {
   private lateinit var emitter: StreamEmitter
 
   private val dataOutputStream = ByteArrayOutputStream()
-  private var isCloseCalledWithNull = false
+  private var isClosedCallWithEmptyData = false
 
   @Before
   fun setup() {
     emitter = object : StreamEmitter {
-
       override fun cancel() {
         throw UnsupportedOperationException("unexpected usage of mock emitter")
       }
@@ -34,8 +33,12 @@ class GRPCStreamEmitterTest {
         throw UnsupportedOperationException("unexpected usage of mock emitter")
       }
 
-      override fun close(trailers: Map<String, List<String>>?) {
-        isCloseCalledWithNull = trailers == null
+      override fun close(trailers: Map<String, List<String>>) {
+        throw UnsupportedOperationException("unexpected usage of mock emitter")
+      }
+
+      override fun close(byteBuffer: ByteBuffer) {
+        isClosedCallWithEmptyData = byteBuffer.array().size == 0
       }
     }
   }
@@ -43,7 +46,7 @@ class GRPCStreamEmitterTest {
   @After
   fun teardown() {
     dataOutputStream.reset()
-    isCloseCalledWithNull = false
+    isClosedCallWithEmptyData = false
   }
 
   @Test
@@ -92,6 +95,6 @@ class GRPCStreamEmitterTest {
     GRPCStreamEmitter(emitter)
       .close()
 
-    assertThat(isCloseCalledWithNull).isTrue()
+    assertThat(isClosedCallWithEmptyData).isTrue()
   }
 }
