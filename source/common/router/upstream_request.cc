@@ -98,6 +98,12 @@ UpstreamRequest::~UpstreamRequest() {
     upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
                       upstream_trailers_.get(), stream_info_);
   }
+
+  while (downstream_data_disabled_ != 0) {
+    parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
+    parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
+    --downstream_data_disabled_;
+  }
 }
 
 void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
@@ -417,7 +423,6 @@ void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermar
   // can disable reads from upstream.
   ASSERT(!parent_.parent_.finalUpstreamRequest() ||
          &parent_ == parent_.parent_.finalUpstreamRequest());
-
   // The downstream connection is overrun. Pause reads from upstream.
   // If there are multiple calls to readDisable either the codec (H2) or the underlying
   // Network::Connection (H1) will handle reference counting.
@@ -447,6 +452,7 @@ void UpstreamRequest::disableDataFromDownstreamForFlowControl() {
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
   parent_.cluster()->stats().upstream_flow_control_backed_up_total_.inc();
   parent_.callbacks()->onDecoderFilterAboveWriteBufferHighWatermark();
+  ++downstream_data_disabled_;
 }
 
 void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
@@ -462,6 +468,10 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
   parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
   parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
+  ASSERT(downstream_data_disabled_ != 0);
+  if (downstream_data_disabled_ > 0) {
+    --downstream_data_disabled_;
+  }
 }
 
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
