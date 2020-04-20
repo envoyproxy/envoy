@@ -21,7 +21,7 @@ TEST(NullValidationVisitorImpl, UnknownField) {
 // The warning validation visitor logs and bumps stats on unknown fields
 TEST(WarningValidationVisitorImpl, UnknownField) {
   Stats::IsolatedStoreImpl stats;
-  Stats::Counter& unknown_counter = stats.counter("counter");
+  Stats::Counter& unknown_counter = stats.counterFromString("counter");
   WarningValidationVisitorImpl warning_validation_visitor;
   // First time around we should log.
   EXPECT_LOG_CONTAINS("warn", "Unexpected field: foo",
@@ -46,7 +46,7 @@ TEST(WarningValidationVisitorImpl, UnknownField) {
 TEST(StrictValidationVisitorImpl, UnknownField) {
   StrictValidationVisitorImpl strict_validation_visitor;
   EXPECT_THROW_WITH_MESSAGE(strict_validation_visitor.onUnknownField("foo"),
-                            UnknownProtoFieldException,
+                            ValidationError::UnknownProtoFieldException,
                             "Protobuf message (foo) has unknown fields");
 }
 
