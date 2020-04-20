@@ -761,7 +761,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   request_headers_ = std::move(headers);
 
   // TODO(alyssawilk) remove this synthetic path in a follow-up PR, including
-  // auditing of empty path headers.  We check for path because HTTP/2 connect requests may have a
+  // auditing of empty path headers. We check for path because HTTP/2 connect requests may have a
   // path.
   if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) {
     request_headers_->setPath("/");
