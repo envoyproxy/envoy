@@ -99,6 +99,8 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 // Validates that the drain actually drains the listeners.
 TEST_P(IntegrationTest, AdminDrainDrainsListeners) { testAdminDrain(downstreamProtocol()); }
 
+TEST_P(IntegrationTest, GracefulDrain) { testGracefulDrain(downstreamProtocol()); }
+
 TEST_P(IntegrationTest, RouterDirectResponse) {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
