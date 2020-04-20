@@ -11,7 +11,7 @@
 namespace Envoy {
 namespace Server {
 
-class RuntimeHandlerImpl {
+class RuntimeHandler {
 
 public:
   static Http::Code handlerRuntime(absl::string_view path_and_query,

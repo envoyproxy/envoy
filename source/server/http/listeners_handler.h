@@ -11,7 +11,7 @@
 namespace Envoy {
 namespace Server {
 
-class ListenersHandlerImpl {
+class ListenersHandler {
 
 public:
   static Http::Code handlerDrainListeners(absl::string_view path_and_query,

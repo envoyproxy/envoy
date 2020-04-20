@@ -13,10 +13,10 @@
 namespace Envoy {
 namespace Server {
 
-Http::Code RuntimeHandlerImpl::handlerRuntime(absl::string_view url,
-                                              Http::ResponseHeaderMap& response_headers,
-                                              Buffer::Instance& response, AdminStream&,
-                                              Server::Instance& server) {
+Http::Code RuntimeHandler::handlerRuntime(absl::string_view url,
+                                          Http::ResponseHeaderMap& response_headers,
+                                          Buffer::Instance& response, AdminStream&,
+                                          Server::Instance& server) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
@@ -76,10 +76,10 @@ Http::Code RuntimeHandlerImpl::handlerRuntime(absl::string_view url,
   return Http::Code::OK;
 }
 
-Http::Code RuntimeHandlerImpl::handlerRuntimeModify(absl::string_view url, Http::ResponseHeaderMap&,
-                                                    Buffer::Instance& response,
-                                                    AdminStream& admin_stream,
-                                                    Server::Instance& server) {
+Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::ResponseHeaderMap&,
+                                                Buffer::Instance& response,
+                                                AdminStream& admin_stream,
+                                                Server::Instance& server) {
   Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   if (params.empty()) {
     // Check if the params are in the request's body.
@@ -107,7 +107,7 @@ Http::Code RuntimeHandlerImpl::handlerRuntimeModify(absl::string_view url, Http:
   return Http::Code::OK;
 }
 
-bool RuntimeHandlerImpl::isFormUrlEncoded(const Http::HeaderEntry* content_type) {
+bool RuntimeHandler::isFormUrlEncoded(const Http::HeaderEntry* content_type) {
   if (content_type == nullptr) {
     return false;
   }
