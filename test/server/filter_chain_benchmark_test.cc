@@ -166,7 +166,7 @@ const char YamlSingleDstPortBottom[] = R"EOF(
 
 class FilterChainBenchmarkFixture : public benchmark::Fixture {
 public:
-  void SetUp(const ::benchmark::State& state) override {
+  void SetUp(::benchmark::State& state) override {
     int64_t input_size = state.range(0);
     std::vector<std::string> port_chains;
     port_chains.reserve(input_size);

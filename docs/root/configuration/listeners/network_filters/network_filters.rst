@@ -26,4 +26,5 @@ filters.
   tcp_proxy_filter
   thrift_proxy_filter
   sni_cluster_filter
+  sni_dynamic_forward_proxy_filter
   zookeeper_proxy_filter

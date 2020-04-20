@@ -156,5 +156,32 @@ public:
 
 using GaugeSharedPtr = RefcountPtr<Gauge>;
 
+/**
+ * A string, possibly non-ASCII.
+ */
+class TextReadout : public virtual Metric {
+public:
+  // Text readout type is used internally to disambiguate isolated store
+  // constructors. In the future we can extend it to specify text encoding or
+  // some such.
+  enum class Type {
+    Default, // No particular meaning.
+  };
+
+  ~TextReadout() override = default;
+
+  /**
+   * Sets the value of this TextReadout by moving the input |value| to minimize
+   * buffer copies under the lock.
+   */
+  virtual void set(std::string&& value) PURE;
+  /**
+   * @return the copy of this TextReadout value.
+   */
+  virtual std::string value() const PURE;
+};
+
+using TextReadoutSharedPtr = RefcountPtr<TextReadout>;
+
 } // namespace Stats
 } // namespace Envoy
