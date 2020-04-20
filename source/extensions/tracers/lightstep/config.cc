@@ -1,7 +1,7 @@
 #include "extensions/tracers/lightstep/config.h"
 
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/lightstep.pb.h"
+#include "envoy/config/trace/v3/lightstep.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
@@ -19,7 +19,7 @@ namespace Lightstep {
 
 LightstepTracerFactory::LightstepTracerFactory() : FactoryBase(TracerNames::get().Lightstep) {}
 
-Tracing::HttpTracerPtr LightstepTracerFactory::createHttpTracerTyped(
+Tracing::HttpTracerSharedPtr LightstepTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v3::LightstepConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
   auto opts = std::make_unique<lightstep::LightStepTracerOptions>();
@@ -35,7 +35,7 @@ Tracing::HttpTracerPtr LightstepTracerFactory::createHttpTracerTyped(
       context.serverFactoryContext().runtime(), std::move(opts),
       Common::Ot::OpenTracingDriver::PropagationMode::TracerNative,
       context.serverFactoryContext().grpcContext());
-  return std::make_unique<Tracing::HttpTracerImpl>(std::move(lightstep_driver),
+  return std::make_shared<Tracing::HttpTracerImpl>(std::move(lightstep_driver),
                                                    context.serverFactoryContext().localInfo());
 }
 

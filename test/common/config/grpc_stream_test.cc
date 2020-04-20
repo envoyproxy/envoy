@@ -3,6 +3,7 @@
 #include "common/config/grpc_stream.h"
 #include "common/protobuf/protobuf.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -31,7 +32,7 @@ protected:
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   Grpc::MockAsyncStream async_stream_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   NiceMock<MockGrpcStreamCallbacks> callbacks_;

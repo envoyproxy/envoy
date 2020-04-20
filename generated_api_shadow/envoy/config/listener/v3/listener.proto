@@ -2,8 +2,10 @@ syntax = "proto3";
 
 package envoy.config.listener.v3;
 
+import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/api_listener.proto";
 import "envoy/config/listener/v3/listener_components.proto";
 import "envoy/config/listener/v3/udp_listener_config.proto";
@@ -12,18 +14,19 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "ListenerProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Listener configuration]
 // Listener :ref:`configuration overview <config_listeners>`
 
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -100,23 +103,6 @@ message Listener {
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
-
-  // If a connection is redirected using *iptables*, the port on which the proxy
-  // receives it might be different from the original destination address. When this flag is set to
-  // true, the listener hands off redirected connections to the listener associated with the
-  // original destination address. If there is no listener associated with the original destination
-  // address, the connection is handled by the listener that receives it. Defaults to false.
-  //
-  // .. attention::
-  //
-  //   This field is deprecated. Use :ref:`an original_dst <config_listener_filters_original_dst>`
-  //   :ref:`listener filter <envoy_api_field_config.listener.v3.Listener.listener_filters>` instead.
-  //
-  //   Note that hand off to another listener is *NOT* performed without this flag. Once
-  //   :ref:`FilterChainMatch <envoy_api_msg_config.listener.v3.FilterChainMatch>` is implemented this flag
-  //   will be removed, as filter chain matching can be used to select a filter chain based on the
-  //   restored destination address.
-  google.protobuf.BoolValue hidden_envoy_deprecated_use_original_dst = 4 [deprecated = true];
 
   // Soft limit on size of the listener’s new connection read and write buffers.
   // If unspecified, an implementation defined default is applied (1MiB).
@@ -246,4 +232,10 @@ message Listener {
   // This issue was fixed by `tcp: Avoid TCP syncookie rejected by SO_REUSEPORT socket
   // <https://github.com/torvalds/linux/commit/40a1227ea845a37ab197dd1caffb60b047fa36b1>`_.
   bool reuse_port = 21;
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>`
+  // emitted by this listener.
+  repeated accesslog.v3.AccessLog access_log = 22;
+
+  google.protobuf.BoolValue hidden_envoy_deprecated_use_original_dst = 4 [deprecated = true];
 }

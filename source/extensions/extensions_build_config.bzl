@@ -98,12 +98,14 @@ EXTENSIONS = {
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
     "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
     "envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
+    "envoy.filters.network.sni_dynamic_forward_proxy":  "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
     "envoy.filters.network.zookeeper_proxy":            "//source/extensions/filters/network/zookeeper_proxy:config",
 
     #
     # UDP filters
     #
 
+    "envoy.filters.udp_listener.dns_filter":             "//source/extensions/filters/udp/dns_filter:config",
     "envoy.filters.udp_listener.udp_proxy":             "//source/extensions/filters/udp/udp_proxy:config",
 
     #

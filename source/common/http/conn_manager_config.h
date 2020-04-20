@@ -3,6 +3,7 @@
 #include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
@@ -59,6 +60,7 @@ namespace Http {
   COUNTER(downstream_rq_too_large)                                                                 \
   COUNTER(downstream_rq_total)                                                                     \
   COUNTER(downstream_rq_tx_reset)                                                                  \
+  COUNTER(downstream_rq_max_duration_reached)                                                      \
   COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
   COUNTER(rs_too_large)                                                                            \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
@@ -193,6 +195,11 @@ public:
   virtual ~ConnectionManagerConfig() = default;
 
   /**
+   * @return RequestIDExtensionSharedPtr The request id utilities instance to use
+   */
+  virtual RequestIDExtensionSharedPtr requestIDExtension() PURE;
+
+  /**
    *  @return const std::list<AccessLog::InstanceSharedPtr>& the access logs to write to.
    */
   virtual const std::list<AccessLog::InstanceSharedPtr>& accessLogs() PURE;
@@ -281,6 +288,11 @@ public:
    *         timeout. See http_connection_manager.proto for a detailed description of this timeout.
    */
   virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
+
+  /**
+   * @return maximum duration time to keep alive stream
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
 
   /**
    * @return Router::RouteConfigProvider* the configuration provider used to acquire a route
@@ -406,6 +418,13 @@ public:
    * one.
    */
   virtual bool shouldMergeSlashes() const PURE;
+
+  /**
+   * @return the action HttpConnectionManager should take when receiving client request
+   * headers containing underscore characters.
+   */
+  virtual envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+  headersWithUnderscoresAction() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

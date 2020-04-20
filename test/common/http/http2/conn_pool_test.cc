@@ -78,7 +78,7 @@ public:
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    test_client.client_dispatcher_ = api_->allocateDispatcher();
+    test_client.client_dispatcher_ = api_->allocateDispatcher("test_thread");
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
     auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
@@ -248,7 +248,7 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionReadyWithRequest) {
  * complete.
  */
 TEST_F(Http2ConnPoolImplTest, DrainConnectionBusy) {
-  cluster_->http2_settings_.max_concurrent_streams_ = 1;
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
   InSequence s;
 
   expectClientCreate();
@@ -331,7 +331,7 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
 // concurrent requests and causes additional connections to be created.
 TEST_F(Http2ConnPoolImplTest, MaxConcurrentRequestsPerStream) {
   cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
-  cluster_->http2_settings_.max_concurrent_streams_ = 1;
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
 
   InSequence s;
 
@@ -462,7 +462,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsNumberConnectingTotalRequestsPerCon
 // Verifies that the correct number of CONNECTING connections are created for
 // the pending requests, when the concurrent requests per connection is limited
 TEST_F(Http2ConnPoolImplTest, PendingRequestsNumberConnectingConcurrentRequestsPerConnection) {
-  cluster_->http2_settings_.max_concurrent_streams_ = 2;
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(2);
   InSequence s;
 
   // Create three requests. The 3rd should create a 2nd connection due to the limit

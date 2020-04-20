@@ -78,9 +78,9 @@ TEST_F(TokenBucketImplTest, PartialConsumption) {
   TokenBucketImpl token_bucket{16, time_system_, 16};
   EXPECT_EQ(16, token_bucket.consume(18, true));
   EXPECT_EQ(std::chrono::milliseconds(63), token_bucket.nextTokenAvailable());
-  time_system_.sleep(std::chrono::milliseconds(62));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(62));
   EXPECT_EQ(0, token_bucket.consume(1, true));
-  time_system_.sleep(std::chrono::milliseconds(1));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(1));
   EXPECT_EQ(1, token_bucket.consume(2, true));
   EXPECT_EQ(std::chrono::milliseconds(63), token_bucket.nextTokenAvailable());
 }

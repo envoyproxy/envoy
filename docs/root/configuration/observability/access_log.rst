@@ -256,7 +256,7 @@ The following command operators are supported:
     * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
     * **UF**: Upstream connection failure in addition to 503 response code.
     * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
-    * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
+    * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
     * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_api_field_route.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.max_connect_attempts>` was reached.
   HTTP only
     * **DC**: Downstream connection termination.
@@ -351,6 +351,12 @@ The following command operators are supported:
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
     Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
 
+%GRPC_STATUS%
+  gRPC status code which is easy to interpret with text message corresponding with number.
+
+%DOWNSTREAM_LOCAL_PORT%
+    Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
+
 %REQ(X?Y):Z%
   HTTP
     An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
@@ -404,12 +410,17 @@ The following command operators are supported:
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
 
-%FILTER_STATE(KEY):Z%
+.. _config_access_log_format_filter_state:
+
+%FILTER_STATE(KEY:F):Z%
   HTTP
     :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
     look up the filter state object. The serialized proto will be logged as JSON string if possible.
     If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
     Z is an optional parameter denoting string truncation up to Z characters long.
+    F is an optional parameter used to indicate which method FilterState uses for serialization. 
+    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string. 
+    If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
 
   TCP
     Same as HTTP, the filter state is from connection instead of a L7 request.

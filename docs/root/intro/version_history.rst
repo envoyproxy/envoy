@@ -35,6 +35,8 @@ Version history
 * network filters: network filter extensions use the "envoy.filters.network" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * network filters: added a :ref:`direct response filter <config_network_filters_direct_response>`.
+* performance: stats symbol table implementation (enabled by default; to disable it, add
+  `--use-fake-symbol-table 1` to the command-line arguments when starting Envoy).
 * rbac: added :ref:`url_path <envoy_api_field_config.rbac.v2.Permission.url_path>` for matching URL path without the query and fragment string.
 * retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
 * router: added :ref:`auto_san_validation <envoy_api_field_core.UpstreamHttpProtocolOptions.auto_san_validation>` to support overrriding SAN validation to transport socket for new upstream connections based on the downstream HTTP host/authority header.

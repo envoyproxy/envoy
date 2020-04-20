@@ -54,16 +54,17 @@ class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVers
                           protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest(stats_store_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
-        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
-        name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_)), name_("proxy"),
+        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
     EXPECT_CALL(socket_factory_, socketType())
         .WillOnce(Return(Network::Address::SocketType::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
-    connection_handler_->addListener(*this);
+    connection_handler_->addListener(absl::nullopt, *this);
     conn_ = dispatcher_->createClientConnection(socket_->localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
@@ -77,9 +78,7 @@ public:
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
-  std::chrono::milliseconds listenerFiltersTimeout() const override {
-    return std::chrono::milliseconds();
-  }
+  std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
   bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
@@ -89,6 +88,9 @@ public:
     return envoy::config::core::v3::UNSPECIFIED;
   }
   Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    return empty_access_logs_;
+  }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -107,13 +109,13 @@ public:
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
-              std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
+              nullptr, std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
           maybeExitDispatcher();
           return true;
         }));
     conn_->connect();
     if (read) {
-      read_filter_.reset(new NiceMock<Network::MockReadFilter>());
+      read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
       EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
           .WillOnce(Invoke([&](Network::Connection& connection,
                                const std::vector<Network::FilterFactoryCb>&) -> bool {
@@ -170,7 +172,7 @@ public:
     EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
@@ -186,6 +188,7 @@ public:
   std::string name_;
   Api::OsSysCallsImpl os_sys_calls_actual_;
   const Network::FilterChainSharedPtr filter_chain_;
+  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
 };
 
 // Parameterize the listener socket address version.
@@ -989,19 +992,20 @@ class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address
                                   protected Logger::Loggable<Logger::Id::main> {
 public:
   WildcardProxyProtocolTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest(stats_store_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
                                                            nullptr, true)),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_->localAddress()->ip()->port())),
-        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
-        name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_)), name_("proxy"),
+        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
     EXPECT_CALL(socket_factory_, socketType())
         .WillOnce(Return(Network::Address::SocketType::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
-    connection_handler_->addListener(*this);
+    connection_handler_->addListener(absl::nullopt, *this);
     conn_ = dispatcher_->createClientConnection(local_dst_address_,
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
@@ -1010,7 +1014,7 @@ public:
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
-              std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
+              nullptr, std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
           return true;
         }));
   }
@@ -1022,9 +1026,7 @@ public:
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
-  std::chrono::milliseconds listenerFiltersTimeout() const override {
-    return std::chrono::milliseconds();
-  }
+  std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
   bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
@@ -1034,6 +1036,9 @@ public:
     return envoy::config::core::v3::UNSPECIFIED;
   }
   Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    return empty_access_logs_;
+  }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -1042,7 +1047,7 @@ public:
 
   void connect() {
     conn_->connect();
-    read_filter_.reset(new NiceMock<Network::MockReadFilter>());
+    read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
     EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
         .WillOnce(Invoke([&](Network::Connection& connection,
                              const std::vector<Network::FilterFactoryCb>&) -> bool {
@@ -1099,6 +1104,7 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
+  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
 };
 
 // Parameterize the listener socket address version.

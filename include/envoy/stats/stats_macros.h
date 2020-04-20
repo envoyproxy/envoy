@@ -39,6 +39,7 @@ namespace Envoy {
 #define GENERATE_COUNTER_STRUCT(NAME) Envoy::Stats::Counter& NAME##_;
 #define GENERATE_GAUGE_STRUCT(NAME, MODE) Envoy::Stats::Gauge& NAME##_;
 #define GENERATE_HISTOGRAM_STRUCT(NAME, UNIT) Envoy::Stats::Histogram& NAME##_;
+#define GENERATE_TEXT_READOUT_STRUCT(NAME) Envoy::Stats::TextReadout& NAME##_;
 
 #define FINISH_STAT_DECL_(X) #X)),
 #define FINISH_STAT_DECL_MODE_(X, MODE) #X), Envoy::Stats::Gauge::ImportMode::MODE),
@@ -54,13 +55,15 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
   return absl::StrCat(prefix, ".", token);
 }
 
-#define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counter(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
-#define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gauge(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_MODE_
-#define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogram(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_UNIT_
+#define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counterFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
+#define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gaugeFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_MODE_
+#define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogramFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_UNIT_
+#define POOL_TEXT_READOUT_PREFIX(POOL, PREFIX) (POOL).textReadoutFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
 
 #define POOL_COUNTER(POOL) POOL_COUNTER_PREFIX(POOL, "")
 #define POOL_GAUGE(POOL) POOL_GAUGE_PREFIX(POOL, "")
 #define POOL_HISTOGRAM(POOL) POOL_HISTOGRAM_PREFIX(POOL, "")
+#define POOL_TEXT_READOUT(POOL) POOL_TEXT_READOUT_PREFIX(POOL, "")
 
 #define NULL_STAT_DECL_(X) std::string(#X)),
 #define NULL_STAT_DECL_IGNORE_MODE_(X, MODE) std::string(#X)),

@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
@@ -24,6 +25,11 @@ namespace Envoy {
 namespace Router {
 class RouteEntry;
 } // namespace Router
+
+namespace Upstream {
+class ClusterInfo;
+using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
+} // namespace Upstream
 
 namespace StreamInfo {
 
@@ -85,6 +91,10 @@ struct ResponseCodeDetailValues {
   // Envoy is doing non-streaming proxying, and the request payload exceeded
   // configured limits.
   const std::string RequestPayloadTooLarge = "request_payload_too_large";
+  // Envoy is doing streaming proxying, but too much data arrived while waiting
+  // to attempt a retry.
+  const std::string RequestPayloadExceededRetryBufferLimit =
+      "request_payload_exceeded_retry_buffer_limit";
   // Envoy is doing non-streaming proxying, and the response payload exceeded
   // configured limits.
   const std::string ResponsePayloadTooLArge = "response_payload_too_large";
@@ -137,6 +147,8 @@ struct ResponseCodeDetailValues {
   // indicates that original "success" headers may have been sent downstream
   // despite the subsequent failure.
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
+  // The connection is rejected due to no matching filter chain.
+  const std::string FilterChainNotFound = "filter_chain_not_found";
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
@@ -520,6 +532,29 @@ public:
    * @return request headers.
    */
   virtual const Http::RequestHeaderMap* getRequestHeaders() const PURE;
+
+  /**
+   * @param Upstream Connection's ClusterInfo.
+   */
+  virtual void
+  setUpstreamClusterInfo(const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) PURE;
+
+  /**
+   * @return Upstream Connection's ClusterInfo.
+   * This returns an optional to differentiate between unset(absl::nullopt),
+   * no route or cluster does not exist(nullptr), and set to a valid cluster(not nullptr).
+   */
+  virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
+
+  /**
+   * @param utils The requestID utils implementation this stream uses
+   */
+  virtual void setRequestIDExtension(Http::RequestIDExtensionSharedPtr utils) PURE;
+
+  /**
+   * @return A shared pointer to the request ID utils for this stream
+   */
+  virtual Http::RequestIDExtensionSharedPtr getRequestIDExtension() const PURE;
 };
 
 } // namespace StreamInfo

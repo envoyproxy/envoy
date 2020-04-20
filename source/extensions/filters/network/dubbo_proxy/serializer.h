@@ -81,7 +81,7 @@ using SerializerPtr = std::unique_ptr<Serializer>;
  */
 class NamedSerializerConfigFactory : public Config::UntypedFactory {
 public:
-  virtual ~NamedSerializerConfigFactory() = default;
+  ~NamedSerializerConfigFactory() override = default;
 
   /**
    * Create a particular Dubbo serializer.

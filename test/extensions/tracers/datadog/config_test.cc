@@ -1,5 +1,6 @@
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/datadog.pb.h"
+#include "envoy/config/trace/v3/datadog.pb.validate.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 
 #include "extensions/tracers/datadog/config.h"
 
@@ -41,7 +42,7 @@ TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
   DatadogTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr datadog_tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr datadog_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, datadog_tracer);
 }
 
