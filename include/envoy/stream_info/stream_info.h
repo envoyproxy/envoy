@@ -91,6 +91,10 @@ struct ResponseCodeDetailValues {
   // Envoy is doing non-streaming proxying, and the request payload exceeded
   // configured limits.
   const std::string RequestPayloadTooLarge = "request_payload_too_large";
+  // Envoy is doing streaming proxying, but too much data arrived while waiting
+  // to attempt a retry.
+  const std::string RequestPayloadExceededRetryBufferLimit =
+      "request_payload_exceeded_retry_buffer_limit";
   // Envoy is doing non-streaming proxying, and the response payload exceeded
   // configured limits.
   const std::string ResponsePayloadTooLArge = "response_payload_too_large";
