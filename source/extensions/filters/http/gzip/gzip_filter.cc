@@ -83,6 +83,10 @@ GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip:
   // what is accepted by the generic compressor.
   if (gzip.has_compressor()) {
     compressor.set_allocated_content_length(
+        // According to
+        // https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#embeddedmessage
+        // the message Compressor takes ownership of the allocated Protobuf::Uint32Value object.
+        // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
         new Protobuf::UInt32Value(gzip.compressor().content_length()));
     for (const std::string& ctype : gzip.compressor().content_type()) {
       compressor.add_content_type(ctype);
@@ -93,6 +97,11 @@ GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip:
       auto feature_flag(new envoy::config::core::v3::RuntimeFeatureFlag());
       feature_flag->set_runtime_key(gzip.compressor().runtime_enabled().runtime_key());
       feature_flag->set_allocated_default_value(
+          // According to
+          // https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#embeddedmessage
+          // the message RuntimeFeatureFlag takes ownership of the allocated Protobuf::BoolValue
+          // object.
+          // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
           new Protobuf::BoolValue(gzip.compressor().runtime_enabled().default_value()));
       compressor.set_allocated_runtime_enabled(feature_flag);
     }
@@ -101,6 +110,10 @@ GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip:
 
   if (gzip.has_hidden_envoy_deprecated_content_length()) {
     compressor.set_allocated_content_length(
+        // According to
+        // https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#embeddedmessage
+        // the message Compressor takes ownership of the allocated Protobuf::Uint32Value object.
+        // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
         new Protobuf::UInt32Value(gzip.hidden_envoy_deprecated_content_length()));
   }
   for (const std::string& ctype : gzip.hidden_envoy_deprecated_content_type()) {
