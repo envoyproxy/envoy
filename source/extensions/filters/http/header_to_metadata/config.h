@@ -23,6 +23,9 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::header_to_metadata::v3::Config& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::header_to_metadata::v3::Config& config,
+      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };
 
 } // namespace HeaderToMetadataFilter

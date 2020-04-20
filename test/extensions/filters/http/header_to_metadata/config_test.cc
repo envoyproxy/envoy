@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.validate.h"
 
 #include "extensions/filters/http/header_to_metadata/config.h"
+#include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
@@ -68,6 +69,34 @@ request_rules:
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);
+}
+
+TEST(HeaderToMetadataFilterConfigTest, PerRouteConfig) {
+  const std::string yaml = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+    on_header_missing:
+      metadata_namespace: envoy.lb
+      key: default
+      value: 'true'
+      type: STRING
+  )EOF";
+
+  HeaderToMetadataProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  HeaderToMetadataConfig factory;
+
+  const auto route_config = factory.createRouteSpecificFilterConfig(
+      proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  const auto* config = dynamic_cast<const Config*>(route_config.get());
+  EXPECT_TRUE(config->doRequest());
+  EXPECT_FALSE(config->doResponse());
 }
 
 } // namespace HeaderToMetadataFilter

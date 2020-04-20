@@ -28,9 +28,11 @@ const uint32_t MAX_HEADER_VALUE_LEN = 8 * 1024;
  *  Encapsulates the filter configuration with STL containers and provides an area for any custom
  *  configuration logic.
  */
-class Config : public Logger::Loggable<Logger::Id::config> {
+class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
+               public Logger::Loggable<Logger::Id::config> {
 public:
-  Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config);
+  Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
+         bool per_route = false);
 
   HeaderToMetadataRules requestRules() const { return request_rules_; }
   HeaderToMetadataRules responseRules() const { return response_rules_; }
@@ -102,9 +104,12 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
 private:
+  friend class HeaderToMetadataTest;
+
   using StructMap = std::map<std::string, ProtobufWkt::Struct>;
 
   const ConfigSharedPtr config_;
+  mutable const Config* effective_config_{nullptr};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 
@@ -123,6 +128,8 @@ private:
   bool addMetadata(StructMap&, const std::string&, const std::string&, absl::string_view, ValueType,
                    ValueEncode) const;
   const std::string& decideNamespace(const std::string& nspace) const;
+  const Config* getConfig() const;
+  const Config* getRouteConfig() const;
 };
 
 } // namespace HeaderToMetadataFilter

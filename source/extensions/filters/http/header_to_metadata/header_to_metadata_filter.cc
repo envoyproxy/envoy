@@ -16,13 +16,18 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
-Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config) {
+Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
+               const bool per_route) {
   request_set_ = Config::configToVector(config.request_rules(), request_rules_);
   response_set_ = Config::configToVector(config.response_rules(), response_rules_);
 
-  // don't allow an empty configuration
-  if (!response_set_ && !request_set_) {
-    throw EnvoyException("Must at least specify either response or request config");
+  // Note: empty configs are fine for the global config, which would be the case for enabling
+  //       the filter globally without rules and then applying them at the virtual host or
+  //       route level. At the virtual or route level, it makes no sense to have an empty
+  //       config so we throw an error.
+  if (per_route && !response_set_ && !request_set_) {
+    throw EnvoyException("header_to_metadata_filter: Per filter configs must at least specify "
+                         "either request or response rules");
   }
 }
 
@@ -56,8 +61,9 @@ HeaderToMetadataFilter::~HeaderToMetadataFilter() = default;
 
 Http::FilterHeadersStatus HeaderToMetadataFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                                 bool) {
-  if (config_->doRequest()) {
-    writeHeaderToMetadata(headers, config_->requestRules(), *decoder_callbacks_);
+  const auto* config = getConfig();
+  if (config->doRequest()) {
+    writeHeaderToMetadata(headers, config->requestRules(), *decoder_callbacks_);
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -70,8 +76,9 @@ void HeaderToMetadataFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus HeaderToMetadataFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                                 bool) {
-  if (config_->doResponse()) {
-    writeHeaderToMetadata(headers, config_->responseRules(), *encoder_callbacks_);
+  const auto* config = getConfig();
+  if (config->doResponse()) {
+    writeHeaderToMetadata(headers, config->responseRules(), *encoder_callbacks_);
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -197,6 +204,34 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
       callbacks.streamInfo().setDynamicMetadata(entry.first, entry.second);
     }
   }
+}
+
+const Config* HeaderToMetadataFilter::getRouteConfig() const {
+  if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
+    return nullptr;
+  }
+
+  const auto* entry = decoder_callbacks_->route()->routeEntry();
+  const auto* per_filter_config =
+      entry->virtualHost().perFilterConfig(HttpFilterNames::get().HeaderToMetadata);
+
+  return dynamic_cast<const Config*>(per_filter_config);
+}
+
+// TODO(rgs1): this belongs in one of the filter interfaces, see issue #10164.
+const Config* HeaderToMetadataFilter::getConfig() const {
+  // Cached config pointer.
+  if (effective_config_) {
+    return effective_config_;
+  }
+
+  effective_config_ = getRouteConfig();
+  if (effective_config_) {
+    return effective_config_;
+  }
+
+  effective_config_ = config_.get();
+  return effective_config_;
 }
 
 } // namespace HeaderToMetadataFilter

@@ -60,6 +60,33 @@ This would then allow requests with the `x-version` header set to be matched aga
 endpoints with the corresponding version. Whereas requests with that header missing
 would be matched with the default endpoints.
 
+Note that this filter also supports per route configuration:
+
+.. code-block:: yaml
+
+  route_config:
+    name: local_route
+    virtual_hosts:
+    - name: local_service
+      domains: ["*"]
+      routes:
+      - match: { prefix: "/version-to-metadata" }
+        route: { cluster: service }
+        per_filter_config:
+          envoy.filters.http.header_to_metadata:
+            request_rules:
+              - header: x-version
+                on_header_present:
+                  metadata_namespace: envoy.lb
+                  key: version
+                  type: STRING
+                remove: false
+      - match: { prefix: "/" }
+        route: { cluster: some_service }
+
+This can be used to either override the global configuration or if the global configuration
+is empty (no rules), it can be used to only enable the filter at a per route level.
+
 Statistics
 ----------
 
