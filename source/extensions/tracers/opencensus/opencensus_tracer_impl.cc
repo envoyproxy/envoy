@@ -2,7 +2,7 @@
 
 #include <grpcpp/grpcpp.h>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/opencensus.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/base64.h"

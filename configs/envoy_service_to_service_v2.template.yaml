@@ -551,13 +551,6 @@ stats_sinks:
       "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
       tcp_cluster_name: statsd
 watchdog: {}
-tracing:
-  http:
-    name: envoy.tracers.lightstep
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.LightstepConfig
-      access_token_file: "/etc/envoy/lightstep_access_token"
-      collector_cluster: lightstep_saas
 layered_runtime:
   layers:
     - name: root

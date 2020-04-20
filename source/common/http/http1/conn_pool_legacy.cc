@@ -15,7 +15,6 @@
 #include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/network/utility.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/upstream_impl.h"
 

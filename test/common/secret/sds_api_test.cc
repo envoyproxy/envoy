@@ -31,7 +31,8 @@ namespace {
 
 class SdsApiTest : public testing::Test {
 protected:
-  SdsApiTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {
+  SdsApiTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {
     EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
     }));
