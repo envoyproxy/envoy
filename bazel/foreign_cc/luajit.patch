@@ -1,5 +1,5 @@
 diff --git a/src/Makefile b/src/Makefile
-index f56465d..3f4f2fa 100644
+index f56465d..5d91fa7 100644
 --- a/src/Makefile
 +++ b/src/Makefile
 @@ -27,7 +27,7 @@ NODOTABIVER= 51
@@ -33,6 +33,15 @@ index f56465d..3f4f2fa 100644
  #
  # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
  #XCFLAGS+= -DLUAJIT_DISABLE_JIT
+@@ -111,7 +111,7 @@ XCFLAGS=
+ #XCFLAGS+= -DLUAJIT_NUMMODE=2
+ #
+ # Enable GC64 mode for x64.
+-#XCFLAGS+= -DLUAJIT_ENABLE_GC64
++XCFLAGS+= -DLUAJIT_ENABLE_GC64
+ #
+ ##############################################################################
+
 @@ -587,7 +587,7 @@ endif
 
  Q= @
