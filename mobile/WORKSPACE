@@ -54,22 +54,22 @@ local_repository(
 http_file(
     name = "xctestrunner",
     executable = 1,
-    sha256 = "9e46d5782a9dc7d40bc93c99377c091886c180b8c4ffb9f79a19a58e234cdb09",
-    urls = ["https://github.com/google/xctestrunner/releases/download/0.2.10/ios_test_runner.par"],
+    sha256 = "0338c71977106f1304a8056739db6f462a76f386a299052c1ed7f8fd463d01a8",
+    urls = ["https://github.com/google/xctestrunner/releases/download/0.2.11/ios_test_runner.par"],
 )
 
 http_archive(
     name = "build_bazel_rules_apple",
-    sha256 = "177888104787d5d3953cfec09e19130e460167d6ef9118c4c0907c41bf0fb13f",
-    strip_prefix = "rules_apple-a595f71b94f75d531ebdf8ae31cc8eb1ead6a480",
-    urls = ["https://github.com/bazelbuild/rules_apple/archive/a595f71b94f75d531ebdf8ae31cc8eb1ead6a480.tar.gz"],
+    sha256 = "ee9e6073aeb5a65c100cb9c44b0017c937706a4ae03176e14a7e78620a198079",
+    strip_prefix = "rules_apple-5131f3d46794bf227d296c82f30c2499c9de3c5b",
+    url = "https://github.com/bazelbuild/rules_apple/archive/5131f3d46794bf227d296c82f30c2499c9de3c5b.tar.gz",
 )
 
 http_archive(
     name = "build_bazel_rules_swift",
-    sha256 = "1a0ad44a137bf56df24c5b09daa51abdb92ebb5dbe219fd9ce92e2196676c314",
-    strip_prefix = "rules_swift-90995572723ed47cbf2968480db250e97a9f5894",
-    urls = ["https://github.com/bazelbuild/rules_swift/archive/90995572723ed47cbf2968480db250e97a9f5894.tar.gz"],
+    sha256 = "d0833bc6dad817a367936a5f902a0c11318160b5e80a20ece35fb85a5675c886",
+    strip_prefix = "rules_swift-3eeeb53cebda55b349d64c9fc144e18c5f7c0eb8",
+    url = "https://github.com/bazelbuild/rules_swift/archive/3eeeb53cebda55b349d64c9fc144e18c5f7c0eb8.tar.gz",
 )
 
 load("@envoy//bazel:api_binding.bzl", "envoy_api_binding")
