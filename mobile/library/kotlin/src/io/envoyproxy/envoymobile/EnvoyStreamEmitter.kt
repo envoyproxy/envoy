@@ -29,22 +29,14 @@ class EnvoyStreamEmitter(
     return this
   }
 
-  /**
-   * For ending an associated stream and sending trailers.
-   *
-   * @param trailers to send with ending a stream. If null, stream will be closed with an empty data frame.
-   */
-  override fun close(trailers: Map<String, List<String>>?) {
-    trailers?.let {
-      stream.sendTrailers(it)
-      return
-    }
-    stream.sendData(ByteBuffer.allocate(0), true)
+  override fun close(trailers: Map<String, List<String>>) {
+    stream.sendTrailers(trailers)
   }
 
-  /**
-   * For cancelling and ending an associated stream.
-   */
+  override fun close(byteBuffer: ByteBuffer) {
+    stream.sendData(byteBuffer, true)
+  }
+
   override fun cancel() {
     stream.cancel()
   }
