@@ -15,6 +15,7 @@
 #include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_cat.h"
@@ -373,7 +374,12 @@ void ConnectionManagerUtility::mutateResponseHeaders(
     // upgrade response it has already passed the protocol checks.
     const bool no_body =
         (!response_headers.TransferEncoding() && !response_headers.ContentLength());
-    if (no_body) {
+
+    const bool is_1xx = CodeUtility::is1xx(Utility::getResponseStatus(response_headers));
+
+    // We are explicitly forbidden from setting content-length for 1xx responses
+    // (RFC7230, Section 3.3.2). We ignore 204 because this is an upgrade.
+    if (no_body && !is_1xx) {
       response_headers.setContentLength(uint64_t(0));
     }
   } else {

@@ -91,7 +91,7 @@ Status codecClientError(absl::string_view message);
 
 /**
  * Returns Envoy::StatusCode of the given status object.
- * If the status object does not contain valid Envoy::Status value the function will RELEASE_ASSERT.
+ * If the status object does not contain valid Envoy::Status value the function will ASSERT.
  */
 StatusCode getStatusCode(const Status& status);
 
@@ -105,7 +105,7 @@ ABSL_MUST_USE_RESULT bool isCodecClientError(const Status& status);
 
 /**
  * Returns Http::Code value of the PrematureResponseError status.
- * IsPrematureResponseError(status) must be true which is checked by RELEASE_ASSERT.
+ * IsPrematureResponseError(status) must be true which is checked by ASSERT.
  */
 Http::Code getPrematureResponseHttpCode(const Status& status);
 

@@ -3,15 +3,30 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
 envoy_package()
 
+envoy_cc_test_library(
+    name = "admin_instance_lib",
+    srcs = ["admin_instance.cc"],
+    hdrs = ["admin_instance.h"],
+    deps = [
+        "//source/server/http:admin_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "admin_test",
     srcs = ["admin_test.cc"],
     deps = [
+        ":admin_instance_lib",
         "//include/envoy/json:json_object_interface",
         "//include/envoy/runtime:runtime_interface",
         "//source/common/http:message_lib",
@@ -43,6 +58,18 @@ envoy_cc_test(
         "//source/server/http:admin_filter_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stats_handler_test",
+    srcs = ["stats_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server/http:stats_handler_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
