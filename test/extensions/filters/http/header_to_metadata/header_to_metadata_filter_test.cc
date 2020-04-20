@@ -7,6 +7,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -17,44 +18,13 @@
 
 using testing::_;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 namespace {
-
-class HeaderToMetadataTest : public testing::Test {
-public:
-  const std::string request_config_yaml = R"EOF(
-request_rules:
-  - header: x-version
-    on_header_present:
-      metadata_namespace: envoy.lb
-      key: version
-      type: STRING
-    on_header_missing:
-      metadata_namespace: envoy.lb
-      key: default
-      value: 'true'
-      type: STRING
-)EOF";
-
-  void initializeFilter(const std::string& yaml) {
-    envoy::extensions::filters::http::header_to_metadata::v3::Config config;
-    TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<Config>(config);
-    filter_ = std::make_shared<HeaderToMetadataFilter>(config_);
-    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-  }
-
-  ConfigSharedPtr config_;
-  std::shared_ptr<HeaderToMetadataFilter> filter_;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
-};
 
 MATCHER_P(MapEq, rhs, "") {
   const ProtobufWkt::Struct& obj = arg;
@@ -83,6 +53,42 @@ MATCHER_P(MapEqValue, rhs, "") {
   return true;
 }
 
+} // namespace
+
+class HeaderToMetadataTest : public testing::Test {
+public:
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+    on_header_missing:
+      metadata_namespace: envoy.lb
+      key: default
+      value: 'true'
+      type: STRING
+)EOF";
+
+  void initializeFilter(const std::string& yaml) {
+    envoy::extensions::filters::http::header_to_metadata::v3::Config config;
+    TestUtility::loadFromYaml(yaml, config);
+    config_ = std::make_shared<Config>(config);
+    filter_ = std::make_shared<HeaderToMetadataFilter>(config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
+  const Config* getConfig() { return filter_->getConfig(); }
+
+  ConfigSharedPtr config_;
+  std::shared_ptr<HeaderToMetadataFilter> filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
+};
+
 /**
  * Basic use-case.
  */
@@ -101,6 +107,50 @@ TEST_F(HeaderToMetadataTest, BasicRequestTest) {
   Http::TestRequestTrailerMapImpl incoming_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(incoming_trailers));
   filter_->onDestroy();
+}
+
+TEST_F(HeaderToMetadataTest, PerRouteOverride) {
+  // Global config is empty.
+  initializeFilter("{}");
+  Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
+  std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
+
+  // Setup per route config.
+  envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
+  TestUtility::loadFromYaml(request_config_yaml, config_proto);
+  Config per_route_config(config_proto, true);
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
+              perFilterConfig(HttpFilterNames::get().HeaderToMetadata))
+      .WillOnce(Return(&per_route_config));
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  Buffer::OwnedImpl data("data");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  Http::TestRequestTrailerMapImpl incoming_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(incoming_trailers));
+  filter_->onDestroy();
+}
+
+TEST_F(HeaderToMetadataTest, ConfigIsCached) {
+  // Global config is empty.
+  initializeFilter("{}");
+  Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
+  std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
+
+  // Setup per route config.
+  envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
+  TestUtility::loadFromYaml(request_config_yaml, config_proto);
+  Config per_route_config(config_proto, true);
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
+              perFilterConfig(HttpFilterNames::get().HeaderToMetadata))
+      .WillOnce(Return(&per_route_config));
+
+  EXPECT_TRUE(getConfig()->doRequest());
+  EXPECT_TRUE(getConfig()->doRequest());
 }
 
 /**
@@ -135,7 +185,7 @@ response_rules:
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
-              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
+              setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEq(expected)));
   Http::TestResponseHeaderMapImpl continue_response{{":status", "100"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encode100ContinueHeaders(continue_response));
@@ -167,7 +217,7 @@ response_rules:
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
-              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEqNum(expected)));
+              setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEqNum(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
 }
 
@@ -192,7 +242,7 @@ response_rules:
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
-              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
+              setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
 }
 
@@ -229,7 +279,7 @@ response_rules:
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
-              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEqValue(expected)));
+              setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEqValue(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
 }
 
@@ -370,7 +420,7 @@ response_rules:
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
-              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
+              setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
   EXPECT_EQ(empty_headers, incoming_headers);
 }
@@ -386,6 +436,11 @@ request_rules:
   auto expected = "header to metadata filter: rule for header 'x-something' has neither "
                   "`on_header_present` nor `on_header_missing` set";
   EXPECT_THROW_WITH_MESSAGE(initializeFilter(config), Envoy::EnvoyException, expected);
+}
+
+TEST_F(HeaderToMetadataTest, PerRouteEmtpyRules) {
+  envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
+  EXPECT_THROW(std::make_shared<Config>(config_proto, true), EnvoyException);
 }
 
 /**
@@ -408,7 +463,6 @@ request_rules:
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
-} // namespace
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters
 } // namespace Extensions
