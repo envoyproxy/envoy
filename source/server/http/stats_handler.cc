@@ -12,7 +12,9 @@ namespace Server {
 
 const uint64_t RecentLookupsCapacity = 100;
 
-const std::regex PromRegex("[^a-zA-Z0-9_]");
+namespace {
+const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_]"); }
+} // namespace
 
 Http::Code StatsHandler::handlerResetCounters(absl::string_view, Http::ResponseHeaderMap&,
                                               Buffer::Instance& response, AdminStream&,
@@ -158,7 +160,7 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
 std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
   // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
   // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
-  std::string stats_name = std::regex_replace(name, PromRegex, "_");
+  std::string stats_name = std::regex_replace(name, promRegex(), "_");
   if (stats_name[0] >= '0' && stats_name[0] <= '9') {
     return absl::StrCat("_", stats_name);
   } else {
