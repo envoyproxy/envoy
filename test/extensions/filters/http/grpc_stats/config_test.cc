@@ -14,6 +14,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Property;
 using testing::Return;
 
 namespace Envoy {
@@ -34,6 +35,10 @@ protected:
     cb(filter_callback);
 
     ON_CALL(decoder_callbacks_, streamInfo()).WillByDefault(testing::ReturnRef(stream_info_));
+
+    ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
+        .WillByDefault(testing::ReturnRef(stats_store_));
+
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
@@ -61,7 +66,8 @@ protected:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<Http::StreamFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  TestStreamInfo stream_info_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
 };
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
@@ -402,6 +408,59 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
           data.serializeAsProto().get());
   EXPECT_EQ(2U, filter_object.request_message_count());
   EXPECT_EQ(3U, filter_object.response_message_count());
+}
+
+TEST_F(GrpcStatsFilterConfigTest, UpstreamStats) {
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  config_.set_emit_filter_state(true);
+  config_.set_enable_upstream_stats(true);
+  initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc+proto"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+
+  ON_CALL(stream_info_, lastUpstreamRxByteReceived())
+      .WillByDefault(testing::Return(
+          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(30000000))));
+  ON_CALL(stream_info_, lastUpstreamTxByteSent())
+      .WillByDefault(testing::Return(
+          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(20000000))));
+
+  EXPECT_CALL(stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name,
+                           "grpc.lyft.users.BadCompanions.GetBadCompanions.upstream_rq_time"),
+                  10ul));
+
+  doRequestResponse(request_headers);
+}
+
+TEST_F(GrpcStatsFilterConfigTest, UpstreamStatsWithTrailersOnly) {
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  config_.set_emit_filter_state(true);
+  config_.set_enable_upstream_stats(true);
+  initialize();
+
+  ON_CALL(stream_info_, lastUpstreamRxByteReceived())
+      .WillByDefault(testing::Return(
+          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(30000000))));
+  ON_CALL(stream_info_, lastUpstreamTxByteSent())
+      .WillByDefault(testing::Return(
+          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(20000000))));
+
+  EXPECT_CALL(stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name,
+                           "grpc.lyft.users.BadCompanions.GetBadCompanions.upstream_rq_time"),
+                  10ul));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc+proto"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 }
 
 } // namespace

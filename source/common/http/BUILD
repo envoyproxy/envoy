@@ -155,6 +155,7 @@ envoy_cc_library(
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/router:rds_interface",
         "//source/common/network:utility_lib",
+        "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
@@ -376,7 +377,7 @@ envoy_cc_library(
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/runtime:runtime_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
@@ -410,5 +411,17 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "status_lib",
+    srcs = ["status.cc"],
+    hdrs = ["status.h"],
+    external_deps = [
+        "abseil_status",
+    ],
+    deps = [
+        "//include/envoy/http:codes_interface",
     ],
 )
