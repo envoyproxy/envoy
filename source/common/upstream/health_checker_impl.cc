@@ -797,7 +797,6 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
       service_status = "service_unknown";
       break;
     default:
-      // Should not happen really, Protobuf should not parse undefined enums values.
       service_status = "unknwon_healthcheck_response";
       break;
     }
