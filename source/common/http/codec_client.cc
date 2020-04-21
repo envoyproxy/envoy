@@ -125,8 +125,9 @@ void CodecClient::onData(Buffer::Instance& data) {
   Envoy::Http::Status status;
   try {
     status = codec_->dispatch(data);
-    // Exception removal is still in migration. Soon we won't need to catch these exceptions, as
-    // they'll be propagated through the callbacks and returned from dispatch.
+    // TODO(#10878): Remove this when exception removal is complete. It is currently in migration.
+    // Soon we won't need to catch these exceptions, as they'll be propagated through the error
+    // statuses callbacks and returned from dispatch.
   } catch (CodecProtocolException& e) {
     status = Envoy::Http::codecProtocolError(e.what());
   } catch (PrematureResponseException& e) {
