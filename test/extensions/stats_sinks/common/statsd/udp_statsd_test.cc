@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
@@ -55,7 +56,8 @@ TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   // this uses low level networking calls because our abstractions in this area only work for IP
   // sockets. Revisit this also.
   auto io_handle = uds_address->socket(Network::Address::SocketType::Datagram);
-  RELEASE_ASSERT(fcntl(io_handle->fd(), F_SETFL, 0) != -1, "");
+  RELEASE_ASSERT(
+      Api::OsSysCallsSingleton::get().setsocketblocking(io_handle->fd(), false).rc_ != -1, "");
   uds_address->bind(io_handle->fd());
 
   // Do the flush which should have somewhere to write now.

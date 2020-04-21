@@ -248,9 +248,10 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
 
   const std::vector<std::string> uri_sans{"foo", "baz"};
   const std::vector<std::string> dns_sans;
+  const std::string subject = "subject";
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
   EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
-  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef("subject"));
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject));
 
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
@@ -272,6 +273,7 @@ TEST(AuthenticatedMatcher, dnsSanPeerCertificate) {
 
   const std::vector<std::string> uri_sans{"uri_foo"};
   const std::vector<std::string> dns_sans{"foo", "baz"};
+  const std::string subject = "subject";
 
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
@@ -279,7 +281,7 @@ TEST(AuthenticatedMatcher, dnsSanPeerCertificate) {
   EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
-  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef("subject"));
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject));
 
   // We should get check if any DNS SAN matches as URI SAN is not available.
   envoy::config::rbac::v3::Principal::Authenticated auth;
@@ -374,9 +376,10 @@ TEST(PolicyMatcher, PolicyMatcher) {
 
   const std::vector<std::string> uri_sans{"bar", "baz"};
   const std::vector<std::string> dns_sans;
+  const std::string subject = "subject";
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).Times(4).WillRepeatedly(Return(uri_sans));
   EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
-  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef("subject"));
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject));
 
   EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(ssl));
   EXPECT_CALL(Const(info), downstreamLocalAddress()).Times(2).WillRepeatedly(ReturnRef(addr));

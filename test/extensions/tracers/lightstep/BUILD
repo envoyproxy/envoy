@@ -17,6 +17,8 @@ envoy_extension_cc_test(
         "lightstep_tracer_impl_test.cc",
     ],
     extension_name = "envoy.tracers.lightstep",
+    # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/http:header_map_lib",
@@ -42,6 +44,8 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_name = "envoy.tracers.lightstep",
+    # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/tracers/lightstep:config",
         "//test/mocks/server:server_mocks",

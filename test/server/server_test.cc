@@ -86,10 +86,12 @@ public:
   RunHelperTest() {
     InSequence s;
 
+#ifndef WIN32
     sigterm_ = new Event::MockSignalEvent(&dispatcher_);
     sigint_ = new Event::MockSignalEvent(&dispatcher_);
     sigusr1_ = new Event::MockSignalEvent(&dispatcher_);
     sighup_ = new Event::MockSignalEvent(&dispatcher_);
+#endif
     EXPECT_CALL(overload_manager_, start());
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
@@ -109,10 +111,12 @@ public:
   ReadyWatcher start_workers_;
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;
+#ifndef WIN32
   Event::MockSignalEvent* sigterm_;
   Event::MockSignalEvent* sigint_;
   Event::MockSignalEvent* sigusr1_;
   Event::MockSignalEvent* sighup_;
+#endif
   bool shutdown_ = false;
 };
 
@@ -121,13 +125,18 @@ TEST_F(RunHelperTest, Normal) {
   cm_init_callback_();
 }
 
+// no signals on Windows
+#ifndef WIN32
 TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
   EXPECT_CALL(start_workers_, ready()).Times(0);
   sigterm_->callback_();
   EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   cm_init_callback_();
 }
+#endif
 
+// no signals on Windows
+#ifndef WIN32
 TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   EXPECT_CALL(start_workers_, ready()).Times(0);
   Init::ExpectableTargetImpl target;
@@ -138,6 +147,7 @@ TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   target.ready();
 }
+#endif
 
 class InitializingInitManager : public Init::ManagerImpl {
 public:

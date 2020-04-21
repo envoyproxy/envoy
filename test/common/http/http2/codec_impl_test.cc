@@ -987,9 +987,6 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   response_encoder_->encodeHeaders(response_headers, true);
 }
 
-class Http2CodecImplSettingsBasicTest : public Http2CodecImplTest {};
-TEST_P(Http2CodecImplSettingsBasicTest, ) {}
-
 class Http2CodecImplStreamLimitTest : public Http2CodecImplTest {};
 
 // Regression test for issue #3076.

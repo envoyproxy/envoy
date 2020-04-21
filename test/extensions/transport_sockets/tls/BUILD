@@ -24,6 +24,8 @@ envoy_cc_test(
     ],
     external_deps = ["ssl"],
     shard_count = 4,
+    # TODO(wrowe): Diagnose timeout error on Windows (skipped for the moment)
+    tags = ["fails_on_windows"],
     deps = [
         ":test_private_key_method_provider_test_lib",
         "//include/envoy/network:transport_socket_interface",
