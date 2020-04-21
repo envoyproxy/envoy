@@ -25,17 +25,16 @@ fi
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
 
-# Using GTEST_SHUFFLE here to workaround https://github.com/envoyproxy/envoy/issues/10108
 BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
     -c fastbuild --copt=-DNDEBUG --instrumentation_filter=//source/...,//include/... \
     --test_timeout=2000 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --test_output=errors \
     --test_arg="--log-path /dev/null" --test_arg="-l trace" --test_env=HEAPCHECK= \
-    --test_env=GTEST_SHUFFLE=1 //test/coverage:coverage_tests
+    //test/coverage:coverage_tests
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
 mkdir -p "${COVERAGE_DIR}"
 
-COVERAGE_IGNORE_REGEX="(/external/|pb\.(validate\.)?(h|cc)|/chromium_url/|/test/|/tmp|/source/extensions/quic_listeners/quiche/)"
+COVERAGE_IGNORE_REGEX="(/external/|pb\.(validate\.)?(h|cc)|/chromium_url/|/test/|/tmp|/tools/|/third_party/|/source/extensions/quic_listeners/quiche/)"
 COVERAGE_BINARY="bazel-bin/test/coverage/coverage_tests"
 COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
 

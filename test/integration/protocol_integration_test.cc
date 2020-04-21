@@ -299,6 +299,117 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_EQ(512U, response->body().size());
 }
 
+TEST_P(ProtocolIntegrationTest, RetryStreaming) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"}});
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+
+  // Send some data, but not the entire body.
+  std::string data(1024, 'a');
+  Buffer::OwnedImpl send1(data);
+  encoder.encodeData(send1, false);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  // Send back an upstream failure.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  // Wait for a retry. Ensure all data, both before and after the retry, is received.
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  // Finish the request.
+  std::string data2(512, 'b');
+  Buffer::OwnedImpl send2(data2);
+  encoder.encodeData(send2, true);
+  std::string combined_request_data = data + data2;
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, combined_request_data));
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(combined_request_data.size(), upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(512U, response->body().size());
+}
+
+TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+
+        route->mutable_per_request_buffer_limit_bytes()->set_value(1024);
+        route->mutable_route()
+            ->mutable_retry_policy()
+            ->mutable_retry_back_off()
+            ->mutable_base_interval()
+            ->MergeFrom(
+                ProtobufUtil::TimeUtil::MillisecondsToDuration(100000000)); // Effectively infinity.
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"}});
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+
+  // Send some data, but less than the buffer limit, and not end-stream
+  std::string data(64, 'a');
+  Buffer::OwnedImpl send1(data);
+  encoder.encodeData(send1, false);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  // Send back an upstream failure.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  // Overflow the request buffer limit. Because the retry base interval is infinity, no
+  // request will be in progress. This will cause the request to be aborted and an error
+  // to be returned to the client.
+  std::string data2(2048, 'b');
+  Buffer::OwnedImpl send2(data2);
+  encoder.encodeData(send2, false);
+
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("507", response->headers().Status()->value().getStringView());
+  test_server_->waitForCounterEq("cluster.cluster_0.retry_or_shadow_abandoned", 1);
+}
+
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request and the
 // downstream response, and updated after the request is retried.
 TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
@@ -1628,12 +1739,12 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
 TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host.com:80"}});
 
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
     response->waitForEndStream();
-    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("403", response->headers().Status()->value().getStringView());
     EXPECT_TRUE(response->complete());
   } else {
     response->waitForReset();
