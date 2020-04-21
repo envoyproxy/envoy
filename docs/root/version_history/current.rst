@@ -18,6 +18,7 @@ Changes
 * router: internal redirect configs are moved to the :ref`internal_redirect_policy
   <envoy_api_field_router.RouterAction.internal_redirect_policy>` field, which defines more fine
   grained control of the internal redirect behavior.
+* logger: added :ref:`--log-format-prefix-with-location <operations_cli>` command line option to prefix '%v' with file path and line number.
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
 * router: allow retries of streaming or incomplete requests. This removes stat `rq_retry_skipped_request_not_complete`.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
