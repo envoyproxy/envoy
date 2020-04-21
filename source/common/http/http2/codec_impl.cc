@@ -20,7 +20,6 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "common/runtime/runtime_impl.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -161,6 +160,10 @@ void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& hea
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
     upgrade_type_ = std::string(headers.Upgrade()->value().getStringView());
     Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
+    buildHeaders(final_headers, *modified_headers);
+  } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
+    modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
+    modified_headers->setProtocol(Headers::get().ProtocolValues.Bytestream);
     buildHeaders(final_headers, *modified_headers);
   } else {
     buildHeaders(final_headers, headers);
