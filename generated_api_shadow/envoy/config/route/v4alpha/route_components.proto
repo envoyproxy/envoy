@@ -108,7 +108,9 @@ message VirtualHost {
 
   // Specifies a list of HTTP headers that should be removed from each request
   // handled by this virtual host.
-  repeated string request_headers_to_remove = 13;
+  repeated string request_headers_to_remove = 13 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Specifies a list of HTTP headers that should be added to each response
   // handled by this virtual host. Headers specified at this level are applied
@@ -252,7 +254,9 @@ message Route {
 
   // Specifies a list of HTTP headers that should be removed from each request
   // matching this route.
-  repeated string request_headers_to_remove = 12;
+  repeated string request_headers_to_remove = 12 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Specifies a set of headers that will be added to responses to requests
   // matching this route. Headers specified at this level are applied before

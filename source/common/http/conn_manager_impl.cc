@@ -760,6 +760,13 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
 
+  // TODO(alyssawilk) remove this synthetic path in a follow-up PR, including
+  // auditing of empty path headers. We check for path because HTTP/2 connect requests may have a
+  // path.
+  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) {
+    request_headers_->setPath("/");
+  }
+
   // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
   if (connection_manager_.config_.isRoutable()) {
     if (connection_manager_.config_.routeConfigProvider() != nullptr) {
@@ -921,9 +928,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
-  if (protocol == Protocol::Http11 && hasCachedRoute()) {
+  if (hasCachedRoute()) {
+    // Do not allow upgrades if the route does not support it.
     if (upgrade_rejected) {
-      // Do not allow upgrades if the route does not support it.
+      // While downstream servers should not send upgrade payload without the upgrade being
+      // accepted, err on the side of caution and refuse to process any further requests on this
+      // connection, to avoid a class of HTTP/1.1 smuggling bugs where Upgrade or CONNECT payload
+      // contains a smuggled HTTP request.
+      state_.saw_connection_close_ = true;
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
                      nullptr, state_.is_head_request_, absl::nullopt,
@@ -2003,7 +2015,12 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
     return false;
   }
   bool upgrade_rejected = false;
-  auto upgrade = request_headers_ ? request_headers_->Upgrade() : nullptr;
+  const Envoy::Http::HeaderEntry* upgrade =
+      request_headers_ ? request_headers_->Upgrade() : nullptr;
+  // Treat CONNECT requests as a special upgrade case.
+  if (!upgrade && request_headers_ && HeaderUtility::isConnect(*request_headers_)) {
+    upgrade = request_headers_->Method();
+  }
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = nullptr;
@@ -2387,7 +2404,7 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   // store any objects with a LifeSpan at or above DownstreamRequest. This is to avoid unnecessary
   // heap allocation.
   if (parent_.stream_info_.filter_state_->hasDataAtOrAboveLifeSpan(
-          StreamInfo::FilterState::LifeSpan::DownstreamRequest)) {
+          StreamInfo::FilterState::LifeSpan::Request)) {
     (*parent_.connection_manager_.streams_.begin())->stream_info_.filter_state_ =
         std::make_shared<StreamInfo::FilterStateImpl>(
             parent_.stream_info_.filter_state_->parent(),

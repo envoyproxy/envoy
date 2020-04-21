@@ -165,12 +165,22 @@ void Cluster::onDnsHostRemove(const std::string& host) {
 
 Upstream::HostConstSharedPtr
 Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
-  if (!context || !context->downstreamHeaders()) {
+  if (!context) {
     return nullptr;
   }
 
-  const auto host_it =
-      host_map_->find(context->downstreamHeaders()->Host()->value().getStringView());
+  absl::string_view host;
+  if (context->downstreamHeaders()) {
+    host = context->downstreamHeaders()->Host()->value().getStringView();
+  } else if (context->downstreamConnection()) {
+    host = context->downstreamConnection()->requestedServerName();
+  }
+
+  if (host.empty()) {
+    return nullptr;
+  }
+
+  const auto host_it = host_map_->find(host);
   if (host_it == host_map_->end()) {
     return nullptr;
   } else {

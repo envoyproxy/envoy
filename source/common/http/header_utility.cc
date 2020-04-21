@@ -187,11 +187,6 @@ HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
       headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
     return SharedResponseCodeDetails::get().InvalidAuthority;
   }
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_method_validation") &&
-      headers.Method() &&
-      Http::Headers::get().MethodValues.Connect == headers.Method()->value().getStringView()) {
-    return SharedResponseCodeDetails::get().ConnectUnsupported;
-  }
   return absl::nullopt;
 }
 

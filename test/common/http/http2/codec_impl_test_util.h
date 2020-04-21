@@ -13,11 +13,11 @@ class TestCodecSettingsProvider {
 public:
   // Returns the value of the SETTINGS parameter keyed by |identifier| sent by the remote endpoint.
   absl::optional<uint32_t> getRemoteSettingsParameterValue(int32_t identifier) const {
-    const auto it = settings_.find({identifier, 0});
+    const auto it = settings_.find(identifier);
     if (it == settings_.end()) {
       return absl::nullopt;
     }
-    return it->value;
+    return it->second;
   }
 
 protected:
@@ -25,15 +25,24 @@ protected:
   // getRemoteSettingsParameterValue().
   void onSettingsFrame(const nghttp2_settings& settings_frame) {
     for (uint32_t i = 0; i < settings_frame.niv; ++i) {
-      auto result = settings_.insert(settings_frame.iv[i]);
-      ASSERT(result.second);
+      auto result = settings_.insert(
+          std::make_pair(settings_frame.iv[i].settings_id, settings_frame.iv[i].value));
+      // It is possible to have duplicate settings parameters, each new parameter replaces any
+      // existing value.
+      // https://tools.ietf.org/html/rfc7540#section-6.5
+      if (!result.second) {
+        ENVOY_LOG_MISC(debug, "Duplicated settings parameter {} with value {}",
+                       settings_frame.iv[i].settings_id, settings_frame.iv[i].value);
+        settings_.erase(result.first);
+        // Guaranteed success here.
+        settings_.insert(
+            std::make_pair(settings_frame.iv[i].settings_id, settings_frame.iv[i].value));
+      }
     }
   }
 
 private:
-  std::unordered_set<nghttp2_settings_entry, ::Envoy::Http2::Utility::SettingsEntryHash,
-                     ::Envoy::Http2::Utility::SettingsEntryEquals>
-      settings_;
+  std::unordered_map<int32_t, uint32_t> settings_;
 };
 
 class TestServerConnectionImpl : public ServerConnectionImpl, public TestCodecSettingsProvider {

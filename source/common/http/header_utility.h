@@ -114,8 +114,8 @@ public:
   /**
    * @brief a helper function to determine if the headers represent a CONNECT request.
    */
-
   static bool isConnect(const RequestHeaderMap& headers);
+
   /**
    * Add headers from one HeaderMap to another
    * @param headers target where headers will be added

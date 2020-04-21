@@ -327,6 +327,8 @@ void UpstreamRequest::onPoolReady(
 
   onUpstreamHostSelected(host);
 
+  stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
+      info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
   stream_info_.setUpstreamLocalAddress(upstream_local_address);
   parent_.callbacks()->streamInfo().setUpstreamLocalAddress(upstream_local_address);
 
