@@ -30,9 +30,9 @@ int main(int argc, char** argv) {
 
   _set_invalid_parameter_handler(NoopInvalidParameterHandler);
 
-  WSADATA wsaData;
-  const WORD versionRequested = MAKEWORD(2, 2);
-  RELEASE_ASSERT(WSAStartup(versionRequested, &wsaData) == 0, "");
+  WSADATA wsa_data;
+  const WORD version_requested = MAKEWORD(2, 2);
+  RELEASE_ASSERT(WSAStartup(version_requested, &wsa_data) == 0, "");
 #endif
 
 #ifndef __APPLE__
