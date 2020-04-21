@@ -75,7 +75,8 @@ done
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
 mkdir -p "${COVERAGE_DIR}"
 
-COVERAGE_IGNORE_REGEX="(/external/|pb\.(validate\.)?(h|cc)|/chromium_url/|/test/|/tmp|/source/extensions/quic_listeners/quiche/)"
+COVERAGE_IGNORE_REGEX="(/external/|pb\.(validate\.)?(h|cc)|/chromium_url/|/test/|/tmp|/tools/|/third_party/|/source/extensions/quic_listeners/quiche/)"
+COVERAGE_BINARY="bazel-bin/test/coverage/coverage_tests"
 COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
 
 echo "Merging coverage data..."
