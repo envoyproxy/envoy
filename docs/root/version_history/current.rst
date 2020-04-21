@@ -18,6 +18,7 @@ Changes
 * request_id: added to :ref:`always_set_request_id_in_response setting <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.always_set_request_id_in_response>`
   to set :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` header in response even if
   tracing is not forced.
+* network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
 * router: allow retries of streaming or incomplete requests. This removes stat `rq_retry_skipped_request_not_complete`.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
   can now have a separate :ref:`tracing provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
