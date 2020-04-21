@@ -23,8 +23,8 @@ using QuantileLatencyMap = std::unordered_map<double, double>;
 static const std::vector<double> hystrix_quantiles = {0,    0.25, 0.5,   0.75, 0.90,
                                                       0.95, 0.99, 0.995, 1};
 
-struct {
-  const std::string AllowHeadersHystrix{"Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
+static const struct {
+  absl::string_view AllowHeadersHystrix{"Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
 } AccessControlAllowHeadersValue;
 
 struct ClusterStatsCache {

@@ -1,7 +1,5 @@
 #include "redis_cluster.h"
 
-#include <err.h>
-
 #include "envoy/config/cluster/redis/redis_cluster.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
