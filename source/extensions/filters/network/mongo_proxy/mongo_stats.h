@@ -7,6 +7,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/stats/symbol_table_impl.h"
+#include "common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,8 +18,8 @@ class MongoStats {
 public:
   MongoStats(Stats::Scope& scope, absl::string_view prefix);
 
-  void incCounter(const std::vector<Stats::StatName>& names);
-  void recordHistogram(const std::vector<Stats::StatName>& names, Stats::Histogram::Unit unit,
+  void incCounter(const Stats::Utility::ElementVec& names);
+  void recordHistogram(const Stats::Utility::ElementVec& names, Stats::Histogram::Unit unit,
                        uint64_t sample);
 
   /**
@@ -34,7 +35,7 @@ public:
   Stats::SymbolTable& symbolTable() { return scope_.symbolTable(); }
 
 private:
-  Stats::SymbolTable::StoragePtr addPrefix(const std::vector<Stats::StatName>& names);
+  Stats::Utility::ElementVec addPrefix(const Stats::Utility::ElementVec& names);
 
   Stats::Scope& scope_;
   Stats::StatNameSetPtr stat_name_set_;

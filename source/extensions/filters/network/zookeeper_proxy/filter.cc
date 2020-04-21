@@ -320,10 +320,6 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
       Stats::Histogram::Unit::Milliseconds);
   histogram.recordValue(latency.count());
 
-  config_->scope_
-      .histogramFromStatName(Stats::StatName(storage.get()), Stats::Histogram::Unit::Milliseconds)
-      .recordValue(latency.count());
-
   setDynamicMetadata({{"opname", opname},
                       {"xid", std::to_string(xid)},
                       {"zxid", std::to_string(zxid)},
