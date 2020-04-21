@@ -14,10 +14,10 @@ envoy_cc_library(
     hdrs = ["zlib_decompressor_impl.h"],
     external_deps = ["zlib"],
     deps = [
-        "//include/envoy/compression/decompressor:decompressor_interface",
+        "//include/envoy/decompressor:decompressor_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/extensions/compression/gzip/common:gzip_base_lib",
+        "//source/common/common:zlib_base_lib",
     ],
 )

@@ -1,9 +1,9 @@
 #include <memory>
 
 #include "common/common/hex.h"
+#include "common/decompressor/zlib_decompressor_impl.h"
 
 #include "extensions/compression/gzip/compressor/config.h"
-#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 #include "extensions/filters/http/compressor/compressor_filter.h"
 
 #include "test/mocks/http/mocks.h"
@@ -122,7 +122,7 @@ protected:
   std::shared_ptr<CompressorFilterConfig> config_;
   std::unique_ptr<Common::Compressors::CompressorFilter> filter_;
   Buffer::OwnedImpl data_;
-  Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_;
+  Decompressor::ZlibDecompressorImpl decompressor_;
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
   Stats::TestUtil::TestStore stats_;

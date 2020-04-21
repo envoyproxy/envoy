@@ -7,10 +7,7 @@
 #include "zlib.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace Compression {
-namespace Gzip {
-namespace Common {
+namespace Zlib {
 
 /**
  * Shared code between the compressor and the decompressor.
@@ -39,8 +36,5 @@ protected:
   const std::unique_ptr<z_stream, std::function<void(z_stream*)>> zstream_ptr_;
 };
 
-} // namespace Common
-} // namespace Gzip
-} // namespace Compression
-} // namespace Extensions
+} // namespace Zlib
 } // namespace Envoy

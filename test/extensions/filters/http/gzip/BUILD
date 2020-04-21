@@ -16,9 +16,9 @@ envoy_extension_cc_test(
     srcs = ["gzip_filter_test.cc"],
     extension_name = "envoy.filters.http.gzip",
     deps = [
+        "//source/common/decompressor:decompressor_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/compression/gzip/compressor:compressor_lib",
-        "//source/extensions/compression/gzip/decompressor:decompressor_lib",
         "//source/extensions/filters/http/gzip:config",
         "//source/extensions/filters/http/gzip:gzip_filter_lib",
         "//test/mocks/http:http_mocks",
@@ -37,7 +37,7 @@ envoy_extension_cc_test(
     ],
     extension_name = "envoy.filters.http.gzip",
     deps = [
-        "//source/extensions/compression/gzip/decompressor:decompressor_lib",
+        "//source/common/decompressor:decompressor_lib",
         "//source/extensions/filters/http/gzip:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:simulated_time_system_lib",

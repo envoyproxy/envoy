@@ -1,4 +1,4 @@
-#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
+#include "common/decompressor/zlib_decompressor_impl.h"
 
 #include <memory>
 
@@ -9,15 +9,12 @@
 #include "absl/container/fixed_array.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace Compression {
-namespace Gzip {
 namespace Decompressor {
 
 ZlibDecompressorImpl::ZlibDecompressorImpl() : ZlibDecompressorImpl(4096) {}
 
 ZlibDecompressorImpl::ZlibDecompressorImpl(uint64_t chunk_size)
-    : Common::Base(chunk_size, [](z_stream* z) {
+    : Zlib::Base(chunk_size, [](z_stream* z) {
         inflateEnd(z);
         delete z;
       }) {
@@ -78,7 +75,4 @@ bool ZlibDecompressorImpl::inflateNext() {
 }
 
 } // namespace Decompressor
-} // namespace Gzip
-} // namespace Compression
-} // namespace Extensions
 } // namespace Envoy

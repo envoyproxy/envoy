@@ -2,7 +2,7 @@
 
 #include "envoy/compression/compressor/compressor.h"
 
-#include "extensions/compression/gzip/common/base.h"
+#include "common/common/zlib/base.h"
 
 #include "zlib.h"
 
@@ -15,7 +15,7 @@ namespace Compressor {
 /**
  * Implementation of compressor's interface.
  */
-class ZlibCompressorImpl : public Common::Base, public Envoy::Compression::Compressor::Compressor {
+class ZlibCompressorImpl : public Zlib::Base, public Envoy::Compression::Compressor::Compressor {
 public:
   ZlibCompressorImpl();
 
