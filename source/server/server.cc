@@ -259,7 +259,8 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 
   if (!config_path.empty()) {
     loadBootsrap(
-        options.bootstrapVersion(), bootstrap, [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
+        options.bootstrapVersion(), bootstrap,
+        [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
           MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
         });
   }

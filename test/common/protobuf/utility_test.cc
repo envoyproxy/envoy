@@ -1219,10 +1219,11 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonSameVersion) {
 
 // MessageUtility::loadFromJson() avoids boosting when version specified.
 TEST_F(ProtobufUtilityTest, LoadFromJsonNoBoosting) {
-    envoy::config::cluster::v3::Cluster dst;
-  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
-                                                    ProtobufMessage::getStrictValidationVisitor(), false),
-                          EnvoyException, "INVALID_ARGUMENT:drain_connections_on_host_removal: Cannot find field.");
+  envoy::config::cluster::v3::Cluster dst;
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
+                                ProtobufMessage::getStrictValidationVisitor(), false),
+      EnvoyException, "INVALID_ARGUMENT:drain_connections_on_host_removal: Cannot find field.");
 }
 
 // MessageUtility::loadFromJson() with API message works across version.
