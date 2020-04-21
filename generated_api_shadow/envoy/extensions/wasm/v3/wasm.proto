@@ -38,7 +38,7 @@ message VmConfig {
 
   // The Wasm configuration used in initialization of a new VM
   // (proxy_on_start). `google.protobuf.Struct` is serialized as JSON before
-  // passing them to the plugin. `google.protobuf.BytesValue` and
+  // passing it to the plugin. `google.protobuf.BytesValue` and
   // `google.protobuf.StringValue` are passed directly without the wrapper.
   google.protobuf.Any configuration = 4;
 
@@ -73,7 +73,7 @@ message PluginConfig {
     // Filter/service configuration used to configure or reconfigure a plugin
     // (proxy_on_configuration).
     // `google.protobuf.Struct` is serialized as JSON before
-    // passing them to the plugin. `google.protobuf.BytesValue` and
+    // passing it to the plugin. `google.protobuf.BytesValue` and
     // `google.protobuf.StringValue` are passed directly without the wrapper.
     VmConfig inline_vm_config = 3;
   }
