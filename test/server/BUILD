@@ -252,7 +252,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
     srcs = ["listener_manager_impl_quic_only_test.cc"],
-    tags = ["nofips"],
+    tags = [
+        "nofips",
+        # Skipping as quiche quic_stream_send_buffer.cc does not currently compile on Windows
+        "skip_on_windows",
+    ],
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
