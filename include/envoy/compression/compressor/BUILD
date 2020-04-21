@@ -25,7 +25,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "compressor_library_config_interface",
+    name = "compressor_config_interface",
     hdrs = ["config.h"],
     deps = [
         ":compressor_factory_interface",

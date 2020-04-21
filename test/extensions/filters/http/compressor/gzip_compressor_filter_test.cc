@@ -37,8 +37,10 @@ protected:
     const std::string uncompressed_str{decompressed_data_.toString()};
     ASSERT_EQ(expected_str_.length(), uncompressed_str.length());
     EXPECT_EQ(expected_str_, uncompressed_str);
-    EXPECT_EQ(expected_str_.length(), stats_.counter("test.gzip.total_uncompressed_bytes").value());
-    EXPECT_EQ(data_.length(), stats_.counter("test.gzip.total_compressed_bytes").value());
+    EXPECT_EQ(expected_str_.length(),
+              stats_.counter("test.gzip.compressor.total_uncompressed_bytes").value());
+    EXPECT_EQ(data_.length(),
+              stats_.counter("test.gzip.compressor.total_compressed_bytes").value());
   }
 
   void feedBuffer(uint64_t size) {
@@ -72,7 +74,7 @@ protected:
     }
     verifyCompressedData(content_length);
     drainBuffer();
-    EXPECT_EQ(1U, stats_.counter("test.gzip.compressed").value());
+    EXPECT_EQ(1U, stats_.counter("test.gzip.compressor.compressed").value());
   }
 
   void expectValidFinishedBuffer(const uint32_t content_length) {
@@ -116,7 +118,7 @@ protected:
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
     Http::TestResponseTrailerMapImpl trailers;
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
-    EXPECT_EQ(1, stats_.counter("test.gzip.not_compressed").value());
+    EXPECT_EQ(1, stats_.counter("test.gzip.compressor.not_compressed").value());
   }
 
   std::shared_ptr<CompressorFilterConfig> config_;

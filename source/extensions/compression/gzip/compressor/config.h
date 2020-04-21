@@ -18,7 +18,7 @@ namespace Compressor {
 
 namespace {
 
-const std::string& gzipStatsPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "gzip."); }
+const std::string& gzipStatsPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "gzip.compressor."); }
 const std::string& gzipExtensionName() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.compression.gzip.compressor");
 }
@@ -29,6 +29,7 @@ class GzipCompressorFactory : public Envoy::Compression::Compressor::CompressorF
 public:
   GzipCompressorFactory(const envoy::extensions::compression::gzip::compressor::v3::Gzip& gzip);
 
+  // Envoy::Compression::Compressor::CompressorFactory
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override;
   const std::string& statsPrefix() const override { return gzipStatsPrefix(); }
   const std::string& contentEncoding() const override {
@@ -47,7 +48,6 @@ private:
 
   ZlibCompressorImpl::CompressionLevel compression_level_;
   ZlibCompressorImpl::CompressionStrategy compression_strategy_;
-
   const int32_t memory_level_;
   const int32_t window_bits_;
   const uint32_t chunk_size_;

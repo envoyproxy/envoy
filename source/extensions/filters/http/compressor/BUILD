@@ -30,7 +30,7 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":compressor_filter_lib",
-        "//include/envoy/compression/compressor:compressor_library_config_interface",
+        "//include/envoy/compression/compressor:compressor_config_interface",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
