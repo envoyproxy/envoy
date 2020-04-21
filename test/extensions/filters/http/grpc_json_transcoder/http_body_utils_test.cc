@@ -31,19 +31,36 @@ public:
       body_field_path_.push_back(&field);
     }
 
-    Buffer::InstancePtr message_buffer = std::make_unique<Buffer::OwnedImpl>();
-    HttpBodyUtils::appendHttpBodyEnvelope(*message_buffer, body_field_path_, content_type,
-                                          content.length());
-    message_buffer->add(content);
+    // Parse using concrete message type.
+    {
+      Buffer::InstancePtr message_buffer = std::make_unique<Buffer::OwnedImpl>();
+      HttpBodyUtils::appendHttpBodyEnvelope(*message_buffer, body_field_path_, content_type,
+                                            content.length());
+      message_buffer->add(content);
 
-    Buffer::ZeroCopyInputStreamImpl stream(std::move(message_buffer));
+      Buffer::ZeroCopyInputStreamImpl stream(std::move(message_buffer));
 
-    Message message;
-    message.ParseFromZeroCopyStream(&stream);
+      Message message;
+      message.ParseFromZeroCopyStream(&stream);
 
-    google::api::HttpBody http_body = get_http_body(std::move(message));
-    EXPECT_EQ(http_body.content_type(), content_type);
-    EXPECT_EQ(http_body.data(), content);
+      google::api::HttpBody http_body = get_http_body(std::move(message));
+      EXPECT_EQ(http_body.content_type(), content_type);
+      EXPECT_EQ(http_body.data(), content);
+    }
+
+    // Parse message dynamically by field path.
+    {
+      Buffer::InstancePtr message_buffer = std::make_unique<Buffer::OwnedImpl>();
+      HttpBodyUtils::appendHttpBodyEnvelope(*message_buffer, body_field_path_, content_type,
+                                            content.length());
+      message_buffer->add(content);
+
+      google::api::HttpBody http_body;
+      Buffer::ZeroCopyInputStreamImpl stream(std::move(message_buffer));
+      EXPECT_TRUE(HttpBodyUtils::parseMessageByFieldPath(&stream, body_field_path_, &http_body));
+      EXPECT_EQ(http_body.content_type(), content_type);
+      EXPECT_EQ(http_body.data(), content);
+    }
   }
 
   std::vector<Protobuf::Field> raw_body_field_path_;
