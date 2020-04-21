@@ -81,10 +81,11 @@ def CreateIssues(access_token, runtime_and_pr):
       login = pr_info.user.login
     else:
       # Extract commit message, sha, and author.
-      # In this case we cannot add a user login for an assignee.
-      change_title = commit.message.split('\n')[0]  # Remove description.
+      # Only keep commit message title (remove description), and truncate to 50 characters.
+      change_title = commit.message.split('\n')[0][:50]
       number = ('commit %s') % commit.hexsha
       email = commit.author.email
+      # Use the commit author's email to search through users for their login.
       search_user = git.search_users(email.split('@')[0] + " in:email")
       login = search_user[0].login if search_user else None
 
@@ -94,7 +95,7 @@ def CreateIssues(access_token, runtime_and_pr):
 
     print(title)
     print(body)
-    print('  >> Assigning to %s' % (login if login else email))
+    print('  >> Assigning to %s' % (login or email))
 
     # TODO(htuch): Figure out how to do this without legacy and faster.
     exists = repo.legacy_search_issues('open', '"%s"' % title) or repo.legacy_search_issues(
@@ -157,6 +158,7 @@ def GetRuntimeAndPr():
           found_test_feature_true = True
           continue
         pr_num = re.search('\(#(\d+)\)', commit.message)
+        # Some commits may not come from a PR (if they are part of a security point release).
         pr = (int(pr_num.group(1))) if pr_num else None
         pr_date = date.fromtimestamp(commit.committed_date)
         removable = (pr_date < removal_date)
