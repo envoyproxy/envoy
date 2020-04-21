@@ -62,7 +62,7 @@ ConnPoolImplBase::newPendingRequest(ResponseDecoder& decoder,
 
 void ConnPoolImplBase::purgePendingRequests(
     const Upstream::HostDescriptionConstSharedPtr& host_description,
-    absl::string_view failure_reason) {
+    absl::string_view failure_reason, bool was_remote_close) {
   // NOTE: We move the existing pending requests to a temporary list. This is done so that
   //       if retry logic submits a new request to the pool, we don't fail it inline.
   pending_requests_to_purge_ = std::move(pending_requests_);
@@ -70,8 +70,10 @@ void ConnPoolImplBase::purgePendingRequests(
     PendingRequestPtr request =
         pending_requests_to_purge_.front()->removeFromList(pending_requests_to_purge_);
     host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
-    request->callbacks_.onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                      failure_reason, host_description);
+    request->callbacks_.onPoolFailure(
+        was_remote_close ? ConnectionPool::PoolFailureReason::RemoteConnectionFailure
+                         : ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+        failure_reason, host_description);
   }
 }
 

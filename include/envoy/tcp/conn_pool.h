@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/conn_pool.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/upstream/upstream.h"
@@ -40,20 +41,6 @@ public:
    *        cancellation.
    */
   virtual void cancel(CancelPolicy cancel_policy) PURE;
-};
-
-/**
- * Reason that a pool connection could not be obtained.
- */
-enum class PoolFailureReason {
-  // A resource overflowed and policy prevented a new connection from being created.
-  Overflow,
-  // A local connection failure took place while creating a new connection.
-  LocalConnectionFailure,
-  // A remote connection failure took place while creating a new connection.
-  RemoteConnectionFailure,
-  // A timeout occurred while creating a new connection.
-  Timeout,
 };
 
 /*
@@ -131,6 +118,7 @@ protected:
 };
 
 using ConnectionDataPtr = std::unique_ptr<ConnectionData>;
+using PoolFailureReason = ::Envoy::ConnectionPool::PoolFailureReason;
 
 /**
  * Pool callbacks invoked in the context of a newConnection() call, either synchronously or

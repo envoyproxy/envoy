@@ -163,7 +163,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       ENVOY_CONN_LOG(debug, "purge pending, failure reason: {}", *client.codec_client_,
                      client.codec_client_->connectionFailureReason());
       purgePendingRequests(client.real_host_description_,
-                           client.codec_client_->connectionFailureReason());
+                           client.codec_client_->connectionFailureReason(),
+                           event == Network::ConnectionEvent::RemoteClose);
     }
 
     dispatcher_.deferredDelete(std::move(removed));

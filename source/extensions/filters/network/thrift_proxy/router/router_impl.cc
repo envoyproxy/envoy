@@ -344,8 +344,7 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     // Response is incomplete, but no more data is coming.
     ENVOY_STREAM_LOG(debug, "response underflow", *callbacks_);
     upstream_request_->onResponseComplete();
-    upstream_request_->onResetStream(
-        Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     cleanup();
   }
 }
@@ -356,13 +355,11 @@ void Router::onEvent(Network::ConnectionEvent event) {
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
     ENVOY_STREAM_LOG(debug, "upstream remote close", *callbacks_);
-    upstream_request_->onResetStream(
-        Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     break;
   case Network::ConnectionEvent::LocalClose:
     ENVOY_STREAM_LOG(debug, "upstream local close", *callbacks_);
-    upstream_request_->onResetStream(
-        Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+    upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
   default:
     // Connected is consumed by the connection pool.
@@ -434,7 +431,7 @@ void Router::UpstreamRequest::releaseConnection(const bool close) {
 
 void Router::UpstreamRequest::resetStream() { releaseConnection(true); }
 
-void Router::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
+void Router::UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                             Upstream::HostDescriptionConstSharedPtr host) {
   conn_pool_handle_ = nullptr;
 
@@ -494,7 +491,7 @@ void Router::UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionCo
   upstream_host_ = host;
 }
 
-void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReason reason) {
+void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
   if (metadata_->messageType() == MessageType::Oneway) {
     // For oneway requests, we should not attempt a response. Reset the downstream to signal
     // an error.
@@ -503,20 +500,20 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
   }
 
   switch (reason) {
-  case Tcp::ConnectionPool::PoolFailureReason::Overflow:
+  case ConnectionPool::PoolFailureReason::Overflow:
     parent_.callbacks_->sendLocalReply(
         AppException(
             AppExceptionType::InternalError,
             fmt::format("too many connections to '{}'", upstream_host_->address()->asString())),
         true);
     break;
-  case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     // Should only happen if we closed the connection, due to an error condition, in which case
     // we've already handled any possible downstream response.
     parent_.callbacks_->resetDownstreamConnection();
     break;
-  case Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-  case Tcp::ConnectionPool::PoolFailureReason::Timeout:
+  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+  case ConnectionPool::PoolFailureReason::Timeout:
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
     if (!response_started_) {
       parent_.callbacks_->sendLocalReply(

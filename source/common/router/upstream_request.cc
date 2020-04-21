@@ -289,17 +289,21 @@ void UpstreamRequest::onPerTryTimeout() {
   }
 }
 
-void UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) {
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
   switch (reason) {
-  case Http::ConnectionPool::PoolFailureReason::Overflow:
+  case ConnectionPool::PoolFailureReason::Overflow:
     reset_reason = Http::StreamResetReason::Overflow;
     break;
-  case Http::ConnectionPool::PoolFailureReason::ConnectionFailure:
+  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    FALLTHRU;
+  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
+  case ConnectionPool::PoolFailureReason::Timeout:
+    reset_reason = Http::StreamResetReason::LocalReset;
   }
 
   // Mimic an upstream reset.
@@ -487,7 +491,7 @@ bool HttpConnPool::cancelAnyPendingRequest() {
 
 absl::optional<Http::Protocol> HttpConnPool::protocol() const { return conn_pool_.protocol(); }
 
-void HttpConnPool::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                  absl::string_view transport_failure_reason,
                                  Upstream::HostDescriptionConstSharedPtr host) {
   callbacks_->onPoolFailure(reason, transport_failure_reason, host);

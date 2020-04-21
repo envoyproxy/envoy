@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/common/conn_pool.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
@@ -25,15 +26,7 @@ public:
   virtual void cancel() PURE;
 };
 
-/**
- * Reason that a pool stream could not be obtained.
- */
-enum class PoolFailureReason {
-  // A resource overflowed and policy prevented a new stream from being created.
-  Overflow,
-  // A connection failure took place and the stream could not be bound.
-  ConnectionFailure
-};
+using PoolFailureReason = ::Envoy::ConnectionPool::PoolFailureReason;
 
 /**
  * Pool callbacks invoked in the context of a newStream() call, either synchronously or

@@ -112,8 +112,7 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   if (end_stream) {
     // Response is incomplete, but no more data is coming.
     ENVOY_STREAM_LOG(debug, "dubbo router: response underflow", *callbacks_);
-    upstream_request_->onResetStream(
-        Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     upstream_request_->onResponseComplete();
     cleanup();
   }
@@ -133,12 +132,10 @@ void Router::onEvent(Network::ConnectionEvent event) {
 
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
-    upstream_request_->onResetStream(
-        Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     break;
   case Network::ConnectionEvent::LocalClose:
-    upstream_request_->onResetStream(
-        Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+    upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
   default:
     // Connected is consumed by the connection pool.
@@ -205,7 +202,7 @@ void Router::UpstreamRequest::encodeData(Buffer::Instance& data) {
   conn_data_->connection().write(data, false);
 }
 
-void Router::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
+void Router::UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                             Upstream::HostDescriptionConstSharedPtr host) {
   conn_pool_handle_ = nullptr;
 
@@ -219,9 +216,9 @@ void Router::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReas
   // the error asynchronously and the upper layer needs to be notified to continue decoding.
   // If it is a non-connection error, it is returned synchronously from the connection pool
   // and is still in the callback at the current Filter, nothing to do.
-  if (reason == Tcp::ConnectionPool::PoolFailureReason::Timeout ||
-      reason == Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure ||
-      reason == Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
+  if (reason == ConnectionPool::PoolFailureReason::Timeout ||
+      reason == ConnectionPool::PoolFailureReason::LocalConnectionFailure ||
+      reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
     parent_.callbacks_->continueDecoding();
   }
 }
@@ -264,7 +261,7 @@ void Router::UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionCo
   upstream_host_ = host;
 }
 
-void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReason reason) {
+void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
   if (metadata_->message_type() == MessageType::Oneway) {
     // For oneway requests, we should not attempt a response. Reset the downstream to signal
     // an error.
@@ -276,13 +273,13 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
   // When the filter's callback does not end, the sendLocalReply function call
   // triggers the release of the current stream at the end of the filter's callback.
   switch (reason) {
-  case Tcp::ConnectionPool::PoolFailureReason::Overflow:
+  case ConnectionPool::PoolFailureReason::Overflow:
     parent_.callbacks_->sendLocalReply(
         AppException(ResponseStatus::ServerError,
                      fmt::format("dubbo upstream request: too many connections")),
         false);
     break;
-  case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     // Should only happen if we closed the connection, due to an error condition, in which case
     // we've already handled any possible downstream response.
     parent_.callbacks_->sendLocalReply(
@@ -291,14 +288,14 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
                                  upstream_host_->address()->asString())),
         false);
     break;
-  case Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     parent_.callbacks_->sendLocalReply(
         AppException(ResponseStatus::ServerError,
                      fmt::format("dubbo upstream request: remote connection failure '{}'",
                                  upstream_host_->address()->asString())),
         false);
     break;
-  case Tcp::ConnectionPool::PoolFailureReason::Timeout:
+  case ConnectionPool::PoolFailureReason::Timeout:
     parent_.callbacks_->sendLocalReply(
         AppException(ResponseStatus::ServerError,
                      fmt::format("dubbo upstream request: connection failure '{}' due to timeout",

@@ -63,7 +63,7 @@ protected:
 
   // Fails all pending requests, calling onPoolFailure on the associated callbacks.
   void purgePendingRequests(const Upstream::HostDescriptionConstSharedPtr& host_description,
-                            absl::string_view failure_reason);
+                            absl::string_view failure_reason, bool was_remote);
 
   // Must be implemented by sub class. Attempts to drain inactive clients.
   virtual void checkForDrained() PURE;
