@@ -108,15 +108,15 @@ TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
                                       absl::nullopt /*headers*/);
 
   const XRay::Span* xray_parent_span = static_cast<XRay::Span*>(parent_span.get());
-  const std::string expected_parent_id = xray_parent_span->Id();
-  auto on_send = [&](const std::string& json) {
+  const std::string expected_parent_id = xray_parent_span->id();
+  auto on_send = [xray_parent_span, expected_parent_id](const std::string& json) {
     ASSERT_FALSE(json.empty());
     daemon::Segment s;
     MessageUtil::loadFromJson(json, s, ProtobufMessage::getNullValidationVisitor());
     ASSERT_STREQ(expected_parent_id.c_str(), s.parent_id().c_str());
     ASSERT_STREQ(expected_span_name, s.name().c_str());
     ASSERT_STREQ(xray_parent_span->traceId().c_str(), s.trace_id().c_str());
-    ASSERT_STRNE(xray_parent_span->Id().c_str(), s.id().c_str());
+    ASSERT_STRNE(xray_parent_span->id().c_str(), s.id().c_str());
   };
 
   EXPECT_CALL(broker, send(_)).WillOnce(Invoke(on_send));
@@ -181,6 +181,16 @@ TEST_F(XRayTracerTest, TraceIDFormatTest) {
   ASSERT_EQ(1, parts[0].length());
   ASSERT_EQ(8, parts[1].length());
   ASSERT_EQ(24, parts[2].length());
+}
+
+TEST(XRayDaemon, SendBytesOverUDP) {
+  NiceMock<Server::MockInstance> server;
+  DaemonBrokerPtr broker_ptr = std::make_unique<DaemonBrokerImpl>("127.0.0.1:2000");
+  Tracer tracer{"my_segment", std::move(broker_ptr), server.timeSource()};
+  auto span = tracer.startSpan("ingress" /*operation name*/, server.timeSource().systemTime(),
+                               absl::nullopt /*headers*/);
+  span->setTag("user_agent", "envoy");
+  span->finishSpan();
 }
 
 } // namespace
