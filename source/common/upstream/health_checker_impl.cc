@@ -797,7 +797,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
       service_status = "service_unknown";
       break;
     default:
-      service_status = "unknwon_healthcheck_response";
+      service_status = "unknown_healthcheck_response";
       break;
     }
   }
