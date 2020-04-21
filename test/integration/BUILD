@@ -583,6 +583,7 @@ envoy_cc_test(
         "integration_test.cc",
         "integration_test.h",
     ],
+    shard_count = 2,
     # Times out on Windows
     tags = ["fails_on_windows"],
     deps = [
@@ -904,6 +905,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        ":http_protocol_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
