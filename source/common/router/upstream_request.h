@@ -52,7 +52,7 @@ class GenericConnectionPoolCallbacks {
 public:
   virtual ~GenericConnectionPoolCallbacks() = default;
 
-  virtual void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+  virtual void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                              absl::string_view transport_failure_reason,
                              Upstream::HostDescriptionConstSharedPtr host) PURE;
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
@@ -97,7 +97,7 @@ public:
   void enableDataFromDownstreamForFlowControl();
 
   // GenericConnPool
-  void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
@@ -186,7 +186,7 @@ public:
   absl::optional<Http::Protocol> protocol() const override;
 
   // Http::ConnectionPool::Callbacks
-  void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Http::RequestEncoder& callbacks_encoder,
@@ -219,26 +219,11 @@ public:
   }
   absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
 
-  static Http::ConnectionPool::PoolFailureReason
-  convertReason(Tcp::ConnectionPool::PoolFailureReason reason) {
-    switch (reason) {
-    case Tcp::ConnectionPool::PoolFailureReason::Overflow:
-      return Http::ConnectionPool::PoolFailureReason::Overflow;
-    case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
-      FALLTHRU;
-    case Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-      FALLTHRU;
-    case Tcp::ConnectionPool::PoolFailureReason::Timeout:
-      return Http::ConnectionPool::PoolFailureReason::ConnectionFailure;
-    }
-    return Http::ConnectionPool::PoolFailureReason::ConnectionFailure;
-  }
-
   // Tcp::ConnectionPool::Callbacks
-  void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_handle_ = nullptr;
-    callbacks_->onPoolFailure(convertReason(reason), "", host);
+    callbacks_->onPoolFailure(reason, "", host);
   }
 
   void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,

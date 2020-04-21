@@ -240,19 +240,6 @@ TEST_F(TcpUpstreamTest, Watermarks) {
   tcp_upstream_->onBelowWriteBufferLowWatermark();
 }
 
-TEST(Errors, ConvertReason) {
-  EXPECT_EQ(Http::ConnectionPool::PoolFailureReason::Overflow,
-            TcpConnPool::convertReason(Tcp::ConnectionPool::PoolFailureReason::Overflow));
-  EXPECT_EQ(
-      Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
-      TcpConnPool::convertReason(Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure));
-  EXPECT_EQ(
-      Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
-      TcpConnPool::convertReason(Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure));
-  EXPECT_EQ(Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
-            TcpConnPool::convertReason(Tcp::ConnectionPool::PoolFailureReason::Timeout));
-}
-
 } // namespace
 } // namespace Router
 } // namespace Envoy

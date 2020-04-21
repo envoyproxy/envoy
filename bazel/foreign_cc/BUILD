@@ -36,8 +36,6 @@ cc_library(
     ],
 )
 
-# autotools packages are unusable on Windows as-is
-# TODO: Consider our own luajit.BUILD file as we do with many other packages
 configure_make(
     name = "luajit",
     configure_command = "build.py",
@@ -51,10 +49,10 @@ configure_make(
     lib_source = "@com_github_luajit_luajit//:all",
     make_commands = [],
     out_include_dir = "include/luajit-2.1",
-    static_libraries = [
-        "libluajit-5.1.a",
-    ],
-    tags = ["skip_on_windows"],
+    static_libraries = select({
+        "//bazel:windows_x86_64": ["lua51.lib"],
+        "//conditions:default": ["libluajit-5.1.a"],
+    }),
 )
 
 configure_make(
@@ -70,10 +68,10 @@ configure_make(
     lib_source = "@com_github_moonjit_moonjit//:all",
     make_commands = [],
     out_include_dir = "include/moonjit-2.2",
-    static_libraries = [
-        "libluajit-5.1.a",
-    ],
-    tags = ["skip_on_windows"],
+    static_libraries = select({
+        "//bazel:windows_x86_64": ["lua51.lib"],
+        "//conditions:default": ["libluajit-5.1.a"],
+    }),
 )
 
 envoy_cmake_external(
