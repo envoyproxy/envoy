@@ -9,9 +9,9 @@ namespace Envoy {
 PlatformImpl::PlatformImpl()
     : thread_factory_(std::make_unique<Thread::ThreadFactoryImplWin32>()),
       file_system_(std::make_unique<Filesystem::InstanceImplWin32>()) {
-  const WORD wVersionRequested = MAKEWORD(2, 2);
   WSADATA wsaData;
-  RELEASE_ASSERT(WSAStartup(wVersionRequested, &wsaData) == 0, "WSAStartup failed with error");
+  const WORD versionRequested = MAKEWORD(2, 2);
+  RELEASE_ASSERT(WSAStartup(versionRequested, &wsaData) == 0, "WSAStartup failed with error");
 }
 
 PlatformImpl::~PlatformImpl() { ::WSACleanup(); }
