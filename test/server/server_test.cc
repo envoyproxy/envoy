@@ -651,6 +651,21 @@ TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromPbText) {
       EnvoyException, "Unable to parse file");
 }
 
+// Validate that we correctly parse a V2 file when configured to do so.
+TEST_P(ServerInstanceImplTest, LoadsV2ConfigWhenV2SelectedFromPbText) {
+  options_.bootstrap_version_ = 2;
+
+  initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
+  EXPECT_EQ(server_->localInfo().node().id(), "bootstrap_id");
+}
+
+// Validate that we correctly parse a V3 file when configured to do so.
+TEST_P(ServerInstanceImplTest, LoadsV3ConfigWhenV2SelectedFromPbText) {
+  options_.bootstrap_version_ = 3;
+
+  initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text");
+}
+
 // Validate that bootstrap v2 pb_text with deprecated fields loads fails if V3 config is specified.
 TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromPbText) {
   options_.bootstrap_version_ = 3;
