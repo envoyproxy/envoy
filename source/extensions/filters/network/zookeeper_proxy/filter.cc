@@ -312,8 +312,6 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
     opname = opcode_info.opname_;
     opcode_latency = opcode_info.latency_name_;
   }
-  Stats::SymbolTable::StoragePtr storage =
-      config_->scope_.symbolTable().join({config_->stat_prefix_, opcode_latency});
 
   Stats::Histogram& histogram = Stats::Utility::histogramFromElements(
       config_->scope_, {config_->stat_prefix_, opcode_latency},

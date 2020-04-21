@@ -19,6 +19,7 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
 
@@ -85,9 +86,7 @@ FaultFilterConfig::FaultFilterConfig(
       stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))) {}
 
 void FaultFilterConfig::incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name) {
-  Stats::SymbolTable::StoragePtr storage =
-      scope_.symbolTable().join({stats_prefix_, downstream_cluster, stat_name});
-  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+  Stats::Utility::counterFromElements(scope_, {stats_prefix_, downstream_cluster, stat_name}).inc();
 }
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
