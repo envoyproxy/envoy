@@ -53,7 +53,7 @@ statistics:
    downstream_rq_3xx, Counter, Total 3xx responses
    downstream_rq_4xx, Counter, Total 4xx responses
    downstream_rq_5xx, Counter, Total 5xx responses
-   downstream_rq_ws_on_non_ws_route, Counter, Total WebSocket upgrade requests rejected by non WebSocket routes
+   downstream_rq_ws_on_non_ws_route, Counter, Total upgrade requests rejected by non upgrade routes. This now applies both to WebSocket and non-WebSocket upgrades
    downstream_rq_time, Histogram, Total time for request and response (milliseconds)
    downstream_rq_idle_timeout, Counter, Total requests closed due to idle timeout
    downstream_rq_max_duration_reached, Counter, Total requests closed due to max duration reached
