@@ -9,6 +9,7 @@ Types
   ../type/v3/http.proto
   ../type/v3/http_status.proto
   ../type/v3/percent.proto
+  ../type/v3/proxy_protocol.proto
   ../type/v3/range.proto
   ../type/v3/semantic_version.proto
   ../type/v3/token_bucket.proto
