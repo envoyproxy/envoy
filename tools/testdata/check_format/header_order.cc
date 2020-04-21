@@ -3,7 +3,7 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "test/test_common/resources.h"
+#include "common/common/resources.h"
 #include "common/config/utility.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
