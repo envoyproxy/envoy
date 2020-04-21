@@ -89,7 +89,7 @@ protected:
     Stats::TimespanPtr conn_length_;
     Event::TimerPtr connect_timer_;
     bool resources_released_{false};
-    bool timed_out_{true};
+    bool timed_out_{false};
   };
 
   using ActiveClientPtr = std::unique_ptr<ActiveClient>;
