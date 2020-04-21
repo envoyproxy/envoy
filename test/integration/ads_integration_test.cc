@@ -889,4 +889,107 @@ TEST_P(AdsClusterFromFileIntegrationTest, BasicTestWidsAdsEndpointLoadedFromFile
                                       {"ads_eds_cluster"}, {}, {}));
 }
 
+class AdsIntegrationTestWithRtds : public AdsIntegrationTest {
+public:
+  AdsIntegrationTestWithRtds() = default;
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* layered_runtime = bootstrap.mutable_layered_runtime();
+      auto* layer = layered_runtime->add_layers();
+      layer->set_name("foobar");
+      auto* rtds_layer = layer->mutable_rtds_layer();
+      rtds_layer->set_name("ads_rtds_layer");
+      auto* rtds_config = rtds_layer->mutable_rtds_config();
+      rtds_config->mutable_ads();
+
+      auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+      ads_config->set_set_node_on_first_message_only(true);
+    });
+    AdsIntegrationTest::initialize();
+  }
+
+  void testBasicFlow() {
+    // Test that runtime discovery request comes first and cluster discovery request comes after
+    // runtime was loaded.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"ads_rtds_layer"},
+                                        {"ads_rtds_layer"}, {}, true));
+    auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+      name: ads_rtds_layer
+      layer:
+        foo: bar
+        baz: meh
+    )EOF");
+    sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
+        Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+
+    test_server_->waitForCounterGe("runtime.load_success", 1);
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"ads_rtds_layer"}, {},
+                                        {}, false));
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsIntegrationTestWithRtds,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(AdsIntegrationTestWithRtds, Basic) {
+  initialize();
+  testBasicFlow();
+}
+
+class AdsIntegrationTestWithRtdsAndSecondaryClusters : public AdsIntegrationTestWithRtds {
+public:
+  AdsIntegrationTestWithRtdsAndSecondaryClusters() = default;
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Add secondary cluster to the list of static resources.
+      auto* eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      eds_cluster->set_name("eds_cluster");
+      eds_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
+      auto* eds_cluster_config = eds_cluster->mutable_eds_cluster_config();
+      eds_cluster_config->mutable_eds_config()->mutable_ads();
+    });
+    AdsIntegrationTestWithRtds::initialize();
+  }
+
+  void testBasicFlow() {
+    // Test that runtime discovery request comes first followed by the cluster load assignment
+    // discovery request for secondary cluster and then CDS discovery request.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"ads_rtds_layer"},
+                                        {"ads_rtds_layer"}, {}, true));
+    auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+      name: ads_rtds_layer
+      layer:
+        foo: bar
+        baz: meh
+    )EOF");
+    sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
+        Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+
+    test_server_->waitForCounterGe("runtime.load_success", 1);
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                        {"eds_cluster"}, {"eds_cluster"}, {}, false));
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("eds_cluster")},
+        {buildClusterLoadAssignment("eds_cluster")}, {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"ads_rtds_layer"}, {},
+                                        {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, false));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {buildCluster("cluster_0")}, {buildCluster("cluster_0")},
+        {}, "1");
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsIntegrationTestWithRtdsAndSecondaryClusters,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
+  initialize();
+  testBasicFlow();
+}
+
 } // namespace Envoy

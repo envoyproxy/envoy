@@ -380,7 +380,6 @@ owning HTTP connection manager.
   rq_direct_response, Counter, Total requests that resulted in a direct response
   rq_total, Counter, Total routed requests
   rq_reset_after_downstream_response_started, Counter, Total requests that were reset after downstream response had started
-  rq_retry_skipped_request_not_complete, Counter, Total retries that were skipped as the request is not yet complete
 
 .. _config_http_filters_router_vcluster_stats:
 
