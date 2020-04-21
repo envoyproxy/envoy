@@ -25,6 +25,7 @@ envoy_proto_library(
 
 envoy_cc_test_library(
     name = "uber_filter_lib",
+    srcs = ["uber_filter.cc"],
     hdrs = ["uber_filter.h"],
     deps = [
         ":filter_fuzz_proto_cc_proto",
