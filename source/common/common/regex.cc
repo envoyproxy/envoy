@@ -19,7 +19,11 @@ public:
 
   // CompiledMatcher
   bool match(absl::string_view value) const override {
-    return std::regex_match(value.begin(), value.end(), regex_);
+    try {
+      return std::regex_match(value.begin(), value.end(), regex_);
+    } catch (const std::regex_error& e) {
+      return false;
+    }
   }
 
   // CompiledMatcher
