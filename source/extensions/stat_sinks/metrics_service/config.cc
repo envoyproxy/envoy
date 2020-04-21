@@ -33,7 +33,8 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
               grpc_service, server.stats(), false),
           server.localInfo());
 
-  return std::make_unique<MetricsServiceSink>(grpc_metrics_streamer, server.timeSource());
+  return std::make_unique<MetricsServiceSink>(grpc_metrics_streamer, server.timeSource(),
+                                              sink_config.report_counters_as_deltas());
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
