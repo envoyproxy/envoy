@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 #
-# This is mostly copied as is from Envoy. We don't require DCO so we only
-# add a pre-push commit hook symlink.
-#
-# BELOW COPIED UNLESS OTHERWISE STATED
-#
 # Bootstraps the developer tools and development environment. This includes
 # copying project-standard git commit hooks that do things like ensure DCO
 # signoff is present during commit.
