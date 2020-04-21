@@ -115,6 +115,13 @@ void jsonConvertInternal(const Protobuf::Message& source,
   MessageUtil::loadFromJson(json, dest, validation_visitor, do_boosting);
 }
 
+enum class MessageVersion {
+  // This is an earlier version of a message, a later one exists.
+  EARLIER_VERSION,
+  // This is the latest version of a message.
+  LATEST_VERSION,
+};
+
 using MessageXformFn = std::function<void(Protobuf::Message&, MessageVersion)>;
 
 class ApiBoostRetryException : public EnvoyException {
@@ -132,18 +139,16 @@ public:
 void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   const Protobuf::Descriptor* earlier_version_desc =
       Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
-  // If there is no earlier version of a message or we only accept the latest version, just apply f
-  // directly.
+  // If there is no earlier version of a message, just apply f directly.
   if (earlier_version_desc == nullptr) {
     f(message, MessageVersion::LATEST_VERSION);
     return;
   }
 
-  // Fall back to trying the earlier version first, followed by the latest version.
+  Protobuf::DynamicMessageFactory dmf;
+  auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
+  ASSERT(earlier_message != nullptr);
   try {
-    Protobuf::DynamicMessageFactory dmf;
-    auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
-    ASSERT(earlier_message != nullptr);
     // Try apply f with an earlier version of the message, then upgrade the
     // result.
     f(*earlier_message, MessageVersion::EARLIER_VERSION);

@@ -259,14 +259,14 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 
   if (!config_path.empty()) {
     loadBootsrap(
-        options.bootstrapVersion(), bootstrap, [&](Protobuf::Message& message, bool do_boosting) {
+        options.bootstrapVersion(), bootstrap, [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
           MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
         });
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
     loadBootsrap(options.bootstrapVersion(), bootstrap_override,
-                 [&](Protobuf::Message& message, bool do_boosting) {
+                 [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
                    MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
                  });
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.

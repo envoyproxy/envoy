@@ -185,13 +185,6 @@ public:
   ProtoValidationException(const std::string& validation_error, const Protobuf::Message& message);
 };
 
-enum class MessageVersion {
-  // This is an earlier version of a message, a later one exists.
-  EARLIER_VERSION,
-  // This is the latest version of a message.
-  LATEST_VERSION,
-};
-
 class MessageUtil {
 public:
   // std::hash
