@@ -671,7 +671,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   } else {
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
     sendLocalReply(request_headers_ != nullptr &&
-                       Grpc::Common::isGrpcRequestHeader(*request_headers_),
+                       Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                    Http::Code::RequestTimeout, "stream timeout", nullptr, state_.is_head_request_,
                    absl::nullopt, StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
   }
@@ -680,7 +680,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
   sendLocalReply(request_headers_ != nullptr &&
-                     Grpc::Common::isGrpcRequestHeader(*request_headers_),
+                     Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                  Http::Code::RequestTimeout, "request timeout", nullptr, state_.is_head_request_,
                  absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
@@ -800,7 +800,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // overload it is more important to avoid unnecessary allocation than to create the filters.
     state_.created_filter_chain_ = true;
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
-    sendLocalReply(Grpc::Common::isGrpcRequestHeader(*request_headers_),
+    sendLocalReply(Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                    Http::Code::ServiceUnavailable, "envoy overloaded", nullptr,
                    state_.is_head_request_, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().Overload);

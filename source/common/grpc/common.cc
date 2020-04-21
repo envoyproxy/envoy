@@ -38,14 +38,14 @@ bool Common::hasGrpcContentType(const Http::RequestOrResponseHeaderMap& headers)
                   .getStringView()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
-bool Common::isGrpcRequestHeader(const Http::RequestHeaderMap& headers) {
+bool Common::isGrpcRequestHeaders(const Http::RequestHeaderMap& headers) {
   if (!headers.Path()) {
     return false;
   }
   return hasGrpcContentType(headers);
 }
 
-bool Common::isGrpcResponseHeader(const Http::ResponseHeaderMap& headers, bool end_stream) {
+bool Common::isGrpcResponseHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
   if (end_stream) {
     // Trailers-only response, only grpc-status is required.
     return headers.GrpcStatus() != nullptr;

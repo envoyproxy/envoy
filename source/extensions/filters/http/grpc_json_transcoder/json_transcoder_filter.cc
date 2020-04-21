@@ -259,7 +259,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     const Http::RequestHeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
     std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info) {
-  if (Grpc::Common::isGrpcRequestHeader(headers)) {
+  if (Grpc::Common::isGrpcRequestHeaders(headers)) {
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
                                 "Request headers has application/grpc content-type");
   }
@@ -476,7 +476,7 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
-  if (!Grpc::Common::isGrpcResponseHeader(headers, end_stream)) {
+  if (!Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
     error_ = true;
   }
 

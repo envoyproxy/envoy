@@ -42,14 +42,14 @@ public:
    * Currently headers are considered gRPC request headers if they have the gRPC
    * content type, and have a path header.
    */
-  static bool isGrpcRequestHeader(const Http::RequestHeaderMap& headers);
+  static bool isGrpcRequestHeaders(const Http::RequestHeaderMap& headers);
 
   /**
    * @param headers the headers to parse.
    * @param bool indicating whether the header is at end_stream.
    * @return bool indicating whether the header is a gRPC response header
    */
-  static bool isGrpcResponseHeader(const Http::ResponseHeaderMap& headers, bool end_stream);
+  static bool isGrpcResponseHeaders(const Http::ResponseHeaderMap& headers, bool end_stream);
 
   /**
    * Returns the GrpcStatus code from a given set of trailers, if present.

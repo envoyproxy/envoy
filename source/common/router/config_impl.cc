@@ -441,7 +441,7 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
   }
 
   if (match_grpc_) {
-    matches &= Grpc::Common::isGrpcRequestHeader(headers);
+    matches &= Grpc::Common::isGrpcRequestHeaders(headers);
   }
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);

@@ -583,7 +583,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
                   end_stream);
     return;
   }
-  if (!Grpc::Common::isGrpcResponseHeader(*headers, end_stream)) {
+  if (!Grpc::Common::isGrpcResponseHeaders(*headers, end_stream)) {
     onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "not a gRPC request", false);
     return;
   }

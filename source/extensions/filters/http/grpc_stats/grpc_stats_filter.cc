@@ -147,7 +147,7 @@ public:
   GrpcStatsFilter(ConfigConstSharedPtr config) : config_(config) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    grpc_request_ = Grpc::Common::isGrpcRequestHeader(headers);
+    grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
     if (grpc_request_) {
       cluster_ = decoder_callbacks_->clusterInfo();
       if (cluster_) {
@@ -203,7 +203,7 @@ public:
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
-    grpc_response_ = Grpc::Common::isGrpcResponseHeader(headers, end_stream);
+    grpc_response_ = Grpc::Common::isGrpcResponseHeaders(headers, end_stream);
     if (doStatTracking()) {
       config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
                                    headers.GrpcStatus());

@@ -187,7 +187,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
                   std::string(request_headers->ClientTraceId()->value().getStringView()));
     }
 
-    if (Grpc::Common::isGrpcRequestHeader(*request_headers)) {
+    if (Grpc::Common::isGrpcRequestHeaders(*request_headers)) {
       addGrpcRequestTags(span, *request_headers);
     }
   }
