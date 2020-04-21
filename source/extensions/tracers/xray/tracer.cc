@@ -198,14 +198,14 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   } else if (name == HttpStatusCode) {
     uint64_t status_code;
     if (!absl::SimpleAtoi(value, &status_code)) {
-      ENVOY_LOG(warn, "{} must be a number, given: {}", HttpStatusCode, value);
+      ENVOY_LOG(debug, "{} must be a number, given: {}", HttpStatusCode, value);
       return;
     }
     http_response_annotations_.emplace(SpanStatus, ValueUtil::numberValue(status_code));
   } else if (name == HttpResponseSize) {
     uint64_t response_size;
     if (!absl::SimpleAtoi(value, &response_size)) {
-      ENVOY_LOG(warn, "{} must be a number, given: {}", HttpResponseSize, value);
+      ENVOY_LOG(debug, "{} must be a number, given: {}", HttpResponseSize, value);
       return;
     }
     http_response_annotations_.emplace(SpanContentLength, ValueUtil::numberValue(response_size));
