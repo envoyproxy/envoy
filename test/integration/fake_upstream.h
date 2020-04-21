@@ -218,6 +218,9 @@ public:
     connection_.addConnectionCallbacks(*this);
   }
 
+  AssertionResult waitForDisconnect(std::chrono::milliseconds timeout,
+                                    Event::TestTimeSystem& time_system);
+
   Common::CallbackHandle* addDisconnectCallback(DisconnectCallback callback) {
     Thread::LockGuard lock(lock_);
     return disconnect_callback_manager_.add(callback);

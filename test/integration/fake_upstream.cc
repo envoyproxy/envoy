@@ -266,19 +266,18 @@ Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encod
 AssertionResult FakeConnectionBase::waitForDisconnect(bool /*ignore_spurious_events*/,
                                                       milliseconds timeout) {
   ENVOY_LOG(trace, "FakeConnectionBase waiting for disconnect");
-  auto end_time = time_system_.monotonicTime() + timeout;
-  Thread::LockGuard lock(lock_);
-  while (shared_connection_.connected()) {
-    if (time_system_.monotonicTime() >= end_time) {
-      return AssertionFailure() << "Timed out waiting for disconnect.";
-    }
-    time_system_.waitFor(lock_, connection_event_, 5ms);
-  }
-
-  if (shared_connection_.connected()) {
-    return AssertionFailure() << "Expected disconnect, but got a different event.";
-  }
+  AssertionResult result = shared_connection_.waitForDisconnect(timeout, time_system_);
   ENVOY_LOG(trace, "FakeConnectionBase done waiting for disconnect");
+  return result;
+}
+
+AssertionResult SharedConnectionWrapper::waitForDisconnect(milliseconds timeout,
+                                                           Event::TestTimeSystem& time_system) {
+  Thread::LockGuard lock(lock_);
+  if (!time_system.await(disconnected_, lock_, timeout)) {
+    return AssertionFailure() << "Timed out waiting for disconnect.";
+  }
+  ASSERT(disconnected_);
   return AssertionSuccess();
 }
 
@@ -447,6 +446,10 @@ AssertionResult FakeUpstream::waitForHttpConnection(
   auto end_time = time_system.monotonicTime() + timeout;
   {
     Thread::LockGuard lock(lock_);
+    // TODO(jmarantz): we would like to use await() below and drop the condvars,
+    // but when we flip this switch, //test/integration:protocol_integration_test
+    // fails.
+#if 1
     while (new_connections_.empty()) {
       if (time_system.monotonicTime() >= end_time) {
         return AssertionFailure() << "Timed out waiting for new connection.";
@@ -457,7 +460,17 @@ AssertionResult FakeUpstream::waitForHttpConnection(
         client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
       }
     }
-
+#else
+    if (!time_system.await([this, &client_dispatcher]() NO_THREAD_SAFETY_ANALYSIS -> bool {
+                             if (!new_connections_.empty()) {
+                               return true;
+                             }
+                             client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+                             return !new_connections_.empty();
+                           }, lock_, timeout)) {
+      return AssertionFailure() << "Timed out waiting for new connection.";
+    }
+#endif
     if (new_connections_.empty()) {
       return AssertionFailure() << "Got a new connection event, but didn't create a connection.";
     }
