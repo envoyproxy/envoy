@@ -1,0 +1,90 @@
+static_resources {
+  clusters {
+    name: "ser"
+    connect_timeout {
+      nanos: 813
+    }
+    per_connection_buffer_limit_bytes {
+    }
+    lb_policy: RING_HASH
+    health_checks {
+      timeout {
+        nanos: 95
+      }
+      interval {
+        seconds: 165537
+        nanos: 95
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+      }
+      http_health_check {
+        host: "a\037\037\037\037\037\037\037\037\037\000\037\037\037\037\037\037\037\037\037\037\037\001\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\031\037\037\037\037\037\037\037\037\037\037\037\037"
+        path: "&"
+      }
+      healthy_edge_interval {
+        nanos: 54784
+      }
+      interval_jitter_percent: 16
+    }
+    http_protocol_options {
+      header_key_format {
+        proper_case_words {
+        }
+      }
+    }
+    load_assignment {
+      cluster_name: "."
+      endpoints {
+        locality {
+          sub_zone: "\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\001\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: DRAINING
+        }
+      }
+      endpoints {
+        locality {
+          region: "."
+          sub_zone: "\037\037\037\037\037\037\037\037\037\000\037\037\037\037\037\037\037\037\037\037\037\001\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\031\037\037\037\037\037\037\037\037\037\037\037\037"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: DRAINING
+        }
+      }
+      endpoints {
+        priority: 16
+      }
+      endpoints {
+      }
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: HEALTHY
+        }
+      }
+    }
+  }
+}
+enable_dispatcher_stats: true
