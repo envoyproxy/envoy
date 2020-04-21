@@ -85,8 +85,6 @@ void Span::finishSpan() {
   auto* request_fields = request->mutable_fields();
   for (const auto& field : http_request_annotations_) {
     request_fields->insert(StructField{field.first, field.second});
-
-    (*request_fields)[field.first] = field.second;
   }
 
   ProtobufWkt::Struct* response = s.mutable_http()->mutable_response();
