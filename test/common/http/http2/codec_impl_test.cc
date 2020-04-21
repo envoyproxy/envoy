@@ -51,7 +51,8 @@ public:
       if (!dispatching_) {
         while (buffer_.length() > 0) {
           dispatching_ = true;
-          connection.dispatch(buffer_);
+          auto status = connection.dispatch(buffer_);
+          EXPECT_TRUE(status.ok());
           dispatching_ = false;
         }
       }

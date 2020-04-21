@@ -89,7 +89,8 @@ public:
         }));
     EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_request_headers), true));
     Buffer::OwnedImpl buffer(raw_request);
-    codec_->dispatch(buffer);
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
     EXPECT_EQ(0U, buffer.length());
     response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "200"}}, true);
   }
@@ -125,7 +126,13 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
         return decoder;
       }));
 
-  EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
+  // TODO: Right now this still throws instead of returning an error status.
+  EXPECT_THROW(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_TRUE(status.ok());
+      },
+      CodecProtocolException);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
   EXPECT_EQ(p, codec_->protocol());
   if (!details.empty()) {
@@ -150,7 +157,8 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
   EXPECT_EQ(p, codec_->protocol());
 }
@@ -182,11 +190,13 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
     EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
     EXPECT_CALL(decoder, decodeData(_, true));
   }
+
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
                            "6\r\nHello \r\n"
                            "5\r\nWorld\r\n"
                            "0\r\nhello: world\r\nsecond: header\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 }
 
@@ -216,15 +226,21 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
                            "Transfer-Encoding: chunked\r\n\r\n"
                            "4\r\n"
                            "body\r\n0\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   buffer = Buffer::OwnedImpl(trailer_string + "\r\n\r\n");
   if (enable_trailers) {
-    EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
-                              "trailers size exceeds limit");
+    EXPECT_THROW_WITH_MESSAGE(
+        {
+          auto status = codec_->dispatch(buffer);
+          EXPECT_FALSE(status.ok());
+        },
+        EnvoyException, "trailers size exceeds limit");
   } else {
     // If trailers are not enabled, we expect Envoy to simply skip over the large
     // trailers as if nothing has happened!
-    codec_->dispatch(buffer);
+    status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
   }
 }
 void Http1ServerConnectionImplTest::testRequestHeadersExceedLimit(std::string header_string,
@@ -241,9 +257,15 @@ void Http1ServerConnectionImplTest::testRequestHeadersExceedLimit(std::string he
       }));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   buffer = Buffer::OwnedImpl(header_string + "\r\n");
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException, "headers size exceeds limit");
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      EnvoyException, "headers size exceeds limit");
   if (!details.empty()) {
     EXPECT_EQ(details, response_encoder->getStream().responseDetails());
   }
@@ -261,9 +283,10 @@ void Http1ServerConnectionImplTest::testRequestHeadersAccepted(std::string heade
       }));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
   buffer = Buffer::OwnedImpl(header_string + "\r\n");
-  codec_->dispatch(buffer);
+  status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
@@ -283,7 +306,8 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nTest:\r\nHello: World\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 }
 
@@ -298,8 +322,12 @@ TEST_F(Http1ServerConnectionImplTest, IdentityEncodingNoChunked) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: identity\r\n\r\n");
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: unsupported transfer encoding");
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      CodecProtocolException, "http/1.1 protocol error: unsupported transfer encoding");
 }
 
 TEST_F(Http1ServerConnectionImplTest, UnsupportedEncoding) {
@@ -311,8 +339,12 @@ TEST_F(Http1ServerConnectionImplTest, UnsupportedEncoding) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: gzip\r\n\r\n");
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: unsupported transfer encoding");
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      CodecProtocolException, "http/1.1 protocol error: unsupported transfer encoding");
 }
 
 // Verify that data in the two body chunks is merged before the call to decodeData.
@@ -340,7 +372,8 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBody) {
                            "6\r\nHello \r\n"
                            "5\r\nWorld\r\n"
                            "0\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 }
 
@@ -366,7 +399,8 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodySplitOverTwoDispatches) {
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
                            "6\r\nHello \r\n"
                            "5\r\nWorl");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 
   // Process the rest of the body and final chunk.
@@ -376,7 +410,8 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodySplitOverTwoDispatches) {
 
   Buffer::OwnedImpl buffer2("d\r\n"
                             "0\r\n\r\n");
-  codec_->dispatch(buffer2);
+  status = codec_->dispatch(buffer2);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer2.length());
 }
 
@@ -405,7 +440,8 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodyFragmentedBuffer) {
                                     "6\r\nHello \r\n"
                                     "5\r\nWorld\r\n"
                                     "0\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 }
 
@@ -429,7 +465,8 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodyCase) {
 
   Buffer::OwnedImpl buffer(
       "POST / HTTP/1.1\r\ntransfer-encoding: Chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 }
 
@@ -455,8 +492,12 @@ TEST_F(Http1ServerConnectionImplTest, InvalidChunkHeader) {
                            "6\r\nHello \r\n"
                            "invalid\r\nWorl");
 
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: HPE_INVALID_CHUNK_SIZE");
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      CodecProtocolException, "http/1.1 protocol error: HPE_INVALID_CHUNK_SIZE");
 }
 
 TEST_F(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
@@ -469,8 +510,12 @@ TEST_F(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
 
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: "
                            "identity,chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: unsupported transfer encoding");
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      CodecProtocolException, "http/1.1 protocol error: unsupported transfer encoding");
 }
 
 TEST_F(Http1ServerConnectionImplTest, HostWithLWS) {
@@ -502,7 +547,8 @@ TEST_F(Http1ServerConnectionImplTest, Http10) {
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
   EXPECT_EQ(Protocol::Http10, codec_->protocol());
 }
@@ -540,7 +586,8 @@ TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
         }));
 
     EXPECT_CALL(decoder, decodeHeaders_(_, true));
-    codec_->dispatch(buffer);
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
 
     std::string output;
     ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
@@ -563,7 +610,8 @@ TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
           return decoder;
         }));
     EXPECT_CALL(decoder, decodeHeaders_(_, true));
-    codec_->dispatch(buffer);
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
     EXPECT_EQ(Protocol::Http11, codec_->protocol());
   }
 }
@@ -635,7 +683,12 @@ TEST_F(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
                            "4\r\n"
                            "body\r\n0\r\n"
                            "badtrailer\r\n\r\n");
-  EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
+  EXPECT_THROW(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      CodecProtocolException);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
 }
 
@@ -700,7 +753,8 @@ TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 }
 
@@ -711,7 +765,12 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestNoStream) {
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
   Buffer::OwnedImpl buffer("bad");
-  EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
+  EXPECT_THROW(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      CodecProtocolException);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
 }
 
@@ -727,7 +786,12 @@ TEST_F(Http1ServerConnectionImplTest, RejectInvalidMethod) {
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
   Buffer::OwnedImpl buffer("BAD / HTTP/1.1\r\nHost: foo\r\n");
-  EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
+  EXPECT_THROW(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      CodecProtocolException);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
 }
 
@@ -741,10 +805,16 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("G");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 
   Buffer::OwnedImpl buffer2("g");
-  EXPECT_THROW(codec_->dispatch(buffer2), CodecProtocolException);
+  EXPECT_THROW(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      CodecProtocolException);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
 }
 
@@ -764,7 +834,8 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
         }));
 
     Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-    codec_->dispatch(buffer);
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
     EXPECT_EQ(0U, buffer.length());
 
     // In most tests the write output is serialized to a buffer here it is
@@ -791,8 +862,12 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
         }));
 
     Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-    EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), FrameFloodException,
-                              "Too many responses queued.");
+    EXPECT_THROW_WITH_MESSAGE(
+        {
+          auto status = codec_->dispatch(buffer);
+          EXPECT_FALSE(status.ok());
+        },
+        FrameFloodException, "Too many responses queued.");
     EXPECT_EQ(1, store_.counter("http1.response_flood").value());
   }
 }
@@ -815,7 +890,8 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtectionOff) {
         }));
 
     Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-    codec_->dispatch(buffer);
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
     EXPECT_EQ(0U, buffer.length());
 
     // In most tests the write output is serialized to a buffer here it is
@@ -844,7 +920,8 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHOST: hello\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 }
 
@@ -864,7 +941,8 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRuntimeGuard) {
 
   Buffer::OwnedImpl buffer(
       absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n"));
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 // Ensures that requests with invalid HTTP header values are properly rejected
@@ -887,8 +965,12 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
       }));
   Buffer::OwnedImpl buffer(
       absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n"));
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: header value contains invalid chars");
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      CodecProtocolException, "http/1.1 protocol error: header value contains invalid chars");
   EXPECT_EQ("http1.invalid_characters", response_encoder->getStream().responseDetails());
 }
 
@@ -910,7 +992,8 @@ TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAllowed) {
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
   EXPECT_EQ(0, store_.counter("http1.dropped_headers_with_underscores").value());
 }
@@ -932,7 +1015,8 @@ TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAreDropped) {
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
   EXPECT_EQ(1, store_.counter("http1.dropped_headers_with_underscores").value());
 }
@@ -952,8 +1036,12 @@ TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreCauseRequestReject
       }));
 
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
-                            "http/1.1 protocol error: header name contains underscores");
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      EnvoyException, "http/1.1 protocol error: header name contains underscores");
   EXPECT_EQ("http1.invalid_characters", response_encoder->getStream().responseDetails());
   EXPECT_EQ(1, store_.counter("http1.requests_rejected_with_underscores_in_headers").value());
 }
@@ -972,7 +1060,11 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
       }));
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.\"com\r\n\r\n"));
   EXPECT_THROW_WITH_MESSAGE(
-      codec_->dispatch(buffer), CodecProtocolException,
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      CodecProtocolException,
       "http/1.1 protocol error: request headers failed spec compliance checks");
   EXPECT_EQ("http.invalid_authority", response_encoder->getStream().responseDetails());
 }
@@ -992,8 +1084,12 @@ TEST_F(Http1ServerConnectionImplTest, HeaderEmbeddedNulRejection) {
 
   Buffer::OwnedImpl buffer(
       absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: bar", std::string(1, '\0'), "baz\r\n"));
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      CodecProtocolException, "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
 // Mutate an HTTP GET with embedded NULs, this should always be rejected in some
@@ -1011,8 +1107,12 @@ TEST_F(Http1ServerConnectionImplTest, HeaderMutateEmbeddedNul) {
 
     Buffer::OwnedImpl buffer(
         absl::StrCat(example_input.substr(0, n), std::string(1, '\0'), example_input.substr(n)));
-    EXPECT_THROW_WITH_REGEX(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error:");
+    EXPECT_THROW_WITH_REGEX(
+        {
+          auto status = codec_->dispatch(buffer);
+          EXPECT_FALSE(status.ok());
+        },
+        CodecProtocolException, "http/1.1 protocol error:");
   }
 }
 
@@ -1034,7 +1134,8 @@ TEST_F(Http1ServerConnectionImplTest, HeaderMutateEmbeddedCRLF) {
       Buffer::OwnedImpl buffer(
           absl::StrCat(example_input.substr(0, n), std::string(1, c), example_input.substr(n)));
       try {
-        codec_->dispatch(buffer);
+        auto status = codec_->dispatch(buffer);
+        EXPECT_TRUE(status.ok());
       } catch (CodecProtocolException&) {
       }
     }
@@ -1058,7 +1159,8 @@ TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
   EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
 
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ncontent-length: 5\r\n\r\n12345");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_NE(0U, buffer.length());
 }
 
@@ -1080,7 +1182,8 @@ TEST_F(Http1ServerConnectionImplTest, PostWithContentLength) {
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), true));
 
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ncontent-length: 5\r\n\r\n12345");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 }
 
@@ -1105,7 +1208,8 @@ TEST_F(Http1ServerConnectionImplTest, PostWithContentLengthFragmentedBuffer) {
 
   Buffer::OwnedImpl buffer =
       createBufferWithOneByteSlices("POST / HTTP/1.1\r\ncontent-length: 5\r\n\r\n12345");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 }
 
@@ -1121,7 +1225,8 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
       }));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
@@ -1146,7 +1251,8 @@ TEST_F(Http1ServerConnectionImplTest, LargeHeaderResponseEncode) {
       }));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
@@ -1172,7 +1278,8 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseTrainProperHeaders) {
       }));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
@@ -1197,7 +1304,8 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith204) {
       }));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
@@ -1220,7 +1328,8 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith100Then200) {
       }));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
@@ -1249,7 +1358,8 @@ TEST_F(Http1ServerConnectionImplTest, MetadataTest) {
         return decoder;
       }));
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 
   MetadataMap metadata_map = {{"key", "value"}};
@@ -1272,7 +1382,8 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
       }));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
@@ -1307,7 +1418,8 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponseWithTrailers) {
       }));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
@@ -1339,7 +1451,8 @@ TEST_F(Http1ServerConnectionImplTest, ContentLengthResponse) {
       }));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
@@ -1365,7 +1478,8 @@ TEST_F(Http1ServerConnectionImplTest, HeadRequestResponse) {
       }));
 
   Buffer::OwnedImpl buffer("HEAD / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
@@ -1388,7 +1502,8 @@ TEST_F(Http1ServerConnectionImplTest, HeadChunkedRequestResponse) {
       }));
 
   Buffer::OwnedImpl buffer("HEAD / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
@@ -1415,12 +1530,13 @@ TEST_F(Http1ServerConnectionImplTest, DoubleRequest) {
   Buffer::OwnedImpl buffer(request);
   buffer.add(request);
 
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(request.size(), buffer.length());
 
   response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  codec_->dispatch(buffer);
+  status = codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
 }
 
@@ -1475,17 +1591,18 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequest) {
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl buffer(
       "POST / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: foo\r\ncontent-length:5\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
 
   Buffer::OwnedImpl expected_data1("12345");
   Buffer::OwnedImpl body("12345");
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data1), false));
-  codec_->dispatch(body);
+  status = codec_->dispatch(body);
 
   Buffer::OwnedImpl expected_data2("abcd");
   Buffer::OwnedImpl websocket_payload("abcd");
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), false));
-  codec_->dispatch(websocket_payload);
+  status = codec_->dispatch(websocket_payload);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithEarlyData) {
@@ -1500,7 +1617,8 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithEarlyData) {
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: "
                            "foo\r\ncontent-length:5\r\n\r\n12345abcd");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithTEChunked) {
@@ -1517,7 +1635,8 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithTEChunked) {
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: "
                            "foo\r\ntransfer-encoding: chunked\r\n\r\n12345abcd");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithNoBody) {
@@ -1534,7 +1653,8 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithNoBody) {
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl buffer(
       "GET / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: foo\r\ncontent-length: 0\r\n\r\nabcd");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ServerConnectionImplTest, ConnectRequestNoContentLength) {
@@ -1550,12 +1670,13 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestNoContentLength) {
   };
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
 
   Buffer::OwnedImpl expected_data("abcd");
   Buffer::OwnedImpl connect_payload("abcd");
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
-  codec_->dispatch(connect_payload);
+  status = codec_->dispatch(connect_payload);
+  EXPECT_TRUE(status.ok());
 }
 
 // We use the absolute URL parsing code for CONNECT requests, but it does not
@@ -1568,7 +1689,12 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestAbsoluteURLNotallowed) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("CONNECT http://host:80 HTTP/1.1\r\n\r\n");
-  EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
+  EXPECT_THROW(
+      {
+        auto status = codec_->dispatch(buffer);
+        EXPECT_TRUE(status.ok());
+      },
+      CodecProtocolException);
 }
 
 TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithEarlyData) {
@@ -1582,7 +1708,8 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithEarlyData) {
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\n\r\nabcd");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithTEChunked) {
@@ -1601,7 +1728,8 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithTEChunked) {
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl buffer(
       "CONNECT host:80 HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n12345abcd");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithContentLength) {
@@ -1617,7 +1745,8 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithContentLength) {
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\ncontent-length: 0\r\n\r\nabcd");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
@@ -1633,7 +1762,7 @@ TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
       }));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
 
   Http::MockStreamCallbacks stream_callbacks;
   response_encoder->getStream().addCallbacks(stream_callbacks);
@@ -1755,14 +1884,20 @@ TEST_F(Http1ClientConnectionImplTest, FlowControlReadDisabledReenable) {
   // Response.
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, PrematureResponse) {
   initialize();
 
   Buffer::OwnedImpl response("HTTP/1.1 408 Request Timeout\r\nConnection: Close\r\n\r\n");
-  EXPECT_THROW(codec_->dispatch(response), PrematureResponseException);
+  EXPECT_THROW(
+      {
+        auto status = codec_->dispatch(response);
+        EXPECT_FALSE(status.ok());
+      },
+      PrematureResponseException);
 }
 
 TEST_F(Http1ClientConnectionImplTest, EmptyBodyResponse503) {
@@ -1775,7 +1910,8 @@ TEST_F(Http1ClientConnectionImplTest, EmptyBodyResponse503) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, EmptyBodyResponse200) {
@@ -1788,7 +1924,8 @@ TEST_F(Http1ClientConnectionImplTest, EmptyBodyResponse200) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, HeadRequest) {
@@ -1801,7 +1938,8 @@ TEST_F(Http1ClientConnectionImplTest, HeadRequest) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, 204Response) {
@@ -1814,7 +1952,8 @@ TEST_F(Http1ClientConnectionImplTest, 204Response) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nContent-Length: 20\r\n\r\n");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, 100Response) {
@@ -1828,12 +1967,13 @@ TEST_F(Http1ClientConnectionImplTest, 100Response) {
   EXPECT_CALL(response_decoder, decode100ContinueHeaders_(_));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
   Buffer::OwnedImpl initial_response("HTTP/1.1 100 Continue\r\n\r\n");
-  codec_->dispatch(initial_response);
+  auto status = codec_->dispatch(initial_response);
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n");
-  codec_->dispatch(response);
+  status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, BadEncodeParams) {
@@ -1864,10 +2004,11 @@ TEST_F(Http1ClientConnectionImplTest, NoContentLengthResponse) {
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data2), true));
 
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\nHello World");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
 
   Buffer::OwnedImpl empty;
-  codec_->dispatch(empty);
+  status = codec_->dispatch(empty);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, ResponseWithTrailers) {
@@ -1880,8 +2021,9 @@ TEST_F(Http1ClientConnectionImplTest, ResponseWithTrailers) {
 
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello "
                              "World\r\n0\r\nhello: world\r\nsecond: header\r\n\r\n");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
   EXPECT_EQ(0UL, response.length());
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, GiantPath) {
@@ -1895,7 +2037,8 @@ TEST_F(Http1ClientConnectionImplTest, GiantPath) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, PrematureUpgradeResponse) {
@@ -1904,7 +2047,12 @@ TEST_F(Http1ClientConnectionImplTest, PrematureUpgradeResponse) {
   // make sure upgradeAllowed doesn't cause crashes if run with no pending response.
   Buffer::OwnedImpl response(
       "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: upgrade\r\nUpgrade: websocket\r\n\r\n");
-  EXPECT_THROW(codec_->dispatch(response), PrematureResponseException);
+  EXPECT_THROW(
+      {
+        auto status = codec_->dispatch(response);
+        EXPECT_FALSE(status.ok());
+      },
+      PrematureResponseException);
 }
 
 TEST_F(Http1ClientConnectionImplTest, UpgradeResponse) {
@@ -1925,19 +2073,20 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponse) {
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl response(
       "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: upgrade\r\nUpgrade: websocket\r\n\r\n");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
 
   // Send body payload
   Buffer::OwnedImpl expected_data1("12345");
   Buffer::OwnedImpl body("12345");
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data1), false));
-  codec_->dispatch(body);
+  status = codec_->dispatch(body);
 
   // Send websocket payload
   Buffer::OwnedImpl expected_data2("abcd");
   Buffer::OwnedImpl websocket_payload("abcd");
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data2), false));
-  codec_->dispatch(websocket_payload);
+  status = codec_->dispatch(websocket_payload);
+  EXPECT_TRUE(status.ok());
 }
 
 // Same data as above, but make sure directDispatch immediately hands off any
@@ -1962,7 +2111,8 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: "
                              "upgrade\r\nUpgrade: websocket\r\n\r\n12345abcd");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, ConnectResponse) {
@@ -1978,19 +2128,20 @@ TEST_F(Http1ClientConnectionImplTest, ConnectResponse) {
   // Send response headers
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
 
   // Send body payload
   Buffer::OwnedImpl expected_data1("12345");
   Buffer::OwnedImpl body("12345");
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data1), false));
-  codec_->dispatch(body);
+  status = codec_->dispatch(body);
 
   // Send connect payload
   Buffer::OwnedImpl expected_data2("abcd");
   Buffer::OwnedImpl connect_payload("abcd");
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data2), false));
-  codec_->dispatch(connect_payload);
+  status = codec_->dispatch(connect_payload);
+  EXPECT_TRUE(status.ok());
 }
 
 // Same data as above, but make sure directDispatch immediately hands off any
@@ -2010,7 +2161,8 @@ TEST_F(Http1ClientConnectionImplTest, ConnectResponseWithEarlyData) {
   Buffer::OwnedImpl expected_data("12345abcd");
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\n12345abcd");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, ConnectRejected) {
@@ -2027,7 +2179,8 @@ TEST_F(Http1ClientConnectionImplTest, ConnectRejected) {
   Buffer::OwnedImpl expected_data("12345abcd");
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl response("HTTP/1.1 400 OK\r\n\r\n12345abcd");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {
@@ -2085,10 +2238,15 @@ TEST_F(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
 
   Buffer::OwnedImpl response2("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n");
-  EXPECT_THROW(codec_->dispatch(response2), PrematureResponseException);
+  EXPECT_THROW(
+      {
+        status = codec_->dispatch(response2);
+        EXPECT_FALSE(status.ok());
+      },
+      PrematureResponseException);
 
   // Fake a call for going below the low watermark. Make sure no stream callbacks get called.
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark()).Times(0);
@@ -2124,7 +2282,8 @@ TEST_F(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
             ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
       }));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
-  codec_->dispatch(response);
+  auto status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeTrailersRejected) {
@@ -2154,7 +2313,7 @@ TEST_F(Http1ServerConnectionImplTest, ManyTrailersIgnored) {
 TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
-  testRequestHeadersExceedLimit(long_string);
+  testRequestHeadersExceedLimit(long_string, "");
 }
 
 // Tests that the default limit for the number of request headers is 100.
@@ -2176,16 +2335,17 @@ TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejected) {
         return decoder;
       }));
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
 
   std::string long_string = std::string(1024, 'q');
   for (int i = 0; i < 59; i++) {
     buffer = Buffer::OwnedImpl(fmt::format("big: {}\r\n", long_string));
-    codec_->dispatch(buffer);
+    status = codec_->dispatch(buffer);
   }
   // the 60th 1kb header should induce overflow
   buffer = Buffer::OwnedImpl(fmt::format("big: {}\r\n", long_string));
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException, "headers size exceeds limit");
+  EXPECT_THROW_WITH_MESSAGE(status = status = codec_->dispatch(buffer), EnvoyException,
+                            "headers size exceeds limit");
   EXPECT_EQ("http1.headers_too_large", response_encoder->getStream().responseDetails());
 }
 
@@ -2204,15 +2364,20 @@ TEST_F(Http1ServerConnectionImplTest, ManyRequestHeadersSplitRejected) {
         return decoder;
       }));
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
 
   // Dispatch 100 headers.
   buffer = Buffer::OwnedImpl(createHeaderFragment(100));
-  codec_->dispatch(buffer);
+  status = codec_->dispatch(buffer);
 
   // The final 101th header should induce overflow.
   buffer = Buffer::OwnedImpl("header101:\r\n\r\n");
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException, "headers size exceeds limit");
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      EnvoyException, "headers size exceeds limit");
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersAccepted) {
@@ -2244,10 +2409,12 @@ TEST_F(Http1ClientConnectionImplTest, LargeResponseHeadersRejected) {
   request_encoder.encodeHeaders(headers, true);
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   std::string long_header = "big: " + std::string(80 * 1024, 'q') + "\r\n";
   buffer = Buffer::OwnedImpl(long_header);
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException, "headers size exceeds limit");
+  EXPECT_THROW_WITH_MESSAGE(status = codec_->dispatch(buffer), EnvoyException,
+                            "headers size exceeds limit");
 }
 
 // Tests that the size of response headers for HTTP/1 must be under 80 kB.
@@ -2260,10 +2427,11 @@ TEST_F(Http1ClientConnectionImplTest, LargeResponseHeadersAccepted) {
   request_encoder.encodeHeaders(headers, true);
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
   std::string long_header = "big: " + std::string(79 * 1024, 'q') + "\r\n";
   buffer = Buffer::OwnedImpl(long_header);
-  codec_->dispatch(buffer);
+  status = codec_->dispatch(buffer);
 }
 
 // Regression test for CVE-2019-18801. Large method headers should not trigger
@@ -2328,9 +2496,14 @@ TEST_F(Http1ClientConnectionImplTest, ManyResponseHeadersRejected) {
   request_encoder.encodeHeaders(headers, true);
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
   buffer = Buffer::OwnedImpl(createHeaderFragment(101) + "\r\n");
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException, "headers size exceeds limit");
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        status = codec_->dispatch(buffer);
+        EXPECT_FALSE(status.ok());
+      },
+      EnvoyException, "headers size exceeds limit");
 }
 
 // Tests that the number of response headers is configurable.
@@ -2345,10 +2518,10 @@ TEST_F(Http1ClientConnectionImplTest, ManyResponseHeadersAccepted) {
   request_encoder.encodeHeaders(headers, true);
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
-  codec_->dispatch(buffer);
+  auto status = codec_->dispatch(buffer);
   // Response already contains one header.
   buffer = Buffer::OwnedImpl(createHeaderFragment(150) + "\r\n");
-  codec_->dispatch(buffer);
+  status = codec_->dispatch(buffer);
 }
 
 } // namespace Http1

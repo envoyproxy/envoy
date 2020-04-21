@@ -34,6 +34,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/path_utility.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
@@ -279,7 +280,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   return **streams_.begin();
 }
 
-void ConnectionManagerImpl::handleCodecException(const char* error) {
+void ConnectionManagerImpl::handleCodecException(absl::string_view error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
   read_callbacks_->connection().streamInfo().setResponseCodeDetails(
       absl::StrCat("codec error: ", error));
@@ -322,15 +323,23 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   bool redispatch;
   do {
     redispatch = false;
+    Envoy::Http::Status status;
 
     try {
-      codec_->dispatch(data);
+      status = codec_->dispatch(data);
     } catch (const FrameFloodException& e) {
-      handleCodecException(e.what());
-      return Network::FilterStatus::StopIteration;
+      status = Envoy::Http::bufferFloodError(e.what());
     } catch (const CodecProtocolException& e) {
+      status = Envoy::Http::codecProtocolError(e.what());
+    }
+
+    ASSERT(!Envoy::Http::isPrematureResponseError(status));
+    if (Envoy::Http::isBufferFloodError(status)) {
+      handleCodecException(status.message());
+      return Network::FilterStatus::StopIteration;
+    } else if (Envoy::Http::isCodecProtocolError(status)) {
       stats_.named_.downstream_cx_protocol_error_.inc();
-      handleCodecException(e.what());
+      handleCodecException(status.message());
       return Network::FilterStatus::StopIteration;
     }
 

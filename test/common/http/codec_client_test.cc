@@ -239,10 +239,8 @@ TEST_F(CodecClientTest, ProtocolError) {
 }
 
 TEST_F(CodecClientTest, 408Response) {
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> void {
-    throw PrematureResponseException(Code::RequestTimeout);
-  }));
-
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillOnce(Throw(PrematureResponseException(Code::RequestTimeout)));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl data;
@@ -252,10 +250,7 @@ TEST_F(CodecClientTest, 408Response) {
 }
 
 TEST_F(CodecClientTest, PrematureResponse) {
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> void {
-    throw PrematureResponseException(Code::OK);
-  }));
-
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Throw(PrematureResponseException(Code::OK)));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl data;
@@ -375,10 +370,12 @@ TEST_P(CodecNetworkTest, SendData) {
   const std::string full_data = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n";
   Buffer::OwnedImpl data(full_data);
   upstream_connection_->write(data, false);
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
-    EXPECT_EQ(full_data, data.toString());
-    dispatcher_->exit();
-  }));
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+        EXPECT_EQ(full_data, data.toString());
+        dispatcher_->exit();
+        return Envoy::Http::okStatus();
+      }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_CALL(inner_encoder_.stream_, resetStream(_));
@@ -397,9 +394,14 @@ TEST_P(CodecNetworkTest, SendHeadersAndClose) {
   upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
-      .WillOnce(
-          Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ(full_data, data.toString()); }))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ("", data.toString()); }));
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+        EXPECT_EQ(full_data, data.toString());
+        return Envoy::Http::okStatus();
+      }))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+        EXPECT_EQ("", data.toString());
+        return Envoy::Http::okStatus();
+      }));
   // Because the headers are not complete, the disconnect will reset the stream.
   // Note even if the final \r\n were appended to the header data, enough of the
   // codec state is mocked out that the data would not be framed and the stream
@@ -430,9 +432,14 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
 
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
-      .WillOnce(
-          Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ(full_data, data.toString()); }))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ("", data.toString()); }));
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+        EXPECT_EQ(full_data, data.toString());
+        return Envoy::Http::okStatus();
+      }))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+        EXPECT_EQ("", data.toString());
+        return Envoy::Http::okStatus();
+      }));
   EXPECT_CALL(inner_encoder_.stream_, resetStream(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
     for (auto callbacks : inner_encoder_.stream_.callbacks_) {
       callbacks->onResetStream(StreamResetReason::RemoteReset, absl::string_view());

@@ -11,6 +11,8 @@
 #include "envoy/http/protocol.h"
 #include "envoy/network/address.h"
 
+#include "common/http/status.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -359,8 +361,10 @@ public:
   /**
    * Dispatch incoming connection data.
    * @param data supplies the data to dispatch. The codec will drain as many bytes as it processes.
+   * @return Envoy::Http::Status indicating the status of the codec. Holds any errors found in the
+   * callbacks.
    */
-  virtual void dispatch(Buffer::Instance& data) PURE;
+  virtual Envoy::Http::Status dispatch(Buffer::Instance& data) PURE;
 
   /**
    * Indicate "go away" to the remote. No new streams can be created beyond this point.

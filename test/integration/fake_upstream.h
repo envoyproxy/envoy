@@ -447,7 +447,10 @@ private:
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
       try {
-        parent_.codec_->dispatch(data);
+        auto status = parent_.codec_->dispatch(data);
+        if (!status.ok()) {
+          return Network::FilterStatus::StopIteration;
+        }
       } catch (const Http::CodecProtocolException& e) {
         ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", e.what());
         // We don't do a full stream shutdown like HCM, but just shutdown the

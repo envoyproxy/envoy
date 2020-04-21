@@ -467,8 +467,11 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
 
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
-void ConnectionImpl::dispatch(Buffer::Instance& data) {
+Envoy::Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
+  // Make sure that dispatching_ is set to false after dispatching, even when
+  // ConnectionImpl::dispatch throws an exception.
+  Cleanup cleanup([this]() { dispatching_ = false; });
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     dispatching_ = true;
     ssize_t rc =
@@ -489,6 +492,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 
   // Decoding incoming frames can generate outbound frames so flush pending.
   sendPendingFrames();
+  return Envoy::Http::okStatus();
 }
 
 ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
@@ -1339,7 +1343,7 @@ void ServerConnectionImpl::checkOutboundQueueLimits() {
   }
 }
 
-void ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+Envoy::Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   ASSERT(!dispatching_downstream_data_);
   dispatching_downstream_data_ = true;
 
@@ -1350,7 +1354,7 @@ void ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   checkOutboundQueueLimits();
 
-  ConnectionImpl::dispatch(data);
+  return ConnectionImpl::dispatch(data);
 }
 
 absl::optional<int>
