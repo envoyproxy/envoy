@@ -33,13 +33,6 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 @property (nonatomic, strong) void (^onData)(NSData *data, BOOL endStream);
 
 /**
- * Called when all metadata gets received on the async HTTP stream.
- * Note that end stream is implied when on_trailers is called.
- * @param metadata the metadata received.
- */
-@property (nonatomic, strong) void (^onMetadata)(EnvoyHeaders *metadata);
-
-/**
  * Called when all trailers get received on the async HTTP stream.
  * Note that end stream is implied when on_trailers is called.
  * @param trailers the trailers received.
@@ -88,13 +81,6 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
  @param close True if the stream should be closed after sending.
  */
 - (void)sendData:(NSData *)data close:(BOOL)close;
-
-/**
- Send metadata over the provided stream.
-
- @param metadata Metadata to send over the stream.
- */
-- (void)sendMetadata:(EnvoyHeaders *)metadata;
 
 /**
  Send trailers over the provided stream.

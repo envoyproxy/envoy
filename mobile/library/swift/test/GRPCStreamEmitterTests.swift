@@ -20,10 +20,6 @@ private final class MockEmitter: StreamEmitter {
     return self
   }
 
-  func sendMetadata(_ metadata: [String: [String]]) -> StreamEmitter {
-    return self
-  }
-
   func close(trailers: [String: [String]]) {}
 
   func close(data: Data) {

@@ -92,15 +92,6 @@ class JniLibrary {
   protected static native int sendData(long stream, ByteBuffer data, boolean endStream);
 
   /**
-   * Send metadata over an HTTP stream. This method can be invoked multiple times.
-   *
-   * @param stream,   the stream to send metadata over.
-   * @param metadata, the metadata to send.
-   * @return int, the resulting status of the operation.
-   */
-  protected static native int sendMetadata(long stream, byte[][] metadata);
-
-  /**
    * Send trailers over an open HTTP stream. This method can only be invoked once
    * per stream. Note that this method implicitly ends the stream.
    *

@@ -25,8 +25,6 @@ extension MockEnvoyHTTPStream: EnvoyHTTPStream {
     MockEnvoyHTTPStream.onData?(data, close)
   }
 
-  func sendMetadata(_ metadata: [String: [String]]) {}
-
   func sendTrailers(_ trailers: [String: [String]]) {
     MockEnvoyHTTPStream.onTrailers?(trailers)
   }

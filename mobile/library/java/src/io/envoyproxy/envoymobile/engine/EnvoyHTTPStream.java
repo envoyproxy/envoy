@@ -51,16 +51,6 @@ public class EnvoyHTTPStream {
   }
 
   /**
-   * Send metadata over an HTTP streamHandle. This method can be invoked multiple
-   * times.
-   *
-   * @param metadata, the metadata to send.
-   */
-  public void sendMetadata(Map<String, List<String>> metadata) {
-    JniLibrary.sendMetadata(streamHandle, toJniLibraryHeaders(metadata));
-  }
-
-  /**
    * Send trailers over an open HTTP streamHandle. This method can only be invoked
    * once per streamHandle. Note that this method implicitly ends the
    * streamHandle.

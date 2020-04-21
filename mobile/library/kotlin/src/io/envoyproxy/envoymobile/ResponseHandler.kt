@@ -15,7 +15,6 @@ class ResponseHandler(val executor: Executor) {
 
     internal var onHeadersClosure: (headers: Map<String, List<String>>, statusCode: Int, endStream: Boolean) -> Unit = { _, _, _ -> Unit }
     internal var onDataClosure: (byteBuffer: ByteBuffer, endStream: Boolean) -> Unit = { _, _ -> Unit }
-    internal var onMetadataClosure: (metadata: Map<String, List<String>>) -> Unit = { Unit }
     internal var onTrailersClosure: (trailers: Map<String, List<String>>) -> Unit = { Unit }
     internal var onErrorClosure: (errorCode: Int, message: String) -> Unit = { _, _ -> Unit }
     internal var onCancelClosure: () -> Unit = { Unit }
@@ -31,10 +30,6 @@ class ResponseHandler(val executor: Executor) {
 
     override fun onData(byteBuffer: ByteBuffer, endStream: Boolean) {
       onDataClosure(byteBuffer, endStream)
-    }
-
-    override fun onMetadata(metadata: Map<String, List<String>>) {
-      onMetadataClosure(metadata)
     }
 
     override fun onTrailers(trailers: Map<String, List<String>>) {
@@ -76,18 +71,6 @@ class ResponseHandler(val executor: Executor) {
    */
   fun onData(closure: (byteBuffer: ByteBuffer, endStream: Boolean) -> Unit): ResponseHandler {
     underlyingCallbacks.onDataClosure = closure
-    return this
-  }
-
-  /**
-   * Called when response metadata is received by the stream.
-   *
-   * @param metadata the metadata of a response.
-   * @param endStream true if the stream is complete.
-   * @return ResponseHandler, this ResponseHandler.
-   */
-  fun onMetadata(closure: (metadata: Map<String, List<String>>) -> Unit): ResponseHandler {
-    underlyingCallbacks.onMetadataClosure = closure
     return this
   }
 
