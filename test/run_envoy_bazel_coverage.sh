@@ -40,7 +40,6 @@ fi
 # Set the bazel targets to run.
 BAZEL_TARGET=//test/coverage:coverage_tests && [[ ${FUZZ_COVERAGE} == "true" ]] && BAZEL_TARGET=${COVERAGE_TARGETS}
 
-# Using GTEST_SHUFFLE here to workaround https://github.com/envoyproxy/envoy/issues/10108
 # Add binaries to OBJECTS to pass in to llvm-cov
 OBJECTS=""
 # For nornaml builds, BAZEL_TARGET only contains //test/coverage:coverage_tests
@@ -66,10 +65,10 @@ do
     TARGET="${t}"
   fi
 
-  BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata /usr/local/bin/bazel coverage ${BAZEL_BUILD_OPTIONS} \
+  BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
     -c fastbuild --copt=-DNDEBUG --instrumentation_filter=//source/...,//include/... \
     --test_timeout=2000 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --test_output=errors \
-    "${TEST_ARGS[@]}" --test_env=HEAPCHECK= --test_env=GTEST_SHUFFLE=1 ${TARGET}
+    "${TEST_ARGS[@]}" --test_env=HEAPCHECK=  ${TARGET}
 done
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
