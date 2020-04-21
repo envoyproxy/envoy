@@ -1370,7 +1370,8 @@ class DeprecatedFieldsTest : public testing::TestWithParam<bool> {
 protected:
   DeprecatedFieldsTest()
       : with_upgrade_(GetParam()), api_(Api::createApiForTest(store_)),
-        runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")) {
+        runtime_deprecated_feature_use_(
+            store_.gauge("runtime.deprecated_feature_use", Stats::Gauge::ImportMode::NeverImport)) {
     envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
     loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
@@ -1397,7 +1398,7 @@ protected:
   Api::ApiPtr api_;
   Runtime::MockRandomGenerator rand_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
-  Stats::Counter& runtime_deprecated_feature_use_;
+  Stats::Gauge& runtime_deprecated_feature_use_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
