@@ -86,8 +86,8 @@ GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip:
         // According to
         // https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#embeddedmessage
         // the message Compressor takes ownership of the allocated Protobuf::Uint32Value object.
-        // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
         new Protobuf::UInt32Value(gzip.compressor().content_length()));
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
     for (const std::string& ctype : gzip.compressor().content_type()) {
       compressor.add_content_type(ctype);
     }
@@ -101,8 +101,8 @@ GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip:
           // https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#embeddedmessage
           // the message RuntimeFeatureFlag takes ownership of the allocated Protobuf::BoolValue
           // object.
-          // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
           new Protobuf::BoolValue(gzip.compressor().runtime_enabled().default_value()));
+      // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
       compressor.set_allocated_runtime_enabled(feature_flag);
     }
     return compressor;
@@ -113,9 +113,9 @@ GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip:
         // According to
         // https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#embeddedmessage
         // the message Compressor takes ownership of the allocated Protobuf::Uint32Value object.
-        // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
         new Protobuf::UInt32Value(gzip.hidden_envoy_deprecated_content_length()));
   }
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   for (const std::string& ctype : gzip.hidden_envoy_deprecated_content_type()) {
     compressor.add_content_type(ctype);
   }
