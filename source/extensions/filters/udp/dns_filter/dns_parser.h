@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/address.h"
 #include "envoy/network/listener.h"
 
