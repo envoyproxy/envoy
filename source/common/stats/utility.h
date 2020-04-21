@@ -36,8 +36,15 @@ public:
    */
   static absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
 
-  // Represents a stat name token, using either a StatName or a string_view.
-  using Element = absl::variant<StatName, absl::string_view>;
+  // Represents a stat name token, using either a StatName or a string_view,
+  // which will be treated as a dynamic string. We subclass string_view simply
+  // to make it a bit more explicit when we are creating a dynamic stat name,
+  // since those are expensive.
+  class Dynamic : public absl::string_view {
+  public:
+    Dynamic(absl::string_view s) : absl::string_view(s) {}
+  };
+  using Element = absl::variant<StatName, Dynamic>;
   using ElementVec = std::vector<Element>;
 
   /**

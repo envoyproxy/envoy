@@ -37,26 +37,31 @@ protected:
 
 TEST_F(StatsUtilityTest, Counters) {
   ScopePtr scope = store_->createScope("scope.");
-  Counter& c1 = Utility::counterFromElements(*scope, {"a", "b"});
+  Counter& c1 =
+      Utility::counterFromElements(*scope, {Utility::Dynamic("a"), Utility::Dynamic("b")});
   EXPECT_EQ("scope.a.b", c1.name());
   StatName token = pool_.add("token");
-  Counter& c2 = Utility::counterFromElements(*scope, {"a", token, "b"});
+  Counter& c2 =
+      Utility::counterFromElements(*scope, {Utility::Dynamic("a"), token, Utility::Dynamic("b")});
   EXPECT_EQ("scope.a.token.b", c2.name());
   StatName suffix = pool_.add("suffix");
   Counter& c3 = Utility::counterFromElements(*scope, {token, suffix});
   EXPECT_EQ("scope.token.suffix", c3.name());
 
-  Counter& ctags = Utility::counterFromElements(*scope, {"x", token, "y"}, tags_);
+  Counter& ctags = Utility::counterFromElements(
+      *scope, {Utility::Dynamic("x"), token, Utility::Dynamic("y")}, tags_);
   EXPECT_EQ("scope.x.token.y.tag1.value1.tag2.value2", ctags.name());
 }
 
 TEST_F(StatsUtilityTest, Gauges) {
   ScopePtr scope = store_->createScope("scope.");
-  Gauge& g1 = Utility::gaugeFromElements(*scope, {"a", "b"}, Gauge::ImportMode::NeverImport);
+  Gauge& g1 = Utility::gaugeFromElements(*scope, {Utility::Dynamic("a"), Utility::Dynamic("b")},
+                                         Gauge::ImportMode::NeverImport);
   EXPECT_EQ("scope.a.b", g1.name());
   EXPECT_EQ(Gauge::ImportMode::NeverImport, g1.importMode());
   StatName token = pool_.add("token");
-  Gauge& g2 = Utility::gaugeFromElements(*scope, {"a", token, "b"}, Gauge::ImportMode::Accumulate);
+  Gauge& g2 = Utility::gaugeFromElements(
+      *scope, {Utility::Dynamic("a"), token, Utility::Dynamic("b")}, Gauge::ImportMode::Accumulate);
   EXPECT_EQ("scope.a.token.b", g2.name());
   EXPECT_EQ(Gauge::ImportMode::Accumulate, g2.importMode());
   StatName suffix = pool_.add("suffix");
@@ -66,12 +71,13 @@ TEST_F(StatsUtilityTest, Gauges) {
 
 TEST_F(StatsUtilityTest, Histograms) {
   ScopePtr scope = store_->createScope("scope.");
-  Histogram& h1 = Utility::histogramFromElements(*scope, {"a", "b"}, Histogram::Unit::Milliseconds);
+  Histogram& h1 = Utility::histogramFromElements(
+      *scope, {Utility::Dynamic("a"), Utility::Dynamic("b")}, Histogram::Unit::Milliseconds);
   EXPECT_EQ("scope.a.b", h1.name());
   EXPECT_EQ(Histogram::Unit::Milliseconds, h1.unit());
   StatName token = pool_.add("token");
-  Histogram& h2 =
-      Utility::histogramFromElements(*scope, {"a", token, "b"}, Histogram::Unit::Microseconds);
+  Histogram& h2 = Utility::histogramFromElements(
+      *scope, {Utility::Dynamic("a"), token, Utility::Dynamic("b")}, Histogram::Unit::Microseconds);
   EXPECT_EQ("scope.a.token.b", h2.name());
   EXPECT_EQ(Histogram::Unit::Microseconds, h2.unit());
   StatName suffix = pool_.add("suffix");

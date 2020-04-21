@@ -155,13 +155,13 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
     Stats::Utility::ElementVec names;
     names.reserve(6); // 2 entries are added by chargeQueryStats().
     names.push_back(mongo_stats_->collection_);
-    names.push_back(active_query->query_info_.collection());
+    names.push_back(Stats::Utility::Dynamic(active_query->query_info_.collection()));
     chargeQueryStats(names, query_type);
 
     // Callsite stats if we have it.
     if (!active_query->query_info_.callsite().empty()) {
       names.push_back(mongo_stats_->callsite_);
-      names.push_back(active_query->query_info_.callsite());
+      names.push_back(Stats::Utility::Dynamic(active_query->query_info_.callsite()));
       chargeQueryStats(names, query_type);
     }
 
@@ -224,14 +224,14 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
 
     if (!active_query.query_info_.command().empty()) {
       Stats::Utility::ElementVec names{mongo_stats_->cmd_,
-                               mongo_stats_->getBuiltin(active_query.query_info_.command(),
-                                                        mongo_stats_->unknown_command_)};
+                                       mongo_stats_->getBuiltin(active_query.query_info_.command(),
+                                                                mongo_stats_->unknown_command_)};
       chargeReplyStats(active_query, names, *message);
     } else {
       // Collection stats first.
       Stats::Utility::ElementVec names{mongo_stats_->collection_,
-                               active_query.query_info_.collection(),
-                               mongo_stats_->query_};
+                                       Stats::Utility::Dynamic(active_query.query_info_.collection()),
+                                       mongo_stats_->query_};
       chargeReplyStats(active_query, names, *message);
 
       // Callsite stats if we have it.
@@ -240,7 +240,7 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
         // to mutate the array to {"collection", collection, "callsite", callsite, "query"}.
         ASSERT(names.size() == 3);
         names.back() = mongo_stats_->callsite_; // Replaces "query".
-        names.push_back(active_query.query_info_.callsite());
+        names.push_back(Stats::Utility::Dynamic(active_query.query_info_.callsite()));
         names.push_back(mongo_stats_->query_);
         chargeReplyStats(active_query, names, *message);
       }
