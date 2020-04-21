@@ -834,12 +834,6 @@ ProtobufWkt::Value ValueUtil::boolValue(bool b) {
   return val;
 }
 
-ProtobufWkt::Value ValueUtil::numberValue(const double d) {
-  ProtobufWkt::Value val;
-  val.set_number_value(d);
-  return val;
-}
-
 ProtobufWkt::Value ValueUtil::structValue(const ProtobufWkt::Struct& obj) {
   ProtobufWkt::Value val;
   (*val.mutable_struct_value()) = obj;
