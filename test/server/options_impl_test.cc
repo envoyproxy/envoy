@@ -48,6 +48,11 @@ public:
     return std::make_unique<OptionsImpl>(
         std::move(words), [](bool) { return "1"; }, spdlog::level::warn);
   }
+
+  std::unique_ptr<OptionsImpl> createOptionsImpl(std::vector<std::string> args) {
+    return std::make_unique<OptionsImpl>(
+        std::move(args), [](bool) { return "1"; }, spdlog::level::warn);
+  }
 };
 
 TEST_F(OptionsImplTest, HotRestartVersion) {
@@ -90,7 +95,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(1U, options->restartEpoch());
   EXPECT_EQ(spdlog::level::info, options->logLevel());
   EXPECT_EQ(2, options->componentLogLevels().size());
-  EXPECT_EQ("[%v]", options->logFormat());
+  EXPECT_EQ("[[%g:%#] %v]", options->logFormat());
   EXPECT_EQ("/foo/bar", options->logPath());
   EXPECT_EQ("cluster", options->serviceClusterName());
   EXPECT_EQ("node", options->serviceNodeName());
@@ -256,7 +261,8 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // 4. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
   // 5. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
   // 6. hot restart version - print the hot restart version and exit.
-  EXPECT_EQ(options->count() - 6, command_line_options->GetDescriptor()->field_count());
+  // 7. log-format-prefix-with-location - short-term override for rollout of dynamic log format.
+  EXPECT_EQ(options->count() - 7, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, OptionsFromArgv) {
@@ -399,6 +405,30 @@ TEST_F(OptionsImplTest, SetBothConcurrencyAndCpuset) {
 TEST_F(OptionsImplTest, SetCpusetOnly) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello --cpuset-threads");
   EXPECT_NE(options->concurrency(), 0);
+}
+
+TEST_F(OptionsImplTest, LogFormatDefault) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl({"envoy", "-c", "hello"});
+  EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
+}
+
+TEST_F(OptionsImplTest, LogFormatDefaultNoPrefix) {
+  std::unique_ptr<OptionsImpl> options =
+      createOptionsImpl({"envoy", "-c", "hello", "--log-format-prefix-with-location", "0"});
+  EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] %v");
+}
+
+TEST_F(OptionsImplTest, LogFormatOverride) {
+  std::unique_ptr<OptionsImpl> options =
+      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
+  EXPECT_EQ(options->logFormat(), "%%v [%g:%#] %v %t [%g:%#] %v");
+}
+
+TEST_F(OptionsImplTest, LogFormatOverrideNoPrefix) {
+  std::unique_ptr<OptionsImpl> options =
+      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v",
+                         "--log-format-prefix-with-location 0"});
+  EXPECT_EQ(options->logFormat(), "%%v %v %t %v");
 }
 
 #if defined(__linux__)
