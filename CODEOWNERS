@@ -40,6 +40,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/tracers/xray @marcomagdy @lavignes @mattklein123
 # mysql_proxy extension
 /*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123
+# postgres_proxy extension
+/*/extensions/filters/network/postgres_proxy @fabriziomello @cpakulski @dio
 # quic extension
 /*/extensions/quic_listeners/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin
 # zookeeper_proxy extension

@@ -1,0 +1,36 @@
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: "{}"
+      port_value: 0
+static_resources:
+  clusters:
+    name: cluster_0
+    type: STATIC
+    load_assignment:
+      cluster_name: cluster_0
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: "{}"
+                port_value: 0
+  listeners:
+    name: listener_0
+    address:
+      socket_address:
+        address: "{}"
+        port_value: 0
+    filter_chains:
+      - filters:
+          - name: postgres
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy
+              stat_prefix: postgres_stats
+          - name: tcp
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+              stat_prefix: tcp_stats
+              cluster: cluster_0

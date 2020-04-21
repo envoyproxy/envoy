@@ -118,6 +118,7 @@ GETting
 GLB
 GOAWAY
 GRPC
+GSS
 GTEST
 GURL
 Grabbit
@@ -222,6 +223,8 @@ PostCBs
 PREBIND
 PRNG
 PROT
+Postgre
+Postgres
 Prereq
 QUIC
 QoS
@@ -828,6 +831,8 @@ pos
 posix
 postfix
 postfixes
+postgres
+postgresql
 pre
 preallocate
 preallocating
