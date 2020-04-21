@@ -115,7 +115,7 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
 
 constexpr uint64_t TimeoutPrecisionFactor = 100;
 
-absl::string_view getPath(const Http::RequestHeaderMap& headers) {
+const absl::string_view getPath(const Http::RequestHeaderMap& headers) {
   return headers.Path() ? headers.Path()->value().getStringView() : "";
 }
 

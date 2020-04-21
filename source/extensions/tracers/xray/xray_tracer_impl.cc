@@ -95,7 +95,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   }
 
   if (!should_trace.has_value()) {
-    absl::string_view path =
+    const absl::string_view path =
         request_headers.Path() ? request_headers.Path()->value().getStringView() : "";
     const SamplingRequest request{std::string{request_headers.Host()->value().getStringView()},
                                   std::string{request_headers.Method()->value().getStringView()},

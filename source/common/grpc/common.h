@@ -39,6 +39,8 @@ public:
   /**
    * @param headers the headers to parse.
    * @return bool indicating whether the header is a gRPC request header.
+   * Currently headers are considered gRPC request headers if they have the gRPC
+   * content type, and have a path header.
    */
   static bool isGrpcRequestHeader(const Http::RequestHeaderMap& headers);
 

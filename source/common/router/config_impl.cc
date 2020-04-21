@@ -59,7 +59,7 @@ convertInternalRedirectAction(const envoy::config::route::v3::RouteAction& route
 
 const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
-absl::string_view getPath(const Http::RequestHeaderMap& headers) {
+const absl::string_view getPath(const Http::RequestHeaderMap& headers) {
   return headers.Path() ? headers.Path()->value().getStringView() : "";
 }
 
