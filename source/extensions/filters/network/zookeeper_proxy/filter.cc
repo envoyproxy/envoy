@@ -290,11 +290,10 @@ void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32
                                         const std::chrono::milliseconds& latency) {
   config_->stats_.connect_resp_.inc();
 
-  Stats::SymbolTable::StoragePtr storage =
-      config_->scope_.symbolTable().join({config_->stat_prefix_, config_->connect_latency_});
-  config_->scope_
-      .histogramFromStatName(Stats::StatName(storage.get()), Stats::Histogram::Unit::Milliseconds)
-      .recordValue(latency.count());
+  Stats::Histogram& histogram = Stats::Utility::histogramFromElements(
+      config_->scope_, {config_->stat_prefix_, config_->connect_latency_},
+      Stats::Histogram::Unit::Milliseconds);
+  histogram.recordValue(latency.count());
 
   setDynamicMetadata({{"opname", "connect_response"},
                       {"protocol_version", std::to_string(proto_version)},
@@ -315,6 +314,12 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
   }
   Stats::SymbolTable::StoragePtr storage =
       config_->scope_.symbolTable().join({config_->stat_prefix_, opcode_latency});
+
+  Stats::Histogram& histogram = Stats::Utility::histogramFromElements(
+      config_->scope_, {config_->stat_prefix_, opcode_latency},
+      Stats::Histogram::Unit::Milliseconds);
+  histogram.recordValue(latency.count());
+
   config_->scope_
       .histogramFromStatName(Stats::StatName(storage.get()), Stats::Histogram::Unit::Milliseconds)
       .recordValue(latency.count());
