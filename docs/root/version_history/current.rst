@@ -23,6 +23,7 @@ Changes
 * router: allow retries of streaming or incomplete requests. This removes stat `rq_retry_skipped_request_not_complete`.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
   can now have a separate :ref:`tracing provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
+* upstream: fixed a bug where Envoy would panic when receiving a GRPC SERVICE_UNKNOWN status on the health check.
 
 Deprecated
 ----------
