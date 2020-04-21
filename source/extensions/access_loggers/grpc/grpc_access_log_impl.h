@@ -21,7 +21,19 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace GrpcCommon {
 
-// TODO(mattklein123): Stats
+/**
+ *  * All stats for the HTTP/1 codec. @see stats_macros.h
+ *   */
+#define ALL_GRPC_ACCESS_LOGGER_STATS(COUNTER)                                                      \
+  COUNTER(logs_written)                                                                            \
+  COUNTER(logs_dropped)
+
+/**
+ * Wrapper struct for the access log stats. @see stats_macros.h
+ */
+struct GrpcAccessLoggerStats {
+  ALL_GRPC_ACCESS_LOGGER_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 /**
  * Interface for an access logger. The logger provides abstraction on top of gRPC stream, deals with
@@ -63,7 +75,7 @@ public:
    */
   virtual GrpcAccessLoggerSharedPtr getOrCreateLogger(
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-      GrpcAccessLoggerType logger_type) PURE;
+      GrpcAccessLoggerType logger_type, Stats::Scope& scope) PURE;
 };
 
 using GrpcAccessLoggerCacheSharedPtr = std::shared_ptr<GrpcAccessLoggerCache>;
@@ -73,7 +85,7 @@ public:
   GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
                        std::chrono::milliseconds buffer_flush_interval_msec,
                        uint64_t buffer_size_bytes, Event::Dispatcher& dispatcher,
-                       const LocalInfo::LocalInfo& local_info);
+                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
 
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void log(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
@@ -98,6 +110,9 @@ private:
 
   void flush();
 
+  bool canLogMore();
+
+  GrpcAccessLoggerStats stats_;
   Grpc::AsyncClient<envoy::service::accesslog::v3::StreamAccessLogsMessage,
                     envoy::service::accesslog::v3::StreamAccessLogsResponse>
       client_;
@@ -119,7 +134,7 @@ public:
 
   GrpcAccessLoggerSharedPtr getOrCreateLogger(
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-      GrpcAccessLoggerType logger_type) override;
+      GrpcAccessLoggerType logger_type, Stats::Scope& scope) override;
 
 private:
   /**
