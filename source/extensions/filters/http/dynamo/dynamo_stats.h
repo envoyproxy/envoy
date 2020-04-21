@@ -6,6 +6,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/stats/symbol_table_impl.h"
+#include "common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,8 +17,8 @@ class DynamoStats {
 public:
   DynamoStats(Stats::Scope& scope, const std::string& prefix);
 
-  void incCounter(const Stats::StatNameVec& names);
-  void recordHistogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
+  void incCounter(const Stats::Utility::ElementVec& names);
+  void recordHistogram(const Stats::Utility::ElementVec& names, Stats::Histogram::Unit unit,
                        uint64_t value);
 
   /**
@@ -42,7 +43,7 @@ public:
   Stats::SymbolTable& symbolTable() { return scope_.symbolTable(); }
 
 private:
-  Stats::SymbolTable::StoragePtr addPrefix(const Stats::StatNameVec& names);
+  Stats::Utility::ElementVec addPrefix(const Stats::Utility::ElementVec& names);
 
   Stats::Scope& scope_;
   Stats::StatNameSetPtr stat_name_set_;

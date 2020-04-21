@@ -46,25 +46,21 @@ DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
   stat_name_set_->rememberBuiltins({"operation", "table"});
 }
 
-Stats::SymbolTable::StoragePtr DynamoStats::addPrefix(const Stats::StatNameVec& names) {
-  Stats::StatNameVec names_with_prefix;
+Stats::Utility::ElementVec DynamoStats::addPrefix(const Stats::Utility::ElementVec& names) {
+  Stats::Utility::ElementVec names_with_prefix;
   names_with_prefix.reserve(1 + names.size());
   names_with_prefix.push_back(prefix_);
   names_with_prefix.insert(names_with_prefix.end(), names.begin(), names.end());
-  return scope_.symbolTable().join(names_with_prefix);
+  return names_with_prefix;
 }
 
-void DynamoStats::incCounter(const Stats::StatNameVec& names) {
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  scope_.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+void DynamoStats::incCounter(const Stats::Utility::ElementVec& names) {
+  Stats::Utility::counterFromElements(scope_, addPrefix(names)).inc();
 }
 
-void DynamoStats::recordHistogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
+void DynamoStats::recordHistogram(const Stats::Utility::ElementVec& names, Stats::Histogram::Unit unit,
                                   uint64_t value) {
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  Stats::Histogram& histogram =
-      scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit);
-  histogram.recordValue(value);
+  Stats::Utility::histogramFromElements(scope_, addPrefix(names), unit).recordValue(value);
 }
 
 Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_name,
@@ -74,10 +70,9 @@ Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_
   absl::string_view id_last_7 = absl::string_view(partition_id).substr(partition_id.size() - 7);
   Stats::StatNameDynamicPool dynamic(scope_.symbolTable());
   const Stats::StatName partition = dynamic.add(absl::StrCat("__partition_id=", id_last_7));
-  const Stats::SymbolTable::StoragePtr stat_name_storage =
-      addPrefix({table_, dynamic.add(table_name), capacity_,
-                 getBuiltin(operation, unknown_operation_), partition});
-  return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
+  return Stats::Utility::counterFromElements(scope_, addPrefix({
+        table_, Stats::Utility::Dynamic(table_name), capacity_,
+        getBuiltin(operation, unknown_operation_), partition}));
 }
 
 size_t DynamoStats::groupIndex(uint64_t status) {
