@@ -945,7 +945,7 @@ public:
   }
 
   void raiseEventUpstreamConnectFailed(uint32_t conn_index,
-                                       Tcp::ConnectionPool::PoolFailureReason reason) {
+                                       ConnectionPool::PoolFailureReason reason) {
     conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, upstream_hosts_.at(conn_index));
   }
 
@@ -1058,8 +1058,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamLocalFail)) 
 
   setup(2, config);
 
-  raiseEventUpstreamConnectFailed(0,
-                                  Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
   raiseEventUpstreamConnected(1);
 
   EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -1076,8 +1075,8 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamLocalFailRee
   // This simulates a connection failure from under the stack of newStream.
   new_connection_functions_.push_back(
       [&](Tcp::ConnectionPool::Cancellable*) -> Tcp::ConnectionPool::Cancellable* {
-        raiseEventUpstreamConnectFailed(
-            0, Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+        raiseEventUpstreamConnectFailed(0,
+                                        ConnectionPool::PoolFailureReason::LocalConnectionFailure);
         return nullptr;
       });
 
@@ -1098,8 +1097,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamRemoteFail))
   config.mutable_max_connect_attempts()->set_value(2);
   setup(2, config);
 
-  raiseEventUpstreamConnectFailed(0,
-                                  Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
   raiseEventUpstreamConnected(1);
 
   EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -1113,7 +1111,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamTimeout)) {
   config.mutable_max_connect_attempts()->set_value(2);
   setup(2, config);
 
-  raiseEventUpstreamConnectFailed(0, Tcp::ConnectionPool::PoolFailureReason::Timeout);
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
   raiseEventUpstreamConnected(1);
 
   EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -1138,11 +1136,9 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsLimit)) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
 
   // Try both failure modes
-  raiseEventUpstreamConnectFailed(0, Tcp::ConnectionPool::PoolFailureReason::Timeout);
-  raiseEventUpstreamConnectFailed(1,
-                                  Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
-  raiseEventUpstreamConnectFailed(2,
-                                  Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+  raiseEventUpstreamConnectFailed(1, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  raiseEventUpstreamConnectFailed(2, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UF,URX");
@@ -1156,12 +1152,11 @@ TEST_F(TcpProxyTest, OutlierDetection) {
 
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
-  raiseEventUpstreamConnectFailed(0, Tcp::ConnectionPool::PoolFailureReason::Timeout);
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
 
   EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
-  raiseEventUpstreamConnectFailed(1,
-                                  Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  raiseEventUpstreamConnectFailed(1, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal, _));
@@ -1228,7 +1223,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamConnectTimeout)) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
-  raiseEventUpstreamConnectFailed(0, Tcp::ConnectionPool::PoolFailureReason::Timeout);
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UF,URX");
@@ -1391,8 +1386,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamConnectFailure)) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
-  raiseEventUpstreamConnectFailed(0,
-                                  Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UF,URX");
