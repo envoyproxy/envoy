@@ -29,10 +29,6 @@ class GRPCStreamEmitterTest {
         return this
       }
 
-      override fun sendMetadata(metadata: Map<String, List<String>>): StreamEmitter {
-        throw UnsupportedOperationException("unexpected usage of mock emitter")
-      }
-
       override fun close(trailers: Map<String, List<String>>) {
         throw UnsupportedOperationException("unexpected usage of mock emitter")
       }

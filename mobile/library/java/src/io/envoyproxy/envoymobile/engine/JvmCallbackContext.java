@@ -93,7 +93,6 @@ class JvmCallbackContext {
           callbacks.onHeaders(headers, endStream);
           break;
         case METADATA:
-          callbacks.onMetadata(headers);
           break;
         case TRAILERS:
           callbacks.onTrailers(headers);

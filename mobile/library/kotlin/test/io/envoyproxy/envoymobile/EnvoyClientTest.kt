@@ -64,26 +64,6 @@ class EnvoyClientTest {
   }
 
   @Test
-  fun `sending metadata on stream forwards metadata to the underlying stream`() {
-    `when`(engine.startStream(any())).thenReturn(stream)
-    val envoy = Envoy(engine, config)
-
-    val metadata = mapOf("key_1" to listOf("value_a"))
-    val emitter = envoy.send(
-        RequestBuilder(
-            method = RequestMethod.POST,
-            scheme = "https",
-            authority = "api.foo.com",
-            path = "foo")
-            .build(),
-        ResponseHandler(Executor {}))
-
-    emitter.sendMetadata(metadata)
-
-    verify(stream).sendMetadata(metadata)
-  }
-
-  @Test
   fun `closing stream sends empty data to the underlying stream`() {
     `when`(engine.startStream(any())).thenReturn(stream)
     val envoy = Envoy(engine, config)

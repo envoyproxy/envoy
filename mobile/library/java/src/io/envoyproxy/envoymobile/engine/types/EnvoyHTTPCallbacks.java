@@ -27,14 +27,6 @@ public interface EnvoyHTTPCallbacks {
   void onData(ByteBuffer data, boolean endStream);
 
   /**
-   * Called when all metadata get received on the async HTTP stream. Note that end
-   * stream is implied when on_metadata is called.
-   *
-   * @param metadata, the metadata received.
-   */
-  void onMetadata(Map<String, List<String>> metadata);
-
-  /**
    * Called when all trailers get received on the async HTTP stream. Note that end
    * stream is implied when on_trailers is called.
    *

@@ -105,15 +105,7 @@ static void ios_on_data(envoy_data data, bool end_stream, void *context) {
   });
 }
 
-static void ios_on_metadata(envoy_headers metadata, void *context) {
-  ios_context *c = (ios_context *)context;
-  EnvoyHTTPCallbacks *callbacks = c->callbacks;
-  dispatch_async(callbacks.dispatchQueue, ^{
-    if (callbacks.onMetadata) {
-      callbacks.onMetadata(to_ios_headers(metadata));
-    }
-  });
-}
+static void ios_on_metadata(envoy_headers metadata, void *context) {}
 
 static void ios_on_trailers(envoy_headers trailers, void *context) {
   ios_context *c = (ios_context *)context;
@@ -229,10 +221,6 @@ static void ios_on_error(envoy_error error, void *context) {
 
 - (void)sendData:(NSData *)data close:(BOOL)close {
   send_data(_streamHandle, toNativeData(data), close);
-}
-
-- (void)sendMetadata:(EnvoyHeaders *)metadata {
-  send_metadata(_streamHandle, toNativeHeaders(metadata));
 }
 
 - (void)sendTrailers:(EnvoyHeaders *)trailers {
