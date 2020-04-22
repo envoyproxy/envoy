@@ -259,8 +259,7 @@ public:
    * responses, which should be the most common cases.
    * @return std::vector<InternalRedirectTargetRoutePredicateSharedPtr>.
    */
-  virtual std::vector<InternalRedirectTargetRoutePredicateSharedPtr>
-  targetRoutePredicates() const PURE;
+  virtual std::vector<InternalRedirectPredicateSharedPtr> predicates() const PURE;
 
   /**
    * @return the maximum number of allowed internal redirects on this route.

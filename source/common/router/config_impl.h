@@ -388,7 +388,8 @@ private:
 class InternalRedirectPolicyImpl : public InternalRedirectPolicy {
 public:
   explicit InternalRedirectPolicyImpl(
-      const envoy::config::route::v3::InternalRedirectPolicy& policy_config);
+      const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
+      ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name);
   InternalRedirectPolicyImpl() = default;
 
   bool enabled() const override { return enabled_; }
@@ -397,7 +398,7 @@ public:
     return redirect_response_codes_.contains(response_code);
   }
 
-  std::vector<InternalRedirectTargetRoutePredicateSharedPtr> targetRoutePredicates() const override;
+  std::vector<InternalRedirectPredicateSharedPtr> predicates() const override;
 
   uint32_t maxInternalRedirects() const override { return max_internal_redirects_; }
 
@@ -417,13 +418,13 @@ private:
   uint8_t compactSchemePair(bool downstream_is_https, bool target_is_https) const;
 
   const bool enabled_{false};
+  std::string current_route_name_;
   const absl::flat_hash_set<Http::Code> redirect_response_codes_;
   const uint32_t max_internal_redirects_{1};
   const absl::flat_hash_set<uint8_t> allowed_scheme_pairs_;
 
-  // Keep a copy of the config so that we can lazy instantiate the predicate implementation to avoid
-  // paying the cost on requests that do not result in redirect responses.
-  const envoy::config::route::v3::InternalRedirectPolicy policy_config_;
+  std::vector<std::pair<InternalRedirectPredicateFactory&, ProtobufTypes::MessagePtr>>
+      predicate_factories_;
 };
 
 /**
@@ -728,7 +729,9 @@ private:
                    ProtobufMessage::ValidationVisitor& validation_visitor) const;
 
   InternalRedirectPolicyImpl
-  buildInternalRedirectPolicy(const envoy::config::route::v3::RouteAction& route_config) const;
+  buildInternalRedirectPolicy(const envoy::config::route::v3::RouteAction& route_config,
+                              ProtobufMessage::ValidationVisitor& validator,
+                              absl::string_view current_route_name) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;

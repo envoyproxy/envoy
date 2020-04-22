@@ -9,26 +9,25 @@
 namespace Envoy {
 namespace Router {
 
-class InternalRedirectTargetRoutePredicate {
+class InternalRedirectPredicate {
 public:
-  virtual ~InternalRedirectTargetRoutePredicate() = default;
+  virtual ~InternalRedirectPredicate() = default;
 
   virtual bool acceptTargetRoute(StreamInfo::FilterState& filter_State,
-                                 absl::string_view route_name) PURE;
-
-  virtual void onTargetRouteAccepted(StreamInfo::FilterState& filter_state,
-                                     absl::string_view route_name) PURE;
+                                 absl::string_view target_route_name) PURE;
 };
 
-using InternalRedirectTargetRoutePredicateSharedPtr =
-    std::shared_ptr<InternalRedirectTargetRoutePredicate>;
+using InternalRedirectPredicateSharedPtr = std::shared_ptr<InternalRedirectPredicate>;
 
-class InternalRedirectTargetRoutePredicateFactory : public Config::TypedFactory {
+class InternalRedirectPredicateFactory : public Config::TypedFactory {
 public:
-  ~InternalRedirectTargetRoutePredicateFactory() override = default;
+  ~InternalRedirectPredicateFactory() override = default;
 
-  virtual InternalRedirectTargetRoutePredicateSharedPtr createInternalRedirectTargetRoutePredicate(
-      const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual InternalRedirectPredicateSharedPtr
+  createInternalRedirectPredicate(const Protobuf::Message& config,
+                                  absl::string_view current_route_name) PURE;
+
+  std::string category() const override { return "envoy.internal_redirect_predicates"; }
 };
 
 } // namespace Router

@@ -136,11 +136,15 @@ public:
   MockInternalRedirectPolicy();
   MOCK_METHOD(bool, enabled, (), (const));
   MOCK_METHOD(bool, shouldRedirectForCode, (const Http::Code& response_code), (const));
-  MOCK_METHOD(std::vector<InternalRedirectTargetRoutePredicateSharedPtr>, targetRoutePredicates, (),
-              (const));
+  MOCK_METHOD(std::vector<InternalRedirectPredicateSharedPtr>, predicates, (), (const));
   MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));
   MOCK_METHOD(bool, isDownstreamAndRedirectTargetSchemePairAllowed,
               (bool downstream_is_https, bool target_is_https), (const));
+};
+
+class MockInternalRedirectPredicate : public InternalRedirectPredicate {
+public:
+  MOCK_METHOD(bool, acceptTargetRoute, (StreamInfo::FilterState&, absl::string_view));
 };
 
 class MockRetryState : public RetryState {

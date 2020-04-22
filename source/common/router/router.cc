@@ -46,22 +46,22 @@ constexpr char NumInternalRedirectsFilterStateName[] = "num_internal_redirects";
 
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
-bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
-                  const Network::Connection& connection) {
+bool schemeIsHttps(const Http::RequestHeaderMap& downstream_headers,
+                   const Network::Connection& connection) {
+  if (!connection.ssl()) {
+    return false;
+  }
   if (downstream_headers.ForwardedProto() &&
       downstream_headers.ForwardedProto()->value().getStringView() ==
           Http::Headers::get().SchemeValues.Http) {
-    return true;
+    return false;
   }
-  if (!connection.ssl()) {
-    return true;
-  }
-  return false;
+  return true;
 }
 
 bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
-                                              StreamInfo::FilterState& filter_state,
-                                              uint32_t max_internal_redirects,
+                                              Http::StreamDecoderFilterCallbacks* callbacks,
+                                              const InternalRedirectPolicy& policy,
                                               const Http::HeaderEntry& internal_redirect,
                                               const Network::Connection& connection) {
   // Make sure the redirect response contains a URL to redirect to.
@@ -75,31 +75,34 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
   }
 
   // Don't allow serving TLS responses over plaintext.
-  bool scheme_is_http = schemeIsHttp(downstream_headers, connection);
-  if (scheme_is_http && absolute_url.scheme() == Http::Headers::get().SchemeValues.Https) {
+  bool downstream_is_https = schemeIsHttps(downstream_headers, connection);
+  bool target_is_https = absolute_url.scheme() == Http::Headers::get().SchemeValues.Https;
+  if (!policy.isDownstreamAndRedirectTargetSchemePairAllowed(downstream_is_https,
+                                                             target_is_https)) {
     return false;
   }
 
+  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks->streamInfo().filterState();
   // Make sure that performing the redirect won't result in exceeding the configured number of
   // redirects allowed for this route.
-  if (!filter_state.hasData<StreamInfo::UInt32Accessor>(NumInternalRedirectsFilterStateName)) {
-    filter_state.setData(NumInternalRedirectsFilterStateName,
-                         std::make_shared<StreamInfo::UInt32AccessorImpl>(0),
-                         StreamInfo::FilterState::StateType::Mutable,
-                         StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+  if (!filter_state->hasData<StreamInfo::UInt32Accessor>(NumInternalRedirectsFilterStateName)) {
+    filter_state->setData(NumInternalRedirectsFilterStateName,
+                          std::make_shared<StreamInfo::UInt32AccessorImpl>(0),
+                          StreamInfo::FilterState::StateType::Mutable,
+                          StreamInfo::FilterState::LifeSpan::DownstreamRequest);
   }
   StreamInfo::UInt32Accessor& num_internal_redirect =
-      filter_state.getDataMutable<StreamInfo::UInt32Accessor>(NumInternalRedirectsFilterStateName);
+      filter_state->getDataMutable<StreamInfo::UInt32Accessor>(NumInternalRedirectsFilterStateName);
 
-  if (num_internal_redirect.value() >= max_internal_redirects) {
+  if (num_internal_redirect.value() >= policy.maxInternalRedirects()) {
     return false;
   }
   num_internal_redirect.increment();
 
   // Preserve the original request URL for the second pass.
   downstream_headers.setEnvoyOriginalUrl(
-      absl::StrCat(scheme_is_http ? Http::Headers::get().SchemeValues.Http
-                                  : Http::Headers::get().SchemeValues.Https,
+      absl::StrCat(downstream_is_https ? Http::Headers::get().SchemeValues.Https
+                                       : Http::Headers::get().SchemeValues.Http,
                    "://", downstream_headers.Host()->value().getStringView(),
                    downstream_headers.Path()->value().getStringView()));
 
@@ -108,6 +111,19 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
   downstream_headers.setHost(absolute_url.host_and_port());
   downstream_headers.setPath(absolute_url.path_and_query_params());
 
+  callbacks->clearRouteCache();
+  auto route = callbacks->route();
+  // Don't allow a redirect to a non existing route.
+  if (!route) {
+    return false;
+  }
+
+  auto& route_name = route->routeEntry()->routeName();
+  for (auto& predicate : policy.predicates()) {
+    if (!predicate->acceptTargetRoute(*filter_state, route_name)) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -1411,16 +1427,13 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
   attempting_internal_redirect_with_complete_stream_ =
       upstream_request.upstreamTiming().last_upstream_rx_byte_received_ && downstream_end_stream_;
 
-  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
-
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
       !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
       location != nullptr &&
-      convertRequestHeadersForInternalRedirect(
-          *downstream_headers_, *filter_state,
-          route_entry_->internalRedirectPolicy().maxInternalRedirects(), *location,
-          *callbacks_->connection()) &&
+      convertRequestHeadersForInternalRedirect(*downstream_headers_, callbacks_,
+                                               route_entry_->internalRedirectPolicy(), *location,
+                                               *callbacks_->connection()) &&
       callbacks_->recreateStream()) {
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;

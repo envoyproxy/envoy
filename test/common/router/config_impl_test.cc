@@ -6740,6 +6740,43 @@ virtual_hosts:
   EXPECT_NE(predicates1, predicates2);
 }
 
+TEST_F(RouteConfigurationV2, DefaultInternalRedirctPolicyIsSensible) {
+  const std::string InternalRedirectEnabled = R"EOF(
+name: InternalRedirectEnabled
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy:
+            internal_redirect_action: HANDLE_INTERNAL_REDIRECT
+            
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(InternalRedirectEnabled),
+                        factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_TRUE(internal_redirect_policy.enabled());
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForCode(static_cast<Http::Code>(302)));
+  EXPECT_FALSE(internal_redirect_policy.shouldRedirectForCode(static_cast<Http::Code>(200)));
+  EXPECT_EQ(1, internal_redirect_policy.maxInternalRedirects());
+  EXPECT_TRUE(internal_redirect_policy.predicates().empty());
+  EXPECT_TRUE(internal_redirect_policy.isDownstreamAndRedirectTargetSchemePairAllowed(true, true));
+  EXPECT_TRUE(internal_redirect_policy.isDownstreamAndRedirectTargetSchemePairAllowed(true, false));
+  EXPECT_TRUE(
+      internal_redirect_policy.isDownstreamAndRedirectTargetSchemePairAllowed(false, false));
+  EXPECT_FALSE(
+      internal_redirect_policy.isDownstreamAndRedirectTargetSchemePairAllowed(false, true));
+}
+
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {
 public:
   PerFilterConfigsTest()
