@@ -323,7 +323,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   bool redispatch;
   do {
     redispatch = false;
-    Envoy::Http::Status status;
+    Status status;
 
     try {
       status = codec_->dispatch(data);
@@ -331,16 +331,16 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       // Soon we won't need to catch these exceptions, as they'll be propagated through the error
       // statuses callbacks and returned from dispatch.
     } catch (const FrameFloodException& e) {
-      status = Envoy::Http::bufferFloodError(e.what());
+      status = bufferFloodError(e.what());
     } catch (const CodecProtocolException& e) {
-      status = Envoy::Http::codecProtocolError(e.what());
+      status = codecProtocolError(e.what());
     }
 
-    ASSERT(!Envoy::Http::isPrematureResponseError(status));
-    if (Envoy::Http::isBufferFloodError(status)) {
+    ASSERT(!isPrematureResponseError(status));
+    if (isBufferFloodError(status)) {
       handleCodecException(status.message());
       return Network::FilterStatus::StopIteration;
-    } else if (Envoy::Http::isCodecProtocolError(status)) {
+    } else if (isCodecProtocolError(status)) {
       stats_.named_.downstream_cx_protocol_error_.inc();
       handleCodecException(status.message());
       return Network::FilterStatus::StopIteration;

@@ -122,7 +122,7 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
 
 void CodecClient::onData(Buffer::Instance& data) {
   bool protocol_error = false;
-  Envoy::Http::Status status;
+  Status status;
   try {
     status = codec_->dispatch(data);
     // TODO(#10878): Remove this when exception removal is complete. It is currently in migration.
