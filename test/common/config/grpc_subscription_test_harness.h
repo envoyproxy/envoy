@@ -11,7 +11,6 @@
 #include "common/config/api_version.h"
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/grpc_subscription_impl.h"
-#include "common/config/resources.h"
 #include "common/config/version_converter.h"
 
 #include "test/common/config/subscription_test_harness.h"
@@ -20,6 +19,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

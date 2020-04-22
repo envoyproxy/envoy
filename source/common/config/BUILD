@@ -262,12 +262,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "resources_lib",
-    hdrs = ["resources.h"],
-    deps = ["//source/common/singleton:const_singleton"],
-)
-
-envoy_cc_library(
     name = "runtime_utility_lib",
     srcs = ["runtime_utility.cc"],
     hdrs = ["runtime_utility.h"],
@@ -317,7 +311,6 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     deps = [
         ":api_type_oracle_lib",
-        ":resources_lib",
         ":version_converter_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",

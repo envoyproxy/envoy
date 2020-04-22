@@ -25,7 +25,6 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
-#include "common/config/resources.h"
 #include "common/filesystem/directory.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/json/json_loader.h"
@@ -34,6 +33,7 @@
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/test_time.h"
 
 #include "absl/container/fixed_array.h"

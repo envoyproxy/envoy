@@ -9,11 +9,11 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "common/config/protobuf_link_hacks.h"
-#include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 using testing::AssertionResult;

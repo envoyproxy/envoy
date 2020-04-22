@@ -7,13 +7,13 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener.pb.validate.h"
+#include "envoy/config/route/v3/route.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/config/api_version.h"
-#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -43,9 +43,11 @@ void LdsApiImpl::onConfigUpdate(
     const std::string& system_version_info) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
-    cm_.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
-    maybe_eds_resume = std::make_unique<Cleanup>(
-        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration); });
+    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+        envoy::config::core::v3::ApiVersion::V2);
+    cm_.adsMux()->pause(type_url);
+    maybe_eds_resume =
+        std::make_unique<Cleanup>([this, type_url] { cm_.adsMux()->resume(type_url); });
   }
 
   bool any_applied = false;

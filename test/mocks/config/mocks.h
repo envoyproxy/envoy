@@ -9,9 +9,9 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/config_provider_impl.h"
-#include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

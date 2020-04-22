@@ -24,7 +24,6 @@
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/http/codes.h"
 #include "common/local_info/local_info_impl.h"
@@ -546,11 +545,13 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       return;
     }
 
+    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+        envoy::config::core::v3::ApiVersion::V2);
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
     if (cm.adsMux()) {
-      cm.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
+      cm.adsMux()->pause(type_url);
     }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
@@ -559,7 +560,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
     if (cm.adsMux()) {
-      cm.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration);
+      cm.adsMux()->resume(type_url);
     }
   });
 }
