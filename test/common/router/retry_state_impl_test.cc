@@ -203,7 +203,8 @@ TEST_F(RouterRetryStateImplTest, Policy5xxRemote503Overloaded) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "503"},
                                                    {"x-envoy-overloaded", "true"}};
-  EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(response_headers, callback_));
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyResourceExhaustedRemoteRateLimited) {

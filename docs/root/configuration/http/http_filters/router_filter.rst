@@ -274,14 +274,6 @@ for the next health check interval. The host can become healthy again via standa
 checks. See the :ref:`health checking overview <arch_overview_health_checking>` for more
 information.
 
-.. _config_http_filters_router_x-envoy-overloaded_consumed:
-
-x-envoy-overloaded
-^^^^^^^^^^^^^^^^^^
-
-If this header is set by upstream, Envoy will not retry. Currently the value of the header is not
-looked at, only its presence.
-
 .. _config_http_filters_router_x-envoy-ratelimited:
 
 x-envoy-ratelimited
