@@ -1,11 +1,11 @@
 #include "test/integration/tcp_dump.h"
 
 #include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
 
 #include <csignal>
 #include <fstream>
+
+#include "envoy/common/platform.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -14,6 +14,9 @@ namespace Envoy {
 
 TcpDump::TcpDump(const std::string& path, const std::string& iface,
                  const std::vector<uint32_t>& ports) {
+#ifdef WIN32
+  ENVOY_LOG_MISC(debug, "tcpdump not supported on windows");
+#else
   // Remove any extant pcap file.
   ::unlink(path.c_str());
   // Derive the port filter expression.
@@ -60,9 +63,11 @@ TcpDump::TcpDump(const std::string& path, const std::string& iface,
     // Give 50ms sleep.
     ::usleep(50000);
   }
+#endif
 }
 
 TcpDump::~TcpDump() {
+#ifndef WIN32
   if (tcpdump_pid_ > 0) {
     RELEASE_ASSERT(::kill(tcpdump_pid_, SIGINT) == 0, "");
     int status;
@@ -71,6 +76,7 @@ TcpDump::~TcpDump() {
     RELEASE_ASSERT(WEXITSTATUS(status) == 0, "");
     ENVOY_LOG_MISC(debug, "tcpdump terminated");
   }
+#endif
 }
 
 } // namespace Envoy
