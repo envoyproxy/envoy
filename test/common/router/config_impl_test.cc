@@ -449,6 +449,12 @@ virtual_hosts:
   - bat3.com
   routes:
   - match:
+      safe_regex:
+        google_re2: {}
+        regex: "foobar"
+    route:
+      cluster: connect_break
+  - match:
         connect_matcher:
           {}
     route:
@@ -485,6 +491,9 @@ virtual_hosts:
   // Connect matching
   EXPECT_EQ("connect_match",
             config.route(genHeaders("bat3.com", " ", "CONNECT"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ(
+      "connect_match",
+      config.route(genPathlessHeaders("bat3.com", "CONNECT"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("connect_fallthrough",
             config.route(genHeaders("bat3.com", " ", "GET"), 0)->routeEntry()->clusterName());
 

@@ -1150,9 +1150,8 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::RequestHead
 
   // Check for a route that matches the request.
   for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
-    if (!headers.Path()) {
-      // TODO(alyssawilk) allow specifically for kConnectMatcher routes.
-      return nullptr;
+    if (!headers.Path() && !route->supportsPathlessHeaders()) {
+      continue;
     }
     RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
     if (nullptr != route_entry) {
