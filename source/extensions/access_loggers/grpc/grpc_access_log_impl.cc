@@ -25,28 +25,28 @@ void GrpcAccessLoggerImpl::LocalStream::onRemoteClose(Grpc::Status::GrpcStatus,
 
 GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
                                            std::chrono::milliseconds buffer_flush_interval_msec,
-                                           uint64_t buffer_size_bytes,
+                                           uint64_t max_buffer_size_bytes,
                                            Event::Dispatcher& dispatcher,
                                            const LocalInfo::LocalInfo& local_info,
                                            Stats::Scope& scope)
-    : stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, "grpc_access_log."))}),
+    : stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, "access_logs.grpc_access_log."))}),
       client_(std::move(client)), log_name_(log_name),
       buffer_flush_interval_msec_(buffer_flush_interval_msec),
       flush_timer_(dispatcher.createTimer([this]() {
         flush();
         flush_timer_->enableTimer(buffer_flush_interval_msec_);
       })),
-      buffer_size_bytes_(buffer_size_bytes), local_info_(local_info) {
+      max_buffer_size_bytes_(max_buffer_size_bytes), local_info_(local_info) {
   flush_timer_->enableTimer(buffer_flush_interval_msec_);
 }
 
 bool GrpcAccessLoggerImpl::canLogMore() {
-  if (buffer_size_bytes_ == 0 || approximate_message_size_bytes_ < buffer_size_bytes_) {
+  if (max_buffer_size_bytes_ == 0 || approximate_message_size_bytes_ < max_buffer_size_bytes_) {
     stats_.logs_written_.inc();
     return true;
   }
   flush();
-  if (approximate_message_size_bytes_ < buffer_size_bytes_) {
+  if (approximate_message_size_bytes_ < max_buffer_size_bytes_) {
     stats_.logs_written_.inc();
     return true;
   }
@@ -60,7 +60,7 @@ void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v3::HTTPAccessLogEntry&& 
   }
   approximate_message_size_bytes_ += entry.ByteSizeLong();
   message_.mutable_http_logs()->mutable_log_entry()->Add(std::move(entry));
-  if (approximate_message_size_bytes_ >= buffer_size_bytes_) {
+  if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
     flush();
   }
 }
@@ -68,7 +68,7 @@ void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v3::HTTPAccessLogEntry&& 
 void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) {
   approximate_message_size_bytes_ += entry.ByteSizeLong();
   message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
-  if (approximate_message_size_bytes_ >= buffer_size_bytes_) {
+  if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
     flush();
   }
 }

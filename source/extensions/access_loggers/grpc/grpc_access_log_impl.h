@@ -22,7 +22,7 @@ namespace AccessLoggers {
 namespace GrpcCommon {
 
 /**
- *  * All stats for the HTTP/1 codec. @see stats_macros.h
+ *  * All stats for the grpc access logger. @see stats_macros.h
  *   */
 #define ALL_GRPC_ACCESS_LOGGER_STATS(COUNTER)                                                      \
   COUNTER(logs_written)                                                                            \
@@ -84,7 +84,7 @@ class GrpcAccessLoggerImpl : public GrpcAccessLogger {
 public:
   GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
                        std::chrono::milliseconds buffer_flush_interval_msec,
-                       uint64_t buffer_size_bytes, Event::Dispatcher& dispatcher,
+                       uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
 
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
@@ -119,7 +119,7 @@ private:
   const std::string log_name_;
   const std::chrono::milliseconds buffer_flush_interval_msec_;
   const Event::TimerPtr flush_timer_;
-  const uint64_t buffer_size_bytes_;
+  const uint64_t max_buffer_size_bytes_;
   uint64_t approximate_message_size_bytes_ = 0;
   envoy::service::accesslog::v3::StreamAccessLogsMessage message_;
   absl::optional<LocalStream> stream_;

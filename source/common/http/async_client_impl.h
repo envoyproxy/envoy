@@ -367,7 +367,10 @@ private:
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
   void encodeMetadata(MetadataMapPtr&&) override {}
   void onDecoderFilterAboveWriteBufferHighWatermark() override { ++high_watermark_calls_; }
-  void onDecoderFilterBelowWriteBufferLowWatermark() override { --high_watermark_calls_; }
+  void onDecoderFilterBelowWriteBufferLowWatermark() override {
+    ASSERT(high_watermark_calls_ != 0);
+    --high_watermark_calls_;
+  }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void setDecoderBufferLimit(uint32_t) override {}

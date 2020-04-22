@@ -103,7 +103,7 @@ http_logs:
   envoy::data::accesslog::v3::HTTPAccessLogEntry entry;
   entry.mutable_request()->set_path("/test/path1");
   logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
-  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "grpc_access_log.logs_written")->value());
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_written")->value());
 
   expectStreamMessage(stream, R"EOF(
 http_logs:
@@ -113,7 +113,7 @@ http_logs:
 )EOF");
   entry.mutable_request()->set_path("/test/path2");
   logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
-  EXPECT_EQ(2, TestUtility::findCounter(stats_store_, "grpc_access_log.logs_written")->value());
+  EXPECT_EQ(2, TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_written")->value());
 
   // Verify that sending an empty response message doesn't do anything bad.
   callbacks->onReceiveMessage(
@@ -138,8 +138,8 @@ http_logs:
 )EOF");
   entry.mutable_request()->set_path("/test/path3");
   logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
-  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "grpc_access_log.logs_dropped")->value());
-  EXPECT_EQ(3, TestUtility::findCounter(stats_store_, "grpc_access_log.logs_written")->value());
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_dropped")->value());
+  EXPECT_EQ(3, TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_written")->value());
 }
 
 TEST_F(GrpcAccessLoggerImplTest, WatermarksOverrun) {
@@ -158,15 +158,15 @@ TEST_F(GrpcAccessLoggerImplTest, WatermarksOverrun) {
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(true));
   EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(0);
   logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
-  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "grpc_access_log.logs_written")->value());
-  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "grpc_access_log.logs_dropped")->value());
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_written")->value());
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_dropped")->value());
 
   // Now canLogMore will fail, and the next log will be dropped.
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(true));
   EXPECT_CALL(stream, sendMessageRaw_(_, _)).Times(0);
   logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
-  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "grpc_access_log.logs_written")->value());
-  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "grpc_access_log.logs_dropped")->value());
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_written")->value());
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_dropped")->value());
 
   // Now allow the flush to happen. The stored log will get logged, and the next log will succeed.
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
@@ -174,8 +174,8 @@ TEST_F(GrpcAccessLoggerImplTest, WatermarksOverrun) {
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
   EXPECT_CALL(stream, sendMessageRaw_(_, _)).Times(1);
   logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
-  EXPECT_EQ(2, TestUtility::findCounter(stats_store_, "grpc_access_log.logs_written")->value());
-  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "grpc_access_log.logs_dropped")->value());
+  EXPECT_EQ(2, TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_written")->value());
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_dropped")->value());
 }
 
 // Test that stream failure is handled correctly.
