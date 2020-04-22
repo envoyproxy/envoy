@@ -207,7 +207,7 @@ public:
   bool enableTrailers() const { return enable_trailers_; }
 
   // Http::Connection
-  Envoy::Http::Status dispatch(Buffer::Instance& data) override;
+  Http::Status dispatch(Buffer::Instance& data) override;
   void goAway() override {} // Called during connection manager drain flow
   Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow

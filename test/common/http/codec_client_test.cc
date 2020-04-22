@@ -371,10 +371,10 @@ TEST_P(CodecNetworkTest, SendData) {
   Buffer::OwnedImpl data(full_data);
   upstream_connection_->write(data, false);
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ(full_data, data.toString());
         dispatcher_->exit();
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
@@ -394,13 +394,13 @@ TEST_P(CodecNetworkTest, SendHeadersAndClose) {
   upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ(full_data, data.toString());
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ("", data.toString());
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
   // Because the headers are not complete, the disconnect will reset the stream.
   // Note even if the final \r\n were appended to the header data, enough of the
@@ -432,13 +432,13 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
 
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ(full_data, data.toString());
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ("", data.toString());
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
   EXPECT_CALL(inner_encoder_.stream_, resetStream(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
     for (auto callbacks : inner_encoder_.stream_.callbacks_) {

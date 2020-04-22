@@ -204,7 +204,7 @@ public:
     setUpBufferLimits();
     EXPECT_CALL(*codec_, dispatch(_))
         .WillOnce(
-            Invoke([&, request_with_data_and_trailers](Buffer::Instance&) -> Envoy::Http::Status {
+            Invoke([&, request_with_data_and_trailers](Buffer::Instance&) -> Http::Status {
               RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
               RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
                   {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -219,7 +219,7 @@ public:
               } else {
                 decoder->decodeHeaders(std::move(headers), true);
               }
-              return Envoy::Http::okStatus();
+              return Http::okStatus();
             }));
 
     setupFilterChain(2, 2);
@@ -456,7 +456,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         // Test not charging stats on the second call.
@@ -475,7 +475,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
 
         // Drain 2 so that on the 2nd iteration we will hit zero.
         data.drain(2);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // Kick off the incoming data. Use extra data which should cause a redispatch.
@@ -516,7 +516,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         // Test not charging stats on the second call.
@@ -530,7 +530,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
         filter->callbacks_->encodeHeaders(std::move(response_headers), true);
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // Kick off the incoming data.
@@ -686,13 +686,13 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":authority", "host"}, {":path", "http://api.lyft.com/"}, {":method", "GET"}}};
         decoder->decodeHeaders(std::move(headers), true);
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
@@ -725,7 +725,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
   normalize_path_ = true;
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":authority", "host"},
@@ -733,7 +733,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
             {":method", "GET"}}};
         decoder->decodeHeaders(std::move(headers), true);
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
@@ -782,12 +782,12 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
 
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {":authority", "host"}, {":path", original_path}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   // Kick off the incoming data.
@@ -804,12 +804,12 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
   const std::string original_path = "/x/%2E%2e/z";
   const std::string normalized_path = "/z";
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {":authority", "host"}, {":path", original_path}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   const std::string fake_cluster_name = "fake_cluster";
@@ -962,7 +962,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{
@@ -976,7 +976,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
         filter->callbacks_->encodeHeaders(std::move(response_headers), true);
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // Should be no 'x-envoy-decorator-operation' response header.
@@ -1032,7 +1032,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{
@@ -1046,7 +1046,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
         filter->callbacks_->encodeHeaders(std::move(response_headers), true);
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // Verify decorator operation response header has been defined.
@@ -1100,7 +1100,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{
@@ -1114,7 +1114,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
         filter->callbacks_->encodeHeaders(std::move(response_headers), true);
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // Verify decorator operation response header has NOT been defined (i.e. not propagated).
@@ -1166,7 +1166,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{
@@ -1182,7 +1182,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // Should be no 'x-envoy-decorator-operation' response header, as decorator
@@ -1249,7 +1249,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{
@@ -1264,7 +1264,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(*filter, decodeHeaders(_, true))
@@ -1333,7 +1333,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{
@@ -1348,7 +1348,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // Verify that decorator operation has NOT been set as request header (propagate is false)
@@ -1415,7 +1415,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{
@@ -1431,7 +1431,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -1473,7 +1473,7 @@ TEST_F(HttpConnectionManagerImplTest,
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{
@@ -1488,7 +1488,7 @@ TEST_F(HttpConnectionManagerImplTest,
         filter->callbacks_->encodeHeaders(std::move(response_headers), true);
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -1531,7 +1531,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{
@@ -1546,7 +1546,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
         filter->callbacks_->encodeHeaders(std::move(response_headers), true);
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -1577,7 +1577,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamDisconnectAccessLog) {
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
@@ -1585,7 +1585,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamDisconnectAccessLog) {
         decoder->decodeHeaders(std::move(headers), true);
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -1618,7 +1618,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{
@@ -1635,7 +1635,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
         filter->callbacks_->encodeTrailers(std::move(response_trailers));
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -1669,7 +1669,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         // These request headers are missing the necessary ":host"
@@ -1677,7 +1677,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
             new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
         decoder->decodeHeaders(std::move(headers), true);
         data.drain(0);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input;
@@ -1711,7 +1711,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{
@@ -1728,7 +1728,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
         filter->callbacks_->encodeTrailers(std::move(response_trailers));
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -1756,7 +1756,7 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{
@@ -1770,7 +1770,7 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
         filter->callbacks_->encodeHeaders(std::move(response_headers), true);
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -1783,13 +1783,13 @@ TEST_F(HttpConnectionManagerImplTest, NoPath) {
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
         RequestHeaderMapPtr headers{
             new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "NOT_CONNECT"}}};
         decoder->decodeHeaders(std::move(headers), true);
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(encoder, encodeHeaders(_, true))
@@ -1809,7 +1809,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNotConfigured) {
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_(_)).Times(0);
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
@@ -1817,7 +1817,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNotConfigured) {
         decoder->decodeHeaders(std::move(headers), false);
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -1833,7 +1833,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutGlobal) {
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
         Event::MockTimer* idle_timer = setUpTimer();
         EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
         conn_manager_->newStream(response_encoder_);
@@ -1843,7 +1843,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutGlobal) {
         EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(2);
         EXPECT_CALL(*idle_timer, disableTimer());
         idle_timer->invokeCallback();
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // 408 direct response after timeout.
@@ -1872,7 +1872,7 @@ TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdl
         callbacks.addStreamEncoderFilter(filter);
       }));
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     Event::MockTimer* idle_timer = setUpTimer();
     EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
     conn_manager_->newStream(response_encoder_);
@@ -1883,7 +1883,7 @@ TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdl
     EXPECT_CALL(*idle_timer, disableTimer());
     // Simulate and idle timeout so that the filter chain gets created.
     idle_timer->invokeCallback();
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   // This should not be called as we don't have request headers.
@@ -1915,7 +1915,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
 
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
         Event::MockTimer* idle_timer = setUpTimer();
         EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
         conn_manager_->newStream(response_encoder_);
@@ -1925,7 +1925,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
         EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(2);
         EXPECT_CALL(*idle_timer, disableTimer());
         idle_timer->invokeCallback();
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -1969,7 +1969,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteOverride) {
       .WillByDefault(Return(std::chrono::milliseconds(30)));
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         Event::MockTimer* idle_timer = setUpTimer();
         EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
@@ -1980,7 +1980,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteOverride) {
         decoder->decodeHeaders(std::move(headers), false);
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -1997,7 +1997,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteZeroOverride) {
       .WillByDefault(Return(std::chrono::milliseconds(0)));
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         Event::MockTimer* idle_timer = setUpTimer();
         EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
@@ -2008,7 +2008,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteZeroOverride) {
         decoder->decodeHeaders(std::move(headers), false);
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2025,7 +2025,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
 
   // Codec sends downstream request headers.
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 
         Event::MockTimer* idle_timer = setUpTimer();
@@ -2041,7 +2041,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
         idle_timer->invokeCallback();
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // 408 direct response after timeout.
@@ -2068,7 +2068,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNormalTermination) {
   // Codec sends downstream request headers.
   Event::MockTimer* idle_timer = setUpTimer();
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
@@ -2077,7 +2077,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNormalTermination) {
         decoder->decodeHeaders(std::move(headers), false);
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2098,7 +2098,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
 
   // Codec sends downstream request headers.
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 
         Event::MockTimer* idle_timer = setUpTimer();
@@ -2117,7 +2117,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
         idle_timer->invokeCallback();
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // 408 direct response after timeout.
@@ -2153,7 +2153,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterUpstreamHeaders) 
   // Codec sends downstream request headers, upstream response headers are
   // encoded.
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 
         Event::MockTimer* idle_timer = setUpTimer();
@@ -2170,7 +2170,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterUpstreamHeaders) 
         idle_timer->invokeCallback();
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // 200 upstream response.
@@ -2206,7 +2206,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
   Event::MockTimer* idle_timer = setUpTimer();
   RequestDecoder* decoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(response_encoder_);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -2237,7 +2237,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
         idle_timer->invokeCallback();
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // 100 continue.
@@ -2262,10 +2262,10 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledByDefault) {
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_).Times(0);
     conn_manager_->newStream(response_encoder_);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2276,10 +2276,10 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledIfSetToZero) {
   request_timeout_ = std::chrono::milliseconds(0);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_).Times(0);
     conn_manager_->newStream(response_encoder_);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2290,12 +2290,12 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutValidlyConfigured) {
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     Event::MockTimer* request_timer = setUpTimer();
     EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _));
 
     conn_manager_->newStream(response_encoder_);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2307,7 +2307,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408
   setup(false, "");
 
   std::string response_body;
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     Event::MockTimer* request_timer = setUpTimer();
     EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
     EXPECT_CALL(*request_timer, disableTimer()).Times(AtLeast(1));
@@ -2321,7 +2321,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408
     conn_manager_->newStream(response_encoder_);
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_)).Times(2);
     request_timer->invokeCallback();
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2335,7 +2335,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsNotDisarmedOnIncompleteReq
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     Event::MockTimer* request_timer = setUpTimer();
     EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
     EXPECT_CALL(*request_timer, disableTimer()).Times(0);
@@ -2346,7 +2346,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsNotDisarmedOnIncompleteReq
 
     // the second parameter 'false' leaves the stream open
     decoder->decodeHeaders(std::move(headers), false);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2359,7 +2359,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     Event::MockTimer* request_timer = setUpTimer();
     EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
 
@@ -2369,7 +2369,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
 
     EXPECT_CALL(*request_timer, disableTimer()).Times(1);
     decoder->decodeHeaders(std::move(headers), true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2383,7 +2383,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         Event::MockTimer* request_timer = setUpTimer();
         EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
 
@@ -2394,7 +2394,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
 
         EXPECT_CALL(*request_timer, disableTimer()).Times(1);
         decoder->decodeData(data, true);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2408,7 +2408,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         Event::MockTimer* request_timer = setUpTimer();
         EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
@@ -2421,7 +2421,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
         EXPECT_CALL(*request_timer, disableTimer()).Times(1);
         RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"foo", "bar"}}};
         decoder->decodeTrailers(std::move(trailers));
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2440,7 +2440,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnEncodeHeaders) {
       }));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, _));
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     Event::MockTimer* request_timer = setUpTimer();
     EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
 
@@ -2453,7 +2453,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnEncodeHeaders) {
     EXPECT_CALL(*request_timer, disableTimer()).Times(1);
     ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
     filter->callbacks_->encodeHeaders(std::move(response_headers), false);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2467,13 +2467,13 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnConnectionTermin
   setup(false, "");
 
   Event::MockTimer* request_timer = setUpTimer();
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
 
     decoder->decodeHeaders(std::move(headers), false);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2491,10 +2491,10 @@ TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationDisabledIfSetToZero) {
   max_stream_duration_ = std::chrono::milliseconds(0);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_).Times(0);
     conn_manager_->newStream(response_encoder_);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2505,12 +2505,12 @@ TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationValidlyConfigured) {
   max_stream_duration_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     Event::MockTimer* duration_timer = setUpTimer();
 
     EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _));
     conn_manager_->newStream(response_encoder_);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2522,10 +2522,10 @@ TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationCallbackResetStream) {
   setup(false, "");
   Event::MockTimer* duration_timer = setUpTimer();
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _)).Times(1);
     conn_manager_->newStream(response_encoder_);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2543,10 +2543,10 @@ TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationCallbackNotCalledIfResetS
   setup(false, "");
   Event::MockTimer* duration_timer = setUpTimer();
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _)).Times(1);
     conn_manager_->newStream(response_encoder_);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2564,7 +2564,7 @@ TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
                                                                  {":method", "GET"},
@@ -2573,7 +2573,7 @@ TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
                                                                  {"upgrade", "websocket"}}};
         decoder->decodeHeaders(std::move(headers), true);
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(encoder, encodeHeaders(_, true))
@@ -2625,7 +2625,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
   // only request into it. Then we respond into the filter.
   RequestDecoder* decoder = nullptr;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
@@ -2640,7 +2640,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
         filter->decoder_callbacks_->encodeHeaders(std::move(response_headers), false);
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // Kick off the incoming data. Use extra data which should cause a redispatch.
@@ -2659,13 +2659,13 @@ TEST_F(HttpConnectionManagerImplTest, ConnectAsUpgrade) {
       .WillRepeatedly(Return(true));
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
         RequestHeaderMapPtr headers{
             new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "CONNECT"}}};
         decoder->decodeHeaders(std::move(headers), false);
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // Kick off the incoming data. Use extra data which should cause a redispatch.
@@ -2680,12 +2680,12 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
 
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder = &conn_manager_->newStream(encoder);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(1, 0);
@@ -2736,12 +2736,12 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
 
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder = &conn_manager_->newStream(encoder);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input;
@@ -2772,12 +2772,12 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
   InSequence s;
   setup(false, "envoy-server-test");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), false);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(1, 0);
@@ -2805,12 +2805,12 @@ TEST_F(HttpConnectionManagerImplTest, DisconnectOnProxyConnectionDisconnect) {
   InSequence s;
   setup(false, "envoy-server-test");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {":authority", "host"}, {":path", "/"}, {":method", "GET"}, {"proxy-connection", "close"}}};
     decoder->decodeHeaders(std::move(headers), false);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(1, 0);
@@ -2852,12 +2852,12 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
   // Start the request
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder = &conn_manager_->newStream(encoder);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), false);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("hello");
@@ -2875,9 +2875,9 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
   // Finish the request.
   EXPECT_CALL(*filter, decodeData(_, true));
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder->decodeData(data, true);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   conn_manager_->onData(fake_input, false);
@@ -2897,10 +2897,10 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamDisconnect) {
 
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         conn_manager_->newStream(encoder);
         data.drain(2);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
@@ -2917,10 +2917,10 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     conn_manager_->newStream(response_encoder_);
     throw CodecProtocolException("protocol error");
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
@@ -2953,10 +2953,10 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAccessLog) {
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
         throw CodecProtocolException("protocol error");
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2986,7 +2986,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAfterHeadersAcc
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
         decoder = &conn_manager_->newStream(encoder);
 
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
@@ -2994,7 +2994,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAfterHeadersAcc
         decoder->decodeHeaders(std::move(headers), true);
 
         throw CodecProtocolException("protocol error");
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -3006,10 +3006,10 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     conn_manager_->newStream(response_encoder_);
     throw FrameFloodException("too many outbound frames.");
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
@@ -3059,7 +3059,7 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
 
   NiceMock<MockResponseEncoder> encoder;
   RequestDecoder* decoder = nullptr;
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder = &conn_manager_->newStream(encoder);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -3067,7 +3067,7 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
 
     Buffer::OwnedImpl fake_data("hello");
     decoder->decodeData(fake_data, true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   EXPECT_CALL(*idle_timer, disableTimer());
@@ -3129,7 +3129,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
 
   NiceMock<MockResponseEncoder> encoder;
   RequestDecoder* decoder = nullptr;
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder = &conn_manager_->newStream(encoder);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -3137,7 +3137,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
 
     Buffer::OwnedImpl fake_data("hello");
     decoder->decodeData(fake_data, true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   EXPECT_CALL(*filter, decodeHeaders(_, false))
@@ -3170,7 +3170,7 @@ TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -3178,7 +3178,7 @@ TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
 
     Buffer::OwnedImpl fake_data("hello");
     decoder->decodeData(fake_data, true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 0);
@@ -3217,13 +3217,13 @@ TEST_F(HttpConnectionManagerImplTest, DoubleBuffering) {
   // The data will get moved so we need to have a copy to compare against.
   Buffer::OwnedImpl fake_data("hello");
   Buffer::OwnedImpl fake_data_copy("hello");
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), false);
     decoder->decodeData(fake_data, true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(3, 0);
@@ -3261,12 +3261,12 @@ TEST_F(HttpConnectionManagerImplTest, ZeroByteDataFiltering) {
   setup(false, "");
 
   RequestDecoder* decoder = nullptr;
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), false);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 0);
@@ -3301,7 +3301,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -3312,7 +3312,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
 
     RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"bazzz", "bar"}}};
     decoder->decodeTrailers(std::move(trailers));
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 2);
@@ -3388,7 +3388,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -3396,7 +3396,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
 
     Buffer::OwnedImpl fake_data("hello");
     decoder->decodeData(fake_data, true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 2);
@@ -3480,7 +3480,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -3491,7 +3491,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
 
     RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"foo", "bar"}}};
     decoder->decodeTrailers(std::move(trailers));
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 2);
@@ -3562,7 +3562,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback_NoDataFram
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -3570,7 +3570,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback_NoDataFram
 
     RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"foo", "bar"}}};
     decoder->decodeTrailers(std::move(trailers));
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 1);
@@ -3622,7 +3622,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback_ContinueAf
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -3630,7 +3630,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback_ContinueAf
 
     RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"foo", "bar"}}};
     decoder->decodeTrailers(std::move(trailers));
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 1);
@@ -3688,7 +3688,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyDuringDecodeData) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -3699,7 +3699,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyDuringDecodeData) {
 
     Buffer::OwnedImpl data2("world");
     decoder->decodeData(data2, true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 2);
@@ -3757,12 +3757,12 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 2);
@@ -3808,12 +3808,12 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
 TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(3, 2);
@@ -3936,11 +3936,11 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWith
   {
     setUpBufferLimits();
     EXPECT_CALL(*codec_, dispatch(_))
-        .WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+        .WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
           decoder = &conn_manager_->newStream(response_encoder_);
           // Call the high buffer callbacks as the codecs do.
           stream_callbacks_->onAboveWriteBufferHighWatermark();
-          return Envoy::Http::okStatus();
+          return Http::okStatus();
         }));
 
     // Send fake data to kick off newStream being created.
@@ -3954,11 +3954,11 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWith
     setupFilterChain(2, 2);
     EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).Times(0);
     EXPECT_CALL(*codec_, dispatch(_))
-        .WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+        .WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
           RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
               {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
           decoder->decodeHeaders(std::move(headers), true);
-          return Envoy::Http::okStatus();
+          return Http::okStatus();
         }));
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
@@ -4000,11 +4000,11 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksUnwoundWithL
   {
     setUpBufferLimits();
     EXPECT_CALL(*codec_, dispatch(_))
-        .WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+        .WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
           decoder = &conn_manager_->newStream(response_encoder_);
           // Call the high buffer callbacks as the codecs do.
           stream_callbacks_->onAboveWriteBufferHighWatermark();
-          return Envoy::Http::okStatus();
+          return Http::okStatus();
         }));
 
     // Send fake data to kick off newStream being created.
@@ -4025,11 +4025,11 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksUnwoundWithL
     setupFilterChain(2, 2);
     EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).Times(0);
     EXPECT_CALL(*codec_, dispatch(_))
-        .WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+        .WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
           RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
               {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
           decoder->decodeHeaders(std::move(headers), true);
-          return Envoy::Http::okStatus();
+          return Http::okStatus();
         }));
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
@@ -4150,7 +4150,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) 
   initial_buffer_limit_ = 10;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -4161,7 +4161,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) 
 
     Buffer::OwnedImpl fake_data2("world world");
     decoder->decodeData(fake_data2, true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setUpBufferLimits();
@@ -4260,13 +4260,13 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":authority", "host"}, {":path", "/"}, {":method", "HEAD"}}};
         decoder->decodeHeaders(std::move(headers), true);
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   setupFilterChain(1, 1);
@@ -4307,7 +4307,7 @@ TEST_F(HttpConnectionManagerImplTest, ResetWithStoppedFilter) {
             {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
         decoder->decodeHeaders(std::move(headers), true);
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   setupFilterChain(1, 1);
@@ -4346,13 +4346,13 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamHeaders) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     auto headers = std::make_unique<TestRequestHeaderMapImpl>(
         std::initializer_list<std::pair<std::string, std::string>>(
             {{":authority", "host"}, {":path", "/"}, {":method", "GET"}}));
     decoder->decodeHeaders(std::move(headers), false);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 2);
@@ -4388,7 +4388,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamData) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     auto headers = makeHeaderMap<TestRequestHeaderMapImpl>(
         {{":authority", "host"}, {":path", "/"}, {":method", "GET"}});
@@ -4396,7 +4396,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamData) {
 
     Buffer::OwnedImpl fake_data("hello");
     decoder->decodeData(fake_data, true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 2);
@@ -4431,7 +4431,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamTrailers) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     auto headers = makeHeaderMap<TestRequestHeaderMapImpl>(
         {{":authority", "host"}, {":path", "/"}, {":method", "GET"}});
@@ -4442,7 +4442,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamTrailers) {
 
     auto trailers = makeHeaderMap<TestRequestTrailerMapImpl>({{"foo", "bar"}});
     decoder->decodeTrailers(std::move(trailers));
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 2);
@@ -4480,12 +4480,12 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(2, 2);
@@ -4566,12 +4566,12 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithAllContinue) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(3, 3);
@@ -4669,12 +4669,12 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithStopAndContinue) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   setupFilterChain(3, 3);
@@ -4745,7 +4745,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -4753,7 +4753,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
 
     Buffer::OwnedImpl fake_data("hello");
     decoder->decodeData(fake_data, true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _));
@@ -4826,7 +4826,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataTrailers) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -4837,7 +4837,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataTrailers) {
 
     RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"foo", "bar"}}};
     decoder->decodeTrailers(std::move(trailers));
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _));
@@ -4921,7 +4921,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
   InSequence s;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -4932,7 +4932,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
 
     Buffer::OwnedImpl fake_data2("world");
     decoder->decodeData(fake_data2, true);
-    return Envoy::Http::okStatus();
+    return Http::okStatus();
   }));
 
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _));
@@ -5035,12 +5035,12 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
       Server::OverloadActionState::Active);
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
         decoder->decodeHeaders(std::move(headers), false);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   // 503 direct response when overloaded.
@@ -5071,7 +5071,7 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
                                                                  {":path", "/"},
@@ -5083,7 +5083,7 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
         filter->callbacks_->encodeHeaders(std::move(response_headers), true);
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
@@ -5194,7 +5194,7 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
                                                                  {":path", "/"},
@@ -5206,7 +5206,7 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
         filter->callbacks_->encodeHeaders(std::move(response_headers), true);
 
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
@@ -5223,9 +5223,9 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
 
   // Set up the codec.
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
@@ -5292,13 +5292,13 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteNotFound) {
       .Times(2)
       .WillRepeatedly(Return(nullptr));
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":authority", "host"}, {":method", "GET"}, {":path", "/foo"}}};
         decoder->decodeHeaders(std::move(headers), true);
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
@@ -5324,13 +5324,13 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
       .WillOnce(Return(nullptr))        // refreshCachedRoute first time.
       .WillOnce(Return(route_config_)); // triggered by callbacks_->route(), SRDS now updated.
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":authority", "host"}, {":method", "GET"}, {":path", "/foo"}}};
         decoder->decodeHeaders(std::move(headers), true);
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
   const std::string fake_cluster1_name = "fake_cluster1";
   std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
@@ -5389,13 +5389,13 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
         return route_config2;
       }));
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":authority", "host"}, {":method", "GET"}, {"scope_key", "foo"}, {":path", "/foo"}}};
         decoder->decodeHeaders(std::move(headers), false);
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
   setupFilterChain(2, 0);
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
@@ -5444,13 +5444,13 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
       .WillOnce(Return(route1));
   RequestDecoder* decoder = nullptr;
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Envoy::Http::Status {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder = &conn_manager_->newStream(response_encoder_);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":authority", "host"}, {":method", "GET"}, {":path", "/foo"}}};
         decoder->decodeHeaders(std::move(headers), true);
         data.drain(4);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
@@ -5550,12 +5550,12 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
 
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
-      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
         decoder->decodeHeaders(std::move(headers), true);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
   {
     InSequence s;
@@ -5633,9 +5633,9 @@ TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
 
   Buffer::OwnedImpl fake_input("1234");
   EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Envoy::Http::Status {
+      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
         conn_manager_->newStream(response_encoder_);
-        return Envoy::Http::okStatus();
+        return Http::okStatus();
       }));
   // Either RDS or SRDS should be set.
   EXPECT_DEBUG_DEATH(conn_manager_->onData(fake_input, false),

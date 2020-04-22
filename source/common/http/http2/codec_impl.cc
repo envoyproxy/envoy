@@ -467,7 +467,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
 
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
-Envoy::Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
+Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
   // ConnectionImpl::dispatch throws an exception.
@@ -492,7 +492,7 @@ Envoy::Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 
   // Decoding incoming frames can generate outbound frames so flush pending.
   sendPendingFrames();
-  return Envoy::Http::okStatus();
+  return Http::okStatus();
 }
 
 ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
@@ -1343,7 +1343,7 @@ void ServerConnectionImpl::checkOutboundQueueLimits() {
   }
 }
 
-Envoy::Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   ASSERT(!dispatching_downstream_data_);
   dispatching_downstream_data_ = true;
 
