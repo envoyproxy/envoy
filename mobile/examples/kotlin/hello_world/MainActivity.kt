@@ -104,6 +104,6 @@ class MainActivity : Activity() {
           Unit
         }
 
-    envoy.send(request, null, emptyMap(), handler)
+    envoy.send(request, null, null, handler)
   }
 }

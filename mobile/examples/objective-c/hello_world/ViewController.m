@@ -95,7 +95,7 @@ NSString *_REQUEST_SCHEME = @"https";
     NSLog(@"Error (%i): Request failed: %@", requestID, error.message);
   }];
 
-  [self.envoy send:request body:nil trailers:[NSDictionary new] handler:handler];
+  [self.envoy send:request body:nil trailers:nil handler:handler];
 }
 
 - (void)addResponseBody:(NSString *)body

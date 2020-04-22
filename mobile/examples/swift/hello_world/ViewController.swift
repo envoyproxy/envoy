@@ -71,7 +71,7 @@ final class ViewController: UITableViewController {
                                                 message: message)))
       }
 
-    envoy.send(request, body: nil, handler: handler)
+    envoy.send(request, body: nil, trailers: nil, handler: handler)
   }
 
   private func add(result: Result<Response, RequestError>) {

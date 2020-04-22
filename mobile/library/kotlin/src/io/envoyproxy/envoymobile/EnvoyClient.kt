@@ -28,22 +28,25 @@ class Envoy private constructor(
     }
   }
 
-  override fun send(request: Request, responseHandler: ResponseHandler): StreamEmitter {
+  override fun start(request: Request, responseHandler: ResponseHandler): StreamEmitter {
     val stream = engine.startStream(responseHandler.underlyingCallbacks)
     stream.sendHeaders(request.outboundHeaders(), false)
     return EnvoyStreamEmitter(stream)
   }
 
-  override fun send(request: Request, body: ByteBuffer?, trailers: Map<String, List<String>>, responseHandler: ResponseHandler): CancelableStream {
-    val stream = send(request, responseHandler)
-    if (body != null) {
-      stream.sendData(body)
+  override fun send(request: Request, body: ByteBuffer?, trailers: Map<String, List<String>>?, responseHandler: ResponseHandler): CancelableStream {
+    val stream = engine.startStream(responseHandler.underlyingCallbacks)
+    if (body != null && trailers != null) { // Close with trailers
+      stream.sendHeaders(request.outboundHeaders(), false)
+      stream.sendData(body, false)
+      stream.sendTrailers(trailers)
+    } else if (body != null) { // Close with data
+      stream.sendHeaders(request.outboundHeaders(), false)
+      stream.sendData(body, true)
+    } else { // Close with headers-only
+      stream.sendHeaders(request.outboundHeaders(), true)
     }
-    stream.close(trailers)
-    return stream
-  }
 
-  override fun send(request: Request, body: ByteBuffer?, responseHandler: ResponseHandler): CancelableStream {
-    return send(request, body, emptyMap(), responseHandler)
+    return EnvoyStreamEmitter(stream)
   }
 }
