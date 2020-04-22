@@ -613,6 +613,27 @@ adding/removing/updating clusters. On the other hand, routes are not
 warmed, i.e., the management plane must ensure that clusters referenced
 by a route are in place, before pushing the updates for a route.
 
+.. _xds_protocol_TTL:
+
+TTL
+~~~
+
+In the event that the management server becomes unreachable, the last known configuration received by envoy will persist until the connection is reestablished. For some services, this may not be desirable. For example, in the case of a fault injection service, a management server crash at the wrong time may leave envoy in an undesirable state. The TTL setting allows envoy to remove a set of resources after a specified period of time if contact with the management server is lost. This can be used, for example, to terminate a fault injection test when the management server can no longer be reached.
+
+State of the World TTL
+^^^^^^^^^^^^^^^^^^^^^^
+
+A TTL field in the :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` specifies the TTL for all resources contained in the response. A timer is started when the response is received. When the timer expires, all resources retrieved from the management server will be removed.
+
+The TTL timer can be updated by sending a specially formed :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` with the same version as the previously applied response. The list of resources included in the response is empty and the TTL field is optional. This serves as a signal to envoy to update the TTL to the value specified or remove the TTL if none is specified.
+
+Incremental TTL
+^^^^^^^^^^^^^^^
+
+A TTL field is specified on each link:Resource. A timer is started for each link:Resource with a TTL specified. When the timer expires, the specific resource is removed.
+
+To update the TTL associated with a Resource, the management server sends a response for the Resource with the same version as was previously sent for the Resource. The body of the resource is empty and the TTL field is optional. This serves as a signal to envoy to update the TTL to the value specified or remove the TTL if none is specified.
+
 .. _xds_protocol_ads:
 
 Aggregated Discovery Service
