@@ -185,6 +185,12 @@ public:
   virtual const std::vector<std::string>& applicationProtocolListOverride() const PURE;
 
   /**
+   * @return the optional fallback for application protocols, for when they are not specified in the
+   *         TLS configuration.
+   */
+  virtual  const std::vector<std::string>& applicationProtocolListFallback() const PURE;
+
+  /**
    * @param vector of bytes to which the option should append hash key data that will be used
    *        to separate connections based on the option. Any data already in the key vector must
    *        not be modified.

@@ -851,6 +851,22 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
   }
 }
 
+bool ClientContextImpl::parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl) {
+  if (alpn.empty()) {
+    return false;
+  }
+    std::vector<uint8_t> parsed_override_alpn =
+        parseAlpnProtocols(absl::StrJoin(alpn, ","));
+    if (!parsed_override_alpn.empty()) {
+      const int rc = SSL_set_alpn_protos(ssl_con.get(), parsed_override_alpn.data(),
+                                         parsed_override_alpn.size());
+      RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
+      return true;
+    }
+
+    return false;
+}
+
 bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOptions* options) {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(options));
 
@@ -868,14 +884,13 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
     SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
 
-  if (options && !options->applicationProtocolListOverride().empty()) {
-    std::vector<uint8_t> parsed_override_alpn =
-        parseAlpnProtocols(absl::StrJoin(options->applicationProtocolListOverride(), ","));
-    if (!parsed_override_alpn.empty()) {
-      const int rc = SSL_set_alpn_protos(ssl_con.get(), parsed_override_alpn.data(),
-                                         parsed_override_alpn.size());
-      RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
-    }
+  bool has_alpn_defined = !parsed_alpn_protocols_.empty();
+  if (options) {
+    has_alpn_defined |= parseAndSetAlpn(options->applicationProtocolListOverride())
+  }
+
+  if (options && !has_alpn_defined) {
+    parseAndSetAlpn(options->applicationProtocolListFallback());
   }
 
   if (allow_renegotiation_) {

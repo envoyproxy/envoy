@@ -29,7 +29,7 @@ protected:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options, Protocol protocol);
   ~ConnPoolImplBase() override;
 
   // Closes and destroys all connections. This must be called in the destructor of
