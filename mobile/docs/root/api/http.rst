@@ -107,7 +107,7 @@ Doing so returns a ``StreamEmitter`` which allows the sender to interact with th
 
   val request = RequestBuilder(...).build()
   val responseHandler = ResponseHandler(...)
-  val emitter = envoy.send(request, responseHandler)
+  val emitter = envoy.start(request, responseHandler)
     .sendData(...)
     .sendData(...)
 
@@ -120,7 +120,7 @@ Doing so returns a ``StreamEmitter`` which allows the sender to interact with th
 
   let request = RequestBuilder(...).build()
   let responseHandler = ResponseHandler(...)
-  let emitter = envoy.send(request, handler: responseHandler)
+  let emitter = envoy.start(request, handler: responseHandler)
     .sendData(...)
     .sendData(...)
 
@@ -137,8 +137,21 @@ Sending a unary request may be done by either closing the ``StreamEmitter`` afte
 set of headers/data has been written, or by using the helper function that returns a
 ``CancelableStream`` type instead of a ``StreamEmitter``.
 
-The unary helper function takes optional body data, then closes the stream.
-The ``CancelableStream`` it returns does not expose options for sending additional data.
+The unary helper function allows for easily performing the following request types:
+
+- **Headers-only:** Send request headers then close the stream.
+
+  - Done by passing ``nil`` body and ``nil`` trailers.
+
+- **Close with data:** Send request headers and data, then close.
+
+  - Done by passing ``nil`` trailers.
+
+- **Close with trailers:** Send request headers and data, then close with trailers.
+
+  - Done by passing a body and trailers.
+
+The ``CancelableStream`` returned by the unary function does not expose options for sending additional data.
 
 **Kotlin**::
 
@@ -146,8 +159,18 @@ The ``CancelableStream`` it returns does not expose options for sending addition
 
   val request = RequestBuilder(...).build()
   val responseHandler = ResponseHandler(...)
+
+  // Headers-only
+  val cancelable = envoy.send(request, null, null, responseHandler)
+
+  // Close using data
+  val cancelable = envoy.send(request, body, null, responseHandler)
+
+  // Close using trailers
   val cancelable = envoy.send(request, body, trailers, responseHandler)
-  // cancelable.cancel()
+
+  // To cancel the request:
+  cancelable.cancel()
 
 **Swift**::
 
@@ -155,5 +178,15 @@ The ``CancelableStream`` it returns does not expose options for sending addition
 
   let request = RequestBuilder(...).build()
   let responseHandler = ResponseHandler(...)
-  let cancelable = envoy.send(request, body, trailers: [:], handler: responseHandler)
-  // cancelable.cancel()
+
+  // Headers-only
+  let cancelable = envoy.send(request, nil, trailers: nil, handler: responseHandler)
+
+  // Close using data
+  let cancelable = envoy.send(request, body, trailers: nil, handler: responseHandler)
+
+  // Close using trailers
+  let cancelable = envoy.send(request, body, trailers: trailers, handler: responseHandler)
+
+  // To cancel the request:
+  cancelable.cancel()
