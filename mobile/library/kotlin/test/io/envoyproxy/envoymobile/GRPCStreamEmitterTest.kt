@@ -9,7 +9,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 class GRPCStreamEmitterTest {
-
   // TODO: Problems with nhaarman/mockito-kotlin https://github.com/lyft/envoy-mobile/issues/504
   // This is a total hack to get something to work.
   private lateinit var emitter: StreamEmitter
@@ -72,7 +71,8 @@ class GRPCStreamEmitterTest {
     GRPCStreamEmitter(emitter)
       .sendMessage(message)
 
-    assertThat(ByteBuffer.wrap(dataOutputStream.toByteArray().sliceArray(1..4)).order(ByteOrder.BIG_ENDIAN).int).isEqualTo(payload.size)
+    assertThat(ByteBuffer.wrap(dataOutputStream.toByteArray().sliceArray(1..4))
+      .order(ByteOrder.BIG_ENDIAN).int).isEqualTo(payload.size)
   }
 
   @Test
@@ -82,8 +82,11 @@ class GRPCStreamEmitterTest {
     GRPCStreamEmitter(emitter)
       .sendMessage(message)
 
-    assertThat(dataOutputStream.toByteArray().sliceArray(GRPC_PREFIX_LENGTH until dataOutputStream.size()).toString(Charsets.UTF_8)).isEqualTo("data")
-
+    assertThat(
+      dataOutputStream.toByteArray()
+        .sliceArray(GRPC_PREFIX_LENGTH until dataOutputStream.size())
+        .toString(Charsets.UTF_8)
+    ).isEqualTo("data")
   }
 
   @Test

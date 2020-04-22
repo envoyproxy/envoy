@@ -146,7 +146,15 @@ open class EnvoyClientBuilder(
         return Envoy(engineType(), configuration.yaml, logLevel)
       }
       is Standard -> {
-        Envoy(engineType(), EnvoyConfiguration(statsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, statsFlushSeconds, appVersion, appId, virtualClusters), logLevel)
+        Envoy(
+          engineType(),
+          EnvoyConfiguration(
+            statsDomain, connectTimeoutSeconds,
+            dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
+            statsFlushSeconds, appVersion, appId, virtualClusters
+          ),
+          logLevel
+        )
       }
     }
   }

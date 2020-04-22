@@ -4,7 +4,9 @@ internal fun Request.outboundHeaders(): Map<String, List<String>> {
   val retryPolicyHeaders = retryPolicy?.outboundHeaders() ?: emptyMap()
 
   val result = mutableMapOf<String, List<String>>()
-  result.putAll(headers.filter { entry -> !entry.key.startsWith(":") && !entry.key.startsWith("x-envoy-mobile")})
+  result.putAll(headers.filter { entry ->
+    !entry.key.startsWith(":") && !entry.key.startsWith("x-envoy-mobile")
+  })
   result.putAll(retryPolicyHeaders)
   result[":method"] = listOf(method.stringValue())
   result[":scheme"] = listOf(scheme)

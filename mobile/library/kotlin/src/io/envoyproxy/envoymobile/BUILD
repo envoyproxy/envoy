@@ -35,7 +35,7 @@ kt_android_library(
 envoy_mobile_kt_library(
     name = "envoy_interfaces_lib",
     srcs = [
-        "EnvoyClient.kt",
+        "Envoy.kt",
         "EnvoyClientBuilder.kt",
         "EnvoyError.kt",
         "EnvoyStreamEmitter.kt",

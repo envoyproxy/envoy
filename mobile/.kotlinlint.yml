@@ -2,14 +2,24 @@
 build:
   maxIssues: 0
 
-processors:
-  active: true
-  exclude:
+complexity:
+  ComplexCondition:
+    active: false
+  TooManyFunctions:
+    active: false
 
 console-reports:
   active: true
-  exclude:
+
+processors:
+  active: true
 
 style:
+  ForbiddenComment:
+    active: false
   MagicNumber:
+    active: false
+  MaxLineLength:
+    maxLineLength: 100
+  ReturnCount:
     active: false

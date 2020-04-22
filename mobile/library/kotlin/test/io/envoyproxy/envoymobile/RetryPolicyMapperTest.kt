@@ -37,7 +37,8 @@ class RetryPolicyMapperTest {
         maxRetryCount = 123,
         retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.GATEWAY_ERROR))
 
-    assertThat(retryPolicy.outboundHeaders()).doesNotContainKey("x-envoy-upstream-rq-per-try-timeout-ms")
+    assertThat(retryPolicy.outboundHeaders())
+      .doesNotContainKey("x-envoy-upstream-rq-per-try-timeout-ms")
   }
 
   @Test
@@ -60,6 +61,7 @@ class RetryPolicyMapperTest {
         maxRetryCount = 3,
         retryOn = listOf(RetryRule.STATUS_5XX),
         perRetryTimeoutMS = 2,
-        totalUpstreamTimeoutMS = 1)
+        totalUpstreamTimeoutMS = 1
+    )
   }
 }

@@ -48,7 +48,8 @@ class MainActivity : Activity() {
 
     viewAdapter = ResponseRecyclerViewAdapter()
     recyclerView.adapter = viewAdapter
-    val dividerItemDecoration = DividerItemDecoration(recyclerView.context, DividerItemDecoration.VERTICAL)
+    val dividerItemDecoration = DividerItemDecoration(
+      recyclerView.context, DividerItemDecoration.VERTICAL)
     recyclerView.addItemDecoration(dividerItemDecoration)
     thread.start()
     val handler = Handler(thread.looper)
@@ -95,7 +96,9 @@ class MainActivity : Activity() {
             Log.d("MainActivity", "successful response!")
             recyclerView.post { viewAdapter.add(Success(body, serverHeaderField)) }
           } else {
-            recyclerView.post { viewAdapter.add(Failure("failed with status " + responseStatus.get())) }
+            recyclerView.post {
+              viewAdapter.add(Failure("failed with status " + responseStatus.get()))
+            }
           }
           Unit
         }

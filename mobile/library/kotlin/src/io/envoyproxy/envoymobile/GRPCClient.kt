@@ -18,7 +18,7 @@ class GRPCClient(
    * @param request The outbound gRPC request. See `GRPCRequestBuilder` for creation.
    * @param handler Handler for receiving responses.
    *
-   * @returns GRPCStreamEmitter, An emitter that can be used for sending more traffic over the stream.
+   * @returns An emitter that can be used for sending more traffic over the stream.
    */
   fun start(request: Request, grpcResponseHandler: GRPCResponseHandler): GRPCStreamEmitter {
     val emitter = httpClient.start(request, grpcResponseHandler.underlyingHandler)

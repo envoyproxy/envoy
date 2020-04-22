@@ -14,7 +14,10 @@ import org.mockito.Mockito.verify
 class EnvoyClientTest {
   private val engine = mock(EnvoyEngine::class.java)
   private val stream = mock(EnvoyHTTPStream::class.java)
-  private val config = EnvoyConfiguration("stats.foo.com", 0, 0, 0, 0, 0, "v1.2.3", "com.mydomain.myapp", "[test]")
+  private val config = EnvoyConfiguration(
+    "stats.foo.com", 0, 0, 0, 0, 0,
+    "v1.2.3", "com.mydomain.myapp", "[test]"
+  )
 
   @Test
   fun `starting a stream sends headers`() {

@@ -19,8 +19,7 @@ data class Request internal constructor(
 ) {
 
   /**
-   * Transforms this Request to the {@link io.envoyproxy.envoymobile.RequestBuilder} for modification using the
-   * current properties.
+   * Transforms this Request to the `RequestBuilder` for modification using the current properties.
    *
    * @return the builder.
    */

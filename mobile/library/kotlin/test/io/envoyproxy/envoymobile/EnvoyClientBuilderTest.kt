@@ -5,8 +5,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.mockito.Mockito.mock
 
-class EnvoyBuilderTest {
-
+class EnvoyClientBuilderTest {
   private lateinit var clientBuilder: EnvoyClientBuilder
 
   private var engine: EnvoyEngine = mock(EnvoyEngine::class.java)
