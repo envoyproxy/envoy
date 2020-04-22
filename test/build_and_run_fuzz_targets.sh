@@ -13,7 +13,7 @@ do
   LIBFUZZER_TARGETS+="${t}_with_libfuzzer "
 done
 
-bazel build ${LIBFUZZER_TARGETS} --config asan-fuzzer -c opt
+bazel build ${BAZEL_BUILD_OPTIONS} ${LIBFUZZER_TARGETS} --config asan-fuzzer -c opt
 
 # Now run each fuzz target in parallel for 60 seconds.
 PIDS=""
