@@ -55,11 +55,11 @@ class FaultAbortConfig {
 public:
   FaultAbortConfig(const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config);
 
-  absl::optional<Http::Code> httpStatusCode(const Http::HeaderEntry* header) const {
-    return provider_->httpStatusCode(header);
+  absl::optional<Http::Code> httpStatusCode(const Http::RequestHeaderMap* request_headers) const {
+    return provider_->httpStatusCode(request_headers);
   }
-  absl::optional<Grpc::Status::GrpcStatus> grpcStatusCode(const Http::HeaderEntry* header) const {
-    return provider_->grpcStatusCode(header);
+  absl::optional<Grpc::Status::GrpcStatus> grpcStatusCode(const Http::RequestHeaderMap* request_headers) const {
+    return provider_->grpcStatusCode(request_headers);
   }
 
   envoy::type::v3::FractionalPercent
@@ -75,12 +75,12 @@ private:
 
     // Return the HTTP status code to use. Optionally passed HTTP headers that may contain the
     // HTTP status code depending on the provider implementation.
-    virtual absl::optional<Http::Code> httpStatusCode(const Http::HeaderEntry* header) const PURE;
+    virtual absl::optional<Http::Code> httpStatusCode(const Http::RequestHeaderMap* request_headers) const PURE;
 
     // Return the gRPC status code to use. Optionally passed an HTTP header that may contain the
     // gRPC status code depending on the provider implementation.
     virtual absl::optional<Grpc::Status::GrpcStatus>
-    grpcStatusCode(const Http::HeaderEntry* header) const PURE;
+    grpcStatusCode(const Http::RequestHeaderMap* request_headers) const PURE;
 
     // Return what percentage of requests abort faults should be applied to. Optionally passed
     // HTTP headers that may contain the percentage depending on the provider implementation.
@@ -97,12 +97,12 @@ private:
         : http_status_code_(http_status_code), grpc_status_code_(grpc_status_code),
           percentage_(percentage) {}
 
-    absl::optional<Http::Code> httpStatusCode(const Http::HeaderEntry*) const override {
+    absl::optional<Http::Code> httpStatusCode(const Http::RequestHeaderMap*) const override {
       return http_status_code_;
     }
 
     absl::optional<Grpc::Status::GrpcStatus>
-    grpcStatusCode(const Http::HeaderEntry*) const override {
+    grpcStatusCode(const Http::RequestHeaderMap*) const override {
       return grpc_status_code_;
     }
 
@@ -122,10 +122,10 @@ private:
     HeaderAbortProvider(const envoy::type::v3::FractionalPercent& percentage)
         : HeaderPercentageProvider(HeaderNames::get().AbortRequestPercentage, percentage) {}
 
-    absl::optional<Http::Code> httpStatusCode(const Http::HeaderEntry* header) const override;
+    absl::optional<Http::Code> httpStatusCode(const Http::RequestHeaderMap* request_headers) const override;
 
     absl::optional<Grpc::Status::GrpcStatus>
-    grpcStatusCode(const Http::HeaderEntry*) const override;
+    grpcStatusCode(const Http::RequestHeaderMap* request_headers) const override;
 
     envoy::type::v3::FractionalPercent
     percentage(const Http::RequestHeaderMap* request_headers) const override {

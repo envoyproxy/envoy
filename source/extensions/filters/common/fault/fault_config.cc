@@ -13,6 +13,10 @@ namespace Fault {
 
 envoy::type::v3::FractionalPercent
 HeaderPercentageProvider::percentage(const Http::RequestHeaderMap* request_headers) const {
+  if (request_headers == nullptr) {
+    return percentage_;
+  }
+
   const auto header = request_headers->get(header_name_);
   if (header == nullptr) {
     return percentage_;
@@ -52,8 +56,13 @@ FaultAbortConfig::FaultAbortConfig(
 }
 
 absl::optional<Http::Code>
-FaultAbortConfig::HeaderAbortProvider::httpStatusCode(const Http::HeaderEntry* header) const {
+FaultAbortConfig::HeaderAbortProvider::httpStatusCode(const Http::RequestHeaderMap* request_headers) const {
+  if(request_headers == nullptr) {
+    return absl::nullopt;
+  }
+
   absl::optional<Http::Code> ret = absl::nullopt;
+  auto header = request_headers->get(Filters::Common::Fault::HeaderNames::get().AbortRequest);
   if (header == nullptr) {
     return ret;
   }
@@ -71,22 +80,22 @@ FaultAbortConfig::HeaderAbortProvider::httpStatusCode(const Http::HeaderEntry* h
 }
 
 absl::optional<Grpc::Status::GrpcStatus>
-FaultAbortConfig::HeaderAbortProvider::grpcStatusCode(const Http::HeaderEntry* header) const {
-  absl::optional<Grpc::Status::GrpcStatus> ret = absl::nullopt;
+FaultAbortConfig::HeaderAbortProvider::grpcStatusCode(const Http::RequestHeaderMap* request_headers) const {
+  if(request_headers == nullptr) {
+    return absl::nullopt;
+  }
+
+  auto header = request_headers->get(Filters::Common::Fault::HeaderNames::get().AbortGrpcRequest);
   if (header == nullptr) {
-    return ret;
+    return absl::nullopt;
   }
 
   uint64_t code;
   if (!absl::SimpleAtoi(header->value().getStringView(), &code)) {
-    return ret;
+    return absl::nullopt;
   }
 
-  if (code <= 16) {
-    ret = static_cast<Grpc::Status::GrpcStatus>(code);
-  }
-
-  return ret;
+  return static_cast<Grpc::Status::GrpcStatus>(code);
 }
 
 FaultDelayConfig::FaultDelayConfig(

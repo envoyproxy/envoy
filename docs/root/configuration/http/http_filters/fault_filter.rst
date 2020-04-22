@@ -43,10 +43,11 @@ x-envoy-fault-abort-request
   <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set.
 
 x-envoy-fault-abort-grpc-request
-  gRPC status code to abort a request with. The header value should be an integer that specifies
-  the gRPC status code to return in response to a request and must be in the range [0, 16].
-  When this header is set, the HTTP response status code will be set to 200. In order for the header to work,
-  :ref:`header_abort <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set. 
+  gRPC status code to abort a request with. The header value should be a non-negative integer that specifies
+  the gRPC status code to return in response to a request. Its value range is [0, UInt32.Max] instead of [0, 16]
+  to allow testing even not well-defined gRPC status codes. When this header is set, the HTTP response status code
+  will be set to 200. In order for the header to work, :ref:`header_abort
+  <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set. 
 
 x-envoy-fault-abort-request-percentage
   The percentage of requests that should be failed with a status code that's defined

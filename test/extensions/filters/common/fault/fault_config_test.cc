@@ -22,23 +22,23 @@ TEST(FaultConfigTest, FaultAbortHeaderConfig) {
   EXPECT_EQ(absl::nullopt, config.httpStatusCode(nullptr));
 
   // Header with bad data.
-  Http::TestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request", "abc"}};
-  EXPECT_EQ(absl::nullopt, config.httpStatusCode(bad_headers.get(HeaderNames::get().AbortRequest)));
+  Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request", "abc"}};
+  EXPECT_EQ(absl::nullopt, config.httpStatusCode(&bad_headers));
 
   // Out of range header - value too low.
-  Http::TestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-request", "199"}};
+  Http::TestRequestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-request", "199"}};
   EXPECT_EQ(absl::nullopt,
-            config.httpStatusCode(too_low_headers.get(HeaderNames::get().AbortRequest)));
+            config.httpStatusCode(&too_low_headers));
 
   // Out of range header - value too high.
-  Http::TestHeaderMapImpl too_high_headers{{"x-envoy-fault-abort-request", "600"}};
+  Http::TestRequestHeaderMapImpl too_high_headers{{"x-envoy-fault-abort-request", "600"}};
   EXPECT_EQ(absl::nullopt,
-            config.httpStatusCode(too_high_headers.get(HeaderNames::get().AbortRequest)));
+            config.httpStatusCode(&too_high_headers));
 
   // Valid header.
-  Http::TestHeaderMapImpl good_headers{{"x-envoy-fault-abort-request", "401"}};
+  Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-abort-request", "401"}};
   EXPECT_EQ(Http::Code::Unauthorized,
-            config.httpStatusCode(good_headers.get(HeaderNames::get().AbortRequest)).value());
+            config.httpStatusCode(&good_headers));
 }
 
 TEST(FaultConfigTest, FaultAbortGrpcHeaderConfig) {
@@ -50,24 +50,23 @@ TEST(FaultConfigTest, FaultAbortGrpcHeaderConfig) {
   EXPECT_EQ(absl::nullopt, config.grpcStatusCode(nullptr));
 
   // Header with bad data.
-  Http::TestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-grpc-request", "abc"}};
+  Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-grpc-request", "abc"}};
   EXPECT_EQ(absl::nullopt,
-            config.grpcStatusCode(bad_headers.get(HeaderNames::get().AbortGrpcRequest)));
+            config.grpcStatusCode(&bad_headers));
 
   // Out of range header - value too low.
-  Http::TestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-grpc-request", "-1"}};
+  Http::TestRequestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-grpc-request", "-1"}};
   EXPECT_EQ(absl::nullopt,
-            config.grpcStatusCode(too_low_headers.get(HeaderNames::get().AbortGrpcRequest)));
-
-  // Out of range header - value too high.
-  Http::TestHeaderMapImpl too_high_headers{{"x-envoy-fault-abort-grpc-request", "17"}};
-  EXPECT_EQ(absl::nullopt,
-            config.grpcStatusCode(too_high_headers.get(HeaderNames::get().AbortGrpcRequest)));
+            config.grpcStatusCode(&too_low_headers));
 
   // Valid header.
-  Http::TestHeaderMapImpl good_headers{{"x-envoy-fault-abort-grpc-request", "5"}};
+  Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-abort-grpc-request", "5"}};
   EXPECT_EQ(Grpc::Status::NotFound,
-            config.grpcStatusCode(good_headers.get(HeaderNames::get().AbortGrpcRequest)).value());
+            config.grpcStatusCode(&good_headers));
+
+  // Valid header - unknown gRPC code (>0).
+  Http::TestRequestHeaderMapImpl too_high_headers{{"x-envoy-fault-abort-grpc-request", "100"}};
+  EXPECT_EQ(100, config.grpcStatusCode(&too_high_headers));
 }
 
 TEST(FaultConfigTest, FaultAbortPercentageHeaderConfig) {
@@ -76,6 +75,9 @@ TEST(FaultConfigTest, FaultAbortPercentageHeaderConfig) {
   proto_config.mutable_percentage()->set_numerator(80);
   proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   FaultAbortConfig config(proto_config);
+
+  // No header.
+  EXPECT_EQ(proto_config.percentage().numerator(), config.percentage(nullptr).numerator());
 
   // Header with bad data - fallback to proto config.
   Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request-percentage", "abc"}};

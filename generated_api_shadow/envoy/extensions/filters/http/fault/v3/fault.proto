@@ -46,7 +46,7 @@ message FaultAbort {
     uint32 http_status = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
     // Fault aborts are controlled via an HTTP header (if applicable).
-    uint32 grpc_status = 5 [(validate.rules).uint32 = {lte: 16}];
+    uint32 grpc_status = 5;
 
     // The percentage of requests/operations/connections that will be aborted with the error code
     // provided.

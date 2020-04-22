@@ -291,22 +291,21 @@ FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
 
 AbortHttpAndGrpcStatus FaultFilter::abortStatus(const Http::RequestHeaderMap& request_headers) {
   if (!isAbortEnabled(request_headers)) {
-    return std::make_pair(absl::nullopt, absl::nullopt);
+    return AbortHttpAndGrpcStatus(absl::nullopt, absl::nullopt);
   }
 
   auto grpc_status = abortGrpcStatus(request_headers);
 
-  // If gRPC status code is set, then HTTP will be set to 200
-  return grpc_status.has_value() ? std::make_pair(Http::Code::OK, grpc_status)
-                                 : std::make_pair(abortHttpStatus(request_headers), grpc_status);
+  // If gRPC status code is set, then HTTP will be set to Http::Code::OK (200).
+  return grpc_status.has_value() ? AbortHttpAndGrpcStatus(Http::Code::OK, grpc_status)
+                                 : AbortHttpAndGrpcStatus(abortHttpStatus(request_headers), absl::nullopt);
 }
 
 absl::optional<Http::Code>
 FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
   // See if the configured abort provider has a default status code, if not there is no abort status
   // code (e.g., header configuration and no/invalid header).
-  auto http_status = fault_settings_->requestAbort()->httpStatusCode(
-      request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortRequest));
+  auto http_status = fault_settings_->requestAbort()->httpStatusCode(&request_headers);
   if (!http_status.has_value()) {
     return absl::nullopt;
   }
@@ -325,8 +324,7 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
 
 absl::optional<Grpc::Status::GrpcStatus>
 FaultFilter::abortGrpcStatus(const Http::RequestHeaderMap& request_headers) {
-  auto grpc_status = fault_settings_->requestAbort()->grpcStatusCode(
-      request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortGrpcRequest));
+  auto grpc_status = fault_settings_->requestAbort()->grpcStatusCode(&request_headers);
 
   auto default_grpc_status_code = grpc_status.has_value()
                                       ? static_cast<uint64_t>(grpc_status.value())
