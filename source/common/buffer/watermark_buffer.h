@@ -17,7 +17,7 @@ class WatermarkBuffer : public OwnedImpl {
 public:
   WatermarkBuffer(std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark,
-                  std::function<bool()> above_overflow_watermark)
+                  std::function<void()> above_overflow_watermark)
       : below_low_watermark_(below_low_watermark), above_high_watermark_(above_high_watermark),
         above_overflow_watermark_(above_overflow_watermark) {}
 
@@ -37,10 +37,9 @@ public:
   Api::IoCallUint64Result write(Network::IoHandle& io_handle) override;
   void postProcess() override { checkLowWatermark(); }
 
-  void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark); }
-  void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
+  void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark, 0); }
+  void setWatermarks(uint32_t low_watermark, uint32_t high_watermark, uint32_t overflow_watermark = 0);
   uint32_t highWatermark() const { return high_watermark_; }
-  void setOverflowMultiplier(uint32_t overflow_watermark_multiplier);
 
 private:
   void checkOverflowAndHighWatermarks();
@@ -48,16 +47,13 @@ private:
 
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
-  std::function<bool()> above_overflow_watermark_;
+  std::function<void()> above_overflow_watermark_;
 
   // Used for enforcing buffer limits (off by default). If these are set to non-zero by a call to
   // setWatermarks() the watermark callbacks will be called as described above.
   uint32_t high_watermark_{0};
   uint32_t low_watermark_{0};
   uint32_t overflow_watermark_{0};
-  // A multiplier that is used to set the overflow watermark threshold as a multiplication of
-  // high_watermark_
-  uint32_t overflow_watermark_multiplier_{0};
   // Tracks the latest state of watermark callbacks.
   // True between the time above_high_watermark_ has been called until above_high_watermark_ has
   // been called.
@@ -72,7 +68,7 @@ public:
   // Buffer::WatermarkFactory
   InstancePtr create(std::function<void()> below_low_watermark,
                      std::function<void()> above_high_watermark,
-                     std::function<bool()> above_overflow_watermark) override {
+                     std::function<void()> above_overflow_watermark) override {
     return InstancePtr{new WatermarkBuffer(below_low_watermark, above_high_watermark,
                                            above_overflow_watermark)};
   }

@@ -1958,6 +1958,13 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
   }
 }
 
+void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferOverflowWatermark() {
+  // TODO(adip): Test counters
+  connection_manager_.stats_.named_.upstream_buffer_overflow_total_.inc();
+  ENVOY_STREAM_LOG(warn, "Upstream stream buffer overflow detected.", *this);
+  callOverflowWatermarkCallbacks();
+}
+
 void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark() {
   ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to downstream stream watermark.", *this);
   callHighWatermarkCallbacks();
@@ -1982,6 +1989,12 @@ bool ConnectionManagerImpl::ActiveStream::verbose() const {
 
 uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
   return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
+}
+
+void ConnectionManagerImpl::ActiveStream::callOverflowWatermarkCallbacks() {
+  for (auto watermark_callbacks : watermark_callbacks_) {
+    watermark_callbacks->onAboveWriteBufferOverflowWatermark();
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {
@@ -2259,7 +2272,8 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
   auto buffer =
       std::make_unique<Buffer::WatermarkBuffer>([this]() -> void { this->requestDataDrained(); },
-                                                [this]() -> void { this->requestDataTooLarge(); });
+                                                [this]() -> void { this->requestDataTooLarge(); },
+                                                [this]() -> void { this->requestDataOverflow(); });
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
 }
@@ -2333,10 +2347,23 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
+    onDecoderFilterAboveWriteBufferOverflowWatermark() {
+  // TODO(adip): Test counters
+  parent_.connection_manager_.stats_.named_.downstream_buffer_overflow_total_.inc();
+  ENVOY_STREAM_LOG(warn, "Downstream stream buffer overflow detected.", parent_);
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::
     onDecoderFilterAboveWriteBufferHighWatermark() {
   ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", parent_);
   parent_.response_encoder_->getStream().readDisable(true);
   parent_.connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataOverflow() {
+  // TODO(adip): Test counters
+  parent_.connection_manager_.stats_.named_.filter_buffer_overflow_total_.inc();
+  ENVOY_STREAM_LOG(debug, "Filter data buffer overflow detected.", parent_);
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataTooLarge() {
@@ -2427,7 +2454,8 @@ ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
   auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
-                                            [this]() -> void { this->responseDataTooLarge(); });
+                                            [this]() -> void { this->responseDataTooLarge(); },
+                                            [this]() -> void { this->responseDataOverflow(); });
   buffer->setWatermarks(parent_.buffer_limit_);
   return Buffer::WatermarkBufferPtr{buffer};
 }
@@ -2466,6 +2494,14 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedMetadata(
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::
+    onEncoderFilterAboveWriteBufferOverflowWatermark() {
+  // TODO(adip): Test counters
+  parent_.connection_manager_.stats_.named_.upstream_buffer_overflow_total_.inc();
+  ENVOY_STREAM_LOG(warn, "Upstream stream buffer overflow detected.", parent_);
+  parent_.callOverflowWatermarkCallbacks();
+}
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::
     onEncoderFilterAboveWriteBufferHighWatermark() {
   ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to filter callbacks.", parent_);
   parent_.callHighWatermarkCallbacks();
@@ -2478,6 +2514,13 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataOverflow() {
+  // TODO(adip): Test counters
+  parent_.connection_manager_.stats_.named_.response_buffer_overflow_total_.inc();
+  ENVOY_STREAM_LOG(warn, "Response data has caused the buffer to overflow", *this);
+  onEncoderFilterAboveWriteBufferOverflowWatermark();
+}
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
   if (parent_.state_.encoder_filters_streaming_) {

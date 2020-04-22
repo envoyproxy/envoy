@@ -53,6 +53,7 @@ protected:
     void onResetStream(StreamResetReason, absl::string_view) override {
       parent_.parent().onDownstreamReset(parent_);
     }
+    void onAboveWriteBufferOverflowWatermark() override {}
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 

@@ -32,6 +32,7 @@ public:
   // Tcp::ConnectionPool::UpstreamCallbacks
   MOCK_METHOD(void, onUpstreamData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event));
+  MOCK_METHOD(void, onAboveWriteBufferOverflowWatermark, ());
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
 };

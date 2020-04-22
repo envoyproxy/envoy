@@ -190,6 +190,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
 
   response_limiter_ = std::make_unique<StreamRateLimiter>(
       rate_kbps.value(), encoder_callbacks_->encoderBufferLimit(),
+      [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferOverflowWatermark(); },
       [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
       [this] { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
       [this](Buffer::Instance& data, bool end_stream) {
@@ -443,6 +444,7 @@ Http::FilterTrailersStatus FaultFilter::encodeTrailers(Http::ResponseTrailerMap&
 }
 
 StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
+                                     std::function<void()> overflow_data_cb,
                                      std::function<void()> pause_data_cb,
                                      std::function<void()> resume_data_cb,
                                      std::function<void(Buffer::Instance&, bool)> write_data_cb,
@@ -456,7 +458,7 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
       // ~63ms intervals.
       token_bucket_(SecondDivisor, time_source, SecondDivisor),
       token_timer_(dispatcher.createTimer([this] { onTokenTimer(); })),
-      buffer_(resume_data_cb, pause_data_cb) {
+      buffer_(resume_data_cb, pause_data_cb, overflow_data_cb) {
   ASSERT(bytes_per_time_slice_ > 0);
   ASSERT(max_buffered_data > 0);
   buffer_.setWatermarks(max_buffered_data);

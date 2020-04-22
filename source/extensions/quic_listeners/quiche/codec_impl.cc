@@ -18,6 +18,7 @@ EnvoyQuicClientStream* quicStreamToEnvoyClientStream(quic::QuicStream* stream) {
 
 bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.bytesToSend() > 0; }
 
+// TODO(adip): Add support for overflow watermark (in addition to high and low)
 void QuicHttpConnectionImplBase::runWatermarkCallbacksForEachStream(
     quic::QuicSmallMap<quic::QuicStreamId, std::unique_ptr<quic::QuicStream>, 10>& stream_map,
     bool high_watermark) {
@@ -41,6 +42,10 @@ QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
     EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks)
     : QuicHttpConnectionImplBase(quic_session), quic_server_session_(quic_session) {
   quic_session.setHttpConnectionCallbacks(callbacks);
+}
+
+void QuicHttpServerConnectionImpl::onUnderlyingConnectionAboveWriteBufferOverflowWatermark() {
+  // TODO(adip): Add support for overflow watermark (in addition to high and low)
 }
 
 void QuicHttpServerConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
@@ -78,6 +83,10 @@ QuicHttpClientConnectionImpl::newStream(Http::ResponseDecoder& response_decoder)
     stream->runHighWatermarkCallbacks();
   }
   return *stream;
+}
+
+void QuicHttpClientConnectionImpl::onUnderlyingConnectionAboveWriteBufferOverflowWatermark() {
+  // TODO(adip): Add support for overflow watermark (in addition to high and low)
 }
 
 void QuicHttpClientConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {

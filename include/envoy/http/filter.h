@@ -378,6 +378,12 @@ public:
 
   /**
    * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
+   * their overflow watermark.
+   */
+  virtual void onDecoderFilterAboveWriteBufferOverflowWatermark() PURE;
+
+  /**
+   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
    * their high watermark.
    *
    * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
@@ -650,6 +656,11 @@ public:
    * @param metadata_map supplies the unique_ptr of the metadata to be encoded.
    */
   virtual void addEncodedMetadata(MetadataMapPtr&& metadata_map) PURE;
+
+  /**
+   * Called when an encoder filter goes over its overflow watermark.
+   */
+  virtual void onEncoderFilterAboveWriteBufferOverflowWatermark() PURE;
 
   /**
    * Called when an encoder filter goes over its high watermark.

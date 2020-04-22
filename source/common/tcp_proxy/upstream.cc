@@ -102,6 +102,10 @@ void HttpUpstream::onResetStream(Http::StreamResetReason, absl::string_view) {
   resetEncoder(Network::ConnectionEvent::LocalClose);
 }
 
+void HttpUpstream::onAboveWriteBufferOverflowWatermark() {
+  upstream_callbacks_.onAboveWriteBufferOverflowWatermark();
+}
+
 void HttpUpstream::onAboveWriteBufferHighWatermark() {
   upstream_callbacks_.onAboveWriteBufferHighWatermark();
 }

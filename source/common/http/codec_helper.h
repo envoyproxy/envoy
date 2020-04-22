@@ -36,6 +36,18 @@ public:
     }
   }
 
+  void runOverflowWatermarkCallbacks() {
+    if (reset_callbacks_started_ || local_end_stream_) {
+      return;
+    }
+    for (StreamCallbacks* callbacks : callbacks_) {
+      if (callbacks) {
+        callbacks->onAboveWriteBufferOverflowWatermark();
+      }
+    }
+  }
+
+
   void runResetCallbacks(StreamResetReason reason) {
     // Reset callbacks are a special case, and the only StreamCallbacks allowed
     // to run after local_end_stream_.

@@ -442,7 +442,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
       reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
-                     [&]() -> void { this->onAboveHighWatermark(); }),
+                     [&]() -> void { this->onAboveHighWatermark(); },
+                     [&]() -> void { this->onAboveOverflowWatermark(); }),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
@@ -926,6 +927,12 @@ void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
   }
 }
 
+void ServerConnectionImpl::onAboveOverflowWatermark() {
+  if (active_request_.has_value()) {
+    active_request_.value().response_encoder_.runOverflowWatermarkCallbacks();
+  }
+}
+
 void ServerConnectionImpl::onAboveHighWatermark() {
   if (active_request_.has_value()) {
     active_request_.value().response_encoder_.runHighWatermarkCallbacks();
@@ -1110,6 +1117,11 @@ void ClientConnectionImpl::sendProtocolError(absl::string_view details) {
     ASSERT(!pending_response_done_);
     pending_response_.value().encoder_.setDetails(details);
   }
+}
+
+void ClientConnectionImpl::onAboveOverflowWatermark() {
+  // This should never happen without an active stream/request.
+  pending_response_.value().encoder_.runOverflowWatermarkCallbacks();
 }
 
 void ClientConnectionImpl::onAboveHighWatermark() {

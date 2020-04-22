@@ -51,6 +51,7 @@ public:
     // TODO(danzh): Add double-GOAWAY support in QUIC.
     ENVOY_CONN_LOG(error, "Shutdown notice is not propagated to QUIC.", quic_server_session_);
   }
+  void onUnderlyingConnectionAboveWriteBufferOverflowWatermark() override;
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override;
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 
@@ -70,6 +71,7 @@ public:
   // Http::Connection
   void goAway() override { NOT_REACHED_GCOVR_EXCL_LINE; }
   void shutdownNotice() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  void onUnderlyingConnectionAboveWriteBufferOverflowWatermark() override;
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override;
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 

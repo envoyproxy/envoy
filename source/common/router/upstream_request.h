@@ -95,6 +95,7 @@ public:
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
+  void overflowDataFromDownstream();
 
   // GenericConnPool
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -114,6 +115,7 @@ public:
     // Http::DownstreamWatermarkCallbacks
     void onBelowWriteBufferLowWatermark() override;
     void onAboveWriteBufferHighWatermark() override;
+    void onAboveWriteBufferOverflowWatermark() override;
 
     UpstreamRequest& parent_;
   };
@@ -246,6 +248,10 @@ public:
   void onResetStream(Http::StreamResetReason reason,
                      absl::string_view transport_failure_reason) override {
     upstream_request_.onResetStream(reason, transport_failure_reason);
+  }
+
+  void onAboveWriteBufferOverflowWatermark() override {
+    upstream_request_.overflowDataFromDownstream();
   }
 
   void onAboveWriteBufferHighWatermark() override {

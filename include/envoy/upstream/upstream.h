@@ -540,6 +540,8 @@ public:
   COUNTER(update_failure)                                                                          \
   COUNTER(update_no_rebuild)                                                                       \
   COUNTER(update_success)                                                                          \
+  COUNTER(upstream_buffer_overflow_multiple_downstreams_total)                                     \
+  COUNTER(upstream_buffer_overflow_single_downstream_total)                                        \
   COUNTER(upstream_cx_close_notify)                                                                \
   COUNTER(upstream_cx_connect_attempts_exceeded)                                                   \
   COUNTER(upstream_cx_connect_fail)                                                                \
@@ -582,6 +584,8 @@ public:
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \
+  COUNTER(upstream_tcp_downstream_buffer_overflow_total)                                           \
+  COUNTER(upstream_tcp_upstream_buffer_overflow_total)                                             \
   GAUGE(lb_subsets_active, Accumulate)                                                             \
   GAUGE(max_host_weight, NeverImport)                                                              \
   GAUGE(membership_degraded, NeverImport)                                                          \

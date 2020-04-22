@@ -68,6 +68,12 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   resetAllMessages(event == Network::ConnectionEvent::LocalClose);
 }
 
+void ConnectionManager::onAboveWriteBufferOverflowWatermark() {
+  // TODO(adip): Test counters
+  stats_.cx_buffer_overflow_total_.inc();
+  ENVOY_CONN_LOG(debug, "onAboveWriteBufferOverflowWatermark", read_callbacks_->connection());
+}
+
 void ConnectionManager::onAboveWriteBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", read_callbacks_->connection());
   read_callbacks_->connection().readDisable(true);

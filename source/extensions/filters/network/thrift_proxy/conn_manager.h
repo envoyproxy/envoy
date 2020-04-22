@@ -71,6 +71,7 @@ public:
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent) override;
+  void onAboveWriteBufferOverflowWatermark() override {}
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 

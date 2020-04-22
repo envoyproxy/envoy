@@ -150,6 +150,8 @@ public:
   /**
    * @param max_kbps maximum rate in KiB/s.
    * @param max_buffered_data maximum data to buffer before invoking the pause callback.
+   * @param overflow_data_cb callback invoked when the limiter has buffered more data than being
+   *                         allowed to.
    * @param pause_data_cb callback invoked when the limiter has buffered too much data.
    * @param resume_data_cb callback invoked when the limiter has gone under the buffer limit.
    * @param write_data_cb callback invoked to write data to the stream.
@@ -160,6 +162,7 @@ public:
    * @param scope the stream's scope
    */
   StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
+                    std::function<void()> overflow_data_cb,
                     std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
                     std::function<void(Buffer::Instance&, bool)> write_data_cb,
                     std::function<void()> continue_cb, TimeSource& time_source,

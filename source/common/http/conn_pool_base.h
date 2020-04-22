@@ -54,6 +54,7 @@ protected:
     void onEvent(Network::ConnectionEvent event) override {
       parent_.onConnectionEvent(*this, event);
     }
+    void onAboveWriteBufferOverflowWatermark() override {}
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 

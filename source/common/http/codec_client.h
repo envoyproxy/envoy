@@ -194,6 +194,7 @@ private:
     void onResetStream(StreamResetReason reason, absl::string_view) override {
       parent_.onReset(*this, reason);
     }
+    void onAboveWriteBufferOverflowWatermark() override {}
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -221,6 +222,9 @@ private:
   void onEvent(Network::ConnectionEvent event) override;
   // Pass watermark events from the connection on to the codec which will pass it to the underlying
   // streams.
+  void onAboveWriteBufferOverflowWatermark() override {
+    codec_->onUnderlyingConnectionAboveWriteBufferOverflowWatermark();
+  }
   void onAboveWriteBufferHighWatermark() override {
     codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
   }

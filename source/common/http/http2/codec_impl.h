@@ -48,9 +48,11 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
   COUNTER(inbound_window_update_frames_flood)                                                      \
   COUNTER(outbound_control_flood)                                                                  \
   COUNTER(outbound_flood)                                                                          \
+  COUNTER(recv_buffer_overflow)                                                                    \
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(rx_messaging_error)                                                                      \
   COUNTER(rx_reset)                                                                                \
+  COUNTER(send_buffer_overflow)                                                                    \
   COUNTER(too_many_header_frames)                                                                  \
   COUNTER(trailers)                                                                                \
   COUNTER(tx_reset)
@@ -127,6 +129,11 @@ public:
   void shutdownNotice() override;
   bool wantsToWrite() override { return nghttp2_session_want_write(session_); }
   // Propagate network connection watermark events to each stream on the connection.
+  void onUnderlyingConnectionAboveWriteBufferOverflowWatermark() override {
+    for (auto& stream : active_streams_) {
+      stream->runOverflowWatermarkCallbacks();
+    }
+  }
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
     for (auto& stream : active_streams_) {
       stream->runHighWatermarkCallbacks();
@@ -236,11 +243,13 @@ protected:
     // If the receive buffer encounters watermark callbacks, enable/disable reads on this stream.
     void pendingRecvBufferHighWatermark();
     void pendingRecvBufferLowWatermark();
+    void pendingRecvBufferOverflowWatermark();
 
     // If the send buffer encounters watermark callbacks, propagate this information to the streams.
     // The router and connection manager will propagate them on as appropriate.
     void pendingSendBufferHighWatermark();
     void pendingSendBufferLowWatermark();
+    void pendingSendBufferOverflowWatermark();
 
     // Does any necessary WebSocket/Upgrade conversion, then passes the headers
     // to the decoder_.
@@ -262,10 +271,12 @@ protected:
     uint32_t read_disable_count_{0};
     Buffer::WatermarkBuffer pending_recv_data_{
         [this]() -> void { this->pendingRecvBufferLowWatermark(); },
-        [this]() -> void { this->pendingRecvBufferHighWatermark(); }};
+        [this]() -> void { this->pendingRecvBufferHighWatermark(); },
+        [this]() -> void { this->pendingRecvBufferOverflowWatermark(); }};
     Buffer::WatermarkBuffer pending_send_data_{
         [this]() -> void { this->pendingSendBufferLowWatermark(); },
-        [this]() -> void { this->pendingSendBufferHighWatermark(); }};
+        [this]() -> void { this->pendingSendBufferHighWatermark(); },
+        [this]() -> void { this->pendingSendBufferOverflowWatermark(); }};
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_;

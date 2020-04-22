@@ -68,6 +68,7 @@ public:
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
                      absl::string_view transport_failure_reason) override;
+  void onAboveWriteBufferOverflowWatermark() override {}
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -118,6 +119,7 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;
+    void onAboveWriteBufferOverflowWatermark() override {}
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 

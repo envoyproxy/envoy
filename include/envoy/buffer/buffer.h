@@ -377,7 +377,7 @@ public:
    */
   virtual InstancePtr create(std::function<void()> below_low_watermark,
                              std::function<void()> above_high_watermark,
-                             std::function<bool()> above_overflow_watermark = {}) PURE;
+                             std::function<void()> above_overflow_watermark = {}) PURE;
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;

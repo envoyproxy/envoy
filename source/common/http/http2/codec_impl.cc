@@ -247,6 +247,13 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
   readDisable(false);
 }
 
+void ConnectionImpl::StreamImpl::pendingRecvBufferOverflowWatermark() {
+  // TODO(adip): test counters
+  parent_.stats_.recv_buffer_overflow_.inc();
+  ENVOY_CONN_LOG(warn, "recv buffer overflowing ", parent_.connection_);
+}
+
+
 void ConnectionImpl::ClientStreamImpl::decodeHeaders(bool allow_waiting_for_informational_headers) {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
   if (allow_waiting_for_informational_headers &&
@@ -297,6 +304,12 @@ void ConnectionImpl::StreamImpl::pendingSendBufferLowWatermark() {
   ASSERT(pending_send_buffer_high_watermark_called_);
   pending_send_buffer_high_watermark_called_ = false;
   runLowWatermarkCallbacks();
+}
+
+void ConnectionImpl::StreamImpl::pendingSendBufferOverflowWatermark() {
+  // TODO(adip): test counters
+  parent_.stats_.send_buffer_overflow_.inc();
+  ENVOY_CONN_LOG(warn, "send buffer overflowing ", parent_.connection_);
 }
 
 void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& value) {

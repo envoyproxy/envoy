@@ -4368,16 +4368,18 @@ protected:
     dispatcher_ = api_->allocateDispatcher("test_thread", Buffer::WatermarkFactoryPtr{factory});
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
-    EXPECT_CALL(*factory, create_(_, _))
+    EXPECT_CALL(*factory, create_(_, _, _))
         .Times(2)
         .WillOnce(Invoke([&](std::function<void()> below_low,
-                             std::function<void()> above_high) -> Buffer::Instance* {
-          client_write_buffer = new MockWatermarkBuffer(below_low, above_high);
+                             std::function<void()> above_high,
+                             std::function<void()> above_overflow) -> Buffer::Instance* {
+          client_write_buffer = new MockWatermarkBuffer(below_low, above_high, above_overflow);
           return client_write_buffer;
         }))
         .WillRepeatedly(Invoke([](std::function<void()> below_low,
-                                  std::function<void()> above_high) -> Buffer::Instance* {
-          return new Buffer::WatermarkBuffer(below_low, above_high);
+                                  std::function<void()> above_high,
+                                  std::function<void()> above_overflow) -> Buffer::Instance* {
+          return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
         }));
 
     initialize();
