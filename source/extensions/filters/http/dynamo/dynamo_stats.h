@@ -17,8 +17,8 @@ class DynamoStats {
 public:
   DynamoStats(Stats::Scope& scope, const std::string& prefix);
 
-  void incCounter(const Stats::Utility::ElementVec& names);
-  void recordHistogram(const Stats::Utility::ElementVec& names, Stats::Histogram::Unit unit,
+  void incCounter(const Stats::ElementVec& names);
+  void recordHistogram(const Stats::ElementVec& names, Stats::Histogram::Unit unit,
                        uint64_t value);
 
   /**
@@ -43,7 +43,7 @@ public:
   Stats::SymbolTable& symbolTable() { return scope_.symbolTable(); }
 
 private:
-  Stats::Utility::ElementVec addPrefix(const Stats::Utility::ElementVec& names);
+  Stats::ElementVec addPrefix(const Stats::ElementVec& names);
 
   Stats::Scope& scope_;
   Stats::StatNameSetPtr stat_name_set_;

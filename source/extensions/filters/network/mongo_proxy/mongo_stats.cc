@@ -31,19 +31,19 @@ MongoStats::MongoStats(Stats::Scope& scope, absl::string_view prefix)
   stat_name_set_->rememberBuiltins({"insert", "query", "update", "delete"});
 }
 
-Stats::Utility::ElementVec MongoStats::addPrefix(const Stats::Utility::ElementVec& names) {
-  Stats::Utility::ElementVec names_with_prefix;
+Stats::ElementVec MongoStats::addPrefix(const Stats::ElementVec& names) {
+  Stats::ElementVec names_with_prefix;
   names_with_prefix.reserve(1 + names.size());
   names_with_prefix.push_back(prefix_);
   names_with_prefix.insert(names_with_prefix.end(), names.begin(), names.end());
   return names_with_prefix;
 }
 
-void MongoStats::incCounter(const Stats::Utility::ElementVec& names) {
+void MongoStats::incCounter(const Stats::ElementVec& names) {
   Stats::Utility::counterFromElements(scope_, addPrefix(names)).inc();
 }
 
-void MongoStats::recordHistogram(const Stats::Utility::ElementVec& names,
+void MongoStats::recordHistogram(const Stats::ElementVec& names,
                                  Stats::Histogram::Unit unit, uint64_t sample) {
   Stats::Utility::histogramFromElements(scope_, addPrefix(names), unit).recordValue(sample);
 }

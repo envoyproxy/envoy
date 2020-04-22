@@ -14,6 +14,24 @@ namespace Envoy {
 namespace Stats {
 
 /**
+ * Represents a stat name token, using either a StatName or a string_view,
+ * which will be treated as a dynamic string. We subclass string_view simply
+ * to make it a bit more explicit when we are creating a dynamic stat name,
+ * since those are expensive.
+ */
+class DynamicName : public absl::string_view {
+ public:
+  DynamicName(absl::string_view s) : absl::string_view(s) {}
+};
+
+using Element = absl::variant<StatName, DynamicName>;
+using ElementVec = std::vector<Element>;
+
+//class Element : public absl::variant<StatName, DynamicName, std::vector<Element>> {
+  //};
+  //using ElementVec = Element;
+
+/**
  * Common stats utility routines.
  */
 class Utility {
@@ -35,17 +53,6 @@ public:
    * @return The value of the tag, if found.
    */
   static absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
-
-  // Represents a stat name token, using either a StatName or a string_view,
-  // which will be treated as a dynamic string. We subclass string_view simply
-  // to make it a bit more explicit when we are creating a dynamic stat name,
-  // since those are expensive.
-  class Dynamic : public absl::string_view {
-  public:
-    Dynamic(absl::string_view s) : absl::string_view(s) {}
-  };
-  using Element = absl::variant<StatName, Dynamic>;
-  using ElementVec = std::vector<Element>;
 
   /**
    * Creates a counter from a vector of tokens which are used to create the

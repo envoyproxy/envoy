@@ -47,8 +47,8 @@ struct ElementVisitor {
   void operator()(absl::string_view name) { stat_names_.push_back(pool_.add(name)); }
 
   // Generates a StatName from the elements.
-  StatName makeStatName(const Utility::ElementVec& elements) {
-    for (const Utility::Element& element : elements) {
+  StatName makeStatName(const ElementVec& elements) {
+    for (const Element& element : elements) {
       absl::visit(*this, element);
     }
     joined_ = symbol_table_.join(stat_names_);
