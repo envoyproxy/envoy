@@ -147,7 +147,7 @@ public:
   GrpcStatsFilter(ConfigConstSharedPtr config) : config_(config) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+    grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
     if (grpc_request_) {
       cluster_ = decoder_callbacks_->clusterInfo();
       if (cluster_) {
@@ -203,10 +203,13 @@ public:
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
-    grpc_response_ = Grpc::Common::isGrpcResponseHeader(headers, end_stream);
+    grpc_response_ = Grpc::Common::isGrpcResponseHeaders(headers, end_stream);
     if (doStatTracking()) {
       config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
                                    headers.GrpcStatus());
+      if (end_stream) {
+        maybeChargeUpstreamStat();
+      }
     }
     return Http::FilterHeadersStatus::Continue;
   }
@@ -228,16 +231,7 @@ public:
     if (doStatTracking()) {
       config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
                                    trailers.GrpcStatus());
-
-      if (config_->enable_upstream_stats_ &&
-          decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().has_value() &&
-          decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().has_value()) {
-        std::chrono::milliseconds chrono_duration =
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().value() -
-                decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().value());
-        config_->context_.chargeUpstreamStat(*cluster_, request_names_, chrono_duration);
-      }
+      maybeChargeUpstreamStat();
     }
     return Http::FilterTrailersStatus::Continue;
   }
@@ -258,6 +252,18 @@ public:
     }
     filter_object_->request_message_count = request_counter_.frameCount();
     filter_object_->response_message_count = response_counter_.frameCount();
+  }
+
+  void maybeChargeUpstreamStat() {
+    if (config_->enable_upstream_stats_ &&
+        decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().has_value() &&
+        decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().has_value()) {
+      std::chrono::milliseconds chrono_duration =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().value() -
+              decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().value());
+      config_->context_.chargeUpstreamStat(*cluster_, request_names_, chrono_duration);
+    }
   }
 
 private:
