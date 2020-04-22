@@ -29,7 +29,8 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std
                                            Event::Dispatcher& dispatcher,
                                            const LocalInfo::LocalInfo& local_info,
                                            Stats::Scope& scope)
-    : stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, "access_logs.grpc_access_log."))}),
+    : stats_({ALL_GRPC_ACCESS_LOGGER_STATS(
+          POOL_COUNTER_PREFIX(scope, "access_logs.grpc_access_log."))}),
       client_(std::move(client)), log_name_(log_name),
       buffer_flush_interval_msec_(buffer_flush_interval_msec),
       flush_timer_(dispatcher.createTimer([this]() {
