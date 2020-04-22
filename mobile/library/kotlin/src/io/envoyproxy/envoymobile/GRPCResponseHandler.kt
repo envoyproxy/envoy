@@ -34,7 +34,9 @@ class GRPCResponseHandler(
    *                 and flag indicating if the stream is complete.
    * @return GRPCResponseHandler, this GRPCResponseHandler.
    */
-  fun onHeaders(closure: (headers: Map<String, List<String>>, statusCode: Int) -> Unit): GRPCResponseHandler {
+  fun onHeaders(
+    closure: (headers: Map<String, List<String>>, statusCode: Int) -> Unit): GRPCResponseHandler
+  {
     underlyingHandler.onHeaders { headers, _, _ ->
       val grpcStatus = headers["grpc-status"]?.first()?.toIntOrNull() ?: 0
       closure(headers, grpcStatus)
@@ -101,6 +103,7 @@ class GRPCResponseHandler(
    * @param bufferedStream The buffer of data from which to determine state and messages.
    * @param processState The current process state of the buffering.
    * @param onMessage Closure to call when a new message is available.
+   * @return ProcessState, the state after processing the passed data.
    */
   private fun processData(
       bufferedStream: ByteArrayOutputStream,
@@ -153,12 +156,19 @@ class GRPCResponseHandler(
 
         val byteArray = bufferedStream.toByteArray()
         onMessage(ByteBuffer.wrap(
-            byteArray.sliceArray(GRPC_PREFIX_LENGTH until GRPC_PREFIX_LENGTH + processState.messageLength)))
+          byteArray.sliceArray(
+            GRPC_PREFIX_LENGTH until GRPC_PREFIX_LENGTH + processState.messageLength
+          )
+        ))
         bufferedStream.reset()
         bufferedStream.write(
-            byteArray.sliceArray(GRPC_PREFIX_LENGTH + processState.messageLength until byteArray.size))
+          byteArray.sliceArray(
+            GRPC_PREFIX_LENGTH + processState.messageLength until byteArray.size
+          )
+        )
 
-        if (byteArray.sliceArray(GRPC_PREFIX_LENGTH + processState.messageLength until byteArray.size).isEmpty()) {
+        val remainingLength = GRPC_PREFIX_LENGTH + processState.messageLength until byteArray.size
+        if (byteArray.sliceArray(remainingLength).isEmpty()) {
           return ProcessState.CompressionFlag
         } else {
           nextState = ProcessState.CompressionFlag

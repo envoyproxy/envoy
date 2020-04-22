@@ -16,7 +16,9 @@ class GRPCResponseHandlerTest {
 
     val handler = GRPCResponseHandler(Executor { })
         .onHeaders { headers, grpcStatus ->
-          assertThat(headers).isEqualTo(mapOf("grpc-status" to listOf("1"), "other" to listOf("foo", "bar")))
+          assertThat(headers).isEqualTo(
+            mapOf("grpc-status" to listOf("1"), "other" to listOf("foo", "bar"))
+          )
           assertThat(grpcStatus).isEqualTo(1)
           countDownLatch.countDown()
         }
@@ -255,10 +257,10 @@ class GRPCResponseHandlerTest {
           countDownLatch.countDown()
         }
 
-    handler.underlyingHandler.underlyingCallbacks.onHeaders(mapOf("grpc-status" to listOf("1", "2")), true)
+    handler.underlyingHandler.underlyingCallbacks
+      .onHeaders(mapOf("grpc-status" to listOf("1", "2")), true)
 
     countDownLatch.await()
-
   }
 
   @Test(timeout = 1000L)
@@ -286,7 +288,8 @@ class GRPCResponseHandlerTest {
           countDownLatch.countDown()
         }
 
-    handler.underlyingHandler.underlyingCallbacks.onHeaders(mapOf("grpc-status" to listOf("invalid")), true)
+    handler.underlyingHandler.underlyingCallbacks
+      .onHeaders(mapOf("grpc-status" to listOf("invalid")), true)
 
     countDownLatch.await()
   }

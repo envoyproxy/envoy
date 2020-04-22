@@ -15,7 +15,9 @@ class GRPCRequestBuilder(
       path = path)
 
   init {
-    underlyingBuilder.addHeader("content-type", "application/grpc").addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
+    underlyingBuilder
+      .addHeader("content-type", "application/grpc")
+      .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
   }
 
   /**
