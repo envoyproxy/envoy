@@ -125,7 +125,7 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
 Note that Envoy retries requests when :ref:`x-envoy-overloaded
 <config_http_filters_router_x-envoy-overloaded_set>` is present. It is recommended to either configure
 :ref:`retry budgets (preferred) <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>` or set
-:ref:`maximum active retries circuit breaker <arch_overview_circuit_break>` to an appropriate value avoid retry storms.
+:ref:`maximum active retries circuit breaker <arch_overview_circuit_break>` to an appropriate value to avoid retry storms.
 
 .. _arch_overview_http_routing_hedging:
 
