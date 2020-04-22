@@ -156,28 +156,28 @@ response, synthesizing a new request, sending it to the upstream specified by th
 and returning the redirected response as the response to the original request.
 
 Internal redirects are configured via the :ref:`internal redirect policy
-<envoy_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field in route configuration.
+<envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field in route configuration.
 When redirect handling is on, any 3xx response from upstream, that matches
 :ref:`redirect_response_codes
-<envoy_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`
+<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`
 is subject to the redirect being handled by Envoy.
 
 For a redirect to be handled successfully it must pass the following checks:
 
 1. Have a response code matching one of :ref:`redirect_response_codes
-   <envoy_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`
 2. Have a *location* header with a valid, fully qualified URL matching the scheme of the original
    request.
 3. The request must have been fully processed by Envoy.
 4. The request must not have a body.
 5. The scheme pair of the downstream request and the *location* header is allowed by
    :ref:`allowed downstream and target scheme pair
-   <envoy_api_field_config.route.v3.InternalRedirectPolicy.allowed_downstream_and_target_scheme_pair>`
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.allowed_downstream_and_target_scheme_pairs>`
 6. The number of previously handled internal redirect within a given downstream request does not
    exceed :ref:`max internal redirects
-   <envoy_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>`
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>`
    of the route that the request or redirected request is hitting.
-7. All :ref:`predicates <envoy_api_field_config.route.v3.InternalRedirectPolicy.predicates>` accept
+7. All :ref:`predicates <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>` accept
    the target route.
 
 Any failure will result in redirect being passed downstream instead.
@@ -185,18 +185,18 @@ Any failure will result in redirect being passed downstream instead.
 Since a redirected request may be bounced between different routes, any route in the chain of redirects that
 
 1. does not have internal redirect enabled
-2. or has a `max internal redirects
-   <envoy_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>`
+2. or has a :ref:`max internal redirects
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>`
    smaller or equal to the redirect chain length when the redirect chain hits it
 3. or is disallowed by any of the :ref:`predicates
-   <envoy_api_field_config.route.v3.InternalRedirectPolicy.predicates>`
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`
 
 will cause the redirect to be passed downstream.
 
 Two predicates can be used to create a DAG that defines the redirect chain, the :ref:`previous routes
-<envoy_api_msg_extensions.internal_redirect.previous_routes.v3.PreviousRoutesConfig` predicate, and
+<envoy_v3_api_msg_extensions.internal_redirect.previous_routes.v3.PreviousRoutesConfig>` predicate, and
 the :ref:`whitelisted routes
-<envoy_api_msg_extensions.internal_redirect.whitelisted_routes.v3.WhitelistedRoutesConfig`.
+<envoy_v3_api_msg_extensions.internal_redirect.whitelisted_routes.v3.WhitelistedRoutesConfig>`.
 Specifically, the *whitelisted routes* predicate defines edges of individual node in the DAG
 and the *previous routes* predicate defines "visited" state of the edges, so that loop can be avoided
 if so desired.
