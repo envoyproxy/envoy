@@ -1,14 +1,11 @@
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 
-#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
-
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
-#include "test/proto/bookstore.pb.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -27,11 +24,11 @@ UberFilterFuzzer::UberFilterFuzzer() {
         filter_ = filter;
         filter_->setDecoderFilterCallbacks(callbacks_);
       }));
+  // Set expectations for particular filters that may get fuzzed.
   setExpectations();
 }
 
 void UberFilterFuzzer::setExpectations() {
-  // Ext-authz setup
   prepareExtAuthz();
   prepareCache();
   prepareTap();
@@ -55,41 +52,9 @@ void UberFilterFuzzer::prepareCache() {
 }
 
 void UberFilterFuzzer::prepareTap() {
+  // Prepare expectations for TAP config.
   ON_CALL(factory_context_.admin_, addHandler(_, _, _, _, _)).WillByDefault(testing::Return(true));
   ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
-}
-
-void UberFilterFuzzer::addFileDescriptorsRecursively(
-    const Protobuf::FileDescriptor* descriptor, Protobuf::FileDescriptorSet* set,
-    absl::flat_hash_set<absl::string_view>* added_descriptors) {
-  if (!added_descriptors->insert(descriptor->name()).second) {
-    // Already added.
-    return;
-  }
-  for (int i = 0; i < descriptor->dependency_count(); i++) {
-    addFileDescriptorsRecursively(descriptor->dependency(i), set, added_descriptors);
-  }
-  descriptor->CopyTo(set->add_file());
-}
-
-void UberFilterFuzzer::addProtoDescriptor(absl::string_view filter_name,
-                                          Protobuf::Message* message) {
-  if (filter_name.find("grpc_json_transcoder") != absl::string_view::npos) {
-    envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder& config =
-        dynamic_cast<
-            envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&>(
-            *message);
-    config.clear_services();
-    config.add_services("bookstore.Bookstore");
-
-    Protobuf::FileDescriptorSet descriptor_set;
-    const auto* file_descriptor =
-        Protobuf::DescriptorPool::generated_pool()->FindFileByName("test/proto/bookstore.proto");
-    ASSERT(file_descriptor != nullptr);
-    absl::flat_hash_set<absl::string_view> added_descriptors;
-    addFileDescriptorsRecursively(file_descriptor, &descriptor_set, &added_descriptors);
-    descriptor_set.SerializeToString(config.mutable_proto_descriptor_bin());
-  }
 }
 
 void UberFilterFuzzer::decode(Http::StreamDecoderFilter* filter, const test::fuzz::HttpData& data) {
@@ -145,8 +110,8 @@ void UberFilterFuzzer::fuzz(
         Server::Configuration::NamedHttpFilterConfigFactory>(proto_config.name());
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, factory_context_.messageValidationVisitor(), factory);
-    // Add a valid service and proto descriptor.
-    addProtoDescriptor(proto_config.name(), message.get());
+    // Clean-up config with filter-specific logic.
+    cleanFuzzedConfig(proto_config.name(), message.get());
     cb_ = factory.createFilterFactoryFromProto(*message, "stats", factory_context_);
     cb_(filter_callback_);
   } catch (const EnvoyException& e) {
