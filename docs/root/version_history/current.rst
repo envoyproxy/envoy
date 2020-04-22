@@ -12,6 +12,9 @@ Changes
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
   can now have a separate :ref:`tracing provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
+* router: internal redirect configs are moved to the :ref`internal_redirect_policy
+  <envoy_api_field_router.RouterAction.internal_redirect_policy>` field, which defines more fine
+  grained control of the internal redirect behavior.
 
 Deprecated
 ----------

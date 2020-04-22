@@ -1567,6 +1567,7 @@ message QueryParameterMatcher {
 // HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
 // [#next-free-field: 6]
 message InternalRedirectPolicy {
+  // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
   enum InternalRedirectAction {
     PASS_THROUGH_INTERNAL_REDIRECT = 0;
     HANDLE_INTERNAL_REDIRECT = 1;
@@ -1579,10 +1580,7 @@ message InternalRedirectPolicy {
     HTTPS_HTTPS = 3;
   }
 
-  // pengg: useful ones
-  // no_previous_route (loop prevention)
-  // route_whitelist (only whitelisted route)
-  message TargetRoutePredicate {
+  message Predicate {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     google.protobuf.Any typed_config = 2;
@@ -1590,11 +1588,34 @@ message InternalRedirectPolicy {
 
   InternalRedirectAction internal_redirect_action = 1;
 
+  // An internal redirect is handled, iff the number of previous internal redirects that a
+  // downstream request has encountered is lower than this value, and
+  // :ref:`internal_redirect_action <envoy_api_field_config.route.v3.InternalRedirectPolicy.internal_redirect_action>`
+  // is set to
+  // :ref:`HANDLE_INTERNAL_REDIRECT <envoy_api_enum_value_config.route.v3.InternalRedirectPolicy.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
+  // In the case where a downstream request is bounced among multiple routes by internal redirect,
+  // the first route that hits this threshold, or has
+  // :ref:`internal_redirect_action
+  // <envoy_api_field_config.route.v3.InternalRedirectPolicy.internal_redirect_action>`
+  // set to
+  // :ref:`PASS_THROUGH_INTERNAL_REDIRECT
+  // <envoy_api_enum_value_config.route.v3.InternalRedirectPolicy.InternalRedirectAction.PASS_THROUGH_INTERNAL_REDIRECT>`
+  // will pass the redirect back to downstream.
+  //
+  // If not specified, at most one redirect will be followed.
   google.protobuf.UInt32Value max_internal_redirects = 2;
 
+  // Defines what upstream response codes can trigger the internal redirect
+  // behavior. This is ignored unless
+  // :ref:`internal_redirect_action <envoy_api_field_config.route.v3.InternalRedirectPolicy.internal_redirect_action>`
+  // is set to
+  // :ref:`HANDLE_INTERNAL_REDIRECT <envoy_api_enum_value_config.route.v3.InternalRedirectPolicy.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
   repeated uint32 redirect_response_codes = 3;
 
-  repeated TargetRoutePredicate target_route_predicates = 4;
+  // Specifies a list of predicates that is queries when an upstream response is deemed to be able to trigger an internal redirect by all other criterias.
+  // Any predicate in the list can reject the redirect.
+  repeated Predicate predicates = 4;
 
+  // Specifies what combinations of dowstream and redirect target scheme is allowed to trigger an internal redirect
   repeated DownstreamAndRedirectTargetSchemePair allowed_downstream_and_target_scheme_pairs = 5;
 }
