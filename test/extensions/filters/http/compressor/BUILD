@@ -12,18 +12,6 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "gzip_compressor_filter_test",
-    srcs = ["gzip_compressor_filter_test.cc"],
-    extension_name = "envoy.filters.http.compressor",
-    deps = [
-        "//source/common/decompressor:decompressor_lib",
-        "//source/extensions/compression/gzip/compressor:config",
-        "//source/extensions/filters/http/compressor:compressor_filter_lib",
-        "//test/mocks/http:http_mocks",
-    ],
-)
-
-envoy_extension_cc_test(
     name = "compressor_filter_integration_test",
     srcs = [
         "compressor_filter_integration_test.cc",
