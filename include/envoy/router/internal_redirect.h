@@ -16,10 +16,12 @@ public:
   virtual ~InternalRedirectPredicate() = default;
 
   /**
+   * A FilterState is provided so that predicate implementation canuse it to preserve state across
+   * internal redirects.
+   *
    * @return whether the route specified by target_route_name is allowed to be followed. Any
-   * predicate returning false will prevent the redirect to be followed, causing the response to be
-   * proxied to the downstream. A FilterState is provided so that predicate implementation can use
-   * it to preserve state across internal redirects.
+   *         predicate returning false will prevent the redirect from being followed, causing the
+   *         response to be proxied to the downstream.
    */
   virtual bool acceptTargetRoute(StreamInfo::FilterState& filter_State,
                                  absl::string_view target_route_name) PURE;
@@ -36,7 +38,7 @@ public:
 
   /**
    * @return an InternalRedirectPredicate. The given current_route_name is useful for predicates
-   * that need to create per-route FilterState.
+   *         that need to create per-route FilterState.
    */
   virtual InternalRedirectPredicateSharedPtr
   createInternalRedirectPredicate(const Protobuf::Message& config,

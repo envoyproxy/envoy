@@ -721,7 +721,7 @@ public:
    * @return const InternalRedirectPolicy& the internal redirect policy for the route. All routes
    *         have a internal redirect policy even if it is not enabled, which means redirects from
    *         the upstream are not followed.
-   * */
+   */
   virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
 
   /**
