@@ -134,19 +134,8 @@ envoy_cc_library(
     srcs = ["scope_prefixer.cc"],
     hdrs = ["scope_prefixer.h"],
     deps = [
-        ":scope_shared_lib",
         ":symbol_table_lib",
         ":utility_lib",
-        "//include/envoy/stats:stats_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "scope_shared_lib",
-    srcs = ["scope_shared_impl.cc"],
-    hdrs = ["scope_shared_impl.h"],
-    deps = [
-        ":symbol_table_lib",
         "//include/envoy/stats:stats_interface",
     ],
 )

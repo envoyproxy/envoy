@@ -1,6 +1,5 @@
 #include "envoy/stats/scope.h"
 
-#include "common/stats/scope_shared_impl.h"
 #include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
@@ -8,7 +7,7 @@ namespace Stats {
 
 // Implements a Scope that delegates to a passed-in scope, prefixing all names
 // prior to creation.
-class ScopePrefixer : public ScopeSharedImpl {
+class ScopePrefixer : public Scope {
 public:
   ScopePrefixer(absl::string_view prefix, Scope& scope);
   ScopePrefixer(StatName prefix, Scope& scope);

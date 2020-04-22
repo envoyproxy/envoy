@@ -16,7 +16,6 @@
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
 #include "common/stats/null_text_readout.h"
-#include "common/stats/scope_shared_impl.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
@@ -136,7 +135,7 @@ using ParentHistogramImplSharedPtr = RefcountPtr<ParentHistogramImpl>;
 /**
  * Class used to create ThreadLocalHistogram in the scope.
  */
-class TlsScope : public ScopeSharedImpl {
+class TlsScope : public Scope {
 public:
   ~TlsScope() override = default;
 

@@ -10,7 +10,6 @@
 #include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
-#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Stats {
@@ -28,14 +27,6 @@ using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogr
 using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
 using ScopePtr = std::unique_ptr<Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
-
-class DynamicName : public absl::string_view {
- public:
-  DynamicName(absl::string_view s) : absl::string_view(s) {}
-};
-
-using Element = absl::variant<StatName, DynamicName>;
-using ElementVec = std::vector<Element>;
 
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
@@ -75,67 +66,6 @@ public:
    */
   virtual Counter& counterFromStatNameWithTags(const StatName& name,
                                                StatNameTagVectorOptConstRef tags) PURE;
-
-  /**
-   * Creates a counter from a vector of tokens which are used to create the
-   * name. The tokens can be specified as string_view or StatName. For
-   * tokens specified as string_view, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
-   * for more detail on why symbolic StatNames are preferred when possible.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed string_view and StatName
-   * @param tags optionally specified tags.
-   * @return A counter named using the joined elements.
-   */
-  Counter& counterFromElements(const ElementVec& elements,
-                               StatNameTagVectorOptConstRef tags = absl::nullopt) {
-    return counterFromElementsHelper(elements, tags);
-  }
-  virtual Counter& counterFromElementsHelper(const ElementVec& elements,
-                                             StatNameTagVectorOptConstRef tags) PURE;
-
-
-  /**
-   * Creates a gauge from a vector of tokens which are used to create the
-   * name. The tokens can be specified as string_view or StatName. For
-   * tokens specified as string_view, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
-   * for more detail on why symbolic StatNames are preferred when possible.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed string_view and StatName
-   * @param import_mode Whether hot-restart should accumulate this value.
-   * @param tags optionally specified tags.
-   * @return A gauge named using the joined elements.
-   */
-  Gauge& gaugeFromElements(const ElementVec& elements, Gauge::ImportMode import_mode,
-                           StatNameTagVectorOptConstRef tags = absl::nullopt) {
-    return gaugeFromElementsHelper(elements, import_mode, tags);
-  }
-  virtual Gauge& gaugeFromElementsHelper(const ElementVec& elements, Gauge::ImportMode import_mode,
-                                         StatNameTagVectorOptConstRef tags) PURE;
-
-  /**
-   * Creates a histogram from a vector of tokens which are used to create the
-   * name. The tokens can be specified as string_view or StatName. For
-   * tokens specified as string_view, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
-   * for more detail on why symbolic StatNames are preferred when possible.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed string_view and StatName
-   * @param unit The unit of measurement.
-   * @param tags optionally specified tags.
-   * @return A histogram named using the joined elements.
-   */
-  Histogram& histogramFromElements(const ElementVec& elements, Histogram::Unit unit,
-                                   StatNameTagVectorOptConstRef tags) {
-    return histogramFromElementsHelper(elements, unit, tags);
-  }
-  virtual Histogram& histogramFromElementsHelper(const ElementVec& elements, Histogram::Unit unit,
-                                                 StatNameTagVectorOptConstRef tags) PURE;
-
 
   /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
