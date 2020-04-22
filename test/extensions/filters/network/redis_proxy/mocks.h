@@ -60,7 +60,6 @@ public:
 
   MOCK_METHOD((absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>>),
               getFaultForCommand, (std::string));
-  MOCK_METHOD(int, numberOfFaults, ());
 };
 
 namespace ConnPool {

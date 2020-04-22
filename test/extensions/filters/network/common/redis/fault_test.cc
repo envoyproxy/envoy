@@ -23,33 +23,52 @@ using RedisProxy = envoy::extensions::filters::network::redis_proxy::v3::RedisPr
 using FractionalPercent = envoy::type::v3::FractionalPercent;
 class FaultTest : public testing::Test {
 public:
-  void createCommandFault(RedisProxy::RedisFault* fault, std::string command_str,
-                          int fault_percentage, int delay_seconds,
-                          envoy::type::v3::FractionalPercent_DenominatorType denominator) {
+  const std::string RUNTIME_KEY = "runtime_key";
+
+  void
+  createCommandFault(RedisProxy::RedisFault* fault, std::string command_str, int delay_seconds,
+                     absl::optional<int> fault_percentage,
+                     absl::optional<envoy::type::v3::FractionalPercent_DenominatorType> denominator,
+                     absl::optional<std::string> runtime_key) {
     // We don't set fault type as it isn't used in the test
 
     auto* commands = fault->mutable_commands();
     auto* command = commands->Add();
     command->assign(command_str);
 
-    addFaultPercentage(fault, fault_percentage, denominator);
+    fault->set_fault_type(envoy::extensions::filters::network::redis_proxy::v3::
+                              RedisProxy_RedisFault_RedisFaultType_ERROR);
+
+    addFaultPercentage(fault, fault_percentage, denominator, runtime_key);
     addDelay(fault, delay_seconds);
   }
 
-  void createAllKeyFault(RedisProxy::RedisFault* fault, int fault_percentage, int delay_seconds,
-                         envoy::type::v3::FractionalPercent_DenominatorType denominator) {
-    addFaultPercentage(fault, fault_percentage, denominator);
+  void
+  createAllKeyFault(RedisProxy::RedisFault* fault, int delay_seconds,
+                    absl::optional<int> fault_percentage,
+                    absl::optional<envoy::type::v3::FractionalPercent_DenominatorType> denominator,
+                    absl::optional<std::string> runtime_key) {
+    addFaultPercentage(fault, fault_percentage, denominator, runtime_key);
     addDelay(fault, delay_seconds);
   }
 
-  void addFaultPercentage(RedisProxy::RedisFault* fault, int fault_percentage,
-                          envoy::type::v3::FractionalPercent_DenominatorType denominator) {
+  void
+  addFaultPercentage(RedisProxy::RedisFault* fault, absl::optional<int> fault_percentage,
+                     absl::optional<envoy::type::v3::FractionalPercent_DenominatorType> denominator,
+                     absl::optional<std::string> runtime_key) {
     envoy::config::core::v3::RuntimeFractionalPercent* fault_enabled =
         fault->mutable_fault_enabled();
-    fault_enabled->set_runtime_key("runtime_key");
+
+    if (runtime_key.has_value()) {
+      fault_enabled->set_runtime_key(runtime_key.value());
+    }
     auto* percentage = fault_enabled->mutable_default_value();
-    percentage->set_numerator(fault_percentage);
-    percentage->set_denominator(denominator);
+    if (fault_percentage.has_value()) {
+      percentage->set_numerator(fault_percentage.value());
+    }
+    if (denominator.has_value()) {
+      percentage->set_denominator(denominator.value());
+    }
   }
 
   void addDelay(RedisProxy::RedisFault* fault, int delay_seconds) {
@@ -67,7 +86,6 @@ TEST_F(FaultTest, NoFaults) {
 
   TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
-  ASSERT_EQ(fault_manager.numberOfFaults(), 0);
 
   absl::optional<std::pair<FaultType, std::chrono::milliseconds>> fault_opt =
       fault_manager.getFaultForCommand("get");
@@ -77,11 +95,10 @@ TEST_F(FaultTest, NoFaults) {
 TEST_F(FaultTest, SingleCommandFaultNotEnabled) {
   RedisProxy redis_config;
   auto* faults = redis_config.mutable_faults();
-  createCommandFault(faults->Add(), "get", 0, 0, FractionalPercent::HUNDRED);
+  createCommandFault(faults->Add(), "get", 0, 0, FractionalPercent::HUNDRED, RUNTIME_KEY);
 
   TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
-  ASSERT_EQ(fault_manager.numberOfFaults(), 1);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0));
   EXPECT_CALL(runtime_, snapshot());
@@ -95,11 +112,10 @@ TEST_F(FaultTest, SingleCommandFault) {
   // we use FractionalPercent::HUNDRED.
   RedisProxy redis_config;
   auto* faults = redis_config.mutable_faults();
-  createCommandFault(faults->Add(), "ttl", 5000, 0, FractionalPercent::TEN_THOUSAND);
+  createCommandFault(faults->Add(), "ttl", 0, 5000, FractionalPercent::TEN_THOUSAND, RUNTIME_KEY);
 
   TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
-  ASSERT_EQ(fault_manager.numberOfFaults(), 1);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_, snapshot());
@@ -108,18 +124,32 @@ TEST_F(FaultTest, SingleCommandFault) {
   ASSERT_TRUE(fault_opt.has_value());
 }
 
+TEST_F(FaultTest, SingleCommandFaultWithNoDefaultValueOrRuntimeValue) {
+  // Inject a single fault with no default value or runtime value.
+  RedisProxy redis_config;
+  auto* faults = redis_config.mutable_faults();
+  createCommandFault(faults->Add(), "ttl", 0, absl::nullopt, absl::nullopt, absl::nullopt);
+
+  TestScopedRuntime scoped_runtime;
+  FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(1));
+  EXPECT_CALL(runtime_, snapshot());
+  absl::optional<std::pair<FaultType, std::chrono::milliseconds>> fault_opt =
+      fault_manager.getFaultForCommand("ttl");
+  ASSERT_FALSE(fault_opt.has_value());
+}
+
 TEST_F(FaultTest, MultipleFaults) {
   // This creates 2 faults, but the map will have 3 entries, as each command points to
   // command specific faults AND the general fault.
   RedisProxy redis_config;
   auto* faults = redis_config.mutable_faults();
-  createCommandFault(faults->Add(), "get", 25, 0, FractionalPercent::HUNDRED);
-  createAllKeyFault(faults->Add(), 25, 2, FractionalPercent::HUNDRED);
+  createCommandFault(faults->Add(), "get", 0, 25, FractionalPercent::HUNDRED, RUNTIME_KEY);
+  createAllKeyFault(faults->Add(), 2, 25, FractionalPercent::HUNDRED, RUNTIME_KEY);
 
   TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
-  ASSERT_EQ(fault_manager.numberOfFaults(), 3);
-
   absl::optional<std::pair<FaultType, std::chrono::milliseconds>> fault_opt;
 
   // Get command - should have a fault 50% of time
@@ -131,26 +161,31 @@ TEST_F(FaultTest, MultipleFaults) {
   ASSERT_TRUE(fault_opt.has_value());
   ASSERT_EQ(fault_opt.value().second, std::chrono::milliseconds(0));
 
-  // For the second call we mock the random percentage to be 25%, which will give us the case with
-  // no fault.
+  // Another Get; we mock the random percentage to be 25%, giving us the ALL_KEY fault
   EXPECT_CALL(random_, random()).WillOnce(Return(25));
-  EXPECT_CALL(runtime_, snapshot()).Times(2);
-  fault_opt = fault_manager.getFaultForCommand("get");
-  ASSERT_FALSE(fault_opt.has_value());
-
-  // The same result is expected for 74%.
-  EXPECT_CALL(random_, random()).WillOnce(Return(74));
-  EXPECT_CALL(runtime_, snapshot()).Times(2);
-  fault_opt = fault_manager.getFaultForCommand("get");
-  ASSERT_FALSE(fault_opt.has_value());
-
-  // For the final call we mock the random percentage to be 75%, which will give us the second fault
-  // with 2s delay.
-  EXPECT_CALL(random_, random()).WillOnce(Return(75));
   EXPECT_CALL(runtime_, snapshot()).Times(2);
   fault_opt = fault_manager.getFaultForCommand("get");
   ASSERT_TRUE(fault_opt.has_value());
   ASSERT_EQ(fault_opt.value().second, std::chrono::milliseconds(2000));
+
+  // No fault for Get command with mocked random percentage >= 50%.
+  EXPECT_CALL(random_, random()).WillOnce(Return(50));
+  EXPECT_CALL(runtime_, snapshot()).Times(2);
+  fault_opt = fault_manager.getFaultForCommand("get");
+  ASSERT_FALSE(fault_opt.has_value());
+
+  // Any other command; we mock the random percentage to be 1%, giving us the ALL_KEY fault
+  EXPECT_CALL(random_, random()).WillOnce(Return(1));
+  EXPECT_CALL(runtime_, snapshot()).Times(1);
+  fault_opt = fault_manager.getFaultForCommand("ttl");
+  ASSERT_TRUE(fault_opt.has_value());
+  ASSERT_EQ(fault_opt.value().second, std::chrono::milliseconds(2000));
+
+  // No fault for any other command with mocked random percentage >= 25%.
+  EXPECT_CALL(random_, random()).WillOnce(Return(25));
+  EXPECT_CALL(runtime_, snapshot()).Times(1);
+  fault_opt = fault_manager.getFaultForCommand("ttl");
+  ASSERT_FALSE(fault_opt.has_value());
 }
 
 } // namespace Redis

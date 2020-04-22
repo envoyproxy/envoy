@@ -25,11 +25,6 @@ public:
    */
   virtual absl::optional<std::pair<FaultType, std::chrono::milliseconds>>
   getFaultForCommand(std::string command) PURE;
-
-  /**
-   * Get number of faults fault manager has loaded from config. Used for testing.
-   */
-  virtual int numberOfFaults() PURE;
 };
 
 using FaultManagerPtr = std::shared_ptr<FaultManager>;
