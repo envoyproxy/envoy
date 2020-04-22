@@ -6,6 +6,7 @@
 
 #include "extensions/filters/http/common/compressor/compressor.h"
 
+#include "test/mocks/compression/compressor/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -14,17 +15,15 @@
 
 #include "gtest/gtest.h"
 
-using testing::Return;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Common {
 namespace Compressors {
 
-class MockCompressor : public Envoy::Compression::Compressor::Compressor {
-  void compress(Buffer::Instance&, Envoy::Compression::Compressor::State) override {}
-};
+using testing::_;
+using testing::AtLeast;
+using testing::Return;
 
 class MockCompressorFilterConfig : public CompressorFilterConfig {
 public:
@@ -36,7 +35,9 @@ public:
                                compressor_name) {}
 
   Envoy::Compression::Compressor::CompressorPtr makeCompressor() override {
-    return std::make_unique<MockCompressor>();
+    auto compressor = std::make_unique<Compression::Compressor::MockCompressor>();
+    EXPECT_CALL(*compressor, compress(_, _)).Times(AtLeast(1));
+    return compressor;
   }
 };
 
@@ -840,15 +841,12 @@ TEST_F(CompressorFilterTest, EtagNoCompression) {
   EXPECT_EQ(1, stats_.counter("test.test.not_compressed_etag").value());
 }
 
-// Verifies that compression is skipped when etag header is NOT allowed.
+// Verifies that compression is not skipped when strong etag header is present.
 TEST_F(CompressorFilterTest, EtagCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "test"}}, true);
   Http::TestResponseHeaderMapImpl headers{
       {":method", "get"}, {"content-length", "256"}, {"etag", "686897696a7c876b7e"}};
-  feedBuffer(256);
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  filter_->setDecoderFilterCallbacks(decoder_callbacks);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  doResponseCompression(std::move(headers), false);
   EXPECT_FALSE(headers.has("etag"));
   EXPECT_EQ("test", headers.get_("content-encoding"));
 }
@@ -963,8 +961,7 @@ TEST_F(CompressorFilterTest, NoVaryHeader) {
   filter_->setDecoderFilterCallbacks(decoder_callbacks);
   doRequest({{":method", "get"}, {"accept-encoding", "test"}}, true);
   Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
-  feedBuffer(256);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  doResponseCompression(std::move(headers), false);
   EXPECT_TRUE(headers.has("vary"));
   EXPECT_EQ("Accept-Encoding", headers.get_("vary"));
 }
@@ -976,8 +973,7 @@ TEST_F(CompressorFilterTest, VaryOtherValues) {
   doRequest({{":method", "get"}, {"accept-encoding", "test"}}, true);
   Http::TestResponseHeaderMapImpl headers{
       {":method", "get"}, {"content-length", "256"}, {"vary", "User-Agent, Cookie"}};
-  feedBuffer(256);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  doResponseCompression(std::move(headers), false);
   EXPECT_TRUE(headers.has("vary"));
   EXPECT_EQ("User-Agent, Cookie, Accept-Encoding", headers.get_("vary"));
 }
@@ -989,8 +985,7 @@ TEST_F(CompressorFilterTest, VaryAlreadyHasAcceptEncoding) {
   doRequest({{":method", "get"}, {"accept-encoding", "test"}}, true);
   Http::TestResponseHeaderMapImpl headers{
       {":method", "get"}, {"content-length", "256"}, {"vary", "accept-encoding"}};
-  feedBuffer(256);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  doResponseCompression(std::move(headers), false);
   EXPECT_TRUE(headers.has("vary"));
   EXPECT_EQ("accept-encoding, Accept-Encoding", headers.get_("vary"));
 }
