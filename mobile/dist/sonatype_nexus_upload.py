@@ -72,11 +72,11 @@ def _install_locally(version, files):
         shutil.copyfile(file, os.path.join(path, basename))
 
 
-def _urlopen_retried(request, max_retries=20, attempt=1, delay_sec=1):
+def _urlopen_retried(request, max_retries=500, attempt=1, delay_sec=1):
     """
     Retries a request via recursion. Retries happen after the provided delay. We do not exponentially back off.
     :param request: the request to be made
-    :param max_retries: Number of retries to use, default is 20. The reason we are using such a high retry is because
+    :param max_retries: Number of retries to use, default is 500. The reason we are using such a high retry is because
     sonatype fails quite frequently
     :param attempt: The current attempt number for the request
     :param delay_sec: The delay before making a retried request
