@@ -884,7 +884,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamWithHttpBodyAsOutput) {
   EXPECT_EQ(nullptr, response_headers.ContentLength());
   EXPECT_EQ(response.data(), response_data->toString());
 
-  // "Send" 3rd multiframed message ("msgmsgmsg")
+  // "Send" 3rd multiframe message ("msgmsgmsg")
   Buffer::OwnedImpl multiframe_data;
   response.set_data("msg");
   for (size_t i = 0; i < 3; i++) {
