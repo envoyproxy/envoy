@@ -159,6 +159,8 @@ private:
   Http::ResponseTrailerMapPtr upstream_trailers_;
   Http::MetadataMapVector downstream_metadata_map_vector_;
 
+  // Tracks the number of times the flow of data from downstream has been disabled.
+  uint32_t downstream_data_disabled_{};
   bool calling_encode_headers_ : 1;
   bool upstream_canary_ : 1;
   bool decode_complete_ : 1;
