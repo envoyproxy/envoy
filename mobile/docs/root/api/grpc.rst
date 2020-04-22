@@ -125,7 +125,7 @@ stream.
 
   val request = GRPCRequestBuilder(...).build()
   val responseHandler = GRPCResponseHandler(...)
-  val grpcEmitter = grpcClient.send(request, responseHandler)
+  val grpcEmitter = grpcClient.start(request, responseHandler)
     .sendMessage(...)
     .sendMessage(...)
 
@@ -139,7 +139,7 @@ stream.
 
   let request = GRPCRequestBuilder(...).build()
   let responseHandler = GRPCResponseHandler(...)
-  let grpcEmitter = grpcClient.send(request, handler: responseHandler)
+  let grpcEmitter = grpcClient.start(request, handler: responseHandler)
     .sendMessage(...)
     .sendMessage(...)
 
