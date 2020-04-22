@@ -21,7 +21,6 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/stats/scope.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -116,6 +115,7 @@ public:
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() const override { return false; }
   bool preserveExternalRequestId() const override { return false; }
+  bool alwaysSetRequestIdInResponse() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return false; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
@@ -179,16 +179,33 @@ public:
     };
   }
 
+  using HandlerWithServerCb = std::function<Http::Code(
+      absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
+      Buffer::Instance& response, AdminStream& admin_stream, Server::Instance& server)>;
+
 private:
   /**
    * Individual admin handler including prefix, help text, and callback.
    */
   struct UrlHandler {
+    UrlHandler(std::string prefix, std::string help_text, HandlerCb handler, bool removable,
+               bool mutates_server_state)
+        : prefix_(prefix), help_text_(help_text), handler_(handler), removable_(removable),
+          mutates_server_state_(mutates_server_state), requires_server_(false) {}
+
+    UrlHandler(std::string prefix, std::string help_text, HandlerWithServerCb handler_with_server,
+               bool removable, bool mutates_server_state)
+        : prefix_(prefix), help_text_(help_text), handler_with_server_(handler_with_server),
+          removable_(removable), mutates_server_state_(mutates_server_state),
+          requires_server_(true) {}
+
     const std::string prefix_;
     const std::string help_text_;
     const HandlerCb handler_;
+    const HandlerWithServerCb handler_with_server_;
     const bool removable_;
     const bool mutates_server_state_;
+    const bool requires_server_;
   };
 
   /**
@@ -234,8 +251,6 @@ private:
     TimeSource& time_source_;
   };
 
-  friend class AdminStatsTest;
-
   /**
    * Attempt to change the log level of a logger or all loggers
    * @param params supplies the incoming endpoint query params.
@@ -273,18 +288,6 @@ private:
   absl::optional<std::pair<Http::Code, std::string>>
   addResourceToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
                     const std::string& resource) const;
-
-  template <class StatType>
-  static bool shouldShowMetric(const StatType& metric, const bool used_only,
-                               const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric.used()) &&
-            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
-  }
-  static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                                 const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool used_only,
-                                 const absl::optional<std::regex> regex = absl::nullopt,
-                                 bool pretty_print = false);
 
   std::vector<const UrlHandler*> sortedHandlers() const;
   envoy::admin::v3::ServerInfo::State serverState();
@@ -340,33 +343,12 @@ private:
   Http::Code handlerDrainListeners(absl::string_view path_and_query,
                                    Http::ResponseHeaderMap& response_headers,
                                    Buffer::Instance& response, AdminStream&);
-  Http::Code handlerResetCounters(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
-                                  Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
-                                       Http::ResponseHeaderMap& response_headers,
-                                       Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookupsClear(absl::string_view path_and_query,
-                                            Http::ResponseHeaderMap& response_headers,
-                                            Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookupsDisable(absl::string_view path_and_query,
-                                              Http::ResponseHeaderMap& response_headers,
-                                              Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
-                                             Http::ResponseHeaderMap& response_headers,
-                                             Buffer::Instance& response, AdminStream&);
   Http::Code handlerServerInfo(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
   Http::Code handlerReady(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
-  Http::Code handlerStats(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                          AdminStream&);
-  Http::Code handlerPrometheusStats(absl::string_view path_and_query,
-                                    Http::ResponseHeaderMap& response_headers,
-                                    Buffer::Instance& response, AdminStream&);
   Http::Code handlerRuntime(absl::string_view path_and_query,
                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                             AdminStream&);
@@ -492,51 +474,6 @@ private:
   Network::ListenSocketFactorySharedPtr socket_factory_;
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
-};
-
-/**
- * Formatter for metric/labels exported to Prometheus.
- *
- * See: https://prometheus.io/docs/concepts/data_model
- */
-class PrometheusStatsFormatter {
-public:
-  /**
-   * Extracts counters and gauges and relevant tags, appending them to
-   * the response buffer after sanitizing the metric / label names.
-   * @return uint64_t total number of metric types inserted in response.
-   */
-  static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
-                                    const std::vector<Stats::GaugeSharedPtr>& gauges,
-                                    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                                    Buffer::Instance& response, const bool used_only,
-                                    const absl::optional<std::regex>& regex);
-  /**
-   * Format the given tags, returning a string as a comma-separated list
-   * of <tag_name>="<tag_value>" pairs.
-   */
-  static std::string formattedTags(const std::vector<Stats::Tag>& tags);
-  /**
-   * Format the given metric name, prefixed with "envoy_".
-   */
-  static std::string metricName(const std::string& extracted_name);
-
-private:
-  /**
-   * Take a string and sanitize it according to Prometheus conventions.
-   */
-  static std::string sanitizeName(const std::string& name);
-
-  /*
-   * Determine whether a metric has never been emitted and choose to
-   * not show it if we only wanted used metrics.
-   */
-  template <class StatType>
-  static bool shouldShowMetric(const StatType& metric, const bool used_only,
-                               const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric.used()) &&
-            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
-  }
 };
 
 } // namespace Server

@@ -13,7 +13,7 @@ public:
   MockIoHandle();
   ~MockIoHandle() override;
 
-  MOCK_METHOD(int, fd, (), (const));
+  MOCK_METHOD(os_fd_t, fd, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, readv,

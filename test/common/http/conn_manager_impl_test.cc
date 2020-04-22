@@ -293,6 +293,7 @@ public:
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() const override { return true; }
   bool preserveExternalRequestId() const override { return false; }
+  bool alwaysSetRequestIdInResponse() const override { return false; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
@@ -2556,6 +2557,29 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
         {":status", "101"}, {"Connection", "upgrade"}, {"upgrade", "foo"}}};
     filter->decoder_callbacks_->encodeHeaders(std::move(response_headers), false);
 
+    data.drain(4);
+  }));
+
+  // Kick off the incoming data. Use extra data which should cause a redispatch.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// Make sure CONNECT requests hit the upgrade filter path.
+TEST_F(HttpConnectionManagerImplTest, ConnectAsUpgrade) {
+  setup(false, "envoy-custom-server", false);
+
+  NiceMock<MockResponseEncoder> encoder;
+  RequestDecoder* decoder = nullptr;
+
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
+      .WillRepeatedly(Return(true));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "CONNECT"}}};
+    decoder->decodeHeaders(std::move(headers), false);
     data.drain(4);
   }));
 
@@ -5388,11 +5412,11 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
           decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_request", std::make_unique<SimpleType>(2),
               StreamInfo::FilterState::StateType::ReadOnly,
-              StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+              StreamInfo::FilterState::LifeSpan::Request);
           decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_connection", std::make_unique<SimpleType>(3),
               StreamInfo::FilterState::StateType::ReadOnly,
-              StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+              StreamInfo::FilterState::LifeSpan::Connection);
           return FilterHeadersStatus::StopIteration;
         }));
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))

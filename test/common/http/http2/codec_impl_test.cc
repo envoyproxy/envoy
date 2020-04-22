@@ -987,9 +987,6 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   response_encoder_->encodeHeaders(response_headers, true);
 }
 
-class Http2CodecImplSettingsBasicTest : public Http2CodecImplTest {};
-TEST_P(Http2CodecImplSettingsBasicTest, ) {}
-
 class Http2CodecImplStreamLimitTest : public Http2CodecImplTest {};
 
 // Regression test for issue #3076.
@@ -1784,6 +1781,26 @@ TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
           CommonUtility::OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD +
           1);
   EXPECT_NO_THROW(server_wrapper_.dispatch(data, *server_));
+}
+
+// CONNECT without upgrade type gets tagged with "bytestream"
+TEST_P(Http2CodecImplTest, ConnectTest) {
+  client_http2_options_.set_allow_connect(true);
+  server_http2_options_.set_allow_connect(true);
+  initialize();
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setReferenceKey(Headers::get().Method, Http::Headers::get().MethodValues.Connect);
+  TestRequestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  expected_headers.setReferenceKey(Headers::get().Method,
+                                   Http::Headers::get().MethodValues.Connect);
+  expected_headers.setReferenceKey(Headers::get().Protocol, "bytestream");
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  request_encoder_->encodeHeaders(request_headers, false);
 }
 
 class TestNghttp2SessionFactory;
