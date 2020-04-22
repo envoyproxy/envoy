@@ -255,8 +255,8 @@ public:
 
   /**
    * Creates the target route predicates. This should really be called only once for each upstream
-   * redirect response. Creating the predicates lazily to avoid wating CPU cycles on non redirect
-   * responses, which should be the most common cases.
+   * redirect response. Creating the predicates lazily to avoid wasting CPU cycles on non-redirect
+   * responses, which should be the most common case.
    * @return std::vector<InternalRedirectTargetRoutePredicateSharedPtr>.
    */
   virtual std::vector<InternalRedirectPredicateSharedPtr> predicates() const PURE;

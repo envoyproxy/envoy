@@ -231,7 +231,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
                                        ->mutable_internal_redirect_policy();
   internal_redirect_policy->set_internal_redirect_action(
       envoy::config::route::v3::InternalRedirectPolicy::HANDLE_INTERNAL_REDIRECT);
-  internal_redirect_policy->add_target_route_predicates()->set_name(
+  internal_redirect_policy->add_predicates()->set_name(
       "envoy.internal_redirect_predicates.previous_routes");
   internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
   config_helper_.addVirtualHost(handle_prevent_repeated_target);
@@ -282,7 +282,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByWhitelistedRoutesPred
   internal_redirect_policy->set_internal_redirect_action(
       envoy::config::route::v3::InternalRedirectPolicy::HANDLE_INTERNAL_REDIRECT);
 
-  auto* whitelisted_routes_predicate = internal_redirect_policy->add_target_route_predicates();
+  auto* whitelisted_routes_predicate = internal_redirect_policy->add_predicates();
   whitelisted_routes_predicate->set_name("envoy.internal_redirect_predicates.whitelisted_routes");
   envoy::extensions::internal_redirect::whitelisted_routes::v3::WhitelistedRoutesConfig
       whitelisted_routes_config;

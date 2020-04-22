@@ -4,6 +4,8 @@
 #include "envoy/extensions/internal_redirect/whitelisted_routes/v3/whitelisted_routes_config.pb.validate.h"
 #include "envoy/router/internal_redirect.h"
 
+#include "common/protobuf/message_validator_impl.h"
+#include "common/protobuf/utility.h"
 #include "extensions/internal_redirect/well_known_names.h"
 #include "extensions/internal_redirect/whitelisted_routes/whitelisted_routes.h"
 

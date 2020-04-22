@@ -148,12 +148,11 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
       max_internal_redirects_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(policy_config, max_internal_redirects, 1)),
       allowed_scheme_pairs_(buildAllowedSchemePairs(policy_config)) {
-  for (const auto& target_route_predicate : policy_config.target_route_predicates()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<InternalRedirectPredicateFactory>(
-        target_route_predicate);
+  for (const auto& predicate : policy_config.predicates()) {
+    auto& factory =
+        Envoy::Config::Utility::getAndCheckFactory<InternalRedirectPredicateFactory>(predicate);
     auto config = factory.createEmptyConfigProto();
-    Envoy::Config::Utility::translateOpaqueConfig(target_route_predicate.typed_config(), {},
-                                                  validator, *config);
+    Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), {}, validator, *config);
     predicate_factories_.emplace_back(factory, std::move(config));
   }
 }

@@ -4,9 +4,6 @@
 #include "envoy/router/internal_redirect.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
