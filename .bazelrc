@@ -110,6 +110,23 @@ build:sizeopt -c opt --copt -Os
 # Test options
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 
+# Coverage options
+coverage --config=coverage
+build:coverage --config=clang
+build:coverage --copt=-DNDEBUG
+build:coverage --test_timeout=900
+build:coverage --cxxopt="-DENVOY_CONFIG_COVERAGE=1"
+build:coverage --coverage_support=@envoy//bazel/coverage:coverage_support
+build:coverage --test_env=CC_CODE_COVERAGE_SCRIPT=external/envoy/bazel/coverage/collect_cc_coverage.sh
+build:coverage --test_env=HEAPCHECK=
+build:coverage --test_arg="--log-path /dev/null"
+build:coverage --test_arg="-l trace"
+build:coverage --combined_report=lcov
+build:coverage --strategy=TestRunner=sandboxed,local
+build:coverage --strategy=CoverageReport=sandboxed,local
+build:coverage --experimental_use_llvm_covmap
+build:coverage --collect_code_coverage
+
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
 build:rbe-toolchain --host_platform=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --platforms=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform

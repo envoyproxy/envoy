@@ -239,7 +239,7 @@ TEST_F(QuicPlatformTest, QuicServerStats) {
 }
 
 TEST_F(QuicPlatformTest, QuicStackTraceTest) {
-  EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
+  EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceImpl"));
 }
 
 TEST_F(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
