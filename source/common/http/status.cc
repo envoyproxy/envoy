@@ -37,17 +37,24 @@ struct PrematureResponsePayload : public EnvoyStatusPayload {
 };
 
 template <typename T> void storePayload(absl::Status& status, const T& payload) {
-  status.SetPayload(
-      EnvoyPayloadUrl,
-      absl::Cord(absl::string_view(reinterpret_cast<const char*>(&payload), sizeof(payload))));
+  absl::Cord cord(absl::string_view(reinterpret_cast<const char*>(&payload), sizeof(payload)));
+  cord.Flatten(); // Flatten ahead of time for easier access later.
+  status.SetPayload(EnvoyPayloadUrl, std::move(cord));
 }
 
 template <typename T = EnvoyStatusPayload> const T* getPayload(const absl::Status& status) {
-  auto payload = status.GetPayload(EnvoyPayloadUrl);
-  ASSERT(payload.has_value(), "Must have payload");
-  auto data = payload.value().Flatten();
-  ASSERT(data.length() >= sizeof(T), "Invalid payload length");
-  return reinterpret_cast<const T*>(data.data());
+  const T* payload = nullptr;
+  status.ForEachPayload([&payload](absl::string_view url, const absl::Cord& cord) {
+    if (url == EnvoyPayloadUrl) {
+      ASSERT(!payload); // Status API guarantees to have one payload with given URL
+      auto data = cord.TryFlat();
+      ASSERT(data.has_value()); // EnvoyPayloadUrl cords are flattened ahead of time
+      ASSERT(data.value().length() >= sizeof(T), "Invalid payload length");
+      payload = reinterpret_cast<const T*>(data.value().data());
+    }
+  });
+  ASSERT(payload);
+  return payload;
 }
 
 } // namespace
