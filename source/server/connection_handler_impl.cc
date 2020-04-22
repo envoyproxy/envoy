@@ -79,8 +79,8 @@ void ConnectionHandlerImpl::removeFilterChains(
   }
   // Fallback to iterate over all listeners. The reason is that the target listener might have began
   // another update and the previous tag is lost.
-  // TODO(lambdai): Remove this once we decide to use the same listener tag during intelligent
-  // update.
+  // TODO(lambdai): Remove this once we decide to use the same listener tag during in place filter
+  // chain update.
   for (auto& listener : listeners_) {
     if (listener.second.tcp_listener_.has_value()) {
       listener.second.tcp_listener_->get().deferredRemoveFilterChains(filter_chains);

@@ -152,7 +152,7 @@ public:
     drain_timer_->enableTimer(drain_time);
   }
 
-  void insertFilterChain(const Network::FilterChain* filter_chain) {
+  void addFilterChainToDrain(const Network::FilterChain* filter_chain) {
     draining_filter_chains_.push_back(filter_chain);
   }
 
@@ -176,7 +176,7 @@ public:
                       WorkerFactory& worker_factory, bool enable_dispatcher_stats);
 
   void onListenerWarmed(ListenerImpl& listener);
-  void onIntelligentListenerWarmed(ListenerImpl& listener);
+  void inPlaceFilterChainUpdate(ListenerImpl& listener);
 
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
@@ -273,8 +273,9 @@ private:
   /**
    * Mark filter chains which owned by listener for draining. The new listener should have taken
    * over the listener socket and partial of the filter chains from listener.
-   * @param listener supplies the listener to drain.
-   * @param new_listener supplies the new listener which co-owns partial of the filter chains.
+   * @param listener supplies the listener to be replaced.
+   * @param new_listener supplies the new listener config which is going to replace the old
+   * listener.
    */
   void drainFilterChains(ListenerImplPtr&& listener, ListenerImpl& new_listener);
 

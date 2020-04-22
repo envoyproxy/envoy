@@ -11,7 +11,7 @@ Changes
 * http: fixed a bug where the upgrade header was not cleared on responses to non-upgrade requests.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
 * listener: added additional draining filter chain stat for :ref:`listener manager <config_listener_manager_stats>`.
-* listener: added intelligent update path which doesn't close connection if the corresponding network filter chain is equivalent during the listener update.
+* listener: added in place filter chain update flow for tcp listener update which doesn't close connections if the corresponding network filter chain is equivalent during the listener update.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
   can now have a separate :ref:`tracing provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
 

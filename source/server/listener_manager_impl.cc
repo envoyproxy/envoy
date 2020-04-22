@@ -405,10 +405,11 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
 
   ListenerImplPtr new_listener = nullptr;
 
-  // Intelligent listener update assumes there is active listener.
+  // In place filter chain update depends on the active listener at worker.
   if (existing_active_listener != active_listeners_.end() &&
       (*existing_active_listener)->supportUpdateFilterChain(config, workers_started_)) {
-    ENVOY_LOG(debug, "use intelligent update path for listener name={} hash={}", name, hash);
+    ENVOY_LOG(debug, "use in place update filter chain update path for listener name={} hash={}",
+              name, hash);
     new_listener =
         (*existing_active_listener)->newListenerWithFilterChain(config, workers_started_, hash);
   } else {
@@ -705,13 +706,13 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   updateWarmingActiveGauges();
 }
 
-void ListenerManagerImpl::onIntelligentListenerWarmed(ListenerImpl& listener) {
+void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
   auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
   ASSERT(existing_warming_listener != warming_listeners_.end());
   ASSERT(*existing_warming_listener != nullptr);
 
-  (*existing_warming_listener)->debugLog("intelligent listener warmed up");
+  (*existing_warming_listener)->debugLog("execute in place filter chain update");
   if (existing_active_listener != active_listeners_.end()) {
     ASSERT(*existing_active_listener != nullptr);
     // The warmed listener should be added first so that the worker will accept new connections
@@ -744,7 +745,7 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
   draining_group->getDrainingListener().diffFilterChain(
       new_listener, [&draining_group](Network::DrainableFilterChain& filter_chain) mutable {
         filter_chain.startDraining();
-        draining_group->insertFilterChain(&filter_chain);
+        draining_group->addFilterChainToDrain(&filter_chain);
       });
   auto filter_chain_size = draining_group->numDrainingFilterChains();
   stats_.total_filter_chains_draining_.add(filter_chain_size);

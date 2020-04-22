@@ -254,17 +254,18 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       }) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
-  this->buildListenSocketOptions(socket_type)
-      ->buildUdpListenerFactory(socket_type, concurrency)
-      ->createListenerFilterFactories(socket_type);
-  this->validateFilterChains(socket_type)->buildFilterChains();
+  buildListenSocketOptions(socket_type);
+  buildUdpListenerFactory(socket_type, concurrency);
+  createListenerFilterFactories(socket_type);
+  validateFilterChains(socket_type);
+  buildFilterChains();
   if (socket_type == Network::Address::SocketType::Datagram) {
     return;
   }
-  this->buildSocketOptions()
-      ->buildOriginalDstListenerFilter()
-      ->buildProxyProtocolListenerFilter()
-      ->buildTlsInspectorListenerFilter();
+  buildSocketOptions();
+  buildOriginalDstListenerFilter();
+  buildProxyProtocolListenerFilter();
+  buildTlsInspectorListenerFilter();
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
     // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
@@ -304,7 +305,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
                             initManager(), origin.filter_chain_manager_),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
         if (workers_started_) {
-          parent_.onIntelligentListenerWarmed(*this);
+          parent_.inPlaceFilterChainUpdate(*this);
         } else {
           // Notify Server that this listener is ready.
           listener_init_target_.ready();
@@ -312,30 +313,30 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
       }) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
-  this->buildListenSocketOptions(socket_type)
-      ->buildUdpListenerFactory(socket_type, concurrency)
-      ->createListenerFilterFactories(socket_type);
-  this->validateFilterChains(socket_type)->buildFilterChains();
+  buildListenSocketOptions(socket_type);
+  buildUdpListenerFactory(socket_type, concurrency);
+  createListenerFilterFactories(socket_type);
+  validateFilterChains(socket_type);
+  buildFilterChains();
   if (socket_type == Network::Address::SocketType::Datagram) {
     return;
   }
-  this->buildSocketOptions()
-      ->buildOriginalDstListenerFilter()
-      ->buildProxyProtocolListenerFilter()
-      ->buildTlsInspectorListenerFilter();
+  buildSocketOptions();
+  buildOriginalDstListenerFilter();
+  buildProxyProtocolListenerFilter();
+  buildTlsInspectorListenerFilter();
 }
 
-ListenerImpl* ListenerImpl::buildAccessLog() {
+void ListenerImpl::buildAccessLog() {
   for (const auto& access_log : config_.access_log()) {
     AccessLog::InstanceSharedPtr current_access_log =
         AccessLog::AccessLogFactory::fromProto(access_log, *listener_factory_context_);
     access_logs_.push_back(current_access_log);
   }
-  return this;
 }
 
-ListenerImpl* ListenerImpl::buildUdpListenerFactory(Network::Address::SocketType socket_type,
-                                                    uint32_t concurrency) {
+void ListenerImpl::buildUdpListenerFactory(Network::Address::SocketType socket_type,
+                                           uint32_t concurrency) {
   if (socket_type == Network::Address::SocketType::Datagram) {
     auto udp_config = config_.udp_listener_config();
     if (udp_config.udp_listener_name().empty()) {
@@ -352,10 +353,9 @@ ListenerImpl* ListenerImpl::buildUdpListenerFactory(Network::Address::SocketType
                       "packet proxying. Consider configuring the reuse_port listener option.");
     }
   }
-  return this;
 }
 
-ListenerImpl* ListenerImpl::buildListenSocketOptions(Network::Address::SocketType socket_type) {
+void ListenerImpl::buildListenSocketOptions(Network::Address::SocketType socket_type) {
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, transparent, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
@@ -375,11 +375,9 @@ ListenerImpl* ListenerImpl::buildListenSocketOptions(Network::Address::SocketTyp
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
   }
-  return this;
 }
 
-ListenerImpl*
-ListenerImpl::createListenerFilterFactories(Network::Address::SocketType socket_type) {
+void ListenerImpl::createListenerFilterFactories(Network::Address::SocketType socket_type) {
   if (!config_.listener_filters().empty()) {
     switch (socket_type) {
     case Network::Address::SocketType::Datagram:
@@ -400,10 +398,9 @@ ListenerImpl::createListenerFilterFactories(Network::Address::SocketType socket_
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
-  return this;
 }
 
-ListenerImpl* ListenerImpl::validateFilterChains(Network::Address::SocketType socket_type) {
+void ListenerImpl::validateFilterChains(Network::Address::SocketType socket_type) {
   if (config_.filter_chains().empty() && (socket_type == Network::Address::SocketType::Stream ||
                                           !udp_listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
@@ -421,10 +418,9 @@ ListenerImpl* ListenerImpl::validateFilterChains(Network::Address::SocketType so
       }
     }
   }
-  return this;
 }
 
-ListenerImpl* ListenerImpl::buildFilterChains() {
+void ListenerImpl::buildFilterChains() {
   Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
       parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
@@ -436,10 +432,9 @@ ListenerImpl* ListenerImpl::buildFilterChains() {
   // TODO(lambdai): create builder from filter_chain_manager to obtain the init manager
   ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
   filter_chain_manager_.addFilterChain(config_.filter_chains(), builder, filter_chain_manager_);
-  return this;
 }
 
-ListenerImpl* ListenerImpl::buildSocketOptions() {
+void ListenerImpl::buildSocketOptions() {
   // TCP specific setup.
   if (config_.has_connection_balance_config()) {
     // Currently exact balance is the only supported type and there are no options.
@@ -453,10 +448,9 @@ ListenerImpl* ListenerImpl::buildSocketOptions() {
     addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
         config_.tcp_fast_open_queue_length().value()));
   }
-  return this;
 }
 
-ListenerImpl* ListenerImpl::buildOriginalDstListenerFilter() {
+void ListenerImpl::buildOriginalDstListenerFilter() {
   // Add original dst listener filter if 'use_original_dst' flag is set.
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, hidden_envoy_deprecated_use_original_dst, false)) {
     auto& factory =
@@ -467,10 +461,9 @@ ListenerImpl* ListenerImpl::buildOriginalDstListenerFilter() {
         Envoy::ProtobufWkt::Empty(),
         /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
   }
-  return this;
 }
 
-ListenerImpl* ListenerImpl::buildProxyProtocolListenerFilter() {
+void ListenerImpl::buildProxyProtocolListenerFilter() {
   // Add proxy protocol listener filter if 'use_proxy_proto' flag is set.
   // TODO(jrajahalme): This is the last listener filter on purpose. When filter chain matching
   //                   is implemented, this needs to be run after the filter chain has been
@@ -483,10 +476,9 @@ ListenerImpl* ListenerImpl::buildProxyProtocolListenerFilter() {
         Envoy::ProtobufWkt::Empty(),
         /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
   }
-  return this;
 }
 
-ListenerImpl* ListenerImpl::buildTlsInspectorListenerFilter() {
+void ListenerImpl::buildTlsInspectorListenerFilter() {
   // TODO(zuercher) remove the deprecated TLS inspector name when the deprecated names are removed.
   const bool need_tls_inspector = needTlsInspector(config_);
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
@@ -505,7 +497,6 @@ ListenerImpl* ListenerImpl::buildTlsInspectorListenerFilter() {
         Envoy::ProtobufWkt::Empty(),
         /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
   }
-  return this;
 }
 
 AccessLog::AccessLogManager& PerListenerFactoryContextImpl::accessLogManager() {
@@ -638,16 +629,15 @@ void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr&
 
 bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
                                             bool worker_started) {
-  // It's adding very little value to support filter chain only update at start phase.
+  // The in place update execution flow is to replace the active listener. worker_started is the
+  // sufficient condition and is very close to the necessary condition.
   if (!worker_started) {
     return false;
   }
 
   // Currently we only support TCP filter chain update.
   if (Network::Utility::protobufAddressSocketType(config.address()) !=
-          Network::Address::SocketType::Stream ||
-      Network::Utility::protobufAddressSocketType(config.address()) !=
-          Network::Address::SocketType::Stream) {
+      Network::Address::SocketType::Stream) {
     return false;
   }
 
@@ -680,11 +670,12 @@ ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::List
 
 void ListenerImpl::diffFilterChain(const ListenerImpl& listener,
                                    std::function<void(Network::DrainableFilterChain&)> callback) {
-  for (const auto& filter_chain : filter_chain_manager_.allFilterChains()) {
-    if (listener.filter_chain_manager_.allFilterChains().find(filter_chain.first) ==
-        listener.filter_chain_manager_.allFilterChains().end()) {
+  for (const auto& message_and_filter_chain : filter_chain_manager_.filterChainsByMessage()) {
+    if (listener.filter_chain_manager_.filterChainsByMessage().find(
+            message_and_filter_chain.first) ==
+        listener.filter_chain_manager_.filterChainsByMessage().end()) {
       // exists in this listener but not in other
-      callback(*filter_chain.second);
+      callback(*message_and_filter_chain.second);
     }
   }
 }

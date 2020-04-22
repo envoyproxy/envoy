@@ -32,8 +32,8 @@ public:
    * ConnectionHandler.
    * @return true if listener update from lhs to rhs could go through fast path.
    */
-  static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener&,
-                                    const envoy::config::listener::v3::Listener&);
+  static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
+                                    const envoy::config::listener::v3::Listener& rhs);
 };
 
 class ListenerManagerImpl;
@@ -252,7 +252,8 @@ public:
                                 bool worker_started);
 
   /**
-   * Run the callback on each filter chain exists in this listener but not in another listener.
+   * Run the callback on each filter chain that exists in this listener but not in the passed
+   * listener config.
    */
   void diffFilterChain(const ListenerImpl& listener,
                        std::function<void(Network::DrainableFilterChain&)> callback);
@@ -336,17 +337,16 @@ public:
 
 private:
   // Helpers for constructor.
-  ListenerImpl* buildAccessLog();
-  ListenerImpl* buildUdpListenerFactory(Network::Address::SocketType socket_type,
-                                        uint32_t concurrency);
-  ListenerImpl* buildListenSocketOptions(Network::Address::SocketType socket_type);
-  ListenerImpl* createListenerFilterFactories(Network::Address::SocketType socket_type);
-  ListenerImpl* validateFilterChains(Network::Address::SocketType socket_type);
-  ListenerImpl* buildFilterChains();
-  ListenerImpl* buildSocketOptions();
-  ListenerImpl* buildOriginalDstListenerFilter();
-  ListenerImpl* buildProxyProtocolListenerFilter();
-  ListenerImpl* buildTlsInspectorListenerFilter();
+  void buildAccessLog();
+  void buildUdpListenerFactory(Network::Address::SocketType socket_type, uint32_t concurrency);
+  void buildListenSocketOptions(Network::Address::SocketType socket_type);
+  void createListenerFilterFactories(Network::Address::SocketType socket_type);
+  void validateFilterChains(Network::Address::SocketType socket_type);
+  void buildFilterChains();
+  void buildSocketOptions();
+  void buildOriginalDstListenerFilter();
+  void buildProxyProtocolListenerFilter();
+  void buildTlsInspectorListenerFilter();
 
   void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
     ensureSocketOptions();
