@@ -66,7 +66,7 @@ upgrade requests or responses with bodies.
 .. CONNECT support
 .. ^^^^^^^^^^^^^^^
 
-.. Envoy CONNECT support is off by default (Envoy will send an internall generated 403 in response to
+.. Envoy CONNECT support is off by default (Envoy will send an internally generated 403 in response to
 .. CONNECT requests). CONNECT support can be enabled via the upgrade options described above, setting
 .. the upgrade value to the special keyword "CONNECT".
 
@@ -75,10 +75,11 @@ upgrade requests or responses with bodies.
 .. :ref:`connect_matcher <envoy_api_field_route.RouteMatch.connect_matcher>`
 ..
 .. Envoy can handle CONNECT in one of two ways, either proxying the CONNECT headers through as if they
-.. were any other request, and letting the upstream handle the CONNECT request, or by terminating the
+.. were any other request, and letting the upstream terminate the CONNECT request, or by terminating the
 .. CONNECT request, and forwarding the payload as raw TCP data. When CONNECT upgrade configuration is
-.. set up, the default behavior is to proxy the CONNECT request. If termination is desired, this can
-.. be accomplished by setting
+.. set up, the default behavior is to proxy the CONNECT request, treating it like any other request using
+.. the upgrade path.
+.. If termination is desired, this can be accomplished by setting
 .. :ref:`connect_config <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfig.connect_config>`
 .. If it that message is present for CONNECT requests, the router filter will strip the request headers,
 .. and forward the HTTP payload upstream. On receipt of initial TCP data from upstream, the router
