@@ -18,8 +18,7 @@ public:
   DynamoStats(Stats::Scope& scope, const std::string& prefix);
 
   void incCounter(const Stats::ElementVec& names);
-  void recordHistogram(const Stats::ElementVec& names, Stats::Histogram::Unit unit,
-                       uint64_t value);
+  void recordHistogram(const Stats::ElementVec& names, Stats::Histogram::Unit unit, uint64_t value);
 
   /**
    * Creates the partition id stats string. The stats format is

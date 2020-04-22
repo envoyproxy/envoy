@@ -20,16 +20,12 @@ namespace Stats {
  * since those are expensive.
  */
 class DynamicName : public absl::string_view {
- public:
+public:
   DynamicName(absl::string_view s) : absl::string_view(s) {}
 };
 
 using Element = absl::variant<StatName, DynamicName>;
 using ElementVec = std::vector<Element>;
-
-//class Element : public absl::variant<StatName, DynamicName, std::vector<Element>> {
-  //};
-  //using ElementVec = Element;
 
 /**
  * Common stats utility routines.

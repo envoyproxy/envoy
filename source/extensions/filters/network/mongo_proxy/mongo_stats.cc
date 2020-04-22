@@ -43,8 +43,8 @@ void MongoStats::incCounter(const Stats::ElementVec& names) {
   Stats::Utility::counterFromElements(scope_, addPrefix(names)).inc();
 }
 
-void MongoStats::recordHistogram(const Stats::ElementVec& names,
-                                 Stats::Histogram::Unit unit, uint64_t sample) {
+void MongoStats::recordHistogram(const Stats::ElementVec& names, Stats::Histogram::Unit unit,
+                                 uint64_t sample) {
   Stats::Utility::histogramFromElements(scope_, addPrefix(names), unit).recordValue(sample);
 }
 

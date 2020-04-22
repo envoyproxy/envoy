@@ -9,6 +9,7 @@
 #include "common/common/hash.h"
 #include "common/grpc/stat_names.h"
 #include "common/stats/symbol_table_impl.h"
+#include "common/stats/utility.h"
 
 #include "absl/types/optional.h"
 
@@ -71,8 +72,8 @@ private:
   // or not.
   // Prefix will be "<protocol>" if request_names is empty, or
   // "<protocol>.<service>.<method>" if it is not empty.
-  std::pair<Stats::StatName, Stats::SymbolTable::StoragePtr>
-  getPrefix(Protocol protocol, const absl::optional<RequestStatNames>& request_names);
+  Stats::ElementVec getPrefix(Protocol protocol,
+                              const absl::optional<RequestStatNames>& request_names);
 
   Stats::SymbolTable& symbol_table_;
   mutable Thread::MutexBasicLockable mutex_;

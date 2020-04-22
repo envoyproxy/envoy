@@ -224,14 +224,14 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
 
     if (!active_query.query_info_.command().empty()) {
       Stats::ElementVec names{mongo_stats_->cmd_,
-                                       mongo_stats_->getBuiltin(active_query.query_info_.command(),
-                                                                mongo_stats_->unknown_command_)};
+                              mongo_stats_->getBuiltin(active_query.query_info_.command(),
+                                                       mongo_stats_->unknown_command_)};
       chargeReplyStats(active_query, names, *message);
     } else {
       // Collection stats first.
       Stats::ElementVec names{mongo_stats_->collection_,
-                                       Stats::DynamicName(active_query.query_info_.collection()),
-                                       mongo_stats_->query_};
+                              Stats::DynamicName(active_query.query_info_.collection()),
+                              mongo_stats_->query_};
       chargeReplyStats(active_query, names, *message);
 
       // Callsite stats if we have it.

@@ -35,17 +35,13 @@ Stats::StatName ContextImpl::makeDynamicStatName(absl::string_view name) {
 }
 
 // Gets the stat prefix and underlying storage, depending on whether request_names is empty
-std::pair<Stats::StatName, Stats::SymbolTable::StoragePtr>
-ContextImpl::getPrefix(Protocol protocol, const absl::optional<RequestStatNames>& request_names) {
+Stats::ElementVec ContextImpl::getPrefix(Protocol protocol,
+                                         const absl::optional<RequestStatNames>& request_names) {
   const Stats::StatName protocolName = protocolStatName(protocol);
   if (request_names) {
-    Stats::SymbolTable::StoragePtr prefix_storage =
-        symbol_table_.join({protocolName, request_names->service_, request_names->method_});
-    Stats::StatName prefix = Stats::StatName(prefix_storage.get());
-    return {prefix, std::move(prefix_storage)};
-  } else {
-    return {protocolName, nullptr};
+    return Stats::ElementVec{protocolName, request_names->service_, request_names->method_};
   }
+  return Stats::ElementVec{protocolName};
 }
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
@@ -70,15 +66,11 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol prot
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
                              const absl::optional<RequestStatNames>& request_names, bool success) {
-  auto prefix_and_storage = getPrefix(protocol, request_names);
-  Stats::StatName prefix = prefix_and_storage.first;
-
-  const Stats::SymbolTable::StoragePtr status =
-      symbol_table_.join({prefix, successStatName(success)});
-  const Stats::SymbolTable::StoragePtr total = symbol_table_.join({prefix, total_});
-
-  cluster.statsScope().counterFromStatName(Stats::StatName(status.get())).inc();
-  cluster.statsScope().counterFromStatName(Stats::StatName(total.get())).inc();
+  Stats::ElementVec elements = getPrefix(protocol, request_names);
+  elements.push_back(successStatName(success));
+  Stats::Utility::counterFromElements(cluster.statsScope(), elements).inc();
+  elements.back() = total_;
+  Stats::Utility::counterFromElements(cluster.statsScope(), elements).inc();
 }
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster,
@@ -89,43 +81,26 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster,
 void ContextImpl::chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
                                            const absl::optional<RequestStatNames>& request_names,
                                            uint64_t amount) {
-  auto prefix_and_storage = getPrefix(Protocol::Grpc, request_names);
-  Stats::StatName prefix = prefix_and_storage.first;
-
-  const Stats::SymbolTable::StoragePtr request_message_count =
-      symbol_table_.join({prefix, request_message_count_});
-
-  cluster.statsScope()
-      .counterFromStatName(Stats::StatName(request_message_count.get()))
-      .add(amount);
+  Stats::ElementVec elements = getPrefix(Protocol::Grpc, request_names);
+  elements.push_back(request_message_count_);
+  Stats::Utility::counterFromElements(cluster.statsScope(), elements).add(amount);
 }
 
 void ContextImpl::chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
                                             const absl::optional<RequestStatNames>& request_names,
                                             uint64_t amount) {
-  auto prefix_and_storage = getPrefix(Protocol::Grpc, request_names);
-  Stats::StatName prefix = prefix_and_storage.first;
-
-  const Stats::SymbolTable::StoragePtr response_message_count =
-      symbol_table_.join({prefix, response_message_count_});
-
-  cluster.statsScope()
-      .counterFromStatName(Stats::StatName(response_message_count.get()))
-      .add(amount);
+  Stats::ElementVec elements = getPrefix(Protocol::Grpc, request_names);
+  elements.push_back(response_message_count_);
+  Stats::Utility::counterFromElements(cluster.statsScope(), elements).add(amount);
 }
 
 void ContextImpl::chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
                                      const absl::optional<RequestStatNames>& request_names,
                                      std::chrono::milliseconds duration) {
-  auto prefix_and_storage = getPrefix(Protocol::Grpc, request_names);
-  Stats::StatName prefix = prefix_and_storage.first;
-
-  const Stats::SymbolTable::StoragePtr upstream_rq_time =
-      symbol_table_.join({prefix, upstream_rq_time_});
-
-  cluster.statsScope()
-      .histogramFromStatName(Stats::StatName(upstream_rq_time.get()),
-                             Stats::Histogram::Unit::Milliseconds)
+  Stats::ElementVec elements = getPrefix(Protocol::Grpc, request_names);
+  elements.push_back(upstream_rq_time_);
+  Stats::Utility::histogramFromElements(cluster.statsScope(), elements,
+                                        Stats::Histogram::Unit::Milliseconds)
       .recordValue(duration.count());
 }
 
