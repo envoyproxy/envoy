@@ -456,7 +456,7 @@ private:
         status = Envoy::Http::codecProtocolError(e.what());
       }
       if (Envoy::Http::isCodecProtocolError(status)) {
-        ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", e.what());
+        ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", status.message());
         // We don't do a full stream shutdown like HCM, but just shutdown the
         // connection for now.
         read_filter_callbacks_->connection().close(
