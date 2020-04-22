@@ -13,7 +13,6 @@
 #include "common/http/codec_client.h"
 #include "common/http/codes.h"
 #include "common/http/headers.h"
-#include "common/http/http1/conn_pool_legacy.h"
 #include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
@@ -138,14 +137,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr hos
                  Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.new_http1_connection_pool_behavior")) {
-    return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, options,
-                                                           transport_socket_options);
-  } else {
-    return std::make_unique<Http::Legacy::Http1::ProdConnPoolImpl>(
-        dispatcher, host, priority, options, transport_socket_options);
-  }
+  return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, options,
+                                                         transport_socket_options);
 }
 
 } // namespace Http1
