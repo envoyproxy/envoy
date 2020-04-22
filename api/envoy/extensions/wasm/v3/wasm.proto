@@ -21,8 +21,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 6]
 // [#not-implemented-hide:] pending implementation.
 message VmConfig {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.config.wasm.v2alpha.VmConfig";
-
   // An ID which will be used along with a hash of the wasm code (or the name of the registered Null
   // VM plugin) to determine which VM will be used for the plugin. All plugins which use the same
   // *vm_id* and code will use the same VM. May be left blank. Sharing a VM between plugins can
@@ -36,7 +34,10 @@ message VmConfig {
   // The Wasm code that Envoy will execute.
   config.core.v3.AsyncDataSource code = 3;
 
-  // The Wasm configuration used in initialization of a new VM (proxy_on_start).
+  // The Wasm configuration used in initialization of a new VM
+  // (proxy_on_start). `google.protobuf.Struct` is serialized as JSON before
+  // passing it to the plugin. `google.protobuf.BytesValue` and
+  // `google.protobuf.StringValue` are passed directly without the wrapper.
   google.protobuf.Any configuration = 4;
 
   // Allow the wasm file to include pre-compiled code on VMs which support it.
@@ -49,9 +50,6 @@ message VmConfig {
 // [#next-free-field: 6]
 // [#not-implemented-hide:] pending implementation.
 message PluginConfig {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.wasm.v2alpha.PluginConfig";
-
   // A unique name for a filters/services in a VM for use in identifying the filter/service if
   // multiple filters/services are handled by the same *vm_id* and *group_name* and for
   // logging/debugging.
@@ -70,6 +68,9 @@ message PluginConfig {
 
   // Filter/service configuration used to configure or reconfigure a plugin
   // (proxy_on_configuration).
+  // `google.protobuf.Struct` is serialized as JSON before
+  // passing it to the plugin. `google.protobuf.BytesValue` and
+  // `google.protobuf.StringValue` are passed directly without the wrapper.
   google.protobuf.Any configuration = 5;
 }
 
@@ -78,9 +79,6 @@ message PluginConfig {
 // create a Wasm Service.
 // [#not-implemented-hide:] pending implementation.
 message WasmService {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.wasm.v2alpha.WasmService";
-
   // General plugin configuration.
   PluginConfig config = 1;
 
