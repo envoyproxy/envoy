@@ -1409,6 +1409,16 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   EXPECT_FALSE(response_headers.has("proxy-connection"));
 }
 
+// maybeNormalizePath() returns true with an empty path.
+TEST_F(ConnectionManagerUtilityTest, SanitizeEmptyPath) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
+  TestRequestHeaderMapImpl original_headers;
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  EXPECT_TRUE(ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  EXPECT_EQ(original_headers, header_map);
+}
+
 // maybeNormalizePath() does nothing by default.
 TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
