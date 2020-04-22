@@ -370,12 +370,11 @@ TEST_P(CodecNetworkTest, SendData) {
   const std::string full_data = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n";
   Buffer::OwnedImpl data(full_data);
   upstream_connection_->write(data, false);
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        EXPECT_EQ(full_data, data.toString());
-        dispatcher_->exit();
-        return Http::okStatus();
-      }));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    EXPECT_EQ(full_data, data.toString());
+    dispatcher_->exit();
+    return Http::okStatus();
+  }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_CALL(inner_encoder_.stream_, resetStream(_));
