@@ -89,10 +89,9 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
   // Make sure that performing the redirect won't result in exceeding the configured number of
   // redirects allowed for this route.
   if (!filter_state->hasData<StreamInfo::UInt32Accessor>(NumInternalRedirectsFilterStateName)) {
-    filter_state->setData(NumInternalRedirectsFilterStateName,
-                          std::make_shared<StreamInfo::UInt32AccessorImpl>(0),
-                          StreamInfo::FilterState::StateType::Mutable,
-                          StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+    filter_state->setData(
+        NumInternalRedirectsFilterStateName, std::make_shared<StreamInfo::UInt32AccessorImpl>(0),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
   }
   StreamInfo::UInt32Accessor& num_internal_redirect =
       filter_state->getDataMutable<StreamInfo::UInt32Accessor>(NumInternalRedirectsFilterStateName);
