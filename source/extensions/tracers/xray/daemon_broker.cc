@@ -36,9 +36,11 @@ void DaemonBrokerImpl::send(const std::string& data) const {
   constexpr auto version = 1;
   constexpr auto format = "json";
   const std::string payload = absl::StrCat(createHeader(format, version), "\n", data);
-  Buffer::OwnedImpl buf(payload);
-  const auto rc =
-      Network::Utility::writeToSocket(*io_handle_, buf, nullptr /*local_ip*/, *address_);
+  Buffer::RawSlice buf;
+  buf.mem_ = const_cast<char*>(payload.data());
+  buf.len_ = payload.length();
+  const auto rc = Network::Utility::writeToSocket(*io_handle_, &buf, 1 /*num_slices*/,
+                                                  nullptr /*local_ip*/, *address_);
 
   if (rc.rc_ != payload.length()) {
     // TODO(marcomagdy): report this in stats
