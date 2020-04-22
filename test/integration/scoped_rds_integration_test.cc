@@ -7,12 +7,12 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/config/api_version.h"
-#include "common/config/resources.h"
 #include "common/config/version_converter.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/resources.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

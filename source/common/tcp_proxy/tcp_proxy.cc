@@ -28,21 +28,6 @@
 
 namespace Envoy {
 namespace TcpProxy {
-namespace {
-
-Tcp::ConnectionPool::PoolFailureReason
-httpToTcpFailure(Http::ConnectionPool::PoolFailureReason reason) {
-  switch (reason) {
-  case Http::ConnectionPool::PoolFailureReason::Overflow:
-    return Tcp::ConnectionPool::PoolFailureReason::Overflow;
-  case Http::ConnectionPool::PoolFailureReason::ConnectionFailure:
-    // TODO(alyssawilk) It's unclear which this is.
-    return Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure;
-  }
-  return Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure;
-}
-
-} // namespace
 
 const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
@@ -464,7 +449,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   return Network::FilterStatus::StopIteration;
 }
 
-void Filter::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
+void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                            Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_.reset();
 
@@ -472,16 +457,16 @@ void Filter::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
   getStreamInfo().onUpstreamHostSelected(host);
 
   switch (reason) {
-  case Tcp::ConnectionPool::PoolFailureReason::Overflow:
-  case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+  case ConnectionPool::PoolFailureReason::Overflow:
+  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
     break;
 
-  case Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
     break;
 
-  case Tcp::ConnectionPool::PoolFailureReason::Timeout:
+  case ConnectionPool::PoolFailureReason::Timeout:
     onConnectTimeout();
     break;
 
@@ -514,9 +499,9 @@ void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
       latched_data->connection().streamInfo().filterState());
 }
 
-void Filter::onPoolFailure(Http::ConnectionPool::PoolFailureReason failure, absl::string_view,
+void Filter::onPoolFailure(ConnectionPool::PoolFailureReason failure, absl::string_view,
                            Upstream::HostDescriptionConstSharedPtr host) {
-  onPoolFailure(httpToTcpFailure(failure), host);
+  onPoolFailure(failure, host);
 }
 
 void Filter::onPoolReady(Http::RequestEncoder& request_encoder,

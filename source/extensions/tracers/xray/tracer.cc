@@ -11,6 +11,7 @@
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/protobuf/message_validator_impl.h"
+#include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "source/extensions/tracers/xray/daemon.pb.validate.h"
@@ -76,17 +77,25 @@ void Span::finishSpan() {
   s.set_end_time(
       time_point_cast<SecondsWithFraction>(time_source_.systemTime()).time_since_epoch().count());
   s.set_parent_id(parentId());
+
+  // HTTP annotations
+  using StructField = Protobuf::MapPair<std::string, ProtobufWkt::Value>;
+
+  ProtobufWkt::Struct* request = s.mutable_http()->mutable_request();
+  auto* request_fields = request->mutable_fields();
+  for (const auto& field : http_request_annotations_) {
+    request_fields->insert(StructField{field.first, field.second});
+  }
+
+  ProtobufWkt::Struct* response = s.mutable_http()->mutable_response();
+  auto* response_fields = response->mutable_fields();
+  for (const auto& field : http_response_annotations_) {
+    response_fields->insert(StructField{field.first, field.second});
+  }
+
   using KeyValue = Protobuf::Map<std::string, std::string>::value_type;
   for (const auto& item : custom_annotations_) {
     s.mutable_annotations()->insert(KeyValue{item.first, item.second});
-  }
-
-  for (const auto& item : http_request_annotations_) {
-    s.mutable_http()->mutable_request()->insert(KeyValue{item.first, item.second});
-  }
-
-  for (const auto& item : http_response_annotations_) {
-    s.mutable_http()->mutable_response()->insert(KeyValue{item.first, item.second});
   }
 
   const std::string json = MessageUtil::getJsonStringFromMessage(
@@ -179,20 +188,30 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   }
 
   if (name == HttpUrl) {
-    http_request_annotations_.emplace(SpanUrl, value);
+    http_request_annotations_.emplace(SpanUrl, ValueUtil::stringValue(std::string(value)));
   } else if (name == HttpMethod) {
-    http_request_annotations_.emplace(SpanMethod, value);
+    http_request_annotations_.emplace(SpanMethod, ValueUtil::stringValue(std::string(value)));
   } else if (name == HttpUserAgent) {
-    http_request_annotations_.emplace(SpanUserAgent, value);
+    http_request_annotations_.emplace(SpanUserAgent, ValueUtil::stringValue(std::string(value)));
   } else if (name == HttpStatusCode) {
-    http_response_annotations_.emplace(SpanStatus, value);
+    uint64_t status_code;
+    if (!absl::SimpleAtoi(value, &status_code)) {
+      ENVOY_LOG(debug, "{} must be a number, given: {}", HttpStatusCode, value);
+      return;
+    }
+    http_response_annotations_.emplace(SpanStatus, ValueUtil::numberValue(status_code));
   } else if (name == HttpResponseSize) {
-    http_response_annotations_.emplace(SpanContentLength, value);
+    uint64_t response_size;
+    if (!absl::SimpleAtoi(value, &response_size)) {
+      ENVOY_LOG(debug, "{} must be a number, given: {}", HttpResponseSize, value);
+      return;
+    }
+    http_response_annotations_.emplace(SpanContentLength, ValueUtil::numberValue(response_size));
   } else if (name == PeerAddress) {
-    http_request_annotations_.emplace(SpanClientIp, value);
+    http_request_annotations_.emplace(SpanClientIp, ValueUtil::stringValue(std::string(value)));
     // In this case, PeerAddress refers to the client's actual IP address, not
     // the address specified in the the HTTP X-Forwarded-For header.
-    http_request_annotations_.emplace(SpanXForwardedFor, "false");
+    http_request_annotations_.emplace(SpanXForwardedFor, ValueUtil::boolValue(false));
   } else {
     custom_annotations_.emplace(name, value);
   }
