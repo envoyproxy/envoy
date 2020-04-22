@@ -11,7 +11,7 @@ import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/health_check.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
-import "envoy/extensions/transport_sockets/tls/v3/cert.proto";
+import "envoy/extensions/transport_sockets/tls/v3/tls.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/any.proto";
