@@ -81,25 +81,11 @@ EXTENSIONS = {
     "envoy.filters.network.ext_authz": "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.http_connection_manager": "//source/extensions/filters/network/http_connection_manager:config",
     # WiP
-<<<<<<< HEAD
-    "envoy.filters.network.kafka_broker":               "//source/extensions/filters/network/kafka:kafka_broker_config_lib",
-    "envoy.filters.network.local_ratelimit":            "//source/extensions/filters/network/local_ratelimit:config",
-    "envoy.filters.network.mongo_proxy":                "//source/extensions/filters/network/mongo_proxy:config",
-    "envoy.filters.network.mysql_proxy":                "//source/extensions/filters/network/mysql_proxy:config",
-    "envoy.filters.network.postgres_proxy":             "//source/extensions/filters/network/postgres_proxy:config",
-    "envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
-    "envoy.filters.network.rbac":                       "//source/extensions/filters/network/rbac:config",
-    "envoy.filters.network.redis_proxy":                "//source/extensions/filters/network/redis_proxy:config",
-    "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
-    "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
-    "envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
-    "envoy.filters.network.sni_dynamic_forward_proxy":  "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
-    "envoy.filters.network.zookeeper_proxy":            "//source/extensions/filters/network/zookeeper_proxy:config",
-=======
     "envoy.filters.network.kafka_broker": "//source/extensions/filters/network/kafka:kafka_broker_config_lib",
     "envoy.filters.network.local_ratelimit": "//source/extensions/filters/network/local_ratelimit:config",
     "envoy.filters.network.mongo_proxy": "//source/extensions/filters/network/mongo_proxy:config",
     "envoy.filters.network.mysql_proxy": "//source/extensions/filters/network/mysql_proxy:config",
+    "envoy.filters.network.postgres_proxy": "//source/extensions/filters/network/postgres_proxy:config",
     "envoy.filters.network.ratelimit": "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.rbac": "//source/extensions/filters/network/rbac:config",
     "envoy.filters.network.redis_proxy": "//source/extensions/filters/network/redis_proxy:config",
@@ -108,8 +94,6 @@ EXTENSIONS = {
     "envoy.filters.network.sni_cluster": "//source/extensions/filters/network/sni_cluster:config",
     "envoy.filters.network.sni_dynamic_forward_proxy": "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
     "envoy.filters.network.zookeeper_proxy": "//source/extensions/filters/network/zookeeper_proxy:config",
->>>>>>> cdc5e08ee... Implemented two initial internal redirect predicates: previous_routes
-
     #
     # UDP filters
     #
@@ -177,8 +161,6 @@ EXTENSIONS = {
     "envoy.internal_redirect_predicates.previous_routes": "//source/extensions/internal_redirect/previous_routes:config",
     "envoy.internal_redirect_predicates.whitelisted_routes": "//source/extensions/internal_redirect/whitelisted_routes:config",
 }
-<<<<<<< HEAD
-=======
 
 WINDOWS_EXTENSIONS = {
     #
@@ -346,4 +328,3 @@ WINDOWS_EXTENSIONS = {
     "envoy.internal_redirect_predicates.previous_routes": "//source/extensions/internal_redirect/previous_routes:config",
     "envoy.internal_redirect_predicates.whitelisted_routes": "//source/extensions/internal_redirect/whitelisted_routes:config",
 }
->>>>>>> cdc5e08ee... Implemented two initial internal redirect predicates: previous_routes

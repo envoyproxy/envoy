@@ -40,7 +40,7 @@ bool PreviousRoutesPredicate::acceptTargetRoute(StreamInfo::FilterState& filter_
   if (!filter_state.hasData<PreviousRoutesPredicateState>(filter_state_name)) {
     filter_state.setData(filter_state_name, std::make_unique<PreviousRoutesPredicateState>(),
                          StreamInfo::FilterState::StateType::Mutable,
-                         StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+                         StreamInfo::FilterState::LifeSpan::Request);
   }
   auto& predicate_state =
       filter_state.getDataMutable<PreviousRoutesPredicateState>(filter_state_name);
