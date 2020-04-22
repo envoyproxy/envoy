@@ -47,6 +47,10 @@ namespace {
 
 const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
+const absl::string_view getPath(const Http::RequestHeaderMap& headers) {
+  return headers.Path() ? headers.Path()->value().getStringView() : "";
+}
+
 } // namespace
 
 std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
@@ -490,12 +494,6 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
                                     uint64_t random_value) const {
   bool matches = true;
 
-  // TODO(mattklein123): Currently all match types require a path header. When we support CONNECT
-  // we will need to figure out how to safely relax this.
-  if (headers.Path() == nullptr) {
-    return false;
-  }
-
   matches &= evaluateRuntimeMatch(random_value);
   if (!matches) {
     // No need to waste further cycles calculating a route match.
@@ -503,13 +501,12 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
   }
 
   if (match_grpc_) {
-    matches &= Grpc::Common::hasGrpcContentType(headers);
+    matches &= Grpc::Common::isGrpcRequestHeaders(headers);
   }
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
   if (!config_query_parameters_.empty()) {
-    Http::Utility::QueryParams query_parameters =
-        Http::Utility::parseQueryString(headers.Path()->value().getStringView());
+    Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(getPath(headers));
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
   }
 
@@ -600,7 +597,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
     return;
   }
 
-  std::string path(headers.Path()->value().getStringView());
+  std::string path(getPath(headers));
   if (insert_envoy_original_path) {
     headers.setEnvoyOriginalPath(path);
   }
@@ -693,8 +690,7 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   if (!path_redirect_.empty()) {
     final_path = path_redirect_.c_str();
   } else {
-    ASSERT(headers.Path());
-    final_path = headers.Path()->value().getStringView();
+    final_path = getPath(headers);
     if (strip_query_) {
       size_t path_end = final_path.find("?");
       if (path_end != absl::string_view::npos) {
@@ -939,7 +935,7 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& 
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(headers.Path()->value().getStringView())) {
+      path_matcher_->match(getPath(headers))) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -961,7 +957,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& he
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(headers.Path()->value().getStringView())) {
+      path_matcher_->match(getPath(headers))) {
     return clusterEntry(headers, random_value);
   }
 
@@ -989,8 +985,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                             bool insert_envoy_original_path) const {
-  const absl::string_view path =
-      Http::PathUtil::removeQueryAndFragment(headers.Path()->value().getStringView());
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(getPath(headers));
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
   // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
   ASSERT(regex_->match(path));
@@ -1001,8 +996,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    const absl::string_view path =
-        Http::PathUtil::removeQueryAndFragment(headers.Path()->value().getStringView());
+    const absl::string_view path = Http::PathUtil::removeQueryAndFragment(getPath(headers));
     if (regex_->match(path)) {
       return clusterEntry(headers, random_value);
     }
@@ -1211,6 +1205,10 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::RequestHead
 
   // Check for a route that matches the request.
   for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
+    if (!headers.Path()) {
+      // TODO(alyssawilk) allow specifically for kConnectMatcher routes.
+      return nullptr;
+    }
     RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
     if (nullptr != route_entry) {
       return route_entry;

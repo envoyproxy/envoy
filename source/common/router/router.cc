@@ -68,6 +68,9 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
   if (internal_redirect.value().getStringView().length() == 0) {
     return false;
   }
+  if (!downstream_headers.Path()) {
+    return false;
+  }
 
   Http::Utility::Url absolute_url;
   if (!absolute_url.initialize(internal_redirect.value().getStringView(), false)) {
@@ -128,6 +131,10 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
 }
 
 constexpr uint64_t TimeoutPrecisionFactor = 100;
+
+const absl::string_view getPath(const Http::RequestHeaderMap& headers) {
+  return headers.Path() ? headers.Path()->value().getStringView() : "";
+}
 
 } // namespace
 
@@ -396,7 +403,6 @@ void Filter::chargeUpstreamCode(Http::Code code,
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
   // These get stripped by HTTP/1 codec where applicable.
-  ASSERT(headers.Path());
   ASSERT(headers.Method());
   ASSERT(headers.Host());
 
@@ -412,7 +418,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           : nullptr;
 
   // TODO: Maybe add a filter API for this.
-  grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+  grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
   // that get handled by earlier filters.
@@ -427,8 +433,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   route_ = callbacks_->route();
   if (!route_) {
     config_.stats_.no_route_.inc();
-    ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_,
-                     headers.Path()->value().getStringView());
+    ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_, getPath(headers));
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     callbacks_->sendLocalReply(Http::Code::NotFound, "", modify_headers, absl::nullopt,
@@ -445,7 +450,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         direct_response->responseCode(), direct_response->responseBody(),
         [this, direct_response,
          &request_headers = headers](Http::ResponseHeaderMap& response_headers) -> void {
-          const auto new_path = direct_response->newPath(request_headers);
+          std::string new_path;
+          if (request_headers.Path()) {
+            new_path = direct_response->newPath(request_headers);
+          }
           // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
           const auto add_location =
               direct_response->responseCode() == Http::Code::Created ||
@@ -490,7 +498,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
-                   route_entry_->clusterName(), headers.Path()->value().getStringView());
+                   route_entry_->clusterName(), getPath(headers));
 
   if (config_.strict_check_headers_ != nullptr) {
     for (const auto& header : *config_.strict_check_headers_) {
