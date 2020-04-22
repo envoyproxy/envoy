@@ -60,8 +60,7 @@ public:
 
   static void mutateResponseHeaders(ResponseHeaderMap& response_headers,
                                     const RequestHeaderMap* request_headers,
-                                    const RequestIDExtensionSharedPtr& rid_extension,
-                                    const std::string& via);
+                                    ConnectionManagerConfig& config, const std::string& via);
 
   // Sanitize the path in the header map if the path exists and it is forced by config.
   // Side affect: the string view of Path header is invalidated.

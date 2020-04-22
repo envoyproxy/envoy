@@ -103,6 +103,7 @@ public:
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() const override { return true; }
   bool preserveExternalRequestId() const override { return false; }
+  bool alwaysSetRequestIdInResponse() const override { return false; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }

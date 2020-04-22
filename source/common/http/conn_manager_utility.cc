@@ -363,9 +363,10 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
   }
 }
 
-void ConnectionManagerUtility::mutateResponseHeaders(
-    ResponseHeaderMap& response_headers, const RequestHeaderMap* request_headers,
-    const RequestIDExtensionSharedPtr& rid_extension, const std::string& via) {
+void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
+                                                     const RequestHeaderMap* request_headers,
+                                                     ConnectionManagerConfig& config,
+                                                     const std::string& via) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.
@@ -391,8 +392,9 @@ void ConnectionManagerUtility::mutateResponseHeaders(
 
   response_headers.removeTransferEncoding();
 
-  if (request_headers != nullptr && request_headers->EnvoyForceTrace()) {
-    rid_extension->setInResponse(response_headers, *request_headers);
+  if (request_headers != nullptr &&
+      (config.alwaysSetRequestIdInResponse() || request_headers->EnvoyForceTrace())) {
+    config.requestIDExtension()->setInResponse(response_headers, *request_headers);
   }
   response_headers.removeKeepAlive();
   response_headers.removeProxyConnection();

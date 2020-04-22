@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
@@ -432,6 +432,11 @@ message HttpConnectionManager {
   // (Edge request is the request from external clients to front Envoy) and not reset it, which
   // is the current Envoy behaviour. This defaults to false.
   bool preserve_external_request_id = 32;
+
+  // If set, Envoy will always set :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` header in response.
+  // If this is false or not set, the request ID is returned in responses only if tracing is forced using
+  // :ref:`x-envoy-force-trace <config_http_conn_man_headers_x-envoy-force-trace>` header.
+  bool always_set_request_id_in_response = 37;
 
   // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
   // header.
