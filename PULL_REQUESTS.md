@@ -22,9 +22,9 @@ describe what the original issue is and how the change resolves it. If it is
 configuration controlled, it should note how the feature is enabled etc...
 
 
-### <a name="desc"></a>Detailed Description
+### <a name="desc"></a>Additional Description
 
-The description field should include additional information of what this PR does
+The additional description field should include information of what this PR does
 that may be out of scope for a commit message. This could include additional
 information or context useful to reviewers.
 
