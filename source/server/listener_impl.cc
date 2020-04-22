@@ -16,6 +16,7 @@
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
@@ -286,7 +287,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
+      listener_tag_(origin.listener_tag_), name_(name), added_via_api_(added_via_api),
       workers_started_(workers_started), hash_(hash),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
@@ -629,6 +630,11 @@ void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr&
 
 bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
                                             bool worker_started) {
+  // if (!Runtime::runtimeFeatureEnabled(
+  //         "envoy.reloadable_features.listener_in_place_filterchain_update")) {
+  //   return false;
+  // }
+
   // The in place update execution flow is to replace the active listener. worker_started is the
   // sufficient condition and is very close to the necessary condition.
   if (!worker_started) {

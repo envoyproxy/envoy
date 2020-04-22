@@ -78,6 +78,7 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
+    "envoy.reloadable_features.listener_in_place_filterchain_update",
 };
 
 RuntimeFeatures::RuntimeFeatures() {
