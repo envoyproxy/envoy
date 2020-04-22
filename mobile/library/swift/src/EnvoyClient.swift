@@ -42,7 +42,7 @@ public final class EnvoyClient: NSObject {
 }
 
 extension EnvoyClient: HTTPClient {
-  public func send(_ request: Request, handler: ResponseHandler) -> StreamEmitter {
+  public func start(_ request: Request, handler: ResponseHandler) -> StreamEmitter {
     let httpStream = self.engine.startStream(with: handler.underlyingCallbacks)
     httpStream.sendHeaders(request.outboundHeaders(), close: false)
     return EnvoyStreamEmitter(stream: httpStream)
@@ -50,15 +50,21 @@ extension EnvoyClient: HTTPClient {
 
   @discardableResult
   public func send(_ request: Request, body: Data?,
-                   trailers: [String: [String]] = [:], handler: ResponseHandler)
+                   trailers: [String: [String]]?, handler: ResponseHandler)
     -> CancelableStream
   {
-    let emitter = self.send(request, handler: handler)
-    if let body = body {
-      emitter.sendData(body)
+    let httpStream = self.engine.startStream(with: handler.underlyingCallbacks)
+    if let body = body, let trailers = trailers { // Close with trailers
+      httpStream.sendHeaders(request.outboundHeaders(), close: false)
+      httpStream.send(body, close: false)
+      httpStream.sendTrailers(trailers)
+    } else if let body = body { // Close with data
+      httpStream.sendHeaders(request.outboundHeaders(), close: false)
+      httpStream.send(body, close: true)
+    } else { // Close with headers-only
+      httpStream.sendHeaders(request.outboundHeaders(), close: true)
     }
 
-    emitter.close(trailers: trailers)
-    return emitter
+    return EnvoyStreamEmitter(stream: httpStream)
   }
 }

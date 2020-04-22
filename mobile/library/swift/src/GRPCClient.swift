@@ -12,14 +12,14 @@ public final class GRPCClient: NSObject {
     self.httpClient = httpClient
   }
 
-  /// Send a gRPC request with the provided handler.
+  /// Start a gRPC request with the provided handler.
   ///
   /// - parameter request: The outbound gRPC request. See `GRPCRequestBuilder` for creation.
   /// - parameter handler: Handler for receiving responses.
   ///
   /// - returns: An emitter that can be used for sending more traffic over the stream.
-  public func send(_ request: Request, handler: GRPCResponseHandler) -> GRPCStreamEmitter {
-    let emitter = self.httpClient.send(request, handler: handler.underlyingHandler)
+  public func start(_ request: Request, handler: GRPCResponseHandler) -> GRPCStreamEmitter {
+    let emitter = self.httpClient.start(request, handler: handler.underlyingHandler)
     return GRPCStreamEmitter(emitter: emitter)
   }
 }

@@ -4,32 +4,25 @@ import java.nio.ByteBuffer
 
 interface HTTPClient {
   /**
-   * For starting a stream.
+   * Start a new stream.
    *
-   * @param request the request for opening a stream.
-   * @param responseHandler the callback for receiving stream events.
-   * @return the emitter for streaming data outward.
+   * @param request The request headers for opening a stream.
+   * @param responseHandler Handler for receiving stream events.
+   * @return Emitter for sending streaming data outward.
    */
-  fun send(request: Request, responseHandler: ResponseHandler): StreamEmitter
+  fun start(request: Request, responseHandler: ResponseHandler): StreamEmitter
 
   /**
-   * Convenience function for sending a unary request.
+   * Send a unary (non-streamed) request.
+   * Close with headers-only: Pass a nil body and nil trailers.
+   * Close with data:         Pass a body and nil trailers.
+   * Close with trailers:     Pass non-nil trailers.
    *
-   * @param request  The request to send.
-   * @param body Serialized data to send as the body of the request.
+   * @param request  The request headers to send.
+   * @param body Data to send as the body.
    * @param trailers Trailers to send with the request.
-   * @param responseHandler the callback for receiving stream events.
-   * @return CancelableStream, a cancelable request.
+   * @param responseHandler Handler for receiving response events.
+   * @return A cancelable request.
    */
-  fun send(request: Request, body: ByteBuffer?, trailers: Map<String, List<String>>, responseHandler: ResponseHandler): CancelableStream
-
-  /**
-   * Convenience function for sending a unary request.
-   *
-   * @param request The request to send.
-   * @param body Serialized data to send as the body of the request.
-   * @param responseHandler the callback for receiving stream events.
-   * @return CancelableStream, a cancelable request.
-   */
-  fun send(request: Request, body: ByteBuffer?, responseHandler: ResponseHandler): CancelableStream
+  fun send(request: Request, body: ByteBuffer?, trailers: Map<String, List<String>>?, responseHandler: ResponseHandler): CancelableStream
 }
