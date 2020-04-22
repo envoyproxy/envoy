@@ -1,5 +1,3 @@
-#include <pthread.h>
-
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
