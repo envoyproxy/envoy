@@ -30,6 +30,8 @@ const Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
     AsyncStreamImpl::RouteEntryImpl::typed_metadata_({});
 const AsyncStreamImpl::NullPathMatchCriterion
     AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
+const absl::optional<envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig>
+    AsyncStreamImpl::RouteEntryImpl::connect_config_nullopt_;
 const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
