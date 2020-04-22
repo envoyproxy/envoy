@@ -112,11 +112,6 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
 
 constexpr uint64_t TimeoutPrecisionFactor = 100;
 
-bool shouldTcpProxy(Http::RequestHeaderMap& headers, const RouteEntry* route_entry) {
-  return route_entry->connectConfig().has_value() &&
-         headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect;
-}
-
 Http::ConnectionPool::Instance*
 httpPool(absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*> pool) {
   return absl::get<Http::ConnectionPool::Instance*>(pool);
@@ -555,24 +550,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*> conn_pool;
   Upstream::HostDescriptionConstSharedPtr host;
-  bool should_tcp_proxy = shouldTcpProxy(*downstream_headers_, route_entry_);
-
-  if (!should_tcp_proxy) {
-    conn_pool = getHttpConnPool();
-    if (httpPool(conn_pool)) {
-      host = httpPool(conn_pool)->host();
-    }
-  } else {
-    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        *callbacks_->streamInfo().filterState());
-    conn_pool = config_.cm_.tcpConnPoolForCluster(route_entry_->clusterName(),
-                                                  Upstream::ResourcePriority::Default, this);
-    if (tcpPool(conn_pool)) {
-      host = tcpPool(conn_pool)->host();
-    }
-  }
+  Filter::HttpOrTcpPool conn_pool = createConnPool(host);
 
   if (!host) {
     sendNoHealthyUpstreamResponse();
@@ -664,14 +643,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
-  UpstreamRequestPtr upstream_request;
-  if (!should_tcp_proxy) {
-    upstream_request = std::make_unique<UpstreamRequest>(
-        *this, std::make_unique<HttpConnPool>(*httpPool(conn_pool)));
-  } else {
-    upstream_request =
-        std::make_unique<UpstreamRequest>(*this, std::make_unique<TcpConnPool>(tcpPool(conn_pool)));
-  }
+  UpstreamRequestPtr upstream_request = createUpstreamRequest(conn_pool);
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
@@ -679,6 +651,38 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   return Http::FilterHeadersStatus::StopIteration;
+}
+
+Filter::HttpOrTcpPool Filter::createConnPool(Upstream::HostDescriptionConstSharedPtr& host) {
+  Filter::HttpOrTcpPool conn_pool;
+  bool should_tcp_proxy = route_entry_->connectConfig().has_value() &&
+                          downstream_headers_->Method()->value().getStringView() ==
+                              Http::Headers::get().MethodValues.Connect;
+
+  if (!should_tcp_proxy) {
+    conn_pool = getHttpConnPool();
+    if (httpPool(conn_pool)) {
+      host = httpPool(conn_pool)->host();
+    }
+  } else {
+    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+        *callbacks_->streamInfo().filterState());
+    conn_pool = config_.cm_.tcpConnPoolForCluster(route_entry_->clusterName(),
+                                                  Upstream::ResourcePriority::Default, this);
+    if (tcpPool(conn_pool)) {
+      host = tcpPool(conn_pool)->host();
+    }
+  }
+  return conn_pool;
+}
+
+UpstreamRequestPtr Filter::createUpstreamRequest(Filter::HttpOrTcpPool conn_pool) {
+  if (absl::holds_alternative<Http::ConnectionPool::Instance*>(conn_pool)) {
+    return std::make_unique<UpstreamRequest>(*this,
+                                             std::make_unique<HttpConnPool>(*httpPool(conn_pool)));
+  }
+  return std::make_unique<UpstreamRequest>(*this,
+                                           std::make_unique<TcpConnPool>(tcpPool(conn_pool)));
 }
 
 Http::ConnectionPool::Instance* Filter::getHttpConnPool() {
@@ -1479,30 +1483,15 @@ void Filter::doRetry() {
   attempt_count_++;
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
-  UpstreamRequestPtr upstream_request;
 
-  if (!shouldTcpProxy(*downstream_headers_, route_entry_)) {
-    Http::ConnectionPool::Instance* conn_pool = getHttpConnPool();
-    if (conn_pool) {
-      upstream_request =
-          std::make_unique<UpstreamRequest>(*this, std::make_unique<HttpConnPool>(*conn_pool));
-    }
-  } else {
-    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        *callbacks_->streamInfo().filterState());
-    Tcp::ConnectionPool::Instance* conn_pool = config_.cm_.tcpConnPoolForCluster(
-        route_entry_->clusterName(), Upstream::ResourcePriority::Default, this);
-    if (conn_pool) {
-      upstream_request =
-          std::make_unique<UpstreamRequest>(*this, std::make_unique<TcpConnPool>(conn_pool));
-    }
-  }
-
-  if (!upstream_request) {
+  Upstream::HostDescriptionConstSharedPtr host;
+  Filter::HttpOrTcpPool conn_pool = createConnPool(host);
+  if (!host) {
     sendNoHealthyUpstreamResponse();
     cleanup();
     return;
   }
+  UpstreamRequestPtr upstream_request = createUpstreamRequest(conn_pool);
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);

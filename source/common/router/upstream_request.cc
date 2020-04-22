@@ -552,9 +552,6 @@ void TcpUpstream::resetStream() {
 }
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
-  if (!upstream_request_) {
-    return;
-  }
   if (!sent_headers_) {
     Http::ResponseHeaderMapPtr headers{
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>({{Http::Headers::get().Status, "200"}})};
