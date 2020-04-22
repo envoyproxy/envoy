@@ -37,8 +37,6 @@ public:
   }
 
 private:
-  friend class GzipTest;
-
   static ZlibCompressorImpl::CompressionLevel
   compressionLevelEnum(envoy::extensions::compression::gzip::compressor::v3::Gzip::CompressionLevel
                            compression_level);
