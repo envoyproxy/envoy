@@ -1597,9 +1597,11 @@ message InternalRedirectPolicy {
 
   // An internal redirect is handled, iff the number of previous internal redirects that a
   // downstream request has encountered is lower than this value, and
-  // :ref:`internal_redirect_action <envoy_api_field_config.route.v3.InternalRedirectPolicy.internal_redirect_action>`
+  // :ref:`internal_redirect_action
+  // <envoy_api_field_config.route.v3.InternalRedirectPolicy.internal_redirect_action>`
   // is set to
-  // :ref:`HANDLE_INTERNAL_REDIRECT <envoy_api_enum_value_config.route.v3.InternalRedirectPolicy.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
+  // :ref:`HANDLE_INTERNAL_REDIRECT
+  // <envoy_api_enum_value_config.route.v3.InternalRedirectPolicy.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
   // In the case where a downstream request is bounced among multiple routes by internal redirect,
   // the first route that hits this threshold, or has
   // :ref:`internal_redirect_action
@@ -1614,15 +1616,19 @@ message InternalRedirectPolicy {
 
   // Defines what upstream response codes can trigger the internal redirect
   // behavior. This is ignored unless
-  // :ref:`internal_redirect_action <envoy_api_field_config.route.v3.InternalRedirectPolicy.internal_redirect_action>`
+  // :ref:`internal_redirect_action
+  // <envoy_api_field_config.route.v3.InternalRedirectPolicy.internal_redirect_action>`
   // is set to
-  // :ref:`HANDLE_INTERNAL_REDIRECT <envoy_api_enum_value_config.route.v3.InternalRedirectPolicy.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
+  // :ref:`HANDLE_INTERNAL_REDIRECT
+  // <envoy_api_enum_value_config.route.v3.InternalRedirectPolicy.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
   repeated uint32 redirect_response_codes = 3;
 
-  // Specifies a list of predicates that is queries when an upstream response is deemed to be able to trigger an internal redirect by all other criterias.
-  // Any predicate in the list can reject the redirect.
+  // Specifies a list of predicates that is queries when an upstream response is deemed to be able
+  // to trigger an internal redirect by all other criterias. Any predicate in the list can reject
+  // the redirect.
   repeated Predicate predicates = 4;
 
-  // Specifies what combinations of dowstream and redirect target scheme is allowed to trigger an internal redirect
+  // Specifies what combinations of dowstream and redirect target scheme is allowed to trigger an
+  // internal redirect.
   repeated DownstreamAndRedirectTargetSchemePair allowed_downstream_and_target_scheme_pairs = 5;
 }

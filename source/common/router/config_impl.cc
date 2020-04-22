@@ -178,10 +178,10 @@ bool InternalRedirectPolicyImpl::isDownstreamAndRedirectTargetSchemePairAllowed(
 bool InternalRedirectPolicyImpl::internalRedirectEnabled(
     const envoy::config::route::v3::InternalRedirectPolicy& policy_config) const {
   switch (policy_config.internal_redirect_action()) {
-  case envoy::config::route::v3::InternalRedirectPolicy::PASS_THROUGH_INTERNAL_REDIRECT:
-    return false;
   case envoy::config::route::v3::InternalRedirectPolicy::HANDLE_INTERNAL_REDIRECT:
     return true;
+  case envoy::config::route::v3::InternalRedirectPolicy::PASS_THROUGH_INTERNAL_REDIRECT:
+    return false;
   default:
     return false;
   }

@@ -158,24 +158,26 @@ and returning the redirected response as the response to the original request.
 Internal redirects are configured via the ref:`internal redirect policy
 <envoy_api_field_route.RouteAction.internal_redirect_policy>` field in route configuration.
 When redirect handling is on, any 3xx response from upstream, that matches
-ref:`redirect_response_codes <envoy_api_field_route.InternalRedirectPolicy.redirect_response_code>`
+ref:`redirect_response_codes <envoy_api_field_route.InternalRedirectPolicy.redirect_response_codes>`
 is subject to the redirect being handled by Envoy.
 
 For a redirect to be handled successfully it must pass the following checks:
 
 1. Have a response code matching one of ref:`redirect_response_codes
-   <envoy_api_field_route.InternalRedirectPolicy.redirect_response_code>`
+   <envoy_api_field_route.InternalRedirectPolicy.redirect_response_codes>`
 2. Have a *location* header with a valid, fully qualified URL matching the scheme of the original
    request.
 3. The request must have been fully processed by Envoy.
 4. The request must not have a body.
-5. The number of previously handled internal redirect within a given downstream request does not
+5. The scheme pair of the downstream request and the *location* header is allowed by
+   `allowed downstream and target scheme pair
+   <envoy_api_field_route.InternalRedirectPolicy.allowed_downstream_and_target_scheme_pair>`
+6. The number of previously handled internal redirect within a given downstream request does not
    exceed `max internal redirects
    <envoy_api_field_route.InternalRedirectPolicy.max_internal_redirects>`
    of the route that the request or redirected request is hitting.
-6. The scheme pair of the downstream request and the *location* header is allowed by
-   `allowed downstream and target scheme pair
-   <envoy_api_field_route.InternalRedirectPolicy.allowed_downstream_and_target_scheme_pair>`
+7. All ref:`predicates <envoy_api_field_route.InternalRedirectPolicy.predicates>` accept
+   the target route.
 
 Any failure will result in redirect being passed downstream instead.
 
@@ -190,11 +192,11 @@ Since a redirected request may be bounced between different routes, any route in
 
 will cause the redirect to be passed downstream.
 
-Two predicates can be used to create a DAG that defines redirect chains, the ref:`previous routes
+Two predicates can be used to create a DAG that defines the redirect chain, the ref:`previous routes
 <envoy_api_msg_extensions.internal_redirect.previous_routes.v3.PreviousRoutesConfig` predicate, and
 the ref:`whitelisted routes
 <envoy_api_msg_extensions.internal_redirect.whitelisted_routes.v3.WhitelistedRoutesConfig`.
-More specifically, the *whitelisted routes* predicate defines edges of individual node in the DAG
+Specifically, the *whitelisted routes* predicate defines edges of individual node in the DAG
 and the *previous routes* predicate defines "visited" state of the edges, so that loop can be avoided
 if so desired.
 

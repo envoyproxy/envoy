@@ -418,7 +418,7 @@ private:
   uint8_t compactSchemePair(bool downstream_is_https, bool target_is_https) const;
 
   const bool enabled_{false};
-  std::string current_route_name_;
+  const std::string current_route_name_;
   const absl::flat_hash_set<Http::Code> redirect_response_codes_;
   const uint32_t max_internal_redirects_{1};
   const absl::flat_hash_set<uint8_t> allowed_scheme_pairs_;

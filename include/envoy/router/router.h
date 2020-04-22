@@ -249,7 +249,7 @@ public:
   virtual bool enabled() const PURE;
 
   /**
-   * @return whether the given response_code should trigger a internal redirect on this route.
+   * @return whether the given response_code should trigger an internal redirect on this route.
    */
   virtual bool shouldRedirectForCode(const Http::Code& response_code) const PURE;
 
@@ -257,7 +257,7 @@ public:
    * Creates the target route predicates. This should really be called only once for each upstream
    * redirect response. Creating the predicates lazily to avoid wasting CPU cycles on non-redirect
    * responses, which should be the most common case.
-   * @return std::vector<InternalRedirectTargetRoutePredicateSharedPtr>.
+   * @return a vector of newly constructed InternalRedirectPredicate instances.
    */
   virtual std::vector<InternalRedirectPredicateSharedPtr> predicates() const PURE;
 
@@ -268,7 +268,7 @@ public:
 
   /**
    * @return if the pair of HTTP scheme from the downstream request and the target url is allowed
-   * for internal redirect.
+   *         for internal redirect.
    */
   virtual bool isDownstreamAndRedirectTargetSchemePairAllowed(bool downstream_is_https,
                                                               bool target_is_https) const PURE;
