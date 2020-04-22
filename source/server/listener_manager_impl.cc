@@ -718,7 +718,7 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
     // The warmed listener should be added first so that the worker will accept new connections
     // when it stops listening on the old listener.
     for (const auto& worker : workers_) {
-      addListenerToWorker(*worker, listenerTag(), listener, nullptr);
+      addListenerToWorker(*worker, listener.listenerTag(), listener, nullptr);
     }
     // Finish active_listeners_ transformation before calling `drainListener` as it depends on their
     // state.

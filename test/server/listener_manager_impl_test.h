@@ -15,6 +15,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
@@ -258,6 +259,14 @@ protected:
     envoy::admin::v3::ListenersConfigDump expected_listeners_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
+  }
+
+  ABSL_MUST_USE_RESULT
+  auto enableInplaceUpdateForThisTest() {
+    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.listener_in_place_filterchain_update", "true"}});
+    return scoped_runtime;
   }
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;

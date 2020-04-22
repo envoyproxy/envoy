@@ -630,10 +630,10 @@ void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr&
 
 bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
                                             bool worker_started) {
-  // if (!Runtime::runtimeFeatureEnabled(
-  //         "envoy.reloadable_features.listener_in_place_filterchain_update")) {
-  //   return false;
-  // }
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.listener_in_place_filterchain_update")) {
+    return false;
+  }
 
   // The in place update execution flow is to replace the active listener. worker_started is the
   // sufficient condition and is very close to the necessary condition.

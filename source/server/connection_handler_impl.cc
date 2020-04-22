@@ -67,9 +67,7 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
 void ConnectionHandlerImpl::removeFilterChains(
     uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
     std::function<void()> completion) {
-  // TODO(lambdai): Merge the optimistic path and the pessimistic path.
   for (auto& listener : listeners_) {
-    // Optimistic path: The listener tag provided by arg is not stale.
     if (listener.second.listener_->listenerTag() == listener_tag) {
       listener.second.tcp_listener_->get().deferredRemoveFilterChains(filter_chains);
       // Completion is deferred because the above removeFilterChains() may defer delete connection.
@@ -77,17 +75,7 @@ void ConnectionHandlerImpl::removeFilterChains(
       return;
     }
   }
-  // Fallback to iterate over all listeners. The reason is that the target listener might have began
-  // another update and the previous tag is lost.
-  // TODO(lambdai): Remove this once we decide to use the same listener tag during in place filter
-  // chain update.
-  for (auto& listener : listeners_) {
-    if (listener.second.tcp_listener_.has_value()) {
-      listener.second.tcp_listener_->get().deferredRemoveFilterChains(filter_chains);
-    }
-  }
-  // Completion is deferred because the above removeFilterChains() may defer delete connection.
-  Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {

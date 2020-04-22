@@ -213,6 +213,7 @@ envoy_cc_test_library(
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

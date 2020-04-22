@@ -798,6 +798,8 @@ static_listeners:
 }
 
 TEST_F(ListenerManagerImplTest, OverrideListener) {
+  auto feature_guard = enableInplaceUpdateForThisTest();
+
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
 
   auto* lds_api = new MockLdsApi();
@@ -4032,6 +4034,8 @@ api_listener:
 }
 
 TEST_F(ListenerManagerImplTest, StopInplaceWarmingListener) {
+  auto feature_guard = enableInplaceUpdateForThisTest();
+
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -4090,6 +4094,8 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplTest, RemoveInplaceUpdatingListener) {
+  auto feature_guard = enableInplaceUpdateForThisTest();
+
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -4155,6 +4161,7 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplTest, UpdateInplaceWarmingListener) {
+  auto feature_guard = enableInplaceUpdateForThisTest();
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -4214,6 +4221,8 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplTest, DrainageDuringInplaceUpdate) {
+  auto feature_guard = enableInplaceUpdateForThisTest();
+
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
