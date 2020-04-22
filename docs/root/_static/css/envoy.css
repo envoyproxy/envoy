@@ -9,3 +9,8 @@
 table.docutils div.line-block {
     margin-left: 0;
 }
+/* Breaking long words */
+.wy-nav-content {
+  overflow-wrap: break-word;
+  max-width: 1000px;
+}
