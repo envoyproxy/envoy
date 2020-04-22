@@ -87,6 +87,14 @@ public:
   const envoy::config::route::v3::RouteConfiguration config_;
 };
 
+Http::TestRequestHeaderMapImpl genPathlessHeaders(const std::string& host,
+                                                  const std::string& method) {
+  return Http::TestRequestHeaderMapImpl{{":authority", host},         {":method", method},
+                                        {"x-safe", "safe"},           {"x-global-nope", "global"},
+                                        {"x-vhost-nope", "vhost"},    {"x-route-nope", "route"},
+                                        {"x-forwarded-proto", "http"}};
+}
+
 Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
                                           const std::string& method) {
   return Http::TestRequestHeaderMapImpl{{":authority", host},        {":path", path},
@@ -368,6 +376,7 @@ virtual_hosts:
             config.route(genHeaders("bat2.com", "/foo", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("regex_default",
             config.route(genHeaders("bat2.com", " ", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_TRUE(config.route(genPathlessHeaders("bat2.com", "GET"), 0) == nullptr);
 
   // Regular Expression matching with query string params
   EXPECT_EQ(

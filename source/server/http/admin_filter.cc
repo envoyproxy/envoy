@@ -62,7 +62,8 @@ const Http::RequestHeaderMap& AdminFilter::getRequestHeaders() const {
 }
 
 void AdminFilter::onComplete() {
-  absl::string_view path = request_headers_->Path()->value().getStringView();
+  const absl::string_view path =
+      request_headers_->Path() ? request_headers_->Path()->value().getStringView() : "";
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *decoder_callbacks_, path);
 
   Buffer::OwnedImpl response;

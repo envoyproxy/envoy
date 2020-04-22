@@ -313,7 +313,7 @@ private:
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
     // called here may change the content type, so we must check it before the call.
     FilterHeadersStatus decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
-      is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+      is_grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
       FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
       if (end_stream) {
         handle_->decodeComplete();

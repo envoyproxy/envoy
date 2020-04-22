@@ -84,7 +84,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // If this is a gRPC request we:
   //  - mark this request as being gRPC
   //  - change the content-type to application/x-protobuf
-  if (Envoy::Grpc::Common::hasGrpcContentType(headers)) {
+  if (Envoy::Grpc::Common::isGrpcRequestHeaders(headers)) {
     enabled_ = true;
 
     // We keep track of the original content-type to ensure that we handle

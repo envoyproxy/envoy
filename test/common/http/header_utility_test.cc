@@ -469,6 +469,12 @@ TEST(HeaderIsValidTest, AuthorityIsValid) {
   EXPECT_FALSE(HeaderUtility::authorityIsValid("illegal{}"));
 }
 
+TEST(HeaderIsValidTest, IsConnect) {
+  EXPECT_TRUE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}}));
+  EXPECT_FALSE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{{":method", "GET"}}));
+  EXPECT_FALSE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{}));
+}
+
 TEST(HeaderAddTest, HeaderAdd) {
   TestHeaderMapImpl headers{{"myheader1", "123value"}};
   TestHeaderMapImpl headers_to_add{{"myheader2", "456value"}};

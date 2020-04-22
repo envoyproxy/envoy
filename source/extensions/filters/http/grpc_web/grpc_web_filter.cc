@@ -39,6 +39,9 @@ const absl::flat_hash_set<std::string>& GrpcWebFilter::gRpcWebContentTypes() con
 }
 
 bool GrpcWebFilter::isGrpcWebRequest(const Http::RequestHeaderMap& headers) {
+  if (!headers.Path()) {
+    return false;
+  }
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr) {
     return gRpcWebContentTypes().count(content_type->value().getStringView()) > 0;
