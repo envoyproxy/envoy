@@ -12,38 +12,9 @@ namespace Extensions {
 namespace UdpFilters {
 namespace DnsFilter {
 
-// These flags have been verified with dig. The flag order does not match the RFC, but takes byte
-// ordering into account so that serialization does not need bitwise operations
-PACKED_STRUCT(struct DnsHeaderFlags {
-  unsigned rcode : 4;  // return code
-  unsigned cd : 1;     // checking disabled
-  unsigned ad : 1;     // authenticated data
-  unsigned z : 1;      // z - bit (must be zero in queries per RFC1035)
-  unsigned ra : 1;     // recursion available
-  unsigned rd : 1;     // recursion desired
-  unsigned tc : 1;     // truncated response
-  unsigned aa : 1;     // authoritative answer
-  unsigned opcode : 4; // operation code
-  unsigned qr : 1;     // query or response
-});
-
-/**
- * Structure representing the DNS header as it appears in a packet
- * See https://www.ietf.org/rfc/rfc1035.txt for more details
- */
-PACKED_STRUCT(struct DnsHeader {
-  uint16_t id;
-  struct DnsHeaderFlags flags;
-  uint16_t questions;
-  uint16_t answers;
-  uint16_t authority_rrs;
-  uint16_t additional_rrs;
-});
-
-enum DnsRecordClass { IN = 1 };
-enum DnsRecordType { A = 1, AAAA = 28 };
-enum DnsResponseCode { NoError, FormatError, ServerFailure, NameError, NotImplemented };
-
+constexpr uint16_t DNS_RECORD_CLASS_IN = 1;
+constexpr uint16_t DNS_RECORD_TYPE_A = 1;
+constexpr uint16_t DNS_RECORD_TYPE_AAAA = 28;
 /**
  * BaseDnsRecord contains the fields and functions common to both query and answer records.
  */
@@ -124,22 +95,52 @@ public:
 
 using DnsQueryContextPtr = std::unique_ptr<DnsQueryContext>;
 
-enum class DnsQueryParseState {
-  Init = 0,
-  Flags,      // 2 bytes
-  Questions,  // 2 bytes
-  Answers,    // 2 bytes
-  Authority,  // 2 bytes
-  Authority2, // 2 bytes
-  Finish
-};
-
 /**
  * This class orchestrates parsing a DNS query and building the response to be sent to a client.
  */
 class DnsMessageParser : public Logger::Loggable<Logger::Id::filter> {
 
 public:
+  enum DnsResponseCode { NoError, FormatError, ServerFailure, NameError, NotImplemented };
+
+  enum class DnsQueryParseState {
+    Init = 0,
+    Flags,      // 2 bytes
+    Questions,  // 2 bytes
+    Answers,    // 2 bytes
+    Authority,  // 2 bytes
+    Authority2, // 2 bytes
+    Finish
+  };
+
+  // These flags have been verified with dig. The flag order does not match the RFC, but takes byte
+  // ordering into account so that serialization does not need bitwise operations
+  PACKED_STRUCT(struct DnsHeaderFlags {
+    unsigned rcode : 4;  // return code
+    unsigned cd : 1;     // checking disabled
+    unsigned ad : 1;     // authenticated data
+    unsigned z : 1;      // z - bit (must be zero in queries per RFC1035)
+    unsigned ra : 1;     // recursion available
+    unsigned rd : 1;     // recursion desired
+    unsigned tc : 1;     // truncated response
+    unsigned aa : 1;     // authoritative answer
+    unsigned opcode : 4; // operation code
+    unsigned qr : 1;     // query or response
+  });
+
+  /**
+   * Structure representing the DNS header as it appears in a packet
+   * See https://www.ietf.org/rfc/rfc1035.txt for more details
+   */
+  PACKED_STRUCT(struct DnsHeader {
+    uint16_t id;
+    struct DnsHeaderFlags flags;
+    uint16_t questions;
+    uint16_t answers;
+    uint16_t authority_rrs;
+    uint16_t additional_rrs;
+  });
+
   DnsMessageParser() = default;
   ~DnsMessageParser() = default;
 

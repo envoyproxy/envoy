@@ -137,7 +137,7 @@ TEST_F(DnsFilterTest, SingleTypeAQuery) {
 
   const std::string domain("www.foo3.com");
   const std::string query =
-      Utils::buildQueryForDomain(domain, DnsRecordType::A, DnsRecordClass::IN);
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
   ASSERT_FALSE(query.empty());
 
   sendQueryFromClient("10.0.0.1:1000", query);
