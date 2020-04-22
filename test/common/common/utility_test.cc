@@ -8,6 +8,8 @@
 
 #include "common/common/utility.h"
 
+#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -19,119 +21,95 @@ using testing::ContainerEq;
 
 namespace Envoy {
 
-TEST(StringUtil, strtoul) {
+TEST(StringUtil, strtoull) {
   uint64_t out;
   const char* rest;
 
   static const char* test_str = "12345b";
-  rest = StringUtil::strtoul(test_str, out);
+  rest = StringUtil::strtoull(test_str, out);
   EXPECT_NE(nullptr, rest);
   EXPECT_EQ('b', *rest);
   EXPECT_EQ(&test_str[5], rest);
   EXPECT_EQ(12345U, out);
 
-  EXPECT_EQ(nullptr, StringUtil::strtoul("", out));
-  EXPECT_EQ(nullptr, StringUtil::strtoul("b123", out));
+  EXPECT_EQ(nullptr, StringUtil::strtoull("", out));
+  EXPECT_EQ(nullptr, StringUtil::strtoull("b123", out));
 
-  rest = StringUtil::strtoul("123", out);
+  rest = StringUtil::strtoull("123", out);
   EXPECT_NE(nullptr, rest);
   EXPECT_EQ('\0', *rest);
   EXPECT_EQ(123U, out);
 
-  EXPECT_NE(nullptr, StringUtil::strtoul("  456", out));
+  EXPECT_NE(nullptr, StringUtil::strtoull("  456", out));
   EXPECT_EQ(456U, out);
 
-  EXPECT_NE(nullptr, StringUtil::strtoul("00789", out));
+  EXPECT_NE(nullptr, StringUtil::strtoull("00789", out));
   EXPECT_EQ(789U, out);
 
   // Hex
-  rest = StringUtil::strtoul("0x1234567890abcdefg", out, 16);
+  rest = StringUtil::strtoull("0x1234567890abcdefg", out, 16);
   EXPECT_NE(nullptr, rest);
   EXPECT_EQ('g', *rest);
   EXPECT_EQ(0x1234567890abcdefU, out);
 
   // Explicit decimal
-  rest = StringUtil::strtoul("01234567890A", out, 10);
+  rest = StringUtil::strtoull("01234567890A", out, 10);
   EXPECT_NE(nullptr, rest);
   EXPECT_EQ('A', *rest);
   EXPECT_EQ(1234567890U, out);
 
   // Octal
-  rest = StringUtil::strtoul("012345678", out, 8);
+  rest = StringUtil::strtoull("012345678", out, 8);
   EXPECT_NE(nullptr, rest);
   EXPECT_EQ('8', *rest);
   EXPECT_EQ(01234567U, out);
 
   // Binary
-  rest = StringUtil::strtoul("01010101012", out, 2);
+  rest = StringUtil::strtoull("01010101012", out, 2);
   EXPECT_NE(nullptr, rest);
   EXPECT_EQ('2', *rest);
   EXPECT_EQ(0b101010101U, out);
 
-  // Verify subsequent call to strtoul succeeds after the first one
+  // Verify subsequent call to strtoull succeeds after the first one
   // failed due to errno ERANGE
-  EXPECT_EQ(nullptr, StringUtil::strtoul("18446744073709551616", out));
-  EXPECT_NE(nullptr, StringUtil::strtoul("18446744073709551615", out));
+  EXPECT_EQ(nullptr, StringUtil::strtoull("18446744073709551616", out));
+  EXPECT_NE(nullptr, StringUtil::strtoull("18446744073709551615", out));
   EXPECT_EQ(18446744073709551615U, out);
 }
 
-TEST(StringUtil, atoul) {
+TEST(StringUtil, atoull) {
   uint64_t out;
-  EXPECT_FALSE(StringUtil::atoul("123b", out));
-  EXPECT_FALSE(StringUtil::atoul("", out));
-  EXPECT_FALSE(StringUtil::atoul("b123", out));
+  EXPECT_FALSE(StringUtil::atoull("123b", out));
+  EXPECT_FALSE(StringUtil::atoull("", out));
+  EXPECT_FALSE(StringUtil::atoull("b123", out));
 
-  EXPECT_TRUE(StringUtil::atoul("123", out));
+  EXPECT_TRUE(StringUtil::atoull("123", out));
   EXPECT_EQ(123U, out);
 
-  EXPECT_TRUE(StringUtil::atoul("  456", out));
+  EXPECT_TRUE(StringUtil::atoull("  456", out));
   EXPECT_EQ(456U, out);
 
-  EXPECT_TRUE(StringUtil::atoul("00789", out));
+  EXPECT_TRUE(StringUtil::atoull("00789", out));
   EXPECT_EQ(789U, out);
 
-  // Verify subsequent call to atoul succeeds after the first one
+  // Verify subsequent call to atoull succeeds after the first one
   // failed due to errno ERANGE
-  EXPECT_FALSE(StringUtil::atoul("18446744073709551616", out));
-  EXPECT_TRUE(StringUtil::atoul("18446744073709551615", out));
+  EXPECT_FALSE(StringUtil::atoull("18446744073709551616", out));
+  EXPECT_TRUE(StringUtil::atoull("18446744073709551615", out));
   EXPECT_EQ(18446744073709551615U, out);
-}
-
-TEST(StringUtil, atol) {
-  int64_t out;
-  EXPECT_FALSE(StringUtil::atol("-123b", out));
-  EXPECT_FALSE(StringUtil::atol("", out));
-  EXPECT_FALSE(StringUtil::atol("b123", out));
-
-  EXPECT_TRUE(StringUtil::atol("123", out));
-  EXPECT_EQ(123, out);
-  EXPECT_TRUE(StringUtil::atol("-123", out));
-  EXPECT_EQ(-123, out);
-  EXPECT_TRUE(StringUtil::atol("+123", out));
-  EXPECT_EQ(123, out);
-
-  EXPECT_TRUE(StringUtil::atol("  456", out));
-  EXPECT_EQ(456, out);
-
-  EXPECT_TRUE(StringUtil::atol("00789", out));
-  EXPECT_EQ(789, out);
-
-  // INT64_MAX + 1
-  EXPECT_FALSE(StringUtil::atol("9223372036854775808", out));
-
-  // INT64_MIN
-  EXPECT_TRUE(StringUtil::atol("-9223372036854775808", out));
-  EXPECT_EQ(INT64_MIN, out);
 }
 
 TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
-  EXPECT_TRUE(DateUtil::timePointValid(std::chrono::system_clock::now()));
+  DangerousDeprecatedTestTime test_time;
+  EXPECT_TRUE(DateUtil::timePointValid(test_time.timeSystem().systemTime()));
 }
 
-TEST(ProdSystemTimeSourceTest, All) {
-  ProdSystemTimeSource source;
-  source.currentTime();
+TEST(DateUtil, NowToMilliseconds) {
+  Event::SimulatedTimeSystem test_time;
+  const SystemTime time_with_millis(std::chrono::seconds(12345) + std::chrono::milliseconds(67));
+  test_time.setSystemTime(time_with_millis);
+  EXPECT_EQ(12345067, DateUtil::nowToMilliseconds(test_time));
 }
 
 TEST(InputConstMemoryStream, All) {
@@ -160,12 +138,6 @@ TEST(StringUtil, WhitespaceChars) {
   EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\v'));
   EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\n'));
   EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\r'));
-}
-
-TEST(StringUtil, caseInsensitiveCompare) {
-  EXPECT_EQ(0, StringUtil::caseInsensitiveCompare("CONTENT-LENGTH", "content-length"));
-  EXPECT_LT(0, StringUtil::caseInsensitiveCompare("CONTENT-LENGTH", "blah"));
-  EXPECT_GT(0, StringUtil::caseInsensitiveCompare("CONTENT-LENGTH", "hello"));
 }
 
 TEST(StringUtil, itoa) {
@@ -221,44 +193,6 @@ TEST(StringUtil, strlcpy) {
   }
 }
 
-TEST(StringUtil, join) {
-  EXPECT_EQ("hello,world", StringUtil::join({"hello", "world"}, ","));
-  EXPECT_EQ("hello", StringUtil::join({"hello"}, ","));
-  EXPECT_EQ("", StringUtil::join({}, ","));
-
-  EXPECT_EQ("helloworld", StringUtil::join({"hello", "world"}, ""));
-  EXPECT_EQ("hello", StringUtil::join({"hello"}, ""));
-  EXPECT_EQ("", StringUtil::join({}, ""));
-
-  EXPECT_EQ("hello,,world", StringUtil::join({"hello", "world"}, ",,"));
-  EXPECT_EQ("hello", StringUtil::join({"hello"}, ",,"));
-  EXPECT_EQ("", StringUtil::join({}, ",,"));
-}
-
-TEST(StringUtil, endsWith) {
-  EXPECT_TRUE(StringUtil::endsWith("test", "st"));
-  EXPECT_TRUE(StringUtil::endsWith("t", "t"));
-  EXPECT_TRUE(StringUtil::endsWith("test", ""));
-  EXPECT_TRUE(StringUtil::endsWith("", ""));
-  EXPECT_FALSE(StringUtil::endsWith("test", "ttest"));
-  EXPECT_FALSE(StringUtil::endsWith("test", "w"));
-}
-
-TEST(StringUtil, startsWith) {
-  EXPECT_TRUE(StringUtil::startsWith("Test", "Te"));
-  EXPECT_TRUE(StringUtil::startsWith("Test", "Te", false));
-  EXPECT_TRUE(StringUtil::startsWith("Test", "te", false));
-  EXPECT_TRUE(StringUtil::startsWith("", ""));
-  EXPECT_TRUE(StringUtil::startsWith("test", ""));
-  EXPECT_FALSE(StringUtil::startsWith("Test", "te"));
-  EXPECT_FALSE(StringUtil::startsWith("Test", "tE", true));
-  EXPECT_FALSE(StringUtil::startsWith("test", "boo", true));
-  EXPECT_FALSE(StringUtil::startsWith("test", "boo", false));
-  EXPECT_FALSE(StringUtil::startsWith("test", "testtest"));
-  EXPECT_FALSE(StringUtil::startsWith("test", "TESTTEST", false));
-  EXPECT_FALSE(StringUtil::startsWith("", "test"));
-}
-
 TEST(StringUtil, escape) {
   EXPECT_EQ(StringUtil::escape("hello world"), "hello world");
   EXPECT_EQ(StringUtil::escape("hello\nworld\n"), "hello\\nworld\\n");
@@ -290,6 +224,13 @@ TEST(StringUtil, StringViewRtrim) {
   EXPECT_EQ("", StringUtil::rtrim(""));
 }
 
+TEST(StringUtil, RemoveTrailingCharacters) {
+  EXPECT_EQ("", StringUtil::removeTrailingCharacters("......", '.'));
+  EXPECT_EQ("\t\f\v\n\rhello ", StringUtil::removeTrailingCharacters("\t\f\v\n\rhello ", '.'));
+  EXPECT_EQ("\t\f\v\n\r a b", StringUtil::removeTrailingCharacters("\t\f\v\n\r a b.......", '.'));
+  EXPECT_EQ("", StringUtil::removeTrailingCharacters("", '.'));
+}
+
 TEST(StringUtil, StringViewTrim) {
   EXPECT_EQ("", StringUtil::trim("   "));
   EXPECT_EQ("hello", StringUtil::trim("\t\f\v\n\r  hello   "));
@@ -307,13 +248,6 @@ TEST(StringUtil, StringViewCaseFindToken) {
   EXPECT_TRUE(StringUtil::caseFindToken(" ", " ", "", true));
   EXPECT_FALSE(StringUtil::caseFindToken(" ", " ", "", false));
   EXPECT_TRUE(StringUtil::caseFindToken("A=5", ".", "A=5"));
-}
-
-TEST(StringUtil, StringViewCaseCompare) {
-  EXPECT_TRUE(StringUtil::caseCompare("HELLO world", "hello world"));
-  EXPECT_TRUE(StringUtil::caseCompare("hello world", "HELLO world"));
-  EXPECT_FALSE(StringUtil::caseCompare("hello world", "hello"));
-  EXPECT_FALSE(StringUtil::caseCompare("hello", "hello world"));
 }
 
 TEST(StringUtil, StringViewCropRight) {
@@ -419,6 +353,58 @@ TEST(StringUtil, StringViewSplit) {
     EXPECT_THAT(std::vector<absl::string_view>({"hello", "world"}),
                 ContainerEq(StringUtil::splitToken("hello world", " ", true)));
   }
+  {
+    auto tokens = StringUtil::splitToken(" one , two , three ", ",", true, true);
+    EXPECT_EQ(3, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "one") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "two") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "three") != tokens.end());
+  }
+  {
+    auto tokens = StringUtil::splitToken(" one ,  , three=five ", ",=", true, true);
+    EXPECT_EQ(4, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "one") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "three") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "five") != tokens.end());
+  }
+  {
+    auto tokens = StringUtil::splitToken(" one ,  , three=five ", ",=", false, true);
+    EXPECT_EQ(3, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "one") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "three") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "five") != tokens.end());
+  }
+  {
+    auto tokens = StringUtil::splitToken(" one ,  , three=five ", ",=", false);
+    EXPECT_EQ(4, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " one ") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "  ") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " three") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "five ") != tokens.end());
+  }
+}
+
+TEST(StringUtil, StringViewRemoveTokens) {
+  // Basic cases.
+  EXPECT_EQ(StringUtil::removeTokens("", ",", {"two"}, ","), "");
+  EXPECT_EQ(StringUtil::removeTokens("one", ",", {"two"}, ","), "one");
+  EXPECT_EQ(StringUtil::removeTokens("one,two ", ",", {"two"}, ","), "one");
+  EXPECT_EQ(StringUtil::removeTokens("one,two ", ",", {"two", "one"}, ","), "");
+  EXPECT_EQ(StringUtil::removeTokens("one,two ", ",", {"one"}, ","), "two");
+  EXPECT_EQ(StringUtil::removeTokens("one,two,three ", ",", {"two"}, ","), "one,three");
+  EXPECT_EQ(StringUtil::removeTokens(" one , two , three ", ",", {"two"}, ","), "one,three");
+  EXPECT_EQ(StringUtil::removeTokens(" one , two , three ", ",", {"three"}, ","), "one,two");
+  EXPECT_EQ(StringUtil::removeTokens(" one , two , three ", ",", {"three"}, ", "), "one, two");
+  EXPECT_EQ(StringUtil::removeTokens("one,two,three", ",", {"two", "three"}, ","), "one");
+  EXPECT_EQ(StringUtil::removeTokens("one,two,three,four", ",", {"two", "three"}, ","), "one,four");
+  // Ignore case.
+  EXPECT_EQ(StringUtil::removeTokens("One,Two,Three,Four", ",", {"two", "three"}, ","), "One,Four");
+  // Longer joiner.
+  EXPECT_EQ(StringUtil::removeTokens("one,two,three,four", ",", {"two", "three"}, " , "),
+            "one , four");
+  // Delimiters.
+  EXPECT_EQ(StringUtil::removeTokens("one,two;three ", ",;", {"two"}, ","), "one,three");
 }
 
 TEST(StringUtil, removeCharacters) {
@@ -454,20 +440,31 @@ TEST(Primes, findPrimeLargerThan) {
   EXPECT_EQ(10007, Primes::findPrimeLargerThan(9991));
 }
 
-TEST(RegexUtil, parseRegex) {
-  EXPECT_THROW_WITH_REGEX(RegexUtil::parseRegex("(+invalid)"), EnvoyException,
-                          "Invalid regex '\\(\\+invalid\\)': .+");
+class WeightedClusterEntry {
+public:
+  WeightedClusterEntry(const std::string name, const uint64_t weight)
+      : name_(name), weight_(weight) {}
 
-  {
-    std::regex regex = RegexUtil::parseRegex("x*");
-    EXPECT_NE(0, regex.flags() & std::regex::optimize);
-  }
+  const std::string& clusterName() const { return name_; }
+  uint64_t clusterWeight() const { return weight_; }
 
-  {
-    std::regex regex = RegexUtil::parseRegex("x*", std::regex::icase);
-    EXPECT_NE(0, regex.flags() & std::regex::icase);
-    EXPECT_EQ(0, regex.flags() & std::regex::optimize);
-  }
+private:
+  const std::string name_;
+  const uint64_t weight_;
+};
+using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
+
+TEST(WeightedClusterUtil, pickCluster) {
+  std::vector<WeightedClusterEntrySharedPtr> clusters;
+
+  std::unique_ptr<WeightedClusterEntry> cluster1(new WeightedClusterEntry("cluster1", 10));
+  clusters.emplace_back(std::move(cluster1));
+
+  std::unique_ptr<WeightedClusterEntry> cluster2(new WeightedClusterEntry("cluster2", 90));
+  clusters.emplace_back(std::move(cluster2));
+
+  EXPECT_EQ("cluster1", WeightedClusterUtil::pickCluster(clusters, 100, 5, false)->clusterName());
+  EXPECT_EQ("cluster2", WeightedClusterUtil::pickCluster(clusters, 80, 79, true)->clusterName());
 }
 
 static std::string intervalSetIntToString(const IntervalSetImpl<int>& interval_set) {
@@ -805,6 +802,77 @@ TEST(WelfordStandardDeviation, InsufficientData) {
   wsd.update(10);
   EXPECT_EQ(10, wsd.mean());
   EXPECT_TRUE(std::isnan(wsd.computeStandardDeviation()));
+}
+
+TEST(DateFormatter, FromTime) {
+  const SystemTime time1(std::chrono::seconds(1522796769));
+  EXPECT_EQ("2018-04-03T23:06:09.000Z", DateFormatter("%Y-%m-%dT%H:%M:%S.000Z").fromTime(time1));
+  EXPECT_EQ("aaa23", DateFormatter(std::string(3, 'a') + "%H").fromTime(time1));
+  const SystemTime time2(std::chrono::seconds(0));
+  EXPECT_EQ("1970-01-01T00:00:00.000Z", DateFormatter("%Y-%m-%dT%H:%M:%S.000Z").fromTime(time2));
+  EXPECT_EQ("aaa00", DateFormatter(std::string(3, 'a') + "%H").fromTime(time2));
+}
+
+// Verify that two DateFormatter patterns with the same ??? patterns but
+// different format strings don't false share cache entries. This is a
+// regression test for when they did.
+TEST(DateFormatter, FromTimeSameWildcard) {
+  const SystemTime time1(std::chrono::seconds(1522796769) + std::chrono::milliseconds(142));
+  EXPECT_EQ("2018-04-03T23:06:09.000Z142",
+            DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%3f").fromTime(time1));
+  EXPECT_EQ("2018-04-03T23:06:09.000Z114",
+            DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%1f%2f").fromTime(time1));
+}
+
+TEST(TrieLookupTable, AddItems) {
+  TrieLookupTable<const char*> trie;
+  const char* cstr_a = "a";
+  const char* cstr_b = "b";
+  const char* cstr_c = "c";
+
+  EXPECT_TRUE(trie.add("foo", cstr_a));
+  EXPECT_TRUE(trie.add("bar", cstr_b));
+  EXPECT_EQ(cstr_a, trie.find("foo"));
+  EXPECT_EQ(cstr_b, trie.find("bar"));
+
+  // overwrite_existing = false
+  EXPECT_FALSE(trie.add("foo", cstr_c, false));
+  EXPECT_EQ(cstr_a, trie.find("foo"));
+
+  // overwrite_existing = true
+  EXPECT_TRUE(trie.add("foo", cstr_c));
+  EXPECT_EQ(cstr_c, trie.find("foo"));
+}
+
+TEST(TrieLookupTable, LongestPrefix) {
+  TrieLookupTable<const char*> trie;
+  const char* cstr_a = "a";
+  const char* cstr_b = "b";
+  const char* cstr_c = "c";
+
+  EXPECT_TRUE(trie.add("foo", cstr_a));
+  EXPECT_TRUE(trie.add("bar", cstr_b));
+  EXPECT_TRUE(trie.add("baro", cstr_c));
+
+  EXPECT_EQ(cstr_a, trie.find("foo"));
+  EXPECT_EQ(cstr_a, trie.findLongestPrefix("foo"));
+  EXPECT_EQ(cstr_a, trie.findLongestPrefix("foosball"));
+
+  EXPECT_EQ(cstr_b, trie.find("bar"));
+  EXPECT_EQ(cstr_b, trie.findLongestPrefix("bar"));
+  EXPECT_EQ(cstr_b, trie.findLongestPrefix("baritone"));
+  EXPECT_EQ(cstr_c, trie.findLongestPrefix("barometer"));
+
+  EXPECT_EQ(nullptr, trie.find("toto"));
+  EXPECT_EQ(nullptr, trie.findLongestPrefix("toto"));
+  EXPECT_EQ(nullptr, trie.find(" "));
+  EXPECT_EQ(nullptr, trie.findLongestPrefix(" "));
+}
+
+TEST(InlineStorageTest, InlineString) {
+  InlineStringPtr hello = InlineString::create("Hello, world!");
+  EXPECT_EQ("Hello, world!", hello->toStringView());
+  EXPECT_EQ("Hello, world!", hello->toString());
 }
 
 } // namespace Envoy

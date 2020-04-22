@@ -2,9 +2,12 @@
 
 #include "envoy/http/filter.h"
 
+#include "common/common/lock_guard.h"
 #include "common/common/logger.h"
+#include "common/common/thread.h"
 
-#include "extensions/filters/http/jwt_authn/authenticator.h"
+#include "extensions/filters/http/jwt_authn/filter_config.h"
+#include "extensions/filters/http/jwt_authn/matcher.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,36 +16,40 @@ namespace JwtAuthn {
 
 // The Envoy filter to process JWT auth.
 class Filter : public Http::StreamDecoderFilter,
-               public Authenticator::Callbacks,
-               public Logger::Loggable<Logger::Id::filter> {
+               public Verifier::Callbacks,
+               public Logger::Loggable<Logger::Id::jwt> {
 public:
-  Filter(JwtAuthnFilterStats& stats, AuthenticatorPtr auth);
+  Filter(FilterConfigSharedPtr config);
 
   // Http::StreamFilterBase
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  // the function for Authenticator::Callbacks interface.
+  // Following two functions are for Verifier::Callbacks interface.
+  // Pass the payload as Struct.
+  void setPayload(const ProtobufWkt::Struct& payload) override;
   // It will be called when its verify() call is completed.
   void onComplete(const ::google::jwt_verify::Status& status) override;
 
-  // The callback funcion.
+  // The callback function.
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
   // The stats object.
   JwtAuthnFilterStats& stats_;
-  // The auth object.
-  AuthenticatorPtr auth_;
   // The state of the request
   enum State { Init, Calling, Responded, Complete };
   State state_ = Init;
   // Mark if request has been stopped.
   bool stopped_ = false;
+  // Filter config object.
+  FilterConfigSharedPtr config_;
+  // Verify context for current request.
+  ContextSharedPtr context_;
 };
 
 } // namespace JwtAuthn

@@ -3,7 +3,7 @@
 namespace Envoy {
 
 #if __cplusplus < 201402L
-#error "Your compiler does not support C++14. GCC 5+ or Clang is required."
+#error "Your compiler does not support C++14. GCC 5+, Clang, or MSVC 2017+ is required."
 #endif
 
 // See:
@@ -17,4 +17,4 @@ namespace Envoy {
   "ENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 in your build."
 #endif
 
-} // Envoy
+} // namespace Envoy

@@ -1,9 +1,11 @@
 licenses(["notice"])  # Apache 2
+
 # Mongo proxy L4 network filter (observability and fault injection).
 # Public docs: docs/root/configuration/network_filters/mongo_proxy_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -57,6 +59,7 @@ envoy_cc_library(
     deps = [
         ":codec_interface",
         ":codec_lib",
+        ":mongo_stats_lib",
         ":utility_lib",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/common:time_interface",
@@ -74,7 +77,18 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",
-        "@envoy_api//envoy/config/filter/network/mongo_proxy/v2:mongo_proxy_cc",
+        "//source/extensions/filters/common/fault:fault_config_lib",
+        "//source/extensions/filters/network:well_known_names",
+    ],
+)
+
+envoy_cc_library(
+    name = "mongo_stats_lib",
+    srcs = ["mongo_stats.cc"],
+    hdrs = ["mongo_stats.h"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//source/common/stats:symbol_table_lib",
     ],
 )
 
@@ -88,15 +102,16 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":proxy_lib",
         "//include/envoy/registry",
-        "//source/common/config:filter_json_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/network/mongo_proxy/v3:pkg_cc_proto",
     ],
 )

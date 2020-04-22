@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
@@ -31,7 +32,7 @@ enum class HealthTransition {
  */
 class HealthChecker {
 public:
-  virtual ~HealthChecker() {}
+  virtual ~HealthChecker() = default;
 
   /**
    * Called when a host has been health checked.
@@ -39,7 +40,8 @@ public:
    * @param changed_state supplies whether the health check resulted in a host moving from healthy
    *                       to not healthy or vice versa.
    */
-  typedef std::function<void(HostSharedPtr host, HealthTransition changed_state)> HostStatusCb;
+  using HostStatusCb =
+      std::function<void(const HostSharedPtr& host, HealthTransition changed_state)>;
 
   /**
    * Install a callback that will be invoked every time a health check round is completed for
@@ -54,10 +56,67 @@ public:
   virtual void start() PURE;
 };
 
-typedef std::shared_ptr<HealthChecker> HealthCheckerSharedPtr;
+using HealthCheckerSharedPtr = std::shared_ptr<HealthChecker>;
 
 std::ostream& operator<<(std::ostream& out, HealthState state);
 std::ostream& operator<<(std::ostream& out, HealthTransition changed_state);
+
+/**
+ * Sink for health check event logs.
+ */
+class HealthCheckEventLogger {
+public:
+  virtual ~HealthCheckEventLogger() = default;
+
+  /**
+   * Log an unhealthy host ejection event.
+   * @param health_checker_type supplies the type of health checker that generated the event.
+   * @param host supplies the host that generated the event.
+   * @param failure_type supplies the type of health check failure.
+   */
+  virtual void logEjectUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                                 const HostDescriptionConstSharedPtr& host,
+                                 envoy::data::core::v3::HealthCheckFailureType failure_type) PURE;
+
+  /**
+   * Log an unhealthy host event.
+   * @param health_checker_type supplies the type of health checker that generated the event.
+   * @param host supplies the host that generated the event.
+   * @param failure_type supplies the type of health check failure.
+   * @param first_check whether this is a failure on the first health check for this host.
+   */
+  virtual void logUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                            const HostDescriptionConstSharedPtr& host,
+                            envoy::data::core::v3::HealthCheckFailureType failure_type,
+                            bool first_check) PURE;
+
+  /**
+   * Log a healthy host addition event.
+   * @param health_checker_type supplies the type of health checker that generated the event.
+   * @param host supplies the host that generated the event.
+   * @param healthy_threshold supplied the configured healthy threshold for this health check.
+   * @param first_check whether this is a fast path success on the first health check for this host.
+   */
+  virtual void logAddHealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                             const HostDescriptionConstSharedPtr& host, bool first_check) PURE;
+
+  /**
+   * Log a degraded healthy host event.
+   * @param health_checker_type supplies the type of health checker that generated the event.
+   * @param host supplies the host that generated the event.
+   */
+  virtual void logDegraded(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                           const HostDescriptionConstSharedPtr& host) PURE;
+  /**
+   * Log a no degraded healthy host event.
+   * @param health_checker_type supplies the type of health checker that generated the event.
+   * @param host supplies the host that generated the event.
+   */
+  virtual void logNoLongerDegraded(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                                   const HostDescriptionConstSharedPtr& host) PURE;
+};
+
+using HealthCheckEventLoggerPtr = std::unique_ptr<HealthCheckEventLogger>;
 
 } // namespace Upstream
 } // namespace Envoy

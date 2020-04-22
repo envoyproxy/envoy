@@ -1,19 +1,24 @@
 #pragma once
 
-#include <netinet/ip.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/un.h>
 
 #include <array>
 #include <cstdint>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/network/address.h"
+#include "envoy/network/io_handle.h"
 
 namespace Envoy {
 namespace Network {
 namespace Address {
+
+/**
+ * Returns true if the given family is supported on this machine.
+ * @param domain the IP family.
+ */
+bool ipFamilySupported(int domain);
 
 /**
  * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
@@ -24,23 +29,23 @@ namespace Address {
  * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
  * @return InstanceConstSharedPtr the address.
  */
-Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
-                                                    bool v6only = true);
+InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
+                                           bool v6only = true);
 
 /**
  * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
- * @param fd file descriptor.
+ * @param fd socket file descriptor
  * @return InstanceConstSharedPtr for bound address.
  */
-InstanceConstSharedPtr addressFromFd(int fd);
+InstanceConstSharedPtr addressFromFd(os_fd_t fd);
 
 /**
  * Obtain the address of the peer of the socket with the specified file descriptor.
  * Raises an EnvoyException on failure.
- * @param fd file descriptor.
+ * @param fd socket file descriptor
  * @return InstanceConstSharedPtr for peer address.
  */
-InstanceConstSharedPtr peerAddressFromFd(int fd);
+InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd);
 
 /**
  * Base class for all address types.
@@ -49,13 +54,17 @@ class InstanceBase : public Instance {
 public:
   // Network::Address::Instance
   const std::string& asString() const override { return friendly_name_; }
+  absl::string_view asStringView() const override { return friendly_name_; }
   // Default logical name is the human-readable name.
   const std::string& logicalName() const override { return asString(); }
   Type type() const override { return type_; }
 
+  virtual const sockaddr* sockAddr() const PURE;
+  virtual socklen_t sockAddrLen() const PURE;
+
 protected:
   InstanceBase(Type type) : type_(type) {}
-  int socketFromSocketType(SocketType type) const;
+  IoHandlePtr socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
 
@@ -91,10 +100,24 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  int bind(int fd) const override;
-  int connect(int fd) const override;
+  Api::SysCallIntResult bind(os_fd_t fd) const override;
+  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return &ip_; }
-  int socket(SocketType type) const override;
+  IoHandlePtr socket(SocketType type) const override;
+
+  // Network::Address::InstanceBase
+  const sockaddr* sockAddr() const override {
+    return reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_);
+  }
+  socklen_t sockAddrLen() const override { return sizeof(sockaddr_in); }
+
+  /**
+   * Convenience function to convert an IPv4 address to canonical string format.
+   * @note This works similarly to inet_ntop() but is faster.
+   * @param addr address to format.
+   * @return the address in dotted-decimal string format.
+   */
+  static std::string sockaddrToString(const sockaddr_in& addr);
 
 private:
   struct Ipv4Helper : public Ipv4 {
@@ -151,10 +174,16 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  int bind(int fd) const override;
-  int connect(int fd) const override;
+  Api::SysCallIntResult bind(os_fd_t fd) const override;
+  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return &ip_; }
-  int socket(SocketType type) const override;
+  IoHandlePtr socket(SocketType type) const override;
+
+  // Network::Address::InstanceBase
+  const sockaddr* sockAddr() const override {
+    return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
+  }
+  socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
 
 private:
   struct Ipv6Helper : public Ipv6 {
@@ -199,25 +228,35 @@ public:
   /**
    * Construct from an existing unix address.
    */
-  explicit PipeInstance(const sockaddr_un* address, socklen_t ss_len);
+  explicit PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0);
 
   /**
    * Construct from a string pipe path.
    */
-  explicit PipeInstance(const std::string& pipe_path);
+  explicit PipeInstance(const std::string& pipe_path, mode_t mode = 0);
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  int bind(int fd) const override;
-  int connect(int fd) const override;
+  Api::SysCallIntResult bind(os_fd_t fd) const override;
+  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return nullptr; }
-  int socket(SocketType type) const override;
+  IoHandlePtr socket(SocketType type) const override;
+
+  // Network::Address::InstanceBase
+  const sockaddr* sockAddr() const override { return reinterpret_cast<const sockaddr*>(&address_); }
+  socklen_t sockAddrLen() const override {
+    if (abstract_namespace_) {
+      return offsetof(struct sockaddr_un, sun_path) + address_length_;
+    }
+    return sizeof(address_);
+  }
 
 private:
   sockaddr_un address_;
   // For abstract namespaces.
   bool abstract_namespace_{false};
   uint32_t address_length_{0};
+  mode_t mode{0};
 };
 
 } // namespace Address

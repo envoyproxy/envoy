@@ -1,5 +1,10 @@
 // Usage: bazel run //test/common/upstream:load_balancer_benchmark
 
+#include <memory>
+
+#include "envoy/config/cluster/v3/cluster.pb.h"
+
+#include "common/memory/stats.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/ring_hash_lb.h"
@@ -8,7 +13,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/mocks.h"
 
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -16,12 +21,8 @@ namespace {
 
 class BaseTester {
 public:
-  BaseTester(uint64_t num_hosts) : BaseTester(num_hosts, 0, 0) {}
-
   // We weight the first weighted_subset_percent of hosts with weight.
-  BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uint32_t weight) {
-    HostSet& host_set = priority_set_.getOrCreateHostSet(0);
-
+  BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0) {
     HostVector hosts;
     ASSERT(num_hosts < 65536);
     for (uint64_t i = 0; i < num_hosts; i++) {
@@ -29,30 +30,122 @@ public:
       hosts.push_back(makeTestHost(info_, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256),
                                    should_weight ? weight : 1));
     }
-    HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
-    host_set.updateHosts(updated_hosts, updated_hosts, nullptr, nullptr, {}, hosts, {});
+
+    HostVectorConstSharedPtr updated_hosts = std::make_shared<HostVector>(hosts);
+    HostsPerLocalityConstSharedPtr hosts_per_locality = makeHostsPerLocality({hosts});
+    priority_set_.updateHosts(0, HostSetImpl::partitionHosts(updated_hosts, hosts_per_locality), {},
+                              hosts, {}, absl::nullopt);
+    local_priority_set_.updateHosts(0,
+                                    HostSetImpl::partitionHosts(updated_hosts, hosts_per_locality),
+                                    {}, hosts, {}, absl::nullopt);
   }
+
+  Envoy::Thread::MutexBasicLockable lock_;
+  // Reduce default log level to warn while running this benchmark to avoid problems due to
+  // excessive debug logging in upstream_impl.cc
+  Envoy::Logger::Context logging_context_{spdlog::level::warn,
+                                          Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock_, false};
 
   PrioritySetImpl priority_set_;
-  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-};
-
-class RingHashTester : public BaseTester {
-public:
-  RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) : BaseTester(num_hosts) {
-    config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
-    config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
-    ring_hash_lb_.reset(new RingHashLoadBalancer{priority_set_, stats_, runtime_, random_, config_,
-                                                 common_config_});
-  }
-
+  PrioritySetImpl local_priority_set_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_)};
   NiceMock<Runtime::MockLoader> runtime_;
   Runtime::RandomGeneratorImpl random_;
-  absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> config_;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+};
+
+class RoundRobinTester : public BaseTester {
+public:
+  RoundRobinTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0)
+      : BaseTester(num_hosts, weighted_subset_percent, weight) {}
+
+  void initialize() {
+    lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, &local_priority_set_, stats_,
+                                                   runtime_, random_, common_config_);
+  }
+
+  std::unique_ptr<RoundRobinLoadBalancer> lb_;
+};
+
+class LeastRequestTester : public BaseTester {
+public:
+  LeastRequestTester(uint64_t num_hosts, uint32_t choice_count) : BaseTester(num_hosts) {
+    envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+    lr_lb_config.mutable_choice_count()->set_value(choice_count);
+    lb_ =
+        std::make_unique<LeastRequestLoadBalancer>(priority_set_, &local_priority_set_, stats_,
+                                                   runtime_, random_, common_config_, lr_lb_config);
+  }
+
+  std::unique_ptr<LeastRequestLoadBalancer> lb_;
+};
+
+void BM_RoundRobinLoadBalancerBuild(benchmark::State& state) {
+  for (auto _ : state) {
+    state.PauseTiming();
+    const uint64_t num_hosts = state.range(0);
+    const uint64_t weighted_subset_percent = state.range(1);
+    const uint64_t weight = state.range(2);
+
+    const size_t start_tester_mem = Memory::Stats::totalCurrentlyAllocated();
+    RoundRobinTester tester(num_hosts, weighted_subset_percent, weight);
+    const size_t end_tester_mem = Memory::Stats::totalCurrentlyAllocated();
+    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+
+    // We are only interested in timing the initial build.
+    state.ResumeTiming();
+    tester.initialize();
+    state.PauseTiming();
+    const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+    state.counters["tester_memory"] = end_tester_mem - start_tester_mem;
+    state.counters["memory"] = end_mem - start_mem;
+    state.counters["memory_per_host"] = (end_mem - start_mem) / num_hosts;
+    state.ResumeTiming();
+  }
+}
+BENCHMARK(BM_RoundRobinLoadBalancerBuild)
+    ->Args({1, 0, 1})
+    ->Args({500, 0, 1})
+    ->Args({500, 50, 50})
+    ->Args({500, 100, 50})
+    ->Args({2500, 0, 1})
+    ->Args({2500, 50, 50})
+    ->Args({2500, 100, 50})
+    ->Args({10000, 0, 1})
+    ->Args({10000, 50, 50})
+    ->Args({10000, 100, 50})
+    ->Args({25000, 0, 1})
+    ->Args({25000, 50, 50})
+    ->Args({25000, 100, 50})
+    ->Args({50000, 0, 1})
+    ->Args({50000, 50, 50})
+    ->Args({50000, 100, 50})
+    ->Unit(benchmark::kMillisecond);
+
+class RingHashTester : public BaseTester {
+public:
+  RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) : BaseTester(num_hosts) {
+    config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
+    config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
+    ring_hash_lb_ = std::make_unique<RingHashLoadBalancer>(
+        priority_set_, stats_, stats_store_, runtime_, random_, config_, common_config_);
+  }
+
+  absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> config_;
   std::unique_ptr<RingHashLoadBalancer> ring_hash_lb_;
-  envoy::api::v2::Cluster::CommonLbConfig common_config_;
+};
+
+class MaglevTester : public BaseTester {
+public:
+  MaglevTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0)
+      : BaseTester(num_hosts, weighted_subset_percent, weight) {
+    maglev_lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
+                                                      random_, common_config_);
+  }
+
+  std::unique_ptr<MaglevLoadBalancer> maglev_lb_;
 };
 
 uint64_t hashInt(uint64_t i) {
@@ -66,10 +159,17 @@ void BM_RingHashLoadBalancerBuildRing(benchmark::State& state) {
     const uint64_t num_hosts = state.range(0);
     const uint64_t min_ring_size = state.range(1);
     RingHashTester tester(num_hosts, min_ring_size);
-    state.ResumeTiming();
+
+    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
 
     // We are only interested in timing the initial ring build.
+    state.ResumeTiming();
     tester.ring_hash_lb_->initialize();
+    state.PauseTiming();
+    const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+    state.counters["memory"] = end_mem - start_mem;
+    state.counters["memory_per_host"] = (end_mem - start_mem) / num_hosts;
+    state.ResumeTiming();
   }
 }
 BENCHMARK(BM_RingHashLoadBalancerBuildRing)
@@ -85,10 +185,18 @@ void BM_MaglevLoadBalancerBuildTable(benchmark::State& state) {
   for (auto _ : state) {
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
-    BaseTester tester(num_hosts);
+    MaglevTester tester(num_hosts);
+
+    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+
+    // We are only interested in timing the initial table build.
     state.ResumeTiming();
-    MaglevTable table(HostsPerLocalityImpl(tester.priority_set_.getOrCreateHostSet(0).hosts()),
-                      nullptr);
+    tester.maglev_lb_->initialize();
+    state.PauseTiming();
+    const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+    state.counters["memory"] = end_mem - start_mem;
+    state.counters["memory_per_host"] = (end_mem - start_mem) / num_hosts;
+    state.ResumeTiming();
   }
 }
 BENCHMARK(BM_MaglevLoadBalancerBuildTable)
@@ -97,13 +205,10 @@ BENCHMARK(BM_MaglevLoadBalancerBuildTable)
     ->Arg(500)
     ->Unit(benchmark::kMillisecond);
 
-class TestLoadBalancerContext : public LoadBalancerContext {
+class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
-  const Network::Connection* downstreamConnection() const override { return nullptr; }
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
   absl::optional<uint64_t> hash_key_;
 };
@@ -128,6 +233,36 @@ void computeHitStats(benchmark::State& state,
   state.counters["relative_stddev_hits"] = (stddev / mean);
 }
 
+void BM_LeastRequestLoadBalancerChooseHost(benchmark::State& state) {
+  for (auto _ : state) {
+    state.PauseTiming();
+    const uint64_t num_hosts = state.range(0);
+    const uint64_t choice_count = state.range(1);
+    const uint64_t keys_to_simulate = state.range(2);
+    LeastRequestTester tester(num_hosts, choice_count);
+    std::unordered_map<std::string, uint64_t> hit_counter;
+    TestLoadBalancerContext context;
+    state.ResumeTiming();
+
+    for (uint64_t i = 0; i < keys_to_simulate; ++i) {
+      hit_counter[tester.lb_->chooseHost(&context)->address()->asString()] += 1;
+    }
+
+    // Do not time computation of mean, standard deviation, and relative standard deviation.
+    state.PauseTiming();
+    computeHitStats(state, hit_counter);
+    state.ResumeTiming();
+  }
+}
+BENCHMARK(BM_LeastRequestLoadBalancerChooseHost)
+    ->Args({100, 1, 1000000})
+    ->Args({100, 2, 1000000})
+    ->Args({100, 3, 1000000})
+    ->Args({100, 10, 1000000})
+    ->Args({100, 50, 1000000})
+    ->Args({100, 100, 1000000})
+    ->Unit(benchmark::kMillisecond);
+
 void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
   for (auto _ : state) {
     // Do not time the creation of the ring.
@@ -148,7 +283,7 @@ void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
     // TODO(mattklein123): When Maglev is a real load balancer, further share code with the
     //                     other test.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_ = (hashInt(i));
+      context.hash_key_ = hashInt(i);
       hit_counter[lb->chooseHost(&context)->address()->asString()] += 1;
     }
 
@@ -173,17 +308,19 @@ void BM_MaglevLoadBalancerChooseHost(benchmark::State& state) {
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
     const uint64_t keys_to_simulate = state.range(1);
-    BaseTester tester(num_hosts);
-    MaglevTable table(HostsPerLocalityImpl(tester.priority_set_.getOrCreateHostSet(0).hosts()),
-                      nullptr);
+    MaglevTester tester(num_hosts);
+    tester.maglev_lb_->initialize();
+    LoadBalancerPtr lb = tester.maglev_lb_->factory()->create();
     std::unordered_map<std::string, uint64_t> hit_counter;
+    TestLoadBalancerContext context;
     state.ResumeTiming();
 
     // Note: To a certain extent this is benchmarking the performance of xxhash as well as
     // std::unordered_map. However, it should be roughly equivalent to the work done when
     // comparing different hashing algorithms.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      hit_counter[table.chooseHost(hashInt(i))->address()->asString()] += 1;
+      context.hash_key_ = hashInt(i);
+      hit_counter[lb->chooseHost(&context)->address()->asString()] += 1;
     }
 
     // Do not time computation of mean, standard deviation, and relative standard deviation.
@@ -211,7 +348,7 @@ void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
     std::vector<HostConstSharedPtr> hosts;
     TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_ = (hashInt(i));
+      context.hash_key_ = hashInt(i);
       hosts.push_back(lb->chooseHost(&context));
     }
 
@@ -220,7 +357,7 @@ void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
     lb = tester2.ring_hash_lb_->factory()->create();
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_ = (hashInt(i));
+      context.hash_key_ = hashInt(i);
       hosts2.push_back(lb->chooseHost(&context));
     }
 
@@ -250,20 +387,23 @@ void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
     const uint64_t hosts_to_lose = state.range(1);
     const uint64_t keys_to_simulate = state.range(2);
 
-    BaseTester tester(num_hosts);
-    MaglevTable table(HostsPerLocalityImpl(tester.priority_set_.getOrCreateHostSet(0).hosts()),
-                      nullptr);
+    MaglevTester tester(num_hosts);
+    tester.maglev_lb_->initialize();
+    LoadBalancerPtr lb = tester.maglev_lb_->factory()->create();
     std::vector<HostConstSharedPtr> hosts;
+    TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      hosts.push_back(table.chooseHost(hashInt(i)));
+      context.hash_key_ = hashInt(i);
+      hosts.push_back(lb->chooseHost(&context));
     }
 
-    BaseTester tester2(num_hosts - hosts_to_lose);
-    MaglevTable table2(HostsPerLocalityImpl(tester2.priority_set_.getOrCreateHostSet(0).hosts()),
-                       nullptr);
+    MaglevTester tester2(num_hosts - hosts_to_lose);
+    tester2.maglev_lb_->initialize();
+    lb = tester2.maglev_lb_->factory()->create();
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      hosts2.push_back(table2.chooseHost(hashInt(i)));
+      context.hash_key_ = hashInt(i);
+      hosts2.push_back(lb->chooseHost(&context));
     }
 
     ASSERT(hosts.size() == hosts2.size());
@@ -294,20 +434,23 @@ void BM_MaglevLoadBalancerWeighted(benchmark::State& state) {
     const uint64_t after_weight = state.range(3);
     const uint64_t keys_to_simulate = state.range(4);
 
-    BaseTester tester(num_hosts, weighted_subset_percent, before_weight);
-    MaglevTable table(HostsPerLocalityImpl(tester.priority_set_.getOrCreateHostSet(0).hosts()),
-                      nullptr);
+    MaglevTester tester(num_hosts, weighted_subset_percent, before_weight);
+    tester.maglev_lb_->initialize();
+    LoadBalancerPtr lb = tester.maglev_lb_->factory()->create();
     std::vector<HostConstSharedPtr> hosts;
+    TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      hosts.push_back(table.chooseHost(hashInt(i)));
+      context.hash_key_ = hashInt(i);
+      hosts.push_back(lb->chooseHost(&context));
     }
 
-    BaseTester tester2(num_hosts, weighted_subset_percent, after_weight);
-    MaglevTable table2(HostsPerLocalityImpl(tester2.priority_set_.getOrCreateHostSet(0).hosts()),
-                       nullptr);
+    MaglevTester tester2(num_hosts, weighted_subset_percent, after_weight);
+    tester2.maglev_lb_->initialize();
+    lb = tester2.maglev_lb_->factory()->create();
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      hosts2.push_back(table2.chooseHost(hashInt(i)));
+      context.hash_key_ = hashInt(i);
+      hosts2.push_back(lb->chooseHost(&context));
     }
 
     ASSERT(hosts.size() == hosts2.size());
@@ -345,18 +488,3 @@ BENCHMARK(BM_MaglevLoadBalancerWeighted)
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
-
-// Boilerplate main(), which discovers benchmarks in the same file and runs them.
-int main(int argc, char** argv) {
-  // TODO(mattklein123): Provide a common bazel benchmark wrapper much like we do for normal tests,
-  // fuzz, etc.
-  Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Registry::initialize(spdlog::level::warn,
-                                      Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
-
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
-  }
-  benchmark::RunSpecifiedBenchmarks();
-}

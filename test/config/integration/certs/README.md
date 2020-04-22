@@ -11,6 +11,10 @@ There are 5 identities:
 - **Upstream**: It has the certificate *upstreamcert.pem*, which is signed by
   the **Upstream CA** using the config *upstreamcert.cfg*. *upstreamkey.pem* is
   its private key.
+- **Upstream localhost**: It has the certificate *upstreamlocalhostcert.pem*, which is signed by
+  the **Upstream CA** using the config *upstreamlocalhostcert.cfg*. *upstreamlocalhostkey.pem* is
+  its private key. The different between this certificate and **Upstream** is that this certifcate
+  has a SAN for "localhost".
 
 # How to update certificates
 **certs.sh** has the commands to generate all files. Running certs.sh directly

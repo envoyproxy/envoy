@@ -1,0 +1,60 @@
+{#
+  Template for 'kafka_response_resolver.cc'.
+  Defines default Kafka response resolver, that uses response parsers in (also generated)
+  'responses.h'.
+#}
+#include "extensions/filters/network/kafka/external/responses.h"
+#include "extensions/filters/network/kafka/kafka_response_parser.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+
+// Implements declaration from 'kafka_response.h'.
+bool responseUsesTaggedFieldsInHeader(const uint16_t api_key, const uint16_t api_version) {
+  switch (api_key) {
+    {% for message_type in message_types %}
+    case {{ message_type.get_extra('api_key') }}:
+      switch (api_version) {
+        {# ApiVersions responses require special handling. #}
+        {% if message_type.get_extra('api_key') != 18 %}
+        {% for flexible_version in message_type.flexible_versions %}
+        case {{ flexible_version }}:
+          return true;
+        {% endfor %}
+        {% endif %}
+        default:
+          return false;
+      }
+    {% endfor %}
+    default:
+      return false;
+  }
+}
+
+/**
+ * Creates a parser that is going to process data specific for given response.
+ * If corresponding parser cannot be found (what means a newer version of Kafka protocol),
+ * a sentinel parser is returned.
+ * @param context parse context (carries the expected message type information).
+ * @return parser that is capable of properly consuming response bytes.
+ */
+ResponseParserSharedPtr ResponseParserResolver::createParser(
+  ResponseContextSharedPtr context) const {
+
+  const int16_t api_key = context->api_key_;
+  const int16_t api_version = context->api_version_;
+
+{% for message_type in message_types %}{% for field_list in message_type.compute_field_lists() %}
+  if ({{ message_type.get_extra('api_key') }} == api_key
+    && {{ field_list.version }} == api_version) {
+    return std::make_shared<{{ message_type.name }}V{{ field_list.version }}Parser>(context);
+  }{% endfor %}{% endfor %}
+  return std::make_shared<SentinelResponseParser>(context);
+}
+
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

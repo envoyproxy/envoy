@@ -27,12 +27,14 @@ int main(int argc, char** argv) {
   } catch (const Envoy::NoServingException& e) {
     return EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {
+    std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   } catch (const Envoy::EnvoyException& e) {
+    std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   }
 
   // Run the server listener loop outside try/catch blocks, so that unexpected exceptions
-  // show up as a core-dumps for easier diagnostis.
+  // show up as a core-dumps for easier diagnostics.
   return main_common->run() ? EXIT_SUCCESS : EXIT_FAILURE;
 }

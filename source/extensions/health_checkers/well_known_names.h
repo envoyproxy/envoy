@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -13,10 +15,10 @@ namespace HealthCheckers {
 class HealthCheckerNameValues {
 public:
   // Redis health checker.
-  const std::string REDIS_HEALTH_CHECKER = "envoy.health_checkers.redis";
+  const std::string RedisHealthChecker = "envoy.health_checkers.redis";
 };
 
-typedef ConstSingleton<HealthCheckerNameValues> HealthCheckerNames;
+using HealthCheckerNames = ConstSingleton<HealthCheckerNameValues>;
 
 } // namespace HealthCheckers
 } // namespace Extensions

@@ -1,9 +1,11 @@
 #pragma once
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
-#include "envoy/common/pure.h"
+#include <memory>
 
-#include "common/config/datasource.h"
+#include "envoy/api/api.h"
+#include "envoy/common/pure.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/typed_config.h"
 
 #include "grpcpp/grpcpp.h"
 
@@ -13,9 +15,9 @@ namespace Grpc {
 /**
  * Interface for all Google gRPC credentials factories.
  */
-class GoogleGrpcCredentialsFactory {
+class GoogleGrpcCredentialsFactory : public Config::UntypedFactory {
 public:
-  virtual ~GoogleGrpcCredentialsFactory() {}
+  ~GoogleGrpcCredentialsFactory() override = default;
 
   /**
    * Get a ChannelCredentials to be used for authentication of a gRPC channel.
@@ -25,17 +27,15 @@ public:
    * CompositeCallCredentials to combine multiple credentials.
    *
    * @param grpc_service_config contains configuration options
+   * @param api reference to the Api object
    * @return std::shared_ptr<grpc::ChannelCredentials> to be used to authenticate a Google gRPC
    * channel.
    */
   virtual std::shared_ptr<grpc::ChannelCredentials>
-  getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config) PURE;
+  getChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service_config,
+                        Api::Api& api) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of
-   * a Google gRPC credentials factory.
-   */
-  virtual std::string name() const PURE;
+  std::string category() const override { return "envoy.grpc_credentials"; }
 };
 
 } // namespace Grpc

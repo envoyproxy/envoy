@@ -1,7 +1,6 @@
-#pragma once
-
 #include "envoy/event/dispatcher.h"
-#include "envoy/service/load_stats/v2/lrs.pb.h"
+#include "envoy/service/load_stats/v3/lrs.pb.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -14,12 +13,10 @@ namespace Upstream {
 /**
  * All load reporter stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_LOAD_REPORTER_STATS(COUNTER)                                                           \
   COUNTER(requests)                                                                                \
   COUNTER(responses)                                                                               \
   COUNTER(errors)
-// clang-format on
 
 /**
  * Struct definition for all load reporter stats. @see stats_macros.h
@@ -29,19 +26,20 @@ struct LoadReporterStats {
 };
 
 class LoadStatsReporter
-    : Grpc::TypedAsyncStreamCallbacks<envoy::service::load_stats::v2::LoadStatsResponse>,
+    : Grpc::AsyncStreamCallbacks<envoy::service::load_stats::v3::LoadStatsResponse>,
       Logger::Loggable<Logger::Id::upstream> {
 public:
-  LoadStatsReporter(const envoy::api::v2::core::Node& node, ClusterManager& cluster_manager,
-                    Stats::Scope& scope, Grpc::AsyncClientPtr async_client,
+  LoadStatsReporter(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
+                    Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
+                    envoy::config::core::v3::ApiVersion transport_api_version,
                     Event::Dispatcher& dispatcher);
 
-  // Grpc::TypedAsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
+  // Grpc::AsyncStreamCallbacks
+  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override;
   void onReceiveMessage(
-      std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse>&& message) override;
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
+      std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) override;
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   // TODO(htuch): Make this configurable or some static.
@@ -56,17 +54,22 @@ private:
 
   ClusterManager& cm_;
   LoadReporterStats stats_;
-  Grpc::AsyncClientPtr async_client_;
-  Grpc::AsyncStream* stream_{};
+  Grpc::AsyncClient<envoy::service::load_stats::v3::LoadStatsRequest,
+                    envoy::service::load_stats::v3::LoadStatsResponse>
+      async_client_;
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
+  Grpc::AsyncStream<envoy::service::load_stats::v3::LoadStatsRequest> stream_{};
   const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   Event::TimerPtr response_timer_;
-  envoy::service::load_stats::v2::LoadStatsRequest request_;
-  std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse> message_;
-  std::vector<std::string> clusters_;
+  envoy::service::load_stats::v3::LoadStatsRequest request_;
+  std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse> message_;
+  // Map from cluster name to start of measurement interval.
+  std::unordered_map<std::string, std::chrono::steady_clock::duration> clusters_;
+  TimeSource& time_source_;
 };
 
-typedef std::unique_ptr<LoadStatsReporter> LoadStatsReporterPtr;
+using LoadStatsReporterPtr = std::unique_ptr<LoadStatsReporter>;
 
 } // namespace Upstream
 } // namespace Envoy

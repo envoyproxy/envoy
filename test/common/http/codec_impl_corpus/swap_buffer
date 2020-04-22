@@ -1,0 +1,68 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+    }
+  }
+}
+actions { quiesce_drain {} }
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+    }
+  }
+}
+actions { quiesce_drain {} }
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      data: 123
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    request {
+      data: 1234
+    }
+  }
+}
+actions {
+  swap_buffer {
+    buffer: 1
+  }
+}
+actions { quiesce_drain {} }

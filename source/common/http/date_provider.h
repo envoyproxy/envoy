@@ -11,13 +11,13 @@ namespace Http {
  */
 class DateProvider {
 public:
-  virtual ~DateProvider() {}
+  virtual ~DateProvider() = default;
 
   /**
    * Set the Date header potentially using a cached value.
    * @param headers supplies the headers to fill.
    */
-  virtual void setDateHeader(HeaderMap& headers) PURE;
+  virtual void setDateHeader(ResponseHeaderMap& headers) PURE;
 };
 
 } // namespace Http

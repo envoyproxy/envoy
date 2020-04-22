@@ -1,5 +1,7 @@
 #include "extensions/tracers/dynamic_ot/config.h"
 
+#include "envoy/config/trace/v3/dynamic_ot.pb.h"
+#include "envoy/config/trace/v3/dynamic_ot.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
@@ -13,24 +15,25 @@ namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
 
-Tracing::HttpTracerPtr
-DynamicOpenTracingTracerFactory::createHttpTracer(const Json::Object& json_config,
-                                                  Server::Instance& server) {
-  const std::string library = json_config.getString("library");
-  const std::string config = json_config.getObject("config")->asJsonString();
-  Tracing::DriverPtr dynamic_driver{
-      std::make_unique<DynamicOpenTracingDriver>(server.stats(), library, config)};
-  return std::make_unique<Tracing::HttpTracerImpl>(std::move(dynamic_driver), server.localInfo());
-}
+DynamicOpenTracingTracerFactory::DynamicOpenTracingTracerFactory()
+    : FactoryBase(TracerNames::get().DynamicOt) {}
 
-std::string DynamicOpenTracingTracerFactory::name() { return TracerNames::get().DYNAMIC_OT; }
+Tracing::HttpTracerSharedPtr DynamicOpenTracingTracerFactory::createHttpTracerTyped(
+    const envoy::config::trace::v3::DynamicOtConfig& proto_config,
+    Server::Configuration::TracerFactoryContext& context) {
+  const std::string& library = proto_config.library();
+  const std::string config = MessageUtil::getJsonStringFromMessage(proto_config.config());
+  Tracing::DriverPtr dynamic_driver = std::make_unique<DynamicOpenTracingDriver>(
+      context.serverFactoryContext().scope(), library, config);
+  return std::make_shared<Tracing::HttpTracerImpl>(std::move(dynamic_driver),
+                                                   context.serverFactoryContext().localInfo());
+}
 
 /**
  * Static registration for the dynamic opentracing tracer. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DynamicOpenTracingTracerFactory,
-                                 Server::Configuration::TracerFactory>
-    register_;
+REGISTER_FACTORY(DynamicOpenTracingTracerFactory,
+                 Server::Configuration::TracerFactory){"envoy.dynamic.ot"};
 
 } // namespace DynamicOt
 } // namespace Tracers

@@ -4,6 +4,7 @@
 
 namespace Envoy {
 namespace Html {
+namespace {
 
 TEST(HttpUtility, SanitizeHtml) {
   EXPECT_EQ("simple text, no cares/worries", Utility::sanitize("simple text, no cares/worries"));
@@ -11,5 +12,6 @@ TEST(HttpUtility, SanitizeHtml) {
   EXPECT_EQ("&lt;script&gt;", Utility::sanitize("<script>"));
 }
 
+} // namespace
 } // namespace Html
 } // namespace Envoy

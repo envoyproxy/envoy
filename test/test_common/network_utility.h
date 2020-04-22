@@ -1,9 +1,11 @@
 #pragma once
 
+#include <list>
 #include <string>
 
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/io_handle.h"
 #include "envoy/network/transport_socket.h"
 
 namespace Envoy {
@@ -58,6 +60,13 @@ const std::string getLoopbackAddressString(const Address::IpVersion version);
 const std::string getAnyAddressUrlString(const Address::IpVersion version);
 
 /**
+ * Get an IP any address as a string.
+ * @param version IP address version of any address.
+ * @return std::string any address as a string.
+ */
+const std::string getAnyAddressString(const Address::IpVersion version);
+
+/**
  * Return a string version of enum IpVersion version.
  * @param version IP address version.
  * @return std::string string version of IpVersion.
@@ -86,10 +95,16 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version,
  * This function tries to create a socket of type IpVersion version and bind to it. If
  * successful this function returns true. If either socket creation or socket
  * bind fail, this function returns false.
- * @param version the IP verson to test.
+ * @param version the IP version to test.
  * @return bool whether IpVersion addresses are "supported".
  */
 bool supportsIpVersion(const Address::IpVersion version);
+
+/**
+ * Returns the DNS family for the specified IP version.
+ * @param version the IP version of the DNS lookup family.
+ */
+std::string ipVersionToDnsFamily(Network::Address::IpVersion version);
 
 /**
  * Bind a socket to a free port on a loopback address, and return the socket's fd and bound address.
@@ -99,8 +114,8 @@ bool supportsIpVersion(const Address::IpVersion version);
  * @param type the type of socket to be bound.
  * @returns the address and the fd of the socket bound to that address.
  */
-std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
-                                                                     Address::SocketType type);
+std::pair<Address::InstanceConstSharedPtr, IoHandlePtr>
+bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type);
 
 /**
  * Create a transport socket for testing purposes.
@@ -125,7 +140,7 @@ public:
       : transport_socket_factory_(std::move(transport_socket_factory)) {}
 
   // Network::FilterChain
-  const Network::TransportSocketFactory& transportSocketFactory() const override {
+  const TransportSocketFactory& transportSocketFactory() const override {
     return *transport_socket_factory_;
   }
 
@@ -141,16 +156,45 @@ private:
 /**
  * Create an empty filter chain for testing purposes.
  * @param transport_socket_factory transport socket factory to use when creating transport sockets.
- * @return const Network::FilterChainSharedPtr filter chain.
+ * @return const FilterChainSharedPtr filter chain.
  */
-const Network::FilterChainSharedPtr
+const FilterChainSharedPtr
 createEmptyFilterChain(TransportSocketFactoryPtr&& transport_socket_factory);
 
 /**
  * Create an empty filter chain creating raw buffer sockets for testing purposes.
- * @return const Network::FilterChainSharedPtr filter chain.
+ * @return const FilterChainSharedPtr filter chain.
  */
-const Network::FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
+const FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
+
+/**
+ * Wrapper for Utility::readFromSocket() which reads a single datagram into the supplied
+ * UdpRecvData without worrying about the packet processor interface. The function will
+ * instantiate the buffer returned in data.
+ */
+Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
+                                       UdpRecvData& data);
+
+/**
+ * A synchronous UDP peer that can be used for testing.
+ */
+class UdpSyncPeer {
+public:
+  UdpSyncPeer(Network::Address::IpVersion version);
+
+  // Writer a datagram to a remote peer.
+  void write(const std::string& buffer, const Network::Address::Instance& peer);
+
+  // Receive a datagram.
+  void recv(Network::UdpRecvData& datagram);
+
+  // Return the local peer's socket address.
+  const Network::Address::InstanceConstSharedPtr& localAddress() { return socket_->localAddress(); }
+
+private:
+  const Network::SocketPtr socket_;
+  std::list<Network::UdpRecvData> received_datagrams_;
+};
 
 } // namespace Test
 } // namespace Network

@@ -1,4 +1,8 @@
+#pragma once
+
 #include "common/network/connection_impl.h"
+
+#include "server/config_validation/dispatcher.h"
 
 namespace Envoy {
 namespace Network {
@@ -20,11 +24,11 @@ public:
 
   // Unit tests may instantiate it without proper event machine and leave opened sockets.
   // Do some cleanup before invoking base class's destructor.
-  virtual ~ConfigValidateConnection() { close(ConnectionCloseType::NoFlush); }
+  ~ConfigValidateConnection() override { close(ConnectionCloseType::NoFlush); }
 
   // connect may be called in config verification mode.
   // It is redefined as no-op. Calling parent's method triggers connection to upstream host.
-  virtual void connect() override {}
+  void connect() override {}
 };
 
 } // namespace Network

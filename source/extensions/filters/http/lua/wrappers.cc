@@ -1,5 +1,9 @@
 #include "extensions/filters/http/lua/wrappers.h"
 
+#include "common/http/utility.h"
+
+#include "extensions/filters/common/lua/wrappers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -21,8 +25,10 @@ int HeaderMapIterator::luaPairsIterator(lua_State* state) {
     parent_.iterator_.reset();
     return 0;
   } else {
-    lua_pushstring(state, entries_[current_]->key().c_str());
-    lua_pushstring(state, entries_[current_]->value().c_str());
+    const absl::string_view key_view(entries_[current_]->key().getStringView());
+    lua_pushlstring(state, key_view.data(), key_view.length());
+    const absl::string_view value_view(entries_[current_]->value().getStringView());
+    lua_pushlstring(state, value_view.data(), value_view.length());
     current_++;
     return 2;
   }
@@ -41,7 +47,8 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
   const char* key = luaL_checkstring(state, 2);
   const Http::HeaderEntry* entry = headers_.get(Http::LowerCaseString(key));
   if (entry != nullptr) {
-    lua_pushstring(state, entry->value().c_str());
+    lua_pushlstring(state, entry->value().getStringView().data(),
+                    entry->value().getStringView().length());
     return 1;
   } else {
     return 0;
@@ -72,12 +79,7 @@ int HeaderMapWrapper::luaReplace(lua_State* state) {
   const char* value = luaL_checkstring(state, 3);
   const Http::LowerCaseString lower_key(key);
 
-  Http::HeaderEntry* entry = headers_.get(lower_key);
-  if (entry != nullptr) {
-    entry->value(value, strlen(value));
-  } else {
-    headers_.addCopy(lower_key, value);
-  }
+  headers_.setCopy(lower_key, value);
 
   return 0;
 }
@@ -98,6 +100,96 @@ void HeaderMapWrapper::checkModifiable(lua_State* state) {
   if (!cb_()) {
     luaL_error(state, "header map can no longer be modified");
   }
+}
+
+int StreamInfoWrapper::luaProtocol(lua_State* state) {
+  lua_pushstring(state, Http::Utility::getProtocolString(stream_info_.protocol().value()).c_str());
+  return 1;
+}
+
+int StreamInfoWrapper::luaDynamicMetadata(lua_State* state) {
+  if (dynamic_metadata_wrapper_.get() != nullptr) {
+    dynamic_metadata_wrapper_.pushStack();
+  } else {
+    dynamic_metadata_wrapper_.reset(DynamicMetadataMapWrapper::create(state, *this), true);
+  }
+  return 1;
+}
+
+DynamicMetadataMapIterator::DynamicMetadataMapIterator(DynamicMetadataMapWrapper& parent)
+    : parent_{parent}, current_{parent_.streamInfo().dynamicMetadata().filter_metadata().begin()} {}
+
+StreamInfo::StreamInfo& DynamicMetadataMapWrapper::streamInfo() { return parent_.stream_info_; }
+
+int DynamicMetadataMapIterator::luaPairsIterator(lua_State* state) {
+  if (current_ == parent_.streamInfo().dynamicMetadata().filter_metadata().end()) {
+    parent_.iterator_.reset();
+    return 0;
+  }
+
+  lua_pushstring(state, current_->first.c_str());
+  Filters::Common::Lua::MetadataMapHelper::createTable(state, current_->second.fields());
+
+  current_++;
+  return 2;
+}
+
+int DynamicMetadataMapWrapper::luaGet(lua_State* state) {
+  const char* filter_name = luaL_checkstring(state, 2);
+  const auto& metadata = streamInfo().dynamicMetadata().filter_metadata();
+  const auto filter_it = metadata.find(filter_name);
+  if (filter_it == metadata.end()) {
+    return 0;
+  }
+
+  Filters::Common::Lua::MetadataMapHelper::createTable(state, filter_it->second.fields());
+  return 1;
+}
+
+int DynamicMetadataMapWrapper::luaSet(lua_State* state) {
+  if (iterator_.get() != nullptr) {
+    luaL_error(state, "dynamic metadata map cannot be modified while iterating");
+  }
+
+  const char* filter_name = luaL_checkstring(state, 2);
+  const char* key = luaL_checkstring(state, 3);
+
+  // MetadataMapHelper::loadValue will convert the value on top of the Lua stack,
+  // so push a copy of the 3rd arg ("value") to the top.
+  lua_pushvalue(state, 4);
+
+  ProtobufWkt::Struct value;
+  (*value.mutable_fields())[key] = Filters::Common::Lua::MetadataMapHelper::loadValue(state);
+  streamInfo().setDynamicMetadata(filter_name, value);
+
+  // Pop the copy of the metadata value from the stack.
+  lua_pop(state, 1);
+  return 0;
+}
+
+int DynamicMetadataMapWrapper::luaPairs(lua_State* state) {
+  if (iterator_.get() != nullptr) {
+    luaL_error(state, "cannot create a second iterator before completing the first");
+  }
+
+  iterator_.reset(DynamicMetadataMapIterator::create(state, *this), true);
+  lua_pushcclosure(state, DynamicMetadataMapIterator::static_luaPairsIterator, 1);
+  return 1;
+}
+
+int PublicKeyWrapper::luaGet(lua_State* state) {
+  if (public_key_ == nullptr || public_key_.get() == nullptr) {
+    lua_pushnil(state);
+  } else {
+    auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*public_key_);
+    EVP_PKEY* pkey = wrapper->getEVP_PKEY();
+    if (pkey == nullptr) {
+      lua_pushnil(state);
+    } else {
+      lua_pushlightuserdata(state, public_key_.get());
+    }
+  }
+  return 1;
 }
 
 } // namespace Lua

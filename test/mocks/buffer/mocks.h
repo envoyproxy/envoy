@@ -1,7 +1,10 @@
 #pragma once
 
+#include <string>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
+#include "common/network/io_socket_error_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -16,20 +19,20 @@ public:
   MockBufferBase();
   MockBufferBase(std::function<void()> below_low, std::function<void()> above_high);
 
-  MOCK_METHOD1(write, int(int fd));
-  MOCK_METHOD1(move, void(Buffer::Instance& rhs));
-  MOCK_METHOD2(move, void(Buffer::Instance& rhs, uint64_t length));
-  MOCK_METHOD1(drain, void(uint64_t size));
+  MOCK_METHOD(Api::IoCallUint64Result, write, (Network::IoHandle & io_handle));
+  MOCK_METHOD(void, move, (Buffer::Instance & rhs));
+  MOCK_METHOD(void, move, (Buffer::Instance & rhs, uint64_t length));
+  MOCK_METHOD(void, drain, (uint64_t size));
 
   void baseMove(Buffer::Instance& rhs) { BaseClass::move(rhs); }
   void baseDrain(uint64_t size) { BaseClass::drain(size); }
 
-  int trackWrites(int fd) {
-    int bytes_written = BaseClass::write(fd);
-    if (bytes_written > 0) {
-      bytes_written_ += bytes_written;
+  Api::IoCallUint64Result trackWrites(Network::IoHandle& io_handle) {
+    Api::IoCallUint64Result result = BaseClass::write(io_handle);
+    if (result.ok() && result.rc_ > 0) {
+      bytes_written_ += result.rc_;
     }
-    return bytes_written;
+    return result;
   }
 
   void trackDrains(uint64_t size) {
@@ -38,9 +41,10 @@ public:
   }
 
   // A convenience function to invoke on write() which fails the write with EAGAIN.
-  int failWrite(int) {
-    errno = EAGAIN;
-    return -1;
+  Api::IoCallUint64Result failWrite(Network::IoHandle&) {
+    return Api::IoCallUint64Result(
+        /*rc=*/0,
+        Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(), [](Api::IoError*) {}));
   }
 
   int bytes_written() const { return bytes_written_; }
@@ -72,7 +76,7 @@ public:
 
 class MockWatermarkBuffer : public MockBufferBase<Buffer::WatermarkBuffer> {
 public:
-  typedef MockBufferBase<Buffer::WatermarkBuffer> BaseClass;
+  using BaseClass = MockBufferBase<Buffer::WatermarkBuffer>;
 
   MockWatermarkBuffer(std::function<void()> below_low, std::function<void()> above_high)
       : BaseClass(below_low, above_high) {
@@ -85,13 +89,16 @@ public:
 
 class MockBufferFactory : public Buffer::WatermarkFactory {
 public:
+  MockBufferFactory();
+  ~MockBufferFactory() override;
+
   Buffer::InstancePtr create(std::function<void()> below_low,
                              std::function<void()> above_high) override {
     return Buffer::InstancePtr{create_(below_low, above_high)};
   }
 
-  MOCK_METHOD2(create_, Buffer::Instance*(std::function<void()> below_low,
-                                          std::function<void()> above_high));
+  MOCK_METHOD(Buffer::Instance*, create_,
+              (std::function<void()> below_low, std::function<void()> above_high));
 };
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {
@@ -99,19 +106,26 @@ MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {
 }
 
 MATCHER_P(BufferStringEqual, rhs, rhs) {
-  *result_listener << "\"" << TestUtility::bufferToString(arg) << "\"";
+  *result_listener << "\"" << arg.toString() << "\"";
 
   Buffer::OwnedImpl buffer(rhs);
   return TestUtility::buffersEqual(arg, buffer);
 }
 
+MATCHER_P(BufferStringContains, rhs,
+          std::string(negation ? "doesn't contain" : "contains") + " \"" + rhs + "\"") {
+  *result_listener << "\"" << arg.toString() << "\"";
+  return arg.toString().find(rhs) != std::string::npos;
+}
+
 ACTION_P(AddBufferToString, target_string) {
-  target_string->append(TestUtility::bufferToString(arg0));
+  auto bufferToString = [](const Buffer::OwnedImpl& buf) -> std::string { return buf.toString(); };
+  target_string->append(bufferToString(arg0));
   arg0.drain(arg0.length());
 }
 
 ACTION_P(AddBufferToStringWithoutDraining, target_string) {
-  target_string->append(TestUtility::bufferToString(arg0));
+  target_string->append(arg0.toString());
 }
 
 } // namespace Envoy

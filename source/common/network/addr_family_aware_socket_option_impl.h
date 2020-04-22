@@ -1,9 +1,7 @@
 #pragma once
 
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <sys/socket.h>
-
+#include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/listen_socket.h"
 
 #include "common/common/logger.h"
@@ -17,17 +15,21 @@ namespace Network {
 class AddrFamilyAwareSocketOptionImpl : public Socket::Option,
                                         Logger::Loggable<Logger::Id::connection> {
 public:
-  AddrFamilyAwareSocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
+  AddrFamilyAwareSocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
                                   SocketOptionName ipv4_optname, SocketOptionName ipv6_optname,
                                   int value)
-      : ipv4_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv4_optname, value)),
-        ipv6_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv6_optname, value)) {}
+      : ipv4_option_(std::make_unique<SocketOptionImpl>(in_state, ipv4_optname, value)),
+        ipv6_option_(std::make_unique<SocketOptionImpl>(in_state, ipv6_optname, value)) {}
 
   // Socket::Option
   bool setOption(Socket& socket,
-                 envoy::api::v2::core::SocketOption::SocketState state) const override;
+                 envoy::config::core::v3::SocketOption::SocketState state) const override;
   // The common socket options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
+
+  absl::optional<Details>
+  getOptionDetails(const Socket& socket,
+                   envoy::config::core::v3::SocketOption::SocketState state) const override;
 
   /**
    * Set a socket option that applies at both IPv4 and IPv6 socket levels. When the underlying FD
@@ -45,7 +47,7 @@ public:
    *         socket is non-IP.
    */
   static bool setIpSocketOption(Socket& socket,
-                                envoy::api::v2::core::SocketOption::SocketState state,
+                                envoy::config::core::v3::SocketOption::SocketState state,
                                 const std::unique_ptr<SocketOptionImpl>& ipv4_option,
                                 const std::unique_ptr<SocketOptionImpl>& ipv6_option);
 

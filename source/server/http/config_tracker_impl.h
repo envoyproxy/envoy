@@ -22,7 +22,7 @@ private:
   class EntryOwnerImpl : public ConfigTracker::EntryOwner {
   public:
     EntryOwnerImpl(const std::shared_ptr<CbsMap>& map, const std::string& key);
-    ~EntryOwnerImpl();
+    ~EntryOwnerImpl() override;
 
   private:
     std::shared_ptr<CbsMap> map_;

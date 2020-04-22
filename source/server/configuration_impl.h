@@ -9,14 +9,14 @@
 #include <unordered_map>
 #include <utility>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
-#include "envoy/tracing/http_tracer.h"
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
@@ -28,38 +28,12 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Implemented by each Tracer and registered via Registry::registerFactory() or the convenience
- * class RegisterFactory.
- */
-class TracerFactory {
-public:
-  virtual ~TracerFactory() {}
-
-  /**
-   * Create a particular HttpTracer implementation. If the implementation is unable to produce an
-   * HttpTracer with the provided parameters, it should throw an EnvoyException in the case of
-   * general error or a Json::Exception if the json configuration is erroneous. The returned
-   * pointer should always be valid.
-   * @param json_config supplies the general json configuration for the HttpTracer
-   * @param server supplies the server instance
-   */
-  virtual Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config,
-                                                  Instance& server) PURE;
-
-  /**
-   * Returns the identifying name for a particular implementation of tracer produced by the
-   * factory.
-   */
-  virtual std::string name() PURE;
-};
-
-/**
  * Implemented for each Stats::Sink and registered via Registry::registerFactory() or
  * the convenience class RegisterFactory.
  */
-class StatsSinkFactory {
+class StatsSinkFactory : public Config::TypedFactory {
 public:
-  virtual ~StatsSinkFactory() {}
+  ~StatsSinkFactory() override = default;
 
   /**
    * Create a particular Stats::Sink implementation. If the implementation is unable to produce a
@@ -70,18 +44,7 @@ public:
    */
   virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server) PURE;
 
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * Returns the identifying name for a particular implementation of Stats::Sink produced by the
-   * factory.
-   */
-  virtual std::string name() PURE;
+  std::string category() const override { return "envoy.stats_sinks"; }
 };
 
 /**
@@ -99,31 +62,43 @@ public:
   /**
    * Given a ListenerFilterManager and a list of factories, create a new filter chain. Chain
    * creation will exit early if any filters immediately close the connection.
+   *
+   * TODO(sumukhs): Coalesce with the above as they are very similar
    */
   static bool buildFilterChain(Network::ListenerFilterManager& filter_manager,
                                const std::vector<Network::ListenerFilterFactoryCb>& factories);
+
+  /**
+   * Given a UdpListenerFilterManager and a list of factories, create a new filter chain. Chain
+   * creation will exit early if any filters immediately close the connection.
+   */
+  static void
+  buildUdpFilterChain(Network::UdpListenerFilterManager& filter_manager,
+                      Network::UdpReadFilterCallbacks& callbacks,
+                      const std::vector<Network::UdpListenerFilterFactoryCb>& factories);
 };
 
 /**
- * Implementation of Server::Configuration::Main that reads a configuration from a JSON file.
+ * Implementation of Server::Configuration::Main that reads a configuration from
+ * a JSON file.
  */
 class MainImpl : Logger::Loggable<Logger::Id::config>, public Main {
 public:
   /**
-   * Initialize the configuration. This happens here vs. the constructor because the initialization
-   * will call through the server into the config to get the cluster manager so the config object
-   * must be created already.
+   * MainImpl is created in two phases. In the first phase it is
+   * default-constructed without a configuration as part of the server. The
+   * server won't be fully populated yet. initialize() applies the
+   * configuration in the second phase, as it requires a fully populated server.
+   *
    * @param bootstrap v2 bootstrap proto.
    * @param server supplies the owning server.
    * @param cluster_manager_factory supplies the cluster manager creation factory.
    */
-  void initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap, Instance& server,
+  void initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Instance& server,
                   Upstream::ClusterManagerFactory& cluster_manager_factory);
 
   // Server::Configuration::Main
   Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
-  Tracing::HttpTracer& httpTracer() override { return *http_tracer_; }
-  RateLimit::ClientFactory& rateLimitClientFactory() override { return *ratelimit_client_factory_; }
   std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }
   std::chrono::milliseconds statsFlushInterval() const override { return stats_flush_interval_; }
   std::chrono::milliseconds wdMissTimeout() const override { return watchdog_miss_timeout_; }
@@ -139,15 +114,13 @@ private:
   /**
    * Initialize tracers and corresponding sinks.
    */
-  void initializeTracers(const envoy::config::trace::v2::Tracing& configuration, Instance& server);
+  void initializeTracers(const envoy::config::trace::v3::Tracing& configuration, Instance& server);
 
-  void initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+  void initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                             Instance& server);
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
-  Tracing::HttpTracerPtr http_tracer_;
   std::list<Stats::SinkPtr> stats_sinks_;
-  RateLimit::ClientFactoryPtr ratelimit_client_factory_;
   std::chrono::milliseconds stats_flush_interval_;
   std::chrono::milliseconds watchdog_miss_timeout_;
   std::chrono::milliseconds watchdog_megamiss_timeout_;
@@ -160,39 +133,32 @@ private:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
+  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
-  absl::optional<std::string> flagsPath() override { return flags_path_; }
-  Runtime* runtime() override { return runtime_.get(); }
+  absl::optional<std::string> flagsPath() const override { return flags_path_; }
+  const envoy::config::bootstrap::v3::LayeredRuntime& runtime() override {
+    return layered_runtime_;
+  }
 
 private:
   struct AdminImpl : public Admin {
     // Server::Configuration::Initial::Admin
-    const std::string& accessLogPath() override { return access_log_path_; }
-    const std::string& profilePath() override { return profile_path_; }
+    const std::string& accessLogPath() const override { return access_log_path_; }
+    const std::string& profilePath() const override { return profile_path_; }
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
+    Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
 
     std::string access_log_path_;
     std::string profile_path_;
     Network::Address::InstanceConstSharedPtr address_;
-  };
-
-  struct RuntimeImpl : public Runtime {
-    // Server::Configuration::Runtime
-    const std::string& symlinkRoot() override { return symlink_root_; }
-    const std::string& subdirectory() override { return subdirectory_; }
-    const std::string& overrideSubdirectory() override { return override_subdirectory_; }
-
-    std::string symlink_root_;
-    std::string subdirectory_;
-    std::string override_subdirectory_;
+    Network::Socket::OptionsSharedPtr socket_options_;
   };
 
   AdminImpl admin_;
   absl::optional<std::string> flags_path_;
-  std::unique_ptr<RuntimeImpl> runtime_;
+  envoy::config::bootstrap::v3::LayeredRuntime layered_runtime_;
 };
 
 } // namespace Configuration

@@ -1,0 +1,14 @@
+---
+tasks:
+  gcc:
+    platform: ubuntu1804
+    build_targets:
+      - "//source/exe:envoy-static"
+  rbe:
+    platform: ubuntu1804
+    test_targets:
+      - "//test/..."
+    test_flags:
+      - "--config=remote-clang"
+      - "--config=remote-ci"
+      - "--jobs=75"

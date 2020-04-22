@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package test.common.router;
+
+import "envoy/config/core/v3/base.proto";
+import "test/fuzz/common.proto";
+
+import "validate/validate.proto";
+
+// Structured input for header_parser_fuzz_test.
+
+message TestCase {
+  repeated envoy.config.core.v3.HeaderValueOption headers_to_add = 1;
+  repeated string headers_to_remove = 2
+      [(validate.rules).repeated .items.string.well_known_regex = HTTP_HEADER_NAME];
+  test.fuzz.StreamInfo stream_info = 3;
+}

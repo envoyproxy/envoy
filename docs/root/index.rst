@@ -15,9 +15,9 @@ Envoy documentation
   intro/intro
   start/start
   install/install
+  version_history/version_history
   configuration/configuration
   operations/operations
   extending/extending
-  api-v1/api
-  api-v2/api
+  api/api
   faq/overview

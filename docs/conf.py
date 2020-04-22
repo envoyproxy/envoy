@@ -12,17 +12,47 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
+from datetime import datetime
+import os
+from sphinx.directives.code import CodeBlock
 import sphinx_rtd_theme
 import sys
-import os
+
+
+# https://stackoverflow.com/questions/44761197/how-to-use-substitution-definitions-with-code-blocks
+class SubstitutionCodeBlock(CodeBlock):
+  """
+  Similar to CodeBlock but replaces placeholders with variables. See "substitutions" below.
+  """
+
+  def run(self):
+    """
+    Replace placeholders with given variables.
+    """
+    app = self.state.document.settings.env.app
+    new_content = []
+    existing_content = self.content
+    for item in existing_content:
+      for pair in app.config.substitutions:
+        original, replacement = pair
+        item = item.replace(original, replacement)
+      new_content.append(item)
+
+    self.content = new_content
+    return list(CodeBlock.run(self))
+
 
 def setup(app):
   app.add_config_value('release_level', '', 'env')
+  app.add_config_value('substitutions', [], 'html')
+  app.add_directive('substitution-code-block', SubstitutionCodeBlock)
+
 
 if not os.environ.get('ENVOY_DOCS_RELEASE_LEVEL'):
   raise Exception("ENVOY_DOCS_RELEASE_LEVEL env var must be defined")
 
 release_level = os.environ['ENVOY_DOCS_RELEASE_LEVEL']
+blob_sha = os.environ['ENVOY_BLOB_SHA']
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -39,9 +69,15 @@ release_level = os.environ['ENVOY_DOCS_RELEASE_LEVEL']
 # ones.
 extensions = ['sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig']
 extlinks = {
-  'repo': ('https://github.com/envoyproxy/envoy/blob/master/%s', ''),
-  'api': ('https://github.com/envoyproxy/envoy/blob/master/api/%s', ''),
+    'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
+    'api': ('https://github.com/envoyproxy/envoy/blob/{}/api/%s'.format(blob_sha), ''),
 }
+
+# Setup global substitutions
+if 'pre-release' in release_level:
+  substitutions = [('|envoy_docker_image|', 'envoy-dev:{}'.format(blob_sha))]
+else:
+  substitutions = [('|envoy_docker_image|', 'envoy:{}'.format(blob_sha))]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -59,7 +95,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'envoy'
-copyright = u'2016-2018, Envoy Project Authors'
+copyright = u'2016-{}, Envoy Project Authors'.format(datetime.now().year)
 author = u'Envoy Project Authors'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -90,7 +126,14 @@ language = None
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
-exclude_patterns = ['_build', '_venv', 'Thumbs.db', '.DS_Store']
+exclude_patterns = [
+    '_build',
+    '_venv',
+    'Thumbs.db',
+    '.DS_Store',
+    'api-v2/api/v2/endpoint/load_report.proto.rst',
+    'api-v2/service/discovery/v2/hds.proto.rst',
+]
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
@@ -119,7 +162,6 @@ exclude_patterns = ['_build', '_venv', 'Thumbs.db', '.DS_Store']
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
 
-
 # -- Options for HTML output ----------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
@@ -129,7 +171,9 @@ html_theme = 'sphinx_rtd_theme'
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-#html_theme_options = {}
+html_theme_options = {
+    'logo_only': True,
+}
 
 # Add any paths that contain custom themes here, relative to this directory.
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
@@ -143,7 +187,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-#html_logo = None
+html_logo = '_static/img/envoy-logo.png'
 
 # The name of an image file (relative to this directory) to use as a favicon of
 # the docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32

@@ -1,26 +1,39 @@
 #pragma once
 
-#include <dirent.h>
-
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
-#include "envoy/api/os_sys_calls.h"
+#include "envoy/api/api.h"
 #include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/subscription.h"
+#include "envoy/init/manager.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
+#include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/type/v3/percent.pb.h"
+#include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/empty_string.h"
+#include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+#include "common/config/subscription_base.h"
+#include "common/init/manager_impl.h"
+#include "common/init/target_impl.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Runtime {
+
+using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 
 /**
  * Implementation of RandomGenerator that uses per-thread RANLUX generators seeded with current
@@ -38,15 +51,15 @@ public:
 /**
  * All runtime stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_RUNTIME_STATS(COUNTER, GAUGE)                                                          \
+  COUNTER(deprecated_feature_use)                                                                  \
   COUNTER(load_error)                                                                              \
-  COUNTER(override_dir_not_exists)                                                                 \
-  COUNTER(override_dir_exists)                                                                     \
   COUNTER(load_success)                                                                            \
-  GAUGE  (num_keys)                                                                                \
-  GAUGE  (admin_overrides_active)
-// clang-format on
+  COUNTER(override_dir_exists)                                                                     \
+  COUNTER(override_dir_not_exists)                                                                 \
+  GAUGE(admin_overrides_active, NeverImport)                                                       \
+  GAUGE(num_keys, NeverImport)                                                                     \
+  GAUGE(num_layers, NeverImport)
 
 /**
  * Struct definition for all runtime stats. @see stats_macros.h
@@ -58,27 +71,61 @@ struct RuntimeStats {
 /**
  * Implementation of Snapshot whose source is the vector of layers passed to the constructor.
  */
-class SnapshotImpl : public Snapshot, public ThreadLocal::ThreadLocalObject {
+class SnapshotImpl : public Snapshot,
+                     public ThreadLocal::ThreadLocalObject,
+                     Logger::Loggable<Logger::Id::runtime> {
 public:
   SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
                std::vector<OverrideLayerConstPtr>&& layers);
 
   // Runtime::Snapshot
-  bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
+  bool deprecatedFeatureEnabled(absl::string_view key, bool default_value) const override;
+  bool runtimeFeatureEnabled(absl::string_view key) const override;
+  bool featureEnabled(absl::string_view key, uint64_t default_value, uint64_t random_value,
                       uint64_t num_buckets) const override;
-  bool featureEnabled(const std::string& key, uint64_t default_value) const override;
-  bool featureEnabled(const std::string& key, uint64_t default_value,
+  bool featureEnabled(absl::string_view key, uint64_t default_value) const override;
+  bool featureEnabled(absl::string_view key, uint64_t default_value,
                       uint64_t random_value) const override;
-  const std::string& get(const std::string& key) const override;
-  uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
+  bool featureEnabled(absl::string_view key,
+                      const envoy::type::v3::FractionalPercent& default_value) const override;
+  bool featureEnabled(absl::string_view key,
+                      const envoy::type::v3::FractionalPercent& default_value,
+                      uint64_t random_value) const override;
+  ConstStringOptRef get(absl::string_view key) const override;
+  uint64_t getInteger(absl::string_view key, uint64_t default_value) const override;
+  double getDouble(absl::string_view key, double default_value) const override;
+  bool getBoolean(absl::string_view key, bool value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
 
   static Entry createEntry(const std::string& value);
+  static Entry createEntry(const ProtobufWkt::Value& value);
 
 private:
+  static void resolveEntryType(Entry& entry) {
+    if (parseEntryBooleanValue(entry)) {
+      return;
+    }
+
+    if (parseEntryDoubleValue(entry) && entry.double_value_ >= 0 &&
+        entry.double_value_ <= std::numeric_limits<uint64_t>::max()) {
+      // Valid uint values will always be parseable as doubles, so we assign the value to both the
+      // uint and double fields. In cases where the value is something like "3.1", we will floor the
+      // number by casting it to a uint and assigning the uint value.
+      entry.uint_value_ = entry.double_value_;
+      return;
+    }
+
+    parseEntryFractionalPercentValue(entry);
+  }
+
+  static bool parseEntryBooleanValue(Entry& entry);
+  static bool parseEntryDoubleValue(Entry& entry);
+  static void parseEntryFractionalPercentValue(Entry& entry);
+
   const std::vector<OverrideLayerConstPtr> layers_;
-  std::unordered_map<std::string, const Snapshot::Entry> values_;
+  EntryMap values_;
   RandomGenerator& generator_;
+  RuntimeStats& stats_;
 };
 
 /**
@@ -86,14 +133,12 @@ private:
  */
 class OverrideLayerImpl : public Snapshot::OverrideLayer {
 public:
-  explicit OverrideLayerImpl(const std::string& name) : name_{name} {}
-  const std::unordered_map<std::string, Snapshot::Entry>& values() const override {
-    return values_;
-  }
+  explicit OverrideLayerImpl(absl::string_view name) : name_{name} {}
+  const Snapshot::EntryMap& values() const override { return values_; }
   const std::string& name() const override { return name_; }
 
 protected:
-  std::unordered_map<std::string, Snapshot::Entry> values_;
+  Snapshot::EntryMap values_;
   const std::string name_;
 };
 
@@ -104,11 +149,12 @@ protected:
  */
 class AdminLayer : public OverrideLayerImpl {
 public:
-  explicit AdminLayer(RuntimeStats& stats) : OverrideLayerImpl{"admin"}, stats_{stats} {}
+  explicit AdminLayer(absl::string_view name, RuntimeStats& stats)
+      : OverrideLayerImpl{name}, stats_{stats} {}
   /**
    * Copy-constructible so that it can snapshotted.
    */
-  AdminLayer(const AdminLayer& admin_layer) : AdminLayer{admin_layer.stats_} {
+  AdminLayer(const AdminLayer& admin_layer) : AdminLayer{admin_layer.name_, admin_layer.stats_} {
     values_ = admin_layer.values();
   }
 
@@ -122,34 +168,70 @@ private:
   RuntimeStats& stats_;
 };
 
+using AdminLayerPtr = std::unique_ptr<AdminLayer>;
+
 /**
  * Extension of OverrideLayerImpl that loads values from the file system upon construction.
  */
 class DiskLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  DiskLayer(const std::string& name, const std::string& path, Api::OsSysCalls& os_sys_calls);
+  DiskLayer(absl::string_view name, const std::string& path, Api::Api& api);
 
 private:
-  struct Directory {
-    Directory(const std::string& path) {
-      dir_ = opendir(path.c_str());
-      if (!dir_) {
-        throw EnvoyException(fmt::format("unable to open directory: {}", path));
-      }
-    }
-
-    ~Directory() { closedir(dir_); }
-
-    DIR* dir_;
-  };
-
-  void walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth);
+  void walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
+                     Api::Api& api);
 
   const std::string path_;
-  Api::OsSysCalls& os_sys_calls_;
-  // Maximum recursion depth for walkDirectory().
-  const uint32_t MaxWalkDepth = 16;
+  const Filesystem::WatcherPtr watcher_;
 };
+
+/**
+ * Extension of OverrideLayerImpl that loads values from a proto Struct representation.
+ */
+class ProtoLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
+public:
+  ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto);
+
+private:
+  void walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix);
+};
+
+class LoaderImpl;
+
+struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>,
+                          Logger::Loggable<Logger::Id::runtime> {
+  RtdsSubscription(LoaderImpl& parent,
+                   const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
+                   Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
+
+  // Config::SubscriptionCallbacks
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string&) override;
+  void onConfigUpdate(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+      const std::string&) override;
+
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                            const EnvoyException* e) override;
+  std::string resourceName(const ProtobufWkt::Any& resource) override {
+    return MessageUtil::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
+  }
+
+  void start();
+  void validateUpdateSize(uint32_t num_resources);
+
+  LoaderImpl& parent_;
+  const envoy::config::core::v3::ConfigSource config_source_;
+  Stats::Store& store_;
+  Config::SubscriptionPtr subscription_;
+  std::string resource_name_;
+  Init::TargetImpl init_target_;
+  ProtobufWkt::Struct proto_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+};
+
+using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;
 
 /**
  * Implementation of Loader that provides Snapshots of values added via mergeValues().
@@ -157,55 +239,47 @@ private:
  * a new runtime can be swapped in by the main thread while workers are still using the previous
  * version.
  */
-class LoaderImpl : public Loader {
+class LoaderImpl : public Loader, Logger::Loggable<Logger::Id::runtime> {
 public:
-  LoaderImpl(RandomGenerator& generator, Stats::Store& stats, ThreadLocal::SlotAllocator& tls);
+  LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+             const envoy::config::bootstrap::v3::LayeredRuntime& config,
+             const LocalInfo::LocalInfo& local_info, Stats::Store& store,
+             RandomGenerator& generator, ProtobufMessage::ValidationVisitor& validation_visitor,
+             Api::Api& api);
 
   // Runtime::Loader
-  Snapshot& snapshot() override;
+  void initialize(Upstream::ClusterManager& cm) override;
+  const Snapshot& snapshot() override;
+  std::shared_ptr<const Snapshot> threadsafeSnapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
+  void startRtdsSubscriptions(ReadyCallback on_done) override;
 
-protected:
-  // Identical the the public constructor but does not call loadSnapshot(). Subclasses must call
-  // loadSnapshot() themselves to create the initial snapshot, since loadSnapshot calls the virtual
-  // function createNewSnapshot() and is therefore unsuitable for use in a superclass constructor.
-  struct DoNotLoadSnapshot {};
-  LoaderImpl(DoNotLoadSnapshot /* unused */, RandomGenerator& generator, Stats::Store& stats,
-             ThreadLocal::SlotAllocator& tls);
+private:
+  friend RtdsSubscription;
 
   // Create a new Snapshot
   virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
+  RuntimeStats generateStats(Stats::Store& store);
+  void onRdtsReady();
 
   RandomGenerator& generator_;
   RuntimeStats stats_;
-  AdminLayer admin_layer_;
-
-private:
-  RuntimeStats generateStats(Stats::Store& store);
-
+  AdminLayerPtr admin_layer_;
   ThreadLocal::SlotPtr tls_;
-};
+  const envoy::config::bootstrap::v3::LayeredRuntime config_;
+  const std::string service_cluster_;
+  Filesystem::WatcherPtr watcher_;
+  Api::Api& api_;
+  ReadyCallback on_rtds_initialized_;
+  Init::WatcherImpl init_watcher_;
+  Init::ManagerImpl init_manager_{"RTDS"};
+  std::vector<RtdsSubscriptionPtr> subscriptions_;
+  Upstream::ClusterManager* cm_{};
 
-/**
- * Extension of LoaderImpl that watches a symlink for swapping and loads a specified subdirectory
- * from disk. Values added via mergeValues() are secondary to those loaded from disk.
- */
-class DiskBackedLoaderImpl : public LoaderImpl, Logger::Loggable<Logger::Id::runtime> {
-public:
-  DiskBackedLoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
-                       const std::string& root_symlink_path, const std::string& subdir,
-                       const std::string& override_dir, Stats::Store& store,
-                       RandomGenerator& generator, Api::OsSysCallsPtr os_sys_calls);
-
-private:
-  std::unique_ptr<SnapshotImpl> createNewSnapshot() override;
-
-  const Filesystem::WatcherPtr watcher_;
-  const std::string root_path_;
-  const std::string override_path_;
-  const Api::OsSysCallsPtr os_sys_calls_;
+  absl::Mutex snapshot_mutex_;
+  std::shared_ptr<const Snapshot> thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
 };
 
 } // namespace Runtime

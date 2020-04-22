@@ -1,8 +1,10 @@
 licenses(["notice"])  # Apache 2
+
 # Trace driver for Zipkin (https://zipkin.io/).
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -14,6 +16,7 @@ envoy_cc_library(
     srcs = [
         "span_buffer.cc",
         "span_context.cc",
+        "span_context_extractor.cc",
         "tracer.cc",
         "util.cc",
         "zipkin_core_types.cc",
@@ -22,6 +25,7 @@ envoy_cc_library(
     hdrs = [
         "span_buffer.h",
         "span_context.h",
+        "span_context_extractor.h",
         "tracer.h",
         "tracer_interface.h",
         "util.h",
@@ -31,7 +35,6 @@ envoy_cc_library(
         "zipkin_tracer_impl.h",
     ],
     external_deps = [
-        "rapidjson",
         "abseil_optional",
     ],
     deps = [
@@ -45,6 +48,8 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/http:async_client_utility_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
@@ -52,16 +57,22 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/upstream:cluster_update_tracker_lib",
+        "//source/extensions/tracers:well_known_names",
+        "@com_github_openzipkin_zipkinapi//:zipkin_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
+        ":zipkin_lib",
         "//source/extensions/tracers:well_known_names",
-        "//source/extensions/tracers/zipkin:zipkin_lib",
-        "//source/server:configuration_lib",
+        "//source/extensions/tracers/common:factory_base_lib",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )

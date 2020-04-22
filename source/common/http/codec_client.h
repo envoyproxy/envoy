@@ -25,7 +25,7 @@ namespace Http {
  */
 class CodecClientCallbacks {
 public:
-  virtual ~CodecClientCallbacks() {}
+  virtual ~CodecClientCallbacks() = default;
 
   /**
    * Called every time an owned stream is destroyed, whether complete or not.
@@ -51,9 +51,9 @@ public:
   /**
    * Type of HTTP codec to use.
    */
-  enum class Type { HTTP1, HTTP2 };
+  enum class Type { HTTP1, HTTP2, HTTP3 };
 
-  ~CodecClient();
+  ~CodecClient() override;
 
   /**
    * Add a connection callback to the underlying network connection.
@@ -79,7 +79,17 @@ public:
   uint64_t id() { return connection_->id(); }
 
   /**
-   * @return size_t the number of oustanding requests that have not completed or been reset.
+   * @return the underlying codec protocol.
+   */
+  Protocol protocol() { return codec_->protocol(); }
+
+  /**
+   * @return the underlying connection error.
+   */
+  absl::string_view connectionFailureReason() { return connection_->transportFailureReason(); }
+
+  /**
+   * @return size_t the number of outstanding requests that have not completed or been reset.
    */
   size_t numActiveRequests() { return active_requests_.size(); }
 
@@ -90,7 +100,7 @@ public:
    * @param response_decoder supplies the decoder to use for response callbacks.
    * @return StreamEncoder& the encoder to use for encoding the request.
    */
-  StreamEncoder& newStream(StreamDecoder& response_decoder);
+  RequestEncoder& newStream(ResponseDecoder& response_decoder);
 
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) {
     connection_->setConnectionStats(stats);
@@ -107,6 +117,8 @@ public:
   bool remoteClosed() const { return remote_closed_; }
 
   Type type() const { return type_; }
+
+  const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
 
 protected:
   /**
@@ -174,12 +186,14 @@ private:
   struct ActiveRequest : LinkedObject<ActiveRequest>,
                          public Event::DeferredDeletable,
                          public StreamCallbacks,
-                         public StreamDecoderWrapper {
-    ActiveRequest(CodecClient& parent, StreamDecoder& inner)
-        : StreamDecoderWrapper(inner), parent_(parent) {}
+                         public ResponseDecoderWrapper {
+    ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
+        : ResponseDecoderWrapper(inner), parent_(parent) {}
 
     // StreamCallbacks
-    void onResetStream(StreamResetReason reason) override { parent_.onReset(*this, reason); }
+    void onResetStream(StreamResetReason reason, absl::string_view) override {
+      parent_.onReset(*this, reason);
+    }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -187,11 +201,11 @@ private:
     void onPreDecodeComplete() override { parent_.responseDecodeComplete(*this); }
     void onDecodeComplete() override {}
 
-    StreamEncoder* encoder_{};
+    RequestEncoder* encoder_{};
     CodecClient& parent_;
   };
 
-  typedef std::unique_ptr<ActiveRequest> ActiveRequestPtr;
+  using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;
 
   /**
    * Called when a response finishes decoding. This is called *before* forwarding on to the
@@ -221,7 +235,7 @@ private:
   bool remote_closed_{};
 };
 
-typedef std::unique_ptr<CodecClient> CodecClientPtr;
+using CodecClientPtr = std::unique_ptr<CodecClient>;
 
 /**
  * Production implementation that installs a real codec.

@@ -2,7 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.pb.validate.h"
+#include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
+#include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
@@ -15,7 +16,7 @@ namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
 Http::FilterFactoryCb HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::header_to_metadata::v2::Config& proto_config,
+    const envoy::extensions::filters::http::header_to_metadata::v3::Config& proto_config,
     const std::string&, Server::Configuration::FactoryContext&) {
   ConfigSharedPtr filter_config(std::make_shared<Config>(proto_config));
 
@@ -25,12 +26,17 @@ Http::FilterFactoryCb HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
+Router::RouteSpecificFilterConfigConstSharedPtr
+HeaderToMetadataConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::header_to_metadata::v3::Config& config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<const Config>(config, true);
+}
+
 /**
  * Static registration for the header-to-metadata filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<HeaderToMetadataConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(HeaderToMetadataConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters

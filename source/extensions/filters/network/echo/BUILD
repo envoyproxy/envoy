@@ -1,9 +1,11 @@
 licenses(["notice"])  # Apache 2
+
 # Echo L4 network filter. This is primarily a simplistic example.
 # Public docs: docs/root/configuration/network_filters/echo_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -23,13 +25,16 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
+    security_posture = "unknown",
     deps = [
         ":echo",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/network:well_known_names",
+        "//source/extensions/filters/network/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/network/echo/v3:pkg_cc_proto",
     ],
 )

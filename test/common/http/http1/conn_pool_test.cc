@@ -1,6 +1,8 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/http/codec.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/http/codec_client.h"
@@ -17,11 +19,13 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -30,11 +34,11 @@ using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+namespace {
 
 /**
  * A test version of ConnPoolImpl that allows for mocking beneath the codec clients.
@@ -45,10 +49,11 @@ public:
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
       : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
-                     Upstream::ResourcePriority::Default, nullptr),
-        mock_dispatcher_(dispatcher), mock_upstream_ready_timer_(upstream_ready_timer) {}
+                     Upstream::ResourcePriority::Default, nullptr, nullptr),
+        api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
+        mock_upstream_ready_timer_(upstream_ready_timer) {}
 
-  ~ConnPoolImplForTest() {
+  ~ConnPoolImplForTest() override {
     EXPECT_EQ(0U, ready_clients_.size());
     EXPECT_EQ(0U, busy_clients_.size());
     EXPECT_EQ(0U, pending_requests_.size());
@@ -69,20 +74,20 @@ public:
     return CodecClientPtr{createCodecClient_()};
   }
 
-  MOCK_METHOD0(createCodecClient_, CodecClient*());
-  MOCK_METHOD0(onClientDestroy, void());
+  MOCK_METHOD(CodecClient*, createCodecClient_, ());
+  MOCK_METHOD(void, onClientDestroy, ());
 
-  void expectClientCreate() {
+  void expectClientCreate(Protocol protocol = Protocol::Http11) {
     test_clients_.emplace_back();
     TestCodecClient& test_client = test_clients_.back();
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&mock_dispatcher_);
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-    test_client.client_dispatcher_.reset(new Event::DispatcherImpl);
+    test_client.client_dispatcher_ = api_->allocateDispatcher("test_thread");
     Network::ClientConnectionPtr connection{test_client.connection_};
     test_client.codec_client_ = new CodecClientForTest(
-        std::move(connection), test_client.codec_,
+        CodecClient::Type::HTTP1, std::move(connection), test_client.codec_,
         [this](CodecClient* codec_client) -> void {
           for (auto i = test_clients_.begin(); i != test_clients_.end(); i++) {
             if (i->codec_client_ == codec_client) {
@@ -96,20 +101,22 @@ public:
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
     EXPECT_CALL(*this, createCodecClient_()).WillOnce(Return(test_client.codec_client_));
-    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_));
+    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
+    ON_CALL(*test_client.codec_, protocol()).WillByDefault(Return(protocol));
   }
 
   void expectEnableUpstreamReady() {
     EXPECT_FALSE(upstream_ready_enabled_);
-    EXPECT_CALL(*mock_upstream_ready_timer_, enableTimer(_)).Times(1).RetiresOnSaturation();
+    EXPECT_CALL(*mock_upstream_ready_timer_, enableTimer(_, _)).Times(1).RetiresOnSaturation();
   }
 
   void expectAndRunUpstreamReady() {
     EXPECT_TRUE(upstream_ready_enabled_);
-    mock_upstream_ready_timer_->callback_();
+    mock_upstream_ready_timer_->invokeCallback();
     EXPECT_FALSE(upstream_ready_enabled_);
   }
 
+  Api::ApiPtr api_;
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Event::MockTimer>* mock_upstream_ready_timer_;
   std::vector<TestCodecClient> test_clients_;
@@ -124,11 +131,8 @@ public:
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
         conn_pool_(dispatcher_, cluster_, upstream_ready_timer_) {}
 
-  ~Http1ConnPoolImplTest() {
-    // Make sure all gauges are 0.
-    for (const Stats::GaugeSharedPtr& gauge : cluster_->stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value());
-    }
+  ~Http1ConnPoolImplTest() override {
+    EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -146,6 +150,9 @@ struct ActiveTestRequest {
 
   ActiveTestRequest(Http1ConnPoolImplTest& parent, size_t client_index, Type type)
       : parent_(parent), client_index_(client_index) {
+    uint64_t active_rq_observed =
+        parent_.cluster_->resourceManager(Upstream::ResourcePriority::Default).requests().count();
+    uint64_t current_rq_total = parent_.cluster_->stats_.upstream_rq_total_.value();
     if (type == Type::CreateConnection) {
       parent.conn_pool_.expectClientCreate();
     }
@@ -153,6 +160,7 @@ struct ActiveTestRequest {
     if (type == Type::Immediate) {
       expectNewStream();
     }
+
     handle_ = parent.conn_pool_.newStream(outer_decoder_, callbacks_);
 
     if (type == Type::Immediate) {
@@ -162,17 +170,24 @@ struct ActiveTestRequest {
     }
 
     if (type == Type::CreateConnection) {
-      EXPECT_CALL(*parent_.conn_pool_.test_clients_[client_index_].connect_timer_, disableTimer());
       expectNewStream();
+      EXPECT_CALL(*parent_.conn_pool_.test_clients_[client_index_].connect_timer_, disableTimer());
       parent.conn_pool_.test_clients_[client_index_].connection_->raiseEvent(
           Network::ConnectionEvent::Connected);
+    }
+    if (type != Type::Pending) {
+      EXPECT_EQ(current_rq_total + 1, parent_.cluster_->stats_.upstream_rq_total_.value());
+      EXPECT_EQ(active_rq_observed + 1,
+                parent_.cluster_->resourceManager(Upstream::ResourcePriority::Default)
+                    .requests()
+                    .count());
     }
   }
 
   void completeResponse(bool with_body) {
     // Test additional metric writes also.
-    Http::HeaderMapPtr response_headers(
-        new TestHeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "true"}});
+    Http::ResponseHeaderMapPtr response_headers(
+        new TestResponseHeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "true"}});
 
     inner_decoder_->decodeHeaders(std::move(response_headers), !with_body);
     if (with_body) {
@@ -187,23 +202,30 @@ struct ActiveTestRequest {
     EXPECT_CALL(callbacks_.pool_ready_, ready());
   }
 
-  void startRequest() { callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true); }
+  void startRequest() {
+    callbacks_.outer_encoder_->encodeHeaders(
+        TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  }
 
   Http1ConnPoolImplTest& parent_;
   size_t client_index_;
-  NiceMock<Http::MockStreamDecoder> outer_decoder_;
+  NiceMock<MockResponseDecoder> outer_decoder_;
   Http::ConnectionPool::Cancellable* handle_{};
-  NiceMock<Http::MockStreamEncoder> request_encoder_;
-  Http::StreamDecoder* inner_decoder_{};
+  NiceMock<MockRequestEncoder> request_encoder_;
+  Http::ResponseDecoder* inner_decoder_{};
   ConnPoolCallbacks callbacks_;
 };
+
+/**
+ * Verify that the pool's host is a member of the cluster the pool was constructed with.
+ */
+TEST_F(Http1ConnPoolImplTest, Host) { EXPECT_EQ(cluster_.get(), &conn_pool_.host()->cluster()); }
 
 /**
  * Verify that connections are drained when requested.
  */
 TEST_F(Http1ConnPoolImplTest, DrainConnections) {
-  cluster_->resource_manager_.reset(
-      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 2, 1024, 1024, 1));
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
   InSequence s;
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
@@ -247,7 +269,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyTimingStats) {
  * Test that buffer limits are set.
  */
 TEST_F(Http1ConnPoolImplTest, VerifyBufferLimits) {
-  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes()).WillOnce(Return(8192));
@@ -257,6 +279,38 @@ TEST_F(Http1ConnPoolImplTest, VerifyBufferLimits) {
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
   EXPECT_CALL(callbacks.pool_failure_, ready());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * Verify that canceling pending connections within the callback works.
+ */
+TEST_F(Http1ConnPoolImplTest, VerifyCancelInCallback) {
+  Http::ConnectionPool::Cancellable* handle1{};
+  // In this scenario, all connections must succeed, so when
+  // one fails, the others are canceled.
+  // Note: We rely on the fact that the implementation cancels the second request first,
+  // to simplify the test.
+  ConnPoolCallbacks callbacks1;
+  EXPECT_CALL(callbacks1.pool_failure_, ready()).Times(0);
+  ConnPoolCallbacks callbacks2;
+  EXPECT_CALL(callbacks2.pool_failure_, ready()).WillOnce(Invoke([&]() -> void {
+    handle1->cancel();
+  }));
+
+  NiceMock<MockResponseDecoder> outer_decoder;
+  // Create the first client.
+  conn_pool_.expectClientCreate();
+  handle1 = conn_pool_.newStream(outer_decoder, callbacks1);
+  ASSERT_NE(nullptr, handle1);
+
+  // Create the second client.
+  Http::ConnectionPool::Cancellable* handle2 = conn_pool_.newStream(outer_decoder, callbacks2);
+  ASSERT_NE(nullptr, handle2);
+
+  // Simulate connection failure.
+  EXPECT_CALL(conn_pool_, onClientDestroy());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }
@@ -288,20 +342,24 @@ TEST_F(Http1ConnPoolImplTest, MultipleRequestAndResponse) {
  * Test when we overflow max pending requests.
  */
 TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
-  cluster_->resource_manager_.reset(
-      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1, 1024, 1));
+  cluster_->resetResourceManager(1, 1, 1024, 1, 1);
 
-  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_pending_open_.value());
+
+  NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
   EXPECT_NE(nullptr, handle);
 
-  NiceMock<Http::MockStreamDecoder> outer_decoder2;
+  NiceMock<MockResponseDecoder> outer_decoder2;
   ConnPoolCallbacks callbacks2;
   EXPECT_CALL(callbacks2.pool_failure_, ready());
   Http::ConnectionPool::Cancellable* handle2 = conn_pool_.newStream(outer_decoder2, callbacks2);
   EXPECT_EQ(nullptr, handle2);
+  EXPECT_EQ(callbacks2.reason_, ConnectionPool::PoolFailureReason::Overflow);
+
+  EXPECT_EQ(1U, cluster_->circuit_breakers_stats_.rq_pending_open_.value());
 
   handle->cancel();
 
@@ -320,7 +378,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectFailure) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
-  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
@@ -337,32 +395,90 @@ TEST_F(Http1ConnPoolImplTest, ConnectFailure) {
 }
 
 /**
+ * Tests that connection creation time is recorded correctly even in cases where
+ * there are multiple pending connection creation attempts to the same upstream.
+ */
+TEST_F(Http1ConnPoolImplTest, MeasureConnectTime) {
+  constexpr uint64_t sleep1_ms = 20;
+  constexpr uint64_t sleep2_ms = 10;
+  constexpr uint64_t sleep3_ms = 5;
+  Event::SimulatedTimeSystem simulated_time;
+
+  // Allow concurrent creation of 2 upstream connections.
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+
+  InSequence s;
+
+  // Start the first connect attempt.
+  conn_pool_.expectClientCreate();
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::Pending);
+
+  // Move time forward and start the second connect attempt.
+  simulated_time.advanceTimeWait(std::chrono::milliseconds(sleep1_ms));
+  conn_pool_.expectClientCreate();
+  ActiveTestRequest r2(*this, 1, ActiveTestRequest::Type::Pending);
+
+  // Move time forward, signal that the first connect completed and verify the time to connect.
+  uint64_t upstream_cx_connect_ms1 = 0;
+  simulated_time.advanceTimeWait(std::chrono::milliseconds(sleep2_ms));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _))
+      .WillOnce(SaveArg<1>(&upstream_cx_connect_ms1));
+  r1.expectNewStream();
+  EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(sleep1_ms + sleep2_ms, upstream_cx_connect_ms1);
+
+  // Move time forward, signal that the second connect completed and verify the time to connect.
+  uint64_t upstream_cx_connect_ms2 = 0;
+  simulated_time.advanceTimeWait(std::chrono::milliseconds(sleep3_ms));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _))
+      .WillOnce(SaveArg<1>(&upstream_cx_connect_ms2));
+  r2.expectNewStream();
+  EXPECT_CALL(*conn_pool_.test_clients_[1].connect_timer_, disableTimer());
+  conn_pool_.test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(sleep2_ms + sleep3_ms, upstream_cx_connect_ms2);
+
+  // Cleanup, cause the connections to go away.
+  while (!conn_pool_.test_clients_.empty()) {
+    EXPECT_CALL(
+        cluster_->stats_store_,
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+    EXPECT_CALL(conn_pool_, onClientDestroy());
+    conn_pool_.test_clients_.front().connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+    dispatcher_.clearDeferredDeleteList();
+  }
+}
+
+/**
  * Tests a connect timeout. Also test that we can add a new request during ejection processing.
  */
 TEST_F(Http1ConnPoolImplTest, ConnectTimeout) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
-  NiceMock<Http::MockStreamDecoder> outer_decoder1;
+  NiceMock<MockResponseDecoder> outer_decoder1;
   ConnPoolCallbacks callbacks1;
   conn_pool_.expectClientCreate();
   EXPECT_NE(nullptr, conn_pool_.newStream(outer_decoder1, callbacks1));
 
-  NiceMock<Http::MockStreamDecoder> outer_decoder2;
+  NiceMock<MockResponseDecoder> outer_decoder2;
   ConnPoolCallbacks callbacks2;
   EXPECT_CALL(callbacks1.pool_failure_, ready()).WillOnce(Invoke([&]() -> void {
     conn_pool_.expectClientCreate();
     EXPECT_NE(nullptr, conn_pool_.newStream(outer_decoder2, callbacks2));
   }));
 
-  conn_pool_.test_clients_[0].connect_timer_->callback_();
+  conn_pool_.test_clients_[0].connect_timer_->invokeCallback();
 
   EXPECT_CALL(callbacks2.pool_failure_, ready());
-  conn_pool_.test_clients_[1].connect_timer_->callback_();
+  conn_pool_.test_clients_[1].connect_timer_->invokeCallback();
 
   EXPECT_CALL(conn_pool_, onClientDestroy()).Times(2);
   dispatcher_.clearDeferredDeleteList();
 
+  EXPECT_EQ(0U, cluster_->stats_.upstream_rq_total_.value());
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_timeout_.value());
 }
@@ -374,7 +490,7 @@ TEST_F(Http1ConnPoolImplTest, CancelBeforeBound) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
-  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
@@ -396,14 +512,14 @@ TEST_F(Http1ConnPoolImplTest, DisconnectWhileBound) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
-  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
   EXPECT_NE(nullptr, handle);
 
-  NiceMock<Http::MockStreamEncoder> request_encoder;
-  Http::StreamDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> request_encoder;
+  ResponseDecoder* inner_decoder;
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
@@ -412,7 +528,7 @@ TEST_F(Http1ConnPoolImplTest, DisconnectWhileBound) {
 
   // We should get a reset callback when the connection disconnects.
   Http::MockStreamCallbacks stream_callbacks;
-  EXPECT_CALL(stream_callbacks, onResetStream(StreamResetReason::ConnectionTermination));
+  EXPECT_CALL(stream_callbacks, onResetStream(StreamResetReason::ConnectionTermination, _));
   request_encoder.getStream().addCallbacks(stream_callbacks);
 
   // Kill the connection while it has an active request.
@@ -427,8 +543,10 @@ TEST_F(Http1ConnPoolImplTest, DisconnectWhileBound) {
 TEST_F(Http1ConnPoolImplTest, MaxConnections) {
   InSequence s;
 
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.cx_open_.value());
+
   // Request 1 should kick off a new connection.
-  NiceMock<Http::MockStreamDecoder> outer_decoder1;
+  NiceMock<MockResponseDecoder> outer_decoder1;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder1, callbacks);
@@ -436,16 +554,17 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
   EXPECT_NE(nullptr, handle);
 
   // Request 2 should not kick off a new connection.
-  NiceMock<Http::MockStreamDecoder> outer_decoder2;
+  NiceMock<MockResponseDecoder> outer_decoder2;
   ConnPoolCallbacks callbacks2;
   handle = conn_pool_.newStream(outer_decoder2, callbacks2);
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_overflow_.value());
+  EXPECT_EQ(1U, cluster_->circuit_breakers_stats_.cx_open_.value());
 
   EXPECT_NE(nullptr, handle);
 
   // Connect event will bind to request 1.
-  NiceMock<Http::MockStreamEncoder> request_encoder;
-  Http::StreamDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> request_encoder;
+  ResponseDecoder* inner_decoder;
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
@@ -458,13 +577,17 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks2.pool_ready_, ready());
 
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  callbacks.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  Http::ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   conn_pool_.expectAndRunUpstreamReady();
-  callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  response_headers.reset(new TestHeaderMapImpl{{":status", "200"}});
+  callbacks2.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
+  response_headers = std::make_unique<TestResponseHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   // Cause the connection to go away.
@@ -481,7 +604,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
-  NiceMock<Http::MockStreamDecoder> outer_decoder1;
+  NiceMock<MockResponseDecoder> outer_decoder1;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder1, callbacks);
@@ -489,7 +612,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   EXPECT_NE(nullptr, handle);
 
   // Request 2 should not kick off a new connection.
-  NiceMock<Http::MockStreamDecoder> outer_decoder2;
+  NiceMock<MockResponseDecoder> outer_decoder2;
   ConnPoolCallbacks callbacks2;
   handle = conn_pool_.newStream(outer_decoder2, callbacks2);
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_overflow_.value());
@@ -497,8 +620,8 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   EXPECT_NE(nullptr, handle);
 
   // Connect event will bind to request 1.
-  NiceMock<Http::MockStreamEncoder> request_encoder;
-  Http::StreamDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> request_encoder;
+  ResponseDecoder* inner_decoder;
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
@@ -508,8 +631,9 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   // Finishing request 1 will schedule binding the connection to request 2.
   conn_pool_.expectEnableUpstreamReady();
 
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  callbacks.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  Http::ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   // Cause the connection to go away.
@@ -525,8 +649,11 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   EXPECT_CALL(callbacks2.pool_ready_, ready());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  response_headers.reset(new TestHeaderMapImpl{{":status", "200"}});
+  callbacks2.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
+  response_headers = std::make_unique<TestResponseHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
@@ -541,26 +668,95 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseHeader) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
-  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
 
   EXPECT_NE(nullptr, handle);
 
-  NiceMock<Http::MockStreamEncoder> request_encoder;
-  Http::StreamDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> request_encoder;
+  ResponseDecoder* inner_decoder;
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
 
   // Response with 'connection: close' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
-  Http::HeaderMapPtr response_headers(
-      new TestHeaderMapImpl{{":status", "200"}, {"Connection", "Close"}});
+  ResponseHeaderMapPtr response_headers(
+      new TestResponseHeaderMapImpl{{":status", "200"}, {"Connection", "Close"}});
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
+}
+
+/**
+ * Test when upstream sends us 'proxy-connection: close'
+ */
+TEST_F(Http1ConnPoolImplTest, ProxyConnectionCloseHeader) {
+  InSequence s;
+
+  // Request 1 should kick off a new connection.
+  NiceMock<MockResponseDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+
+  EXPECT_NE(nullptr, handle);
+
+  NiceMock<MockRequestEncoder> request_encoder;
+  ResponseDecoder* inner_decoder;
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+  EXPECT_CALL(callbacks.pool_ready_, ready());
+
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  callbacks.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+
+  // Response with 'proxy-connection: close' which should cause the connection to go away.
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  ResponseHeaderMapPtr response_headers(
+      new TestResponseHeaderMapImpl{{":status", "200"}, {"Proxy-Connection", "Close"}});
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
+}
+
+/**
+ * Test when upstream is HTTP/1.0 and does not send 'connection: keep-alive'
+ */
+TEST_F(Http1ConnPoolImplTest, Http10NoConnectionKeepAlive) {
+  InSequence s;
+
+  // Request 1 should kick off a new connection.
+  NiceMock<MockResponseDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate(Protocol::Http10);
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+
+  EXPECT_NE(nullptr, handle);
+
+  NiceMock<MockRequestEncoder> request_encoder;
+  ResponseDecoder* inner_decoder;
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+  EXPECT_CALL(callbacks.pool_ready_, ready());
+
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  callbacks.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+
+  // Response without 'connection: keep-alive' which should cause the connection to go away.
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  ResponseHeaderMapPtr response_headers(
+      new TestResponseHeaderMapImpl{{":protocol", "HTTP/1.0"}, {":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
@@ -576,25 +772,26 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   cluster_->max_requests_per_connection_ = 1;
 
   // Request 1 should kick off a new connection.
-  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
 
   EXPECT_NE(nullptr, handle);
 
-  NiceMock<Http::MockStreamEncoder> request_encoder;
-  Http::StreamDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> request_encoder;
+  ResponseDecoder* inner_decoder;
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
 
   // Response with 'connection: close' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
-  Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  Http::ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
@@ -603,10 +800,9 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
 }
 
 TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
   InSequence s;
 
-  cluster_->resource_manager_.reset(
-      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 2, 1024, 1024, 1));
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();
 
@@ -622,6 +818,7 @@ TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
   r1.completeResponse(false);
   conn_pool_.expectAndRunUpstreamReady();
   r3.startRequest();
+  EXPECT_EQ(3U, cluster_->stats_.upstream_rq_total_.value());
 
   r2.completeResponse(false);
   r3.completeResponse(false);
@@ -631,6 +828,9 @@ TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
   conn_pool_.test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(2U, cluster_->stats_.upstream_cx_destroy_.value());
+  EXPECT_EQ(2U, cluster_->stats_.upstream_cx_destroy_remote_.value());
 }
 
 TEST_F(Http1ConnPoolImplTest, DrainCallback) {
@@ -643,6 +843,7 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Pending);
   r2.handle_->cancel();
+  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_total_.value());
 
   EXPECT_CALL(drained, ready());
   r1.startRequest();
@@ -657,18 +858,17 @@ TEST_F(Http1ConnPoolImplTest, DrainWhileConnecting) {
   InSequence s;
   ReadyWatcher drained;
 
-  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
   EXPECT_NE(nullptr, handle);
 
   conn_pool_.addDrainedCallback([&]() -> void { drained.ready(); });
-  handle->cancel();
   EXPECT_CALL(*conn_pool_.test_clients_[0].connection_,
               close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(drained, ready());
-  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  handle->cancel();
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
@@ -677,23 +877,25 @@ TEST_F(Http1ConnPoolImplTest, DrainWhileConnecting) {
 TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   InSequence s;
 
-  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
   EXPECT_NE(nullptr, handle);
 
-  NiceMock<Http::MockStreamEncoder> request_encoder;
-  Http::StreamDecoder* inner_decoder;
-  EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
+  NiceMock<MockRequestEncoder> request_encoder;
+  ResponseDecoder* inner_decoder;
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
+  EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
 
-  inner_decoder->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, false);
+  inner_decoder->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);
   Buffer::OwnedImpl dummy_data("12345");
   inner_decoder->decodeData(dummy_data, false);
 
@@ -709,8 +911,58 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   EXPECT_CALL(conn_pool_, onClientDestroy());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
 }
 
+TEST_F(Http1ConnPoolImplTest, NoActiveConnectionsByDefault) {
+  EXPECT_FALSE(conn_pool_.hasActiveConnections());
+}
+
+TEST_F(Http1ConnPoolImplTest, ActiveRequestHasActiveConnectionsTrue) {
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+
+  EXPECT_TRUE(conn_pool_.hasActiveConnections());
+
+  // cleanup
+  r1.completeResponse(false);
+  conn_pool_.drainConnections();
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(Http1ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnections) {
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+  r1.completeResponse(false);
+
+  EXPECT_FALSE(conn_pool_.hasActiveConnections());
+
+  conn_pool_.drainConnections();
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
+  conn_pool_.expectClientCreate();
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::Pending);
+
+  EXPECT_TRUE(conn_pool_.hasActiveConnections());
+
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  r1.handle_->cancel();
+  EXPECT_EQ(0U, cluster_->stats_.upstream_rq_total_.value());
+  conn_pool_.drainConnections();
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_local_.value());
+}
+
+} // namespace
 } // namespace Http1
 } // namespace Http
 } // namespace Envoy

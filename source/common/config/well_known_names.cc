@@ -44,68 +44,74 @@ TagNameValues::TagNameValues() {
 
   // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.<base_stat>
   addRegex(MONGO_CALLSITE,
-           "^mongo(?=\\.).*?\\.collection(?=\\.).*?\\.callsite\\.((.*?)\\.).*?query.\\w+?$",
+           R"(^mongo(?=\.).*?\.collection(?=\.).*?\.callsite\.((.*?)\.).*?query.\w+?$)",
            ".collection.");
 
   // http.[<stat_prefix>.]dynamodb.table.(<table_name>.) or
   // http.[<stat_prefix>.]dynamodb.error.(<table_name>.)*
-  addRegex(DYNAMO_TABLE, "^http(?=\\.).*?\\.dynamodb.(?:table|error)\\.((.*?)\\.)", ".dynamodb.");
+  addRegex(DYNAMO_TABLE, R"(^http(?=\.).*?\.dynamodb.(?:table|error)\.((.*?)\.))", ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.(<collection>.)query.<base_stat>
-  addRegex(MONGO_COLLECTION, "^mongo(?=\\.).*?\\.collection\\.((.*?)\\.).*?query.\\w+?$",
+  addRegex(MONGO_COLLECTION, R"(^mongo(?=\.).*?\.collection\.((.*?)\.).*?query.\w+?$)",
            ".collection.");
 
   // mongo.[<stat_prefix>.]cmd.(<cmd>.)<base_stat>
-  addRegex(MONGO_CMD, "^mongo(?=\\.).*?\\.cmd\\.((.*?)\\.)\\w+?$", ".cmd.");
+  addRegex(MONGO_CMD, R"(^mongo(?=\.).*?\.cmd\.((.*?)\.)\w+?$)", ".cmd.");
 
   // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)<base_stat>
-  addRegex(GRPC_BRIDGE_METHOD, "^cluster(?=\\.).*?\\.grpc(?=\\.).*\\.((.*?)\\.)\\w+?$", ".grpc.");
+  addRegex(GRPC_BRIDGE_METHOD, R"(^cluster(?=\.).*?\.grpc(?=\.).*\.((.*?)\.)\w+?$)", ".grpc.");
 
   // http.[<stat_prefix>.]user_agent.(<user_agent>.)<base_stat>
-  addRegex(HTTP_USER_AGENT, "^http(?=\\.).*?\\.user_agent\\.((.*?)\\.)\\w+?$", ".user_agent.");
+  addRegex(HTTP_USER_AGENT, R"(^http(?=\.).*?\.user_agent\.((.*?)\.)\w+?$)", ".user_agent.");
 
   // vhost.[<virtual host name>.]vcluster.(<virtual_cluster_name>.)<base_stat>
-  addRegex(VIRTUAL_CLUSTER, "^vhost(?=\\.).*?\\.vcluster\\.((.*?)\\.)\\w+?$", ".vcluster.");
+  addRegex(VIRTUAL_CLUSTER, R"(^vhost(?=\.).*?\.vcluster\.((.*?)\.)\w+?$)", ".vcluster.");
 
   // http.[<stat_prefix>.]fault.(<downstream_cluster>.)<base_stat>
-  addRegex(FAULT_DOWNSTREAM_CLUSTER, "^http(?=\\.).*?\\.fault\\.((.*?)\\.)\\w+?$", ".fault.");
+  addRegex(FAULT_DOWNSTREAM_CLUSTER, R"(^http(?=\.).*?\.fault\.((.*?)\.)\w+?$)", ".fault.");
 
   // listener.[<address>.]ssl.cipher.(<cipher>)
-  addRegex(SSL_CIPHER, "^listener(?=\\.).*?\\.ssl\\.cipher(\\.(.*?))$");
+  addRegex(SSL_CIPHER, R"(^listener(?=\.).*?\.ssl\.cipher(\.(.*?))$)");
 
   // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
-  addRegex(SSL_CIPHER_SUITE, "^cluster(?=\\.).*?\\.ssl\\.ciphers(\\.(.*?))$", ".ssl.ciphers.");
+  addRegex(SSL_CIPHER_SUITE, R"(^cluster(?=\.).*?\.ssl\.ciphers(\.(.*?))$)", ".ssl.ciphers.");
 
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
-  addRegex(GRPC_BRIDGE_SERVICE, "^cluster(?=\\.).*?\\.grpc\\.((.*?)\\.)", ".grpc.");
+  addRegex(GRPC_BRIDGE_SERVICE, R"(^cluster(?=\.).*?\.grpc\.((.*?)\.))", ".grpc.");
 
   // tcp.(<stat_prefix>.)<base_stat>
-  addRegex(TCP_PREFIX, "^tcp\\.((.*?)\\.)\\w+?$");
+  addRegex(TCP_PREFIX, R"(^tcp\.((.*?)\.)\w+?$)");
 
   // auth.clientssl.(<stat_prefix>.)<base_stat>
-  addRegex(CLIENTSSL_PREFIX, "^auth\\.clientssl\\.((.*?)\\.)\\w+?$");
+  addRegex(CLIENTSSL_PREFIX, R"(^auth\.clientssl\.((.*?)\.)\w+?$)");
 
   // ratelimit.(<stat_prefix>.)<base_stat>
-  addRegex(RATELIMIT_PREFIX, "^ratelimit\\.((.*?)\\.)\\w+?$");
+  addRegex(RATELIMIT_PREFIX, R"(^ratelimit\.((.*?)\.)\w+?$)");
 
   // cluster.(<cluster_name>.)*
   addRegex(CLUSTER_NAME, "^cluster\\.((.*?)\\.)");
 
   // listener.[<address>.]http.(<stat_prefix>.)*
-  addRegex(HTTP_CONN_MANAGER_PREFIX, "^listener(?=\\.).*?\\.http\\.((.*?)\\.)", ".http.");
+  addRegex(HTTP_CONN_MANAGER_PREFIX, R"(^listener(?=\.).*?\.http\.((.*?)\.))", ".http.");
 
   // http.(<stat_prefix>.)*
   addRegex(HTTP_CONN_MANAGER_PREFIX, "^http\\.((.*?)\\.)");
 
   // listener.(<address>.)*
   addRegex(LISTENER_ADDRESS,
-           "^listener\\.(((?:[_.[:digit:]]*|[_\\[\\]aAbBcCdDeEfF[:digit:]]*))\\.)");
+           R"(^listener\.(((?:[_.[:digit:]]*|[_\[\]aAbBcCdDeEfF[:digit:]]*))\.))");
 
   // vhost.(<virtual host name>.)*
   addRegex(VIRTUAL_HOST, "^vhost\\.((.*?)\\.)");
 
   // mongo.(<stat_prefix>.)*
   addRegex(MONGO_PREFIX, "^mongo\\.((.*?)\\.)");
+
+  // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
+  addRegex(RDS_ROUTE_CONFIG, R"(^http(?=\.).*?\.rds\.((.*?)\.)\w+?$)", ".rds.");
+
+  // listener_manager.(worker_<id>.)*
+  addRegex(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
 }
 
 void TagNameValues::addRegex(const std::string& name, const std::string& regex,

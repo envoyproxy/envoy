@@ -1,13 +1,19 @@
 #pragma once
 
+#include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/sink.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/tag.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/macros.h"
+#include "common/network/io_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,28 +24,18 @@ namespace Statsd {
 static const std::string& getDefaultPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "envoy"); }
 
 /**
- * This is a simple UDP localhost writer for statsd messages.
- */
-class Writer : public ThreadLocal::ThreadLocalObject {
-public:
-  Writer(Network::Address::InstanceConstSharedPtr address);
-  // For testing.
-  Writer() : fd_(-1) {}
-  virtual ~Writer();
-
-  virtual void write(const std::string& message);
-  // Called in unit test to validate address.
-  int getFdForTests() const { return fd_; };
-
-private:
-  int fd_;
-};
-
-/**
  * Implementation of Sink that writes to a UDP statsd address.
  */
 class UdpStatsdSink : public Stats::Sink {
 public:
+  /**
+   * Base interface for writing UDP datagrams.
+   */
+  class Writer : public ThreadLocal::ThreadLocalObject {
+  public:
+    virtual void write(const std::string& message) PURE;
+  };
+
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix());
   // For testing.
@@ -52,20 +48,33 @@ public:
   }
 
   // Stats::Sink
-  void flush(Stats::Source& source) override;
+  void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override;
 
-  // Called in unit test to validate writer construction and address.
-  int getFdForTests() { return tls_->getTyped<Writer>().getFdForTests(); }
   bool getUseTagForTest() { return use_tag_; }
   const std::string& getPrefix() { return prefix_; }
 
 private:
-  const std::string getName(const Stats::Metric& metric);
-  const std::string buildTagStr(const std::vector<Stats::Tag>& tags);
+  /**
+   * This is a simple UDP localhost writer for statsd messages.
+   */
+  class WriterImpl : public Writer {
+  public:
+    WriterImpl(UdpStatsdSink& parent);
 
-  ThreadLocal::SlotPtr tls_;
-  Network::Address::InstanceConstSharedPtr server_address_;
+    // Writer
+    void write(const std::string& message) override;
+
+  private:
+    UdpStatsdSink& parent_;
+    const Network::IoHandlePtr io_handle_;
+  };
+
+  const std::string getName(const Stats::Metric& metric) const;
+  const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
+
+  const ThreadLocal::SlotPtr tls_;
+  const Network::Address::InstanceConstSharedPtr server_address_;
   const bool use_tag_;
   // Prefix for all flushed stats.
   const std::string prefix_;
@@ -81,7 +90,7 @@ public:
                 Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
 
   // Stats::Sink
-  void flush(Stats::Source& source) override;
+  void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override {
     // For statsd histograms are all timers.
     tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),
@@ -93,16 +102,15 @@ public:
 private:
   struct TlsSink : public ThreadLocal::ThreadLocalObject, public Network::ConnectionCallbacks {
     TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher);
-    ~TlsSink();
+    ~TlsSink() override;
 
     void beginFlush(bool expect_empty_buffer);
-    void checkSize();
     void commonFlush(const std::string& name, uint64_t value, char stat_type);
     void flushCounter(const std::string& name, uint64_t delta);
     void flushGauge(const std::string& name, uint64_t value);
     void endFlush(bool do_write);
     void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms);
-    uint64_t usedBuffer();
+    uint64_t usedBuffer() const;
     void write(Buffer::Instance& buffer);
 
     // Network::ConnectionCallbacks

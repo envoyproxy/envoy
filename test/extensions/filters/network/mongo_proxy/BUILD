@@ -43,11 +43,14 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/mongo_proxy:bson_lib",
         "//source/extensions/filters/network/mongo_proxy:codec_lib",
         "//source/extensions/filters/network/mongo_proxy:proxy_lib",
+        "//test/common/stream_info:test_util",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "@envoy_api//envoy/extensions/filters/common/fault/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -69,5 +72,8 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/network/mongo_proxy:config",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/mongo_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )

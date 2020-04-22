@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/assert.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -18,21 +20,23 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
 }
 
 void Filter::callCheck() {
-  Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_);
+  Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_,
+                                                               config_->includePeerCertificate());
 
   status_ = Status::Calling;
   config_->stats().active_.inc();
   config_->stats().total_.inc();
 
   calling_check_ = true;
-  client_->check(*this, check_request_, Tracing::NullSpan::instance());
+  client_->check(*this, check_request_, Tracing::NullSpan::instance(),
+                 filter_callbacks_->connection().streamInfo());
   calling_check_ = false;
 }
 
 Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
   if (status_ == Status::NotStarted) {
     // By waiting to invoke the check at onData() the call to authorization service will have
-    // sufficient information to fillout the checkRequest_.
+    // sufficient information to fill out the checkRequest_.
     callCheck();
   }
   return filter_return_ == FilterReturn::Stop ? Network::FilterStatus::StopIteration
@@ -56,11 +60,11 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void Filter::onComplete(Filters::Common::ExtAuthz::CheckStatus status) {
+void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   status_ = Status::Complete;
   config_->stats().active_.dec();
 
-  switch (status) {
+  switch (response->status) {
   case Filters::Common::ExtAuthz::CheckStatus::OK:
     config_->stats().ok_.inc();
     break;
@@ -73,14 +77,16 @@ void Filter::onComplete(Filters::Common::ExtAuthz::CheckStatus status) {
   }
 
   // Fail open only if configured to do so and if the check status was a error.
-  if (status == Filters::Common::ExtAuthz::CheckStatus::Denied ||
-      (status == Filters::Common::ExtAuthz::CheckStatus::Error && !config_->failureModeAllow())) {
+  if (response->status == Filters::Common::ExtAuthz::CheckStatus::Denied ||
+      (response->status == Filters::Common::ExtAuthz::CheckStatus::Error &&
+       !config_->failureModeAllow())) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   } else {
     // Let the filter chain continue.
     filter_return_ = FilterReturn::Continue;
-    if (config_->failureModeAllow() && status == Filters::Common::ExtAuthz::CheckStatus::Error) {
+    if (config_->failureModeAllow() &&
+        response->status == Filters::Common::ExtAuthz::CheckStatus::Error) {
       // Status is Error and yet we are configured to allow traffic. Click a counter.
       config_->stats().failure_mode_allowed_.inc();
     }

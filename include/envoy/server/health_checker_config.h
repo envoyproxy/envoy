@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/health_checker.h"
 
@@ -9,7 +11,7 @@ namespace Configuration {
 
 class HealthCheckerFactoryContext {
 public:
-  virtual ~HealthCheckerFactoryContext() {}
+  virtual ~HealthCheckerFactoryContext() = default;
 
   /**
    * @return Upstream::Cluster& the owning cluster.
@@ -31,34 +33,47 @@ public:
    *         for all singleton processing.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /*
+   * @return Upstream::HealthCheckEventLoggerPtr the health check event logger for the
+   * created health checkers. This function may not be idempotent.
+   */
+  virtual Upstream::HealthCheckEventLoggerPtr eventLogger() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for health checker configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
+   * @return Api::Api& the API used by the server.
+   */
+  virtual Api::Api& api() PURE;
 };
 
 /**
  * Implemented by each custom health checker and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
-class CustomHealthCheckerFactory {
+class CustomHealthCheckerFactory : public Config::TypedFactory {
 public:
-  virtual ~CustomHealthCheckerFactory() {}
+  ~CustomHealthCheckerFactory() override = default;
 
   /**
    * Creates a particular custom health checker factory implementation.
    *
-   * @param config supplies the configuration as a full envoy::api::v2::core::HealthCheck config.
-   *        The implementation of this method can get the specific configuration for a custom health
-   *        check from custom_health_check().config().
+   * @param config supplies the configuration as a full envoy::config::core::v3::HealthCheck
+   * config. The implementation of this method can get the specific configuration for a custom
+   * health check from custom_health_check().config().
    * @param context supplies the custom health checker's context.
    * @return HealthCheckerSharedPtr the pointer of a health checker instance.
    */
   virtual Upstream::HealthCheckerSharedPtr
-  createCustomHealthChecker(const envoy::api::v2::core::HealthCheck& config,
+  createCustomHealthChecker(const envoy::config::core::v3::HealthCheck& config,
                             HealthCheckerFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of a custom health
-   * checker produced by the factory.
-   */
-  virtual std::string name() PURE;
+  std::string category() const override { return "envoy.health_checkers"; }
 };
 
 } // namespace Configuration

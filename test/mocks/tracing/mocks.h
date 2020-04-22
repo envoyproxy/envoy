@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/http_tracer_manager.h"
 
 #include "gmock/gmock.h"
 
@@ -13,66 +14,81 @@ namespace Tracing {
 class MockConfig : public Config {
 public:
   MockConfig();
-  ~MockConfig();
+  ~MockConfig() override;
 
-  MOCK_CONST_METHOD0(operationName, OperationName());
-  MOCK_CONST_METHOD0(requestHeadersForTags, const std::vector<Http::LowerCaseString>&());
+  MOCK_METHOD(OperationName, operationName, (), (const));
+  MOCK_METHOD(const CustomTagMap*, customTags, (), (const));
+  MOCK_METHOD(bool, verbose, (), (const));
+  MOCK_METHOD(uint32_t, maxPathTagLength, (), (const));
 
   OperationName operation_name_{OperationName::Ingress};
-  std::vector<Http::LowerCaseString> headers_;
+  CustomTagMap custom_tags_;
+  bool verbose_{false};
 };
 
 class MockSpan : public Span {
 public:
   MockSpan();
-  ~MockSpan();
+  ~MockSpan() override;
 
-  MOCK_METHOD1(setOperation, void(const std::string& operation));
-  MOCK_METHOD2(setTag, void(const std::string& name, const std::string& value));
-  MOCK_METHOD0(finishSpan, void());
-  MOCK_METHOD1(injectContext, void(Http::HeaderMap& request_headers));
-  MOCK_METHOD1(setSampled, void(const bool sampled));
+  MOCK_METHOD(void, setOperation, (absl::string_view operation));
+  MOCK_METHOD(void, setTag, (absl::string_view name, absl::string_view value));
+  MOCK_METHOD(void, log, (SystemTime timestamp, const std::string& event));
+  MOCK_METHOD(void, finishSpan, ());
+  MOCK_METHOD(void, injectContext, (Http::RequestHeaderMap & request_headers));
+  MOCK_METHOD(void, setSampled, (const bool sampled));
 
   SpanPtr spawnChild(const Config& config, const std::string& name,
                      SystemTime start_time) override {
     return SpanPtr{spawnChild_(config, name, start_time)};
   }
 
-  MOCK_METHOD3(spawnChild_,
-               Span*(const Config& config, const std::string& name, SystemTime start_time));
+  MOCK_METHOD(Span*, spawnChild_,
+              (const Config& config, const std::string& name, SystemTime start_time));
 };
 
 class MockHttpTracer : public HttpTracer {
 public:
   MockHttpTracer();
-  ~MockHttpTracer();
+  ~MockHttpTracer() override;
 
-  SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                    const RequestInfo::RequestInfo& request_info,
+  SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
+                    const StreamInfo::StreamInfo& stream_info,
                     const Tracing::Decision tracing_decision) override {
-    return SpanPtr{startSpan_(config, request_headers, request_info, tracing_decision)};
+    return SpanPtr{startSpan_(config, request_headers, stream_info, tracing_decision)};
   }
 
-  MOCK_METHOD4(startSpan_, Span*(const Config& config, Http::HeaderMap& request_headers,
-                                 const RequestInfo::RequestInfo& request_info,
-                                 const Tracing::Decision tracing_decision));
+  MOCK_METHOD(Span*, startSpan_,
+              (const Config& config, Http::HeaderMap& request_headers,
+               const StreamInfo::StreamInfo& stream_info,
+               const Tracing::Decision tracing_decision));
 };
 
 class MockDriver : public Driver {
 public:
   MockDriver();
-  ~MockDriver();
+  ~MockDriver() override;
 
-  SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
+  SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
                     const std::string& operation_name, SystemTime start_time,
                     const Tracing::Decision tracing_decision) override {
     return SpanPtr{
         startSpan_(config, request_headers, operation_name, start_time, tracing_decision)};
   }
 
-  MOCK_METHOD5(startSpan_, Span*(const Config& config, Http::HeaderMap& request_headers,
-                                 const std::string& operation_name, SystemTime start_time,
-                                 const Tracing::Decision tracing_decision));
+  MOCK_METHOD(Span*, startSpan_,
+              (const Config& config, Http::HeaderMap& request_headers,
+               const std::string& operation_name, SystemTime start_time,
+               const Tracing::Decision tracing_decision));
+};
+
+class MockHttpTracerManager : public HttpTracerManager {
+public:
+  MockHttpTracerManager();
+  ~MockHttpTracerManager() override;
+
+  MOCK_METHOD(HttpTracerSharedPtr, getOrCreateHttpTracer,
+              (const envoy::config::trace::v3::Tracing_Http*));
 };
 
 } // namespace Tracing

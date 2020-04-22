@@ -7,7 +7,9 @@
 #include "common/common/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
+
+namespace Envoy {
 
 static const char TextToTrim[] = "\t  the quick brown fox jumps over the lazy dog\n\r\n";
 static size_t TextToTrimLength = sizeof(TextToTrim) - 1;
@@ -111,12 +113,12 @@ BENCHMARK(BM_RTrimStringViewAlreadyTrimmedAndMakeString);
 static void BM_FindToken(benchmark::State& state) {
   const absl::string_view cache_control(CacheControl, CacheControlLength);
   for (auto _ : state) {
-    RELEASE_ASSERT(Envoy::StringUtil::findToken(cache_control, ",", "no-transform"));
+    RELEASE_ASSERT(Envoy::StringUtil::findToken(cache_control, ",", "no-transform"), "");
   }
 }
 BENCHMARK(BM_FindToken);
 
-static bool nextToken(absl::string_view& str, char delim, bool stripWhitespace,
+static bool nextToken(absl::string_view& str, char delim, bool strip_whitespace,
                       absl::string_view* token) {
   while (!str.empty()) {
     absl::string_view::size_type pos = str.find(delim);
@@ -127,7 +129,7 @@ static bool nextToken(absl::string_view& str, char delim, bool stripWhitespace,
       *token = str.substr(0, pos);
       str.remove_prefix(pos + 1); // move past token and delim
     }
-    if (stripWhitespace) {
+    if (strip_whitespace) {
       *token = Envoy::StringUtil::trim(*token);
     }
     if (!token->empty()) {
@@ -141,8 +143,8 @@ static bool nextToken(absl::string_view& str, char delim, bool stripWhitespace,
 // a temp vector, but just iterates through the string_view, tokenizing, and matching against
 // the token we want. It appears to be about 2.5x to 3x faster on this testcase.
 static bool findTokenWithoutSplitting(absl::string_view str, char delim, absl::string_view token,
-                                      bool stripWhitespace) {
-  for (absl::string_view tok; nextToken(str, delim, stripWhitespace, &tok);) {
+                                      bool strip_whitespace) {
+  for (absl::string_view tok; nextToken(str, delim, strip_whitespace, &tok);) {
     if (tok == token) {
       return true;
     }
@@ -153,7 +155,7 @@ static bool findTokenWithoutSplitting(absl::string_view str, char delim, absl::s
 static void BM_FindTokenWithoutSplitting(benchmark::State& state) {
   const absl::string_view cache_control(CacheControl, CacheControlLength);
   for (auto _ : state) {
-    RELEASE_ASSERT(findTokenWithoutSplitting(cache_control, ',', "no-transform", true));
+    RELEASE_ASSERT(findTokenWithoutSplitting(cache_control, ',', "no-transform", true), "");
   }
 }
 BENCHMARK(BM_FindTokenWithoutSplitting);
@@ -168,7 +170,7 @@ static void BM_FindTokenValueNestedSplit(benchmark::State& state) {
         max_age = Envoy::StringUtil::trim(name_value[1]);
       }
     }
-    RELEASE_ASSERT(max_age == "300");
+    RELEASE_ASSERT(max_age == "300", "");
   }
 }
 BENCHMARK(BM_FindTokenValueNestedSplit);
@@ -184,7 +186,7 @@ static void BM_FindTokenValueSearchForEqual(benchmark::State& state) {
         max_age = Envoy::StringUtil::trim(token.substr(equals + 1));
       }
     }
-    RELEASE_ASSERT(max_age == "300");
+    RELEASE_ASSERT(max_age == "300", "");
   }
 }
 BENCHMARK(BM_FindTokenValueSearchForEqual);
@@ -199,10 +201,32 @@ static void BM_FindTokenValueNoSplit(benchmark::State& state) {
         max_age = Envoy::StringUtil::trim(token);
       }
     }
-    RELEASE_ASSERT(max_age == "300");
+    RELEASE_ASSERT(max_age == "300", "");
   }
 }
 BENCHMARK(BM_FindTokenValueNoSplit);
+
+static void BM_RemoveTokensLong(benchmark::State& state) {
+  auto size = state.range(0);
+  std::string input(size, ',');
+  std::vector<std::string> to_remove;
+  StringUtil::CaseUnorderedSet to_remove_set;
+  for (decltype(size) i = 0; i < size; i++) {
+    to_remove.push_back(std::to_string(i));
+  }
+  for (int i = 0; i < size; i++) {
+    if (i & 1) {
+      to_remove_set.insert(to_remove[i]);
+    }
+    input.append(",");
+    input.append(to_remove[i]);
+  }
+  for (auto _ : state) {
+    Envoy::StringUtil::removeTokens(input, ",", to_remove_set, ",");
+    state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) * input.size());
+  }
+}
+BENCHMARK(BM_RemoveTokensLong)->Range(8, 8 << 10);
 
 static void BM_IntervalSetInsert17(benchmark::State& state) {
   for (auto _ : state) {
@@ -222,8 +246,8 @@ static void BM_IntervalSetInsert17(benchmark::State& state) {
     interval_set.insert(3, 6);
     interval_set.insert(3, 20);
     interval_set.insert(3, 22);
-    interval_set.insert(-2, 23);
-    interval_set.insert(-3, 24);
+    interval_set.insert(23, 9223372036854775806UL);
+    interval_set.insert(24, 9223372036854775805UL);
   }
 }
 BENCHMARK(BM_IntervalSetInsert17);
@@ -250,12 +274,4 @@ static void BM_IntervalSet50ToVector(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_IntervalSet50ToVector);
-
-// Boilerplate main(), which discovers benchmarks in the same file and runs them.
-int main(int argc, char** argv) {
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
-  }
-  benchmark::RunSpecifiedBenchmarks();
-}
+} // namespace Envoy

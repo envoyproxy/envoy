@@ -1,3 +1,7 @@
+#include "envoy/config/trace/v3/dynamic_ot.pb.h"
+#include "envoy/config/trace/v3/dynamic_ot.pb.validate.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
+
 #include "extensions/tracers/dynamic_ot/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -7,38 +11,54 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
+namespace {
 
 TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
-  NiceMock<Server::MockInstance> server;
-  EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
-      .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
-  ON_CALL(*server.cluster_manager_.thread_local_cluster_.cluster_.info_, features())
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_, get(Eq("fake_cluster")))
+      .WillRepeatedly(
+          Return(&context.server_factory_context_.cluster_manager_.thread_local_cluster_));
+  ON_CALL(*context.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+          features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
-  const std::string valid_config = fmt::sprintf(R"EOF(
-  {
-    "library": "%s/external/io_opentracing_cpp/mocktracer/libmocktracer_plugin.so",
-    "config": {
-      "output_file" : "fake_file"
-    }
-  }
+  const std::string yaml_string = fmt::sprintf(
+      R"EOF(
+  http:
+    name: envoy.tracers.dynamic_ot
+    config:
+      library: %s
+      config:
+        output_file: fake_file
   )EOF",
-                                                TestEnvironment::runfilesDirectory());
-  const Json::ObjectSharedPtr valid_json = Json::Factory::loadFromString(valid_config);
-  DynamicOpenTracingTracerFactory factory;
+      TestEnvironment::runfilesPath("mocktracer/libmocktracer_plugin.so", "io_opentracing_cpp"));
+  envoy::config::trace::v3::Tracing configuration;
+  TestUtility::loadFromYaml(yaml_string, configuration);
 
-  const Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*valid_json, server);
+  DynamicOpenTracingTracerFactory factory;
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  const Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, tracer);
 }
 
+// Test that the deprecated extension name still functions.
+TEST(DynamicOtTracerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.dynamic.ot";
+
+  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
+                         deprecated_name));
+}
+
+} // namespace
 } // namespace DynamicOt
 } // namespace Tracers
 } // namespace Extensions

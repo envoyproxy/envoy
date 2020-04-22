@@ -7,88 +7,85 @@
 
 #include "envoy/thread/thread.h"
 
+#include "common/common/base_logger.h"
 #include "common/common/fmt.h"
+#include "common/common/logger_impl.h"
 #include "common/common/macros.h"
 #include "common/common/non_copyable.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/mutex.h"
 #include "fmt/ostream.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Logger {
 
-// clang-format off
-#define ALL_LOGGER_IDS(FUNCTION) \
-  FUNCTION(admin)                \
-  FUNCTION(assert)               \
-  FUNCTION(backtrace)            \
-  FUNCTION(client)               \
-  FUNCTION(config)               \
-  FUNCTION(connection)           \
-  FUNCTION(misc)                 \
-  FUNCTION(file)                 \
-  FUNCTION(filter)               \
-  FUNCTION(hc)                   \
-  FUNCTION(health_checker)       \
-  FUNCTION(http)                 \
-  FUNCTION(http2)                \
-  FUNCTION(lua)                  \
-  FUNCTION(main)                 \
-  FUNCTION(mongo)                \
-  FUNCTION(pool)                 \
-  FUNCTION(redis)                \
-  FUNCTION(router)               \
-  FUNCTION(runtime)              \
-  FUNCTION(testing)              \
-  FUNCTION(tracing)              \
-  FUNCTION(upstream)             \
-  FUNCTION(grpc)                 \
-  FUNCTION(stats)                \
-  FUNCTION(thrift)
+// TODO: find out a way for extensions to register new logger IDs
+#define ALL_LOGGER_IDS(FUNCTION)                                                                   \
+  FUNCTION(admin)                                                                                  \
+  FUNCTION(aws)                                                                                    \
+  FUNCTION(assert)                                                                                 \
+  FUNCTION(backtrace)                                                                              \
+  FUNCTION(cache_filter)                                                                           \
+  FUNCTION(client)                                                                                 \
+  FUNCTION(config)                                                                                 \
+  FUNCTION(connection)                                                                             \
+  FUNCTION(conn_handler)                                                                           \
+  FUNCTION(decompression)                                                                          \
+  FUNCTION(dubbo)                                                                                  \
+  FUNCTION(file)                                                                                   \
+  FUNCTION(filter)                                                                                 \
+  FUNCTION(forward_proxy)                                                                          \
+  FUNCTION(grpc)                                                                                   \
+  FUNCTION(hc)                                                                                     \
+  FUNCTION(health_checker)                                                                         \
+  FUNCTION(http)                                                                                   \
+  FUNCTION(http2)                                                                                  \
+  FUNCTION(hystrix)                                                                                \
+  FUNCTION(init)                                                                                   \
+  FUNCTION(io)                                                                                     \
+  FUNCTION(jwt)                                                                                    \
+  FUNCTION(kafka)                                                                                  \
+  FUNCTION(lua)                                                                                    \
+  FUNCTION(main)                                                                                   \
+  FUNCTION(misc)                                                                                   \
+  FUNCTION(mongo)                                                                                  \
+  FUNCTION(quic)                                                                                   \
+  FUNCTION(quic_stream)                                                                            \
+  FUNCTION(pool)                                                                                   \
+  FUNCTION(rbac)                                                                                   \
+  FUNCTION(redis)                                                                                  \
+  FUNCTION(router)                                                                                 \
+  FUNCTION(runtime)                                                                                \
+  FUNCTION(stats)                                                                                  \
+  FUNCTION(secret)                                                                                 \
+  FUNCTION(tap)                                                                                    \
+  FUNCTION(testing)                                                                                \
+  FUNCTION(thrift)                                                                                 \
+  FUNCTION(tracing)                                                                                \
+  FUNCTION(upstream)                                                                               \
+  FUNCTION(udp)                                                                                    \
+  FUNCTION(wasm)
 
+// clang-format off
 enum class Id {
   ALL_LOGGER_IDS(GENERATE_ENUM)
 };
 // clang-format on
 
 /**
- * Logger wrapper for a spdlog logger.
+ * Logger that uses the DelegatingLogSink.
  */
-class Logger {
-public:
-  /* This is simple mapping between Logger severity levels and spdlog severity levels.
-   * The only reason for this mapping is to go around the fact that spdlog defines level as err
-   * but the method to log at err level is called LOGGER.error not LOGGER.err. All other level are
-   * fine spdlog::info corresponds to LOGGER.info method.
-   */
-  typedef enum {
-    trace = spdlog::level::trace,
-    debug = spdlog::level::debug,
-    info = spdlog::level::info,
-    warn = spdlog::level::warn,
-    error = spdlog::level::err,
-    critical = spdlog::level::critical,
-    off = spdlog::level::off
-  } levels;
-
-  std::string levelString() const { return spdlog::level::level_names[logger_->level()]; }
-  std::string name() const { return logger_->name(); }
-  void setLevel(spdlog::level::level_enum level) { logger_->set_level(level); }
-  spdlog::level::level_enum level() const { return logger_->level(); }
-
-  static const char* DEFAULT_LOG_FORMAT;
-
+class StandardLogger : public Logger {
 private:
-  Logger(const std::string& name);
+  StandardLogger(const std::string& name);
 
-  std::shared_ptr<spdlog::logger> logger_; // Use shared_ptr here to allow static construction
-                                           // of constant vector below.
   friend class Registry;
 };
 
 class DelegatingLogSink;
-typedef std::shared_ptr<DelegatingLogSink> DelegatingLogSinkPtr;
+using DelegatingLogSinkSharedPtr = std::shared_ptr<DelegatingLogSink>;
 
 /**
  * Captures a logging sink that can be delegated to for a bounded amount of time.
@@ -97,7 +94,7 @@ typedef std::shared_ptr<DelegatingLogSink> DelegatingLogSinkPtr;
  */
 class SinkDelegate : NonCopyable {
 public:
-  explicit SinkDelegate(DelegatingLogSinkPtr log_sink);
+  explicit SinkDelegate(DelegatingLogSinkSharedPtr log_sink);
   virtual ~SinkDelegate();
 
   virtual void log(absl::string_view msg) PURE;
@@ -108,7 +105,7 @@ protected:
 
 private:
   SinkDelegate* previous_delegate_;
-  DelegatingLogSinkPtr log_sink_;
+  DelegatingLogSinkSharedPtr log_sink_;
 };
 
 /**
@@ -116,7 +113,7 @@ private:
  */
 class StderrSinkDelegate : public SinkDelegate {
 public:
-  explicit StderrSinkDelegate(DelegatingLogSinkPtr log_sink);
+  explicit StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink);
 
   // SinkDelegate
   void log(absl::string_view msg) override;
@@ -124,6 +121,8 @@ public:
 
   bool hasLock() const { return lock_ != nullptr; }
   void setLock(Thread::BasicLockable& lock) { lock_ = &lock; }
+  void clearLock() { lock_ = nullptr; }
+  Thread::BasicLockable* lock() { return lock_; }
 
 private:
   Thread::BasicLockable* lock_{};
@@ -131,28 +130,48 @@ private:
 
 /**
  * Stacks logging sinks, so you can temporarily override the logging mechanism, restoring
- * the prevoius state when the DelegatingSink is destructed.
+ * the previous state when the DelegatingSink is destructed.
  */
 class DelegatingLogSink : public spdlog::sinks::sink {
 public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
+  void clearLock() { stderr_sink_->clearLock(); }
 
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
   void flush() override { sink_->flush(); }
+  void set_pattern(const std::string& pattern) override {
+    set_formatter(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
+  }
+  void set_formatter(std::unique_ptr<spdlog::formatter> formatter) override;
+  void set_should_escape(bool should_escape) { should_escape_ = should_escape; }
 
   /**
    * @return bool whether a lock has been established.
    */
   bool hasLock() const { return stderr_sink_->hasLock(); }
 
-  // Constructs a new DelegatingLogSink, sets up the default sink to stderr,
-  // and returns a shared_ptr to it. A shared_ptr is required for sinks used
-  // in spdlog::logger; it would not otherwise be required in Envoy. This method
-  // must own the construction process because StderrSinkDelegate needs access to
-  // the DelegatingLogSinkPtr, not just the DelegatingLogSink*, and that is only
-  // available after construction.
-  static DelegatingLogSinkPtr init();
+  /**
+   * Constructs a new DelegatingLogSink, sets up the default sink to stderr,
+   * and returns a shared_ptr to it.
+   *
+   * A shared_ptr is required for sinks used
+   * in spdlog::logger; it would not otherwise be required in Envoy. This method
+   * must own the construction process because StderrSinkDelegate needs access to
+   * the DelegatingLogSinkSharedPtr, not just the DelegatingLogSink*, and that is only
+   * available after construction.
+   */
+  static DelegatingLogSinkSharedPtr init();
+
+  /**
+   * Give a log line with trailing whitespace, this will escape all c-style
+   * escape sequences except for the trailing whitespace.
+   * This allows logging escaped messages, but preserves end-of-line characters.
+   *
+   * @param source the log line with trailing whitespace
+   * @return a string with all c-style escape sequences escaped, except trailing whitespace
+   */
+  static std::string escapeLogLine(absl::string_view source);
 
 private:
   friend class SinkDelegate;
@@ -164,6 +183,36 @@ private:
 
   SinkDelegate* sink_{nullptr};
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
+  std::unique_ptr<spdlog::formatter> formatter_ ABSL_GUARDED_BY(format_mutex_);
+  absl::Mutex format_mutex_; // direct absl reference to break build cycle.
+  bool should_escape_{false};
+};
+
+/**
+ * Defines a scope for the logging system with the specified lock and log level.
+ * This is equivalent to setLogLevel, setLogFormat, and setLock, which can be
+ * called individually as well, e.g. to set the log level without changing the
+ * lock or format.
+ *
+ * Contexts can be nested. When a nested context is destroyed, the previous
+ * context is restored. When all contexts are destroyed, the lock is cleared,
+ * and logging will remain unlocked, the same state it is in prior to
+ * instantiating a Context.
+ */
+class Context {
+public:
+  Context(spdlog::level::level_enum log_level, const std::string& log_format,
+          Thread::BasicLockable& lock, bool should_escape);
+  ~Context();
+
+private:
+  void activate();
+
+  const spdlog::level::level_enum log_level_;
+  const std::string log_format_;
+  Thread::BasicLockable& lock_;
+  bool should_escape_;
+  Context* const save_context_;
 };
 
 /**
@@ -181,19 +230,10 @@ public:
   /**
    * @return the singleton sink to use for all loggers.
    */
-  static DelegatingLogSinkPtr getSink() {
-    static DelegatingLogSinkPtr sink = DelegatingLogSink::init();
+  static DelegatingLogSinkSharedPtr getSink() {
+    static DelegatingLogSinkSharedPtr sink = DelegatingLogSink::init();
     return sink;
   }
-
-  /*
-   * Initialize the logging system with the specified lock and log level.
-   * This is equivalalent to setLogLevel, setLogFormat, and setLock, which
-   * can be called individually as well, e.g. to set the log level without
-   * changing the lock or format.
-   */
-  static void initialize(spdlog::level::level_enum log_level, const std::string& log_format,
-                         Thread::BasicLockable& lock);
 
   /**
    * Sets the minimum log severity required to print messages.
@@ -216,6 +256,8 @@ public:
    */
   static bool initialized() { return getSink()->hasLock(); }
 
+  static Logger* logger(const std::string& log_name);
+
 private:
   /*
    * @return std::vector<Logger>& return the installed loggers.
@@ -224,7 +266,7 @@ private:
 };
 
 /**
- * Mixin class that allows any class to peform logging with a logger of a particular ID.
+ * Mixin class that allows any class to perform logging with a logger of a particular ID.
  */
 template <Id id> class Loggable {
 protected:
@@ -238,21 +280,17 @@ protected:
   }
 };
 
-} // Logger
-
-// Convert the line macro to a string literal for concatenation in log macros.
-#define DO_STRINGIZE(x) STRINGIZE(x)
-#define STRINGIZE(x) #x
-#define LINE_STRING DO_STRINGIZE(__LINE__)
-#define LOG_PREFIX __FILE__ ":" LINE_STRING "] "
+} // namespace Logger
 
 /**
  * Base logging macros. It is expected that users will use the convenience macros below rather than
  * invoke these directly.
  */
 
-#define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)                                                        \
-  (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL) >= LOGGER.level())
+#define ENVOY_SPDLOG_LEVEL(LEVEL)                                                                  \
+  (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL))
+
+#define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) (ENVOY_SPDLOG_LEVEL(LEVEL) >= LOGGER.level())
 
 // Compare levels before invoking logger. This is an optimization to avoid
 // executing expressions computing log contents when they would be suppressed.
@@ -260,7 +298,8 @@ protected:
 #define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
-      LOGGER.LEVEL(LOG_PREFIX __VA_ARGS__);                                                        \
+      LOGGER.log(::spdlog::source_loc{__FILE__, __LINE__, __func__}, ENVOY_SPDLOG_LEVEL(LEVEL),    \
+                 __VA_ARGS__);                                                                     \
     }                                                                                              \
   } while (0)
 

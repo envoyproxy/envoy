@@ -25,7 +25,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~Reporter() {}
+  virtual ~Reporter() = default;
 
   /**
    * Method that a concrete Reporter class must implement to handle finished spans.
@@ -33,10 +33,10 @@ public:
    *
    * @param span The span that needs action.
    */
-  virtual void reportSpan(const Span& span) PURE;
+  virtual void reportSpan(Span&& span) PURE;
 };
 
-typedef std::unique_ptr<Reporter> ReporterPtr;
+using ReporterPtr = std::unique_ptr<Reporter>;
 
 /**
  * This class implements the Zipkin tracer. It has methods to create the appropriate Zipkin span
@@ -57,11 +57,14 @@ public:
    * in all annotations' endpoints of the spans created by the Tracer.
    * @param random_generator Reference to the random-number generator to be used by the Tracer.
    * @param trace_id_128bit Whether 128bit ids should be used.
+   * @param shared_span_context Whether shared span id should be used.
    */
   Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address,
-         Runtime::RandomGenerator& random_generator, const bool trace_id_128bit)
+         Runtime::RandomGenerator& random_generator, const bool trace_id_128bit,
+         const bool shared_span_context, TimeSource& time_source)
       : service_name_(service_name), address_(address), reporter_(nullptr),
-        random_generator_(random_generator), trace_id_128bit_(trace_id_128bit) {}
+        random_generator_(random_generator), trace_id_128bit_(trace_id_128bit),
+        shared_span_context_(shared_span_context), time_source_(time_source) {}
 
   /**
    * Creates a "root" Zipkin span.
@@ -69,6 +72,7 @@ public:
    * @param config The tracing configuration
    * @param span_name Name of the new span.
    * @param start_time The time indicating the beginning of the span.
+   * @return SpanPtr The root span.
    */
   SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp);
 
@@ -79,12 +83,15 @@ public:
    * @param span_name Name of the new span.
    * @param start_time The time indicating the beginning of the span.
    * @param previous_context The context of the span preceding the one to be created.
+   * @return SpanPtr The child span.
    */
   SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp,
-                    SpanContext& previous_context);
+                    const SpanContext& previous_context);
 
   /**
    * TracerInterface::reportSpan.
+   *
+   * @param span The span to be reported.
    */
   void reportSpan(Span&& span) override;
 
@@ -100,6 +107,8 @@ public:
 
   /**
    * Associates a Reporter object with this Tracer.
+   *
+   * @param The span reporter.
    */
   void setReporter(ReporterPtr reporter);
 
@@ -114,9 +123,11 @@ private:
   ReporterPtr reporter_;
   Runtime::RandomGenerator& random_generator_;
   const bool trace_id_128bit_;
+  const bool shared_span_context_;
+  TimeSource& time_source_;
 };
 
-typedef std::unique_ptr<Tracer> TracerPtr;
+using TracerPtr = std::unique_ptr<Tracer>;
 
 } // namespace Zipkin
 } // namespace Tracers

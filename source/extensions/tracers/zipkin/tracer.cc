@@ -22,13 +22,13 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   Annotation cs;
   cs.setEndpoint(std::move(ep));
   if (config.operationName() == Tracing::OperationName::Egress) {
-    cs.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
+    cs.setValue(CLIENT_SEND);
   } else {
-    cs.setValue(ZipkinCoreConstants::get().SERVER_RECV);
+    cs.setValue(SERVER_RECV);
   }
 
   // Create an all-new span, with no parent id
-  SpanPtr span_ptr(new Span());
+  SpanPtr span_ptr = std::make_unique<Span>(time_source_);
   span_ptr->setName(span_name);
   uint64_t random_number = random_generator_.random();
   span_ptr->setId(random_number);
@@ -36,10 +36,9 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   if (trace_id_128bit_) {
     span_ptr->setTraceIdHigh(random_generator_.random());
   }
-  int64_t start_time_micro =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch())
-          .count();
+  int64_t start_time_micro = std::chrono::duration_cast<std::chrono::microseconds>(
+                                 time_source_.monotonicTime().time_since_epoch())
+                                 .count();
   span_ptr->setStartTime(start_time_micro);
 
   // Set the timestamp globally for the span and also for the CS annotation
@@ -57,8 +56,8 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 }
 
 SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
-                          SystemTime timestamp, SpanContext& previous_context) {
-  SpanPtr span_ptr(new Span());
+                          SystemTime timestamp, const SpanContext& previous_context) {
+  SpanPtr span_ptr = std::make_unique<Span>(time_source_);
   Annotation annotation;
   uint64_t timestamp_micro;
 
@@ -67,7 +66,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 
   span_ptr->setName(span_name);
 
-  if (config.operationName() == Tracing::OperationName::Egress) {
+  if (config.operationName() == Tracing::OperationName::Egress || !shared_span_context_) {
     // We need to create a new span that is a child of the previous span; no shared context
 
     // Create a new span id
@@ -78,7 +77,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
     span_ptr->setParentId(previous_context.id());
 
     // Set the CS annotation value
-    annotation.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
+    annotation.setValue(CLIENT_SEND);
 
     // Set the timestamp globally for the span
     span_ptr->setTimestamp(timestamp_micro);
@@ -92,7 +91,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
     }
 
     // Set the SR annotation value
-    annotation.setValue(ZipkinCoreConstants::get().SERVER_RECV);
+    annotation.setValue(SERVER_RECV);
   } else {
     return span_ptr; // return an empty span
   }
@@ -114,10 +113,9 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   // Keep the same sampled flag
   span_ptr->setSampled(previous_context.sampled());
 
-  int64_t start_time_micro =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch())
-          .count();
+  int64_t start_time_micro = std::chrono::duration_cast<std::chrono::microseconds>(
+                                 time_source_.monotonicTime().time_since_epoch())
+                                 .count();
   span_ptr->setStartTime(start_time_micro);
 
   span_ptr->setTracer(this);

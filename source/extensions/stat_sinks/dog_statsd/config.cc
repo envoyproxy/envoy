@@ -1,7 +1,9 @@
 #include "extensions/stat_sinks/dog_statsd/config.h"
 
-#include "envoy/config/metrics/v2/stats.pb.h"
-#include "envoy/config/metrics/v2/stats.pb.validate.h"
+#include <memory>
+
+#include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/network/resolver_impl.h"
@@ -17,26 +19,25 @@ namespace DogStatsd {
 Stats::SinkPtr DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                      Server::Instance& server) {
   const auto& sink_config =
-      MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::DogStatsdSink&>(config);
+      MessageUtil::downcastAndValidate<const envoy::config::metrics::v3::DogStatsdSink&>(
+          config, server.messageValidationContext().staticValidationVisitor());
   Network::Address::InstanceConstSharedPtr address =
       Network::Address::resolveProtoAddress(sink_config.address());
   ENVOY_LOG(debug, "dog_statsd UDP ip address: {}", address->asString());
   return std::make_unique<Common::Statsd::UdpStatsdSink>(server.threadLocal(), std::move(address),
-                                                         true);
+                                                         true, sink_config.prefix());
 }
 
 ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {
-  return std::unique_ptr<envoy::config::metrics::v2::DogStatsdSink>(
-      new envoy::config::metrics::v2::DogStatsdSink());
+  return std::make_unique<envoy::config::metrics::v3::DogStatsdSink>();
 }
 
-std::string DogStatsdSinkFactory::name() { return StatsSinkNames::get().DOG_STATSD; }
+std::string DogStatsdSinkFactory::name() const { return StatsSinkNames::get().DogStatsd; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DogStatsdSinkFactory, Server::Configuration::StatsSinkFactory>
-    register_;
+REGISTER_FACTORY(DogStatsdSinkFactory, Server::Configuration::StatsSinkFactory){"envoy.dog_statsd"};
 
 } // namespace DogStatsd
 } // namespace StatSinks

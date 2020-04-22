@@ -6,7 +6,6 @@ Administration interface
 Envoy exposes a local administration interface that can be used to query and
 modify different aspects of the server:
 
-* :ref:`v1 API reference <config_admin_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.bootstrap.v2.Admin>`
 
 .. _operations_admin_interface_security:
@@ -26,14 +25,15 @@ modify different aspects of the server:
 
     admin:
       access_log_path: /tmp/admin_access.log
+      profile_path: /tmp/envoy.prof
       address:
         socket_address: { address: 127.0.0.1, port_value: 9901 }
 
   In the future additional security options will be added to the administration interface. This
   work is tracked in `this <https://github.com/envoyproxy/envoy/issues/2763>`_ issue.
 
-  All mutations should be sent as HTTP POST operations. For a limited time, they will continue
-  to work with HTTP GET, with a warning logged.
+  All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
+  the request has no effect, and an HTTP 400 (Invalid Request) response is returned.
 
 .. http:get:: /
 
@@ -43,10 +43,12 @@ modify different aspects of the server:
 
   Print a textual table of all available options.
 
+.. _operations_admin_interface_certs:
+
 .. http:get:: /certs
 
-  List out all loaded TLS certificates, including file name, serial number, and days until
-  expiration.
+  List out all loaded TLS certificates, including file name, serial number, subject alternate names and days until
+  expiration in JSON format conforming to the :ref:`certificate proto definition <envoy_api_msg_admin.v2alpha.Certificates>`.
 
 .. _operations_admin_interface_clusters:
 
@@ -59,17 +61,17 @@ modify different aspects of the server:
   Cluster manager information
     - ``version_info`` string -- the version info string of the last loaded
       :ref:`CDS<config_cluster_manager_cds>` update.
-      If envoy does not have :ref:`CDS<config_cluster_manager_cds>` setup, the
+      If Envoy does not have :ref:`CDS<config_cluster_manager_cds>` setup, the
       output will read ``version_info::static``.
 
   Cluster wide information
     - :ref:`circuit breakers<config_cluster_manager_cluster_circuit_breakers>` settings for all priority settings.
 
     - Information about :ref:`outlier detection<arch_overview_outlier_detection>` if a detector is installed. Currently
-      :ref:`success rate average<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_average>`,
-      and :ref:`ejection threshold<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_ejection_threshold>`
+      :ref:`average success rate <envoy_api_field_data.cluster.v2alpha.OutlierEjectSuccessRate.cluster_average_success_rate>`,
+      and :ref:`ejection threshold<envoy_api_field_data.cluster.v2alpha.OutlierEjectSuccessRate.cluster_success_rate_ejection_threshold>`
       are presented. Both of these values could be ``-1`` if there was not enough data to calculate them in the last
-      :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`.
+      :ref:`interval<envoy_api_field_cluster.OutlierDetection.interval>`.
 
     - ``added_via_api`` flag -- ``false`` if the cluster was added via static configuration, ``true``
       if it was added via the :ref:`CDS<config_cluster_manager_cds>` api.
@@ -92,8 +94,8 @@ modify different aspects of the server:
       zone, String, Service zone
       canary, Boolean, Whether the host is a canary
       success_rate, Double, "Request success rate (0-100). -1 if there was not enough
-      :ref:`request volume<config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
-      in the :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`
+      :ref:`request volume<envoy_api_field_cluster.OutlierDetection.success_rate_request_volume>`
+      in the :ref:`interval<envoy_api_field_cluster.OutlierDetection.interval>`
       to calculate it"
 
   Host health status
@@ -110,6 +112,11 @@ modify different aspects of the server:
 
     */failed_outlier_check*: The host has failed an outlier detection check.
 
+.. http:get:: /clusters?format=json
+
+  Dump the */clusters* output in a JSON-serialized proto. See the
+  :ref:`definition <envoy_api_msg_admin.v2alpha.Clusters>` for more information.
+
 .. _operations_admin_interface_config_dump:
 
 .. http:get:: /config_dump
@@ -119,12 +126,64 @@ modify different aspects of the server:
   information.
 
 .. warning::
+  Configuration may include :ref:`TLS certificates <envoy_api_msg_auth.TlsCertificate>`. Before
+  dumping the configuration, Envoy will attempt to redact the ``private_key`` and ``password``
+  fields from any certificates it finds. This relies on the configuration being a strongly-typed
+  protobuf message. If your Envoy configuration uses deprecated ``config`` fields (of type
+  ``google.protobuf.Struct``), please update to the recommended ``typed_config`` fields (of type
+  ``google.protobuf.Any``) to ensure sensitive data is redacted properly.
+
+.. warning::
   The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
   are not guaranteed to be stable.
 
+.. _operations_admin_interface_config_dump_by_mask:
+
+.. http:get:: /config_dump?mask={}
+
+  Specify a subset of fields that you would like to be returned. The mask is parsed as a
+  ``ProtobufWkt::FieldMask`` and applied to each top level dump such as
+  :ref:`BootstrapConfigDump <envoy_api_msg_admin.v2alpha.BootstrapConfigDump>` and
+  :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`.
+  This behavior changes if both resource and mask query parameters are specified. See
+  below for details.
+
+.. _operations_admin_interface_config_dump_by_resource:
+
+.. http:get:: /config_dump?resource={}
+
+  Dump only the currently loaded configuration that matches the specified resource. The resource must
+  be a repeated field in one of the top level config dumps such as
+  :ref:`static_listeners <envoy_api_field_admin.v2alpha.ListenersConfigDump.static_listeners>` from
+  :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>` or
+  :ref:`dynamic_active_clusters <envoy_api_field_admin.v2alpha.ClustersConfigDump.dynamic_active_clusters>` from
+  :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`. If you need a non-repeated
+  field, use the mask query parameter documented above. If you want only a subset of fields from the repeated
+  resource, use both as documented below.
+
+.. _operations_admin_interface_config_dump_by_resource_and_mask:
+
+.. http:get:: /config_dump?resource={}&mask={}
+
+  When both resource and mask query parameters are specified, the mask is applied to every element
+  in the desired repeated field so that only a subset of fields are returned. The mask is parsed
+  as a ``ProtobufWkt::FieldMask``.
+
+  For example, get the names of all active dynamic clusters with
+  ``/config_dump?resource=dynamic_active_clusters&mask=cluster.name``
+
+.. http:get:: /contention
+
+  Dump current Envoy mutex contention stats (:ref:`MutexStats <envoy_api_msg_admin.v2alpha.MutexStats>`) in JSON
+  format, if mutex tracing is enabled. See :option:`--enable-mutex-tracing`.
+
 .. http:post:: /cpuprofiler
 
-  Enable or disable the CPU profiler. Requires compiling with gperftools.
+  Enable or disable the CPU profiler. Requires compiling with gperftools. The output file can be configured by admin.profile_path.
+
+.. http:post:: /heapprofiler
+
+  Enable or disable the Heap profiler. Requires compiling with gperftools. The output file can be configured by admin.profile_path.
 
 .. _operations_admin_interface_healthcheck_fail:
 
@@ -146,12 +205,36 @@ modify different aspects of the server:
 
   See :option:`--hot-restart-version`.
 
+.. _operations_admin_interface_listeners:
+
+.. http:get:: /listeners
+
+  List out all configured :ref:`listeners <arch_overview_listeners>`. This information includes the names of listeners as well as
+  the addresses that they are listening on. If a listener is configured to listen on port 0, then the output will contain the actual
+  port that was allocated by the OS.
+
+.. http:get:: /listeners?format=json
+
+  Dump the */listeners* output in a JSON-serialized proto. See the
+  :ref:`definition <envoy_api_msg_admin.v2alpha.Listeners>` for more information.
+
 .. _operations_admin_interface_logging:
 
 .. http:post:: /logging
 
-  Enable/disable different logging levels on different subcomponents. Generally only used during
-  development.
+  Enable/disable different logging levels on a particular logger or all loggers.
+
+  - To change the logging level across all loggers, set the query parameter as level=<desired_level>.
+  - To change a particular logger's level, set the query parameter like so, <logger_name>=<desired_level>.
+  - To list the loggers, send a POST request to the /logging endpoint without a query parameter.
+
+  .. note::
+
+    Generally only used during development.
+
+.. http:get:: /memory
+
+  Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all `/stats` and filtering to get the memory-related statistics.
 
 .. http:post:: /quitquitquit
 
@@ -160,25 +243,83 @@ modify different aspects of the server:
 .. http:post:: /reset_counters
 
   Reset all counters to zero. This is useful along with :http:get:`/stats` during debugging. Note
-  that this does not drop any data sent to statsd. It just effects local output of the
+  that this does not drop any data sent to statsd. It just affects local output of the
   :http:get:`/stats` command.
+
+.. _operations_admin_interface_drain:
+
+.. http:post:: /drain_listeners
+   
+   :ref:`Drains <arch_overview_draining>` all listeners.
+
+   .. http:post:: /drain_listeners?inboundonly
+
+   :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in 
+   :ref:`Listener <envoy_api_msg_Listener>` is used to determine whether a listener 
+   is inbound or outbound.
+
+.. attention::
+
+   This operation directly stops the matched listeners on workers. Once listeners in a given
+   traffic direction are stopped, listener additions and modifications in that direction
+   are not allowed.
 
 .. http:get:: /server_info
 
-  Outputs information about the running server. Sample output looks like:
+  Outputs a JSON message containing information about the running server.
 
-.. code-block:: none
+  Sample output looks like:
 
-  envoy 267724/RELEASE live 1571 1571 0
+  .. code-block:: json
 
-The fields are:
+    {
+      "version": "b050513e840aa939a01f89b07c162f00ab3150eb/1.9.0-dev/Modified/DEBUG",
+      "state": "LIVE",
+      "command_line_options": {
+        "base_id": "0",
+        "concurrency": 8,
+        "config_path": "config.yaml",
+        "config_yaml": "",
+        "allow_unknown_static_fields": false,
+        "admin_address_path": "",
+        "local_address_ip_version": "v4",
+        "log_level": "info",
+        "component_log_level": "",
+        "log_format": "[%Y-%m-%d %T.%e][%t][%l][%n] %v",
+        "log_path": "",
+        "hot_restart_version": false,
+        "service_cluster": "",
+        "service_node": "",
+        "service_zone": "",
+        "mode": "Serve",
+        "disable_hot_restart": false,
+        "enable_mutex_tracing": false,
+        "restart_epoch": 0,
+        "file_flush_interval": "10s",
+        "drain_time": "600s",
+        "parent_shutdown_time": "900s",
+        "cpuset_threads": false
+      },
+      "uptime_current_epoch": "6s",
+      "uptime_all_epochs": "6s"
+    }
 
-* Process name
-* Compiled SHA and build type
-* Health check state (live or draining)
-* Current hot restart epoch uptime in seconds
-* Total uptime in seconds (across all hot restarts)
-* Current hot restart epoch
+  See the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
+  explanation of the output.
+
+.. http:get:: /ready
+
+  Outputs a string and error code reflecting the state of the server. 200 is returned for the LIVE state,
+  and 503 otherwise. This can be used as a readiness check.
+
+  Example output:
+
+  .. code-block:: none
+
+    LIVE
+
+  See the `state` field of the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
+  explanation of the output.
 
 .. _operations_admin_interface_stats:
 
@@ -188,7 +329,7 @@ The fields are:
   Histograms will output the computed quantiles i.e P0,P25,P50,P75,P90,P99,P99.9 and P100.
   The output for each quantile will be in the form of (interval,cumulative) where interval value
   represents the summary since last flush interval and cumulative value represents the
-  summary since the start of envoy instance. "No recorded values" in the histogram output indicates
+  summary since the start of Envoy instance. "No recorded values" in the histogram output indicates
   that it has not been updated with a value.
   See :ref:`here <operations_stats>` for more information.
 
@@ -197,6 +338,14 @@ The fields are:
   Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
   least once, and histograms added to at least once).
 
+  .. http:get:: /stats?filter=regex
+
+  Filters the returned stats to those with names matching the regular expression
+  `regex`. Compatible with `usedonly`. Performs partial matching by default, so
+  `/stats?filter=server` will return all stats containing the word `server`.
+  Full-string matching can be specified with begin- and end-line anchors. (i.e.
+  `/stats?filter=^server.concurrency$`)
+
 .. http:get:: /stats?format=json
 
   Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
@@ -204,8 +353,8 @@ The fields are:
   that contains "supported_quantiles" which lists the quantiles supported and an array of computed_quantiles
   that has the computed quantile for each histogram.
 
-  If a histogram is not updated during an interval, the ouput will have null for all the quantiles.
-  
+  If a histogram is not updated during an interval, the output will have null for all the quantiles.
+
   Example histogram output:
 
   .. code-block:: json
@@ -247,10 +396,10 @@ The fields are:
         ]
       }
     }
- 
+
   .. http:get:: /stats?format=json&usedonly
 
-  Outputs statistics that Envoy has updated (counters incremented at least once, 
+  Outputs statistics that Envoy has updated (counters incremented at least once,
   gauges changed at least once, and histograms added to at least once) in JSON format.
 
 .. http:get:: /stats?format=prometheus
@@ -260,8 +409,60 @@ The fields are:
   .. http:get:: /stats/prometheus
 
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
-  v0.0.4 format. This can be used to integrate with a Prometheus server. Currently, only counters and
-  gauges are output. Histograms will be output in a future update.
+  v0.0.4 format. This can be used to integrate with a Prometheus server.
+
+  You can optionally pass the `usedonly` URL query argument to only get statistics that
+  Envoy has updated (counters incremented at least once, gauges changed at least once,
+  and histograms added to at least once)
+
+  .. http:get:: /stats/recentlookups
+
+  This endpoint helps Envoy developers debug potential contention
+  issues in the stats system. Initially, only the count of StatName
+  lookups is acumulated, not the specific names that are being looked
+  up. In order to see specific recent requests, you must enable the
+  feature by POSTing to `/stats/recentlookups/enable`. There may be
+  approximately 40-100 nanoseconds of added overhead per lookup.
+
+  When enabled, this endpoint emits a table of stat names that were
+  recently accessed as strings by Envoy. Ideally, strings should be
+  converted into StatNames, counters, gauges, and histograms by Envoy
+  code only during startup or when receiving a new configuration via
+  xDS. This is because when stats are looked up as strings they must
+  take a global symbol table lock. During startup this is acceptable,
+  but in response to user requests on high core-count machines, this
+  can cause performance issues due to mutex contention.
+
+  This admin endpoint requires Envoy to be started with option
+  `--use-fake-symbol-table 0`.
+
+  See :repo:`source/docs/stats.md` for more details.
+
+  Note also that actual mutex contention can be tracked via :http:get:`/contention`.
+
+  .. http:post:: /stats/recentlookups/enable
+
+  Turns on collection of recent lookup of stat-names, thus enabling
+  `/stats/recentlookups`.
+
+  See :repo:`source/docs/stats.md` for more details.
+
+  .. http:post:: /stats/recentlookups/disable
+
+  Turns off collection of recent lookup of stat-names, thus disabling
+  `/stats/recentlookups`. It also clears the list of lookups. However,
+  the total count, visible as stat `server.stats_recent_lookups`, is
+  not cleared, and continues to accumulate.
+
+  See :repo:`source/docs/stats.md` for more details.
+
+  .. http:post:: /stats/recentlookups/clear
+
+  Clears all outstanding lookups and counts. This clears all recent
+  lookups data as well as the count, but collection continues if
+  it is enabled.
+
+  See :repo:`source/docs/stats.md` for more details.
 
 .. _operations_admin_interface_runtime:
 
@@ -314,3 +515,50 @@ The fields are:
   Use the /runtime_modify endpoint with care. Changes are effectively immediately. It is
   **critical** that the admin interface is :ref:`properly secured
   <operations_admin_interface_security>`.
+
+  .. _operations_admin_interface_hystrix_event_stream:
+
+.. http:get:: /hystrix_event_stream
+
+  This endpoint is intended to be used as the stream source for
+  `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
+  a GET to this endpoint will trigger a stream of statistics from Envoy in
+  `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_
+  format, as expected by the Hystrix dashboard.
+
+  If invoked from a browser or a terminal, the response will be shown as a continuous stream,
+  sent in intervals defined by the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
+  :ref:`stats_flush_interval <envoy_api_field_config.bootstrap.v2.Bootstrap.stats_flush_interval>`
+
+  This handler is enabled only when a Hystrix sink is enabled in the config file as documented
+  :ref:`here <envoy_api_msg_config.metrics.v2.HystrixSink>`.
+
+  As Envoy's and Hystrix resiliency mechanisms differ, some of the statistics shown in the dashboard
+  had to be adapted:
+
+  * **Thread pool rejections** - Generally similar to what's called short circuited in Envoy,
+    and counted by *upstream_rq_pending_overflow*, although the term thread pool is not accurate for
+    Envoy. Both in Hystrix and Envoy, the result is rejected requests which are not passed upstream.
+  * **circuit breaker status (closed or open)** - Since in Envoy, a circuit is opened based on the
+    current number of connections/requests in queue, there is no sleeping window for circuit breaker,
+    circuit open/closed is momentary. Hence, we set the circuit breaker status to "forced closed".
+  * **Short-circuited (rejected)** - The term exists in Envoy but refers to requests not sent because
+    of passing a limit (queue or connections), while in Hystrix it refers to requests not sent because
+    of high percentage of service unavailable responses during some time frame.
+    In Envoy, service unavailable response will cause **outlier detection** - removing a node off the
+    load balancer pool, but requests are not rejected as a result. Therefore, this counter is always
+    set to '0'.
+  * Latency information represents data since last flush.
+    Mean latency is currently not available.
+
+.. http:post:: /tap
+
+  This endpoint is used for configuring an active tap session. It is only
+  available if a valid tap extension has been configured, and that extension has
+  been configured to accept admin configuration. See:
+
+  * :ref:`HTTP tap filter configuration <config_http_filters_tap_admin_handler>`
+
+.. http:post:: /reopen_logs
+
+  Triggers reopen of all access logs. Behavior is similar to SIGUSR1 handling.

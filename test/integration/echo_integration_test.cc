@@ -7,25 +7,25 @@ namespace Envoy {
 
 std::string echo_config;
 
-class EchoIntegrationTest : public BaseIntegrationTest,
-                            public testing::TestWithParam<Network::Address::IpVersion> {
+class EchoIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                            public BaseIntegrationTest {
 public:
   EchoIntegrationTest() : BaseIntegrationTest(GetParam(), echo_config) {}
 
   // Called once by the gtest framework before any EchoIntegrationTests are run.
-  static void SetUpTestCase() {
-    echo_config = ConfigHelper::BASE_CONFIG + R"EOF(
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    echo_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
-        name: envoy.ratelimit
-        config:
+        name: ratelimit
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.rate_limit.v2.RateLimit
           domain: foo
           stats_prefix: name
           descriptors: [{"key": "foo", "value": "bar"}]
       filters:
-        name: envoy.echo
-        config:
-      )EOF";
+        name: envoy.filters.network.echo
+      )EOF");
   }
 
   /**
@@ -42,9 +42,9 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, EchoIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, EchoIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(EchoIntegrationTest, Hello) {
   Buffer::OwnedImpl buffer("hello");
@@ -52,7 +52,7 @@ TEST_P(EchoIntegrationTest, Hello) {
   RawConnectionDriver connection(
       lookupPort("listener_0"), buffer,
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
+        response.append(data.toString());
         connection.close();
       },
       version_);
@@ -63,13 +63,14 @@ TEST_P(EchoIntegrationTest, Hello) {
 
 TEST_P(EchoIntegrationTest, AddRemoveListener) {
   const std::string json = TestEnvironment::substitute(R"EOF(
-  {
-    "name": "new_listener",
-    "address": "tcp://{{ ip_loopback_address }}:0",
-    "filters": [
-      { "name": "echo", "config": {} }
-    ]
-  }
+name: new_listener
+address:
+  socket_address:
+    address: "{{ ip_loopback_address }}"
+    port_value: 0
+filter_chains:
+- filters:
+  - name: envoy.filters.network.echo
   )EOF",
                                                        GetParam());
 
@@ -80,7 +81,7 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
       [&listener_added_by_worker]() -> void { listener_added_by_worker.setReady(); });
   test_server_->server().dispatcher().post([this, json, &listener_added_by_manager]() -> void {
     EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
-        Server::parseListenerFromJson(json), "", true));
+        Server::parseListenerFromV2Yaml(json), "", true));
     listener_added_by_manager.setReady();
   });
   listener_added_by_worker.waitReady();
@@ -91,7 +92,7 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
                                    .listenerManager()
                                    .listeners()[1]
                                    .get()
-                                   .socket()
+                                   .listenSocketFactory()
                                    .localAddress()
                                    ->ip()
                                    ->port();
@@ -101,7 +102,7 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
   RawConnectionDriver connection(
       new_listener_port, buffer,
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
+        response.append(data.toString());
         connection.close();
       },
       version_);
@@ -118,10 +119,32 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
   listener_removed.waitReady();
 
   // Now connect. This should fail.
-  RawConnectionDriver connection2(
-      new_listener_port, buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
-  connection2.run();
+  // Allow for a few attempts, in order to handle a race (likely due to lack of
+  // LEV_OPT_CLOSE_ON_FREE, which would break listener reuse)
+  //
+  // In order for this test to work, it must be tagged as "exclusive" in its
+  // build file. Otherwise, it's possible that when the listener is destroyed
+  // above, another test would start listening on the released port, and this
+  // connect would unexpectedly succeed.
+  bool connect_fail = false;
+  for (int i = 0; i < 10; ++i) {
+    RawConnectionDriver connection2(
+        new_listener_port, buffer,
+        [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
+    while (connection2.connecting()) {
+      // Don't busy loop, but macOS often needs a moment to decide this connection isn't happening.
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+
+      connection2.run(Event::Dispatcher::RunType::NonBlock);
+    }
+    if (connection2.connection().state() == Network::Connection::State::Closed) {
+      connect_fail = true;
+      break;
+    } else {
+      connection2.close();
+    }
+  }
+  ASSERT_TRUE(connect_fail);
 }
 
 } // namespace Envoy

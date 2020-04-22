@@ -1,33 +1,33 @@
 #pragma once
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 namespace Envoy {
 namespace Grpc {
 
-// Per-service factory for Grpc::AsyncClients. This factory is thread aware and will instantiate
+// Per-service factory for Grpc::RawAsyncClients. This factory is thread aware and will instantiate
 // with thread local state. Clients will use ThreadLocal::Instance::dispatcher() for event handling.
 class AsyncClientFactory {
 public:
-  virtual ~AsyncClientFactory() {}
+  virtual ~AsyncClientFactory() = default;
 
   /**
-   * Create a gRPC::AsyncClient.
-   * @return AsyncClientPtr async client.
+   * Create a gRPC::RawAsyncClient.
+   * @return RawAsyncClientPtr async client.
    */
-  virtual AsyncClientPtr create() PURE;
+  virtual RawAsyncClientPtr create() PURE;
 };
 
-typedef std::unique_ptr<AsyncClientFactory> AsyncClientFactoryPtr;
+using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 
 // Singleton gRPC client manager. Grpc::AsyncClientManager can be used to create per-service
 // Grpc::AsyncClientFactory instances. All manufactured Grpc::AsyncClients must
 // be destroyed before the AsyncClientManager can be safely destructed.
 class AsyncClientManager {
 public:
-  virtual ~AsyncClientManager() {}
+  virtual ~AsyncClientManager() = default;
 
   /**
    * Create a Grpc::AsyncClients factory for a service. Validation of the service is performed and
@@ -40,11 +40,11 @@ public:
    * @throws EnvoyException when grpc_service validation fails.
    */
   virtual AsyncClientFactoryPtr
-  factoryForGrpcService(const envoy::api::v2::core::GrpcService& grpc_service, Stats::Scope& scope,
-                        bool skip_cluster_check) PURE;
+  factoryForGrpcService(const envoy::config::core::v3::GrpcService& grpc_service,
+                        Stats::Scope& scope, bool skip_cluster_check) PURE;
 };
 
-typedef std::unique_ptr<AsyncClientManager> AsyncClientManagerPtr;
+using AsyncClientManagerPtr = std::unique_ptr<AsyncClientManager>;
 
 } // namespace Grpc
 } // namespace Envoy

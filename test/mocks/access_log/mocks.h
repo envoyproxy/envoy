@@ -5,45 +5,57 @@
 
 #include "envoy/access_log/access_log.h"
 
-#include "test/mocks/filesystem/mocks.h"
-
 #include "gmock/gmock.h"
 
 namespace Envoy {
 namespace AccessLog {
 
+class MockAccessLogFile : public AccessLogFile {
+public:
+  MockAccessLogFile();
+  ~MockAccessLogFile() override;
+
+  // AccessLog::AccessLogFile
+  MOCK_METHOD(void, write, (absl::string_view data));
+  MOCK_METHOD(void, reopen, ());
+  MOCK_METHOD(void, flush, ());
+};
+
 class MockFilter : public Filter {
 public:
   MockFilter();
-  ~MockFilter();
+  ~MockFilter() override;
 
   // AccessLog::Filter
-  MOCK_METHOD2(evaluate,
-               bool(const RequestInfo::RequestInfo& info, const Http::HeaderMap& request_headers));
+  MOCK_METHOD(bool, evaluate,
+              (const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+               const Http::ResponseHeaderMap& response_headers,
+               const Http::ResponseTrailerMap& response_trailers));
 };
 
 class MockAccessLogManager : public AccessLogManager {
 public:
   MockAccessLogManager();
-  ~MockAccessLogManager();
+  ~MockAccessLogManager() override;
 
   // AccessLog::AccessLogManager
-  MOCK_METHOD0(reopen, void());
-  MOCK_METHOD1(createAccessLog, Filesystem::FileSharedPtr(const std::string& file_name));
+  MOCK_METHOD(void, reopen, ());
+  MOCK_METHOD(AccessLogFileSharedPtr, createAccessLog, (const std::string& file_name));
 
-  std::shared_ptr<Filesystem::MockFile> file_{new testing::NiceMock<Filesystem::MockFile>()};
+  std::shared_ptr<MockAccessLogFile> file_{new testing::NiceMock<MockAccessLogFile>()};
 };
 
 class MockInstance : public Instance {
 public:
   MockInstance();
-  ~MockInstance();
+  ~MockInstance() override;
 
   // AccessLog::Instance
-  MOCK_METHOD4(log,
-               void(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-                    const Http::HeaderMap* response_trailers,
-                    const RequestInfo::RequestInfo& request_info));
+  MOCK_METHOD(void, log,
+              (const Http::RequestHeaderMap* request_headers,
+               const Http::ResponseHeaderMap* response_headers,
+               const Http::ResponseTrailerMap* response_trailers,
+               const StreamInfo::StreamInfo& stream_info));
 };
 
 } // namespace AccessLog

@@ -17,10 +17,15 @@ envoy_extension_cc_test(
     srcs = ["matchers_test.cc"],
     extension_name = "envoy.filters.http.rbac",
     deps = [
+        "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -32,7 +37,10 @@ envoy_extension_cc_test(
         "//source/extensions/filters/common/rbac:engine_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
     ],
 )
 
@@ -42,5 +50,6 @@ envoy_extension_cc_mock(
     extension_name = "envoy.filters.http.rbac",
     deps = [
         "//source/extensions/filters/common/rbac:engine_lib",
+        "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
     ],
 )

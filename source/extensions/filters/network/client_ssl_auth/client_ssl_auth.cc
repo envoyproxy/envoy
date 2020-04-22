@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "envoy/network/connection.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
@@ -20,12 +22,13 @@ namespace NetworkFilters {
 namespace ClientSslAuth {
 
 ClientSslAuthConfig::ClientSslAuthConfig(
-    const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+    const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
     ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
     Stats::Scope& scope, Runtime::RandomGenerator& random)
     : RestApiFetcher(
           cm, config.auth_api_cluster(), dispatcher, random,
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000))),
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000)),
+          std::chrono::milliseconds(1000)),
       tls_(tls.allocateSlot()), ip_white_list_(config.ip_white_list()),
       stats_(generateStats(scope, config.stat_prefix())) {
 
@@ -40,7 +43,7 @@ ClientSslAuthConfig::ClientSslAuthConfig(
 }
 
 ClientSslAuthConfigSharedPtr ClientSslAuthConfig::create(
-    const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+    const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
     ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
     Stats::Scope& scope, Runtime::RandomGenerator& random) {
   ClientSslAuthConfigSharedPtr new_config(
@@ -60,7 +63,7 @@ GlobalStats ClientSslAuthConfig::generateStats(Stats::Scope& scope, const std::s
   return stats;
 }
 
-void ClientSslAuthConfig::parseResponse(const Http::Message& message) {
+void ClientSslAuthConfig::parseResponse(const Http::ResponseMessage& message) {
   AllowedPrincipalsSharedPtr new_principals(new AllowedPrincipals());
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(message.bodyAsString());
   for (const Json::ObjectSharedPtr& certificate : loader->getObjectArray("certificates")) {
@@ -75,13 +78,15 @@ void ClientSslAuthConfig::parseResponse(const Http::Message& message) {
   stats_.total_principals_.set(new_principals->size());
 }
 
-void ClientSslAuthConfig::onFetchFailure(const EnvoyException*) { stats_.update_failure_.inc(); }
+void ClientSslAuthConfig::onFetchFailure(Config::ConfigUpdateFailureReason, const EnvoyException*) {
+  stats_.update_failure_.inc();
+}
 
 static const std::string Path = "/v1/certs/list/approved";
 
-void ClientSslAuthConfig::createRequest(Http::Message& request) {
-  request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
-  request.headers().insertPath().value(Path);
+void ClientSslAuthConfig::createRequest(Http::RequestMessage& request) {
+  request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
+  request.headers().setPath(Path);
 }
 
 Network::FilterStatus ClientSslAuthFilter::onData(Buffer::Instance&, bool) {

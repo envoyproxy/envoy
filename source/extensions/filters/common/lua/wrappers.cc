@@ -26,7 +26,7 @@ int BufferWrapper::luaGetBytes(lua_State* state) {
   return 1;
 }
 
-void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& value) {
+void MetadataMapHelper::setValue(lua_State* state, const ProtobufWkt::Value& value) {
   ProtobufWkt::Value::KindCase kind = value.kind_case();
 
   switch (kind) {
@@ -40,7 +40,7 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& va
     return lua_pushboolean(state, value.bool_value());
 
   case ProtobufWkt::Value::kStringValue: {
-    const auto string_value = value.string_value();
+    const auto& string_value = value.string_value();
     return lua_pushstring(state, string_value.c_str());
   }
 
@@ -49,7 +49,7 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& va
   }
 
   case ProtobufWkt::Value::kListValue: {
-    const auto list = value.list_value();
+    const auto& list = value.list_value();
     const int values_size = list.values_size();
 
     lua_createtable(state, values_size, 0);
@@ -72,13 +72,12 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& va
   }
 
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-void MetadataMapWrapper::createTable(
-    lua_State* state,
-    const Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>& fields) {
+void MetadataMapHelper::createTable(lua_State* state,
+                                    const Protobuf::Map<std::string, ProtobufWkt::Value>& fields) {
   lua_createtable(state, 0, fields.size());
   for (const auto& field : fields) {
     int top = lua_gettop(state);
@@ -86,6 +85,99 @@ void MetadataMapWrapper::createTable(
     setValue(state, field.second);
     lua_settable(state, top);
   }
+}
+
+/**
+ * Converts the value on top of the Lua stack into a ProtobufWkt::Value.
+ * Any Lua types that cannot be directly mapped to Value types will
+ * yield an error.
+ */
+ProtobufWkt::Value MetadataMapHelper::loadValue(lua_State* state) {
+  ProtobufWkt::Value value;
+  int type = lua_type(state, -1);
+
+  switch (type) {
+  case LUA_TNIL:
+    value.set_null_value(ProtobufWkt::NullValue());
+    break;
+  case LUA_TNUMBER:
+    value.set_number_value(static_cast<double>(lua_tonumber(state, -1)));
+    break;
+  case LUA_TBOOLEAN:
+    value.set_bool_value(lua_toboolean(state, -1) != 0);
+    break;
+  case LUA_TTABLE: {
+    int length = MetadataMapHelper::tableLength(state);
+    if (length > 0) {
+      *value.mutable_list_value() = MetadataMapHelper::loadList(state, length);
+    } else {
+      *value.mutable_struct_value() = MetadataMapHelper::loadStruct(state);
+    }
+    break;
+  }
+  case LUA_TSTRING:
+    value.set_string_value(lua_tostring(state, -1));
+    break;
+  default:
+    luaL_error(state, "unexpected type '%s' in dynamicMetadata", lua_typename(state, type));
+  }
+
+  return value;
+}
+
+/**
+ * Returns the length of a Lua table if it's actually shaped like a List,
+ * i.e. if all the keys are consecutive number values. Otherwise, returns -1.
+ */
+int MetadataMapHelper::tableLength(lua_State* state) {
+  double max = 0;
+
+  lua_pushnil(state);
+  while (lua_next(state, -2) != 0) {
+    if (lua_type(state, -2) == LUA_TNUMBER) {
+      double k = lua_tonumber(state, -2);
+      if (floor(k) == k && k >= 1) {
+        if (k > max) {
+          max = k;
+        }
+        lua_pop(state, 1);
+        continue;
+      }
+    }
+    lua_pop(state, 2);
+    return -1;
+  }
+  return static_cast<int>(max);
+}
+
+ProtobufWkt::ListValue MetadataMapHelper::loadList(lua_State* state, int length) {
+  ProtobufWkt::ListValue list;
+
+  for (int i = 1; i <= length; i++) {
+    lua_rawgeti(state, -1, i);
+    *list.add_values() = MetadataMapHelper::loadValue(state);
+    lua_pop(state, 1);
+  }
+
+  return list;
+}
+
+ProtobufWkt::Struct MetadataMapHelper::loadStruct(lua_State* state) {
+  ProtobufWkt::Struct struct_obj;
+
+  lua_pushnil(state);
+  while (lua_next(state, -2) != 0) {
+    int key_type = lua_type(state, -2);
+    if (key_type != LUA_TSTRING) {
+      luaL_error(state, "unexpected type %s in table key (only string keys are supported)",
+                 lua_typename(state, key_type));
+    }
+    const char* key = lua_tostring(state, -2);
+    (*struct_obj.mutable_fields())[key] = MetadataMapHelper::loadValue(state);
+    lua_pop(state, 1);
+  }
+
+  return struct_obj;
 }
 
 MetadataMapIterator::MetadataMapIterator(MetadataMapWrapper& parent)
@@ -98,7 +190,7 @@ int MetadataMapIterator::luaPairsIterator(lua_State* state) {
   }
 
   lua_pushstring(state, current_->first.c_str());
-  parent_.setValue(state, current_->second);
+  MetadataMapHelper::setValue(state, current_->second);
 
   current_++;
   return 2;
@@ -111,7 +203,7 @@ int MetadataMapWrapper::luaGet(lua_State* state) {
     return 0;
   }
 
-  setValue(state, filter_it->second);
+  MetadataMapHelper::setValue(state, filter_it->second);
   return 1;
 }
 
@@ -122,6 +214,20 @@ int MetadataMapWrapper::luaPairs(lua_State* state) {
 
   iterator_.reset(MetadataMapIterator::create(state, *this), true);
   lua_pushcclosure(state, MetadataMapIterator::static_luaPairsIterator, 1);
+  return 1;
+}
+
+int ConnectionWrapper::luaSsl(lua_State* state) {
+  const auto& ssl = connection_->ssl();
+  if (ssl != nullptr) {
+    if (ssl_connection_wrapper_.get() != nullptr) {
+      ssl_connection_wrapper_.pushStack();
+    } else {
+      ssl_connection_wrapper_.reset(SslConnectionWrapper::create(state, ssl), true);
+    }
+  } else {
+    lua_pushnil(state);
+  }
   return 1;
 }
 

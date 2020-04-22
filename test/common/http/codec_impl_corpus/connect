@@ -1,0 +1,29 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "CONNECT"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com:80"
+      }
+    }
+    end_stream: false
+  }
+}
+actions { quiesce_drain {} }
+actions {
+  stream_action {
+    stream_id: 0
+    response {
+      headers {
+        headers {
+          key: ":status"
+          value: "200"
+        }
+      }
+    }
+  }
+}

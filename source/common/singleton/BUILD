@@ -21,6 +21,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/singleton:manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:non_copyable",
         "//source/common/common:thread_lib",
     ],
 )
@@ -29,4 +30,5 @@ envoy_cc_library(
     name = "threadsafe_singleton",
     hdrs = ["threadsafe_singleton.h"],
     external_deps = ["abseil_base"],
+    deps = ["//source/common/common:assert_lib"],
 )

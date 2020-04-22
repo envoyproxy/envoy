@@ -9,32 +9,35 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-class ZipkinJsonFieldNameValues {
-public:
-  const std::string SPAN_TRACE_ID = "traceId";
-  const std::string SPAN_PARENT_ID = "parentId";
-  const std::string SPAN_NAME = "name";
-  const std::string SPAN_ID = "id";
-  const std::string SPAN_TIMESTAMP = "timestamp";
-  const std::string SPAN_DURATION = "duration";
-  const std::string SPAN_ANNOTATIONS = "annotations";
-  const std::string SPAN_BINARY_ANNOTATIONS = "binaryAnnotations";
+namespace {
 
-  const std::string ANNOTATION_ENDPOINT = "endpoint";
-  const std::string ANNOTATION_TIMESTAMP = "timestamp";
-  const std::string ANNOTATION_VALUE = "value";
+constexpr char SPAN_ID[] = "id";
+constexpr char SPAN_KIND[] = "kind";
+constexpr char SPAN_NAME[] = "name";
+constexpr char SPAN_TAGS[] = "tags";
+constexpr char SPAN_SHARED[] = "shared";
+constexpr char SPAN_TRACE_ID[] = "traceId";
+constexpr char SPAN_DURATION[] = "duration";
+constexpr char SPAN_PARENT_ID[] = "parentId";
+constexpr char SPAN_TIMESTAMP[] = "timestamp";
+constexpr char SPAN_ANNOTATIONS[] = "annotations";
+constexpr char SPAN_LOCAL_ENDPOINT[] = "localEndpoint";
+constexpr char SPAN_BINARY_ANNOTATIONS[] = "binaryAnnotations";
 
-  const std::string BINARY_ANNOTATION_ENDPOINT = "endpoint";
-  const std::string BINARY_ANNOTATION_KEY = "key";
-  const std::string BINARY_ANNOTATION_VALUE = "value";
+constexpr char ANNOTATION_VALUE[] = "value";
+constexpr char ANNOTATION_ENDPOINT[] = "endpoint";
+constexpr char ANNOTATION_TIMESTAMP[] = "timestamp";
 
-  const std::string ENDPOINT_SERVICE_NAME = "serviceName";
-  const std::string ENDPOINT_PORT = "port";
-  const std::string ENDPOINT_IPV4 = "ipv4";
-  const std::string ENDPOINT_IPV6 = "ipv6";
-};
+constexpr char BINARY_ANNOTATION_KEY[] = "key";
+constexpr char BINARY_ANNOTATION_VALUE[] = "value";
+constexpr char BINARY_ANNOTATION_ENDPOINT[] = "endpoint";
 
-typedef ConstSingleton<ZipkinJsonFieldNameValues> ZipkinJsonFieldNames;
+constexpr char ENDPOINT_PORT[] = "port";
+constexpr char ENDPOINT_IPV4[] = "ipv4";
+constexpr char ENDPOINT_IPV6[] = "ipv6";
+constexpr char ENDPOINT_SERVICE_NAME[] = "serviceName";
+
+} // namespace
 
 } // namespace Zipkin
 } // namespace Tracers

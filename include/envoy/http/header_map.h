@@ -1,19 +1,45 @@
 #pragma once
 
-#include <string.h>
-
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <unordered_set>
+#include <vector>
 
 #include "envoy/common/pure.h"
 
+#include "common/common/assert.h"
+#include "common/common/hash.h"
+#include "common/common/macros.h"
+
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
+
+// Used by ASSERTs to validate internal consistency. E.g. valid HTTP header keys/values should
+// never contain embedded NULLs.
+static inline bool validHeaderString(absl::string_view s) {
+  // If you modify this list of illegal embedded characters you will probably
+  // want to change header_map_fuzz_impl_test at the same time.
+  for (const char c : s) {
+    switch (c) {
+    case '\0':
+      FALLTHRU;
+    case '\r':
+      FALLTHRU;
+    case '\n':
+      return false;
+    default:
+      continue;
+    }
+  }
+  return true;
+}
 
 /**
  * Wrapper for a lower case string used in header operations to generally avoid needless case
@@ -21,30 +47,67 @@ namespace Http {
  */
 class LowerCaseString {
 public:
-  LowerCaseString(LowerCaseString&& rhs) : string_(std::move(rhs.string_)) {}
-  LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) {}
-  explicit LowerCaseString(const std::string& new_string) : string_(new_string) { lower(); }
+  LowerCaseString(LowerCaseString&& rhs) noexcept : string_(std::move(rhs.string_)) {
+    ASSERT(valid());
+  }
+  LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) { ASSERT(valid()); }
+  explicit LowerCaseString(const std::string& new_string) : string_(new_string) {
+    ASSERT(valid());
+    lower();
+  }
 
   const std::string& get() const { return string_; }
   bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }
+  bool operator!=(const LowerCaseString& rhs) const { return string_ != rhs.string_; }
+  bool operator<(const LowerCaseString& rhs) const { return string_.compare(rhs.string_) < 0; }
 
 private:
-  void lower() { std::transform(string_.begin(), string_.end(), string_.begin(), tolower); }
+  void lower() {
+    std::transform(string_.begin(), string_.end(), string_.begin(), absl::ascii_tolower);
+  }
+  bool valid() const { return validHeaderString(string_); }
 
   std::string string_;
 };
 
 /**
+ * Lower case string hasher.
+ */
+struct LowerCaseStringHash {
+  size_t operator()(const LowerCaseString& value) const { return HashUtil::xxHash64(value.get()); }
+};
+
+/**
+ * Convenient type for unordered set of lower case string.
+ */
+using LowerCaseStrUnorderedSet = std::unordered_set<LowerCaseString, LowerCaseStringHash>;
+
+/**
+ * Convenient type for a vector of lower case string and string pair.
+ */
+using LowerCaseStrPairVector =
+    std::vector<std::pair<const Http::LowerCaseString, const std::string>>;
+
+/**
+ * Convenient type for an inline vector that will be used by HeaderString.
+ */
+using InlineHeaderVector = absl::InlinedVector<char, 128>;
+
+/**
+ * Convenient type for the underlying type of HeaderString that allows a variant
+ * between string_view and the InlinedVector.
+ */
+using VariantHeader = absl::variant<absl::string_view, InlineHeaderVector>;
+
+/**
  * This is a string implementation for use in header processing. It is heavily optimized for
- * performance. It supports 3 different types of storage and can switch between them:
+ * performance. It supports 2 different types of storage and can switch between them:
  * 1) A reference.
- * 2) Interned string.
- * 3) Heap allocated storage.
+ * 2) An InlinedVector (an optimized interned string for small strings, but allows heap
+ * allocation if needed).
  */
 class HeaderString {
 public:
-  enum class Type { Inline, Reference, Dynamic };
-
   /**
    * Default constructor. Sets up for inline storage.
    */
@@ -62,10 +125,10 @@ public:
    * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
    *        using the string (since a codec may optimize for zero copy).
    */
-  explicit HeaderString(const std::string& ref_value);
+  explicit HeaderString(absl::string_view ref_value);
 
-  HeaderString(HeaderString&& move_value);
-  ~HeaderString();
+  HeaderString(HeaderString&& move_value) noexcept;
+  ~HeaderString() = default;
 
   /**
    * Append data to an existing string. If the string is a reference string the reference data is
@@ -74,21 +137,23 @@ public:
   void append(const char* data, uint32_t size);
 
   /**
-   * @return the modifiable backing buffer (either inline or heap allocated).
+   * Transforms the inlined vector data using the given UnaryOperation (conforms
+   * to std::transform).
+   * @param unary_op the operations to be performed on each of the elements.
    */
-  char* buffer() { return buffer_.dynamic_; }
+  template <typename UnaryOperation> void inlineTransform(UnaryOperation&& unary_op) {
+    ASSERT(type() == Type::Inline);
+    std::transform(absl::get<InlineHeaderVector>(buffer_).begin(),
+                   absl::get<InlineHeaderVector>(buffer_).end(),
+                   absl::get<InlineHeaderVector>(buffer_).begin(), unary_op);
+  }
 
   /**
-   * @return a null terminated C string.
-   */
-  const char* c_str() const { return buffer_.ref_; }
-
-  /**
+   * Get an absl::string_view. It will NOT be NUL terminated!
+   *
    * @return an absl::string_view.
    */
-  absl::string_view getStringView() const {
-    return absl::string_view(buffer_.ref_, string_length_);
-  }
+  absl::string_view getStringView() const;
 
   /**
    * Return the string to a default state. Reference strings are not touched. Both inline/dynamic
@@ -99,42 +164,19 @@ public:
   /**
    * @return whether the string is empty or not.
    */
-  bool empty() const { return string_length_ == 0; }
+  bool empty() const { return size() == 0; }
 
-  /**
-   * @return whether a substring exists in the string.
-   */
-  bool find(const char* str) const { return strstr(c_str(), str); }
-
-  /**
-   * HeaderString is in token list form, each token separated by commas or whitespace,
-   * see https://www.w3.org/Protocols/rfc2616/rfc2616-sec2.html#sec2.1 for more information,
-   * header field value's case sensitivity depends on each header.
-   * @return whether contains token in case insensitive manner.
-   */
-  bool caseInsensitiveContains(const char* token) const {
-    // Avoid dead loop if token argument is empty.
-    const int n = strlen(token);
-    if (n == 0) {
-      return false;
-    }
-
-    // Find token substring, skip if it's partial of other token.
-    const char* tokens = c_str();
-    for (const char* p = tokens; (p = strcasestr(p, token)); p += n) {
-      if ((p == tokens || *(p - 1) == ' ' || *(p - 1) == ',') &&
-          (*(p + n) == '\0' || *(p + n) == ' ' || *(p + n) == ',')) {
-        return true;
-      }
-    }
-
-    return false;
-  }
+  // Looking for find? Use getStringView().find()
 
   /**
    * Set the value of the string by copying data into it. This overwrites any existing string.
    */
   void setCopy(const char* data, uint32_t size);
+
+  /**
+   * Set the value of the string by copying data into it. This overwrites any existing string.
+   */
+  void setCopy(absl::string_view view);
 
   /**
    * Set the value of the string to an integer. This overwrites any existing string.
@@ -146,36 +188,38 @@ public:
    * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
    *        using the string (since a codec may optimize for zero copy).
    */
-  void setReference(const std::string& ref_value);
+  void setReference(absl::string_view ref_value);
+
+  /**
+   * @return whether the string is a reference or an InlinedVector.
+   */
+  bool isReference() const { return type() == Type::Reference; }
 
   /**
    * @return the size of the string, not including the null terminator.
    */
-  uint32_t size() const { return string_length_; }
+  uint32_t size() const;
+
+  bool operator==(const char* rhs) const {
+    return getStringView() == absl::NullSafeStringView(rhs);
+  }
+  bool operator==(absl::string_view rhs) const { return getStringView() == rhs; }
+  bool operator!=(const char* rhs) const {
+    return getStringView() != absl::NullSafeStringView(rhs);
+  }
+  bool operator!=(absl::string_view rhs) const { return getStringView() != rhs; }
+
+private:
+  enum class Type { Reference, Inline };
+
+  VariantHeader buffer_;
+
+  bool valid() const;
 
   /**
    * @return the type of backing storage for the string.
    */
-  Type type() const { return type_; }
-
-  bool operator==(const char* rhs) const { return 0 == strcmp(c_str(), rhs); }
-  bool operator!=(const char* rhs) const { return 0 != strcmp(c_str(), rhs); }
-
-private:
-  union {
-    char* dynamic_;
-    const char* ref_;
-  } buffer_;
-
-  union {
-    char inline_buffer_[128];
-    uint32_t dynamic_capacity_;
-  };
-
-  void freeDynamic();
-
-  uint32_t string_length_;
-  Type type_;
+  Type type() const;
 };
 
 /**
@@ -183,7 +227,7 @@ private:
  */
 class HeaderEntry {
 public:
-  virtual ~HeaderEntry() {}
+  virtual ~HeaderEntry() = default;
 
   /**
    * @return the header key.
@@ -193,12 +237,7 @@ public:
   /**
    * Set the header value by copying data into it.
    */
-  virtual void value(const char* value, uint32_t size) PURE;
-
-  /**
-   * Set the header value by copying data into it.
-   */
-  virtual void value(const std::string& value) PURE;
+  virtual void value(absl::string_view value) PURE;
 
   /**
    * Set the header value by copying an integer into it.
@@ -225,126 +264,168 @@ private:
 };
 
 /**
- * The following defines all headers that Envoy allows direct access to inside of the header map.
- * In practice, these are all headers used during normal Envoy request flow processing. This allows
- * O(1) access to these headers without even a hash lookup.
+ * The following defines all request headers that Envoy allows direct access to inside of the
+ * header map. In practice, these are all headers used during normal Envoy request flow
+ * processing. This allows O(1) access to these headers without even a hash lookup.
  */
-#define ALL_INLINE_HEADERS(HEADER_FUNC)                                                            \
+#define INLINE_REQ_HEADERS(HEADER_FUNC)                                                            \
+  HEADER_FUNC(Accept)                                                                              \
   HEADER_FUNC(AcceptEncoding)                                                                      \
-  HEADER_FUNC(AccessControlRequestHeaders)                                                         \
   HEADER_FUNC(AccessControlRequestMethod)                                                          \
-  HEADER_FUNC(AccessControlAllowOrigin)                                                            \
-  HEADER_FUNC(AccessControlAllowHeaders)                                                           \
-  HEADER_FUNC(AccessControlAllowMethods)                                                           \
-  HEADER_FUNC(AccessControlAllowCredentials)                                                       \
-  HEADER_FUNC(AccessControlExposeHeaders)                                                          \
-  HEADER_FUNC(AccessControlMaxAge)                                                                 \
   HEADER_FUNC(Authorization)                                                                       \
-  HEADER_FUNC(CacheControl)                                                                        \
   HEADER_FUNC(ClientTraceId)                                                                       \
-  HEADER_FUNC(Connection)                                                                          \
-  HEADER_FUNC(ContentEncoding)                                                                     \
-  HEADER_FUNC(ContentLength)                                                                       \
-  HEADER_FUNC(ContentType)                                                                         \
-  HEADER_FUNC(Date)                                                                                \
-  HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(EnvoyDownstreamServiceCluster)                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceNode)                                                          \
   HEADER_FUNC(EnvoyExpectedRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyExternalAddress)                                                                \
   HEADER_FUNC(EnvoyForceTrace)                                                                     \
-  HEADER_FUNC(EnvoyImmediateHealthCheckFail)                                                       \
+  HEADER_FUNC(EnvoyHedgeOnPerTryTimeout)                                                           \
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
   HEADER_FUNC(EnvoyIpTags)                                                                         \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
-  HEADER_FUNC(EnvoyOriginalPath)                                                                   \
-  HEADER_FUNC(EnvoyOverloaded)                                                                     \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
+  HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
+  HEADER_FUNC(EnvoyRetriableHeaderNames)                                                           \
+  HEADER_FUNC(EnvoyOriginalPath)                                                                   \
+  HEADER_FUNC(EnvoyOriginalUrl)                                                                    \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
-  HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
-  HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
   HEADER_FUNC(EnvoyUpstreamRequestPerTryTimeoutMs)                                                 \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutAltResponse)                                              \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutMs)                                                       \
-  HEADER_FUNC(EnvoyUpstreamServiceTime)                                                            \
-  HEADER_FUNC(Etag)                                                                                \
   HEADER_FUNC(Expect)                                                                              \
   HEADER_FUNC(ForwardedClientCert)                                                                 \
   HEADER_FUNC(ForwardedFor)                                                                        \
   HEADER_FUNC(ForwardedProto)                                                                      \
   HEADER_FUNC(GrpcAcceptEncoding)                                                                  \
-  HEADER_FUNC(GrpcMessage)                                                                         \
-  HEADER_FUNC(GrpcStatus)                                                                          \
   HEADER_FUNC(GrpcTimeout)                                                                         \
   HEADER_FUNC(Host)                                                                                \
-  HEADER_FUNC(KeepAlive)                                                                           \
-  HEADER_FUNC(LastModified)                                                                        \
   HEADER_FUNC(Method)                                                                              \
-  HEADER_FUNC(Origin)                                                                              \
   HEADER_FUNC(OtSpanContext)                                                                       \
+  HEADER_FUNC(Origin)                                                                              \
   HEADER_FUNC(Path)                                                                                \
-  HEADER_FUNC(ProxyConnection)                                                                     \
+  HEADER_FUNC(Protocol)                                                                            \
   HEADER_FUNC(Referer)                                                                             \
-  HEADER_FUNC(RequestId)                                                                           \
   HEADER_FUNC(Scheme)                                                                              \
-  HEADER_FUNC(Server)                                                                              \
-  HEADER_FUNC(Status)                                                                              \
   HEADER_FUNC(TE)                                                                                  \
-  HEADER_FUNC(TransferEncoding)                                                                    \
-  HEADER_FUNC(Upgrade)                                                                             \
-  HEADER_FUNC(UserAgent)                                                                           \
-  HEADER_FUNC(Vary)                                                                                \
-  HEADER_FUNC(Via)                                                                                 \
-  HEADER_FUNC(XB3TraceId)                                                                          \
-  HEADER_FUNC(XB3SpanId)                                                                           \
-  HEADER_FUNC(XB3ParentSpanId)                                                                     \
-  HEADER_FUNC(XB3Sampled)                                                                          \
-  HEADER_FUNC(XB3Flags)
+  HEADER_FUNC(UserAgent)
 
 /**
- * The following functions are defined for each inline header above. E.g., for ContentLength we
- * have:
+ * O(1) response headers.
+ */
+#define INLINE_RESP_HEADERS(HEADER_FUNC)                                                           \
+  HEADER_FUNC(AccessControlAllowCredentials)                                                       \
+  HEADER_FUNC(AccessControlAllowHeaders)                                                           \
+  HEADER_FUNC(AccessControlAllowMethods)                                                           \
+  HEADER_FUNC(AccessControlAllowOrigin)                                                            \
+  HEADER_FUNC(AccessControlExposeHeaders)                                                          \
+  HEADER_FUNC(AccessControlMaxAge)                                                                 \
+  HEADER_FUNC(ContentEncoding)                                                                     \
+  HEADER_FUNC(Date)                                                                                \
+  HEADER_FUNC(Etag)                                                                                \
+  HEADER_FUNC(EnvoyDegraded)                                                                       \
+  HEADER_FUNC(EnvoyImmediateHealthCheckFail)                                                       \
+  HEADER_FUNC(EnvoyOverloaded)                                                                     \
+  HEADER_FUNC(EnvoyRateLimited)                                                                    \
+  HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
+  HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
+  HEADER_FUNC(EnvoyUpstreamServiceTime)                                                            \
+  HEADER_FUNC(Location)                                                                            \
+  HEADER_FUNC(Server)                                                                              \
+  HEADER_FUNC(Status)                                                                              \
+  HEADER_FUNC(Vary)
+
+/**
+ * O(1) request and response headers.
+ */
+#define INLINE_REQ_RESP_HEADERS(HEADER_FUNC)                                                       \
+  HEADER_FUNC(CacheControl)                                                                        \
+  HEADER_FUNC(Connection)                                                                          \
+  HEADER_FUNC(ContentLength)                                                                       \
+  HEADER_FUNC(ContentType)                                                                         \
+  HEADER_FUNC(EnvoyAttemptCount)                                                                   \
+  HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
+  HEADER_FUNC(KeepAlive)                                                                           \
+  HEADER_FUNC(ProxyConnection)                                                                     \
+  HEADER_FUNC(RequestId)                                                                           \
+  HEADER_FUNC(TransferEncoding)                                                                    \
+  HEADER_FUNC(Upgrade)                                                                             \
+  HEADER_FUNC(Via)
+
+/**
+ * O(1) response headers and trailers.
+ */
+#define INLINE_RESP_HEADERS_TRAILERS(HEADER_FUNC)                                                  \
+  HEADER_FUNC(GrpcMessage)                                                                         \
+  HEADER_FUNC(GrpcStatus)
+
+/**
+ * The following functions are defined for each inline header above.
+
+ * E.g., for path we have:
+ * Path() -> returns the header entry if it exists or nullptr.
+ * appendPath(path, "/") -> appends the string path with delimiter "/" to the header value.
+ * setReferencePath(PATH) -> sets header value to reference string PATH.
+ * setPath(path_string) -> sets the header value to the string path_string by copying the data.
+ * removePath() -> removes the header if it exists.
  *
- * ContentLength() -> returns the header entry if it exists or nullptr.
- * insertContentLength() -> inserts the header if it does not exist, and returns a reference to it.
- * removeContentLength() -> removes the header if it exists.
+ * For inline headers that use integers, we have:
+ * setContentLength(5) -> sets the header value to the integer 5.
+ *
+ * TODO(asraa): Remove the integer set for inline headers that do not take integer values.
  */
 #define DEFINE_INLINE_HEADER(name)                                                                 \
   virtual const HeaderEntry* name() const PURE;                                                    \
-  virtual HeaderEntry* name() PURE;                                                                \
-  virtual HeaderEntry& insert##name() PURE;                                                        \
-  virtual void remove##name() PURE;
+  virtual void append##name(absl::string_view data, absl::string_view delimiter) PURE;             \
+  virtual void setReference##name(absl::string_view value) PURE;                                   \
+  virtual void set##name(absl::string_view value) PURE;                                            \
+  virtual void set##name(uint64_t value) PURE;                                                     \
+  virtual size_t remove##name() PURE;
 
 /**
  * Wraps a set of HTTP headers.
  */
 class HeaderMap {
 public:
-  virtual ~HeaderMap() {}
+  virtual ~HeaderMap() = default;
 
-  ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER)
+  /**
+   * For testing. This is an exact match comparison (order matters).
+   */
+  virtual bool operator==(const HeaderMap& rhs) const PURE;
+  virtual bool operator!=(const HeaderMap& rhs) const PURE;
+
+  /**
+   * Add a header via full move. This is the expected high performance paths for codecs populating
+   * a map when receiving.
+   * @param key supplies the header key.
+   * @param value supplies the header value.
+   */
+  virtual void addViaMove(HeaderString&& key, HeaderString&& value) PURE;
 
   /**
    * Add a reference header to the map. Both key and value MUST point to data that will live beyond
    * the lifetime of any request/response using the string (since a codec may optimize for zero
-   * copy). Nothing will be copied.
+   * copy). The key will not be copied and a best effort will be made not to
+   * copy the value (but this may happen when comma concatenating, see below).
    *
-   * Calling addReference multiple times for the same header will result in multiple headers being
-   * present in the HeaderMap.
+   * Calling addReference multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL NOT be copied.
    */
-  virtual void addReference(const LowerCaseString& key, const std::string& value) PURE;
+  virtual void addReference(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
    * Add a header with a reference key to the map. The key MUST point to data that will live beyond
    * the lifetime of any request/response using the string (since a codec may optimize for zero
    * copy). The value will be copied.
    *
-   * Calling addReferenceKey multiple times for the same header will result in multiple headers
-   * being present in the HeaderMap.
+   * Calling addReference multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
@@ -356,19 +437,21 @@ public:
    * live beyond the lifetime of any request/response using the string (since a codec may optimize
    * for zero copy). The value will be copied.
    *
-   * Calling addReferenceKey multiple times for the same header will result in multiple headers
-   * being present in the HeaderMap.
+   * Calling addReference multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
    */
-  virtual void addReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
+  virtual void addReferenceKey(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
    * Add a header by copying both the header key and the value.
    *
-   * Calling addCopy multiple times for the same header will result in multiple headers being
-   * present in the HeaderMap.
+   * Calling addCopy multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
@@ -378,13 +461,27 @@ public:
   /**
    * Add a header by copying both the header key and the value.
    *
-   * Calling addCopy multiple times for the same header will result in multiple headers being
-   * present in the HeaderMap.
+   * Calling addCopy multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
    */
-  virtual void addCopy(const LowerCaseString& key, const std::string& value) PURE;
+  virtual void addCopy(const LowerCaseString& key, absl::string_view value) PURE;
+
+  /**
+   * Appends data to header. If header already has a value, the string "," is added between the
+   * existing value and data.
+   *
+   * @param key specifies the name of the header to append; it WILL be copied.
+   * @param value specifies the value of the header to add; it WILL be copied.
+   *
+   * Caution: This iterates over the HeaderMap to find the header to append. This will modify only
+   * the first occurrence of the header.
+   * TODO(asraa): Investigate whether necessary to append to all headers with the key.
+   */
+  virtual void appendCopy(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
    * Set a reference header in the map. Both key and value MUST point to data that will live beyond
@@ -397,7 +494,7 @@ public:
    * @param key specifies the name of the header to set; it WILL NOT be copied.
    * @param value specifies the value of the header to set; it WILL NOT be copied.
    */
-  virtual void setReference(const LowerCaseString& key, const std::string& value) PURE;
+  virtual void setReference(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
    * Set a header with a reference key in the map. The key MUST point to point to data that will
@@ -410,10 +507,26 @@ public:
    * @param key specifies the name of the header to set; it WILL NOT be copied.
    * @param value specifies the value of the header to set; it WILL be copied.
    */
-  virtual void setReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
+  virtual void setReferenceKey(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
-   * @return uint64_t the approximate size of the header map in bytes.
+   * Replaces a header value by copying the value. Copies the key if the key does not exist.
+   *
+   * Calling setCopy multiple times for the same header will result in only the last header
+   * being present in the HeaderMap.
+   *
+   * @param key specifies the name of the header to set; it WILL be copied.
+   * @param value specifies the value of the header to set; it WILL be copied.
+   *
+   * Caution: This iterates over the HeaderMap to find the header to set. This will modify only the
+   * first occurrence of the header.
+   * TODO(asraa): Investigate whether necessary to set all headers with the key.
+   */
+  virtual void setCopy(const LowerCaseString& key, absl::string_view value) PURE;
+
+  /**
+   * @return uint64_t the size of the header map in bytes. This is the sum of the header keys and
+   * values and does not account for data structure overhead.
    */
   virtual uint64_t byteSize() const PURE;
 
@@ -423,7 +536,6 @@ public:
    * @return the header entry if it exists otherwise nullptr.
    */
   virtual const HeaderEntry* get(const LowerCaseString& key) const PURE;
-  virtual HeaderEntry* get(const LowerCaseString& key) PURE;
 
   // aliases to make iterate() and iterateReverse() callbacks easier to read
   enum class Iterate { Continue, Break };
@@ -434,7 +546,7 @@ public:
    * @param context supplies the context passed to iterate().
    * @return Iterate::Continue to continue iteration.
    */
-  typedef Iterate (*ConstIterateCb)(const HeaderEntry& header, void* context);
+  using ConstIterateCb = Iterate (*)(const HeaderEntry&, void*);
 
   /**
    * Iterate over a constant header map.
@@ -463,16 +575,23 @@ public:
   virtual Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const PURE;
 
   /**
+   * Clears the headers in the map.
+   */
+  virtual void clear() PURE;
+
+  /**
    * Remove all instances of a header by key.
    * @param key supplies the header key to remove.
+   * @return the number of headers removed.
    */
-  virtual void remove(const LowerCaseString& key) PURE;
+  virtual size_t remove(const LowerCaseString& key) PURE;
 
   /**
    * Remove all instances of headers where the key begins with the supplied prefix.
    * @param prefix supplies the prefix to match header keys against.
+   * @return the number of headers removed.
    */
-  virtual void removePrefix(const LowerCaseString& prefix) PURE;
+  virtual size_t removePrefix(const LowerCaseString& prefix) PURE;
 
   /**
    * @return the number of headers in the map.
@@ -480,23 +599,90 @@ public:
   virtual size_t size() const PURE;
 
   /**
+   * @return true if the map is empty, false otherwise.
+   */
+  virtual bool empty() const PURE;
+
+  /**
+   * Dump the header map to the ostream specified
+   *
+   * @param os the stream to dump state to
+   * @param indent_level the depth, for pretty-printing.
+   *
+   * This function is called on Envoy fatal errors so should avoid memory allocation where possible.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
    * Allow easy pretty-printing of the key/value pairs in HeaderMap
    * @param os supplies the ostream to print to.
    * @param headers the headers to print.
    */
   friend std::ostream& operator<<(std::ostream& os, const HeaderMap& headers) {
-    headers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          *static_cast<std::ostream*>(context)
-              << "'" << header.key().c_str() << "', '" << header.value().c_str() << "'\n";
-          return HeaderMap::Iterate::Continue;
-        },
-        &os);
+    headers.dumpState(os);
     return os;
   }
 };
 
-typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
+using HeaderMapPtr = std::unique_ptr<HeaderMap>;
+
+/**
+ * Typed derived classes for all header map types.
+ */
+
+// Base class for both request and response headers.
+class RequestOrResponseHeaderMap : public virtual HeaderMap {
+public:
+  INLINE_REQ_RESP_HEADERS(DEFINE_INLINE_HEADER)
+};
+
+// Request headers.
+class RequestHeaderMap : public RequestOrResponseHeaderMap {
+public:
+  INLINE_REQ_HEADERS(DEFINE_INLINE_HEADER)
+};
+using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
+
+// Request trailers.
+class RequestTrailerMap : public virtual HeaderMap {};
+using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
+
+// Base class for both response headers and trailers.
+class ResponseHeaderOrTrailerMap : public virtual HeaderMap {
+public:
+  INLINE_RESP_HEADERS_TRAILERS(DEFINE_INLINE_HEADER)
+};
+
+// Response headers.
+class ResponseHeaderMap : public RequestOrResponseHeaderMap, public ResponseHeaderOrTrailerMap {
+public:
+  INLINE_RESP_HEADERS(DEFINE_INLINE_HEADER)
+};
+using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
+
+// Response trailers.
+class ResponseTrailerMap : public virtual HeaderMap, public ResponseHeaderOrTrailerMap {};
+using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
+
+/**
+ * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.
+ */
+using HeaderVector = std::vector<std::pair<LowerCaseString, std::string>>;
+
+/**
+ * An interface to be implemented by header matchers.
+ */
+class HeaderMatcher {
+public:
+  virtual ~HeaderMatcher() = default;
+
+  /**
+   * Check whether header matcher matches any headers in a given HeaderMap.
+   */
+  virtual bool matchesHeaders(const HeaderMap& headers) const PURE;
+};
+
+using HeaderMatcherSharedPtr = std::shared_ptr<HeaderMatcher>;
 
 } // namespace Http
 } // namespace Envoy

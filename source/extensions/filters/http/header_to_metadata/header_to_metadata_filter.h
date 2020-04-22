@@ -4,7 +4,7 @@
 #include <tuple>
 #include <vector>
 
-#include "envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.pb.h"
+#include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
@@ -16,17 +16,23 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
-typedef envoy::config::filter::http::header_to_metadata::v2::Config::Rule Rule;
-typedef envoy::config::filter::http::header_to_metadata::v2::Config::ValueType ValueType;
-typedef std::vector<std::pair<Http::LowerCaseString, Rule>> HeaderToMetadataRules;
+using Rule = envoy::extensions::filters::http::header_to_metadata::v3::Config::Rule;
+using ValueType = envoy::extensions::filters::http::header_to_metadata::v3::Config::ValueType;
+using ValueEncode = envoy::extensions::filters::http::header_to_metadata::v3::Config::ValueEncode;
+using HeaderToMetadataRules = std::vector<std::pair<Http::LowerCaseString, Rule>>;
+
+// TODO(yangminzhu): Make MAX_HEADER_VALUE_LEN configurable.
+const uint32_t MAX_HEADER_VALUE_LEN = 8 * 1024;
 
 /**
  *  Encapsulates the filter configuration with STL containers and provides an area for any custom
  *  configuration logic.
  */
-class Config : public Logger::Loggable<Logger::Id::config> {
+class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
+               public Logger::Loggable<Logger::Id::config> {
 public:
-  Config(const envoy::config::filter::http::header_to_metadata::v2::Config config);
+  Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
+         bool per_route = false);
 
   HeaderToMetadataRules requestRules() const { return request_rules_; }
   HeaderToMetadataRules responseRules() const { return response_rules_; }
@@ -34,7 +40,7 @@ public:
   bool doRequest() const { return request_set_; }
 
 private:
-  typedef Protobuf::RepeatedPtrField<Rule> ProtobufRepeatedRule;
+  using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<Rule>;
 
   HeaderToMetadataRules request_rules_;
   HeaderToMetadataRules response_rules_;
@@ -56,7 +62,7 @@ private:
   const std::string& decideNamespace(const std::string& nspace) const;
 };
 
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * Header-To-Metadata examines request/response headers and either copies or
@@ -66,38 +72,44 @@ class HeaderToMetadataFilter : public Http::StreamFilter,
                                public Logger::Loggable<Logger::Id::filter> {
 public:
   HeaderToMetadataFilter(const ConfigSharedPtr config);
-  ~HeaderToMetadataFilter();
+  ~HeaderToMetadataFilter() override;
 
   // Http::StreamFilterBase
   void onDestroy() override {}
 
   // StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
   }
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
   }
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
+  }
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
 private:
-  typedef std::map<std::string, ProtobufWkt::Struct> StructMap;
+  friend class HeaderToMetadataTest;
+
+  using StructMap = std::map<std::string, ProtobufWkt::Struct>;
 
   const ConfigSharedPtr config_;
+  mutable const Config* effective_config_{nullptr};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 
@@ -108,14 +120,16 @@ private:
    *                 request headers depending on whether this is called from the encode state or
    *                 decode state.
    *  @param rules the header-to-metadata mapping set in configuration.
-   *  @param callbacks the callback used to fetch the RequestInfo (which is then used to get
+   *  @param callbacks the callback used to fetch the StreamInfo (which is then used to get
    *                   metadata). Callable with both encoder_callbacks_ and decoder_callbacks_.
    */
   void writeHeaderToMetadata(Http::HeaderMap& headers, const HeaderToMetadataRules& rules,
                              Http::StreamFilterCallbacks& callbacks);
-  bool addMetadata(StructMap&, const std::string&, const std::string&, absl::string_view,
-                   ValueType) const;
+  bool addMetadata(StructMap&, const std::string&, const std::string&, absl::string_view, ValueType,
+                   ValueEncode) const;
   const std::string& decideNamespace(const std::string& nspace) const;
+  const Config* getConfig() const;
+  const Config* getRouteConfig() const;
 };
 
 } // namespace HeaderToMetadataFilter

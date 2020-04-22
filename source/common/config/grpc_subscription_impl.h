@@ -1,42 +1,62 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/grpc/async_client.h"
 
-#include "common/config/grpc_mux_impl.h"
-#include "common/config/grpc_mux_subscription_impl.h"
+#include "common/common/logger.h"
 
 namespace Envoy {
 namespace Config {
 
-template <class ResourceType>
-class GrpcSubscriptionImpl : public Config::Subscription<ResourceType> {
+/**
+ * Adapter from typed Subscription to untyped GrpcMux. Also handles per-xDS API stats/logging.
+ */
+class GrpcSubscriptionImpl : public Subscription,
+                             SubscriptionCallbacks,
+                             Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcSubscriptionImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
-                       Event::Dispatcher& dispatcher,
-                       const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
-      : grpc_mux_(node, std::move(async_client), dispatcher, service_method),
-        grpc_mux_subscription_(grpc_mux_, stats) {}
+  GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
+                       SubscriptionStats stats, absl::string_view type_url,
+                       Event::Dispatcher& dispatcher, std::chrono::milliseconds init_fetch_timeout,
+                       bool is_aggregated);
 
   // Config::Subscription
-  void start(const std::vector<std::string>& resources,
-             Config::SubscriptionCallbacks<ResourceType>& callbacks) override {
-    // Subscribe first, so we get failure callbacks if grpc_mux_.start() fails.
-    grpc_mux_subscription_.start(resources, callbacks);
-    grpc_mux_.start();
-  }
+  void start(const std::set<std::string>& resource_names) override;
+  void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
 
-  void updateResources(const std::vector<std::string>& resources) override {
-    grpc_mux_subscription_.updateResources(resources);
-  }
+  // Config::SubscriptionCallbacks (all pass through to callbacks_!)
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
 
-  GrpcMuxImpl& grpcMux() { return grpc_mux_; }
+  void onConfigUpdate(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+      const std::string& system_version_info) override;
+
+  void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
+
+  std::string resourceName(const ProtobufWkt::Any& resource) override;
+
+  GrpcMuxSharedPtr grpcMux() { return grpc_mux_; }
+
+  void pause();
+  void resume();
 
 private:
-  GrpcMuxImpl grpc_mux_;
-  GrpcMuxSubscriptionImpl<ResourceType> grpc_mux_subscription_;
+  void disableInitFetchTimeoutTimer();
+
+  GrpcMuxSharedPtr grpc_mux_;
+  SubscriptionCallbacks& callbacks_;
+  SubscriptionStats stats_;
+  const std::string type_url_;
+  GrpcMuxWatchPtr watch_;
+  Event::Dispatcher& dispatcher_;
+  // NOTE: if another subscription of the same type_url has already been started, this value will be
+  // ignored in favor of the other subscription's.
+  std::chrono::milliseconds init_fetch_timeout_;
+  Event::TimerPtr init_fetch_timeout_timer_;
+  const bool is_aggregated_;
 };
 
 } // namespace Config

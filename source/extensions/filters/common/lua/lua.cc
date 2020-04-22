@@ -1,5 +1,7 @@
 #include "extensions/filters/common/lua/lua.h"
 
+#include <memory>
+
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
@@ -49,6 +51,7 @@ ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAll
 
   // First verify that the supplied code can be parsed.
   CSmartPtr<lua_State, lua_close> state(lua_open());
+  ASSERT(state.get() != nullptr, "unable to create new lua state object");
   luaL_openlibs(state.get());
 
   if (0 != luaL_dostring(state.get(), code.c_str())) {
@@ -85,10 +88,11 @@ uint64_t ThreadLocalState::registerGlobal(const std::string& global) {
 
 CoroutinePtr ThreadLocalState::createCoroutine() {
   lua_State* state = tls_slot_->getTyped<LuaThreadLocal>().state_.get();
-  return CoroutinePtr{new Coroutine({lua_newthread(state), state})};
+  return std::make_unique<Coroutine>(std::make_pair(lua_newthread(state), state));
 }
 
 ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code) : state_(lua_open()) {
+  ASSERT(state_.get() != nullptr, "unable to create new lua state object");
   luaL_openlibs(state_.get());
   int rc = luaL_dostring(state_.get(), code.c_str());
   ASSERT(rc == 0);

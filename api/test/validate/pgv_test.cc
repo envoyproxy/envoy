@@ -4,10 +4,10 @@
 
 // We don't use all the headers in the test below, but including them anyway as
 // a cheap way to get some C++ compiler sanity checking.
-#include "envoy/api/v2/cds.pb.validate.h"
-#include "envoy/api/v2/eds.pb.validate.h"
-#include "envoy/api/v2/lds.pb.validate.h"
-#include "envoy/api/v2/rds.pb.validate.h"
+#include "envoy/api/v2/cluster.pb.validate.h"
+#include "envoy/api/v2/endpoint.pb.validate.h"
+#include "envoy/api/v2/listener.pb.validate.h"
+#include "envoy/api/v2/route.pb.validate.h"
 #include "envoy/api/v2/core/protocol.pb.validate.h"
 #include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
@@ -54,6 +54,7 @@ template <class Proto> struct TestCase {
 // from data plane API.
 int main(int argc, char* argv[]) {
   envoy::config::bootstrap::v2::Bootstrap invalid_bootstrap;
+  invalid_bootstrap.mutable_static_resources()->add_clusters();
   // This is a baseline test of the validation features we care about. It's
   // probably not worth adding in every filter and field that we want to valid
   // in the API upfront, but as regressions occur, this is the place to add the
@@ -63,7 +64,7 @@ int main(int argc, char* argv[]) {
   cluster_manager {}
   admin {
     access_log_path: "/dev/null"
-    address {}
+    address { pipe { path: "/" } }
   }
   )EOF";
   envoy::config::bootstrap::v2::Bootstrap valid_bootstrap;

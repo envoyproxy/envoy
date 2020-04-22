@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/rbac/v3/rbac.pb.h"
+
 #include "extensions/filters/common/rbac/engine_impl.h"
 
 #include "gmock/gmock.h"
@@ -12,11 +14,18 @@ namespace RBAC {
 
 class MockEngine : public RoleBasedAccessControlEngineImpl {
 public:
-  MockEngine(const envoy::config::rbac::v2alpha::RBAC& rules)
+  MockEngine(const envoy::config::rbac::v3::RBAC& rules)
       : RoleBasedAccessControlEngineImpl(rules){};
 
-  MOCK_CONST_METHOD2(allowed,
-                     bool(const Envoy::Network::Connection&, const Envoy::Http::HeaderMap&));
+  MOCK_METHOD(bool, allowed,
+              (const Envoy::Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+               const StreamInfo::StreamInfo&, std::string* effective_policy_id),
+              (const));
+
+  MOCK_METHOD(bool, allowed,
+              (const Envoy::Network::Connection&, const StreamInfo::StreamInfo&,
+               std::string* effective_policy_id),
+              (const));
 };
 
 } // namespace RBAC

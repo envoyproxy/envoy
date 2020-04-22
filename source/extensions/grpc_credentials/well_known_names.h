@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -13,12 +15,14 @@ namespace GrpcCredentials {
 class GrpcCredentialsNameValues {
 public:
   // Access Token Example.
-  const std::string ACCESS_TOKEN_EXAMPLE = "envoy.grpc_credentials.access_token_example";
+  const std::string AccessTokenExample = "envoy.grpc_credentials.access_token_example";
   // File Based Metadata credentials
-  const std::string FILE_BASED_METADATA = "envoy.grpc_credentials.file_based_metadata";
+  const std::string FileBasedMetadata = "envoy.grpc_credentials.file_based_metadata";
+  // AWS IAM
+  const std::string AwsIam = "envoy.grpc_credentials.aws_iam";
 };
 
-typedef ConstSingleton<GrpcCredentialsNameValues> GrpcCredentialsNames;
+using GrpcCredentialsNames = ConstSingleton<GrpcCredentialsNameValues>;
 
 } // namespace GrpcCredentials
 } // namespace Extensions

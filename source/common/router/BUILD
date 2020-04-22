@@ -10,9 +10,20 @@ envoy_package()
 
 envoy_cc_library(
     name = "metadatamatchcriteria_lib",
+    srcs = ["metadatamatchcriteria_impl.cc"],
     hdrs = ["metadatamatchcriteria_impl.h"],
     deps = [
         "//include/envoy/router:router_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "tls_context_match_criteria_lib",
+    srcs = ["tls_context_match_criteria_impl.cc"],
+    hdrs = ["tls_context_match_criteria_impl.h"],
+    deps = [
+        "//include/envoy/router:router_interface",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -28,6 +39,8 @@ envoy_cc_library(
         ":metadatamatchcriteria_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
+        ":tls_context_match_criteria_lib",
+        "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -37,15 +50,24 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:hash_lib",
+        "//source/common/common:matchers_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
-        "//source/common/config:rds_json_lib",
+        "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
+        "//source/common/http:hash_policy_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:path_utility_lib",
         "//source/common/http:utility_lib",
-        "//source/common/http/websocket:ws_handler_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/tracing:http_tracer_lib",
+        "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -58,11 +80,69 @@ envoy_cc_library(
         "//include/envoy/upstream:resource_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
-        "//source/common/config:rds_json_lib",
-        "//source/common/filesystem:filesystem_lib",
+        "//source/common/common:matchers_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "debug_config_lib",
+    srcs = ["debug_config.cc"],
+    hdrs = ["debug_config.h"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "route_config_update_impl_lib",
+    srcs = ["route_config_update_receiver_impl.cc"],
+    hdrs = ["route_config_update_receiver_impl.h"],
+    deps = [
+        ":config_lib",
+        "//include/envoy/router:rds_interface",
+        "//include/envoy/router:route_config_update_info_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "vhds_lib",
+    srcs = ["vhds.cc"],
+    hdrs = ["vhds.h"],
+    deps = [
+        ":config_lib",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/router:rds_interface",
+        "//include/envoy/router:route_config_provider_manager_interface",
+        "//include/envoy/router:route_config_update_info_interface",
+        "//include/envoy/singleton:instance_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/config:subscription_base_interface",
+        "//source/common/config:utility_lib",
+        "//source/common/init:target_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/router:route_config_update_impl_lib",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -72,41 +152,83 @@ envoy_cc_library(
     hdrs = ["rds_impl.h"],
     deps = [
         ":config_lib",
-        ":rds_subscription_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/http:codes_interface",
-        "//include/envoy/init:init_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/router:rds_interface",
         "//include/envoy/router:route_config_provider_manager_interface",
+        "//include/envoy/router:route_config_update_info_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/config:rds_json_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/config:subscription_base_interface",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
+        "//source/common/config:version_converter_lib",
+        "//source/common/init:manager_lib",
+        "//source/common/init:target_lib",
+        "//source/common/init:watcher_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
-        "@envoy_api//envoy/api/v2:rds_cc",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+        "//source/common/router:route_config_update_impl_lib",
+        "//source/common/router:vhds_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
 envoy_cc_library(
-    name = "rds_subscription_lib",
-    srcs = ["rds_subscription.cc"],
-    hdrs = ["rds_subscription.h"],
+    name = "scoped_config_lib",
+    srcs = ["scoped_config_impl.cc"],
+    hdrs = ["scoped_config_impl.h"],
+    external_deps = [
+        "abseil_str_format",
+    ],
     deps = [
+        ":config_lib",
+        "//include/envoy/router:rds_interface",
+        "//include/envoy/router:scopes_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "scoped_rds_lib",
+    srcs = ["scoped_rds.cc"],
+    hdrs = ["scoped_rds.h"],
+    deps = [
+        ":rds_lib",
+        ":scoped_config_lib",
+        "//include/envoy/config:config_provider_interface",
         "//include/envoy/config:subscription_interface",
+        "//include/envoy/router:route_config_provider_manager_interface",
+        "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
-        "//source/common/config:rds_json_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http:rest_api_fetcher_lib",
-        "//source/common/json:json_loader_lib",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+        "//source/common/common:cleanup_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/config:config_provider_lib",
+        "//source/common/config:resource_name_lib",
+        "//source/common/config:subscription_base_interface",
+        "//source/common/config:version_converter_lib",
+        "//source/common/init:manager_lib",
+        "//source/common/init:watcher_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -123,20 +245,30 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:backoff_lib",
         "//source/common/common:utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
 envoy_cc_library(
     name = "router_lib",
-    srcs = ["router.cc"],
-    hdrs = ["router.h"],
+    srcs = [
+        "router.cc",
+        "upstream_request.cc",
+    ],
+    hdrs = [
+        "router.h",
+        "upstream_request.h",
+    ],
     deps = [
         ":config_lib",
+        ":debug_config_lib",
         ":header_parser_lib",
         ":retry_state_lib",
         "//include/envoy/event:dispatcher_interface",
@@ -161,18 +293,23 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
+        "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",
-        "//source/common/filesystem:filesystem_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
-        "//source/common/request_info:request_info_lib",
+        "//source/common/network:application_protocol_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
+        "//source/common/upstream:load_balancer_lib",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
     ],
 )
 
@@ -186,9 +323,9 @@ envoy_cc_library(
         "//include/envoy/router:router_ratelimit_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
-        "//source/common/config:rds_json_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -211,8 +348,9 @@ envoy_cc_library(
     deps = [
         ":header_formatter_lib",
         "//include/envoy/http:header_map_interface",
-        "//source/common/config:base_json_lib",
+        "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -222,11 +360,22 @@ envoy_cc_library(
     hdrs = ["header_formatter.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        "//include/envoy/router:string_accessor_interface",
+        "//include/envoy/stream_info:filter_state_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "string_accessor_lib",
+    hdrs = ["string_accessor_impl.h"],
+    deps = [
+        "//include/envoy/router:string_accessor_interface",
     ],
 )

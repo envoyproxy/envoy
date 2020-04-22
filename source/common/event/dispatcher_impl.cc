@@ -6,39 +6,70 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/lock_guard.h"
+#include "common/common/thread.h"
 #include "common/event/file_event_impl.h"
+#include "common/event/libevent_scheduler.h"
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/listener_impl.h"
+#include "common/network/udp_listener_impl.h"
 
 #include "event2/event.h"
+
+#ifdef ENVOY_HANDLE_SIGNALS
+#include "common/signal/signal_action.h"
+#endif
 
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl()
-    : DispatcherImpl(Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}) {
-  // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
-  RELEASE_ASSERT(Libevent::Global::initialized());
-}
+DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
+                               Event::TimeSystem& time_system)
+    : DispatcherImpl(name, std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
 
-DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory)
-    : buffer_factory_(std::move(factory)), base_(event_base_new()),
-      deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
-      post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
+DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory,
+                               Api::Api& api, Event::TimeSystem& time_system)
+    : name_(name), api_(api), buffer_factory_(std::move(factory)),
+      scheduler_(time_system.createScheduler(base_scheduler_)),
+      deferred_delete_timer_(createTimerInternal([this]() -> void { clearDeferredDeleteList(); })),
+      post_timer_(createTimerInternal([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
-  RELEASE_ASSERT(Libevent::Global::initialized());
+  ASSERT(!name_.empty());
+#ifdef ENVOY_HANDLE_SIGNALS
+  SignalAction::registerFatalErrorHandler(*this);
+#endif
+  updateApproximateMonotonicTimeInternal();
+  base_scheduler_.registerOnPrepareCallback(
+      std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
-DispatcherImpl::~DispatcherImpl() {}
+DispatcherImpl::~DispatcherImpl() {
+#ifdef ENVOY_HANDLE_SIGNALS
+  SignalAction::removeFatalErrorHandler(*this);
+#endif
+}
+
+void DispatcherImpl::initializeStats(Stats::Scope& scope,
+                                     const absl::optional<std::string>& prefix) {
+  const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
+  // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
+  post([this, &scope, effective_prefix] {
+    stats_prefix_ = effective_prefix + "dispatcher";
+    stats_ = std::make_unique<DispatcherStats>(
+        DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
+    base_scheduler_.initializeStats(stats_.get());
+    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_.debugString());
+  });
+}
 
 void DispatcherImpl::clearDeferredDeleteList() {
   ASSERT(isThreadSafe());
@@ -74,10 +105,11 @@ void DispatcherImpl::clearDeferredDeleteList() {
 
 Network::ConnectionPtr
 DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                       Network::TransportSocketPtr&& transport_socket) {
+                                       Network::TransportSocketPtr&& transport_socket,
+                                       StreamInfo::StreamInfo& stream_info) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::ConnectionImpl>(*this, std::move(socket),
-                                                   std::move(transport_socket), true);
+                                                   std::move(transport_socket), stream_info, true);
 }
 
 Network::ClientConnectionPtr
@@ -91,12 +123,14 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+    const bool use_tcp_for_dns_lookups) {
   ASSERT(isThreadSafe());
-  return Network::DnsResolverSharedPtr{new Network::DnsResolverImpl(*this, resolvers)};
+  return Network::DnsResolverSharedPtr{
+      new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
 }
 
-FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                              uint32_t events) {
   ASSERT(isThreadSafe());
   return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};
@@ -104,20 +138,29 @@ FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTrigger
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   ASSERT(isThreadSafe());
-  return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
+  return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, api_)};
 }
 
-Network::ListenerPtr
-DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
-                               bool bind_to_port, bool hand_off_restored_destination_connections) {
+Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
+                                                    Network::ListenerCallbacks& cb,
+                                                    bool bind_to_port) {
   ASSERT(isThreadSafe());
-  return Network::ListenerPtr{new Network::ListenerImpl(*this, socket, cb, bind_to_port,
-                                                        hand_off_restored_destination_connections)};
+  return std::make_unique<Network::ListenerImpl>(*this, std::move(socket), cb, bind_to_port);
+}
+
+Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr&& socket,
+                                                          Network::UdpListenerCallbacks& cb) {
+  ASSERT(isThreadSafe());
+  return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource());
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   ASSERT(isThreadSafe());
-  return TimerPtr{new TimerImpl(*this, cb)};
+  return createTimerInternal(cb);
+}
+
+TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
+  return scheduler_->createTimer(cb, *this);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
@@ -129,7 +172,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   }
 }
 
-void DispatcherImpl::exit() { event_base_loopexit(base_.get(), nullptr); }
+void DispatcherImpl::exit() { base_scheduler_.loopExit(); }
 
 SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
   ASSERT(isThreadSafe());
@@ -150,15 +193,24 @@ void DispatcherImpl::post(std::function<void()> callback) {
 }
 
 void DispatcherImpl::run(RunType type) {
-  run_tid_ = Thread::Thread::currentThreadId();
+  run_tid_ = api_.threadFactory().currentThreadId();
 
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
-  // not gaurantee that events are run in any particular order. So even if we post() and call
+  // not guarantee that events are run in any particular order. So even if we post() and call
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
+  base_scheduler_.run(type);
+}
 
-  event_base_loop(base_.get(), type == RunType::NonBlock ? EVLOOP_NONBLOCK : 0);
+MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
+  return approximate_monotonic_time_;
+}
+
+void DispatcherImpl::updateApproximateMonotonicTime() { updateApproximateMonotonicTimeInternal(); }
+
+void DispatcherImpl::updateApproximateMonotonicTimeInternal() {
+  approximate_monotonic_time_ = api_.timeSource().monotonicTime();
 }
 
 void DispatcherImpl::runPostCallbacks() {

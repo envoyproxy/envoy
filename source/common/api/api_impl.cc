@@ -3,28 +3,26 @@
 #include <chrono>
 #include <string>
 
+#include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
-#include "common/filesystem/filesystem_impl.h"
 
 namespace Envoy {
 namespace Api {
 
-Event::DispatcherPtr Impl::allocateDispatcher() {
-  return Event::DispatcherPtr{new Event::DispatcherImpl()};
+Impl::Impl(Thread::ThreadFactory& thread_factory, Stats::Store& store,
+           Event::TimeSystem& time_system, Filesystem::Instance& file_system,
+           const ProcessContextOptRef& process_context)
+    : thread_factory_(thread_factory), store_(store), time_system_(time_system),
+      file_system_(file_system), process_context_(process_context) {}
+
+Event::DispatcherPtr Impl::allocateDispatcher(const std::string& name) {
+  return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_);
 }
 
-Impl::Impl(std::chrono::milliseconds file_flush_interval_msec)
-    : file_flush_interval_msec_(file_flush_interval_msec) {}
-
-Filesystem::FileSharedPtr Impl::createFile(const std::string& path, Event::Dispatcher& dispatcher,
-                                           Thread::BasicLockable& lock, Stats::Store& stats_store) {
-  return std::make_shared<Filesystem::FileImpl>(path, dispatcher, lock, stats_store,
-                                                file_flush_interval_msec_);
+Event::DispatcherPtr Impl::allocateDispatcher(const std::string& name,
+                                              Buffer::WatermarkFactoryPtr&& factory) {
+  return std::make_unique<Event::DispatcherImpl>(name, std::move(factory), *this, time_system_);
 }
-
-bool Impl::fileExists(const std::string& path) { return Filesystem::fileExists(path); }
-
-std::string Impl::fileReadToEnd(const std::string& path) { return Filesystem::fileReadToEnd(path); }
 
 } // namespace Api
 } // namespace Envoy

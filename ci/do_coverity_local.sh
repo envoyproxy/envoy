@@ -46,7 +46,7 @@ then
     --form file=@"${COVERITY_OUTPUT_FILE}" \
     --form version="${ENVOY_BUILD_SHA}" \
     --form description="Envoy Proxy Build ${ENVOY_BUILD_SHA}" \
-    https://scan.coverity.com/builds?project=Envoy+Proxy
+    https://scan.coverity.com/projects/envoy-proxy
 else
   echo "Coverity Scan output file appears to be too small."
   echo "Not submitting build for analysis."

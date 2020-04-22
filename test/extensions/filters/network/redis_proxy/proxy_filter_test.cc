@@ -1,11 +1,14 @@
 #include <memory>
 #include <string>
 
-#include "common/config/filter_json.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
 
+#include "test/common/stats/stat_test_utility.h"
+#include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -15,6 +18,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::ByRef;
 using testing::DoAll;
 using testing::Eq;
@@ -24,108 +28,89 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::WithArg;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-envoy::config::filter::network::redis_proxy::v2::RedisProxy
-parseProtoFromJson(const std::string& json_string) {
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy config;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::FilterJson::translateRedisProxy(*json_object_ptr, config);
-
+envoy::extensions::filters::network::redis_proxy::v3::RedisProxy
+parseProtoFromYaml(const std::string& yaml_string) {
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy config;
+  TestUtility::loadFromYaml(yaml_string, config);
   return config;
 }
 
 class RedisProxyFilterConfigTest : public testing::Test {
 public:
-  NiceMock<Upstream::MockClusterManager> cm_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   Network::MockDrainDecision drain_decision_;
   Runtime::MockLoader runtime_;
+  NiceMock<Api::MockApi> api_;
 };
 
 TEST_F(RedisProxyFilterConfigTest, Normal) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "stat_prefix": "foo",
-    "conn_pool": { "op_timeout_ms" : 10 }
-  }
+  const std::string yaml_string = R"EOF(
+  prefix_routes:
+    catch_all_route:
+      cluster: fake_cluster
+  stat_prefix: foo
+  settings:
+    op_timeout: 0.01s
   )EOF";
 
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
-      parseProtoFromJson(json_string);
-  ProxyFilterConfig config(proto_config, cm_, store_, drain_decision_, runtime_);
-  EXPECT_EQ("fake_cluster", config.cluster_name_);
-}
-
-TEST_F(RedisProxyFilterConfigTest, InvalidCluster) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "stat_prefix": "foo",
-    "conn_pool": { "op_timeout_ms" : 10 }
-  }
-  )EOF";
-
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
-      parseProtoFromJson(json_string);
-
-  EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(proto_config, cm_, store_, drain_decision_, runtime_),
-                            EnvoyException, "redis: unknown cluster 'fake_cluster'");
-}
-
-TEST_F(RedisProxyFilterConfigTest, InvalidAddedByApi) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "stat_prefix": "foo",
-    "conn_pool": { "op_timeout_ms" : 10 }
-  }
-  )EOF";
-
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
-      parseProtoFromJson(json_string);
-
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
-  EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(proto_config, cm_, store_, drain_decision_, runtime_),
-                            EnvoyException,
-                            "redis: invalid cluster 'fake_cluster': currently only "
-                            "static (non-CDS) clusters are supported");
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
+      parseProtoFromYaml(yaml_string);
+  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_);
+  EXPECT_EQ("redis.foo.", config.stat_prefix_);
+  EXPECT_TRUE(config.downstream_auth_password_.empty());
 }
 
 TEST_F(RedisProxyFilterConfigTest, BadRedisProxyConfig) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "cluster": "fake_cluster"
-  }
+  const std::string yaml_string = R"EOF(
+  cluster_name: fake_cluster
+  cluster: fake_cluster
   )EOF";
 
-  EXPECT_THROW(parseProtoFromJson(json_string), Json::Exception);
+  EXPECT_THROW(parseProtoFromYaml(yaml_string), EnvoyException);
 }
 
-class RedisProxyFilterTest : public testing::Test, public DecoderFactory {
-public:
-  RedisProxyFilterTest() {
-    std::string json_string = R"EOF(
-    {
-      "cluster_name": "fake_cluster",
-      "stat_prefix": "foo",
-      "conn_pool": { "op_timeout_ms" : 10 }
-    }
-    )EOF";
+TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
+  const std::string yaml_string = R"EOF(
+  prefix_routes:
+    catch_all_route:
+      cluster: fake_cluster
+  stat_prefix: foo
+  settings:
+    op_timeout: 0.01s
+  downstream_auth_password:
+    inline_string: somepassword
+  )EOF";
 
-    envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
-        parseProtoFromJson(json_string);
-    NiceMock<Upstream::MockClusterManager> cm;
-    config_.reset(new ProxyFilterConfig(proto_config, cm, store_, drain_decision_, runtime_));
-    filter_.reset(new ProxyFilter(*this, EncoderPtr{encoder_}, splitter_, config_));
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
+      parseProtoFromYaml(yaml_string);
+  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_);
+  EXPECT_EQ(config.downstream_auth_password_, "somepassword");
+}
+
+class RedisProxyFilterTest : public testing::Test, public Common::Redis::DecoderFactory {
+public:
+  static constexpr const char* DefaultConfig = R"EOF(
+  prefix_routes:
+    catch_all_route:
+      cluster: fake_cluster
+  stat_prefix: foo
+  settings:
+    op_timeout: 0.01s
+  )EOF";
+
+  RedisProxyFilterTest(const std::string& yaml_string) {
+    envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
+        parseProtoFromYaml(yaml_string);
+    config_ =
+        std::make_shared<ProxyFilterConfig>(proto_config, store_, drain_decision_, runtime_, api_);
+    filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,
+                                            config_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
     EXPECT_EQ(1UL, config_->stats_.downstream_cx_total_.value());
@@ -136,29 +121,32 @@ public:
     filter_->onBelowWriteBufferLowWatermark();
   }
 
-  ~RedisProxyFilterTest() {
+  RedisProxyFilterTest() : RedisProxyFilterTest(DefaultConfig) {}
+
+  ~RedisProxyFilterTest() override {
     filter_.reset();
     for (const Stats::GaugeSharedPtr& gauge : store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
   }
 
-  // RedisProxy::DecoderFactory
-  DecoderPtr create(DecoderCallbacks& callbacks) override {
+  // Common::Redis::DecoderFactory
+  Common::Redis::DecoderPtr create(Common::Redis::DecoderCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
-    return DecoderPtr{decoder_};
+    return Common::Redis::DecoderPtr{decoder_};
   }
 
-  MockEncoder* encoder_{new MockEncoder()};
-  MockDecoder* decoder_{new MockDecoder()};
-  DecoderCallbacks* decoder_callbacks_{};
+  Common::Redis::MockEncoder* encoder_{new Common::Redis::MockEncoder()};
+  Common::Redis::MockDecoder* decoder_{new Common::Redis::MockDecoder()};
+  Common::Redis::DecoderCallbacks* decoder_callbacks_{};
   CommandSplitter::MockInstance splitter_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
   NiceMock<Runtime::MockLoader> runtime_;
   ProxyFilterConfigSharedPtr config_;
   std::unique_ptr<ProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  NiceMock<Api::MockApi> api_;
 };
 
 TEST_F(RedisProxyFilterTest, OutOfOrderResponseWithDrainClose) {
@@ -170,12 +158,12 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponseWithDrainClose) {
   CommandSplitter::MockSplitRequest* request_handle2 = new CommandSplitter::MockSplitRequest();
   CommandSplitter::SplitCallbacks* request_callbacks2;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    RespValuePtr request1(new RespValue());
+    Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
     EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks1)), Return(request_handle1)));
     decoder_callbacks_->onRespValue(std::move(request1));
 
-    RespValuePtr request2(new RespValue());
+    Common::Redis::RespValuePtr request2(new Common::Redis::RespValue());
     EXPECT_CALL(splitter_, makeRequest_(Ref(*request2), _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks2)), Return(request_handle2)));
     decoder_callbacks_->onRespValue(std::move(request2));
@@ -185,11 +173,11 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponseWithDrainClose) {
   EXPECT_EQ(2UL, config_->stats_.downstream_rq_total_.value());
   EXPECT_EQ(2UL, config_->stats_.downstream_rq_active_.value());
 
-  RespValuePtr response2(new RespValue());
-  RespValue* response2_ptr = response2.get();
+  Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
+  Common::Redis::RespValue* response2_ptr = response2.get();
   request_callbacks2->onResponse(std::move(response2));
 
-  RespValuePtr response1(new RespValue());
+  Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
   EXPECT_CALL(*encoder_, encode(Ref(*response1), _));
   EXPECT_CALL(*encoder_, encode(Ref(*response2_ptr), _));
   EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
@@ -211,12 +199,12 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponseDownstreamDisconnectBeforeFlush) 
   CommandSplitter::MockSplitRequest* request_handle2 = new CommandSplitter::MockSplitRequest();
   CommandSplitter::SplitCallbacks* request_callbacks2;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    RespValuePtr request1(new RespValue());
+    Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
     EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks1)), Return(request_handle1)));
     decoder_callbacks_->onRespValue(std::move(request1));
 
-    RespValuePtr request2(new RespValue());
+    Common::Redis::RespValuePtr request2(new Common::Redis::RespValue());
     EXPECT_CALL(splitter_, makeRequest_(Ref(*request2), _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks2)), Return(request_handle2)));
     decoder_callbacks_->onRespValue(std::move(request2));
@@ -226,7 +214,7 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponseDownstreamDisconnectBeforeFlush) 
   EXPECT_EQ(2UL, config_->stats_.downstream_rq_total_.value());
   EXPECT_EQ(2UL, config_->stats_.downstream_rq_active_.value());
 
-  RespValuePtr response2(new RespValue());
+  Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
   request_callbacks2->onResponse(std::move(response2));
   EXPECT_CALL(*request_handle1, cancel());
 
@@ -240,7 +228,7 @@ TEST_F(RedisProxyFilterTest, DownstreamDisconnectWithActive) {
   CommandSplitter::MockSplitRequest* request_handle1 = new CommandSplitter::MockSplitRequest();
   CommandSplitter::SplitCallbacks* request_callbacks1;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    RespValuePtr request1(new RespValue());
+    Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
     EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks1)), Return(request_handle1)));
     decoder_callbacks_->onRespValue(std::move(request1));
@@ -255,16 +243,16 @@ TEST_F(RedisProxyFilterTest, ImmediateResponse) {
   InSequence s;
 
   Buffer::OwnedImpl fake_data;
-  RespValuePtr request1(new RespValue());
+  Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request1));
   }));
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _))
       .WillOnce(
-          Invoke([&](const RespValue&,
+          Invoke([&](const Common::Redis::RespValue&,
                      CommandSplitter::SplitCallbacks& callbacks) -> CommandSplitter::SplitRequest* {
-            RespValuePtr error(new RespValue());
-            error->type(RespType::Error);
+            Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
+            error->type(Common::Redis::RespType::Error);
             error->asString() = "no healthy upstream";
             EXPECT_CALL(*encoder_, encode(Eq(ByRef(*error)), _));
             EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
@@ -281,11 +269,11 @@ TEST_F(RedisProxyFilterTest, ProtocolError) {
 
   Buffer::OwnedImpl fake_data;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    throw ProtocolError("error");
+    throw Common::Redis::ProtocolError("error");
   }));
 
-  RespValue error;
-  error.type(RespType::Error);
+  Common::Redis::RespValue error;
+  error.type(Common::Redis::RespType::Error);
   error.asString() = "downstream protocol error";
   EXPECT_CALL(*encoder_, encode(Eq(ByRef(error)), _));
   EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
@@ -293,6 +281,103 @@ TEST_F(RedisProxyFilterTest, ProtocolError) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data, false));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.downstream_cx_protocol_error").value());
+}
+
+TEST_F(RedisProxyFilterTest, AuthWhenNotRequired) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _))
+      .WillOnce(
+          Invoke([&](const Common::Redis::RespValue&,
+                     CommandSplitter::SplitCallbacks& callbacks) -> CommandSplitter::SplitRequest* {
+            EXPECT_TRUE(callbacks.connectionAllowed());
+            Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
+            error->type(Common::Redis::RespType::Error);
+            error->asString() = "ERR Client sent AUTH, but no password is set";
+            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*error)), _));
+            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+            callbacks.onAuth("foo");
+            // callbacks cannot be accessed now.
+            EXPECT_TRUE(filter_->connectionAllowed());
+            return nullptr;
+          }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+const std::string downstream_auth_password_config = R"EOF(
+prefix_routes:
+  catch_all_route:
+      cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.01s
+downstream_auth_password:
+  inline_string: somepassword
+)EOF";
+
+class RedisProxyFilterWithAuthPasswordTest : public RedisProxyFilterTest {
+public:
+  RedisProxyFilterWithAuthPasswordTest() : RedisProxyFilterTest(downstream_auth_password_config) {}
+};
+
+TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordCorrect) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _))
+      .WillOnce(
+          Invoke([&](const Common::Redis::RespValue&,
+                     CommandSplitter::SplitCallbacks& callbacks) -> CommandSplitter::SplitRequest* {
+            EXPECT_FALSE(callbacks.connectionAllowed());
+            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+            reply->type(Common::Redis::RespType::SimpleString);
+            reply->asString() = "OK";
+            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+            callbacks.onAuth("somepassword");
+            // callbacks cannot be accessed now.
+            EXPECT_TRUE(filter_->connectionAllowed());
+            return nullptr;
+          }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordIncorrect) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _))
+      .WillOnce(
+          Invoke([&](const Common::Redis::RespValue&,
+                     CommandSplitter::SplitCallbacks& callbacks) -> CommandSplitter::SplitRequest* {
+            EXPECT_FALSE(callbacks.connectionAllowed());
+            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+            reply->type(Common::Redis::RespType::Error);
+            reply->asString() = "ERR invalid password";
+            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+            callbacks.onAuth("wrongpassword");
+            // callbacks cannot be accessed now.
+            EXPECT_FALSE(filter_->connectionAllowed());
+            return nullptr;
+          }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
 
 } // namespace RedisProxy

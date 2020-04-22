@@ -1,0 +1,1 @@
+static_resources {   clusters {     name: " "     type: STRICT_DNS     connect_timeout {       nanos: 4     }     dns_refresh_rate {       nanos: 4     }   } } 

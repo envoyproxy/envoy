@@ -2,6 +2,9 @@
 
 #include "envoy/decompressor/decompressor.h"
 
+#include "common/common/logger.h"
+#include "common/common/zlib/base.h"
+
 #include "zlib.h"
 
 namespace Envoy {
@@ -10,7 +13,9 @@ namespace Decompressor {
 /**
  * Implementation of decompressor's interface.
  */
-class ZlibDecompressorImpl : public Decompressor {
+class ZlibDecompressorImpl : public Zlib::Base,
+                             public Decompressor,
+                             public Logger::Loggable<Logger::Id::decompression> {
 public:
   ZlibDecompressorImpl();
 
@@ -32,25 +37,15 @@ public:
    */
   void init(int64_t window_bits);
 
-  /**
-   * It returns the checksum of all output produced so far. Decompressor's checksum at the end of
-   * the stream has to match compressor's checksum produced at the end of the compression.
-   * @return uint64_t CRC-32 if a gzip stream is being read or Adler-32 for other compression
-   * types.
-   */
-  uint64_t checksum();
-
   // Decompressor
   void decompress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
 
+  // Flag to track whether error occurred during decompression.
+  // When an error occurs, the error code (a negative int) will be stored in this variable.
+  int decompression_error_{0};
+
 private:
   bool inflateNext();
-
-  const uint64_t chunk_size_;
-  bool initialized_;
-
-  std::unique_ptr<unsigned char[]> chunk_char_ptr_;
-  std::unique_ptr<z_stream, std::function<void(z_stream*)>> zstream_ptr_;
 };
 
 } // namespace Decompressor

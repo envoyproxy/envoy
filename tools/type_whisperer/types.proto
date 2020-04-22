@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package tools.type_whisperer;
+
+// Description for a single type.
+message TypeDescription {
+  // Fully qualified package name.
+  string qualified_package = 2;
+
+  // Path to .proto from API root.
+  string proto_path = 3;
+
+  // Fully qualified type names for type dependencies.
+  repeated string type_dependencies = 4;
+
+  // Does this type have a breaking change? If so, it needs to be upgraded at
+  // the next major version.
+  bool next_version_upgrade = 5;
+
+  // The package of the type in next version
+  string next_version_package = 6;
+
+  // Is this a type in an active package?
+  bool active = 7;
+
+  // Is this type a synthesized map entry?
+  bool map_entry = 8;
+
+  // Is this type deprecated?
+  bool deprecated_type = 9;
+}
+
+message Types {
+  // Map from fully qualified type name to description.
+  map<string, TypeDescription> types = 1;
+}

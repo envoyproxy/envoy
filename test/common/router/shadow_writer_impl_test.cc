@@ -10,60 +10,67 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::_;
+using testing::Eq;
+using testing::InSequence;
+using testing::Invoke;
+using testing::Return;
 
 namespace Envoy {
 namespace Router {
+namespace {
 
-void expectShadowWriter(absl::string_view host, absl::string_view shadowed_host) {
-  Upstream::MockClusterManager cm;
-  ShadowWriterImpl writer(cm);
+class ShadowWriterImplTest : public testing::Test {
+public:
+  void expectShadowWriter(absl::string_view host, absl::string_view shadowed_host) {
+    Http::RequestMessagePtr message(new Http::RequestMessageImpl());
+    message->headers().setHost(host);
+    EXPECT_CALL(cm_, get(Eq("foo")));
+    EXPECT_CALL(cm_, httpAsyncClientForCluster("foo")).WillOnce(ReturnRef(cm_.async_client_));
+    auto options = Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5));
+    EXPECT_CALL(cm_.async_client_, send_(_, _, options))
+        .WillOnce(Invoke(
+            [&](Http::RequestMessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
+                const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+              EXPECT_EQ(message, inner_message);
+              EXPECT_EQ(shadowed_host, message->headers().Host()->value().getStringView());
+              callback_ = &callbacks;
+              return &request_;
+            }));
+    writer_.shadow("foo", std::move(message), options);
+  }
 
-  // Success case
-  Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().insertHost().value(std::string(host));
-  EXPECT_CALL(cm, httpAsyncClientForCluster("foo")).WillOnce(ReturnRef(cm.async_client_));
-  Http::MockAsyncClientRequest request(&cm.async_client_);
-  Http::AsyncClient::Callbacks* callback;
-  EXPECT_CALL(cm.async_client_,
-              send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(5))))
-      .WillOnce(Invoke(
-          [&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ(message, inner_message);
-            EXPECT_EQ(shadowed_host, message->headers().Host()->value().c_str());
-            callback = &callbacks;
-            return &request;
-          }));
-  writer.shadow("foo", std::move(message), std::chrono::milliseconds(5));
+  Upstream::MockClusterManager cm_;
+  ShadowWriterImpl writer_{cm_};
+  Http::MockAsyncClientRequest request_{&cm_.async_client_};
+  Http::AsyncClient::Callbacks* callback_{};
+};
 
-  Http::MessagePtr response(new Http::RequestMessageImpl());
-  callback->onSuccess(std::move(response));
+TEST_F(ShadowWriterImplTest, Success) {
+  InSequence s;
 
-  // Failure case
-  message.reset(new Http::RequestMessageImpl());
-  message->headers().insertHost().value(std::string(host));
-  EXPECT_CALL(cm, httpAsyncClientForCluster("bar")).WillOnce(ReturnRef(cm.async_client_));
-  EXPECT_CALL(cm.async_client_,
-              send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(10))))
-      .WillOnce(Invoke(
-          [&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ(message, inner_message);
-            EXPECT_EQ(shadowed_host, message->headers().Host()->value().c_str());
-            callback = &callbacks;
-            return &request;
-          }));
-  writer.shadow("bar", std::move(message), std::chrono::milliseconds(10));
-  callback->onFailure(Http::AsyncClient::FailureReason::Reset);
-}
-
-TEST(ShadowWriterImplTest, All) {
   expectShadowWriter("cluster1", "cluster1-shadow");
-  expectShadowWriter("cluster1:8000", "cluster1-shadow:8000");
-  expectShadowWriter("cluster1:80", "cluster1-shadow:80");
+  Http::ResponseMessagePtr response(new Http::ResponseMessageImpl());
+  callback_->onSuccess(request_, std::move(response));
 }
 
+TEST_F(ShadowWriterImplTest, Failure) {
+  InSequence s;
+
+  expectShadowWriter("cluster1:8000", "cluster1-shadow:8000");
+  callback_->onFailure(request_, Http::AsyncClient::FailureReason::Reset);
+}
+
+TEST_F(ShadowWriterImplTest, NoCluster) {
+  InSequence s;
+
+  Http::RequestMessagePtr message(new Http::RequestMessageImpl());
+  EXPECT_CALL(cm_, get(Eq("foo"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("foo")).Times(0);
+  auto options = Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5));
+  writer_.shadow("foo", std::move(message), options);
+}
+
+} // namespace
 } // namespace Router
 } // namespace Envoy

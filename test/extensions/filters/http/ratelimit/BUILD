@@ -18,10 +18,11 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
-        "//source/common/config:filter_json_lib",
+        "//source/common/http:context_lib",
         "//source/common/http:headers_lib",
-        "//source/common/ratelimit:ratelimit_lib",
+        "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/http/ratelimit:ratelimit_lib",
+        "//test/extensions/filters/common/ratelimit:ratelimit_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/ratelimit:ratelimit_mocks",
@@ -29,6 +30,7 @@ envoy_extension_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
     ],
 )
 
@@ -39,5 +41,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/ratelimit:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
     ],
 )

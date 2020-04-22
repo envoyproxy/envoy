@@ -12,9 +12,15 @@ envoy_cc_test(
     name = "dispatcher_impl_test",
     srcs = ["dispatcher_impl_test.cc"],
     deps = [
+        "//source/common/api:api_lib",
+        "//source/common/event:deferred_task",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
+        "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -25,21 +31,9 @@ envoy_cc_test(
         "//include/envoy/event:file_event_interface",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
+        "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "dispatched_thread_impl_test",
-    srcs = ["dispatched_thread_impl_test.cc"],
-    deps = [
-        "//source/common/common:utility_lib",
-        "//source/common/event:dispatched_thread_lib",
-        "//source/server:guarddog_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/server:server_mocks",
-        "//test/mocks/stats:stats_mocks",
     ],
 )

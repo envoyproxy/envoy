@@ -1,5 +1,7 @@
 #include "uds_integration_test.h"
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "common/event/dispatcher_impl.h"
 #include "common/network/utility.h"
 
@@ -9,21 +11,24 @@
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(TestParameters, UdsUpstreamIntegrationTest,
-                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
 #if defined(__linux__)
-                                         testing::Values(false, true)
+INSTANTIATE_TEST_SUITE_P(
+    TestParameters, UdsUpstreamIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(false, true)));
 #else
-                                         testing::Values(false)
+INSTANTIATE_TEST_SUITE_P(
+    TestParameters, UdsUpstreamIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(false)));
 #endif
-                                             ));
 
 TEST_P(UdsUpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
 TEST_P(UdsUpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(UdsUpstreamIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
@@ -38,23 +43,26 @@ TEST_P(UdsUpstreamIntegrationTest, RouterDownstreamDisconnectBeforeResponseCompl
   testRouterDownstreamDisconnectBeforeResponseComplete();
 }
 
-INSTANTIATE_TEST_CASE_P(TestParameters, UdsListenerIntegrationTest,
-                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
 #if defined(__linux__)
-                                         testing::Values(false, true)
+INSTANTIATE_TEST_SUITE_P(
+    TestParameters, UdsListenerIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(false, true)));
 #else
-                                         testing::Values(false)
+INSTANTIATE_TEST_SUITE_P(
+    TestParameters, UdsListenerIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(false)));
 #endif
-                                             ));
 
 void UdsListenerIntegrationTest::initialize() {
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* admin_addr = bootstrap.mutable_admin()->mutable_address();
     admin_addr->clear_socket_address();
     admin_addr->mutable_pipe()->set_path(getAdminSocketName());
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
-    RELEASE_ASSERT(listeners->size() > 0);
+    RELEASE_ASSERT(!listeners->empty(), "");
     auto filter_chains = listeners->Get(0).filter_chains();
     listeners->Clear();
     auto* listener = listeners->Add();
@@ -76,14 +84,39 @@ HttpIntegrationTest::ConnectionCreationFunction UdsListenerIntegrationTest::crea
   };
 }
 
+TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
+  fake_upstreams_count_ = 1;
+  initialize();
+  auto client_connection = createConnectionFn()();
+  codec_client_ = makeHttpConnection(std::move(client_connection));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+      {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(0);
+
+  auto credentials = codec_client_->connection()->unixSocketPeerCredentials();
+#ifndef SO_PEERCRED
+  EXPECT_EQ(credentials, absl::nullopt);
+#else
+  EXPECT_EQ(credentials->pid, getpid());
+  EXPECT_EQ(credentials->uid, getuid());
+  EXPECT_EQ(credentials->gid, getgid());
+#endif
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  response->waitForEndStream();
+}
+
 TEST_P(UdsListenerIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = createConnectionFn();
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 TEST_P(UdsListenerIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
   ConnectionCreationFunction creator = createConnectionFn();
-  testRouterHeaderOnlyRequestAndResponse(true, &creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
 }
 
 TEST_P(UdsListenerIntegrationTest, RouterListenerDisconnectBeforeResponseComplete) {

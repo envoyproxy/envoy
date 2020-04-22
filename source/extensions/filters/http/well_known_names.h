@@ -13,53 +13,66 @@ namespace HttpFilters {
 class HttpFilterNameValues {
 public:
   // Buffer filter
-  const std::string BUFFER = "envoy.buffer";
+  const std::string Buffer = "envoy.filters.http.buffer";
+  // Cache filter
+  const std::string Cache = "envoy.filters.http.cache";
   // CORS filter
-  const std::string CORS = "envoy.cors";
+  const std::string Cors = "envoy.filters.http.cors";
+  // CSRF filter
+  const std::string Csrf = "envoy.filters.http.csrf";
   // Dynamo filter
-  const std::string DYNAMO = "envoy.http_dynamo_filter";
+  const std::string Dynamo = "envoy.filters.http.dynamo";
   // Fault filter
-  const std::string FAULT = "envoy.fault";
+  const std::string Fault = "envoy.filters.http.fault";
   // GRPC http1 bridge filter
-  const std::string GRPC_HTTP1_BRIDGE = "envoy.grpc_http1_bridge";
+  const std::string GrpcHttp1Bridge = "envoy.filters.http.grpc_http1_bridge";
   // GRPC json transcoder filter
-  const std::string GRPC_JSON_TRANSCODER = "envoy.grpc_json_transcoder";
+  const std::string GrpcJsonTranscoder = "envoy.filters.http.grpc_json_transcoder";
   // GRPC web filter
-  const std::string GRPC_WEB = "envoy.grpc_web";
+  const std::string GrpcWeb = "envoy.filters.http.grpc_web";
+  // GRPC http1 reverse bridge filter
+  const std::string GrpcHttp1ReverseBridge = "envoy.filters.http.grpc_http1_reverse_bridge";
+  // GRPC telemetry
+  const std::string GrpcStats = "envoy.filters.http.grpc_stats";
   // Gzip filter
-  const std::string ENVOY_GZIP = "envoy.gzip";
+  const std::string EnvoyGzip = "envoy.filters.http.gzip";
   // IP tagging filter
-  const std::string IP_TAGGING = "envoy.ip_tagging";
+  const std::string IpTagging = "envoy.filters.http.ip_tagging";
   // Rate limit filter
-  const std::string RATE_LIMIT = "envoy.rate_limit";
+  const std::string RateLimit = "envoy.filters.http.ratelimit";
   // Router filter
-  const std::string ROUTER = "envoy.router";
+  const std::string Router = "envoy.filters.http.router";
   // Health checking filter
-  const std::string HEALTH_CHECK = "envoy.health_check";
+  const std::string HealthCheck = "envoy.filters.http.health_check";
   // Lua filter
-  const std::string LUA = "envoy.lua";
+  const std::string Lua = "envoy.filters.http.lua";
+  // On-demand RDS updates filter
+  const std::string OnDemand = "envoy.filters.http.on_demand";
   // Squash filter
-  const std::string SQUASH = "envoy.squash";
+  const std::string Squash = "envoy.filters.http.squash";
   // External Authorization filter
-  const std::string EXT_AUTHORIZATION = "envoy.ext_authz";
+  const std::string ExtAuthorization = "envoy.filters.http.ext_authz";
   // RBAC HTTP Authorization filter
-  const std::string RBAC = "envoy.filters.http.rbac";
+  const std::string Rbac = "envoy.filters.http.rbac";
   // JWT authentication filter
-  const std::string JWT_AUTHN = "envoy.filters.http.jwt_authn";
+  const std::string JwtAuthn = "envoy.filters.http.jwt_authn";
   // Header to metadata filter
-  const std::string HEADER_TO_METADATA = "envoy.filters.http.header_to_metadata";
-
-  // Converts names from v1 to v2
-  const Config::V1Converter v1_converter_;
-
-  // NOTE: Do not add any new filters to this list. All future filters are v2 only.
-  HttpFilterNameValues()
-      : v1_converter_({BUFFER, CORS, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER,
-                       GRPC_WEB, HEADER_TO_METADATA, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER,
-                       LUA, EXT_AUTHORIZATION}) {}
+  const std::string HeaderToMetadata = "envoy.filters.http.header_to_metadata";
+  // Tap filter
+  const std::string Tap = "envoy.filters.http.tap";
+  // Adaptive concurrency limit filter
+  const std::string AdaptiveConcurrency = "envoy.filters.http.adaptive_concurrency";
+  // Original Src Filter
+  const std::string OriginalSrc = "envoy.filters.http.original_src";
+  // Dynamic forward proxy filter
+  const std::string DynamicForwardProxy = "envoy.filters.http.dynamic_forward_proxy";
+  // AWS request signing filter
+  const std::string AwsRequestSigning = "envoy.filters.http.aws_request_signing";
+  // AWS Lambda filter
+  const std::string AwsLambda = "envoy.filters.http.aws_lambda";
 };
 
-typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;
+using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;
 
 } // namespace HttpFilters
 } // namespace Extensions

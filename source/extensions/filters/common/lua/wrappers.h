@@ -42,6 +42,18 @@ private:
 
 class MetadataMapWrapper;
 
+struct MetadataMapHelper {
+  static void setValue(lua_State* state, const ProtobufWkt::Value& value);
+  static void createTable(lua_State* state,
+                          const Protobuf::Map<std::string, ProtobufWkt::Value>& fields);
+  static ProtobufWkt::Value loadValue(lua_State* state);
+
+private:
+  static ProtobufWkt::Struct loadStruct(lua_State* state);
+  static ProtobufWkt::ListValue loadList(lua_State* state, int length);
+  static int tableLength(lua_State* state);
+};
+
 /**
  * Iterator over a metadata map.
  */
@@ -55,7 +67,7 @@ public:
 
 private:
   MetadataMapWrapper& parent_;
-  Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>::const_iterator current_;
+  Protobuf::Map<std::string, ProtobufWkt::Value>::const_iterator current_;
 };
 
 /**
@@ -89,14 +101,43 @@ private:
     iterator_.reset();
   }
 
-  void setValue(lua_State* state, const ProtobufWkt::Value& value);
-  void createTable(lua_State* state,
-                   const Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>& fields);
-
   const ProtobufWkt::Struct metadata_;
   LuaDeathRef<MetadataMapIterator> iterator_;
 
   friend class MetadataMapIterator;
+};
+
+/**
+ * Lua wrapper for Ssl::ConnectionInfo.
+ */
+class SslConnectionWrapper : public BaseLuaObject<SslConnectionWrapper> {
+public:
+  SslConnectionWrapper(const Ssl::ConnectionInfoConstSharedPtr) {}
+  static ExportedFunctions exportedFunctions() { return {}; }
+
+  // TODO(dio): Add more Lua APIs around Ssl::Connection.
+};
+
+/**
+ * Lua wrapper for Network::Connection.
+ */
+class ConnectionWrapper : public BaseLuaObject<ConnectionWrapper> {
+public:
+  ConnectionWrapper(const Network::Connection* connection) : connection_{connection} {}
+  static ExportedFunctions exportedFunctions() { return {{"ssl", static_luaSsl}}; }
+
+private:
+  /**
+   * Get the Ssl::Connection wrapper
+   * @return object if secured and nil if not.
+   */
+  DECLARE_LUA_FUNCTION(ConnectionWrapper, luaSsl);
+
+  // Envoy::Lua::BaseLuaObject
+  void onMarkDead() override { ssl_connection_wrapper_.reset(); }
+
+  const Network::Connection* connection_;
+  LuaDeathRef<SslConnectionWrapper> ssl_connection_wrapper_;
 };
 
 } // namespace Lua

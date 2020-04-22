@@ -11,6 +11,11 @@
 namespace Envoy {
 namespace Tracing {
 
+class Span;
+using SpanPtr = std::unique_ptr<Span>;
+
+constexpr uint32_t DefaultMaxPathTagLength = 256;
+
 enum class OperationName { Ingress, Egress };
 
 /**
@@ -38,11 +43,43 @@ struct Decision {
 };
 
 /**
+ * The context for the custom tag to obtain the tag value.
+ */
+struct CustomTagContext {
+  const Http::RequestHeaderMap* request_headers;
+  const StreamInfo::StreamInfo& stream_info;
+};
+
+/**
+ * Tracing custom tag, with tag name and how it would be applied to the span.
+ */
+class CustomTag {
+public:
+  virtual ~CustomTag() = default;
+
+  /**
+   * @return the tag name view.
+   */
+  virtual absl::string_view tag() const PURE;
+
+  /**
+   * The way how to apply the custom tag to the span,
+   * generally obtain the tag value from the context and attached it to the span.
+   * @param span the active span.
+   * @param ctx the custom tag context.
+   */
+  virtual void apply(Span& span, const CustomTagContext& ctx) const PURE;
+};
+
+using CustomTagConstSharedPtr = std::shared_ptr<const CustomTag>;
+using CustomTagMap = absl::flat_hash_map<std::string, CustomTagConstSharedPtr>;
+
+/**
  * Tracing configuration, it carries additional data needed to populate the span.
  */
 class Config {
 public:
-  virtual ~Config() {}
+  virtual ~Config() = default;
 
   /**
    * @return operation name for tracing, e.g., ingress.
@@ -50,33 +87,47 @@ public:
   virtual OperationName operationName() const PURE;
 
   /**
-   * @return list of headers to populate tags on the active span.
+   * @return custom tags to be attached to the active span.
    */
-  virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const PURE;
-};
+  virtual const CustomTagMap* customTags() const PURE;
 
-class Span;
-typedef std::unique_ptr<Span> SpanPtr;
+  /**
+   * @return true if spans should be annotated with more detailed information.
+   */
+  virtual bool verbose() const PURE;
+
+  /**
+   * @return the maximum length allowed for paths in the extracted HttpUrl tag.
+   */
+  virtual uint32_t maxPathTagLength() const PURE;
+};
 
 /**
  * Basic abstraction for span.
  */
 class Span {
 public:
-  virtual ~Span() {}
+  virtual ~Span() = default;
 
   /**
    * Set the operation name.
    * @param operation the operation name
    */
-  virtual void setOperation(const std::string& operation) PURE;
+  virtual void setOperation(absl::string_view operation) PURE;
 
   /**
    * Attach metadata to a Span, to be handled in an implementation-dependent fashion.
    * @param name the name of the tag
    * @param value the value to associate with the tag
    */
-  virtual void setTag(const std::string& name, const std::string& value) PURE;
+  virtual void setTag(absl::string_view name, absl::string_view value) PURE;
+
+  /**
+   * Record an event associated with a span, to be handled in an implementation-dependent fashion.
+   * @param timestamp the time of the event.
+   * @param event the name of the event.
+   */
+  virtual void log(SystemTime timestamp, const std::string& event) PURE;
 
   /**
    * Capture the final duration for this Span and carry out any work necessary to complete it.
@@ -89,7 +140,7 @@ public:
    * (implementation-specific) trace.
    * @param request_headers the headers to which propagation context will be added
    */
-  virtual void injectContext(Http::HeaderMap& request_headers) PURE;
+  virtual void injectContext(Http::RequestHeaderMap& request_headers) PURE;
 
   /**
    * Create and start a child Span, with this Span as its parent in the trace.
@@ -114,17 +165,17 @@ public:
  */
 class Driver {
 public:
-  virtual ~Driver() {}
+  virtual ~Driver() = default;
 
   /**
    * Start driver specific span.
    */
-  virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
+  virtual SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
                             const std::string& operation_name, SystemTime start_time,
                             const Tracing::Decision tracing_decision) PURE;
 };
 
-typedef std::unique_ptr<Driver> DriverPtr;
+using DriverPtr = std::unique_ptr<Driver>;
 
 /**
  * HttpTracer is responsible for handling traces and delegate actions to the
@@ -132,14 +183,14 @@ typedef std::unique_ptr<Driver> DriverPtr;
  */
 class HttpTracer {
 public:
-  virtual ~HttpTracer() {}
+  virtual ~HttpTracer() = default;
 
-  virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                            const RequestInfo::RequestInfo& request_info,
+  virtual SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
+                            const StreamInfo::StreamInfo& stream_info,
                             const Tracing::Decision tracing_decision) PURE;
 };
 
-typedef std::unique_ptr<HttpTracer> HttpTracerPtr;
+using HttpTracerSharedPtr = std::shared_ptr<HttpTracer>;
 
 } // namespace Tracing
 } // namespace Envoy

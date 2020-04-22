@@ -5,10 +5,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 
-#include "common/config/rds_json.h"
 #include "common/http/header_utility.h"
 
 namespace Envoy {
@@ -41,7 +41,7 @@ public:
  */
 class RequestHeadersAction : public RateLimitAction {
 public:
-  RequestHeadersAction(const envoy::api::v2::route::RateLimit::Action::RequestHeaders& action)
+  RequestHeadersAction(const envoy::config::route::v3::RateLimit::Action::RequestHeaders& action)
       : header_name_(action.header_name()), descriptor_key_(action.descriptor_key()) {}
 
   // Router::RateLimitAction
@@ -70,7 +70,7 @@ public:
  */
 class GenericKeyAction : public RateLimitAction {
 public:
-  GenericKeyAction(const envoy::api::v2::route::RateLimit::Action::GenericKey& action)
+  GenericKeyAction(const envoy::config::route::v3::RateLimit::Action::GenericKey& action)
       : descriptor_value_(action.descriptor_value()) {}
 
   // Router::RateLimitAction
@@ -87,7 +87,8 @@ private:
  */
 class HeaderValueMatchAction : public RateLimitAction {
 public:
-  HeaderValueMatchAction(const envoy::api::v2::route::RateLimit::Action::HeaderValueMatch& action);
+  HeaderValueMatchAction(
+      const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action);
 
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
@@ -97,7 +98,7 @@ public:
 private:
   const std::string descriptor_value_;
   const bool expect_match_;
-  std::vector<Http::HeaderUtility::HeaderData> action_headers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> action_headers_;
 };
 
 /*
@@ -105,7 +106,7 @@ private:
  */
 class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
 public:
-  RateLimitPolicyEntryImpl(const envoy::api::v2::route::RateLimit& config);
+  RateLimitPolicyEntryImpl(const envoy::config::route::v3::RateLimit& config);
 
   // Router::RateLimitPolicyEntry
   uint64_t stage() const override { return stage_; }
@@ -127,7 +128,7 @@ private:
 class RateLimitPolicyImpl : public RateLimitPolicy {
 public:
   RateLimitPolicyImpl(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::route::RateLimit>& rate_limits);
+      const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits);
 
   // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&

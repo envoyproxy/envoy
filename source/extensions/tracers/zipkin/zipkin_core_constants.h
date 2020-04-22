@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/http/header_map.h"
+
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -9,41 +11,51 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
+namespace {
+
+constexpr char KIND_CLIENT[] = "CLIENT";
+constexpr char KIND_SERVER[] = "SERVER";
+
+constexpr char CLIENT_SEND[] = "cs";
+constexpr char CLIENT_RECV[] = "cr";
+constexpr char SERVER_SEND[] = "ss";
+constexpr char SERVER_RECV[] = "sr";
+
+constexpr char HTTP_HOST[] = "http.host";
+constexpr char HTTP_METHOD[] = "http.method";
+constexpr char HTTP_PATH[] = "http.path";
+constexpr char HTTP_URL[] = "http.url";
+constexpr char HTTP_STATUS_CODE[] = "http.status_code";
+constexpr char HTTP_REQUEST_SIZE[] = "http.request.size";
+constexpr char HTTP_RESPONSE_SIZE[] = "http.response.size";
+
+constexpr char LOCAL_COMPONENT[] = "lc";
+constexpr char ERROR[] = "error";
+constexpr char CLIENT_ADDR[] = "ca";
+constexpr char SERVER_ADDR[] = "sa";
+
+constexpr char SAMPLED[] = "1";
+constexpr char NOT_SAMPLED[] = "0";
+
+constexpr char DEFAULT_COLLECTOR_ENDPOINT[] = "/api/v1/spans";
+constexpr bool DEFAULT_SHARED_SPAN_CONTEXT = true;
+
+} // namespace
+
 class ZipkinCoreConstantValues {
 public:
-  const std::string CLIENT_SEND = "cs";
-  const std::string CLIENT_RECV = "cr";
-  const std::string SERVER_SEND = "ss";
-  const std::string SERVER_RECV = "sr";
-
-  const std::string HTTP_HOST = "http.host";
-  const std::string HTTP_METHOD = "http.method";
-  const std::string HTTP_PATH = "http.path";
-  const std::string HTTP_URL = "http.url";
-  const std::string HTTP_STATUS_CODE = "http.status_code";
-  const std::string HTTP_REQUEST_SIZE = "http.request.size";
-  const std::string HTTP_RESPONSE_SIZE = "http.response.size";
-
-  const std::string LOCAL_COMPONENT = "lc";
-  const std::string ERROR = "error";
-  const std::string CLIENT_ADDR = "ca";
-  const std::string SERVER_ADDR = "sa";
-
   // Zipkin B3 headers
-  const std::string X_B3_TRACE_ID = "X-B3-TraceId";
-  const std::string X_B3_SPAN_ID = "X-B3-SpanId";
-  const std::string X_B3_PARENT_SPAN_ID = "X-B3-ParentSpanId";
-  const std::string X_B3_SAMPLED = "X-B3-Sampled";
-  const std::string X_B3_FLAGS = "X-B3-Flags";
+  const Http::LowerCaseString X_B3_TRACE_ID{"x-b3-traceid"};
+  const Http::LowerCaseString X_B3_SPAN_ID{"x-b3-spanid"};
+  const Http::LowerCaseString X_B3_PARENT_SPAN_ID{"x-b3-parentspanid"};
+  const Http::LowerCaseString X_B3_SAMPLED{"x-b3-sampled"};
+  const Http::LowerCaseString X_B3_FLAGS{"x-b3-flags"};
 
-  const std::string SAMPLED = "1";
-  const std::string NOT_SAMPLED = "0";
-
-  const std::string DEFAULT_COLLECTOR_ENDPOINT = "/api/v1/spans";
-  const bool DEFAULT_TRACE_ID_128BIT = false;
+  // Zipkin b3 single header
+  const Http::LowerCaseString B3{"b3"};
 };
 
-typedef ConstSingleton<ZipkinCoreConstantValues> ZipkinCoreConstants;
+using ZipkinCoreConstants = ConstSingleton<ZipkinCoreConstantValues>;
 
 } // namespace Zipkin
 } // namespace Tracers

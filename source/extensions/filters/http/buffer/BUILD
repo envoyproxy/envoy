@@ -1,9 +1,11 @@
 licenses(["notice"])  # Apache 2
+
 # Request buffering and timeout L7 HTTP filter
 # Public docs: docs/root/configuration/http_filters/buffer_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -16,11 +18,8 @@ envoy_cc_library(
     hdrs = ["buffer_filter.h"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
@@ -28,20 +27,22 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/config/filter/http/buffer/v2:buffer_cc",
+        "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",
-        "//source/common/config:filter_json_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/buffer:buffer_filter_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
     ],
 )

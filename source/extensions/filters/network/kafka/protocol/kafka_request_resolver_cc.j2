@@ -1,0 +1,56 @@
+{#
+  Template for 'kafka_request_resolver.cc'.
+  Defines default Kafka request resolver, that uses request parsers in (also generated)
+  'requests.h'.
+#}
+#include "extensions/filters/network/kafka/external/requests.h"
+#include "extensions/filters/network/kafka/kafka_request_parser.h"
+#include "extensions/filters/network/kafka/parser.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+
+// Implements declaration from 'kafka_request.h'.
+bool requestUsesTaggedFieldsInHeader(const uint16_t api_key, const uint16_t api_version) {
+  switch (api_key) {
+    {% for message_type in message_types %}
+    case {{ message_type.get_extra('api_key') }}:
+      switch (api_version) {
+        {% for flexible_version in message_type.flexible_versions %}
+        case {{ flexible_version }}:
+          return true;
+        {% endfor %}
+        default:
+          return false;
+      }
+    {% endfor %}
+    default:
+      return false;
+  }
+}
+
+/**
+ * Creates a parser that corresponds to provided key and version.
+ * If corresponding parser cannot be found (what means a newer version of Kafka protocol),
+ * a sentinel parser is returned.
+ * @param api_key Kafka request key
+ * @param api_version Kafka request's version
+ * @param context parse context
+ */
+RequestParserSharedPtr RequestParserResolver::createParser(int16_t api_key, int16_t api_version,
+                                                           RequestContextSharedPtr context) const {
+
+{% for message_type in message_types %}{% for field_list in message_type.compute_field_lists() %}
+  if ({{ message_type.get_extra('api_key') }} == api_key
+    && {{ field_list.version }} == api_version) {
+    return std::make_shared<{{ message_type.name }}V{{ field_list.version }}Parser>(context);
+  }{% endfor %}{% endfor %}
+  return std::make_shared<SentinelParser>(context);
+}
+
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

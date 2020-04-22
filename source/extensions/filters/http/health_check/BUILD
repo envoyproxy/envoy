@@ -1,9 +1,11 @@
 licenses(["notice"])  # Apache 2
+
 # L7 HTTP filter that implements health check responses
 # Public docs: docs/root/configuration/http_filters/health_check_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -28,20 +30,20 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/http/health_check/v2:health_check_cc",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",
-        "//source/common/config:filter_json_lib",
         "//source/common/http:header_utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/health_check:health_check_lib",
+        "@envoy_api//envoy/extensions/filters/http/health_check/v3:pkg_cc_proto",
     ],
 )

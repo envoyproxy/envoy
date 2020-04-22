@@ -2,6 +2,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+
 #include "common/common/fmt.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
@@ -20,16 +25,17 @@ using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                                  const std::string& url, uint32_t weight = 1,
                                  const std::string& zone = "") {
-  envoy::api::v2::core::Locality locality;
+  envoy::config::core::v3::Locality locality;
   locality.set_zone(zone);
   return HostSharedPtr{
-      new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
-                   envoy::api::v2::core::Metadata::default_instance(), weight, locality,
-                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
+      new HostImpl(cluster, "", Network::Utility::resolveUrl(url), nullptr, weight, locality,
+                   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+                   envoy::config::core::v3::UNKNOWN)};
 }
 
 // Simulate weighted LR load balancer.
@@ -41,7 +47,6 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 
   PrioritySetImpl priority_set;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  HostSet& host_set = priority_set.getOrCreateHostSet(0);
   HostVector hosts;
   for (uint64_t i = 0; i < num_hosts; i++) {
     const bool should_weight = i < num_hosts * (weighted_subset_percent / 100.0);
@@ -53,16 +58,22 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   }
   HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
   HostsPerLocalitySharedPtr updated_locality_hosts{new HostsPerLocalityImpl(hosts)};
-  host_set.updateHosts(updated_hosts, updated_hosts, updated_locality_hosts, updated_locality_hosts,
-                       {}, hosts, {});
+  priority_set.updateHosts(
+      0,
+      updateHostsParams(updated_hosts, updated_locality_hosts,
+                        std::make_shared<const HealthyHostVector>(*updated_hosts),
+                        updated_locality_hosts),
+      {}, hosts, {}, absl::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
   ClusterStats stats{ClusterInfoImpl::generateStats(stats_store)};
   stats.max_host_weight_.set(weight);
   NiceMock<Runtime::MockLoader> runtime;
   Runtime::RandomGeneratorImpl random;
-  envoy::api::v2::Cluster::CommonLbConfig common_config;
-  LeastRequestLoadBalancer lb_{priority_set, nullptr, stats, runtime, random, common_config};
+  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
+  LeastRequestLoadBalancer lb_{
+      priority_set, nullptr, stats, runtime, random, common_config, least_request_lb_config};
 
   std::unordered_map<HostConstSharedPtr, uint64_t> host_hits;
   const uint64_t total_requests = 100;
@@ -153,9 +164,12 @@ public:
         per_zone_local.push_back(local_per_zone_hosts->get()[zone]);
       }
       auto per_zone_local_shared = makeHostsPerLocality(std::move(per_zone_local));
-      local_priority_set_->getOrCreateHostSet(0).updateHosts(
-          originating_hosts, originating_hosts, per_zone_local_shared, per_zone_local_shared, {},
-          empty_vector_, empty_vector_);
+      local_priority_set_->updateHosts(
+          0,
+          updateHostsParams(originating_hosts, per_zone_local_shared,
+                            std::make_shared<const HealthyHostVector>(*originating_hosts),
+                            per_zone_local_shared),
+          {}, empty_vector_, empty_vector_, absl::nullopt);
 
       HostConstSharedPtr selected = lb.chooseHost(nullptr);
       hits[selected->address()->asString()]++;
@@ -224,36 +238,37 @@ public:
   Runtime::RandomGeneratorImpl random_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
-  envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
 };
 
-TEST_F(DISABLED_SimulationTest, strictlyEqualDistribution) {
+TEST_F(DISABLED_SimulationTest, StrictlyEqualDistribution) {
   run({1U, 1U, 1U}, {3U, 3U, 3U}, {3U, 3U, 3U});
 }
 
-TEST_F(DISABLED_SimulationTest, unequalZoneDistribution) {
+TEST_F(DISABLED_SimulationTest, UnequalZoneDistribution) {
   run({1U, 1U, 1U}, {2U, 5U, 5U}, {2U, 5U, 5U});
 }
 
-TEST_F(DISABLED_SimulationTest, unequalZoneDistribution2) {
+TEST_F(DISABLED_SimulationTest, UnequalZoneDistribution2) {
   run({1U, 1U, 1U}, {5U, 5U, 6U}, {5U, 5U, 6U});
 }
 
-TEST_F(DISABLED_SimulationTest, unequalZoneDistribution3) {
+TEST_F(DISABLED_SimulationTest, UnequalZoneDistribution3) {
   run({1U, 1U, 1U}, {10U, 10U, 10U}, {10U, 8U, 8U});
 }
 
-TEST_F(DISABLED_SimulationTest, unequalZoneDistribution4) {
+TEST_F(DISABLED_SimulationTest, UnequalZoneDistribution4) {
   run({20U, 20U, 21U}, {4U, 5U, 5U}, {4U, 5U, 5U});
 }
 
-TEST_F(DISABLED_SimulationTest, unequalZoneDistribution5) {
+TEST_F(DISABLED_SimulationTest, UnequalZoneDistribution5) {
   run({3U, 2U, 5U}, {4U, 5U, 5U}, {4U, 5U, 5U});
 }
 
-TEST_F(DISABLED_SimulationTest, unequalZoneDistribution6) {
+TEST_F(DISABLED_SimulationTest, UnequalZoneDistribution6) {
   run({3U, 2U, 5U}, {3U, 4U, 5U}, {3U, 4U, 5U});
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

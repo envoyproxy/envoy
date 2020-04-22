@@ -12,7 +12,7 @@ namespace Envoy {
  */
 template <class T> class LinkedObject {
 public:
-  typedef std::list<std::unique_ptr<T>> ListType;
+  using ListType = std::list<std::unique_ptr<T>>;
 
   /**
    * @return the list iterator for the object.
@@ -28,15 +28,15 @@ public:
   bool inserted() { return inserted_; }
 
   /**
-   * Move a linked item between 2 lists.
-   * @param list1 supplies the first list.
-   * @param list2 supplies the second list.
+   * Move a linked item from src list to dst list.
+   * @param src supplies the list that the item is currently in.
+   * @param dst supplies the destination list for the item.
    */
-  void moveBetweenLists(ListType& list1, ListType& list2) {
+  void moveBetweenLists(ListType& src, ListType& dst) {
     ASSERT(inserted_);
-    ASSERT(std::find(list1.begin(), list1.end(), *entry_) != list1.end());
+    ASSERT(std::find(src.begin(), src.end(), *entry_) != src.end());
 
-    list2.splice(list2.begin(), list1, entry_);
+    dst.splice(dst.begin(), src, entry_);
   }
 
   /**
@@ -76,11 +76,11 @@ public:
   }
 
 protected:
-  LinkedObject() : inserted_(false) {}
+  LinkedObject() = default;
 
 private:
   typename ListType::iterator entry_;
-  bool inserted_; // iterators do not have any "invalid" value so we need this boolean for sanity
-                  // checking.
+  bool inserted_{false}; // iterators do not have any "invalid" value so we need this boolean for
+                         // sanity checking.
 };
 } // namespace Envoy

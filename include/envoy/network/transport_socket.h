@@ -1,8 +1,13 @@
 #pragma once
 
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/io_handle.h"
 #include "envoy/ssl/connection.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Network {
@@ -43,12 +48,17 @@ struct IoResult {
  */
 class TransportSocketCallbacks {
 public:
-  virtual ~TransportSocketCallbacks() {}
+  virtual ~TransportSocketCallbacks() = default;
 
   /**
-   * @return int the file descriptor associated with the connection.
+   * @return reference to the IoHandle associated with the connection.
    */
-  virtual int fd() const PURE;
+  virtual IoHandle& ioHandle() PURE;
+
+  /**
+   * @return const reference to the IoHandle associated with the connection.
+   */
+  virtual const IoHandle& ioHandle() const PURE;
 
   /**
    * @return Network::Connection& the connection interface.
@@ -73,6 +83,12 @@ public:
    * @param event supplies the connection event
    */
   virtual void raiseEvent(ConnectionEvent event) PURE;
+
+  /**
+   * If the callbacks' write buffer is not empty, try to drain the buffer.
+   * As of 2/20, used by Google.
+   */
+  virtual void flushWriteBuffer() PURE;
 };
 
 /**
@@ -81,7 +97,7 @@ public:
  */
 class TransportSocket {
 public:
-  virtual ~TransportSocket() {}
+  virtual ~TransportSocket() = default;
 
   /**
    * Called by connection once to initialize the transport socket callbacks that the transport
@@ -92,10 +108,16 @@ public:
 
   /**
    * @return std::string the protocol to use as selected by network level negotiation. (E.g., ALPN).
-   *         If network level negotation is not supported by the connection or no protocol
+   *         If network level negotiation is not supported by the connection or no protocol
    *         has been negotiated the empty string is returned.
    */
   virtual std::string protocol() const PURE;
+
+  /**
+   * @return std::string the last failure reason occurred on the transport socket. If no failure
+   *         has been occurred the empty string is returned.
+   */
+  virtual absl::string_view failureReason() const PURE;
 
   /**
    * @return bool whether the socket can be flushed and closed.
@@ -109,7 +131,6 @@ public:
   virtual void closeSocket(Network::ConnectionEvent event) PURE;
 
   /**
-   *
    * @param buffer supplies the buffer to read to.
    * @return IoResult the result of the read action.
    */
@@ -129,24 +150,57 @@ public:
   virtual void onConnected() PURE;
 
   /**
-   * @return the SSL connection data if this is an SSL connection, or nullptr if it is not.
-   */
-  virtual Ssl::Connection* ssl() PURE;
-
-  /**
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
-  virtual const Ssl::Connection* ssl() const PURE;
+  virtual Ssl::ConnectionInfoConstSharedPtr ssl() const PURE;
 };
 
-typedef std::unique_ptr<TransportSocket> TransportSocketPtr;
+using TransportSocketPtr = std::unique_ptr<TransportSocket>;
+
+/**
+ * Options for creating transport sockets.
+ */
+class TransportSocketOptions {
+public:
+  virtual ~TransportSocketOptions() = default;
+
+  /**
+   * @return the const optional server name to set in the transport socket, for example SNI for
+   *         SSL, regardless of the upstream cluster configuration. Filters that influence
+   *         upstream connection selection, such as tcp_proxy, should take this option into account
+   *         and should pass it through to the connection pool to ensure the correct endpoints are
+   *         selected and the upstream connection is set up accordingly.
+   */
+  virtual const absl::optional<std::string>& serverNameOverride() const PURE;
+
+  /**
+   * @return the optional overridden SAN names to verify, if the transport socket supports SAN
+   *         verification.
+   */
+  virtual const std::vector<std::string>& verifySubjectAltNameListOverride() const PURE;
+
+  /**
+   * @return the optional overridden application protocols.
+   */
+  virtual const std::vector<std::string>& applicationProtocolListOverride() const PURE;
+
+  /**
+   * @param vector of bytes to which the option should append hash key data that will be used
+   *        to separate connections based on the option. Any data already in the key vector must
+   *        not be modified.
+   */
+  virtual void hashKey(std::vector<uint8_t>& key) const PURE;
+};
+
+// TODO(mattklein123): Rename to TransportSocketOptionsConstSharedPtr in a dedicated follow up.
+using TransportSocketOptionsSharedPtr = std::shared_ptr<const TransportSocketOptions>;
 
 /**
  * A factory for creating transport socket. It will be associated to filter chains and clusters.
  */
 class TransportSocketFactory {
 public:
-  virtual ~TransportSocketFactory() {}
+  virtual ~TransportSocketFactory() = default;
 
   /**
    * @return bool whether the transport socket implements secure transport.
@@ -154,12 +208,14 @@ public:
   virtual bool implementsSecureTransport() const PURE;
 
   /**
+   * @param options for creating the transport socket
    * @return Network::TransportSocketPtr a transport socket to be passed to connection.
    */
-  virtual TransportSocketPtr createTransportSocket() const PURE;
+  virtual TransportSocketPtr
+  createTransportSocket(TransportSocketOptionsSharedPtr options) const PURE;
 };
 
-typedef std::unique_ptr<TransportSocketFactory> TransportSocketFactoryPtr;
+using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;
 
 } // namespace Network
 } // namespace Envoy

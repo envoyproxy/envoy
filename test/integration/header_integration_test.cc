@@ -1,13 +1,19 @@
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/config/filter/http/router/v2/router.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/endpoint.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "common/config/api_version.h"
 #include "common/config/metadata.h"
-#include "common/config/resources.h"
+#include "common/http/exception.h"
 #include "common/protobuf/protobuf.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -16,16 +22,16 @@ namespace Envoy {
 namespace {
 
 std::string ipSuppressEnvoyHeadersTestParamsToString(
-    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
   return fmt::format(
       "{}_{}",
       TestUtility::ipTestParamsToString(
-          testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
+          ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
       std::get<1>(params.param) ? "with_x_envoy_from_router" : "without_x_envoy_from_router");
 }
 
 void disableHeaderValueOptionAppend(
-    Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& header_value_options) {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& header_value_options) {
   for (auto& i : header_value_options) {
     i.mutable_append()->set_value(false);
   }
@@ -33,7 +39,7 @@ void disableHeaderValueOptionAppend(
 
 const std::string http_connection_mgr_config = R"EOF(
 http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
 codec_type: HTTP1
 use_remote_address: false
 xff_num_trusted_hops: 1
@@ -51,6 +57,7 @@ route_config:
         - header:
             key: "x-vhost-request"
             value: "vhost"
+      request_headers_to_remove: ["x-vhost-request-remove"]
       response_headers_to_add:
         - header:
             key: "x-vhost-response"
@@ -60,28 +67,30 @@ route_config:
         - match: { prefix: "/vhost-only" }
           route: { cluster: "cluster_0" }
         - match: { prefix: "/vhost-and-route" }
+          request_headers_to_add:
+            - header:
+                key: "x-route-request"
+                value: "route"
+          request_headers_to_remove: ["x-route-request-remove"]
+          response_headers_to_add:
+            - header:
+                key: "x-route-response"
+                value: "route"
+          response_headers_to_remove: ["x-route-response-remove"]
           route:
             cluster: cluster_0
-            request_headers_to_add:
-              - header:
-                  key: "x-route-request"
-                  value: "route"
-            response_headers_to_add:
-              - header:
-                  key: "x-route-response"
-                  value: "route"
-            response_headers_to_remove: ["x-route-response-remove"]
         - match: { prefix: "/vhost-route-and-weighted-clusters" }
+          request_headers_to_add:
+            - header:
+                key: "x-route-request"
+                value: "route"
+          request_headers_to_remove: ["x-route-request-remove"]
+          response_headers_to_add:
+            - header:
+                key: "x-route-response"
+                value: "route"
+          response_headers_to_remove: ["x-route-response-remove"]
           route:
-            request_headers_to_add:
-              - header:
-                  key: "x-route-request"
-                  value: "route"
-            response_headers_to_add:
-              - header:
-                  key: "x-route-response"
-                  value: "route"
-            response_headers_to_remove: ["x-route-response-remove"]
             weighted_clusters:
               clusters:
                 - name: cluster_0
@@ -90,6 +99,7 @@ route_config:
                     - header:
                         key: "x-weighted-cluster-request"
                         value: "weighted-cluster-1"
+                  request_headers_to_remove: ["x-weighted-cluster-request-remove"]
                   response_headers_to_add:
                     - header:
                         key: "x-weighted-cluster-response"
@@ -99,34 +109,72 @@ route_config:
       domains: ["route-headers.com"]
       routes:
         - match: { prefix: "/route-only" }
+          request_headers_to_add:
+            - header:
+                key: "x-route-request"
+                value: "route"
+          request_headers_to_remove: ["x-route-request-remove"]
+          response_headers_to_add:
+            - header:
+                key: "x-route-response"
+                value: "route"
+          response_headers_to_remove: ["x-route-response-remove"]
           route:
             cluster: cluster_0
-            request_headers_to_add:
-              - header:
-                  key: "x-route-request"
-                  value: "route"
-            response_headers_to_add:
-              - header:
-                  key: "x-route-response"
-                  value: "route"
-            response_headers_to_remove: ["x-route-response-remove"]
     - name: xff-headers
       domains: ["xff-headers.com"]
       routes:
         - match: { prefix: "/test" }
           route:
             cluster: cluster_0
-            request_headers_to_add:
-              - header:
-                  key: "x-real-ip"
-                  value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+          request_headers_to_add:
+            - header:
+                key: "x-real-ip"
+                value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    - name: append-same-headers
+      domains: ["append-same-headers.com"]
+      request_headers_to_add:
+        - header:
+            key: "x-foo"
+            value: "value1"
+        - header:
+            key: "authorization"
+            value: "token1"
+      routes:
+        - match: { prefix: "/test" }
+          route:
+            cluster: cluster_0
+          request_headers_to_add:
+            - header:
+                key: "x-foo"
+                value: "value2"
+            - header:
+                key: "authorization"
+                value: "token2"
+    - name: path-sanitization
+      domains: ["path-sanitization.com"]
+      routes:
+        - match: { prefix: "/private" }
+          route:
+            cluster: cluster_0
+          request_headers_to_add:
+            - header:
+                key: "x-site"
+                value: "private"
+        - match: { prefix: "/public" }
+          route:
+            cluster: cluster_0
+          request_headers_to_add:
+            - header:
+                key: "x-site"
+                value: "public"
 )EOF";
 
 } // namespace
 
 class HeaderIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
 public:
   HeaderIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())) {}
@@ -140,18 +188,22 @@ public:
 
   void TearDown() override {
     if (eds_connection_ != nullptr) {
-      eds_connection_->close();
-      eds_connection_->waitForDisconnect();
+      // Don't ASSERT fail if an EDS reconnect ends up unparented.
+      fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
+      AssertionResult result = eds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = eds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
       eds_connection_.reset();
     }
+    cleanupUpstreamAndDownstream();
     test_server_.reset();
-    fake_upstream_connection_.reset();
     fake_upstreams_.clear();
   }
 
-  void addHeader(Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>* field,
+  void addHeader(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>* field,
                  const std::string& key, const std::string& value, bool append) {
-    envoy::api::v2::core::HeaderValueOption* header_value_option = field->Add();
+    envoy::config::core::v3::HeaderValueOption* header_value_option = field->Add();
     auto* mutable_header = header_value_option->mutable_header();
     mutable_header->set_key(key);
     mutable_header->set_value(value);
@@ -159,12 +211,12 @@ public:
   }
 
   void prepareEDS() {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       ASSERT(static_resources->clusters_size() == 1);
 
       static_resources->mutable_clusters(0)->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::Cluster>(
+          TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
               R"EOF(
                   name: cluster_0
                   type: EDS
@@ -183,30 +235,40 @@ public:
       // host must come before the eds-cluster's host to keep the upstreams and ports in the same
       // order.
       static_resources->add_clusters()->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
+          TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(
               R"EOF(
                       name: unused-cluster
                       type: STATIC
                       lb_policy: ROUND_ROBIN
-                      hosts:
-                        - socket_address:
-                            address: {}
-                            port_value: 0
+                      load_assignment:
+                        cluster_name: unused-cluster
+                        endpoints:
+                        - lb_endpoints:
+                          - endpoint:
+                              address:
+                                socket_address:
+                                  address: {}
+                                  port_value: 0
                   )EOF",
               Network::Test::getLoopbackAddressString(version_))));
 
       static_resources->add_clusters()->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
+          TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(
               R"EOF(
                       name: eds-cluster
                       type: STATIC
                       lb_policy: ROUND_ROBIN
                       http2_protocol_options: {{}}
                       connect_timeout: 5s
-                      hosts:
-                        - socket_address:
-                            address: {}
-                            port_value: 0
+                      load_assignment:
+                        cluster_name: eds-cluster
+                        endpoints:
+                        - lb_endpoints:
+                          - endpoint:
+                              address:
+                                socket_address:
+                                  address: {}
+                                  port_value: 0
                   )EOF",
               Network::Test::getLoopbackAddressString(version_))));
     });
@@ -216,13 +278,13 @@ public:
 
   void initializeFilter(HeaderMode mode, bool inject_route_config_headers) {
     config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           // Overwrite default config with our own.
-          MessageUtil::loadFromYaml(http_connection_mgr_config, hcm);
-          envoy::config::filter::http::router::v2::Router router_config;
+          TestUtility::loadFromYaml(http_connection_mgr_config, hcm);
+          envoy::extensions::filters::http::router::v3::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
-          MessageUtil::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config());
+          hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
 
           const bool append = mode == HeaderMode::Append;
 
@@ -234,28 +296,29 @@ public:
             route_config->add_response_headers_to_remove("x-routeconfig-response-remove");
             addHeader(route_config->mutable_request_headers_to_add(), "x-routeconfig-request",
                       "routeconfig", append);
+            route_config->add_request_headers_to_remove("x-routeconfig-request-remove");
           }
 
           if (use_eds_) {
             addHeader(route_config->mutable_response_headers_to_add(), "x-routeconfig-dynamic",
-                      "%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+                      R"(%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
 
             // Iterate over VirtualHosts, nested Routes and WeightedClusters, adding a dynamic
             // response header.
             for (auto& vhost : *route_config->mutable_virtual_hosts()) {
               addHeader(vhost.mutable_response_headers_to_add(), "x-vhost-dynamic",
-                        "vhost:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+                        R"(vhost:%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
 
-              for (auto& rte : *vhost.mutable_routes()) {
-                if (rte.has_route()) {
-                  auto* mutable_rte = rte.mutable_route();
-                  addHeader(mutable_rte->mutable_response_headers_to_add(), "x-route-dynamic",
-                            "route:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+              for (auto& route : *vhost.mutable_routes()) {
+                addHeader(route.mutable_response_headers_to_add(), "x-route-dynamic",
+                          R"(route:%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
 
-                  if (mutable_rte->has_weighted_clusters()) {
-                    for (auto& c : *mutable_rte->mutable_weighted_clusters()->mutable_clusters()) {
+                if (route.has_route()) {
+                  auto* route_action = route.mutable_route();
+                  if (route_action->has_weighted_clusters()) {
+                    for (auto& c : *route_action->mutable_weighted_clusters()->mutable_clusters()) {
                       addHeader(c.mutable_response_headers_to_add(), "x-weighted-cluster-dynamic",
-                                "weighted:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%",
+                                R"(weighted:%UPSTREAM_METADATA(["test.namespace", "key"])%)",
                                 append);
                     }
                   }
@@ -263,6 +326,8 @@ public:
               }
             }
           }
+
+          hcm.mutable_normalize_path()->set_value(normalize_path_);
 
           if (append) {
             // The config specifies append by default: no modifications needed.
@@ -274,15 +339,15 @@ public:
             disableHeaderValueOptionAppend(*vhost.mutable_request_headers_to_add());
             disableHeaderValueOptionAppend(*vhost.mutable_response_headers_to_add());
 
-            for (auto& rte : *vhost.mutable_routes()) {
-              if (rte.has_route()) {
-                auto* mutable_rte = rte.mutable_route();
+            for (auto& route : *vhost.mutable_routes()) {
+              disableHeaderValueOptionAppend(*route.mutable_request_headers_to_add());
+              disableHeaderValueOptionAppend(*route.mutable_response_headers_to_add());
 
-                disableHeaderValueOptionAppend(*mutable_rte->mutable_request_headers_to_add());
-                disableHeaderValueOptionAppend(*mutable_rte->mutable_response_headers_to_add());
+              if (route.has_route()) {
+                auto* route_action = route.mutable_route();
 
-                if (mutable_rte->has_weighted_clusters()) {
-                  for (auto& c : *mutable_rte->mutable_weighted_clusters()->mutable_clusters()) {
+                if (route_action->has_weighted_clusters()) {
+                  for (auto& c : *route_action->mutable_weighted_clusters()->mutable_clusters()) {
                     disableHeaderValueOptionAppend(*c.mutable_request_headers_to_add());
                     disableHeaderValueOptionAppend(*c.mutable_response_headers_to_add());
                   }
@@ -299,26 +364,31 @@ public:
     HttpIntegrationTest::createUpstreams();
 
     if (use_eds_) {
-      fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
     }
   }
 
   void initialize() override {
     if (use_eds_) {
-      pre_worker_start_test_steps_ = [this]() {
-        eds_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-        eds_stream_ = eds_connection_->waitForNewStream(*dispatcher_);
+      on_server_init_function_ = [this]() {
+        AssertionResult result =
+            fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, eds_connection_);
+        RELEASE_ASSERT(result, result.message());
+        result = eds_connection_->waitForNewStream(*dispatcher_, eds_stream_);
+        RELEASE_ASSERT(result, result.message());
         eds_stream_->startGrpcStream();
 
-        envoy::api::v2::DiscoveryRequest discovery_request;
-        eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+        API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
+        result = eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+        RELEASE_ASSERT(result, result.message());
 
-        envoy::api::v2::DiscoveryResponse discovery_response;
+        API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
         discovery_response.set_version_info("1");
         discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
-        envoy::api::v2::ClusterLoadAssignment cluster_load_assignment =
-            TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(fmt::format(
+        auto cluster_load_assignment =
+            TestUtility::parseYaml<API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment)>(fmt::format(
                 R"EOF(
                 cluster_name: cluster_0
                 endpoints:
@@ -340,7 +410,8 @@ public:
         eds_stream_->sendGrpcMessage(discovery_response);
 
         // Wait for the next request to make sure the first response was consumed.
-        eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+        result = eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+        RELEASE_ASSERT(result, result.message());
       };
     }
 
@@ -353,13 +424,8 @@ protected:
                       Http::TestHeaderMapImpl&& response_headers,
                       Http::TestHeaderMapImpl&& expected_response_headers) {
     registerTestServerPorts({"http"});
-
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-    waitForNextUpstreamRequest();
-
-    upstream_request_->encodeHeaders(response_headers, true);
-    response->waitForEndStream();
+    auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
 
     compareHeaders(upstream_request_->headers(), expected_request_headers);
     compareHeaders(response->headers(), expected_response_headers);
@@ -381,14 +447,15 @@ protected:
   }
 
   bool use_eds_{false};
+  bool normalize_path_{false};
   FakeHttpConnectionPtr eds_connection_;
   FakeStreamPtr eds_stream_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
-                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                         testing::Bool()),
-                        ipSuppressEnvoyHeadersTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    ipSuppressEnvoyHeadersTestParamsToString);
 
 // Validate that downstream request headers are passed upstream and upstream response headers are
 // passed downstream.
@@ -432,6 +499,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAppendHeaderManipulation) {
           {":scheme", "http"},
           {":authority", "vhost-headers.com"},
           {"x-vhost-request", "downstream"},
+          {"x-vhost-request-remove", "downstream"},
       },
       Http::TestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
@@ -499,6 +567,7 @@ TEST_P(HeaderIntegrationTest, TestRouteAppendHeaderManipulation) {
           {":scheme", "http"},
           {":authority", "route-headers.com"},
           {"x-route-request", "downstream"},
+          {"x-route-request-remove", "downstream"},
       },
       Http::TestHeaderMapImpl{
           {":authority", "route-headers.com"},
@@ -532,6 +601,7 @@ TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
           {":scheme", "http"},
           {":authority", "route-headers.com"},
           {"x-route-request", "downstream"},
+          {"x-route-request-remove", "downstream"},
           {"x-unmodified", "downstream"},
       },
       Http::TestHeaderMapImpl{
@@ -567,7 +637,9 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteAppendHeaderManipulation) {
           {":scheme", "http"},
           {":authority", "vhost-headers.com"},
           {"x-vhost-request", "downstream"},
+          {"x-vhost-request-remove", "downstream"},
           {"x-route-request", "downstream"},
+          {"x-route-request-remove", "downstream"},
       },
       Http::TestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
@@ -646,8 +718,11 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteAppendHeaderMani
           {":scheme", "http"},
           {":authority", "vhost-headers.com"},
           {"x-routeconfig-request", "downstream"},
+          {"x-routeconfig-request-remove", "downstream"},
           {"x-vhost-request", "downstream"},
+          {"x-vhost-request-remove", "downstream"},
           {"x-route-request", "downstream"},
+          {"x-route-request-remove", "downstream"},
       },
       Http::TestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
@@ -737,9 +812,13 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterAppendHea
           {":scheme", "http"},
           {":authority", "vhost-headers.com"},
           {"x-routeconfig-request", "downstream"},
+          {"x-routeconfig-request-remove", "downstream"},
           {"x-vhost-request", "downstream"},
+          {"x-vhost-request-remove", "downstream"},
           {"x-route-request", "downstream"},
+          {"x-route-request-remove", "downstream"},
           {"x-weighted-cluster-request", "downstream"},
+          {"x-weighted-cluster-request-remove", "downstream"},
       },
       Http::TestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
@@ -910,4 +989,167 @@ TEST_P(HeaderIntegrationTest, TestXFFParsing) {
       });
 }
 
+// Validates behavior around same header appending (both predefined headers and
+// other).
+TEST_P(HeaderIntegrationTest, TestAppendSameHeaders) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/test"},
+          {":scheme", "http"},
+          {":authority", "append-same-headers.com"},
+          {"authorization", "token3"},
+          {"x-foo", "value3"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "append-same-headers.com"},
+          {":path", "/test"},
+          {":method", "GET"},
+          {"authorization", "token3,token2,token1"},
+          {"x-foo", "value3"},
+          {"x-foo", "value2"},
+          {"x-foo", "value1"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {":status", "200"},
+      });
+}
+
+// Validates behavior when normalize path is off.
+// Route selection and path to upstream are the exact string literal
+// from downstream.
+TEST_P(HeaderIntegrationTest, TestPathAndRouteWhenNormalizePathOff) {
+  normalize_path_ = false;
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private/../public"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      },
+      Http::TestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                              {":path", "/private/../public"},
+                              {":method", "GET"},
+                              {"x-site", "private"}},
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {":status", "200"},
+      });
+}
+
+// Validates behavior when normalize path is on.
+// Path to decide route and path to upstream are both
+// the normalized.
+TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
+  normalize_path_ = true;
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private/../public"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      },
+      Http::TestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                              {":path", "/public"},
+                              {":method", "GET"},
+                              {"x-site", "public"}},
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {":status", "200"},
+      });
+}
+
+// Validates TE header is forwarded if it contains a supported value
+TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, close"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+      });
+}
+
+// Validates TE header is stripped if it contains an unsupported value
+TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, mike, sam, will, close"},
+          {"te", "gzip"},
+          {"mike", "foo"},
+          {"sam", "bar"},
+          {"will", "baz"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+          {"connection", "close"},
+      });
+}
 } // namespace Envoy

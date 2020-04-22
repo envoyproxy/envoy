@@ -1,0 +1,18 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+    }
+  }
+}
+actions {
+  mutate {
+    buffer: 0
+    offset: 2
+    value: 123
+  }
+}
+actions { quiesce_drain {} }

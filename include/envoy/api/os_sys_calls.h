@@ -1,13 +1,12 @@
 #pragma once
 
-#include <sys/mman.h>   // for mode_t
-#include <sys/socket.h> // for sockaddr
 #include <sys/stat.h>
-#include <sys/uio.h> // for iovec
 
 #include <memory>
 #include <string>
 
+#include "envoy/api/os_sys_calls_common.h"
+#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
@@ -15,84 +14,145 @@ namespace Api {
 
 class OsSysCalls {
 public:
-  virtual ~OsSysCalls() {}
+  virtual ~OsSysCalls() = default;
 
   /**
    * @see bind (man 2 bind)
    */
-  virtual int bind(int sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
+  virtual SysCallIntResult bind(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
 
   /**
-   * Open file by full_path with given flags and mode.
-   * @return file descriptor.
+   * @see chmod (man 2 chmod)
    */
-  virtual int open(const std::string& full_path, int flags, int mode) PURE;
+  virtual SysCallIntResult chmod(const std::string& path, mode_t mode) PURE;
 
   /**
-   * Write num_bytes to fd from buffer.
-   * @return number of bytes written if non negative, otherwise error code.
+   * @see ioctl (man 2 ioctl)
    */
-  virtual ssize_t write(int fd, const void* buffer, size_t num_bytes) PURE;
+  virtual SysCallIntResult ioctl(os_fd_t sockfd, unsigned long int request, void* argp) PURE;
 
   /**
    * @see writev (man 2 writev)
    */
-  virtual ssize_t writev(int fd, const iovec* iovec, int num_iovec) PURE;
+  virtual SysCallSizeResult writev(os_fd_t fd, const iovec* iov, int num_iov) PURE;
 
   /**
    * @see readv (man 2 readv)
    */
-  virtual ssize_t readv(int fd, const iovec* iovec, int num_iovec) PURE;
+  virtual SysCallSizeResult readv(os_fd_t fd, const iovec* iov, int num_iov) PURE;
 
   /**
    * @see recv (man 2 recv)
    */
-  virtual ssize_t recv(int socket, void* buffer, size_t length, int flags) PURE;
+  virtual SysCallSizeResult recv(os_fd_t socket, void* buffer, size_t length, int flags) PURE;
+
+  /**
+   * @see recvmsg (man 2 recvmsg)
+   */
+  virtual SysCallSizeResult recvmsg(os_fd_t sockfd, msghdr* msg, int flags) PURE;
+
+  /**
+   * @see recvmmsg (man 2 recvmmsg)
+   */
+  virtual SysCallIntResult recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen,
+                                    int flags, struct timespec* timeout) PURE;
+
+  /**
+   * return true if the OS supports recvmmsg() and sendmmsg().
+   */
+  virtual bool supportsMmsg() const PURE;
 
   /**
    * Release all resources allocated for fd.
    * @return zero on success, -1 returned otherwise.
    */
-  virtual int close(int fd) PURE;
-
-  /**
-   * @see shm_open (man 3 shm_open)
-   */
-  virtual int shmOpen(const char* name, int oflag, mode_t mode) PURE;
-
-  /**
-   * @see shm_unlink (man 3 shm_unlink)
-   */
-  virtual int shmUnlink(const char* name) PURE;
+  virtual SysCallIntResult close(os_fd_t fd) PURE;
 
   /**
    * @see man 2 ftruncate
    */
-  virtual int ftruncate(int fd, off_t length) PURE;
+  virtual SysCallIntResult ftruncate(int fd, off_t length) PURE;
 
   /**
    * @see man 2 mmap
    */
-  virtual void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) PURE;
+  virtual SysCallPtrResult mmap(void* addr, size_t length, int prot, int flags, int fd,
+                                off_t offset) PURE;
 
   /**
    * @see man 2 stat
    */
-  virtual int stat(const char* pathname, struct stat* buf) PURE;
+  virtual SysCallIntResult stat(const char* pathname, struct stat* buf) PURE;
 
   /**
    * @see man 2 setsockopt
    */
-  virtual int setsockopt(int sockfd, int level, int optname, const void* optval,
-                         socklen_t optlen) PURE;
+  virtual SysCallIntResult setsockopt(os_fd_t sockfd, int level, int optname, const void* optval,
+                                      socklen_t optlen) PURE;
 
   /**
    * @see man 2 getsockopt
    */
-  virtual int getsockopt(int sockfd, int level, int optname, void* optval, socklen_t* optlen) PURE;
+  virtual SysCallIntResult getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
+                                      socklen_t* optlen) PURE;
+
+  /**
+   * @see man 2 socket
+   */
+  virtual SysCallSocketResult socket(int domain, int type, int protocol) PURE;
+
+  /**
+   * @see man 2 sendmsg
+   */
+  virtual SysCallSizeResult sendmsg(os_fd_t sockfd, const msghdr* message, int flags) PURE;
+
+  /**
+   * @see man 2 getsockname
+   */
+  virtual SysCallIntResult getsockname(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) PURE;
+
+  /**
+   * @see man 2 gethostname
+   */
+  virtual SysCallIntResult gethostname(char* name, size_t length) PURE;
+
+  /**
+   * @see man 2 getpeername
+   */
+  virtual SysCallIntResult getpeername(os_fd_t sockfd, sockaddr* name, socklen_t* namelen) PURE;
+
+  /**
+   * Toggle the blocking state bit using fcntl
+   */
+  virtual SysCallIntResult setsocketblocking(os_fd_t sockfd, bool blocking) PURE;
+
+  /**
+   * @see man 2 connect
+   */
+  virtual SysCallIntResult connect(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
+
+  /**
+   * @see man 2 shutdown
+   */
+  virtual SysCallIntResult shutdown(os_fd_t sockfd, int how) PURE;
+
+  /**
+   * @see man 2 socketpair
+   */
+  virtual SysCallIntResult socketpair(int domain, int type, int protocol, os_fd_t sv[2]) PURE;
+
+  /**
+   * @see man 2 listen
+   */
+  virtual SysCallIntResult listen(os_fd_t sockfd, int backlog) PURE;
+
+  /**
+   * @see man 2 write
+   */
+  virtual SysCallSizeResult write(os_fd_t socket, const void* buffer, size_t length) PURE;
 };
 
-typedef std::unique_ptr<OsSysCalls> OsSysCallsPtr;
+using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;
 
 } // namespace Api
 } // namespace Envoy

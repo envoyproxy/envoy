@@ -1,0 +1,6 @@
+# The Google Python styles can be found here: https://github.com/google/styleguide/blob/gh-pages/pyguide.md
+# TODO: Look into enforcing single vs double quote.
+[style]
+based_on_style=Google
+indent_width=2
+column_limit=100

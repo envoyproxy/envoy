@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdint>
 #include <queue>
 
@@ -11,9 +13,9 @@ namespace Upstream {
 #define EDF_DEBUG 0
 
 #if EDF_DEBUG
-#define EDF_TRACE(fmt...) ENVOY_LOG_MISC(trace, fmt)
+#define EDF_TRACE(...) ENVOY_LOG_MISC(trace, __VA_ARGS__)
 #else
-#define EDF_TRACE(fmt...)
+#define EDF_TRACE(...)
 #endif
 
 // Earliest Deadline First (EDF) scheduler
@@ -65,6 +67,12 @@ public:
     ASSERT(queue_.top().deadline_ >= current_time_);
   }
 
+  /**
+   * Implements empty() on the internal queue. Does not attempt to discard expired elements.
+   * @return bool whether or not the internal queue is empty.
+   */
+  bool empty() const { return queue_.empty(); }
+
 private:
   struct EdfEntry {
     double deadline_;
@@ -82,7 +90,7 @@ private:
   };
 
   // Current time in EDF scheduler.
-  // TOOD(htuch): Is it worth the small extra complexity to use integer time for performance
+  // TODO(htuch): Is it worth the small extra complexity to use integer time for performance
   // reasons?
   double current_time_{};
   // Offset used during addition to break ties when entries have the same weight but should reflect

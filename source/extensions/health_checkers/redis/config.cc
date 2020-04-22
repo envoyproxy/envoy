@@ -1,5 +1,8 @@
 #include "extensions/health_checkers/redis/config.h"
 
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
@@ -12,21 +15,19 @@ namespace HealthCheckers {
 namespace RedisHealthChecker {
 
 Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthChecker(
-    const envoy::api::v2::core::HealthCheck& config,
+    const envoy::config::core::v3::HealthCheck& config,
     Server::Configuration::HealthCheckerFactoryContext& context) {
-
   return std::make_shared<RedisHealthChecker>(
-      context.cluster(), config, getRedisHealthCheckConfig(config), context.dispatcher(),
-      context.runtime(), context.random(),
-      NetworkFilters::RedisProxy::ConnPool::ClientFactoryImpl::instance_);
+      context.cluster(), config,
+      getRedisHealthCheckConfig(config, context.messageValidationVisitor()), context.dispatcher(),
+      context.runtime(), context.random(), context.eventLogger(), context.api(),
+      NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_);
 };
 
 /**
  * Static registration for the redis custom health checker. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RedisHealthCheckerFactory,
-                                 Server::Configuration::CustomHealthCheckerFactory>
-    registered_;
+REGISTER_FACTORY(RedisHealthCheckerFactory, Server::Configuration::CustomHealthCheckerFactory);
 
 } // namespace RedisHealthChecker
 } // namespace HealthCheckers

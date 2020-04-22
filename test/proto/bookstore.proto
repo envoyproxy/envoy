@@ -3,7 +3,9 @@ syntax = "proto3";
 package bookstore;
 
 import "google/api/annotations.proto";
+import "google/api/httpbody.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
 
 // A simple Bookstore API.
 //
@@ -82,6 +84,40 @@ service Bookstore {
   rpc GetAuthor(GetAuthorRequest) returns (Author) {
     option (google.api.http) = {
       get: "/authors/{author}"
+    };
+  }
+  rpc GetIndex(google.protobuf.Empty) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/index"
+    };
+  }
+  rpc GetIndexStream(google.protobuf.Empty) returns (stream google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/indexStream"
+    };
+  }
+  rpc PostBody(EchoBodyRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/postBody"
+      body: "nested.content"
+    };
+  }
+  rpc StreamBody(stream EchoBodyRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/streamBody"
+      body: "nested.content"
+    };
+  }
+  rpc EchoBody(EchoBodyRequest) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      post: "/echoBody"
+      body: "nested.content"
+    };
+  }
+  rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
+    option (google.api.http) = {
+      post: "/echoStruct"
+      body: "content"
     };
   }
 }
@@ -186,4 +222,33 @@ message DeleteBookRequest {
 message GetAuthorRequest {
   // The ID of the author resource to retrieve.
   int64 author = 1;
+}
+
+message EchoBodyRequest {
+  message Nested {
+    google.api.HttpBody content = 1;
+  }
+  string arg = 1;
+  string unused = 2;
+  Nested nested = 3;
+}
+
+// Request and Response message for EchoStructReqResp method.
+message EchoStructReqResp {
+  // The content of request.
+  google.protobuf.Struct content = 1;
+}
+
+// Test message for deeply-nested HttpBody field.
+message DeepNestedBody {
+  message Nested {
+    message Nested {
+      message Nested {
+        google.api.HttpBody body = 500000000;
+      }
+      Nested nested = 100000000;
+    }
+    Nested nested = 1000000;
+  }
+  Nested nested = 1;
 }

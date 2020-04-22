@@ -1,40 +1,47 @@
 #include "server/worker_impl.h"
 
 #include <functional>
+#include <memory>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/thread.h"
-
 #include "server/connection_handler_impl.h"
 
 namespace Envoy {
 namespace Server {
 
-WorkerPtr ProdWorkerFactory::createWorker() {
-  Event::DispatcherPtr dispatcher(api_.allocateDispatcher());
-  return WorkerPtr{new WorkerImpl(
-      tls_, hooks_, std::move(dispatcher),
-      Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher)})};
+WorkerPtr ProdWorkerFactory::createWorker(OverloadManager& overload_manager,
+                                          const std::string& worker_name) {
+  Event::DispatcherPtr dispatcher(api_.allocateDispatcher(worker_name));
+  return WorkerPtr{
+      new WorkerImpl(tls_, hooks_, std::move(dispatcher),
+                     Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(*dispatcher)},
+                     overload_manager, api_)};
 }
 
-WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, TestHooks& hooks,
-                       Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler)
-    : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)) {
+WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
+                       Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
+                       OverloadManager& overload_manager, Api::Api& api)
+    : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
+      api_(api) {
   tls_.registerThread(*dispatcher_, false);
+  overload_manager.registerForAction(
+      OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
+      [this](OverloadActionState state) { stopAcceptingConnectionsCb(state); });
 }
 
-void WorkerImpl::addListener(Network::ListenerConfig& listener, AddListenerCompletion completion) {
+void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
+                             Network::ListenerConfig& listener, AddListenerCompletion completion) {
   // All listener additions happen via post. However, we must deal with the case where the listener
   // can not be created on the worker. There is a race condition where 2 processes can successfully
   // bind to an address, but then fail to listen() with EADDRINUSE. During initial startup, we want
   // to surface this.
-  dispatcher_->post([this, &listener, completion]() -> void {
+  dispatcher_->post([this, overridden_listener, &listener, completion]() -> void {
     try {
-      handler_->addListener(listener);
+      handler_->addListener(overridden_listener, listener);
       hooks_.onWorkerListenerAdded();
       completion(true);
     } catch (const Network::CreateListenerException& e) {
@@ -43,7 +50,7 @@ void WorkerImpl::addListener(Network::ListenerConfig& listener, AddListenerCompl
   });
 }
 
-uint64_t WorkerImpl::numConnections() {
+uint64_t WorkerImpl::numConnections() const {
   uint64_t ret = 0;
   if (handler_) {
     ret = handler_->numConnections();
@@ -62,10 +69,23 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
   });
 }
 
+void WorkerImpl::removeFilterChains(uint64_t listener_tag,
+                                    const std::list<const Network::FilterChain*>& filter_chains,
+                                    std::function<void()> completion) {
+  ASSERT(thread_);
+  dispatcher_->post(
+      [this, listener_tag, &filter_chains, completion = std::move(completion)]() -> void {
+        handler_->removeFilterChains(listener_tag, filter_chains, completion);
+      });
+}
+
 void WorkerImpl::start(GuardDog& guard_dog) {
   ASSERT(!thread_);
-  thread_.reset(new Thread::Thread([this, &guard_dog]() -> void { threadRoutine(guard_dog); }));
+  thread_ =
+      api_.threadFactory().createThread([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
 }
+
+void WorkerImpl::initializeStats(Stats::Scope& scope) { dispatcher_->initializeStats(scope); }
 
 void WorkerImpl::stop() {
   // It's possible for the server to cleanly shut down while cluster initialization during startup
@@ -76,32 +96,47 @@ void WorkerImpl::stop() {
   }
 }
 
-void WorkerImpl::stopListener(Network::ListenerConfig& listener) {
+void WorkerImpl::stopListener(Network::ListenerConfig& listener, std::function<void()> completion) {
   ASSERT(thread_);
   const uint64_t listener_tag = listener.listenerTag();
-  dispatcher_->post([this, listener_tag]() -> void { handler_->stopListeners(listener_tag); });
-}
-
-void WorkerImpl::stopListeners() {
-  ASSERT(thread_);
-  dispatcher_->post([this]() -> void { handler_->stopListeners(); });
+  dispatcher_->post([this, listener_tag, completion]() -> void {
+    handler_->stopListeners(listener_tag);
+    if (completion != nullptr) {
+      completion();
+    }
+  });
 }
 
 void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
-  auto watchdog = guard_dog.createWatchDog(Thread::Thread::currentThreadId());
-  watchdog->startWatchdog(*dispatcher_);
+  // The watch dog must be created after the dispatcher starts running and has post events flushed,
+  // as this is when TLS stat scopes start working.
+  dispatcher_->post([this, &guard_dog]() {
+    watch_dog_ =
+        guard_dog.createWatchDog(api_.threadFactory().currentThreadId(), dispatcher_->name());
+    watch_dog_->startWatchdog(*dispatcher_);
+  });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(debug, "worker exited dispatch loop");
-  guard_dog.stopWatching(watchdog);
+  guard_dog.stopWatching(watch_dog_);
 
   // We must close all active connections before we actually exit the thread. This prevents any
   // destructors from running on the main thread which might reference thread locals. Destroying
-  // the handler does this as well as destroying the dispatcher which purges the delayed deletion
-  // list.
+  // the handler does this which additionally purges the dispatcher delayed deletion list.
   handler_.reset();
   tls_.shutdownThread();
-  watchdog.reset();
+  watch_dog_.reset();
+}
+
+void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {
+  switch (state) {
+  case OverloadActionState::Active:
+    handler_->disableListeners();
+    break;
+  case OverloadActionState::Inactive:
+    handler_->enableListeners();
+    break;
+  }
 }
 
 } // namespace Server

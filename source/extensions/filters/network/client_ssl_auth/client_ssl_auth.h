@@ -5,9 +5,11 @@
 #include <string>
 #include <unordered_set>
 
-#include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.h"
+#include "envoy/config/subscription.h"
+#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -25,16 +27,14 @@ namespace ClientSslAuth {
 /**
  * All client SSL auth stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_CLIENT_SSL_AUTH_STATS(COUNTER, GAUGE)                                                  \
-  COUNTER(update_success)                                                                          \
-  COUNTER(update_failure)                                                                          \
-  COUNTER(auth_no_ssl)                                                                             \
-  COUNTER(auth_ip_white_list)                                                                      \
   COUNTER(auth_digest_match)                                                                       \
   COUNTER(auth_digest_no_match)                                                                    \
-  GAUGE  (total_principals)
-// clang-format on
+  COUNTER(auth_ip_white_list)                                                                      \
+  COUNTER(auth_no_ssl)                                                                             \
+  COUNTER(update_failure)                                                                          \
+  COUNTER(update_success)                                                                          \
+  GAUGE(total_principals, NeverImport)
 
 /**
  * Struct definition for all client SSL auth stats. @see stats_macros.h
@@ -62,10 +62,10 @@ private:
   std::unordered_set<std::string> allowed_sha256_digests_;
 };
 
-typedef std::shared_ptr<AllowedPrincipals> AllowedPrincipalsSharedPtr;
+using AllowedPrincipalsSharedPtr = std::shared_ptr<AllowedPrincipals>;
 
 class ClientSslAuthConfig;
-typedef std::shared_ptr<ClientSslAuthConfig> ClientSslAuthConfigSharedPtr;
+using ClientSslAuthConfigSharedPtr = std::shared_ptr<ClientSslAuthConfig>;
 
 /**
  * Global configuration for client SSL authentication. The config contacts a JSON API to fetch the
@@ -75,7 +75,7 @@ typedef std::shared_ptr<ClientSslAuthConfig> ClientSslAuthConfigSharedPtr;
 class ClientSslAuthConfig : public Http::RestApiFetcher {
 public:
   static ClientSslAuthConfigSharedPtr
-  create(const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+  create(const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
          ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
          Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random);
 
@@ -85,17 +85,17 @@ public:
 
 private:
   ClientSslAuthConfig(
-      const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+      const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
       ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
       Stats::Scope& scope, Runtime::RandomGenerator& random);
 
   static GlobalStats generateStats(Stats::Scope& scope, const std::string& prefix);
 
   // Http::RestApiFetcher
-  void createRequest(Http::Message& request) override;
-  void parseResponse(const Http::Message& response) override;
+  void createRequest(Http::RequestMessage& request) override;
+  void parseResponse(const Http::ResponseMessage& response) override;
   void onFetchComplete() override {}
-  void onFetchFailure(const EnvoyException* e) override;
+  void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
   ThreadLocal::SlotPtr tls_;
   Network::Address::IpList ip_white_list_;
@@ -127,7 +127,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
-} // ClientSsl
+} // namespace ClientSslAuth
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

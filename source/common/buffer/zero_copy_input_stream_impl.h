@@ -34,10 +34,10 @@ public:
   // Note Next() will return true with no data until more data is available if the stream is not
   // finished. It is the caller's responsibility to finish the stream or wrap with
   // LimitingInputStream before passing to protobuf code to avoid a spin loop.
-  virtual bool Next(const void** data, int* size) override;
-  virtual void BackUp(int count) override;
-  virtual bool Skip(int count) override; // Not implemented
-  virtual ProtobufTypes::Int64 ByteCount() const override { return byte_count_; }
+  bool Next(const void** data, int* size) override;
+  void BackUp(int count) override;
+  bool Skip(int count) override; // Not implemented
+  ProtobufTypes::Int64 ByteCount() const override { return byte_count_; }
 
 protected:
   Buffer::InstancePtr buffer_;

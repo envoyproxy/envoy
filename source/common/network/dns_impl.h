@@ -1,11 +1,10 @@
 #pragma once
 
-#include <netdb.h>
-
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/network/dns.h"
@@ -28,7 +27,8 @@ class DnsResolverImplPeer;
 class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::upstream> {
 public:
   DnsResolverImpl(Event::Dispatcher& dispatcher,
-                  const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
+                  const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                  const bool use_tcp_for_dns_lookups);
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver
@@ -39,8 +39,10 @@ private:
   friend class DnsResolverImplPeer;
   struct PendingResolution : public ActiveDnsQuery {
     // Network::ActiveDnsQuery
-    PendingResolution(ResolveCb callback, ares_channel channel, const std::string& dns_name)
-        : callback_(callback), channel_(channel), dns_name_(dns_name) {}
+    PendingResolution(DnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher,
+                      ares_channel channel, const std::string& dns_name)
+        : parent_(parent), callback_(callback), dispatcher_(dispatcher), channel_(channel),
+          dns_name_(dns_name) {}
 
     void cancel() override {
       // c-ares only supports channel-wide cancellation, so we just allow the
@@ -49,20 +51,23 @@ private:
     }
 
     /**
-     * c-ares ares_gethostbyname() query callback.
-     * @param status return status of call to ares_gethostbyname.
+     * ares_getaddrinfo query callback.
+     * @param status return status of call to ares_getaddrinfo.
      * @param timeouts the number of times the request timed out.
-     * @param hostent structure that stores information about a given host.
+     * @param addrinfo structure to store address info.
      */
-    void onAresHostCallback(int status, int timeouts, hostent* hostent);
+    void onAresGetAddrInfoCallback(int status, int timeouts, ares_addrinfo* addrinfo);
     /**
-     * wrapper function of call to ares_gethostbyname.
+     * wrapper function of call to ares_getaddrinfo.
      * @param family currently AF_INET and AF_INET6 are supported.
      */
-    void getHostByName(int family);
+    void getAddrInfo(int family);
 
+    DnsResolverImpl& parent_;
     // Caller supplied callback to invoke on query completion or error.
     const ResolveCb callback_;
+    // Dispatcher to post any callback_ exceptions to.
+    Event::Dispatcher& dispatcher_;
     // Does the object own itself? Resource reclamation occurs via self-deleting
     // on query completion or error.
     bool owned_ = false;
@@ -77,19 +82,28 @@ private:
     const std::string dns_name_;
   };
 
+  struct AresOptions {
+    ares_options options_;
+    int optmask_;
+  };
+
   // Callback for events on sockets tracked in events_.
-  void onEventCallback(int fd, uint32_t events);
+  void onEventCallback(os_fd_t fd, uint32_t events);
   // c-ares callback when a socket state changes, indicating that libevent
   // should listen for read/write events.
-  void onAresSocketStateChange(int fd, int read, int write);
-  // Initialize the channel with given ares_init_options().
+  void onAresSocketStateChange(os_fd_t fd, int read, int write);
+  // Initialize the channel.
   void initializeChannel(ares_options* options, int optmask);
   // Update timer for c-ares timeouts.
   void updateAresTimer();
+  // Return default AresOptions.
+  AresOptions defaultAresOptions();
 
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr timer_;
   ares_channel channel_;
+  bool dirty_channel_{};
+  const bool use_tcp_for_dns_lookups_;
   std::unordered_map<int, Event::FileEventPtr> events_;
 };
 

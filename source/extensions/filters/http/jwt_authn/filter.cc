@@ -1,6 +1,11 @@
 #include "extensions/filters/http/jwt_authn/filter.h"
 
+#include "common/http/headers.h"
 #include "common/http/utility.h"
+
+#include "extensions/filters/http/well_known_names.h"
+
+#include "jwt_verify_lib/status.h"
 
 using ::google::jwt_verify::Status;
 
@@ -9,28 +14,59 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-Filter::Filter(JwtAuthnFilterStats& stats, AuthenticatorPtr auth)
-    : stats_(stats), auth_(std::move(auth)) {}
+namespace {
+
+bool isCorsPreflightRequest(const Http::RequestHeaderMap& headers) {
+  return headers.Method() &&
+         headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Options &&
+         headers.Origin() && !headers.Origin()->value().empty() &&
+         headers.AccessControlRequestMethod() &&
+         !headers.AccessControlRequestMethod()->value().empty();
+}
+
+} // namespace
+
+struct RcDetailsValues {
+  // The jwt_authn filter rejected the request
+  const std::string JwtAuthnAccessDenied = "jwt_authn_access_denied";
+};
+using RcDetails = ConstSingleton<RcDetailsValues>;
+
+Filter::Filter(FilterConfigSharedPtr config)
+    : stats_(config->stats()), config_(std::move(config)) {}
 
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
-  if (auth_) {
-    auth_->onDestroy();
+  if (context_) {
+    context_->cancel();
   }
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
-
-  // Remove headers configured to pass payload
-  auth_->sanitizePayloadHeaders(headers);
 
   state_ = Calling;
   stopped_ = false;
 
-  // TODO(qiwzhang): support per-route config.
+  if (config_->bypassCorsPreflightRequest() && isCorsPreflightRequest(headers)) {
+    // The CORS preflight doesn't include user credentials, bypass regardless of JWT requirements.
+    // See http://www.w3.org/TR/cors/#cross-origin-request-with-preflight.
+    ENVOY_LOG(debug, "CORS preflight request bypassed regardless of JWT requirements");
+    stats_.cors_preflight_bypassed_.inc();
+    onComplete(Status::Ok);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   // Verify the JWT token, onComplete() will be called when completed.
-  auth_->verify(headers, this);
+  const auto* verifier =
+      config_->findVerifier(headers, *decoder_callbacks_->streamInfo().filterState());
+  if (!verifier) {
+    onComplete(Status::Ok);
+  } else {
+    context_ = Verifier::createContext(headers, decoder_callbacks_->activeSpan(), this);
+    verifier->verify(context_);
+  }
+
   if (state_ == Complete) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -39,23 +75,28 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   return Http::FilterHeadersStatus::StopIteration;
 }
 
+void Filter::setPayload(const ProtobufWkt::Struct& payload) {
+  decoder_callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().JwtAuthn, payload);
+}
+
 void Filter::onComplete(const Status& status) {
-  ENVOY_LOG(debug, "Called Filter : check complete {}", int(status));
+  ENVOY_LOG(debug, "Called Filter : check complete {}",
+            ::google::jwt_verify::getStatusString(status));
   // This stream has been reset, abort the callback.
   if (state_ == Responded) {
     return;
   }
-  if (status != Status::Ok) {
+  if (Status::Ok != status) {
     stats_.denied_.inc();
     state_ = Responded;
     // verification failed
-    Http::Code code = Http::Code::Unauthorized;
+    Http::Code code =
+        status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
-    Http::Utility::sendLocalReply(false, *decoder_callbacks_, false, code,
-                                  ::google::jwt_verify::getStatusString(status));
+    decoder_callbacks_->sendLocalReply(code, ::google::jwt_verify::getStatusString(status), nullptr,
+                                       absl::nullopt, RcDetails::get().JwtAuthnAccessDenied);
     return;
   }
-
   stats_.allowed_.inc();
   state_ = Complete;
   if (stopped_) {
@@ -71,7 +112,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
   if (state_ == Calling) {
     return Http::FilterTrailersStatus::StopIteration;

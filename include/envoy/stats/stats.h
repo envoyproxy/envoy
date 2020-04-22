@@ -1,125 +1,102 @@
 #pragma once
 
-#include <chrono>
 #include <cstdint>
-#include <functional>
-#include <list>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "envoy/common/interval_set.h"
 #include "envoy/common/pure.h"
+#include "envoy/stats/refcount_ptr.h"
+#include "envoy/stats/symbol_table.h"
+#include "envoy/stats/tag.h"
 
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace Event {
-class Dispatcher;
-}
-
-namespace ThreadLocal {
-class Instance;
-}
-
 namespace Stats {
 
-/**
- * General representation of a tag.
- */
-struct Tag {
-  std::string name_;
-  std::string value_;
-};
-
-/**
- * Class to extract tags from the stat names.
- */
-class TagExtractor {
-public:
-  virtual ~TagExtractor() {}
-
-  /**
-   * Identifier for the tag extracted by this object.
-   */
-  virtual std::string name() const PURE;
-
-  /**
-   * Finds tags for stat_name and adds them to the tags vector. If the tag is not
-   * represented in the name, the tags vector will remain unmodified. Also finds the
-   * character indexes for the tags in stat_name and adds them to remove_characters (an
-   * in/out arg). Returns true if a tag-match was found. The characters removed from the
-   * name may be different from the values put into the tag vector for readability
-   * purposes. Note: The extraction process is expected to be run iteratively, aggregating
-   * the character intervals to be removed from the name after all the tag extractions are
-   * complete. This approach simplifies the tag searching process because without mutations,
-   * the tag extraction will be order independent, apart from the order of the tag array.
-   * @param stat_name name from which the tag will be extracted if found to exist.
-   * @param tags list of tags updated with the tag name and value if found in the name.
-   * @param remove_characters set of intervals of character-indices to be removed from name.
-   * @return bool indicates whether a tag was found in the name.
-   */
-  virtual bool extractTag(const std::string& stat_name, std::vector<Tag>& tags,
-                          IntervalSet<size_t>& remove_characters) const PURE;
-
-  /**
-   * Finds a prefix string associated with the matching criteria owned by the
-   * extractor. This is used to reduce the number of extractors required for
-   * processing each stat, by pulling the first "."-separated token on the tag.
-   *
-   * If a prefix cannot be extracted, an empty string_view is returned, and the
-   * matcher must be applied on all inputs.
-   *
-   * The storage for the prefix is owned by the TagExtractor.
-   *
-   * @return absl::string_view the prefix, or an empty string_view if none was found.
-   */
-  virtual absl::string_view prefixToken() const PURE;
-};
-
-typedef std::unique_ptr<const TagExtractor> TagExtractorPtr;
-
-class TagProducer {
-public:
-  virtual ~TagProducer() {}
-
-  /**
-   * Take a metric name and a vector then add proper tags into the vector and
-   * return an extracted metric name.
-   * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
-   * @param tags std::vector a set of Stats::Tag.
-   */
-  virtual std::string produceTags(const std::string& metric_name,
-                                  std::vector<Tag>& tags) const PURE;
-};
-
-typedef std::unique_ptr<const TagProducer> TagProducerPtr;
+class Allocator;
 
 /**
  * General interface for all stats objects.
  */
-class Metric {
+class Metric : public RefcountInterface {
 public:
-  virtual ~Metric() {}
+  ~Metric() override = default;
   /**
-   * Returns the full name of the Metric.
+   * Returns the full name of the Metric. This is intended for most uses, such
+   * as streaming out the name to a stats sink or admin request, or comparing
+   * against it in a test. Independent of the evolution of the data
+   * representation for the name, this method will be available. For storing the
+   * name as a map key, however, nameCStr() is a better choice, albeit one that
+   * might change in the future to return a symbolized representation of the
+   * elaborated string.
    */
-  virtual const std::string& name() const PURE;
+  virtual std::string name() const PURE;
+
+  /**
+   * Returns the full name of the Metric as an encoded array of symbols.
+   */
+  virtual StatName statName() const PURE;
 
   /**
    * Returns a vector of configurable tags to identify this Metric.
    */
-  virtual const std::vector<Tag>& tags() const PURE;
+  virtual TagVector tags() const PURE;
 
   /**
-   * Returns the name of the Metric with the portions designated as tags removed.
+   * See a more detailed description in tagExtractedStatName(), which is the
+   * preferred API to use when feasible. This API needs to compose the
+   * std::string on the fly, and return it by value.
+   *
+   * @return The stat name with all tag values extracted, as a std::string.
    */
-  virtual const std::string& tagExtractedName() const PURE;
+  virtual std::string tagExtractedName() const PURE;
+
+  /**
+   * Returns the name of the Metric with the portions designated as tags removed
+   * as a string. For example, The stat name "vhost.foo.vcluster.bar.c1" would
+   * have "foo" extracted as the value of tag "vhost" and "bar" extracted as the
+   * value of tag "vcluster". Thus the tagExtractedName is simply
+   * "vhost.vcluster.c1".
+   *
+   * @return the name of the Metric with the portions designated as tags
+   *     removed.
+   */
+  virtual StatName tagExtractedStatName() const PURE;
+
+  // Function to be called from iterateTagStatNames passing name and value as StatNames.
+  using TagStatNameIterFn = std::function<bool(StatName, StatName)>;
+
+  /**
+   * Iterates over all tags, calling a functor for each name/value pair. The
+   * functor can return 'true' to continue or 'false' to stop the
+   * iteration.
+   *
+   * @param fn The functor to call for StatName pair.
+   */
+  virtual void iterateTagStatNames(const TagStatNameIterFn& fn) const PURE;
+
+  // Function to be called from iterateTags passing name and value as const Tag&.
+  using TagIterFn = std::function<bool(const Tag&)>;
 
   /**
    * Indicates whether this metric has been updated since the server was started.
    */
   virtual bool used() const PURE;
+
+  /**
+   * Flags:
+   * Used: used by all stats types to figure out whether they have been used.
+   * Logic...: used by gauges to cache how they should be combined with a parent's value.
+   */
+  struct Flags {
+    static const uint8_t Used = 0x01;
+    static const uint8_t LogicAccumulate = 0x02;
+    static const uint8_t NeverImport = 0x04;
+  };
+  virtual SymbolTable& symbolTable() PURE;
+  virtual const SymbolTable& constSymbolTable() const PURE;
 };
 
 /**
@@ -127,9 +104,10 @@ public:
  * global counter as well as periodic counter. Calling latch() returns the periodic counter and
  * clears it.
  */
-class Counter : public virtual Metric {
+class Counter : public Metric {
 public:
-  virtual ~Counter() {}
+  ~Counter() override = default;
+
   virtual void add(uint64_t amount) PURE;
   virtual void inc() PURE;
   virtual uint64_t latch() PURE;
@@ -137,14 +115,20 @@ public:
   virtual uint64_t value() const PURE;
 };
 
-typedef std::shared_ptr<Counter> CounterSharedPtr;
+using CounterSharedPtr = RefcountPtr<Counter>;
 
 /**
  * A gauge that can both increment and decrement.
  */
-class Gauge : public virtual Metric {
+class Gauge : public Metric {
 public:
-  virtual ~Gauge() {}
+  enum class ImportMode {
+    Uninitialized, // Gauge was discovered during hot-restart transfer.
+    NeverImport,   // On hot-restart, each process starts with gauge at 0.
+    Accumulate,    // Transfers gauge state on hot-restart.
+  };
+
+  ~Gauge() override = default;
 
   virtual void add(uint64_t amount) PURE;
   virtual void dec() PURE;
@@ -152,295 +136,52 @@ public:
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
   virtual uint64_t value() const PURE;
+
+  /**
+   * @return the import mode, dictating behavior of the gauge across hot restarts.
+   */
+  virtual ImportMode importMode() const PURE;
+
+  /**
+   * Gauges can be created with ImportMode::Uninitialized during hot-restart
+   * merges, if they haven't yet been instantiated by the child process. When
+   * they finally get instantiated, mergeImportMode should be called to
+   * initialize the gauge's import mode. It is only valid to call
+   * mergeImportMode when the current mode is ImportMode::Uninitialized.
+   *
+   * @param import_mode the new import mode.
+   */
+  virtual void mergeImportMode(ImportMode import_mode) PURE;
 };
 
-typedef std::shared_ptr<Gauge> GaugeSharedPtr;
+using GaugeSharedPtr = RefcountPtr<Gauge>;
 
 /**
- * Holds the computed statistics for a histogram.
+ * A string, possibly non-ASCII.
  */
-class HistogramStatistics {
+class TextReadout : public virtual Metric {
 public:
-  virtual ~HistogramStatistics() {}
+  // Text readout type is used internally to disambiguate isolated store
+  // constructors. In the future we can extend it to specify text encoding or
+  // some such.
+  enum class Type {
+    Default, // No particular meaning.
+  };
+
+  ~TextReadout() override = default;
 
   /**
-   * Returns summary representation of the histogram.
+   * Sets the value of this TextReadout by moving the input |value| to minimize
+   * buffer copies under the lock.
    */
-  virtual std::string summary() const PURE;
-
+  virtual void set(std::string&& value) PURE;
   /**
-   * Returns supported quantiles.
+   * @return the copy of this TextReadout value.
    */
-  virtual const std::vector<double>& supportedQuantiles() const PURE;
-
-  /**
-   * Returns computed quantile values during the period.
-   */
-  virtual const std::vector<double>& computedQuantiles() const PURE;
+  virtual std::string value() const PURE;
 };
 
-/**
- * A histogram that records values one at a time.
- * Note: Histograms now incorporate what used to be timers because the only difference between the
- * two stat types was the units being represented. It is assumed that no downstream user of this
- * class (Sinks, in particular) will need to explicitly differentiate between histograms
- * representing durations and histograms representing other types of data.
- */
-class Histogram : public virtual Metric {
-public:
-  virtual ~Histogram() {}
-
-  /**
-   * Records an unsigned value. If a timer, values are in units of milliseconds.
-   */
-  virtual void recordValue(uint64_t value) PURE;
-};
-
-typedef std::shared_ptr<Histogram> HistogramSharedPtr;
-
-/**
- * A histogram that is stored in main thread and provides summary view of the histogram.
- */
-class ParentHistogram : public virtual Histogram {
-public:
-  virtual ~ParentHistogram() {}
-
-  /**
-   * This method is called during the main stats flush process for each of the histograms and used
-   * to merge the histogram values.
-   */
-  virtual void merge() PURE;
-
-  /**
-   * Returns the interval histogram summary statistics for the flush interval.
-   */
-  virtual const HistogramStatistics& intervalStatistics() const PURE;
-
-  /**
-   * Returns the cumulative histogram summary statistics.
-   */
-  virtual const HistogramStatistics& cumulativeStatistics() const PURE;
-
-  /**
-   * Returns the summary representation.
-   */
-  virtual const std::string summary() const PURE;
-};
-
-typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;
-
-/**
- * Provides cached access to a particular store's stats.
- */
-class Source {
-public:
-  virtual ~Source() {}
-
-  /**
-   * Returns all known counters. Will use cached values if already accessed and clearCache() hasn't
-   * been called since.
-   * @return std::vector<CounterSharedPtr>& all known counters. Note: reference may not be valid
-   * after clearCache() is called.
-   */
-  virtual const std::vector<CounterSharedPtr>& cachedCounters() PURE;
-
-  /**
-   * Returns all known gauges. Will use cached values if already accessed and clearCache() hasn't
-   * been called since.
-   * @return std::vector<GaugeSharedPtr>& all known gauges. Note: reference may not be valid after
-   * clearCache() is called.
-   */
-  virtual const std::vector<GaugeSharedPtr>& cachedGauges() PURE;
-
-  /**
-   * Returns all known parent histograms. Will use cached values if already accessed and
-   * clearCache() hasn't been called since.
-   * @return std::vector<ParentHistogramSharedPtr>& all known histograms. Note: reference may not be
-   * valid after clearCache() is called.
-   */
-  virtual const std::vector<ParentHistogramSharedPtr>& cachedHistograms() PURE;
-
-  /**
-   * Resets the cache so that any future calls to get cached metrics will refresh the set.
-   */
-  virtual void clearCache() PURE;
-};
-
-/**
- * A sink for stats. Each sink is responsible for writing stats to a backing store.
- */
-class Sink {
-public:
-  virtual ~Sink() {}
-
-  /**
-   * Periodic metric flush to the sink.
-   * @param source interface through which the sink can access all metrics being flushed.
-   */
-  virtual void flush(Source& source) PURE;
-
-  /**
-   * Flush a single histogram sample. Note: this call is called synchronously as a part of recording
-   * the metric, so implementations must be thread-safe.
-   * @param histogram the histogram that this sample applies to.
-   * @param value the value of the sample.
-   */
-  virtual void onHistogramComplete(const Histogram& histogram, uint64_t value) PURE;
-};
-
-typedef std::unique_ptr<Sink> SinkPtr;
-
-class Scope;
-typedef std::unique_ptr<Scope> ScopePtr;
-typedef std::shared_ptr<Scope> ScopeSharedPtr;
-
-/**
- * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
- * (for example to free/delete all of them).
- */
-class Scope {
-public:
-  virtual ~Scope() {}
-
-  /**
-   * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
-   * that point to the same reference counted backing stats. This allows a new scope to be
-   * gracefully swapped in while an old scope with the same name is being destroyed.
-   * @param name supplies the scope's namespace prefix.
-   */
-  virtual ScopePtr createScope(const std::string& name) PURE;
-
-  /**
-   * Deliver an individual histogram value to all registered sinks.
-   */
-  virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
-
-  /**
-   * @return a counter within the scope's namespace.
-   */
-  virtual Counter& counter(const std::string& name) PURE;
-
-  /**
-   * @return a gauge within the scope's namespace.
-   */
-  virtual Gauge& gauge(const std::string& name) PURE;
-
-  /**
-   * @return a histogram within the scope's namespace with a particular value type.
-   */
-  virtual Histogram& histogram(const std::string& name) PURE;
-};
-
-/**
- * A store for all known counters, gauges, and timers.
- */
-class Store : public Scope {
-public:
-  /**
-   * @return a list of all known counters.
-   */
-  virtual std::vector<CounterSharedPtr> counters() const PURE;
-
-  /**
-   * @return a list of all known gauges.
-   */
-  virtual std::vector<GaugeSharedPtr> gauges() const PURE;
-
-  /**
-   * @return a list of all known histograms.
-   */
-  virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
-};
-
-typedef std::unique_ptr<Store> StorePtr;
-
-/**
- * Callback invoked when a store's mergeHistogram() runs.
- */
-typedef std::function<void()> PostMergeCb;
-
-/**
- * The root of the stat store.
- */
-class StoreRoot : public Store {
-public:
-  /**
-   * Add a sink that is used for stat flushing.
-   */
-  virtual void addSink(Sink& sink) PURE;
-
-  /**
-   * Set the given tag producer to control tags.
-   */
-  virtual void setTagProducer(TagProducerPtr&& tag_producer) PURE;
-
-  /**
-   * Initialize the store for threading. This will be called once after all worker threads have
-   * been initialized. At this point the store can initialize itself for multi-threaded operation.
-   */
-  virtual void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
-                                   ThreadLocal::Instance& tls) PURE;
-
-  /**
-   * Shutdown threading support in the store. This is called once when the server is about to shut
-   * down.
-   */
-  virtual void shutdownThreading() PURE;
-
-  /**
-   * Called during the flush process to merge all the thread local histograms. The passed in
-   * callback will be called on the main thread, but it will happen after the method returns
-   * which means that the actual flush process will happen on the main thread after this method
-   * returns. It is expected that only one merge runs at any time and concurrent calls to this
-   * method would be asserted.
-   */
-  virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
-
-  /**
-   * Returns the Source to provide cached metrics.
-   * @return Source& the source.
-   */
-  virtual Source& source() PURE;
-};
-
-typedef std::unique_ptr<StoreRoot> StoreRootPtr;
-
-struct RawStatData;
-
-/**
- * Abstract interface for allocating statistics. Implementations can
- * be created utilizing a single fixed-size block suitable for
- * shared-memory, or in the heap, allowing for pointers and sharing of
- * substrings, with an opportunity for reduced memory consumption.
- */
-class StatDataAllocator {
-public:
-  virtual ~StatDataAllocator() {}
-
-  /**
-   * @param name the full name of the stat.
-   * @param tag_extracted_name the name of the stat with tag-values stripped out.
-   * @param tags the extracted tag values.
-   * @return CounterSharedPtr a counter, or nullptr if allocation failed, in which case
-   *     tag_extracted_name and tags are not moved.
-   */
-  virtual CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
-                                       std::vector<Tag>&& tags) PURE;
-
-  /**
-   * @param name the full name of the stat.
-   * @param tag_extracted_name the name of the stat with tag-values stripped out.
-   * @param tags the extracted tag values.
-   * @return GaugeSharedPtr a gauge, or nullptr if allocation failed, in which case
-   *     tag_extracted_name and tags are not moved.
-   */
-  virtual GaugeSharedPtr makeGauge(const std::string& name, std::string&& tag_extracted_name,
-                                   std::vector<Tag>&& tags) PURE;
-
-  // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
-  // the moment, histograms don't fit the same pattern of counters and gaugaes
-  // as they are not actually created in the context of a stats allocator.
-};
+using TextReadoutSharedPtr = RefcountPtr<TextReadout>;
 
 } // namespace Stats
 } // namespace Envoy

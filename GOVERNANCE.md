@@ -37,6 +37,8 @@
 * Triage GitHub issues and perform pull request reviews for other maintainers and the community.
   The areas of specialization listed in [OWNERS.md](OWNERS.md) can be used to help with routing
   an issue/question to the right person.
+* Triage build issues - file issues for known flaky builds or bugs, and either fix or find someone
+  to fix any master build breakages.
 * During GitHub issue triage, apply all applicable [labels](https://github.com/envoyproxy/envoy/labels)
   to each new issue. Labels are extremely useful for future issue follow up. Which labels to apply
   is somewhat subjective so just use your best judgment. A few of the most important labels that are
@@ -50,10 +52,10 @@
     can be promoted to other issue types once it's clear they are actionable (at which point the
     question label should be removed).
 * Make sure that ongoing PRs are moving forward at the right pace or closing them.
-* Participate when called upon in the [security release process](SECURITY_RELEASE_PROCESS.md). Note
-  that although this should be a rare occurrence, if a serious vulnerability is found, the process
-  may take up to several full days of work to implement. This reality should be taken into account
-  when discussing time commitment obligations with employers.
+* Participate when called upon in the [security release process](SECURITY.md). Note that although
+  this should be a rare occurrence, if a serious vulnerability is found, the process may take up to
+  several full days of work to implement. This reality should be taken into account when discussing
+  time commitment obligations with employers.
 * In general continue to be willing to spend at least 25% of ones time working on Envoy (~1.25
   business days per week).
 * We currently maintain an "on-call" rotation within the maintainers. Each on-call is 1 week.
@@ -62,43 +64,67 @@
   forward. To reiterate, it is *not* the responsibility of the on-call maintainer to answer all
   questions and do all reviews, but it is their responsibility to make sure that everything is
   being actively covered by someone.
-* The on-call rotation is tracked at PagerDuty. The calendar is visible [here](https://pagerduty.github.io/addons/PDcal/index.html?iCalURL=https://cncf.pagerduty.com/private/e44caf2604ce6c5ccc616b7b84f99b94dc801dba4cceb8d71fb128338f75b9af/feed/PXU9KPH) or you can subscribe to the iCal feed [here](https://cncf.pagerduty.com/private/e44caf2604ce6c5ccc616b7b84f99b94dc801dba4cceb8d71fb128338f75b9af/feed/PXU9KPH).
+* The on-call rotation is tracked at Opsgenie. The calendar is visible
+[here](https://calendar.google.com/calendar/embed?src=ms6efr2erlvum9aolnvg1688cd3mu85e%40import.calendar.google.com&ctz=America%2FNew_York)
+or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/getRecentSchedule?webcalToken=75f2990470ca21de1033ecf4586bea1e40bae32bf3c39e2289f6186da1904ee0&scheduleId=a3505963-c064-4c97-8865-947dfcb06060)
 
 ## Cutting a release
 
-* We do releases approximately every 3 months as described in the
-  [release cadence documentation](CONTRIBUTING.md#release-cadence).
-* Decide on the somewhat arbitrary time that a release will occur.
+* We do releases every 3 months, at the end of each quarter, as described in the
+  [release schedule](RELEASES.md#release-schedule).
 * Take a look at open issues tagged with the current release, by
   [searching](https://github.com/envoyproxy/envoy/issues) for
   "is:open is:issue milestone:[current milestone]" and either hold off until
   they are fixed or bump them to the next milestone.
 * Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
-  particularly risky PRs until after the release is tagged. This is because we currently don't use
-  release branches and assume that master is RC quality at all times.
-* Do a final check of the [release notes](docs/root/intro/version_history.rst) and make any needed
-  corrections.
-* Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
-  "1.6.0". Also remove the "Pending" tag from the top of the [release notes](docs/root/intro/version_history.rst)
-  and [DEPRECATED.md](DEPRECATED.md). Get a review and merge.
-* **Wait for tests to pass on
-  [master](https://circleci.com/gh/envoyproxy/envoy/tree/master).**
+  particularly risky PRs until after the release is tagged. This is because we aim for master to be
+  at release candidate quality at all times.
+* Do a final check of the [release notes](docs/root/version_history/current.rst):
+  * Make any needed corrections (grammar, punctuation, formatting, etc.).
+  * Check to see if any security/stable version release notes are duplicated in
+    the major version release notes. These should not be duplicated.
+  * If the "Deprecated" section is empty, delete it.
+  * Remove the "Pending" tags and add dates to the top of the [release notes for this version](docs/root/version_history/current.rst).
+  * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
+    "1.6.0".
+  * Get a review and merge.
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
   start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
   [VERSION](VERSION).**
-* Monitor the CircleCI tag build to make sure that the final docker images get pushed along with
+* Create a branch from the tagged release, e.g. "release/v1.6". It will be used for the
+  [stable releases](RELEASES.md#stable-releases).
+* Monitor the AZP tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
   [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
-* Contact rdl@ on Slack so that the website can be updated for the new release.
+* Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the
   Envoy account post).
-* Do a new PR to update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". At
-  the same time, also add a new empty "pending" section to the [release
-  notes](docs/root/intro/version_history.rst) and to [DEPRECATED.md](DEPRECATED.md) for the
-  following version. E.g., "1.7.0 (pending)".
-* Run the deprecate_versions.py script to file tracking issues for code which
-  can be removed.
+* Do a new PR to setup the next version
+  * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". 
+  * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
+    release version number in the filename, and add an entry for the new file in the `toctree` in 
+    [version_history.rst](docs/root/version_history/version_history.rst).
+  * Create a new "current" version history file at the [release
+  notes](docs/root/version_history/current.rst) for the following version. E.g., "1.7.0 (pending)". Use
+  this text as the template for the new file:
+```
+1.7.0 (Pending)
+===============
+
+Changes
+-------
+
+Deprecated
+----------
+```
+* Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh`)
+  to file tracking issues for code which can be removed.
+* Run the deprecate_features.py script (e.g. `sh tools/deprecate_features/deprecate_features.sh`)
+  to make the last release's deprecated features fatal-by-default. Submit the resultant PR and send
+  an email to envoy-announce.
+* Check source/common/runtime/runtime_features.cc and see if any runtime guards in
+  disabled_runtime_features should be reassessed, and ping on the relevant issues.
 
 ## When does a maintainer lose maintainer status
 
@@ -109,8 +135,7 @@ the maintainers per the voting process below.
 # Extension addition policy
 
 Adding new [extensions](REPO_LAYOUT.md#sourceextensions-layout) has a dedicated policy. Please
-see [this](https://docs.google.com/document/d/1eDQQSxqx2khTXfa2vVm4vqkyRwXYkPzZCcbjxJ2_AvA) document
-for more information.
+see [this](./EXTENSION_POLICY.md) document for more information.
 
 # Conflict resolution and voting
 

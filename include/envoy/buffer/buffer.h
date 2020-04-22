@@ -5,7 +5,17 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/os_sys_calls.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/io_handle.h"
+
+#include "common/common/byte_order.h"
+
+#include "absl/container/inlined_vector.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -16,7 +26,11 @@ namespace Buffer {
 struct RawSlice {
   void* mem_ = nullptr;
   size_t len_ = 0;
+
+  bool operator==(const RawSlice& rhs) const { return mem_ == rhs.mem_ && len_ == rhs.len_; }
 };
+
+using RawSliceVector = absl::InlinedVector<RawSlice, 16>;
 
 /**
  * A wrapper class to facilitate passing in externally owned data to a buffer via addBufferFragment.
@@ -24,6 +38,7 @@ struct RawSlice {
  */
 class BufferFragment {
 public:
+  virtual ~BufferFragment() = default;
   /**
    * @return const void* a pointer to the referenced data.
    */
@@ -35,12 +50,9 @@ public:
   virtual size_t size() const PURE;
 
   /**
-   * Called by a buffer when the refernced data is no longer needed.
+   * Called by a buffer when the referenced data is no longer needed.
    */
   virtual void done() PURE;
-
-protected:
-  virtual ~BufferFragment() {}
 };
 
 /**
@@ -48,10 +60,12 @@ protected:
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
-   * Copy data into the buffer.
+   * Copy data into the buffer (deprecated, use absl::string_view variant
+   * instead).
+   * TODO(htuch): Cleanup deprecated call sites.
    * @param data supplies the data address.
    * @param size supplies the data size.
    */
@@ -68,7 +82,7 @@ public:
    * Copy a string into the buffer.
    * @param data supplies the string to copy.
    */
-  virtual void add(const std::string& data) PURE;
+  virtual void add(absl::string_view data) PURE;
 
   /**
    * Copy another buffer into this buffer.
@@ -77,8 +91,23 @@ public:
   virtual void add(const Instance& data) PURE;
 
   /**
-   * Commit a set of slices originally obtained from reserve(). The number of slices can be
-   * different from the number obtained from reserve(). The size of each slice can also be altered.
+   * Prepend a string_view to the buffer.
+   * @param data supplies the string_view to copy.
+   */
+  virtual void prepend(absl::string_view data) PURE;
+
+  /**
+   * Prepend data from another buffer to this buffer.
+   * The supplied buffer is drained after this operation.
+   * @param data supplies the buffer to copy.
+   */
+  virtual void prepend(Instance& data) PURE;
+
+  /**
+   * Commit a set of slices originally obtained from reserve(). The number of slices should match
+   * the number obtained from reserve(). The size of each slice can also be altered. Commit must
+   * occur once following a reserve() without any mutating operations in between other than to the
+   * iovecs len_ fields.
    * @param iovecs supplies the array of slices to commit.
    * @param num_iovecs supplies the size of the slices array.
    */
@@ -99,21 +128,12 @@ public:
   virtual void drain(uint64_t size) PURE;
 
   /**
-   * Fetch the raw buffer slices. This routine is optimized for performance.
-   * @param out supplies an array of RawSlice objects to fill.
-   * @param out_size supplies the size of out.
-   * @return the actual number of slices needed, which may be greater than out_size. Passing
-   *         nullptr for out and 0 for out_size will just return the size of the array needed
-   *         to capture all of the slice data.
-   * TODO(mattklein123): WARNING: The underlying implementation of this function currently uses
-   * libevent's evbuffer. It has the infuriating property where calling getRawSlices(nullptr, 0)
-   * will return the slices that include all of the buffer data, but not any empty slices at the
-   * end. However, calling getRawSlices(iovec, SOME_CONST), WILL return potentially empty slices
-   * beyond the end of the buffer. Code that is trying to avoid stack overflow by limiting the
-   * number of returned slices needs to deal with this. When we get rid of evbuffer we can rework
-   * all of this.
+   * Fetch the raw buffer slices.
+   * @param max_slices supplies an optional limit on the number of slices to fetch, for performance.
+   * @return RawSliceVector with non-empty slices in the buffer.
    */
-  virtual uint64_t getRawSlices(RawSlice* out, uint64_t out_size) const PURE;
+  virtual RawSliceVector
+  getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const PURE;
 
   /**
    * @return uint64_t the total length of the buffer (not necessarily contiguous in memory).
@@ -140,11 +160,12 @@ public:
 
   /**
    * Read from a file descriptor directly into the buffer.
-   * @param fd supplies the descriptor to read from.
+   * @param io_handle supplies the io handle to read from.
    * @param max_length supplies the maximum length to read.
-   * @return the number of bytes read or -1 if there was an error.
+   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
+   * read if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be used.
    */
-  virtual int read(int fd, uint64_t max_length) PURE;
+  virtual Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) PURE;
 
   /**
    * Reserve space in the buffer.
@@ -156,7 +177,7 @@ public:
   virtual uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) PURE;
 
   /**
-   * Search for an occurence of a buffer within the larger buffer.
+   * Search for an occurrence of data within the buffer.
    * @param data supplies the data to search for.
    * @param size supplies the length of the data to search for.
    * @param start supplies the starting index to search from.
@@ -165,21 +186,186 @@ public:
   virtual ssize_t search(const void* data, uint64_t size, size_t start) const PURE;
 
   /**
-   * Write the buffer out to a file descriptor.
-   * @param fd supplies the descriptor to write to.
-   * @return the number of bytes written or -1 if there was an error.
+   * Search for an occurrence of data at the start of a buffer.
+   * @param data supplies the data to search for.
+   * @return true if this buffer starts with data, false otherwise.
    */
-  virtual int write(int fd) PURE;
+  virtual bool startsWith(absl::string_view data) const PURE;
+
+  /**
+   * Constructs a flattened string from a buffer.
+   * @return the flattened string.
+   */
+  virtual std::string toString() const PURE;
+
+  /**
+   * Write the buffer out to a file descriptor.
+   * @param io_handle supplies the io_handle to write to.
+   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
+   * written if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be
+   * used.
+   */
+  virtual Api::IoCallUint64Result write(Network::IoHandle& io_handle) PURE;
+
+  /**
+   * Copy an integer out of the buffer.
+   * @param start supplies the buffer index to start copying from.
+   * @param Size how many bytes to read out of the buffer.
+   * @param Endianness specifies the byte order to use when decoding the integer.
+   * @details Size parameter: Some protocols have integer fields whose size in bytes won't match the
+   * size in bytes of C++'s integer types. Take a 3-byte integer field for example, which we want to
+   * represent as a 32-bit (4 bytes) integer. One option to deal with that situation is to read 4
+   * bytes from the buffer and ignore 1. There are a few problems with that solution, though.
+   *   * The first problem is buffer underflow: there may not be more than Size bytes available
+   * (say, last field in the payload), so that's an edge case to take into consideration.
+   *   * The second problem is draining the buffer after reading. With the above solution we cannot
+   *     read and discard in one go. We'd need to peek 4 bytes, ignore 1 and then drain 3. That not
+   *     only looks hacky since the sizes don't match, but also produces less terse code and
+   * requires the caller to propagate that logic to all call sites. Things complicate even further
+   * when endianness is taken into consideration: should the most or least-significant bytes be
+   * padded? Dealing with this situation requires a high level of care and attention to detail.
+   * Properly calculating which bytes to discard and how to displace the data is not only error
+   * prone, but also shifts to the caller a burden that could be solved in a much more generic,
+   * transparent and well tested manner.
+   *   * The last problem in the list is sign extension, which should be properly handled when
+   * reading signed types with negative values. To make matters easier, the optional Size parameter
+   * can be specified in those situations where there's a need to read less bytes than a C++'s
+   * integer size in bytes. For the most common case when one needs to read exactly as many bytes as
+   * the size of C++'s integer, this parameter can simply be omitted and it will be automatically
+   * deduced from the size of the type T
+   */
+  template <typename T, ByteOrder Endianness = ByteOrder::Host, size_t Size = sizeof(T)>
+  T peekInt(uint64_t start = 0) {
+    static_assert(Size <= sizeof(T), "requested size is bigger than integer being read");
+
+    if (length() < start + Size) {
+      throw EnvoyException("buffer underflow");
+    }
+
+    constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;
+
+    auto result = static_cast<T>(0);
+    constexpr const auto all_bits_enabled = static_cast<T>(~static_cast<T>(0));
+
+    int8_t* bytes = reinterpret_cast<int8_t*>(std::addressof(result));
+    copyOut(start, Size, &bytes[displacement]);
+
+    constexpr const auto most_significant_read_byte =
+        Endianness == ByteOrder::BigEndian ? displacement : Size - 1;
+
+    // If Size == sizeof(T), we need to make sure we don't generate an invalid left shift
+    // (e.g. int32 << 32), even though we know that that branch of the conditional will.
+    // not be taken. Size % sizeof(T) gives us the correct left shift when Size < sizeof(T),
+    // and generates a left shift of 0 bits when Size == sizeof(T)
+    const auto sign_extension_bits =
+        std::is_signed<T>::value && Size < sizeof(T) && bytes[most_significant_read_byte] < 0
+            ? static_cast<T>(static_cast<typename std::make_unsigned<T>::type>(all_bits_enabled)
+                             << ((Size % sizeof(T)) * CHAR_BIT))
+            : static_cast<T>(0);
+
+    return fromEndianness<Endianness>(static_cast<T>(result)) | sign_extension_bits;
+  }
+
+  /**
+   * Copy a little endian integer out of the buffer.
+   * @param start supplies the buffer index to start copying from.
+   * @param Size how many bytes to read out of the buffer.
+   */
+  template <typename T, size_t Size = sizeof(T)> T peekLEInt(uint64_t start = 0) {
+    return peekInt<T, ByteOrder::LittleEndian, Size>(start);
+  }
+
+  /**
+   * Copy a big endian integer out of the buffer.
+   * @param start supplies the buffer index to start copying from.
+   * @param Size how many bytes to read out of the buffer.
+   */
+  template <typename T, size_t Size = sizeof(T)> T peekBEInt(uint64_t start = 0) {
+    return peekInt<T, ByteOrder::BigEndian, Size>(start);
+  }
+
+  /**
+   * Copy an integer out of the buffer and drain the read data.
+   * @param Size how many bytes to read out of the buffer.
+   * @param Endianness specifies the byte order to use when decoding the integer.
+   */
+  template <typename T, ByteOrder Endianness = ByteOrder::Host, size_t Size = sizeof(T)>
+  T drainInt() {
+    const auto result = peekInt<T, Endianness, Size>();
+    drain(Size);
+    return result;
+  }
+
+  /**
+   * Copy a little endian integer out of the buffer and drain the read data.
+   * @param Size how many bytes to read out of the buffer.
+   */
+  template <typename T, size_t Size = sizeof(T)> T drainLEInt() {
+    return drainInt<T, ByteOrder::LittleEndian, Size>();
+  }
+
+  /**
+   * Copy a big endian integer out of the buffer and drain the read data.
+   * @param Size how many bytes to read out of the buffer.
+   */
+  template <typename T, size_t Size = sizeof(T)> T drainBEInt() {
+    return drainInt<T, ByteOrder::BigEndian, Size>();
+  }
+
+  /**
+   * Copy a byte into the buffer.
+   * @param value supplies the byte to copy into the buffer.
+   */
+  void writeByte(uint8_t value) { add(std::addressof(value), 1); }
+
+  /**
+   * Copy value as a byte into the buffer.
+   * @param value supplies the byte to copy into the buffer.
+   */
+  template <typename T> void writeByte(T value) { writeByte(static_cast<uint8_t>(value)); }
+
+  /**
+   * Copy an integer into the buffer.
+   * @param value supplies the integer to copy into the buffer.
+   * @param Size how many bytes to write from the requested integer.
+   * @param Endianness specifies the byte order to use when encoding the integer.
+   */
+  template <ByteOrder Endianness = ByteOrder::Host, typename T, size_t Size = sizeof(T)>
+  void writeInt(T value) {
+    static_assert(Size <= sizeof(T), "requested size is bigger than integer being written");
+
+    const auto data = toEndianness<Endianness>(value);
+    constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;
+    add(reinterpret_cast<const char*>(std::addressof(data)) + displacement, Size);
+  }
+
+  /**
+   * Copy an integer into the buffer in little endian byte order.
+   * @param value supplies the integer to copy into the buffer.
+   * @param Size how many bytes to write from the requested integer.
+   */
+  template <typename T, size_t Size = sizeof(T)> void writeLEInt(T value) {
+    writeInt<ByteOrder::LittleEndian, T, Size>(value);
+  }
+
+  /**
+   * Copy an integer into the buffer in big endian byte order.
+   * @param value supplies the integer to copy into the buffer.
+   * @param Size how many bytes to write from the requested integer.
+   */
+  template <typename T, size_t Size = sizeof(T)> void writeBEInt(T value) {
+    writeInt<ByteOrder::BigEndian, T, Size>(value);
+  }
 };
 
-typedef std::unique_ptr<Instance> InstancePtr;
+using InstancePtr = std::unique_ptr<Instance>;
 
 /**
  * A factory for creating buffers which call callbacks when reaching high and low watermarks.
  */
 class WatermarkFactory {
 public:
-  virtual ~WatermarkFactory() {}
+  virtual ~WatermarkFactory() = default;
 
   /**
    * Creates and returns a unique pointer to a new buffer.
@@ -193,7 +379,7 @@ public:
                              std::function<void()> above_high_watermark) PURE;
 };
 
-typedef std::unique_ptr<WatermarkFactory> WatermarkFactoryPtr;
+using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;
 
 } // namespace Buffer
 } // namespace Envoy

@@ -1,8 +1,8 @@
 #pragma once
 
-namespace Envoy {
+// NOLINT(namespace-envoy)
+
 /**
  * Friendly name for a pure virtual routine.
  */
 #define PURE = 0
-} // Envoy

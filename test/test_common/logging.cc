@@ -21,9 +21,9 @@ LogLevelSetter::~LogLevelSetter() {
   ASSERT(prev_level == previous_levels_.end());
 }
 
-LogRecordingSink::LogRecordingSink(Logger::DelegatingLogSinkPtr log_sink)
+LogRecordingSink::LogRecordingSink(Logger::DelegatingLogSinkSharedPtr log_sink)
     : Logger::SinkDelegate(log_sink) {}
-LogRecordingSink::~LogRecordingSink() {}
+LogRecordingSink::~LogRecordingSink() = default;
 
 void LogRecordingSink::log(absl::string_view msg) {
   previous_delegate()->log(msg);

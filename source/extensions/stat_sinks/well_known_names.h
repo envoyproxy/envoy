@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -13,14 +15,16 @@ namespace StatSinks {
 class StatsSinkNameValues {
 public:
   // Statsd sink
-  const std::string STATSD = "envoy.statsd";
-  // DogStatsD compatible stastsd sink
-  const std::string DOG_STATSD = "envoy.dog_statsd";
+  const std::string Statsd = "envoy.stat_sinks.statsd";
+  // DogStatsD compatible statsd sink
+  const std::string DogStatsd = "envoy.stat_sinks.dog_statsd";
   // MetricsService sink
-  const std::string METRICS_SERVICE = "envoy.metrics_service";
+  const std::string MetricsService = "envoy.stat_sinks.metrics_service";
+  // Hystrix sink
+  const std::string Hystrix = "envoy.stat_sinks.hystrix";
 };
 
-typedef ConstSingleton<StatsSinkNameValues> StatsSinkNames;
+using StatsSinkNames = ConstSingleton<StatsSinkNameValues>;
 
 } // namespace StatSinks
 } // namespace Extensions

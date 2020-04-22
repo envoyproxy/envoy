@@ -5,38 +5,32 @@
 #include "envoy/common/pure.h"
 
 namespace Envoy {
+
 /**
  * Less typing for common system time and steady time type.
  *
  * SystemTime should be used when getting a time to present to the user, e.g. for logging.
  * MonotonicTime should be used when tracking time for computing an interval.
  */
-typedef std::chrono::time_point<std::chrono::system_clock> SystemTime;
-typedef std::chrono::time_point<std::chrono::steady_clock> MonotonicTime;
+using SystemTime = std::chrono::time_point<std::chrono::system_clock>;
+using MonotonicTime = std::chrono::time_point<std::chrono::steady_clock>;
 
 /**
- * Abstraction for getting the current system time. Useful for testing.
+ * Captures a system-time source, capable of computing both monotonically increasing
+ * and real time.
  */
-class SystemTimeSource {
+class TimeSource {
 public:
-  virtual ~SystemTimeSource() {}
+  virtual ~TimeSource() = default;
 
   /**
-   * @return the current system time.
+   * @return the current system time; not guaranteed to be monotonically increasing.
    */
-  virtual SystemTime currentTime() PURE;
-};
-
-/**
- * Abstraction for getting the current monotonically increasing time. Useful for testing.
- */
-class MonotonicTimeSource {
-public:
-  virtual ~MonotonicTimeSource() {}
-
+  virtual SystemTime systemTime() PURE;
   /**
    * @return the current monotonic time.
    */
-  virtual MonotonicTime currentTime() PURE;
+  virtual MonotonicTime monotonicTime() PURE;
 };
+
 } // namespace Envoy

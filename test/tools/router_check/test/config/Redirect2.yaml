@@ -1,0 +1,17 @@
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+    - match:
+        prefix: /
+      route:
+        cluster: www2
+- name: redirect
+  domains:
+  - redirect.lyft.com
+  routes:
+    - match:
+        prefix: /foo
+      redirect:
+        host_redirect: new.lyft.com

@@ -1,0 +1,27 @@
+# https://github.com/protocolbuffers/upb/pull/226
+diff --git a/bazel/upb_proto_library.bzl b/bazel/upb_proto_library.bzl
+index f148745be..21ed34b48 100644
+--- a/bazel/upb_proto_library.bzl
++++ b/bazel/upb_proto_library.bzl
+@@ -8,7 +8,7 @@ load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+ 
+ # copybara:strip_for_google3_begin
+ load("@bazel_skylib//lib:versions.bzl", "versions")
+-load("@bazel_version//:bazel_version.bzl", "bazel_version")
++load("@upb_bazel_version//:bazel_version.bzl", "bazel_version")
+ # copybara:strip_end
+ 
+ # Generic support code #########################################################
+diff --git a/bazel/workspace_deps.bzl b/bazel/workspace_deps.bzl
+index 39bf524a7..aabbc3411 100644
+--- a/bazel/workspace_deps.bzl
++++ b/bazel/workspace_deps.bzl
+@@ -5,7 +5,7 @@ load("//bazel:repository_defs.bzl", "bazel_version_repository")
+ 
+ def upb_deps():
+     bazel_version_repository(
+-        name = "bazel_version",
++        name = "upb_bazel_version",
+     )
+ 
+     git_repository(

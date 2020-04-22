@@ -23,19 +23,20 @@ To build the Go gRPC service run::
 
   $ pwd
   envoy/examples/grpc-bridge
-  $ script/bootstrap
-  $ script/build
+  $ script/bootstrap.sh
+  $ script/build.sh
 
-Note: ``build`` requires that your Envoy codebase (or a working copy thereof) is in ``$GOPATH/src/github.com/envoyproxy/envoy``.
+Note: ``build.sh`` requires that your Envoy codebase (or a working copy thereof) is in ``$GOPATH/src/github.com/envoyproxy/envoy``.
 
 Docker compose
 ~~~~~~~~~~~~~~
 
 To run the docker compose file, and set up both the Python and the gRPC containers
-run::
+run:
 
   $ pwd
   envoy/examples/grpc-bridge
+  $ docker-compose pull
   $ docker-compose up --build
 
 Sending requests to the Key/Value store

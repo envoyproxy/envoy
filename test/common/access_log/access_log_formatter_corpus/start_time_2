@@ -1,0 +1,4 @@
+format: "%START_TIME(segment1:%s.%3f|segment2:%s.%4f|seg3:%s.%6f|%s-%3f-asdf-%9f|.%7f:segm5:%Y)%"
+stream_info {
+  start_time: 1522796769123456
+}

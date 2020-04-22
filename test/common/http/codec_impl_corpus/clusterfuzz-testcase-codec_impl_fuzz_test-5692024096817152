@@ -1,0 +1,23 @@
+h2_settings {
+  client {
+    hpack_table_size: 103
+    max_concurrent_streams: 103
+    initial_stream_window_size: 103
+  }
+}
+actions {
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "transfer-encodinG"
+        value: "Yh2_settings {\n  client {\n    hpack_table_size: 103\n    max_concurrent_streams: 103\n    initial_stream_window_size: 103\n  }\n}\nactions {\n}\nactions {\n  new_stream {\n    request_headers {\n      headers {\n        key: \"transfer-encodinG\"\n        value: \"Y\"\n      }\n    }\n  }\n}\n"
+      }
+    }
+  }
+}

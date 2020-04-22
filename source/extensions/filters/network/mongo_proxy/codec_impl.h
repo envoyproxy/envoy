@@ -136,9 +136,9 @@ public:
   void numberToSkip(int32_t skip) override { number_to_skip_ = skip; }
   int32_t numberToReturn() const override { return number_to_return_; }
   void numberToReturn(int32_t to_return) override { number_to_return_ = to_return; }
-  virtual const Bson::Document* query() const override { return query_.get(); }
+  const Bson::Document* query() const override { return query_.get(); }
   void query(Bson::DocumentSharedPtr&& query) override { query_ = std::move(query); }
-  virtual const Bson::Document* returnFieldsSelector() const override {
+  const Bson::Document* returnFieldsSelector() const override {
     return return_fields_selector_.get();
   }
   void returnFieldsSelector(Bson::DocumentSharedPtr&& fields) override {

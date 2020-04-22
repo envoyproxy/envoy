@@ -2,76 +2,123 @@
 
 #include <string>
 
-#include "envoy/api/v2/cds.pb.validate.h"
-#include "envoy/api/v2/cluster/outlier_detection.pb.validate.h"
+#include "envoy/api/v2/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.validate.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
+#include "envoy/stats/scope.h"
 
+#include "common/common/assert.h"
 #include "common/common/cleanup.h"
-#include "common/config/resources.h"
-#include "common/config/subscription_factory.h"
+#include "common/common/utility.h"
+#include "common/config/api_version.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/upstream/cds_subscription.h"
+
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Upstream {
 
-CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
-                             const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                             ClusterManager& cm, Event::Dispatcher& dispatcher,
-                             Runtime::RandomGenerator& random,
-                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope) {
-  return CdsApiPtr{
-      new CdsApiImpl(cds_config, eds_config, cm, dispatcher, random, local_info, scope)};
+CdsApiPtr CdsApiImpl::create(const envoy::config::core::v3::ConfigSource& cds_config,
+                             ClusterManager& cm, Stats::Scope& scope,
+                             ProtobufMessage::ValidationVisitor& validation_visitor) {
+  return CdsApiPtr{new CdsApiImpl(cds_config, cm, scope, validation_visitor)};
 }
 
-CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config,
-                       const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                       ClusterManager& cm, Event::Dispatcher& dispatcher,
-                       Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                       Stats::Scope& scope)
-    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
-  Config::Utility::checkLocalInfo("cds", local_info);
-
-  subscription_ =
-      Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
-          cds_config, local_info.node(), dispatcher, cm, random, *scope_,
-          [this, &cds_config, &eds_config, &cm, &dispatcher, &random,
-           &local_info]() -> Config::Subscription<envoy::api::v2::Cluster>* {
-            return new CdsSubscription(Config::Utility::generateStats(*scope_), cds_config,
-                                       eds_config, cm, dispatcher, random, local_info);
-          },
-          "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
-          "envoy.api.v2.ClusterDiscoveryService.StreamClusters");
+CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm,
+                       Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
+    : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(
+          cds_config.resource_api_version()),
+      cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
+      validation_visitor_(validation_visitor) {
+  const auto resource_name = getResourceName();
+  subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
+      cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this);
 }
 
-void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
-  cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
-  Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
-  for (const auto& cluster : resources) {
-    MessageUtil::validate(cluster);
-  }
-  // We need to keep track of which clusters we might need to remove.
+void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                const std::string& version_info) {
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
-  for (auto& cluster : resources) {
-    const std::string cluster_name = cluster.name();
-    clusters_to_remove.erase(cluster_name);
-    if (cm_.addOrUpdateCluster(cluster, version_info)) {
-      ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
-    }
+  std::vector<envoy::config::cluster::v3::Cluster> clusters;
+  for (const auto& cluster_blob : resources) {
+    // No validation needed here the overloaded call to onConfigUpdate validates.
+    clusters.push_back(MessageUtil::anyConvert<envoy::config::cluster::v3::Cluster>(cluster_blob));
+    clusters_to_remove.erase(clusters.back().name());
   }
-
-  for (auto cluster : clusters_to_remove) {
-    const std::string cluster_name = cluster.first;
-    if (cm_.removeCluster(cluster_name)) {
-      ENVOY_LOG(debug, "cds: remove cluster '{}'", cluster_name);
-    }
+  Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
+  for (const auto& cluster : clusters_to_remove) {
+    *to_remove_repeated.Add() = cluster.first;
   }
-
-  version_info_ = version_info;
-  runInitializeCallbackIfAny();
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> to_add_repeated;
+  for (const auto& cluster : clusters) {
+    envoy::service::discovery::v3::Resource* to_add = to_add_repeated.Add();
+    to_add->set_name(cluster.name());
+    to_add->set_version(version_info);
+    to_add->mutable_resource()->PackFrom(cluster);
+  }
+  onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
 }
 
-void CdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {
+void CdsApiImpl::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+    const std::string& system_version_info) {
+  std::unique_ptr<Cleanup> maybe_eds_resume;
+  if (cm_.adsMux()) {
+    const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        envoy::config::core::v3::ApiVersion::V2);
+    cm_.adsMux()->pause(type_url);
+    maybe_eds_resume =
+        std::make_unique<Cleanup>([this, type_url] { cm_.adsMux()->resume(type_url); });
+  }
+
+  ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),
+            removed_resources.size());
+
+  std::vector<std::string> exception_msgs;
+  std::unordered_set<std::string> cluster_names;
+  bool any_applied = false;
+  for (const auto& resource : added_resources) {
+    envoy::config::cluster::v3::Cluster cluster;
+    try {
+      cluster = MessageUtil::anyConvertAndValidate<envoy::config::cluster::v3::Cluster>(
+          resource.resource(), validation_visitor_);
+      if (!cluster_names.insert(cluster.name()).second) {
+        // NOTE: at this point, the first of these duplicates has already been successfully applied.
+        throw EnvoyException(fmt::format("duplicate cluster {} found", cluster.name()));
+      }
+      if (cm_.addOrUpdateCluster(cluster, resource.version())) {
+        any_applied = true;
+        ENVOY_LOG(info, "cds: add/update cluster '{}'", cluster.name());
+      } else {
+        ENVOY_LOG(debug, "cds: add/update cluster '{}' skipped", cluster.name());
+      }
+    } catch (const EnvoyException& e) {
+      exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
+    }
+  }
+  for (const auto& resource_name : removed_resources) {
+    if (cm_.removeCluster(resource_name)) {
+      any_applied = true;
+      ENVOY_LOG(info, "cds: remove cluster '{}'", resource_name);
+    }
+  }
+
+  if (any_applied) {
+    system_version_info_ = system_version_info;
+  }
+  runInitializeCallbackIfAny();
+  if (!exception_msgs.empty()) {
+    throw EnvoyException(
+        fmt::format("Error adding/updating cluster(s) {}", absl::StrJoin(exception_msgs, ", ")));
+  }
+}
+
+void CdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                                      const EnvoyException*) {
+  ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad
   // config.
   runInitializeCallbackIfAny();

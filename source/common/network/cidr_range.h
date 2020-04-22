@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/network/address.h"
 
@@ -78,7 +78,7 @@ public:
    * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    * @return a CidrRange instance with the specified address and length, modified so that the only
    *         bits that might be non-zero are in the high-order length bits, and so that length is
-   *         in the appropriate range (0 to 32 for IPv4, 0 to 128 for IPv6). If the the address or
+   *         in the appropriate range (0 to 32 for IPv4, 0 to 128 for IPv6). If the address or
    *         length is invalid, then the range will be invalid (i.e. length == -1).
    */
   static CidrRange create(InstanceConstSharedPtr address, int length);
@@ -98,7 +98,7 @@ public:
    * Constructs a CidrRange from envoy::api::v2::core::CidrRange.
    * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    */
-  static CidrRange create(const envoy::api::v2::core::CidrRange& cidr);
+  static CidrRange create(const envoy::config::core::v3::CidrRange& cidr);
 
   /**
    * Given an IP address and a length of high order bits to keep, returns an address
@@ -128,8 +128,8 @@ class IpList {
 public:
   IpList(const std::vector<std::string>& subnets);
   IpList(const Json::Object& config, const std::string& member_name);
-  IpList(const Protobuf::RepeatedPtrField<envoy::api::v2::core::CidrRange>& cidrs);
-  IpList(){};
+  IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs);
+  IpList() = default;
 
   bool contains(const Instance& address) const;
   bool empty() const { return ip_list_.empty(); }

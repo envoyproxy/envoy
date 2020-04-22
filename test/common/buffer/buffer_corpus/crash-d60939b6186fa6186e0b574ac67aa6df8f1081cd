@@ -1,0 +1,53 @@
+actions {
+  prepend_string: 1024
+}
+actions {
+}
+actions {
+  add_buffer_fragment: 1
+}
+actions {
+  read: 2789
+}
+actions {
+  read: 0
+}
+actions {
+  linearize: 45
+}
+actions {
+  reserve_commit {
+    reserve_length: 14
+    commit_length: 1048576
+  }
+}
+actions {
+  move {
+    source_index: 1
+  }
+}
+actions {
+  reserve_commit {
+    reserve_length: 2048
+    commit_length: 1048576
+  }
+}
+actions {
+  read: 0
+}
+actions {
+  drain: 1024
+}
+actions {
+  move {
+    length: 23
+  }
+}
+actions {
+  linearize: 45
+}
+actions {
+  copy_out {
+    length: 5
+  }
+}

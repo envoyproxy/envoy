@@ -20,9 +20,13 @@ public:
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
   ConfigTracker& getConfigTracker() override;
-  Http::Code request(absl::string_view path, const Http::Utility::QueryParams& params,
-                     absl::string_view method, Http::HeaderMap& response_headers,
-                     std::string& body) override;
+  void startHttpListener(const std::string& access_log_path, const std::string& address_out_path,
+                         Network::Address::InstanceConstSharedPtr address,
+                         const Network::Socket::OptionsSharedPtr&,
+                         Stats::ScopePtr&& listener_scope) override;
+  Http::Code request(absl::string_view path_and_query, absl::string_view method,
+                     Http::ResponseHeaderMap& response_headers, std::string& body) override;
+  void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
 private:
   ConfigTrackerImpl config_tracker_;

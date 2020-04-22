@@ -15,9 +15,15 @@ envoy_sh_test(
         ":configs",
         "//test/tools/router_check:router_check_tool",
     ],
+    # TODO: This script invocation does not work on Windows, see: https://github.com/bazelbuild/bazel/issues/10959
+    tags = ["fails_on_windows"],
 )
 
 filegroup(
     name = "configs",
-    srcs = glob(["config/*.json"]),
+    srcs = glob([
+        "config/*.yaml",
+        "config/*.json",
+        "config/*.pb_text",
+    ]),
 )

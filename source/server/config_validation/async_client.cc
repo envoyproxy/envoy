@@ -3,15 +3,15 @@
 namespace Envoy {
 namespace Http {
 
-AsyncClient::Request*
-ValidationAsyncClient::send(MessagePtr&&, Callbacks&,
-                            const absl::optional<std::chrono::milliseconds>&) {
+ValidationAsyncClient::ValidationAsyncClient(Api::Api& api, Event::TimeSystem& time_system)
+    : dispatcher_("validation_async_client", api, time_system) {}
+
+AsyncClient::Request* ValidationAsyncClient::send(RequestMessagePtr&&, Callbacks&,
+                                                  const RequestOptions&) {
   return nullptr;
 }
 
-AsyncClient::Stream* ValidationAsyncClient::start(StreamCallbacks&,
-                                                  const absl::optional<std::chrono::milliseconds>&,
-                                                  bool) {
+AsyncClient::Stream* ValidationAsyncClient::start(StreamCallbacks&, const StreamOptions&) {
   return nullptr;
 }
 

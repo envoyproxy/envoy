@@ -21,15 +21,25 @@ namespace Envoy {
 /**
  * Stop the compiler from complaining about an unreferenced parameter.
  */
+#ifndef WIN32
 #define UNREFERENCED_PARAMETER(X) ((void)(X))
+#endif
 
 /**
  * Construct On First Use idiom.
  * See https://isocpp.org/wiki/faq/ctors#static-init-order-on-first-use.
  */
 #define CONSTRUCT_ON_FIRST_USE(type, ...)                                                          \
-  static const type* objectptr = new type{__VA_ARGS__};                                            \
-  return *objectptr;
+  do {                                                                                             \
+    static const type* objectptr = new type{__VA_ARGS__};                                          \
+    return *objectptr;                                                                             \
+  } while (0)
+
+#define MUTABLE_CONSTRUCT_ON_FIRST_USE(type, ...)                                                  \
+  do {                                                                                             \
+    static type* objectptr = new type{__VA_ARGS__};                                                \
+    return *objectptr;                                                                             \
+  } while (0)
 
 /**
  * Have a generic fall-through for different versions of C++
@@ -44,4 +54,4 @@ namespace Envoy {
 #define FALLTHRU
 #endif
 
-} // Envoy
+} // namespace Envoy

@@ -24,18 +24,18 @@ CLUSTER_BLOB = {
 
 def test(writer):
 
-    writer.write_test_file(
-        'Valid',
-        schema='CLUSTER_SCHEMA',
-        data=get_blob(CLUSTER_BLOB),
-        throws=False,
-    )
+  writer.write_test_file(
+      'Valid',
+      schema='CLUSTER_SCHEMA',
+      data=get_blob(CLUSTER_BLOB),
+      throws=False,
+  )
 
-    blob = get_blob(CLUSTER_BLOB)
-    blob['features'] = "nonexistentfeature"
-    writer.write_test_file(
-        'UnsupportedFeature',
-        schema='CLUSTER_SCHEMA',
-        data=blob,
-        throws=True,
-    )
+  blob = get_blob(CLUSTER_BLOB)
+  blob['features'] = "nonexistentfeature"
+  writer.write_test_file(
+      'UnsupportedFeature',
+      schema='CLUSTER_SCHEMA',
+      data=blob,
+      throws=True,
+  )

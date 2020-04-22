@@ -1,11 +1,13 @@
 #include "common/router/header_parser.h"
 
-#include <ctype.h>
-
+#include <cctype>
 #include <memory>
 #include <string>
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/common/assert.h"
+#include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -33,12 +35,22 @@ std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%
 // is either literal text (with % escaped as %%) or part of a %VAR% or %VAR(["args"])% expression.
 // The statement machine does minimal validation of the arguments (if any) and does not know the
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
-// RequestInfoHeaderFormatter.
-HeaderFormatterPtr
-parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option) {
-  const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
+// StreamInfoHeaderFormatter.
+HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& header_value,
+                                 bool append) {
+  const std::string& key = header_value.key();
+  // PGV constraints provide this guarantee.
+  ASSERT(!key.empty());
+  // We reject :path/:authority rewriting, there is already a well defined mechanism to
+  // perform this in the RouteAction, and doing this via request_headers_to_add
+  // will cause us to have to worry about interaction with other aspects of the
+  // RouteAction, e.g. prefix rewriting. We also reject other :-prefixed
+  // headers, since it seems dangerous and there doesn't appear a use case.
+  if (key[0] == ':') {
+    throw EnvoyException(":-prefixed headers may not be modified");
+  }
 
-  absl::string_view format(header_value_option.header().value());
+  absl::string_view format(header_value.value());
   if (format.empty()) {
     return std::make_unique<PlainHeaderFormatter>("", append);
   }
@@ -84,7 +96,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
       if (ch == '%') {
         // Found complete variable name, add formatter.
         formatters.emplace_back(
-            new RequestInfoHeaderFormatter(format.substr(start, pos - start), append));
+            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -165,7 +177,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
       // Search for closing % of a %VAR(...)% expression
       if (ch == '%') {
         formatters.emplace_back(
-            new RequestInfoHeaderFormatter(format.substr(start, pos - start), append));
+            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -179,7 +191,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
       break;
 
     default:
-      NOT_REACHED;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   } while (++pos < format.size());
 
@@ -196,7 +208,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
     formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
   }
 
-  ASSERT(formatters.size() > 0);
+  ASSERT(!formatters.empty());
 
   if (formatters.size() == 1) {
     return std::move(formatters[0]);
@@ -208,11 +220,12 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
 } // namespace
 
 HeaderParserPtr HeaderParser::configure(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add) {
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add) {
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
-    HeaderFormatterPtr header_formatter = parseInternal(header_value_option);
+    const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
+    HeaderFormatterPtr header_formatter = parseInternal(header_value_option.header(), append);
 
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()), std::move(header_formatter));
@@ -222,11 +235,32 @@ HeaderParserPtr HeaderParser::configure(
 }
 
 HeaderParserPtr HeaderParser::configure(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add,
-    const Protobuf::RepeatedPtrField<ProtobufTypes::String>& headers_to_remove) {
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers_to_add,
+    bool append) {
+  HeaderParserPtr header_parser(new HeaderParser());
+
+  for (const auto& header_value : headers_to_add) {
+    HeaderFormatterPtr header_formatter = parseInternal(header_value, append);
+
+    header_parser->headers_to_add_.emplace_back(Http::LowerCaseString(header_value.key()),
+                                                std::move(header_formatter));
+  }
+
+  return header_parser;
+}
+
+HeaderParserPtr HeaderParser::configure(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add,
+    const Protobuf::RepeatedPtrField<std::string>& headers_to_remove) {
   HeaderParserPtr header_parser = configure(headers_to_add);
 
   for (const auto& header : headers_to_remove) {
+    // We reject :-prefix (e.g. :path) removal here. This is dangerous, since other aspects of
+    // request finalization assume their existence and they are needed for well-formedness in most
+    // cases.
+    if (header[0] == ':' || Http::LowerCaseString(header).get() == "host") {
+      throw EnvoyException(":-prefixed or host headers may not be removed");
+    }
     header_parser->headers_to_remove_.emplace_back(header);
   }
 
@@ -234,9 +268,15 @@ HeaderParserPtr HeaderParser::configure(
 }
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const RequestInfo::RequestInfo& request_info) const {
+                                   const StreamInfo::StreamInfo& stream_info) const {
+  // Removing headers in the headers_to_remove_ list first makes
+  // remove-before-add the default behavior as expected by users.
+  for (const auto& header : headers_to_remove_) {
+    headers.remove(header);
+  }
+
   for (const auto& formatter : headers_to_add_) {
-    const std::string value = formatter.second->format(request_info);
+    const std::string value = formatter.second->format(stream_info);
     if (!value.empty()) {
       if (formatter.second->append()) {
         headers.addReferenceKey(formatter.first, value);
@@ -244,10 +284,6 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
         headers.setReferenceKey(formatter.first, value);
       }
     }
-  }
-
-  for (const auto& header : headers_to_remove_) {
-    headers.remove(header);
   }
 }
 

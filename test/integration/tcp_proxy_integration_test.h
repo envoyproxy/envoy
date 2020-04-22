@@ -4,26 +4,25 @@
 #include <string>
 
 #include "test/integration/integration.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
-class TcpProxyIntegrationTest : public BaseIntegrationTest,
-                                public testing::TestWithParam<Network::Address::IpVersion> {
+
+class TcpProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                public BaseIntegrationTest {
 public:
-  TcpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::TCP_PROXY_CONFIG) {
+  TcpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {
     enable_half_close_ = true;
   }
 
-  void initialize() override;
-
-  void TearDown() override {
+  ~TcpProxyIntegrationTest() override {
     test_server_.reset();
     fake_upstreams_.clear();
   }
+
+  void initialize() override;
 };
 
 class TcpProxySslIntegrationTest : public TcpProxyIntegrationTest {
@@ -33,16 +32,14 @@ public:
   void sendAndReceiveTlsData(const std::string& data_to_send_upstream,
                              const std::string& data_to_send_downstream);
 
-  Network::ClientConnectionPtr ssl_client_;
-  FakeRawConnectionPtr fake_upstream_connection_;
-  testing::NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Ssl::ContextManager> context_manager_;
   Network::TransportSocketFactoryPtr context_;
   ConnectionStatusCallbacks connect_callbacks_;
   MockWatermarkBuffer* client_write_buffer_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;
-  Secret::MockSecretManager secret_manager_;
+  testing::NiceMock<Secret::MockSecretManager> secret_manager_;
+  Network::ClientConnectionPtr ssl_client_;
+  FakeRawConnectionPtr fake_upstream_connection_;
 };
 
-} // namespace
 } // namespace Envoy

@@ -1,4 +1,4 @@
-@import "theme.css";
+@import url("theme.css");
 
 /* Splits a long line descriptions in tables in to multiple lines */
 .wy-table-responsive table td, .wy-table-responsive table th {

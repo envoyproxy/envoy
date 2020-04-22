@@ -1,8 +1,11 @@
 #pragma once
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/http/context_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/config_validation/async_client.h"
@@ -16,25 +19,34 @@ namespace Upstream {
  */
 class ValidationClusterManagerFactory : public ProdClusterManagerFactory {
 public:
-  ValidationClusterManagerFactory(Runtime::Loader& runtime, Stats::Store& stats,
-                                  ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
-                                  Network::DnsResolverSharedPtr dns_resolver,
-                                  Ssl::ContextManager& ssl_context_manager,
-                                  Event::Dispatcher& main_thread_dispatcher,
-                                  const LocalInfo::LocalInfo& local_info,
-                                  Secret::SecretManager& secret_manager);
+  using ProdClusterManagerFactory::ProdClusterManagerFactory;
+
+  explicit ValidationClusterManagerFactory(
+      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
+      ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
+      Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
+      Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
+      Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
+      Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+      AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager,
+      Event::TimeSystem& time_system)
+      : ProdClusterManagerFactory(admin, runtime, stats, tls, random, dns_resolver,
+                                  ssl_context_manager, main_thread_dispatcher, local_info,
+                                  secret_manager, validation_context, api, http_context,
+                                  grpc_context, log_manager, singleton_manager),
+        grpc_context_(grpc_context), time_system_(time_system) {}
 
   ClusterManagerPtr
-  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                          Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) override;
+  clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
   // Delegates to ProdClusterManagerFactory::createCds, but discards the result and returns nullptr
   // unconditionally.
-  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                      const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
+  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                       ClusterManager& cm) override;
+
+private:
+  Grpc::Context& grpc_context_;
+  Event::TimeSystem& time_system_;
 };
 
 /**
@@ -42,12 +54,15 @@ public:
  */
 class ValidationClusterManager : public ClusterManagerImpl {
 public:
-  ValidationClusterManager(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+  ValidationClusterManager(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                            ClusterManagerFactory& factory, Stats::Store& stats,
                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                            AccessLog::AccessLogManager& log_manager, Event::Dispatcher& dispatcher,
-                           Server::Admin& admin);
+                           Server::Admin& admin,
+                           ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+                           Http::Context& http_context, Grpc::Context& grpc_context,
+                           Event::TimeSystem& time_system);
 
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string&, ResourcePriority,
                                                          Http::Protocol,

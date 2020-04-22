@@ -1,6 +1,7 @@
 #include "extensions/filters/http/cors/cors_filter.h"
 
 #include "envoy/http/codes.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -12,11 +13,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cors {
 
-CorsFilter::CorsFilter() : policies_({{nullptr, nullptr}}), is_cors_request_(false) {}
+CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
+    : stats_(generateStats(stats_prefix + "cors.", scope)) {}
 
-// This handles the CORS preflight request as described in #6.2
-// https://www.w3.org/TR/cors/
-Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config)
+    : policies_({{nullptr, nullptr}}), config_(std::move(config)) {}
+
+// This handles the CORS preflight request as described in
+// https://www.w3.org/TR/cors/#resource-preflight-requests
+Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (decoder_callbacks_->route() == nullptr ||
       decoder_callbacks_->route()->routeEntry() == nullptr) {
     return Http::FilterHeadersStatus::Continue;
@@ -27,7 +32,7 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
       decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy(),
   }};
 
-  if (!enabled()) {
+  if (!enabled() && !shadowEnabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -37,13 +42,20 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
   }
 
   if (!isOriginAllowed(origin_->value())) {
+    config_->stats().origin_invalid_.inc();
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  config_->stats().origin_valid_.inc();
+  if (shadowEnabled() && !enabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
   is_cors_request_ = true;
 
   const auto method = headers.Method();
-  if (method == nullptr || method->value().c_str() != Http::Headers::get().MethodValues.Options) {
+  if (method == nullptr ||
+      method->value().getStringView() != Http::Headers::get().MethodValues.Options) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -52,30 +64,26 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
-      {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}}};
+  auto response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+      {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}})};
 
-  response_headers->insertAccessControlAllowOrigin().value(*origin_);
+  response_headers->setAccessControlAllowOrigin(origin_->value().getStringView());
 
   if (allowCredentials()) {
-    response_headers->insertAccessControlAllowCredentials().value(
+    response_headers->setReferenceAccessControlAllowCredentials(
         Http::Headers::get().CORSValues.True);
   }
 
   if (!allowMethods().empty()) {
-    response_headers->insertAccessControlAllowMethods().value(allowMethods());
+    response_headers->setAccessControlAllowMethods(allowMethods());
   }
 
   if (!allowHeaders().empty()) {
-    response_headers->insertAccessControlAllowHeaders().value(allowHeaders());
-  }
-
-  if (!exposeHeaders().empty()) {
-    response_headers->insertAccessControlExposeHeaders().value(exposeHeaders());
+    response_headers->setAccessControlAllowHeaders(allowHeaders());
   }
 
   if (!maxAge().empty()) {
-    response_headers->insertAccessControlMaxAge().value(maxAge());
+    response_headers->setAccessControlMaxAge(maxAge());
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
@@ -83,16 +91,20 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-// This handles simple CORS requests as described in #6.1
-// https://www.w3.org/TR/cors/
-Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
+// This handles simple CORS requests as described in
+// https://www.w3.org/TR/cors/#resource-requests
+Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (!is_cors_request_) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  headers.insertAccessControlAllowOrigin().value(*origin_);
+  headers.setAccessControlAllowOrigin(origin_->value().getStringView());
   if (allowCredentials()) {
-    headers.insertAccessControlAllowCredentials().value(Http::Headers::get().CORSValues.True);
+    headers.setReferenceAccessControlAllowCredentials(Http::Headers::get().CORSValues.True);
+  }
+
+  if (!exposeHeaders().empty()) {
+    headers.setAccessControlExposeHeaders(exposeHeaders());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -100,21 +112,22 @@ Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::HeaderMap& headers, bo
 
 void CorsFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
-};
+}
 
 bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
-  if (allowOrigins() == nullptr) {
+  const auto allow_origins = allowOrigins();
+  if (allow_origins == nullptr) {
     return false;
   }
-  for (const auto& o : *allowOrigins()) {
-    if (o == "*" || origin == o.c_str()) {
+  for (const auto& allow_origin : *allow_origins) {
+    if (allow_origin->match("*") || allow_origin->match(origin.getStringView())) {
       return true;
     }
   }
   return false;
 }
 
-const std::list<std::string>* CorsFilter::allowOrigins() {
+const std::vector<Matchers::StringMatcherPtr>* CorsFilter::allowOrigins() {
   for (const auto policy : policies_) {
     if (policy && !policy->allowOrigins().empty()) {
       return &policy->allowOrigins();
@@ -163,6 +176,15 @@ bool CorsFilter::allowCredentials() {
   for (const auto policy : policies_) {
     if (policy && policy->allowCredentials()) {
       return policy->allowCredentials().value();
+    }
+  }
+  return false;
+}
+
+bool CorsFilter::shadowEnabled() {
+  for (const auto policy : policies_) {
+    if (policy) {
+      return policy->shadowEnabled();
     }
   }
   return false;

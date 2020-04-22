@@ -1,78 +1,95 @@
 #include <chrono>
 #include <string>
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
-#include "common/event/dispatcher_impl.h"
+#include "common/common/assert.h"
 #include "common/filesystem/filesystem_impl.h"
-#include "common/stats/stats_impl.h"
 
-#include "test/mocks/api/mocks.h"
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::InSequence;
-using testing::Invoke;
-using testing::NiceMock;
-using testing::Return;
-using testing::SaveArg;
-using testing::Sequence;
-using testing::Throw;
-using testing::_;
-
 namespace Envoy {
+namespace Filesystem {
 
-TEST(FileSystemImpl, BadFile) {
-  Event::MockDispatcher dispatcher;
-  Thread::MutexBasicLockable lock;
-  Stats::IsolatedStoreImpl store;
-  EXPECT_CALL(dispatcher, createTimer_(_));
-  EXPECT_THROW(Filesystem::FileImpl("", dispatcher, lock, store, std::chrono::milliseconds(10000)),
-               EnvoyException);
+static constexpr FlagSet DefaultFlags{
+    1 << Filesystem::File::Operation::Read | 1 << Filesystem::File::Operation::Write |
+    1 << Filesystem::File::Operation::Create | 1 << Filesystem::File::Operation::Append};
+
+class FileSystemImplTest : public testing::Test {
+protected:
+  int getFd(File* file) {
+#ifdef WIN32
+    auto file_impl = dynamic_cast<FileImplWin32*>(file);
+#else
+    auto file_impl = dynamic_cast<FileImplPosix*>(file);
+#endif
+    RELEASE_ASSERT(file_impl != nullptr, "failed to cast File* to FileImpl*");
+    return file_impl->fd_;
+  }
+#ifdef WIN32
+  InstanceImplWin32 file_system_;
+#else
+  Api::SysCallStringResult canonicalPath(const std::string& path) {
+    return file_system_.canonicalPath(path);
+  }
+  InstanceImplPosix file_system_;
+#endif
+};
+
+TEST_F(FileSystemImplTest, FileExists) {
+  EXPECT_FALSE(file_system_.fileExists("/dev/blahblahblah"));
+#ifdef WIN32
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", "x");
+  EXPECT_TRUE(file_system_.fileExists(file_path));
+  EXPECT_TRUE(file_system_.fileExists("c:/windows"));
+#else
+  EXPECT_TRUE(file_system_.fileExists("/dev/null"));
+  EXPECT_TRUE(file_system_.fileExists("/dev"));
+#endif
 }
 
-TEST(FileSystemImpl, fileExists) {
-  EXPECT_TRUE(Filesystem::fileExists("/dev/null"));
-  EXPECT_FALSE(Filesystem::fileExists("/dev/blahblahblah"));
+TEST_F(FileSystemImplTest, DirectoryExists) {
+  EXPECT_FALSE(file_system_.directoryExists("/dev/blahblah"));
+#ifdef WIN32
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", "x");
+  EXPECT_FALSE(file_system_.directoryExists(file_path));
+  EXPECT_TRUE(file_system_.directoryExists("c:/windows"));
+#else
+  EXPECT_FALSE(file_system_.directoryExists("/dev/null"));
+  EXPECT_TRUE(file_system_.directoryExists("/dev"));
+#endif
 }
 
-TEST(FileSystemImpl, directoryExists) {
-  EXPECT_TRUE(Filesystem::directoryExists("/dev"));
-  EXPECT_FALSE(Filesystem::directoryExists("/dev/null"));
-  EXPECT_FALSE(Filesystem::directoryExists("/dev/blahblah"));
-}
-
-TEST(FileSystemImpl, fileSize) {
-  EXPECT_EQ(0, Filesystem::fileSize("/dev/null"));
-  EXPECT_EQ(-1, Filesystem::fileSize("/dev/blahblahblah"));
+TEST_F(FileSystemImplTest, FileSize) {
+#ifdef WIN32
+  EXPECT_EQ(0, file_system_.fileSize("NUL"));
+#else
+  EXPECT_EQ(0, file_system_.fileSize("/dev/null"));
+#endif
+  EXPECT_EQ(-1, file_system_.fileSize("/dev/blahblahblah"));
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
-  EXPECT_EQ(data.length(), Filesystem::fileSize(file_path));
+  EXPECT_EQ(data.length(), file_system_.fileSize(file_path));
 }
 
-TEST(FileSystemImpl, fileReadToEndSuccess) {
+TEST_F(FileSystemImplTest, FileReadToEndSuccess) {
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
-  EXPECT_EQ(data, Filesystem::fileReadToEnd(file_path));
+  EXPECT_EQ(data, file_system_.fileReadToEnd(file_path));
 }
 
-// Files are read into std::string; verify that all bytes (eg non-ascii characters) come back
+// Files are read into std::string; verify that all bytes (e.g., non-ascii characters) come back
 // unmodified
-TEST(FileSystemImpl, fileReadToEndSuccessBinary) {
+TEST_F(FileSystemImplTest, FileReadToEndSuccessBinary) {
   std::string data;
   for (unsigned i = 0; i < 256; i++) {
     data.push_back(i);
   }
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
-  const std::string read = Filesystem::fileReadToEnd(file_path);
+  const std::string read = file_system_.fileReadToEnd(file_path);
   const std::vector<uint8_t> binary_read(read.begin(), read.end());
   EXPECT_EQ(binary_read.size(), 256);
   for (unsigned i = 0; i < 256; i++) {
@@ -80,315 +97,259 @@ TEST(FileSystemImpl, fileReadToEndSuccessBinary) {
   }
 }
 
-TEST(FileSystemImpl, fileReadToEndDoesNotExist) {
+TEST_F(FileSystemImplTest, FileReadToEndDoesNotExist) {
   unlink(TestEnvironment::temporaryPath("envoy_this_not_exist").c_str());
-  EXPECT_THROW(Filesystem::fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
+  EXPECT_THROW(file_system_.fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
                EnvoyException);
 }
 
-TEST(FilesystemImpl, CanonicalPathSuccess) { EXPECT_EQ("/", Filesystem::canonicalPath("//")); }
-
-TEST(FilesystemImpl, CanonicalPathFail) {
-  EXPECT_THROW_WITH_MESSAGE(Filesystem::canonicalPath("/_some_non_existant_file"), EnvoyException,
-                            "Unable to determine canonical path for /_some_non_existant_file");
+TEST_F(FileSystemImplTest, FileReadToEndBlacklisted) {
+  EXPECT_THROW(file_system_.fileReadToEnd("/dev/urandom"), EnvoyException);
+  EXPECT_THROW(file_system_.fileReadToEnd("/proc/cpuinfo"), EnvoyException);
+  EXPECT_THROW(file_system_.fileReadToEnd("/sys/block/sda/dev"), EnvoyException);
 }
 
-TEST(FilesystemImpl, IllegalPath) {
-  EXPECT_FALSE(Filesystem::illegalPath("/"));
-  EXPECT_TRUE(Filesystem::illegalPath("/dev"));
-  EXPECT_TRUE(Filesystem::illegalPath("/dev/"));
-  EXPECT_TRUE(Filesystem::illegalPath("/proc"));
-  EXPECT_TRUE(Filesystem::illegalPath("/proc/"));
-  EXPECT_TRUE(Filesystem::illegalPath("/sys"));
-  EXPECT_TRUE(Filesystem::illegalPath("/sys/"));
-  EXPECT_TRUE(Filesystem::illegalPath("/_some_non_existant_file"));
+#ifndef WIN32
+TEST_F(FileSystemImplTest, CanonicalPathSuccess) { EXPECT_EQ("/", canonicalPath("//").rc_); }
+#endif
+
+#ifndef WIN32
+TEST_F(FileSystemImplTest, CanonicalPathFail) {
+  const Api::SysCallStringResult result = canonicalPath("/_some_non_existent_file");
+  EXPECT_TRUE(result.rc_.empty());
+  EXPECT_STREQ("No such file or directory", ::strerror(result.errno_));
+}
+#endif
+
+TEST_F(FileSystemImplTest, SplitPathFromFilename) {
+  PathSplitResult result;
+  result = file_system_.splitPathFromFilename("/foo/bar/baz");
+  EXPECT_EQ(result.directory_, "/foo/bar");
+  EXPECT_EQ(result.file_, "baz");
+  result = file_system_.splitPathFromFilename("/foo/bar");
+  EXPECT_EQ(result.directory_, "/foo");
+  EXPECT_EQ(result.file_, "bar");
+  result = file_system_.splitPathFromFilename("/foo");
+  EXPECT_EQ(result.directory_, "/");
+  EXPECT_EQ(result.file_, "foo");
+  result = file_system_.splitPathFromFilename("/");
+  EXPECT_EQ(result.directory_, "/");
+  EXPECT_EQ(result.file_, "");
+  EXPECT_THROW(file_system_.splitPathFromFilename("nopathdelimeter"), EnvoyException);
+#ifdef WIN32
+  result = file_system_.splitPathFromFilename("c:\\foo/bar");
+  EXPECT_EQ(result.directory_, "c:\\foo");
+  EXPECT_EQ(result.file_, "bar");
+  result = file_system_.splitPathFromFilename("c:/foo\\bar");
+  EXPECT_EQ(result.directory_, "c:/foo");
+  EXPECT_EQ(result.file_, "bar");
+  result = file_system_.splitPathFromFilename("c:\\foo");
+  EXPECT_EQ(result.directory_, "c:\\");
+  EXPECT_EQ(result.file_, "foo");
+  result = file_system_.splitPathFromFilename("c:foo");
+  EXPECT_EQ(result.directory_, "c:");
+  EXPECT_EQ(result.file_, "foo");
+  result = file_system_.splitPathFromFilename("c:");
+  EXPECT_EQ(result.directory_, "c:");
+  EXPECT_EQ(result.file_, "");
+  result = file_system_.splitPathFromFilename("\\\\?\\C:\\");
+  EXPECT_EQ(result.directory_, "\\\\?\\C:\\");
+  EXPECT_EQ(result.file_, "");
+#endif
 }
 
-TEST(FileSystemImpl, flushToLogFilePeriodically) {
-  NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
-
-  Thread::MutexBasicLockable mutex;
-  Stats::IsolatedStoreImpl stats_store;
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
-  EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
-
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
-  EXPECT_CALL(os_sys_calls, write_(_, _, _))
-      .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
-        std::string written = std::string(reinterpret_cast<const char*>(buffer), num_bytes);
-        EXPECT_EQ("test", written);
-        EXPECT_EQ(5, fd);
-
-        return num_bytes;
-      }));
-
-  file.write("test");
-
-  {
-    Thread::LockGuard lock(os_sys_calls.write_mutex_);
-    while (os_sys_calls.num_writes_ != 1) {
-      os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
-    }
-  }
-
-  EXPECT_CALL(os_sys_calls, write_(_, _, _))
-      .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
-        std::string written = std::string(reinterpret_cast<const char*>(buffer), num_bytes);
-        EXPECT_EQ("test2", written);
-        EXPECT_EQ(5, fd);
-
-        return num_bytes;
-      }));
-
-  // make sure timer is re-enabled on callback call
-  file.write("test2");
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
-  timer->callback_();
-
-  {
-    Thread::LockGuard lock(os_sys_calls.write_mutex_);
-    while (os_sys_calls.num_writes_ != 2) {
-      os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
-    }
-  }
+TEST_F(FileSystemImplTest, IllegalPath) {
+  EXPECT_FALSE(file_system_.illegalPath("/"));
+  EXPECT_FALSE(file_system_.illegalPath("//"));
+#ifdef WIN32
+  EXPECT_FALSE(file_system_.illegalPath("/dev"));
+  EXPECT_FALSE(file_system_.illegalPath("/dev/"));
+  EXPECT_FALSE(file_system_.illegalPath("/proc"));
+  EXPECT_FALSE(file_system_.illegalPath("/proc/"));
+  EXPECT_FALSE(file_system_.illegalPath("/sys"));
+  EXPECT_FALSE(file_system_.illegalPath("/sys/"));
+  EXPECT_FALSE(file_system_.illegalPath("/_some_non_existent_file"));
+  EXPECT_TRUE(file_system_.illegalPath(R"EOF(\\.\foo)EOF"));
+  EXPECT_TRUE(file_system_.illegalPath(R"EOF(\\z\foo)EOF"));
+  EXPECT_TRUE(file_system_.illegalPath(R"EOF(\\?\nul)EOF"));
+  EXPECT_FALSE(file_system_.illegalPath(R"EOF(\\?\C:\foo)EOF"));
+  EXPECT_FALSE(file_system_.illegalPath(R"EOF(C:\foo)EOF"));
+  EXPECT_FALSE(file_system_.illegalPath(R"EOF(C:\foo/bar\baz)EOF"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/foo"));
+  EXPECT_FALSE(file_system_.illegalPath("C:zfoo"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/foo/bar/baz"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/foo/b*ar/baz"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/foo/b?ar/baz"));
+  EXPECT_TRUE(file_system_.illegalPath(R"EOF(C:/i/x"x)EOF"));
+  EXPECT_TRUE(file_system_.illegalPath(std::string("C:/i\0j", 6)));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/\177"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/\alarm"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/../j"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/./j"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/.j"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/j."));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/j "));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i///"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/NUL"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/nul"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/nul.ext"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/nul.ext.ext2"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/nul .ext"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/COM1"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/COM1/whoops"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/COM1.ext"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/COM1  .ext"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/COM1  ext"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/COM1foo"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/COM0"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/COM"));
+#else
+  EXPECT_TRUE(file_system_.illegalPath("/dev"));
+  EXPECT_TRUE(file_system_.illegalPath("/dev/"));
+  // Exception to allow opening from file descriptors. See #7258.
+  EXPECT_FALSE(file_system_.illegalPath("/dev/fd/0"));
+  EXPECT_TRUE(file_system_.illegalPath("/proc"));
+  EXPECT_TRUE(file_system_.illegalPath("/proc/"));
+  EXPECT_TRUE(file_system_.illegalPath("/sys"));
+  EXPECT_TRUE(file_system_.illegalPath("/sys/"));
+  EXPECT_TRUE(file_system_.illegalPath("/_some_non_existent_file"));
+#endif
 }
 
-TEST(FileSystemImpl, flushToLogFileOnDemand) {
-  NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
+TEST_F(FileSystemImplTest, ConstructedFileNotOpen) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
 
-  Thread::MutexBasicLockable mutex;
-  Stats::IsolatedStoreImpl stats_store;
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
-  EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
-
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
-
-  // The first write to a given file will start the flush thread, which can flush
-  // immediately (race on whether it will or not). So do a write and flush to
-  // get that state out of the way, then test that small writes don't trigger a flush.
-  EXPECT_CALL(os_sys_calls, write_(_, _, _))
-      .WillOnce(Invoke([](int, const void*, size_t num_bytes) -> ssize_t { return num_bytes; }));
-  file.write("prime-it");
-  file.flush();
-  uint32_t expected_writes = 1;
-  {
-    Thread::LockGuard lock(os_sys_calls.write_mutex_);
-    EXPECT_EQ(expected_writes, os_sys_calls.num_writes_);
-  }
-
-  EXPECT_CALL(os_sys_calls, write_(_, _, _))
-      .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
-        std::string written = std::string(reinterpret_cast<const char*>(buffer), num_bytes);
-        EXPECT_EQ("test", written);
-        EXPECT_EQ(5, fd);
-
-        return num_bytes;
-      }));
-
-  file.write("test");
-
-  {
-    Thread::LockGuard lock(os_sys_calls.write_mutex_);
-    EXPECT_EQ(expected_writes, os_sys_calls.num_writes_);
-  }
-
-  file.flush();
-  expected_writes++;
-  {
-    Thread::LockGuard lock(os_sys_calls.write_mutex_);
-    EXPECT_EQ(expected_writes, os_sys_calls.num_writes_);
-  }
-
-  EXPECT_CALL(os_sys_calls, write_(_, _, _))
-      .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
-        std::string written = std::string(reinterpret_cast<const char*>(buffer), num_bytes);
-        EXPECT_EQ("test2", written);
-        EXPECT_EQ(5, fd);
-
-        return num_bytes;
-      }));
-
-  // make sure timer is re-enabled on callback call
-  file.write("test2");
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
-  timer->callback_();
-  expected_writes++;
-
-  {
-    Thread::LockGuard lock(os_sys_calls.write_mutex_);
-    while (os_sys_calls.num_writes_ != expected_writes) {
-      os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
-    }
-  }
+  FilePtr file = file_system_.createFile(new_file_path);
+  EXPECT_FALSE(file->isOpen());
 }
 
-TEST(FileSystemImpl, reopenFile) {
-  NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
+TEST_F(FileSystemImplTest, Open) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
 
-  Thread::MutexBasicLockable mutex;
-  Stats::IsolatedStoreImpl stats_store;
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
-  Sequence sq;
-  EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
-
-  EXPECT_CALL(os_sys_calls, write_(_, _, _))
-      .InSequence(sq)
-      .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
-        std::string written = std::string(reinterpret_cast<const char*>(buffer), num_bytes);
-        EXPECT_EQ("before", written);
-        EXPECT_EQ(5, fd);
-
-        return num_bytes;
-      }));
-
-  file.write("before");
-  timer->callback_();
-
-  {
-    Thread::LockGuard lock(os_sys_calls.write_mutex_);
-    while (os_sys_calls.num_writes_ != 1) {
-      os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
-    }
-  }
-
-  EXPECT_CALL(os_sys_calls, close(5)).InSequence(sq);
-  EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(10));
-
-  EXPECT_CALL(os_sys_calls, write_(_, _, _))
-      .InSequence(sq)
-      .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
-        std::string written = std::string(reinterpret_cast<const char*>(buffer), num_bytes);
-        EXPECT_EQ("reopened", written);
-        EXPECT_EQ(10, fd);
-
-        return num_bytes;
-      }));
-
-  EXPECT_CALL(os_sys_calls, close(10)).InSequence(sq);
-
-  file.reopen();
-  file.write("reopened");
-  timer->callback_();
-
-  {
-    Thread::LockGuard lock(os_sys_calls.write_mutex_);
-    while (os_sys_calls.num_writes_ != 2) {
-      os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
-    }
-  }
+  FilePtr file = file_system_.createFile(new_file_path);
+  const Api::IoCallBoolResult result = file->open(DefaultFlags);
+  EXPECT_TRUE(result.rc_);
+  EXPECT_TRUE(file->isOpen());
 }
 
-TEST(FilesystemImpl, reopenThrows) {
-  NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
+TEST_F(FileSystemImplTest, OpenTwice) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
 
-  Thread::MutexBasicLockable mutex;
-  Stats::IsolatedStoreImpl stats_store;
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  FilePtr file = file_system_.createFile(new_file_path);
+  EXPECT_EQ(getFd(file.get()), -1);
 
-  EXPECT_CALL(os_sys_calls, write_(_, _, _))
-      .WillRepeatedly(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
-        UNREFERENCED_PARAMETER(fd);
-        UNREFERENCED_PARAMETER(buffer);
+  const Api::IoCallBoolResult result1 = file->open(DefaultFlags);
+  const int initial_fd = getFd(file.get());
+  EXPECT_TRUE(result1.rc_);
+  EXPECT_TRUE(file->isOpen());
 
-        return num_bytes;
-      }));
-
-  Sequence sq;
-  EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(5));
-
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
-  EXPECT_CALL(os_sys_calls, close(5)).InSequence(sq);
-  EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(-1));
-
-  file.write("test write");
-  timer->callback_();
-  {
-    Thread::LockGuard lock(os_sys_calls.write_mutex_);
-    while (os_sys_calls.num_writes_ != 1) {
-      os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
-    }
-  }
-  file.reopen();
-
-  file.write("this is to force reopen");
-  timer->callback_();
-
-  {
-    Thread::LockGuard lock(os_sys_calls.open_mutex_);
-    while (os_sys_calls.num_open_ != 2) {
-      os_sys_calls.open_event_.wait(os_sys_calls.open_mutex_);
-    }
-  }
-
-  // write call should not cause any exceptions
-  file.write("random data");
-  timer->callback_();
+  // check that we don't leak a file descriptor
+  const Api::IoCallBoolResult result2 = file->open(DefaultFlags);
+  EXPECT_EQ(initial_fd, getFd(file.get()));
+  EXPECT_TRUE(result2.rc_);
+  EXPECT_TRUE(file->isOpen());
 }
 
-TEST(FilesystemImpl, bigDataChunkShouldBeFlushedWithoutTimer) {
-  NiceMock<Event::MockDispatcher> dispatcher;
-  Thread::MutexBasicLockable mutex;
-  Stats::IsolatedStoreImpl stats_store;
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
-
-  EXPECT_CALL(os_sys_calls, write_(_, _, _))
-      .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
-        UNREFERENCED_PARAMETER(fd);
-
-        std::string written = std::string(reinterpret_cast<const char*>(buffer), num_bytes);
-        std::string expected("a");
-        EXPECT_EQ(expected, written);
-
-        return num_bytes;
-      }));
-
-  file.write("a");
-
-  {
-    Thread::LockGuard lock(os_sys_calls.write_mutex_);
-    while (os_sys_calls.num_writes_ != 1) {
-      os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
-    }
-  }
-
-  // First write happens without waiting on thread_flush_. Now make a big string and it should be
-  // flushed even when timer is not enabled
-  EXPECT_CALL(os_sys_calls, write_(_, _, _))
-      .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
-        UNREFERENCED_PARAMETER(fd);
-
-        std::string written = std::string(reinterpret_cast<const char*>(buffer), num_bytes);
-        std::string expected(1024 * 64 + 1, 'b');
-        EXPECT_EQ(expected, written);
-
-        return num_bytes;
-      }));
-
-  std::string big_string(1024 * 64 + 1, 'b');
-  file.write(big_string);
-
-  {
-    Thread::LockGuard lock(os_sys_calls.write_mutex_);
-    while (os_sys_calls.num_writes_ != 2) {
-      os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
-    }
-  }
+TEST_F(FileSystemImplTest, OpenBadFilePath) {
+  FilePtr file = file_system_.createFile("");
+  const Api::IoCallBoolResult result = file->open(DefaultFlags);
+  EXPECT_FALSE(result.rc_);
 }
+
+TEST_F(FileSystemImplTest, ExistingFile) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "existing file");
+
+  {
+    FilePtr file = file_system_.createFile(file_path);
+    const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+    EXPECT_TRUE(open_result.rc_);
+    std::string data(" new data");
+    const Api::IoCallSizeResult result = file->write(data);
+    EXPECT_EQ(data.length(), result.rc_);
+  }
+
+  auto contents = TestEnvironment::readFileToStringForTest(file_path);
+  EXPECT_EQ("existing file new data", contents);
+}
+
+TEST_F(FileSystemImplTest, NonExistingFile) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
+
+  {
+    FilePtr file = file_system_.createFile(new_file_path);
+    const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+    EXPECT_TRUE(open_result.rc_);
+    std::string data(" new data");
+    const Api::IoCallSizeResult result = file->write(data);
+    EXPECT_EQ(data.length(), result.rc_);
+  }
+
+  auto contents = TestEnvironment::readFileToStringForTest(new_file_path);
+  EXPECT_EQ(" new data", contents);
+}
+
+TEST_F(FileSystemImplTest, Close) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
+
+  FilePtr file = file_system_.createFile(new_file_path);
+  const Api::IoCallBoolResult result1 = file->open(DefaultFlags);
+  EXPECT_TRUE(result1.rc_);
+  EXPECT_TRUE(file->isOpen());
+
+  const Api::IoCallBoolResult result2 = file->close();
+  EXPECT_TRUE(result2.rc_);
+  EXPECT_FALSE(file->isOpen());
+}
+
+TEST_F(FileSystemImplTest, WriteAfterClose) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
+
+  FilePtr file = file_system_.createFile(new_file_path);
+  const Api::IoCallBoolResult bool_result1 = file->open(DefaultFlags);
+  EXPECT_TRUE(bool_result1.rc_);
+  const Api::IoCallBoolResult bool_result2 = file->close();
+  EXPECT_TRUE(bool_result2.rc_);
+  const Api::IoCallSizeResult size_result = file->write(" new data");
+  EXPECT_EQ(-1, size_result.rc_);
+  EXPECT_EQ(IoFileError::IoErrorCode::UnknownError, size_result.err_->getErrorCode());
+  EXPECT_EQ("Bad file descriptor", size_result.err_->getErrorDetails());
+}
+
+TEST_F(FileSystemImplTest, NonExistingFileAndReadOnly) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
+
+  static constexpr FlagSet flag(static_cast<size_t>(Filesystem::File::Operation::Read));
+  FilePtr file = file_system_.createFile(new_file_path);
+  const Api::IoCallBoolResult open_result = file->open(flag);
+  EXPECT_FALSE(open_result.rc_);
+}
+
+TEST_F(FileSystemImplTest, ExistingReadOnlyFileAndWrite) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "existing file");
+
+  {
+    static constexpr FlagSet flag(static_cast<size_t>(Filesystem::File::Operation::Read));
+    FilePtr file = file_system_.createFile(file_path);
+    const Api::IoCallBoolResult open_result = file->open(flag);
+    EXPECT_TRUE(open_result.rc_);
+    std::string data(" new data");
+    const Api::IoCallSizeResult result = file->write(data);
+    EXPECT_TRUE(result.rc_ < 0);
+    EXPECT_EQ(result.err_->getErrorDetails(), "Bad file descriptor");
+  }
+
+  auto contents = TestEnvironment::readFileToStringForTest(file_path);
+  EXPECT_EQ("existing file", contents);
+}
+
+} // namespace Filesystem
 } // namespace Envoy

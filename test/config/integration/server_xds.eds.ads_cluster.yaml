@@ -1,0 +1,11 @@
+version_info: "123"
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
+  cluster_name: ads_cluster
+  endpoints:
+  - lb_endpoints:
+    - endpoint:
+        address:
+          socket_address:
+            address: {{ ntop_ip_loopback_address }}
+            port_value: {{ upstream_0 }}

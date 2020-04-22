@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "common/json/json_loader.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -9,9 +10,16 @@
 
 namespace Envoy {
 namespace Json {
+namespace {
 
-TEST(JsonLoaderTest, Basic) {
-  EXPECT_THROW(Factory::loadFromFile("bad_file"), Exception);
+class JsonLoaderTest : public testing::Test {
+protected:
+  JsonLoaderTest() : api_(Api::createApiForTest()) {}
+
+  Api::ApiPtr api_;
+};
+
+TEST_F(JsonLoaderTest, Basic) {
   EXPECT_THROW(Factory::loadFromString("{"), Exception);
 
   {
@@ -199,7 +207,7 @@ TEST(JsonLoaderTest, Basic) {
   }
 }
 
-TEST(JsonLoaderTest, Integer) {
+TEST_F(JsonLoaderTest, Integer) {
   {
     ObjectSharedPtr json =
         Factory::loadFromString("{\"max\":9223372036854775807, \"min\":-9223372036854775808}");
@@ -217,7 +225,7 @@ TEST(JsonLoaderTest, Integer) {
   }
 }
 
-TEST(JsonLoaderTest, Double) {
+TEST_F(JsonLoaderTest, Double) {
   {
     ObjectSharedPtr json = Factory::loadFromString("{\"value1\": 10.5, \"value2\": -12.3}");
     EXPECT_EQ(10.5, json->getDouble("value1"));
@@ -234,7 +242,7 @@ TEST(JsonLoaderTest, Double) {
   }
 }
 
-TEST(JsonLoaderTest, Hash) {
+TEST_F(JsonLoaderTest, Hash) {
   ObjectSharedPtr json1 = Factory::loadFromString("{\"value1\": 10.5, \"value2\": -12.3}");
   ObjectSharedPtr json2 = Factory::loadFromString("{\"value2\": -12.3, \"value1\": 10.5}");
   ObjectSharedPtr json3 = Factory::loadFromString("  {  \"value2\":  -12.3, \"value1\":  10.5} ");
@@ -242,7 +250,7 @@ TEST(JsonLoaderTest, Hash) {
   EXPECT_EQ(json2->hash(), json3->hash());
 }
 
-TEST(JsonLoaderTest, Schema) {
+TEST_F(JsonLoaderTest, Schema) {
   {
     std::string invalid_json_schema = R"EOF(
     {
@@ -306,7 +314,7 @@ TEST(JsonLoaderTest, Schema) {
   }
 }
 
-TEST(JsonLoaderTest, NestedSchema) {
+TEST_F(JsonLoaderTest, NestedSchema) {
 
   std::string schema = R"EOF(
   {
@@ -336,7 +344,7 @@ TEST(JsonLoaderTest, NestedSchema) {
                             "key: #/value1");
 }
 
-TEST(JsonLoaderTest, MissingEnclosingDocument) {
+TEST_F(JsonLoaderTest, MissingEnclosingDocument) {
 
   std::string json_string = R"EOF(
   "listeners" : [
@@ -352,7 +360,7 @@ TEST(JsonLoaderTest, MissingEnclosingDocument) {
                             "parsing due to Handler error.\n");
 }
 
-TEST(JsonLoaderTest, AsString) {
+TEST_F(JsonLoaderTest, AsString) {
   ObjectSharedPtr json = Factory::loadFromString("{\"name1\": \"value1\", \"name2\": true}");
   json->iterate([&](const std::string& key, const Json::Object& value) {
     EXPECT_TRUE(key == "name1" || key == "name2");
@@ -366,105 +374,6 @@ TEST(JsonLoaderTest, AsString) {
   });
 }
 
-TEST(JsonLoaderTest, AsJsonString) {
-  // We can't do simply equality of asJsonString(), since there is a reliance on internal ordering,
-  // e.g. of map traversal, in the output.
-  const std::string json_string = "{\"name1\": \"value1\", \"name2\": true}";
-  const ObjectSharedPtr json = Factory::loadFromString(json_string);
-  const ObjectSharedPtr json2 = Factory::loadFromString(json->asJsonString());
-  EXPECT_EQ("value1", json2->getString("name1"));
-  EXPECT_TRUE(json2->getBoolean("name2"));
-}
-
-TEST(JsonLoaderTest, ListAsString) {
-  {
-    std::list<std::string> list = {};
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString(Json::Factory::listAsJsonString(list));
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_TRUE(output.empty());
-  }
-
-  {
-    std::list<std::string> list = {"one"};
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString(Json::Factory::listAsJsonString(list));
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_EQ(1, output.size());
-    EXPECT_EQ("one", output[0]->asString());
-  }
-
-  {
-    std::list<std::string> list = {"one", "two", "three", "four"};
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString(Json::Factory::listAsJsonString(list));
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_EQ(4, output.size());
-    EXPECT_EQ("one", output[0]->asString());
-    EXPECT_EQ("two", output[1]->asString());
-    EXPECT_EQ("three", output[2]->asString());
-    EXPECT_EQ("four", output[3]->asString());
-  }
-
-  {
-    std::list<std::string> list = {"127.0.0.1:46465", "127.0.0.1:52211", "127.0.0.1:58941"};
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString(Json::Factory::listAsJsonString(list));
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_EQ(3, output.size());
-    EXPECT_EQ("127.0.0.1:46465", output[0]->asString());
-    EXPECT_EQ("127.0.0.1:52211", output[1]->asString());
-    EXPECT_EQ("127.0.0.1:58941", output[2]->asString());
-  }
-}
-
-TEST(JsonLoaderTest, YamlScalar) {
-  EXPECT_EQ(true, Factory::loadFromYamlString("true")->asBoolean());
-  EXPECT_EQ("true", Factory::loadFromYamlString("\"true\"")->asString());
-  EXPECT_EQ(1, Factory::loadFromYamlString("1")->asInteger());
-  EXPECT_EQ("1", Factory::loadFromYamlString("\"1\"")->asString());
-  EXPECT_DOUBLE_EQ(1.0, Factory::loadFromYamlString("1.0")->asDouble());
-  EXPECT_EQ("1.0", Factory::loadFromYamlString("\"1.0\"")->asString());
-}
-
-TEST(JsonLoaderTest, YamlObject) {
-  {
-    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("[foo, bar]");
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_EQ(2, output.size());
-    EXPECT_EQ("foo", output[0]->asString());
-    EXPECT_EQ("bar", output[1]->asString());
-  }
-  {
-    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("foo: bar");
-    EXPECT_EQ("bar", json->getString("foo"));
-  }
-  {
-    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("Null");
-    EXPECT_TRUE(json->isNull());
-  }
-}
-
-TEST(JsonLoaderTest, YamlAsJsonString) {
-  const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("");
-  EXPECT_EQ(json->asJsonString(), "null");
-}
-
-TEST(JsonLoaderTest, BadYamlException) {
-  std::string bad_yaml = R"EOF(
-admin:
-  access_log_path: /dev/null
-  address:
-    socket_address:
-      address: {{ ntop_ip_loopback_address }}
-      port_value: 0
-)EOF";
-
-  EXPECT_THROW_WITH_REGEX(Json::Factory::loadFromYamlString(bad_yaml), EnvoyException,
-                          "bad conversion");
-  EXPECT_THROW_WITHOUT_REGEX(Json::Factory::loadFromYamlString(bad_yaml), EnvoyException,
-                             "Unexpected YAML exception");
-}
-
+} // namespace
 } // namespace Json
 } // namespace Envoy

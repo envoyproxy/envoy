@@ -5,6 +5,8 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/registry/registry.h"
 #include "envoy/singleton/instance.h"
 
 namespace Envoy {
@@ -13,10 +15,10 @@ namespace Singleton {
 /**
  * An abstract registration for a singleton entry.
  */
-class Registration {
+class Registration : public Config::UntypedFactory {
 public:
-  virtual ~Registration() {}
-  virtual std::string name() PURE;
+  ~Registration() override = default;
+  std::string category() const override { return "envoy.singleton"; }
 };
 
 /**
@@ -33,7 +35,7 @@ public:
  */
 template <const char* name_param> class RegistrationImpl : public Registration {
 public:
-  std::string name() override { return name_param; }
+  std::string name() const override { return name_param; }
 };
 
 /**
@@ -44,7 +46,7 @@ public:
  */
 #define SINGLETON_MANAGER_REGISTRATION(NAME)                                                       \
   static constexpr char NAME##_singleton_name[] = #NAME "_singleton";                              \
-  static Envoy::Registry::RegisterFactory<                                                         \
+  static Envoy::Registry::RegisterInternalFactory<                                                 \
       Envoy::Singleton::RegistrationImpl<NAME##_singleton_name>, Envoy::Singleton::Registration>   \
       NAME##_singleton_registered_;
 
@@ -53,14 +55,14 @@ public:
 /**
  * Callback function used to create a singleton.
  */
-typedef std::function<InstanceSharedPtr()> SingletonFactoryCb;
+using SingletonFactoryCb = std::function<InstanceSharedPtr()>;
 
 /**
  * A manager for all server-side singletons.
  */
 class Manager {
 public:
-  virtual ~Manager() {}
+  virtual ~Manager() = default;
 
   /**
    * This is a helper on top of get() that casts the object stored to the specified type. Since the
@@ -83,7 +85,7 @@ public:
   virtual InstanceSharedPtr get(const std::string& name, SingletonFactoryCb) PURE;
 };
 
-typedef std::unique_ptr<Manager> ManagerPtr;
+using ManagerPtr = std::unique_ptr<Manager>;
 
 } // namespace Singleton
 } // namespace Envoy

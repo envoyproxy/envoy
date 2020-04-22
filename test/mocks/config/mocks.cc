@@ -1,46 +1,44 @@
 #include "test/mocks/config/mocks.h"
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/rds.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Config {
 
-MockGrpcMuxWatch::MockGrpcMuxWatch() {}
+MockSubscriptionFactory::MockSubscriptionFactory() {
+  ON_CALL(*this, subscriptionFromConfigSource(_, _, _, _))
+      .WillByDefault(testing::Invoke([this](const envoy::config::core::v3::ConfigSource&,
+                                            absl::string_view, Stats::Scope&,
+                                            SubscriptionCallbacks& callbacks) -> SubscriptionPtr {
+        auto ret = std::make_unique<testing::NiceMock<MockSubscription>>();
+        subscription_ = ret.get();
+        callbacks_ = &callbacks;
+        return ret;
+      }));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(testing::ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+}
+
+MockSubscriptionFactory::~MockSubscriptionFactory() = default;
+
+MockGrpcMuxWatch::MockGrpcMuxWatch() = default;
 MockGrpcMuxWatch::~MockGrpcMuxWatch() { cancel(); }
 
-MockGrpcMux::MockGrpcMux() {}
-MockGrpcMux::~MockGrpcMux() {}
+MockGrpcMux::MockGrpcMux() = default;
+MockGrpcMux::~MockGrpcMux() = default;
 
-GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
-                                       const std::vector<std::string>& resources,
-                                       GrpcMuxCallbacks& callbacks) {
-  return GrpcMuxWatchPtr(subscribe_(type_url, resources, callbacks));
-}
+MockGrpcStreamCallbacks::MockGrpcStreamCallbacks() = default;
+MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() = default;
 
-MockGrpcMuxCallbacks::MockGrpcMuxCallbacks() {
+MockSubscriptionCallbacks::MockSubscriptionCallbacks() {
   ON_CALL(*this, resourceName(testing::_))
-      .WillByDefault(testing::Invoke([](const ProtobufWkt::Any& resource) -> std::string {
-        if (resource.type_url() == Config::TypeUrl::get().Listener) {
-          return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
-        }
-        if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
-          return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
-        }
-        if (resource.type_url() == Config::TypeUrl::get().Cluster) {
-          return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
-        }
-        if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
-          return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource)
-              .cluster_name();
-        }
-        throw EnvoyException(
-            fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
-      }));
+      .WillByDefault(testing::Invoke(TestUtility::xdsResourceName));
 }
 
-MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() {}
+MockSubscriptionCallbacks::~MockSubscriptionCallbacks() = default;
 
+MockTypedFactory::~MockTypedFactory() = default;
 } // namespace Config
 } // namespace Envoy

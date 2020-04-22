@@ -3,11 +3,11 @@
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
 
-#include "openssl/bytestring.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -22,7 +22,6 @@ namespace TlsInspector {
   COUNTER(connection_closed)                                                                       \
   COUNTER(client_hello_too_large)                                                                  \
   COUNTER(read_error)                                                                              \
-  COUNTER(read_timeout)                                                                            \
   COUNTER(tls_found)                                                                               \
   COUNTER(tls_not_found)                                                                           \
   COUNTER(alpn_found)                                                                              \
@@ -37,6 +36,14 @@ struct TlsInspectorStats {
   ALL_TLS_INSPECTOR_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+enum class ParseState {
+  // Parse result is out. It could be tls or not.
+  Done,
+  // Parser expects more data.
+  Continue,
+  // Parser reports unrecoverable error.
+  Error
+};
 /**
  * Global configuration for TLS inspector.
  */
@@ -49,6 +56,8 @@ public:
   uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
 
   static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
+  static const unsigned TLS_MIN_SUPPORTED_VERSION;
+  static const unsigned TLS_MAX_SUPPORTED_VERSION;
 
 private:
   TlsInspectorStats stats_;
@@ -56,7 +65,7 @@ private:
   const uint32_t max_client_hello_size_;
 };
 
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * TLS inspector listener filter.
@@ -69,9 +78,8 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
 private:
-  void parseClientHello(const void* data, size_t len);
-  void onRead();
-  void onTimeout();
+  ParseState parseClientHello(const void* data, size_t len);
+  ParseState onRead();
   void done(bool success);
   void onALPN(const unsigned char* data, unsigned int len);
   void onServername(absl::string_view name);
@@ -79,7 +87,6 @@ private:
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_;
   Event::FileEventPtr file_event_;
-  Event::TimerPtr timer_;
 
   bssl::UniquePtr<SSL> ssl_;
   uint64_t read_{0};

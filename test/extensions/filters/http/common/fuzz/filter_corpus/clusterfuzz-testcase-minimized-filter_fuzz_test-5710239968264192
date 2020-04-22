@@ -1,0 +1,7 @@
+config {
+  name: "envoy.rate_limit"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit"
+    value: "\n\020envoy.rate_limit\032>type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC:\007\022\005\n\003\n\0012"
+  }
+}

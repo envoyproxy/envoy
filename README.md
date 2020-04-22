@@ -1,6 +1,6 @@
 ![Envoy Logo](https://github.com/envoyproxy/artwork/blob/master/PNG/Envoy_Logo_Final_PANTONE.png)
 
-[C++ L7 proxy and communication bus](https://www.envoyproxy.io/)
+[Cloud-native high-performance edge/middle/service proxy](https://www.envoyproxy.io/)
 
 Envoy is hosted by the [Cloud Native Computing Foundation](https://cncf.io) (CNCF). If you are a
 company that wants to help shape the evolution of technologies that are container-packaged,
@@ -9,12 +9,17 @@ involved and how Envoy plays a role, read the CNCF
 [announcement](https://www.cncf.io/blog/2017/09/13/cncf-hosts-envoy/).
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1266/badge)](https://bestpractices.coreinfrastructure.org/projects/1266)
+[![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=master)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=master)
+[![CircleCI](https://circleci.com/gh/envoyproxy/envoy/tree/master.svg?style=shield)](https://circleci.com/gh/envoyproxy/envoy/tree/master)
+[![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/envoy.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:envoy)
+[![fuzzit](https://app.fuzzit.dev/badge?org_id=envoyproxy)](https://app.fuzzit.dev/orgs/envoyproxy/dashboard)
+[![Jenkins](https://img.shields.io/jenkins/s/https/powerci.osuosl.org/job/build-envoy-master/badge/icon/.svg?label=ppc64le%20build)](http://powerci.osuosl.org/job/build-envoy-master/)
 
 ## Documentation
 
 * [Official documentation](https://www.envoyproxy.io/)
 * [FAQ](https://www.envoyproxy.io/docs/envoy/latest/faq/overview)
-* [Unofficial Chinese documentation](https://github.com/lixiangyun/envoyproxy_doc_ZH_CN)
+* [Unofficial Chinese documentation](https://github.com/servicemesher/envoy/)
 * Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
 ([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
 to find out more about the origin story and design philosophy of Envoy
@@ -36,13 +41,15 @@ to find out more about the origin story and design philosophy of Envoy
 
 * [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce): Low frequency mailing
   list where we will email announcements only.
+* [envoy-security-announce](https://groups.google.com/forum/#!forum/envoy-security-announce): Low frequency mailing
+  list where we will email security related announcements only.
 * [envoy-users](https://groups.google.com/forum/#!forum/envoy-users): General user discussion.
 * [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev): Envoy developer discussion (APIs,
   feature design, etc.).
 * [envoy-maintainers](https://groups.google.com/forum/#!forum/envoy-maintainers): Use this list
   to reach all core Envoy maintainers.
 * [Twitter](https://twitter.com/EnvoyProxy/): Follow along on Twitter!
-* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](http://envoyslack.cncf.io).
+* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](https://envoyslack.cncf.io).
   We have the IRC/XMPP gateways enabled if you prefer either of those. Once an account is created,
   connection instructions for IRC/XMPP can be found [here](https://envoyproxy.slack.com/account/gateways).
   * NOTE: Response to user questions is best effort on Slack. For a "guaranteed" response please email
@@ -65,9 +72,11 @@ have prior experience. To get started:
 
 ## Community Meeting
 
-The Envoy team meets every other Tuesday at 9am PT. The public Google calendar is here: https://goo.gl/PkDijT
+The Envoy team meets twice per month on Tuesday, alternating between 9am PT and 5PM PT. The public
+Google calendar is here: https://goo.gl/PkDijT
 
-Meeting minutes are here: https://goo.gl/5Cergb
+* Meeting minutes are [here](https://goo.gl/5Cergb)
+* Recorded videos are posted [here](https://www.youtube.com/channel/UCvqbFHwN-nwalWPjPUKpvTA/videos?view=0&sort=dd&shelf_id=1)
 
 ## Security
 
@@ -82,4 +91,4 @@ If you've found a vulnerability or a potential vulnerability in Envoy please let
 email to acknowledge your report, and we'll send an additional email when we've identified the issue
 positively or negatively.
 
-For further details please see our complete [security release process](SECURITY_RELEASE_PROCESS.md).
+For further details please see our complete [security release process](SECURITY.md).

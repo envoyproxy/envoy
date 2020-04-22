@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/cidr_range.h"
@@ -14,21 +16,22 @@ namespace LcTrie {
 class LcTrieTest : public testing::Test {
 public:
   void setup(const std::vector<std::vector<std::string>>& cidr_range_strings,
-             double fill_factor = 0, uint32_t root_branch_factor = 0) {
+             bool exclusive = false, double fill_factor = 0, uint32_t root_branch_factor = 0) {
     std::vector<std::pair<std::string, std::vector<Address::CidrRange>>> output;
     for (size_t i = 0; i < cidr_range_strings.size(); i++) {
       std::pair<std::string, std::vector<Address::CidrRange>> ip_tags;
       ip_tags.first = fmt::format("tag_{0}", i);
-      for (size_t j = 0; j < cidr_range_strings[i].size(); j++) {
-        ip_tags.second.push_back(Address::CidrRange::create(cidr_range_strings[i][j]));
+      for (const auto& j : cidr_range_strings[i]) {
+        ip_tags.second.push_back(Address::CidrRange::create(j));
       }
       output.push_back(ip_tags);
     }
     // Use custom fill factors and root branch factors if they are in the valid range.
     if ((fill_factor > 0) && (fill_factor <= 1) && (root_branch_factor > 0)) {
-      trie_.reset(new LcTrie(output, fill_factor, root_branch_factor));
+      trie_ =
+          std::make_unique<LcTrie<std::string>>(output, exclusive, fill_factor, root_branch_factor);
     } else {
-      trie_.reset(new LcTrie(output));
+      trie_ = std::make_unique<LcTrie<std::string>>(output, exclusive);
     }
   }
 
@@ -37,13 +40,13 @@ public:
     for (const auto& kv : test_output) {
       std::vector<std::string> expected(kv.second);
       std::sort(expected.begin(), expected.end());
-      std::vector<std::string> actual(trie_->getTags(Utility::parseInternetAddress(kv.first)));
+      std::vector<std::string> actual(trie_->getData(Utility::parseInternetAddress(kv.first)));
       std::sort(actual.begin(), actual.end());
       EXPECT_EQ(expected, actual);
     }
   }
 
-  std::unique_ptr<LcTrie> trie_;
+  std::unique_ptr<LcTrie<std::string>> trie_;
 };
 
 // Use the default constructor values.
@@ -102,7 +105,7 @@ TEST_F(LcTrieTest, RootBranchingFactor) {
       {"232.0.0.0/8"}, // tag_13
       {"233.0.0.0/8"}, // tag_14
   };
-  setup(cidr_range_strings, fill_factor, root_branching_factor);
+  setup(cidr_range_strings, false, fill_factor, root_branching_factor);
 
   std::vector<std::pair<std::string, std::vector<std::string>>> test_case = {
       {"0.0.0.0", {"tag_0"}},     {"16.0.0.1", {"tag_1"}},
@@ -284,19 +287,41 @@ TEST_F(LcTrieTest, NestedPrefixesWithCatchAll) {
       {"::0/0"},                              // tag_4
       {"2001:db8::/96", "2001:db8::8000/97"}, // tag_5
       {"2001:db8::ffff/128"},                 // tag_6
-      {"2001:db8:1::/48"}                     // tag_7
+      {"2001:db8:1::/48"},                    // tag_7
+      {"203.0.113.0/24"}                      // tag_8 (same subnet as tag_1)
   };
   setup(cidr_range_strings);
 
   std::vector<std::pair<std::string, std::vector<std::string>>> test_case = {
-      {"203.0.113.0", {"tag_0", "tag_1"}},
-      {"203.0.113.192", {"tag_0", "tag_1", "tag_2"}},
-      {"203.0.113.255", {"tag_0", "tag_1", "tag_2"}},
+      {"203.0.0.0", {"tag_0"}},
+      {"203.0.113.0", {"tag_0", "tag_1", "tag_8"}},
+      {"203.0.113.192", {"tag_0", "tag_1", "tag_2", "tag_8"}},
+      {"203.0.113.255", {"tag_0", "tag_1", "tag_2", "tag_8"}},
       {"198.51.100.1", {"tag_0", "tag_3"}},
       {"2001:db8::ffff", {"tag_4", "tag_5", "tag_6"}},
-      {"2001:db8:1::ffff", {"tag_4", "tag_7"}}
+      {"2001:db8:1::ffff", {"tag_4", "tag_7"}}};
+  expectIPAndTags(test_case);
+}
 
+TEST_F(LcTrieTest, ExclusiveNestedPrefixesWithCatchAll) {
+  std::vector<std::vector<std::string>> cidr_range_strings = {
+      {"0.0.0.0/0"},                          // tag_0
+      {"203.0.113.0/24"},                     // tag_1
+      {"203.0.113.128/25"},                   // tag_2
+      {"198.51.100.0/24"},                    // tag_3
+      {"::0/0"},                              // tag_4
+      {"2001:db8::/96", "2001:db8::8000/97"}, // tag_5
+      {"2001:db8::ffff/128"},                 // tag_6
+      {"2001:db8:1::/48"},                    // tag_7
+      {"203.0.113.0/24"}                      // tag_8 (same subnet as tag_1)
   };
+  setup(cidr_range_strings, true);
+
+  std::vector<std::pair<std::string, std::vector<std::string>>> test_case = {
+      {"203.0.0.0", {"tag_0"}},       {"203.0.113.0", {"tag_1", "tag_8"}},
+      {"203.0.113.192", {"tag_2"}},   {"203.0.113.255", {"tag_2"}},
+      {"198.51.100.1", {"tag_3"}},    {"2001:db8::ffff", {"tag_6"}},
+      {"2001:db8:1::ffff", {"tag_7"}}};
   expectIPAndTags(test_case);
 }
 
@@ -315,7 +340,7 @@ TEST_F(LcTrieTest, MaximumEntriesExceptionDefault) {
   std::pair<std::string, std::vector<Address::CidrRange>> ip_tag =
       std::make_pair("bad_tag", prefixes);
   std::vector<std::pair<std::string, std::vector<Address::CidrRange>>> ip_tags_input{ip_tag};
-  EXPECT_THROW_WITH_MESSAGE(new LcTrie(ip_tags_input), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(new LcTrie<std::string>(ip_tags_input), EnvoyException,
                             "The input vector has '524288' CIDR range entries. "
                             "LC-Trie can only support '262144' CIDR ranges with "
                             "the specified fill factor.");
@@ -339,7 +364,7 @@ TEST_F(LcTrieTest, MaximumEntriesExceptionOverride) {
   std::pair<std::string, std::vector<Address::CidrRange>> ip_tag =
       std::make_pair("bad_tag", prefixes);
   std::vector<std::pair<std::string, std::vector<Address::CidrRange>>> ip_tags_input{ip_tag};
-  EXPECT_THROW_WITH_MESSAGE(new LcTrie(ip_tags_input, 0.01), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(new LcTrie<std::string>(ip_tags_input, false, 0.01), EnvoyException,
                             "The input vector has '8192' CIDR range entries. "
                             "LC-Trie can only support '5242' CIDR ranges with "
                             "the specified fill factor.");

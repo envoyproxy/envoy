@@ -13,7 +13,7 @@
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
 #include "common/common/utility.h"
-#include "common/filesystem/filesystem_impl.h"
+#include "common/protobuf/utility.h"
 
 // Do not let RapidJson leak outside of this file.
 #include "rapidjson/document.h"
@@ -24,6 +24,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "absl/strings/match.h"
 #include "yaml-cpp/yaml.h"
 
 namespace Envoy {
@@ -34,7 +35,7 @@ namespace {
  * Internal representation of Object.
  */
 class Field;
-typedef std::shared_ptr<Field> FieldSharedPtr;
+using FieldSharedPtr = std::shared_ptr<Field>;
 
 class Field : public Object {
 public:
@@ -47,12 +48,12 @@ public:
   static FieldSharedPtr createNull() { return FieldSharedPtr{new Field(Type::Null)}; }
 
   bool isNull() const override { return type_ == Type::Null; }
-  bool isArray() const { return type_ == Type::Array; }
-  bool isObject() const { return type_ == Type::Object; }
+  bool isArray() const override { return type_ == Type::Array; }
+  bool isObject() const override { return type_ == Type::Object; }
 
   // Value factory.
   template <typename T> static FieldSharedPtr createValue(T value) {
-    return FieldSharedPtr{new Field(value)};
+    return FieldSharedPtr{new Field(value)}; // NOLINT(modernize-make-shared)
   }
 
   void append(FieldSharedPtr field_ptr) {
@@ -118,7 +119,7 @@ private:
       return "String";
     }
 
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   struct Value {
@@ -181,7 +182,7 @@ private:
  * Custom stream to allow access to the line number for each object.
  */
 class LineCountingStringStream : public rapidjson::StringStream {
-  // Ch is typdef in parent class to handle character encoding.
+  // Ch is typedef in parent class to handle character encoding.
 public:
   LineCountingStringStream(const Ch* src) : rapidjson::StringStream(src), line_number_(1) {}
   Ch Take() {
@@ -202,7 +203,7 @@ private:
  */
 class ObjectHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, ObjectHandler> {
 public:
-  ObjectHandler(LineCountingStringStream& stream) : state_(expectRoot), stream_(stream){};
+  ObjectHandler(LineCountingStringStream& stream) : state_(State::ExpectRoot), stream_(stream){};
 
   bool StartObject();
   bool EndObject(rapidjson::SizeType);
@@ -224,12 +225,12 @@ public:
 private:
   bool handleValueEvent(FieldSharedPtr ptr);
 
-  enum State {
-    expectRoot,
-    expectKeyOrEndObject,
-    expectValueOrStartObjectArray,
-    expectArrayValueOrEndArray,
-    expectFinished,
+  enum class State {
+    ExpectRoot,
+    ExpectKeyOrEndObject,
+    ExpectValueOrStartObjectArray,
+    ExpectArrayValueOrEndArray,
+    ExpectFinished,
   };
   State state_;
   LineCountingStringStream& stream_;
@@ -312,7 +313,7 @@ void Field::buildRapidJsonDocument(const Field& field, rapidjson::Value& value,
     break;
   }
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -541,53 +542,53 @@ bool ObjectHandler::StartObject() {
   object->setLineNumberStart(stream_.getLineNumber());
 
   switch (state_) {
-  case expectValueOrStartObjectArray:
+  case State::ExpectValueOrStartObjectArray:
     stack_.top()->insert(key_, object);
     stack_.push(object);
-    state_ = expectKeyOrEndObject;
+    state_ = State::ExpectKeyOrEndObject;
     return true;
-  case expectArrayValueOrEndArray:
+  case State::ExpectArrayValueOrEndArray:
     stack_.top()->append(object);
     stack_.push(object);
-    state_ = expectKeyOrEndObject;
+    state_ = State::ExpectKeyOrEndObject;
     return true;
-  case expectRoot:
+  case State::ExpectRoot:
     root_ = object;
     stack_.push(object);
-    state_ = expectKeyOrEndObject;
+    state_ = State::ExpectKeyOrEndObject;
     return true;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
 bool ObjectHandler::EndObject(rapidjson::SizeType) {
   switch (state_) {
-  case expectKeyOrEndObject:
+  case State::ExpectKeyOrEndObject:
     stack_.top()->setLineNumberEnd(stream_.getLineNumber());
     stack_.pop();
 
     if (stack_.empty()) {
-      state_ = expectFinished;
+      state_ = State::ExpectFinished;
     } else if (stack_.top()->isObject()) {
-      state_ = expectKeyOrEndObject;
+      state_ = State::ExpectKeyOrEndObject;
     } else if (stack_.top()->isArray()) {
-      state_ = expectArrayValueOrEndArray;
+      state_ = State::ExpectArrayValueOrEndArray;
     }
     return true;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
 bool ObjectHandler::Key(const char* value, rapidjson::SizeType size, bool) {
   switch (state_) {
-  case expectKeyOrEndObject:
+  case State::ExpectKeyOrEndObject:
     key_ = std::string(value, size);
-    state_ = expectValueOrStartObjectArray;
+    state_ = State::ExpectValueOrStartObjectArray;
     return true;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -596,42 +597,42 @@ bool ObjectHandler::StartArray() {
   array->setLineNumberStart(stream_.getLineNumber());
 
   switch (state_) {
-  case expectValueOrStartObjectArray:
+  case State::ExpectValueOrStartObjectArray:
     stack_.top()->insert(key_, array);
     stack_.push(array);
-    state_ = expectArrayValueOrEndArray;
+    state_ = State::ExpectArrayValueOrEndArray;
     return true;
-  case expectArrayValueOrEndArray:
+  case State::ExpectArrayValueOrEndArray:
     stack_.top()->append(array);
     stack_.push(array);
     return true;
-  case expectRoot:
+  case State::ExpectRoot:
     root_ = array;
     stack_.push(array);
-    state_ = expectArrayValueOrEndArray;
+    state_ = State::ExpectArrayValueOrEndArray;
     return true;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
 bool ObjectHandler::EndArray(rapidjson::SizeType) {
   switch (state_) {
-  case expectArrayValueOrEndArray:
+  case State::ExpectArrayValueOrEndArray:
     stack_.top()->setLineNumberEnd(stream_.getLineNumber());
     stack_.pop();
 
     if (stack_.empty()) {
-      state_ = expectFinished;
+      state_ = State::ExpectFinished;
     } else if (stack_.top()->isObject()) {
-      state_ = expectKeyOrEndObject;
+      state_ = State::ExpectKeyOrEndObject;
     } else if (stack_.top()->isArray()) {
-      state_ = expectArrayValueOrEndArray;
+      state_ = State::ExpectArrayValueOrEndArray;
     }
 
     return true;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -646,7 +647,7 @@ bool ObjectHandler::Uint(unsigned value) {
 }
 bool ObjectHandler::Int64(int64_t value) { return handleValueEvent(Field::createValue(value)); }
 bool ObjectHandler::Uint64(uint64_t value) {
-  if (value > std::numeric_limits<int64_t>::max()) {
+  if (value > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
     throw Exception(fmt::format("JSON value from line {} is larger than int64_t (not supported)",
                                 stream_.getLineNumber()));
   }
@@ -661,18 +662,18 @@ bool ObjectHandler::String(const char* value, rapidjson::SizeType size, bool) {
 
 bool ObjectHandler::RawNumber(const char*, rapidjson::SizeType, bool) {
   // Only called if kParseNumbersAsStrings is set as a parse flag, which it is not.
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
   ptr->setLineNumberStart(stream_.getLineNumber());
 
   switch (state_) {
-  case expectValueOrStartObjectArray:
-    state_ = expectKeyOrEndObject;
+  case State::ExpectValueOrStartObjectArray:
+    state_ = State::ExpectKeyOrEndObject;
     stack_.top()->insert(key_, ptr);
     return true;
-  case expectArrayValueOrEndArray:
+  case State::ExpectArrayValueOrEndArray:
     stack_.top()->append(ptr);
     return true;
   default:
@@ -681,82 +682,6 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
 }
 
 } // namespace
-
-ObjectSharedPtr Factory::loadFromFile(const std::string& file_path) {
-  try {
-    const std::string contents = Filesystem::fileReadToEnd(file_path);
-    return StringUtil::endsWith(file_path, ".yaml") ? loadFromYamlString(contents)
-                                                    : loadFromString(contents);
-  } catch (EnvoyException& e) {
-    throw Exception(e.what());
-  }
-}
-
-namespace {
-
-FieldSharedPtr parseYamlNode(YAML::Node node) {
-  switch (node.Type()) {
-  case YAML::NodeType::Null:
-    return Field::createNull();
-  case YAML::NodeType::Scalar:
-    // Due to the fact that we prefer to parse without schema or application knowledge (e.g. since
-    // we may have embedded opaque configs), we must use heuristics to resolve what the type of the
-    // scalar is. See discussion in https://github.com/jbeder/yaml-cpp/issues/261.
-    // First, if we know this has been explicitly quoted as a string, do that.
-    if (node.Tag() == "!") {
-      return Field::createValue(node.as<std::string>());
-    }
-    bool bool_value;
-    if (YAML::convert<bool>::decode(node, bool_value)) {
-      return Field::createValue(bool_value);
-    }
-    int64_t int_value;
-    if (YAML::convert<int64_t>::decode(node, int_value)) {
-      return Field::createValue(int_value);
-    }
-    double double_value;
-    if (YAML::convert<double>::decode(node, double_value)) {
-      return Field::createValue(double_value);
-    }
-    // Otherwise, fall back on string.
-    return Field::createValue(node.as<std::string>());
-  case YAML::NodeType::Sequence: {
-    FieldSharedPtr array = Field::createArray();
-    for (auto it : node) {
-      array->append(parseYamlNode(it));
-    }
-    return array;
-  }
-  case YAML::NodeType::Map: {
-    FieldSharedPtr object = Field::createObject();
-    for (auto it : node) {
-      object->insert(it.first.as<std::string>(), parseYamlNode(it.second));
-    }
-    return object;
-  }
-  case YAML::NodeType::Undefined:
-    throw EnvoyException("Undefined YAML value");
-  }
-  NOT_REACHED;
-}
-
-} // namespace
-
-ObjectSharedPtr Factory::loadFromYamlString(const std::string& yaml) {
-  try {
-    return parseYamlNode(YAML::Load(yaml));
-  } catch (YAML::ParserException& e) {
-    throw EnvoyException(e.what());
-  } catch (YAML::BadConversion& e) {
-    throw EnvoyException(e.what());
-  } catch (std::exception& e) {
-    // There is a potentially wide space of exceptions thrown by the YAML parser,
-    // and enumerating them all may be difficult. Envoy doesn't work well with
-    // unhandled exceptions, so we capture them and record the exception name in
-    // the Envoy Exception text.
-    throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
-  }
-}
 
 ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   LineCountingStringStream json_stream(json.c_str());
@@ -772,19 +697,6 @@ ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   }
 
   return handler.getRoot();
-}
-
-const std::string Factory::listAsJsonString(const std::list<std::string>& items) {
-  rapidjson::StringBuffer writer_string_buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(writer_string_buffer);
-
-  writer.StartArray();
-  for (const std::string& item : items) {
-    writer.String(item.c_str());
-  }
-  writer.EndArray();
-
-  return writer_string_buffer.GetString();
 }
 
 } // namespace Json

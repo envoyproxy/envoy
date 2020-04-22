@@ -1,10 +1,8 @@
 #include "extensions/filters/http/router/config.h"
 
-#include "envoy/config/filter/http/router/v2/router.pb.validate.h"
-#include "envoy/registry/registry.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.validate.h"
 
-#include "common/config/filter_json.h"
-#include "common/json/config_schemas.h"
 #include "common/router/router.h"
 #include "common/router/shadow_writer_impl.h"
 
@@ -14,7 +12,7 @@ namespace HttpFilters {
 namespace RouterFilter {
 
 Http::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::router::v2::Router& proto_config,
+    const envoy::extensions::filters::http::router::v3::Router& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   Router::FilterConfigSharedPtr filter_config(new Router::FilterConfig(
       stat_prefix, context, std::make_unique<Router::ShadowWriterImpl>(context.clusterManager()),
@@ -25,21 +23,11 @@ Http::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb
-RouterFilterConfig::createFilterFactory(const Json::Object& json_config,
-                                        const std::string& stat_prefix,
-                                        Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::http::router::v2::Router proto_config;
-  Config::FilterJson::translateRouter(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, stat_prefix, context);
-}
-
 /**
  * Static registration for the router filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RouterFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(RouterFilterConfig,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.router"};
 
 } // namespace RouterFilter
 } // namespace HttpFilters

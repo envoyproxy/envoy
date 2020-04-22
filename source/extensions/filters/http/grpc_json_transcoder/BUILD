@@ -1,12 +1,13 @@
 licenses(["notice"])  # Apache 2
+
 # L7 HTTP filter that implements binary gRPC to JSON transcoding
 # Public docs: docs/root/configuration/http_filters/grpc_json_transcoder_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_select_google_grpc",
 )
 
 envoy_package()
@@ -19,16 +20,30 @@ envoy_cc_library(
         "path_matcher",
         "grpc_transcoding",
         "http_api_protos",
+        "api_httpbody_protos",
     ],
     deps = [
+        ":http_body_utils_lib",
         ":transcoder_input_stream_lib",
         "//include/envoy/http:filter_interface",
-        "//source/common/common:base64_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/filter/http/transcoder/v2:transcoder_cc",
+        "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "http_body_utils_lib",
+    srcs = ["http_body_utils.cc"],
+    hdrs = ["http_body_utils.h"],
+    external_deps = [
+        "api_httpbody_protos",
+    ],
+    deps = [
+        "//source/common/grpc:codec_lib",
+        "//source/common/protobuf",
     ],
 )
 
@@ -40,15 +55,16 @@ envoy_cc_library(
     deps = ["//source/common/buffer:zero_copy_input_stream_lib"],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "unknown",
     deps = [
         "//include/envoy/registry",
-        "//source/common/config:filter_json_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )

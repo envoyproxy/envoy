@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 #
 # Cleanup network namespace after testing Envoy original_dst cluster
 #

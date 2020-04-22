@@ -12,10 +12,10 @@ namespace Event {
  */
 class DeferredDeletable {
 public:
-  virtual ~DeferredDeletable() {}
+  virtual ~DeferredDeletable() = default;
 };
 
-typedef std::unique_ptr<DeferredDeletable> DeferredDeletablePtr;
+using DeferredDeletablePtr = std::unique_ptr<DeferredDeletable>;
 
 } // namespace Event
 } // namespace Envoy

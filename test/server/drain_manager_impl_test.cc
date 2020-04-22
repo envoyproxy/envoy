@@ -1,5 +1,7 @@
 #include <chrono>
 
+#include "envoy/config/listener/v3/listener.pb.h"
+
 #include "server/drain_manager_impl.h"
 
 #include "test/mocks/server/mocks.h"
@@ -7,13 +9,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Return;
-using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 class DrainManagerImplTest : public testing::Test {
 public:
@@ -28,15 +30,15 @@ public:
 
 TEST_F(DrainManagerImplTest, Default) {
   InSequence s;
-  DrainManagerImpl drain_manager(server_, envoy::api::v2::Listener_DrainType_DEFAULT);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
 
   // Test parent shutdown.
   Event::MockTimer* shutdown_timer = new Event::MockTimer(&server_.dispatcher_);
-  EXPECT_CALL(*shutdown_timer, enableTimer(std::chrono::milliseconds(900000)));
+  EXPECT_CALL(*shutdown_timer, enableTimer(std::chrono::milliseconds(900000), _));
   drain_manager.startParentShutdownSequence();
 
-  EXPECT_CALL(server_.hot_restart_, terminateParent());
-  shutdown_timer->callback_();
+  EXPECT_CALL(server_.hot_restart_, sendParentTerminateRequest());
+  shutdown_timer->invokeCallback();
 
   // Verify basic drain close.
   EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(false));
@@ -46,18 +48,18 @@ TEST_F(DrainManagerImplTest, Default) {
 
   // Test drain sequence.
   Event::MockTimer* drain_timer = new Event::MockTimer(&server_.dispatcher_);
-  EXPECT_CALL(*drain_timer, enableTimer(_));
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
   ReadyWatcher drain_complete;
   drain_manager.startDrainSequence([&drain_complete]() -> void { drain_complete.ready(); });
 
   // 600s which is the default drain time.
   for (size_t i = 0; i < 599; i++) {
     if (i < 598) {
-      EXPECT_CALL(*drain_timer, enableTimer(_));
+      EXPECT_CALL(*drain_timer, enableTimer(_, _));
     } else {
       EXPECT_CALL(drain_complete, ready());
     }
-    drain_timer->callback_();
+    drain_timer->invokeCallback();
   }
 
   EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(false));
@@ -66,11 +68,12 @@ TEST_F(DrainManagerImplTest, Default) {
 
 TEST_F(DrainManagerImplTest, ModifyOnly) {
   InSequence s;
-  DrainManagerImpl drain_manager(server_, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::MODIFY_ONLY);
 
   EXPECT_CALL(server_, healthCheckFailed()).Times(0);
   EXPECT_FALSE(drain_manager.drainClose());
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

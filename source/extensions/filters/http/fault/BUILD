@@ -1,9 +1,11 @@
 licenses(["notice"])  # Apache 2
+
 # HTTP L7 filter that injects faults into the request flow
 # Public docs: docs/root/configuration/http_filters/fault_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -22,26 +24,32 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/common:token_bucket_impl_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/http/fault/v2:fault_cc",
+        "//source/extensions/filters/common/fault:fault_config_lib",
+        "//source/extensions/filters/http:well_known_names",
+        "@envoy_api//envoy/extensions/filters/http/fault/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",
-        "//source/common/config:filter_json_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/fault:fault_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/fault/v3:pkg_cc_proto",
     ],
 )

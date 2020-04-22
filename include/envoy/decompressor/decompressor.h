@@ -10,7 +10,7 @@ namespace Decompressor {
  */
 class Decompressor {
 public:
-  virtual ~Decompressor() {}
+  virtual ~Decompressor() = default;
 
   /**
    * Decompresses data from one buffer into another buffer.

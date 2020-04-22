@@ -4,11 +4,11 @@
 
 #include "common/common/perf_annotation.h"
 
-#include <unistd.h>
-
 #include <chrono>
 #include <iostream>
 #include <string>
+
+#include "envoy/common/platform.h"
 
 #include "common/common/lock_guard.h"
 #include "common/common/utility.h"
@@ -18,11 +18,10 @@
 namespace Envoy {
 
 PerfOperation::PerfOperation()
-    : start_time_(ProdMonotonicTimeSource::instance_.currentTime()),
-      context_(PerfAnnotationContext::getOrCreate()) {}
+    : context_(PerfAnnotationContext::getOrCreate()), start_time_(context_->currentTime()) {}
 
 void PerfOperation::record(absl::string_view category, absl::string_view description) {
-  const MonotonicTime end_time = ProdMonotonicTimeSource::instance_.currentTime();
+  const MonotonicTime end_time = context_->currentTime();
   const std::chrono::nanoseconds duration =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_);
   context_->record(duration, category, description);
@@ -30,8 +29,8 @@ void PerfOperation::record(absl::string_view category, absl::string_view descrip
 
 // The ctor is explicitly declared private to encourage clients to use getOrCreate(), at
 // least for now. Given that it's declared it must be instantiated. It's not inlined
-// because the contructor is non-trivial due to the contained unordered_map.
-PerfAnnotationContext::PerfAnnotationContext() {}
+// because the constructor is non-trivial due to the contained unordered_map.
+PerfAnnotationContext::PerfAnnotationContext() = default;
 
 void PerfAnnotationContext::record(std::chrono::nanoseconds duration, absl::string_view category,
                                    absl::string_view description) {
@@ -109,7 +108,7 @@ std::string PerfAnnotationContext::toString() {
             : std::to_string(
                   std::chrono::duration_cast<std::chrono::nanoseconds>(stats.total_).count() /
                   count));
-    columns[3].push_back(fmt::format("{}", stats.stddev_.computeStandardDeviation()));
+    columns[3].push_back(absl::StrCat("", stats.stddev_.computeStandardDeviation()));
     columns[4].push_back(nanoseconds_string(stats.min_));
     columns[5].push_back(nanoseconds_string(stats.max_));
     const CategoryDescription& category_description = p->first;
@@ -147,7 +146,7 @@ void PerfAnnotationContext::clear() {
 }
 
 PerfAnnotationContext* PerfAnnotationContext::getOrCreate() {
-  static PerfAnnotationContext* context = new PerfAnnotationContext();
+  static auto* context = new PerfAnnotationContext();
   return context;
 }
 

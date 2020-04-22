@@ -1,0 +1,77 @@
+{#
+  Template for request serialization/deserialization tests.
+  For every request, we want to check if it can be serialized and deserialized properly.
+#}
+
+#include "extensions/filters/network/kafka/external/requests.h"
+#include "extensions/filters/network/kafka/request_codec.h"
+
+#include "test/extensions/filters/network/kafka/buffer_based_test.h"
+#include "test/mocks/server/mocks.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+namespace RequestTest {
+
+class RequestTest : public testing::Test, public MessageBasedTest<RequestEncoder> {
+protected:
+  template <typename T> std::shared_ptr<T> serializeAndDeserialize(T message);
+};
+
+class MockMessageListener : public RequestCallback {
+public:
+  MOCK_METHOD(void, onMessage, (AbstractRequestSharedPtr));
+  MOCK_METHOD(void, onFailedParse, (RequestParseFailureSharedPtr));
+};
+
+/**
+ * Helper method.
+ * Takes an instance of a request, serializes it, then deserializes it.
+ * This method gets executed for every request * version pair.
+ */
+template <typename T> std::shared_ptr<T> RequestTest::serializeAndDeserialize(T message) {
+  putMessageIntoBuffer(message);
+
+  std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
+  RequestDecoder testee{ {mock_listener} };
+
+  AbstractRequestSharedPtr received_message;
+  EXPECT_CALL(*mock_listener, onMessage(testing::_))
+    .WillOnce(testing::SaveArg<0>(&received_message));
+
+  testee.onData(buffer_);
+
+  return std::dynamic_pointer_cast<T>(received_message);
+};
+
+{#
+  Concrete tests for each message_type and version (field_list).
+  Each request is naively constructed using some default values
+  (put "string" as std::string, 32 as uint32_t, etc.).
+#}
+{% for message_type in message_types %}{% for field_list in message_type.compute_field_lists() %}
+TEST_F(RequestTest, ShouldParse{{ message_type.name }}V{{ field_list.version }}) {
+  // given
+  {{ message_type.name }} data = { {{ field_list.example_value() }} };
+  Request<{{ message_type.name }}> message = { {
+    {{ message_type.get_extra('api_key') }}, {{ field_list.version }}, 0, absl::nullopt }, data };
+
+  // when
+  auto received = serializeAndDeserialize(message);
+
+  // then
+  ASSERT_NE(received, nullptr);
+  ASSERT_EQ(*received, message);
+}
+{% endfor %}{% endfor %}
+
+} // namespace RequestTest
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

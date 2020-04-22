@@ -19,15 +19,15 @@ TEST(DateProviderImplTest, All) {
   Event::MockDispatcher dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
   Event::MockTimer* timer = new Event::MockTimer(&dispatcher);
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(500)));
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(500), _));
 
   TlsCachingDateProviderImpl provider(dispatcher, tls);
-  HeaderMapImpl headers;
+  ResponseHeaderMapImpl headers;
   provider.setDateHeader(headers);
   EXPECT_NE(nullptr, headers.Date());
 
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(500)));
-  timer->callback_();
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(500), _));
+  timer->invokeCallback();
 
   headers.removeDate();
   provider.setDateHeader(headers);

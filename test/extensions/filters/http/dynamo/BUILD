@@ -40,12 +40,13 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "dynamo_utility_test",
-    srcs = ["dynamo_utility_test.cc"],
+    name = "dynamo_stats_test",
+    srcs = ["dynamo_stats_test.cc"],
     extension_name = "envoy.filters.http.dynamo",
     deps = [
         "//source/common/stats:stats_lib",
-        "//source/extensions/filters/http/dynamo:dynamo_utility_lib",
+        "//source/extensions/filters/http/dynamo:dynamo_stats_lib",
+        "//test/mocks/stats:stats_mocks",
     ],
 )
 
@@ -56,5 +57,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/dynamo:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/extensions/filters/http/dynamo/v3:pkg_cc_proto",
     ],
 )

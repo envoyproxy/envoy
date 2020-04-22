@@ -1,0 +1,23 @@
+version_info: "0"
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.Listener
+  name: listener_0
+  address:
+    socket_address:
+      address: {{ ntop_ip_loopback_address }}
+      port_value: 0
+  filter_chains:
+  - filters:
+    - name: http
+      typed_config:
+        "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+        type_url: "type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager"
+        value:
+          codec_type: HTTP2
+          drain_timeout: 5s
+          stat_prefix: router
+          rds:
+            route_config_name: route_config_0
+            config_source: { path: {{ rds_json_path }} }
+          http_filters: [{ name: envoy.filters.http.router }]
+          foo: bar

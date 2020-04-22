@@ -1,10 +1,12 @@
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
-#include "common/config/filter_json.h"
+#include "common/protobuf/utility.h"
 
 #include "extensions/filters/network/redis_proxy/config.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,76 +21,162 @@ namespace RedisProxy {
 TEST(RedisProxyFilterConfigFactoryTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(RedisProxyFilterConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::redis_proxy::v2::RedisProxy(), context),
+                   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy(), context),
                ProtoValidationException);
 }
 
-TEST(RedisProxyFilterConfigFactoryTest, RedisProxyCorrectJson) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "stat_prefix": "foo",
-    "conn_pool": {
-      "op_timeout_ms": 20
-    }
-  }
+TEST(RedisProxyFilterConfigFactoryTest, NoUpstreamDefined) {
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings settings;
+  settings.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy config;
+  config.set_stat_prefix("foo");
+  config.mutable_settings()->CopyFrom(settings);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  EXPECT_THROW_WITH_MESSAGE(
+      RedisProxyFilterConfigFactory().createFilterFactoryFromProto(config, context), EnvoyException,
+      "cannot configure a redis-proxy without any upstream");
+}
+
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyNoSettings) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
+                          ProtoValidationException, "value is required");
+}
+
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyNoOpTimeout) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+settings: {}
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
+                          ProtoValidationException, "embedded message failed validation");
+}
+
+TEST(RedisProxyFilterConfigFactoryTest,
+     DEPRECATED_FEATURE_TEST(RedisProxyCorrectProtoLegacyCluster)) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features:envoy.config.filter.network.redis_proxy.v2.RedisProxy.cluster",
+        "true"},
+       {"envoy.deprecated_features:envoy.extensions.filters.network.redis_proxy.v3.RedisProxy."
+        "hidden_envoy_deprecated_cluster",
+        "true"}});
+
+  const std::string yaml = R"EOF(
+cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.02s
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  EXPECT_TRUE(factory.isTerminalFilter());
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+TEST(RedisProxyFilterConfigFactoryTest,
+     DEPRECATED_FEATURE_TEST(RedisProxyCorrectProtoLegacyCatchAllCluster)) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features:envoy.config.filter.network.redis_proxy.v2.RedisProxy."
+        "PrefixRoutes.catch_all_cluster",
+        "true"},
+       {"envoy.deprecated_features:envoy.extensions.filters.network.redis_proxy.v3.RedisProxy."
+        "PrefixRoutes.hidden_envoy_deprecated_catch_all_cluster",
+        "true"}});
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.02s
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  EXPECT_TRUE(factory.isTerminalFilter());
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }
 
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyCorrectProto) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "stat_prefix": "foo",
-    "conn_pool": {
-      "op_timeout_ms": 20
-    }
-  }
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.02s
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config{};
-  Config::FilterJson::translateRedisProxy(*json_config, proto_config);
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  EXPECT_TRUE(factory.isTerminalFilter());
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }
 
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyEmptyProto) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "stat_prefix": "foo",
-    "conn_pool": {
-      "op_timeout_ms": 20
-    }
-  }
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.02s
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
-      *dynamic_cast<envoy::config::filter::network::redis_proxy::v2::RedisProxy*>(
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
+      *dynamic_cast<envoy::extensions::filters::network::redis_proxy::v3::RedisProxy*>(
           factory.createEmptyConfigProto().get());
 
-  Config::FilterJson::translateRedisProxy(*json_config, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(RedisProxyFilterConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.redis_proxy";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace RedisProxy

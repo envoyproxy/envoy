@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/route/v3/route_components.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/protobuf/utility.h"
@@ -40,7 +42,8 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
     return false;
   }
 
-  descriptor.entries_.push_back({descriptor_key_, header_value->value().c_str()});
+  descriptor.entries_.push_back(
+      {descriptor_key_, std::string(header_value->value().getStringView())});
   return true;
 }
 
@@ -64,13 +67,10 @@ bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
 }
 
 HeaderValueMatchAction::HeaderValueMatchAction(
-    const envoy::api::v2::route::RateLimit::Action::HeaderValueMatch& action)
+    const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action)
     : descriptor_value_(action.descriptor_value()),
-      expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)) {
-  for (const auto& header_matcher : action.headers()) {
-    action_headers_.push_back(header_matcher);
-  }
-}
+      expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
+      action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers())) {}
 
 bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
                                                 RateLimit::Descriptor& descriptor,
@@ -84,31 +84,32 @@ bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
   }
 }
 
-RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const envoy::api::v2::route::RateLimit& config)
+RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
+    const envoy::config::route::v3::RateLimit& config)
     : disable_key_(config.disable_key()),
       stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))) {
   for (const auto& action : config.actions()) {
     switch (action.action_specifier_case()) {
-    case envoy::api::v2::route::RateLimit::Action::kSourceCluster:
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kSourceCluster:
       actions_.emplace_back(new SourceClusterAction());
       break;
-    case envoy::api::v2::route::RateLimit::Action::kDestinationCluster:
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kDestinationCluster:
       actions_.emplace_back(new DestinationClusterAction());
       break;
-    case envoy::api::v2::route::RateLimit::Action::kRequestHeaders:
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRequestHeaders:
       actions_.emplace_back(new RequestHeadersAction(action.request_headers()));
       break;
-    case envoy::api::v2::route::RateLimit::Action::kRemoteAddress:
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRemoteAddress:
       actions_.emplace_back(new RemoteAddressAction());
       break;
-    case envoy::api::v2::route::RateLimit::Action::kGenericKey:
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kGenericKey:
       actions_.emplace_back(new GenericKeyAction(action.generic_key()));
       break;
-    case envoy::api::v2::route::RateLimit::Action::kHeaderValueMatch:
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kHeaderValueMatch:
       actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));
       break;
     default:
-      NOT_REACHED;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 }
@@ -133,7 +134,7 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
 }
 
 RateLimitPolicyImpl::RateLimitPolicyImpl(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::route::RateLimit>& rate_limits)
+    const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits)
     : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
   for (const auto& rate_limit : rate_limits) {
     std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(

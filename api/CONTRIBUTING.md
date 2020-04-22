@@ -8,8 +8,8 @@ API changes are regular PRs in https://github.com/envoyproxy/envoy for the API/c
 changes. They may be as part of a larger implementation PR. Please follow the standard Bazel and CI
 process for validating build/test sanity of `api/` before submitting a PR.
 
-*Note: New .proto files should be also included to [build.sh](https://github.com/envoyproxy/envoy/blob/master/docs/build.sh) and
-[BUILD](https://github.com/envoyproxy/envoy/blob/master/api/docs/BUILD) in order to get the RSTs generated.*
+*Note: New .proto files should be added to
+[BUILD](https://github.com/envoyproxy/envoy/blob/master/api/versioning/BUILD) in order to get the RSTs generated.*
 
 ## Documentation changes
 
@@ -33,7 +33,7 @@ Or to use a hermetic Docker container:
 ```
 
 This process builds RST documentation directly from the proto files, merges it with the static RST
-files, and then runs [Sphinx](http://www.sphinx-doc.org/en/stable/rest.html) over the entire tree to
+files, and then runs [Sphinx](https://www.sphinx-doc.org/en/stable/rest.html) over the entire tree to
 produce the final documentation. The generated RST files are not committed as they are regenerated
 every time the documentation is built.
 
@@ -70,8 +70,3 @@ The following are some general guidelines around documentation.
 * Prefer *italics* for emphasis as `backtick` emphasis is somewhat jarring in our Sphinx theme.
 * All documentation is expected to use proper English grammar with proper punctuation. If you are
   not a fluent English speaker please let us know and we will help out.
-* Tag messages/enum/files with `[#proto-status: draft|experimental|frozen]` to
-  reflect their [API
-  status](https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/v2_overview#status).
-  Frozen entities do not need to be tagged except when overriding an outer scope
-  draft or experimental status.

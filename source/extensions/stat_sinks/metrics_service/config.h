@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/registry/registry.h"
 #include "envoy/server/instance.h"
 
 #include "server/configuration_impl.h"
@@ -20,8 +21,10 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
-  std::string name() override;
+  std::string name() const override;
 };
+
+DECLARE_FACTORY(MetricsServiceSinkFactory);
 
 } // namespace MetricsService
 } // namespace StatSinks

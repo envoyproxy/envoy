@@ -1,0 +1,4 @@
+// NOLINT(namespace-envoy)
+constexpr char TEST_UPSTREAMLOCALHOST_CERT_HASH[] =
+    "44:A1:C4:AD:71:B5:AE:A0:A2:24:63:DA:C8:FF:0C:FC:26:6E:4B:D7:08:DE:64:60:34:A0:72:42:6E:18:BA:"
+    "87";

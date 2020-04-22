@@ -1,9 +1,12 @@
 # C++ coding style
 
-* The Envoy source code is formatted using clang-format. Thus all white space, etc.
-  issues are taken care of automatically. The Travis tests will automatically check
+* The Envoy source code is formatted using clang-format. Thus all white spaces, etc.
+  issues are taken care of automatically. The CircleCI tests will automatically check
   the code format and fail. There are make targets that can both check the format
-  (check_format) as well as fix the code format for you (fix_format).
+  (check_format) as well as fix the code format for you (fix_format). Errors in
+  .clang-tidy are enforced while other warnings are suggestions. Note that code and
+  comment blocks designated `clang-format off` must be closed with `clang-format on`.
+  To run these checks locally, see [Support Tools](support/README.md).
 * Beyond code formatting, for the most part Envoy uses the
   [Google C++ style guidelines](https://google.github.io/styleguide/cppguide.html).
   The following section covers the major areas where we deviate from the Google
@@ -17,6 +20,18 @@
 
 * Exceptions are allowed and encouraged where appropriate. When using exceptions, do not add
   additional error handing that cannot possibly happen in the case an exception is thrown.
+* Do use exceptions for:
+  - Configuration ingestion error handling. Invalid configurations (dynamic and
+    static) should throw meaningful `EnvoyException`s, the configuration
+    ingestion code will catch these.
+  - Constructor failure.
+  - Error handling in deep call stacks, where exceptions provide material
+    improvements to code complexity and readability.
+* Apply caution when using exceptions on the data path for general purpose error
+  handling. Exceptions are not caught on the data path and they should not be
+  used for simple error handling, e.g. with shallow call stacks, where explicit
+  error handling provides a more readable and easier to reason about
+  implementation.
 * References are always preferred over pointers when the reference cannot be null. This
   includes both const and non-const references.
 * Function names should all use camel case starting with a lower case letter (e.g., `doFoo()`).
@@ -25,10 +40,13 @@
 * 100 columns is the line limit.
 * Use your GitHub name in TODO comments, e.g. `TODO(foobar): blah`.
 * Smart pointers are type aliased:
-  * `typedef std::unique_ptr<Foo> FooPtr;`
-  * `typedef std::shared_ptr<Bar> BarSharedPtr;`
-  * `typedef std::shared_ptr<const Blah> BlahConstSharedPtr;`
+  * `using FooPtr = std::unique_ptr<Foo>;`
+  * `using BarSharedPtr = std::shared_ptr<Bar>;`
+  * `using BlahConstSharedPtr = std::shared_ptr<const Blah>;`
   * Regular pointers (e.g. `int* foo`) should not be type aliased.
+* `absl::optional<std::reference_wrapper<T>> is type aliased:
+  * `using FooOptRef = absl::optional<std::reference_wrapper<T>>;`
+  * `using FooOptConstRef = absl::optional<std::reference_wrapper<T>>;`
 * If move semantics are intended, prefer specifying function arguments with `&&`.
   E.g., `void onHeaders(Http::HeaderMapPtr&& headers, ...)`. The rationale for this is that it
   forces the caller to specify `std::move(...)` or pass a temporary and makes the intention at
@@ -65,16 +83,17 @@
   In most cases tests can and should be structured so this is not necessary.
 * Tests default to StrictMock so will fail if hitting unexpected warnings. Feel free to use
   NiceMock for mocks whose behavior is not the focus of a test.
-* There are probably a few other things missing from this list. We will add them as they
-  are brought to our attention.
 * [Thread
   annotations](https://github.com/abseil/abseil-cpp/blob/master/absl/base/thread_annotations.h),
   such as `GUARDED_BY`, should be used for shared state guarded by
   locks/mutexes.
-* Functions intended to be local to a cc file should be declared in an anonymonus namespace,
+* Functions intended to be local to a cc file should be declared in an anonymous namespace,
   rather than using the 'static' keyword. Note that the
   [Google C++ style guide](https://google.github.io/styleguide/cppguide.html#Unnamed_Namespaces_and_Static_Variables)
-   allows either, but in Envoy we prefer annonymous namespaces.
+   allows either, but in Envoy we prefer anonymous namespaces.
+* Braces are required for all control statements include single line if, while, etc. statements.
+* Don't use [mangled Protobuf enum
+  names](https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#enum).
 
 # Error handling
 
@@ -96,7 +115,7 @@ A few general notes on our error handling philosophy:
   silently be ignored and should crash the process either via the C++ allocation error exception, an
   explicit `RELEASE_ASSERT` following a third party library call, or an obvious crash on a subsequent
   line via null pointer dereference. This rule is again based on the philosophy that the engineering
-  costs of properly handling these cases is not worth it. Time is better spent designing proper system
+  costs of properly handling these cases are not worth it. Time is better spent designing proper system
   controls that shed load if resource usage becomes too high, etc.
 * The "less is more" error handling philosophy described in the previous two points is primarily
   based on the fact that restarts are designed to be fast, reliable and cheap.
@@ -152,7 +171,7 @@ environment. In general, there should be no non-local network access. In additio
 
 * Paths should be constructed using:
   * The methods in [`TestEnvironment`](test/test_common/environment.h) for C++ tests.
-  * With `${TEST_TMPDIR}` (for writable temporary space) or `${TEST_RUNDIR}` for read-only access to
+  * With `${TEST_TMPDIR}` (for writable temporary space) or `${TEST_SRCDIR}` for read-only access to
     test inputs in shell tests.
   * With `{{ test_tmpdir }}`, `{{ test_rundir }}` and `{{ test_udsdir }}` respectively for JSON templates.
     `{{ test_udsdir }}` is provided for pathname based Unix Domain Sockets, which must fit within a

@@ -1,6 +1,9 @@
 #include "extensions/transport_sockets/raw_buffer/config.h"
 
-#include "envoy/registry/registry.h"
+#include <iostream>
+
+#include "envoy/config/transport_socket/raw_buffer/v2/raw_buffer.pb.h"
+#include "envoy/config/transport_socket/raw_buffer/v2/raw_buffer.pb.validate.h"
 
 #include "common/network/raw_buffer_socket.h"
 
@@ -21,16 +24,14 @@ Network::TransportSocketFactoryPtr DownstreamRawBufferSocketFactory::createTrans
 }
 
 ProtobufTypes::MessagePtr RawBufferSocketFactory::createEmptyConfigProto() {
-  return std::make_unique<ProtobufWkt::Empty>();
+  return std::make_unique<envoy::config::transport_socket::raw_buffer::v2::RawBuffer>();
 }
 
-static Registry::RegisterFactory<UpstreamRawBufferSocketFactory,
-                                 Server::Configuration::UpstreamTransportSocketConfigFactory>
-    upstream_registered_;
+REGISTER_FACTORY(UpstreamRawBufferSocketFactory,
+                 Server::Configuration::UpstreamTransportSocketConfigFactory){"raw_buffer"};
 
-static Registry::RegisterFactory<DownstreamRawBufferSocketFactory,
-                                 Server::Configuration::DownstreamTransportSocketConfigFactory>
-    downstream_registered_;
+REGISTER_FACTORY(DownstreamRawBufferSocketFactory,
+                 Server::Configuration::DownstreamTransportSocketConfigFactory){"raw_buffer"};
 
 } // namespace RawBuffer
 } // namespace TransportSockets

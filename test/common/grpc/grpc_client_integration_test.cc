@@ -1,4 +1,6 @@
 #ifdef ENVOY_GOOGLE_GRPC
+#include "envoy/config/core/v3/grpc_service.pb.h"
+
 #include "common/grpc/google_async_client_impl.h"
 
 #include "extensions/grpc_credentials/well_known_names.h"
@@ -7,13 +9,16 @@
 
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
 
+using testing::Eq;
+
 namespace Envoy {
 namespace Grpc {
 namespace {
 
 // Parameterize the loopback test server socket address and gRPC client type.
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, GrpcClientIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcClientIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Validate that a simple request-reply stream works.
 TEST_P(GrpcClientIntegrationTest, BasicStream) {
@@ -22,7 +27,7 @@ TEST_P(GrpcClientIntegrationTest, BasicStream) {
   stream->sendRequest();
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata_);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -51,8 +56,8 @@ TEST_P(GrpcClientIntegrationTest, MultiStream) {
   stream_1->sendRequest();
   stream_0->sendServerInitialMetadata(empty_metadata_);
   stream_0->sendReply();
-  stream_1->sendServerTrailers(Status::GrpcStatus::Unavailable, "", empty_metadata_, true);
-  stream_0->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata_);
+  stream_1->sendServerTrailers(Status::WellKnownGrpcStatus::Unavailable, "", empty_metadata_, true);
+  stream_0->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -77,8 +82,8 @@ TEST_P(GrpcClientIntegrationTest, HttpNon200Status) {
     // Technically this should be
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
     // as given by Grpc::Utility::httpToGrpcStatus(), but the Google gRPC client treats
-    // this as GrpcStatus::Canceled.
-    stream->expectGrpcStatus(Status::GrpcStatus::Canceled);
+    // this as WellKnownGrpcStatus::Canceled.
+    stream->expectGrpcStatus(Status::WellKnownGrpcStatus::Canceled);
     stream->fake_stream_->encodeHeaders(reply_headers, true);
     dispatcher_helper_.runDispatcher();
   }
@@ -90,11 +95,11 @@ TEST_P(GrpcClientIntegrationTest, GrpcStatusFallback) {
   auto stream = createStream(empty_metadata_);
   const Http::TestHeaderMapImpl reply_headers{
       {":status", "404"},
-      {"grpc-status", std::to_string(enumToInt(Status::GrpcStatus::PermissionDenied))},
+      {"grpc-status", std::to_string(enumToInt(Status::WellKnownGrpcStatus::PermissionDenied))},
       {"grpc-message", "error message"}};
   stream->expectInitialMetadata(empty_metadata_);
   stream->expectTrailingMetadata(empty_metadata_);
-  stream->expectGrpcStatus(Status::GrpcStatus::PermissionDenied);
+  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::PermissionDenied);
   stream->fake_stream_->encodeHeaders(reply_headers, true);
   dispatcher_helper_.runDispatcher();
 }
@@ -106,7 +111,7 @@ TEST_P(GrpcClientIntegrationTest, HttpReset) {
   stream->sendServerInitialMetadata(empty_metadata_);
   dispatcher_helper_.runDispatcher();
   stream->expectTrailingMetadata(empty_metadata_);
-  stream->expectGrpcStatus(Status::GrpcStatus::Internal);
+  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::Internal);
   stream->fake_stream_->encodeResetStream();
   dispatcher_helper_.runDispatcher();
 }
@@ -122,7 +127,7 @@ TEST_P(GrpcClientIntegrationTest, BadReplyGrpcFraming) {
   stream->sendRequest();
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->expectTrailingMetadata(empty_metadata_);
-  stream->expectGrpcStatus(Status::GrpcStatus::Internal);
+  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::Internal);
   Buffer::OwnedImpl reply_buffer("\xde\xad\xbe\xef\x00", 5);
   stream->fake_stream_->encodeData(reply_buffer, true);
   dispatcher_helper_.runDispatcher();
@@ -135,9 +140,25 @@ TEST_P(GrpcClientIntegrationTest, BadReplyProtobuf) {
   stream->sendRequest();
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->expectTrailingMetadata(empty_metadata_);
-  stream->expectGrpcStatus(Status::GrpcStatus::Internal);
+  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::Internal);
   Buffer::OwnedImpl reply_buffer("\x00\x00\x00\x00\x02\xff\xff", 7);
   stream->fake_stream_->encodeData(reply_buffer, true);
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that a reply with bad protobuf is handled as an INTERNAL gRPC error.
+TEST_P(GrpcClientIntegrationTest, BadRequestReplyProtobuf) {
+  initialize();
+  auto request = createRequest(empty_metadata_);
+  request->fake_stream_->startGrpcStream();
+  EXPECT_CALL(*request->child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
+  EXPECT_CALL(*request, onFailure(Status::Internal, "", _)).WillExitIfNeeded();
+  EXPECT_CALL(*request->child_span_, finishSpan());
+  dispatcher_helper_.setStreamEventPending();
+  Buffer::OwnedImpl reply_buffer("\x00\x00\x00\x00\x02\xff\xff", 7);
+  Common::prependGrpcFrameHeader(reply_buffer);
+  request->fake_stream_->encodeData(reply_buffer, false);
+  request->fake_stream_->finishGrpcStream(Grpc::Status::Ok);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -155,7 +176,7 @@ TEST_P(GrpcClientIntegrationTest, OutOfRangeGrpcStatus) {
   stream->sendReply();
   EXPECT_CALL(*stream, onReceiveTrailingMetadata_(_)).WillExitIfNeeded();
   dispatcher_helper_.setStreamEventPending();
-  stream->expectGrpcStatus(Status::GrpcStatus::InvalidCode);
+  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::InvalidCode);
   const Http::TestHeaderMapImpl reply_trailers{{"grpc-status", std::to_string(0x1337)}};
   stream->fake_stream_->encodeTrailers(reply_trailers);
   dispatcher_helper_.runDispatcher();
@@ -169,7 +190,7 @@ TEST_P(GrpcClientIntegrationTest, MissingGrpcStatus) {
   stream->sendReply();
   EXPECT_CALL(*stream, onReceiveTrailingMetadata_(_)).WillExitIfNeeded();
   dispatcher_helper_.setStreamEventPending();
-  stream->expectGrpcStatus(Status::GrpcStatus::Unknown);
+  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::Unknown);
   const Http::TestHeaderMapImpl reply_trailers{{"some", "other header"}};
   stream->fake_stream_->encodeTrailers(reply_trailers);
   dispatcher_helper_.runDispatcher();
@@ -186,8 +207,8 @@ TEST_P(GrpcClientIntegrationTest, ReplyNoTrailers) {
   EXPECT_CALL(*stream, onReceiveMessage_(HelloworldReplyEq(HELLO_REPLY))).WillExitIfNeeded();
   dispatcher_helper_.setStreamEventPending();
   stream->expectTrailingMetadata(empty_metadata_);
-  stream->expectGrpcStatus(Status::GrpcStatus::InvalidCode);
-  auto serialized_response = Grpc::Common::serializeBody(reply);
+  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::InvalidCode);
+  auto serialized_response = Grpc::Common::serializeToGrpcFrame(reply);
   stream->fake_stream_->encodeData(*serialized_response, true);
   stream->fake_stream_->encodeResetStream();
   dispatcher_helper_.runDispatcher();
@@ -201,7 +222,7 @@ TEST_P(GrpcClientIntegrationTest, StreamClientInitialMetadata) {
       {Http::LowerCaseString("baz"), "blah"},
   };
   auto stream = createStream(initial_metadata);
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata_, true);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_, true);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -235,10 +256,11 @@ TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
   const TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
+      {Http::LowerCaseString("binary-bin"), "help"},
   };
   stream->sendServerInitialMetadata(initial_metadata);
   stream->sendReply();
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata_);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -253,7 +275,7 @@ TEST_P(GrpcClientIntegrationTest, ServerTrailingMetadata) {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
   };
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", trailing_metadata);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", trailing_metadata);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -261,7 +283,7 @@ TEST_P(GrpcClientIntegrationTest, ServerTrailingMetadata) {
 TEST_P(GrpcClientIntegrationTest, StreamTrailersOnly) {
   initialize();
   auto stream = createStream(empty_metadata_);
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata_, true);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_, true);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -271,8 +293,9 @@ TEST_P(GrpcClientIntegrationTest, RequestTrailersOnly) {
   initialize();
   auto request = createRequest(empty_metadata_);
   const Http::TestHeaderMapImpl reply_headers{{":status", "200"}, {"grpc-status", "0"}};
-  EXPECT_CALL(*request->child_span_, setTag(Tracing::Tags::get().GRPC_STATUS_CODE, "0"));
-  EXPECT_CALL(*request->child_span_, setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE));
+  EXPECT_CALL(*request->child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
+  EXPECT_CALL(*request->child_span_,
+              setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*request, onFailure(Status::Internal, "", _)).WillExitIfNeeded();
   dispatcher_helper_.setStreamEventPending();
   EXPECT_CALL(*request->child_span_, finishSpan());
@@ -287,8 +310,30 @@ TEST_P(GrpcClientIntegrationTest, ResourceExhaustedError) {
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
   dispatcher_helper_.runDispatcher();
-  stream->sendServerTrailers(Status::GrpcStatus::ResourceExhausted, "error message",
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::ResourceExhausted, "error message",
                              empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that a trailers Unauthenticated reply is handled.
+TEST_P(GrpcClientIntegrationTest, UnauthenticatedError) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Unauthenticated, "error message",
+                             empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that a trailers reply is still handled even if a grpc status code larger than
+// MaximumKnown, is handled.
+TEST_P(GrpcClientIntegrationTest, MaximumKnownPlusOne) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendServerTrailers(
+      static_cast<Status::GrpcStatus>(Status::WellKnownGrpcStatus::MaximumKnown + 1),
+      "error message", empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -299,7 +344,7 @@ TEST_P(GrpcClientIntegrationTest, ReceiveAfterLocalClose) {
   stream->sendRequest(true);
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata_);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -308,10 +353,10 @@ TEST_P(GrpcClientIntegrationTest, ResetAfterCloseLocal) {
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->grpc_stream_->closeStream();
-  stream->fake_stream_->waitForEndStream(dispatcher_helper_.dispatcher_);
+  ASSERT_TRUE(stream->fake_stream_->waitForEndStream(dispatcher_helper_.dispatcher_));
   stream->grpc_stream_->resetStream();
   dispatcher_helper_.dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-  stream->fake_stream_->waitForReset();
+  ASSERT_TRUE(stream->fake_stream_->waitForReset());
 }
 
 // Validate that request cancel() works.
@@ -319,16 +364,17 @@ TEST_P(GrpcClientIntegrationTest, CancelRequest) {
   initialize();
   auto request = createRequest(empty_metadata_);
   EXPECT_CALL(*request->child_span_,
-              setTag(Tracing::Tags::get().STATUS, Tracing::Tags::get().CANCELED));
+              setTag(Eq(Tracing::Tags::get().Status), Eq(Tracing::Tags::get().Canceled)));
   EXPECT_CALL(*request->child_span_, finishSpan());
   request->grpc_request_->cancel();
   dispatcher_helper_.dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-  request->fake_stream_->waitForReset();
+  ASSERT_TRUE(request->fake_stream_->waitForReset());
 }
 
 // Parameterize the loopback test server socket address and gRPC client type.
-INSTANTIATE_TEST_CASE_P(SslIpVersionsClientType, GrpcSslClientIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(SslIpVersionsClientType, GrpcSslClientIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Validate that a simple request-reply unary RPC works with SSL.
 TEST_P(GrpcSslClientIntegrationTest, BasicSslRequest) {
@@ -352,10 +398,11 @@ TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestWithClientCert) {
 class GrpcAccessTokenClientIntegrationTest : public GrpcSslClientIntegrationTest {
 public:
   void expectExtraHeaders(FakeStream& fake_stream) override {
-    fake_stream.waitForHeadersComplete();
+    AssertionResult result = fake_stream.waitForHeadersComplete();
+    RELEASE_ASSERT(result, result.message());
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
-    if (access_token_value_ != "") {
-      if (access_token_value_2_ == "") {
+    if (!access_token_value_.empty()) {
+      if (access_token_value_2_.empty()) {
         EXPECT_EQ("Bearer " + access_token_value_, stream_headers.get_("authorization"));
       } else {
         EXPECT_EQ("Bearer " + access_token_value_ + ",Bearer " + access_token_value_2_,
@@ -364,7 +411,7 @@ public:
     }
   }
 
-  virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
+  envoy::config::core::v3::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_credentials_factory_name(credentials_factory_name_);
@@ -372,10 +419,10 @@ public:
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     google_grpc->add_call_credentials()->set_access_token(access_token_value_);
-    if (access_token_value_2_ != "") {
+    if (!access_token_value_2_.empty()) {
       google_grpc->add_call_credentials()->set_access_token(access_token_value_2_);
     }
-    if (refresh_token_value_ != "") {
+    if (!refresh_token_value_.empty()) {
       google_grpc->add_call_credentials()->set_google_refresh_token(refresh_token_value_);
     }
     return config;
@@ -388,15 +435,16 @@ public:
 };
 
 // Parameterize the loopback test server socket address and gRPC client type.
-INSTANTIATE_TEST_CASE_P(SslIpVersionsClientType, GrpcAccessTokenClientIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(SslIpVersionsClientType, GrpcAccessTokenClientIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Validate that a simple request-reply unary RPC works with AccessToken auth.
 TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthRequest) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -408,13 +456,13 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthStream) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendRequest();
   stream->sendReply();
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata_);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -424,7 +472,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, MultipleAccessTokens) {
   access_token_value_ = "accesstokenvalue";
   access_token_value_2_ = "accesstokenvalue2";
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -437,7 +485,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, ExtraCredentialParams) {
   access_token_value_ = "accesstokenvalue";
   refresh_token_value_ = "refreshtokenvalue";
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -448,7 +496,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, ExtraCredentialParams) {
 TEST_P(GrpcAccessTokenClientIntegrationTest, NoAccessTokens) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();

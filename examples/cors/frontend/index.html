@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Envoy CORS Webpage</title>
+    <link rel="shortcut icon" href="https://www.envoyproxy.io/img/favicon.ico">
+    <script type="text/javascript">
+        var client = new XMLHttpRequest();
+        var resultText;
+
+        function invokeRemoteDomain() {
+            var remoteIP = document.getElementById("remoteip").value;
+            var enforcement = document.querySelector('input[name="cors"]:checked').value;
+            if(client) {
+                var url = `http://${remoteIP}:8002/cors/${enforcement}`;
+                client.open('GET', url, true);
+                client.onreadystatechange = handler;
+                client.send();
+            } else {
+                resultText = "Could not find client to make request.";
+                document.getElementById("results").textContent = resultText;
+            }
+        }
+
+        function handler() {
+            var responseHeaders = client.getAllResponseHeaders()
+            if (responseHeaders === "") {
+                document.getElementById("results").textContent = 'CORS Error';
+            }
+            if (client.readyState == 4 && client.status == 200) {
+                resultText = client.responseText;
+                document.getElementById("results").textContent = resultText;
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>
+        Envoy CORS Demo
+    </h1>
+    <p>
+        This page requests an asset from another domain via cross-site XMLHttpRequest mitigated by Access Control.<br/>
+        This scenario demonstrates a <a href="https://www.w3.org/TR/cors/#simple-method">simple method</a>.<br/>
+        It does <b>NOT</b> dispatch a preflight request.
+    </p>
+    <p>
+        Enter the IP address of backend Docker container. As we are running Docker Compose this should just be localhost.<br/>
+    </p>
+    <div>
+        <input id="remoteip" type="text" placeholder="Remote IP" value="localhost"/>
+        <button id="submit" onclick="invokeRemoteDomain()">Fetch asset</button><br/>
+        <div style="width:20%;float:left;">
+            <h5>CORS Enforcement</h5>
+            <input type="radio" name="cors" value="disabled" checked="checked"/> Disabled<br/>
+            <input type="radio" name="cors" value="open"/> Open<br/>
+            <input type="radio" name="cors" value="restricted"/> Restricted<br/>
+            <br/>
+        </div>
+        <div style="float:left;">
+            <h3>Request Results</h3>
+            <p id="results"></p>
+        </div>
+    </div>
+</body>
+<script>
+    var input = document.getElementById("remoteip");
+    input.addEventListener("keyup", function(event) {
+        event.preventDefault();
+        if (event.keyCode === 13) {
+            document.getElementById("submit").click();
+        }
+    });
+</script>
+</html>

@@ -1,0 +1,98 @@
+#!/bin/bash
+
+set -e
+
+# This works only on Linux-{x86_64,s390x,aarch64} and macOS-x86_64.
+case "$$(uname -s)-$$(uname -m)" in
+Linux-x86_64|Linux-s390x|Linux-aarch64|Darwin-x86_64)
+  ;;
+*)
+  echo "ERROR: wee8 is currently supported only on Linux-{x86_64,s390x,aarch64} and macOS-x86_64." >&2
+  exit 1
+esac
+
+# Bazel magic.
+ROOT=$$(dirname $(rootpath wee8/BUILD.gn))/..
+pushd $$ROOT/wee8
+
+# Clean after previous build.
+rm -rf out/wee8
+
+# Export compiler configuration.
+if [[ ( `uname` == "Darwin" && $${CXX-} == "" ) || $${CXX-} == *"clang"* ]]; then
+  export IS_CLANG=true
+  export CC=$${CC:-clang}
+  export CXX=$${CXX:-clang++}
+else
+  export IS_CLANG=false
+  export CC=$${CC:-gcc}
+  export CXX=$${CXX:-g++}
+fi
+
+export AR=$${AR:-ar}
+export NM=$${NM:-nm}
+
+# Hook sanitizers.
+if [[ $${ENVOY_ASAN-} == "1" ]]; then
+  WEE8_BUILD_ARGS+=" is_asan=true"
+  WEE8_BUILD_ARGS+=" is_lsan=true"
+fi
+if [[ $${ENVOY_UBSAN_VPTR-} == "1" ]]; then
+  WEE8_BUILD_ARGS+=" is_ubsan=true"
+  WEE8_BUILD_ARGS+=" is_ubsan_vptr=true"
+fi
+if [[ $${ENVOY_MSAN-} == "1" ]]; then
+  WEE8_BUILD_ARGS+=" is_msan=true"
+  export LDFLAGS="$${LDFLAGS} -L/opt/libcxx_msan/lib -Wl,-rpath,/opt/libcxx_msan/lib"
+fi
+if [[ $${ENVOY_TSAN-} == "1" ]]; then
+  WEE8_BUILD_ARGS+=" is_tsan=true"
+fi
+
+# Release build.
+WEE8_BUILD_ARGS+=" is_debug=false"
+# Clang or not Clang, that is the question.
+WEE8_BUILD_ARGS+=" is_clang=$$IS_CLANG"
+# Hack to disable bleeding-edge compiler flags.
+WEE8_BUILD_ARGS+=" use_xcode_clang=true"
+# Use local toolchain.
+WEE8_BUILD_ARGS+=" custom_toolchain=\"//build/toolchain/linux/unbundle:default\""
+# Use local stdlibc++ / libc++.
+WEE8_BUILD_ARGS+=" use_custom_libcxx=false"
+# Use local sysroot.
+WEE8_BUILD_ARGS+=" use_sysroot=false"
+# Disable unused GLib2 dependency.
+WEE8_BUILD_ARGS+=" use_glib=false"
+# Expose debug symbols.
+WEE8_BUILD_ARGS+=" v8_expose_symbols=true"
+# Build monolithic library.
+WEE8_BUILD_ARGS+=" is_component_build=false"
+WEE8_BUILD_ARGS+=" v8_enable_i18n_support=false"
+WEE8_BUILD_ARGS+=" v8_enable_gdbjit=false"
+WEE8_BUILD_ARGS+=" v8_use_external_startup_data=false"
+# Disable read-only heap, since it's leaky and HEAPCHECK complains about it.
+# TODO(PiotrSikora): remove when fixed upstream.
+WEE8_BUILD_ARGS+=" v8_enable_shared_ro_heap=false"
+# Support Arm64
+if [[ `uname -m` == "aarch64" ]]; then
+  WEE8_BUILD_ARGS+=" target_cpu=\"arm64\""
+fi
+
+# Build wee8.
+if [[ "$$(uname -s)" == "Darwin" ]]; then
+  gn=buildtools/mac/gn
+  ninja=third_party/depot_tools/ninja
+elif [[ "$$(uname -s)-$$(uname -m)" == "Linux-x86_64" ]]; then
+  gn=buildtools/linux64/gn
+  ninja=third_party/depot_tools/ninja
+else
+  # Using system default ninja & gn tools
+  gn=$$(command -v gn)
+  ninja=$$(command -v ninja)
+fi
+"$$gn" gen out/wee8 --args="$$WEE8_BUILD_ARGS"
+"$$ninja" -C out/wee8 wee8
+
+# Move compiled library to the expected destinations.
+popd
+mv $$ROOT/wee8/out/wee8/obj/libwee8.a $(execpath libwee8.a)

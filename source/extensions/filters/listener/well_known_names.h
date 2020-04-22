@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -12,15 +14,19 @@ namespace ListenerFilters {
  */
 class ListenerFilterNameValues {
 public:
+  // HTTP Inspector listener filter
+  const std::string HttpInspector = "envoy.filters.listener.http_inspector";
   // Original destination listener filter
-  const std::string ORIGINAL_DST = "envoy.listener.original_dst";
+  const std::string OriginalDst = "envoy.filters.listener.original_dst";
+  // Original source listener filter
+  const std::string OriginalSrc = "envoy.filters.listener.original_src";
   // Proxy Protocol listener filter
-  const std::string PROXY_PROTOCOL = "envoy.listener.proxy_protocol";
+  const std::string ProxyProtocol = "envoy.filters.listener.proxy_protocol";
   // TLS Inspector listener filter
-  const std::string TLS_INSPECTOR = "envoy.listener.tls_inspector";
+  const std::string TlsInspector = "envoy.filters.listener.tls_inspector";
 };
 
-typedef ConstSingleton<ListenerFilterNameValues> ListenerFilterNames;
+using ListenerFilterNames = ConstSingleton<ListenerFilterNameValues>;
 
 } // namespace ListenerFilters
 } // namespace Extensions

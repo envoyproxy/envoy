@@ -1,6 +1,8 @@
 #pragma once
 
-#include "envoy/config/filter/http/router/v2/router.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.validate.h"
+#include "envoy/registry/registry.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -16,19 +18,19 @@ namespace RouterFilter {
  * Config registration for the router filter. @see NamedHttpFilterConfigFactory.
  */
 class RouterFilterConfig
-    : public Common::FactoryBase<envoy::config::filter::http::router::v2::Router> {
+    : public Common::FactoryBase<envoy::extensions::filters::http::router::v3::Router> {
 public:
-  RouterFilterConfig() : FactoryBase(HttpFilterNames::get().ROUTER) {}
+  RouterFilterConfig() : FactoryBase(HttpFilterNames::get().Router) {}
 
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string& stat_prefix,
-                      Server::Configuration::FactoryContext& context) override;
+  bool isTerminalFilter() override { return true; }
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::http::router::v2::Router& proto_config,
+      const envoy::extensions::filters::http::router::v3::Router& proto_config,
       const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;
 };
+
+DECLARE_FACTORY(RouterFilterConfig);
 
 } // namespace RouterFilter
 } // namespace HttpFilters

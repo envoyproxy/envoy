@@ -1,0 +1,27 @@
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+    - match:
+        prefix: /disabled
+        runtime_fraction:
+          runtime_key: runtime.key
+          default_value:
+            numerator: 0
+            denominator: HUNDRED
+      route:
+        cluster: www4
+    - match:
+        prefix: /
+        runtime_fraction:
+          runtime_key: runtime.key
+          default_value:
+            numerator: 30
+            denominator: HUNDRED
+      route:
+        cluster: www2
+    - match:
+        prefix: /
+      route:
+        cluster: www3

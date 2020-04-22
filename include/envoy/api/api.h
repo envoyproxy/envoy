@@ -3,8 +3,11 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/server/process_context.h"
+#include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {
@@ -15,37 +18,55 @@ namespace Api {
  */
 class Api {
 public:
-  virtual ~Api() {}
+  virtual ~Api() = default;
 
   /**
    * Allocate a dispatcher.
+   * @param name the identity name for a dispatcher, e.g. "worker_2" or "main_thread".
+   *             This name will appear in per-handler/worker statistics, such as
+   *             "server.worker_2.watchdog_miss".
    * @return Event::DispatcherPtr which is owned by the caller.
    */
-  virtual Event::DispatcherPtr allocateDispatcher() PURE;
+  virtual Event::DispatcherPtr allocateDispatcher(const std::string& name) PURE;
 
   /**
-   * Create/open a local file that supports async appending.
-   * @param path supplies the file path.
-   * @param dispatcher supplies the dispatcher uses for async flushing.
-   * @param lock supplies the lock to use for cross thread appends.
+   * Allocate a dispatcher.
+   * @param name the identity name for a dispatcher, e.g. "worker_2" or "main_thread".
+   *             This name will appear in per-handler/worker statistics, such as
+   *             "server.worker_2.watchdog_miss".
+   * @param watermark_factory the watermark factory, ownership is transferred to the dispatcher.
+   * @return Event::DispatcherPtr which is owned by the caller.
    */
-  virtual Filesystem::FileSharedPtr createFile(const std::string& path,
-                                               Event::Dispatcher& dispatcher,
-                                               Thread::BasicLockable& lock,
-                                               Stats::Store& stats_store) PURE;
+  virtual Event::DispatcherPtr
+  allocateDispatcher(const std::string& name, Buffer::WatermarkFactoryPtr&& watermark_factory) PURE;
 
   /**
-   * @return bool whether a file exists and can be opened for read on disk.
+   * @return a reference to the ThreadFactory
    */
-  virtual bool fileExists(const std::string& path) PURE;
+  virtual Thread::ThreadFactory& threadFactory() PURE;
 
   /**
-   * @return file content.
+   * @return a reference to the Filesystem::Instance
    */
-  virtual std::string fileReadToEnd(const std::string& path) PURE;
+  virtual Filesystem::Instance& fileSystem() PURE;
+
+  /**
+   * @return a reference to the TimeSource
+   */
+  virtual TimeSource& timeSource() PURE;
+
+  /**
+   * @return a constant reference to the root Stats::Scope
+   */
+  virtual const Stats::Scope& rootScope() PURE;
+
+  /**
+   * @return an optional reference to the ProcessContext
+   */
+  virtual ProcessContextOptRef processContext() PURE;
 };
 
-typedef std::unique_ptr<Api> ApiPtr;
+using ApiPtr = std::unique_ptr<Api>;
 
 } // namespace Api
 } // namespace Envoy

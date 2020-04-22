@@ -1,6 +1,6 @@
-#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.validate.h"
-
-#include "common/config/filter_json.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
+#include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.validate.h"
 
 #include "extensions/filters/http/ratelimit/config.h"
 
@@ -15,88 +15,78 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
+namespace {
 
 TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(RateLimitFilterConfig().createFilterFactoryFromProto(
-                   envoy::config::filter::http::rate_limit::v2::RateLimit(), "stats", context),
+                   envoy::extensions::filters::http::ratelimit::v3::RateLimit(), "stats", context),
                ProtoValidationException);
 }
 
-TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectJson) {
-  std::string json_string = R"EOF(
-  {
-    "domain" : "test",
-    "timeout_ms" : 1337
-  }
+TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
+  const std::string yaml = R"EOF(
+  domain: test
+  timeout: 2s
+  rate_limit_service:
+    grpc_service:
+      envoy_grpc:
+        cluster_name: ratelimit_cluster
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  RateLimitFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
-TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
-  std::string json_string = R"EOF(
-  {
-    "domain" : "test",
-    "timeout_ms" : 1337
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
-  Envoy::Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
+  envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+
   RateLimitFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
 TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
-  std::string json_string = R"EOF(
-  {
-    "domain" : "test",
-    "timeout_ms" : 1337
-  }
-  )EOF";
-
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::MockInstance> instance;
+
   RateLimitFilterConfig factory;
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config =
-      *dynamic_cast<envoy::config::filter::http::rate_limit::v2::RateLimit*>(
+  envoy::extensions::filters::http::ratelimit::v3::RateLimit empty_proto_config =
+      *dynamic_cast<envoy::extensions::filters::http::ratelimit::v3::RateLimit*>(
           factory.createEmptyConfigProto().get());
-  Envoy::Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
 
-  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
+  EXPECT_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context),
+               EnvoyException);
 }
 
 TEST(RateLimitFilterConfigTest, BadRateLimitFilterConfig) {
-  std::string json_string = R"EOF(
-  {
-    "domain" : "test",
-    "timeout_ms" : 0
-  }
+  const std::string yaml = R"EOF(
+  domain: foo
+  route_key: my_route
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  RateLimitFilterConfig factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
+  envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException,
+                          "route_key: Cannot find field");
 }
 
+// Test that the deprecated extension name still functions.
+TEST(RateLimitFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.rate_limit";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
+}
+
+} // namespace
 } // namespace RateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions

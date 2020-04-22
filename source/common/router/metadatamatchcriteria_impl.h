@@ -6,12 +6,17 @@ namespace Envoy {
 namespace Router {
 
 class MetadataMatchCriteriaImpl;
-typedef std::unique_ptr<const MetadataMatchCriteriaImpl> MetadataMatchCriteriaImplConstPtr;
+using MetadataMatchCriteriaImplConstPtr = std::unique_ptr<const MetadataMatchCriteriaImpl>;
 
 class MetadataMatchCriteriaImpl : public MetadataMatchCriteria {
 public:
   MetadataMatchCriteriaImpl(const ProtobufWkt::Struct& metadata_matches)
       : metadata_match_criteria_(extractMetadataMatchCriteria(nullptr, metadata_matches)){};
+
+  // MetadataMatchCriteria
+  const std::vector<MetadataMatchCriterionConstSharedPtr>& metadataMatchCriteria() const override {
+    return metadata_match_criteria_;
+  }
 
   MetadataMatchCriteriaConstPtr
   mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const override {
@@ -19,10 +24,8 @@ public:
         new MetadataMatchCriteriaImpl(extractMetadataMatchCriteria(this, metadata_matches)));
   }
 
-  // MetadataMatchCriteria
-  const std::vector<MetadataMatchCriterionConstSharedPtr>& metadataMatchCriteria() const override {
-    return metadata_match_criteria_;
-  }
+  MetadataMatchCriteriaConstPtr
+  filterMatchCriteria(const std::set<std::string>& names) const override;
 
 private:
   MetadataMatchCriteriaImpl(const std::vector<MetadataMatchCriterionConstSharedPtr>& criteria)

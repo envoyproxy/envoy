@@ -5,8 +5,9 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/network/address.h"
 
 namespace Envoy {
@@ -16,9 +17,9 @@ namespace Address {
 /**
  * Interface for all network address resolvers.
  */
-class Resolver {
+class Resolver : public Config::UntypedFactory {
 public:
-  virtual ~Resolver() {}
+  ~Resolver() override = default;
 
   /**
    * Resolve a custom address string and port to an Address::Instance.
@@ -26,13 +27,9 @@ public:
    * @return InstanceConstSharedPtr appropriate Address::Instance.
    */
   virtual InstanceConstSharedPtr
-  resolve(const envoy::api::v2::core::SocketAddress& socket_address) PURE;
+  resolve(const envoy::config::core::v3::SocketAddress& socket_address) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of
-   * a resolver.
-   */
-  virtual std::string name() const PURE;
+  std::string category() const override { return "envoy.resolvers"; }
 };
 
 } // namespace Address

@@ -19,7 +19,7 @@ That command will take some time to run because it is compiling an Envoy binary 
 
 For more information on building and different build targets, please refer to :repo:`ci/README.md`.
 
-**Step 2: Build image with only envoy binary**
+**Step 2: Build image with only Envoy binary**
 
 In this step we'll build an image that only has the Envoy binary, and none
 of the software used to build it.::

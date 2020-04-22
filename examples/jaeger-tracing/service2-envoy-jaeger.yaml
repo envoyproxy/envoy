@@ -4,12 +4,21 @@ static_resources:
       socket_address:
         address: 0.0.0.0
         port_value: 80
+    traffic_direction: INBOUND
     filter_chains:
     - filters:
-      - name: envoy.http_connection_manager
-        config:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           tracing:
-            operation_name: ingress
+            provider:
+              name: envoy.tracers.zipkin
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
+                collector_cluster: jaeger
+                collector_endpoint: "/api/v2/spans"
+                shared_span_context: false
+                collector_endpoint_version: HTTP_JSON
           codec_type: auto
           stat_prefix: ingress_http
           route_config:
@@ -26,31 +35,35 @@ static_resources:
                 decorator:
                   operation: checkStock
           http_filters:
-          - name: envoy.router
-            config: {}
+          - name: envoy.filters.http.router
+            typed_config: {}
   clusters:
   - name: local_service
     connect_timeout: 0.250s
     type: strict_dns
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 8080
+    load_assignment:
+      cluster_name: local_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8080
   - name: jaeger
     connect_timeout: 1s
     type: strict_dns
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: jaeger
-        port_value: 9411
-tracing:
-  http:
-    name: envoy.zipkin
-    config:
-      collector_cluster: jaeger
-      collector_endpoint: "/api/v1/spans"
+    load_assignment:
+      cluster_name: jaeger
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: jaeger
+                port_value: 9411
 admin:
   access_log_path: "/dev/null"
   address:

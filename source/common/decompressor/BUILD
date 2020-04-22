@@ -17,5 +17,7 @@ envoy_cc_library(
         "//include/envoy/decompressor:decompressor_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:zlib_base_lib",
     ],
 )

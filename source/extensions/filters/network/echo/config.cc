@@ -1,6 +1,9 @@
+#include "envoy/extensions/filters/network/echo/v3/echo.pb.h"
+#include "envoy/extensions/filters/network/echo/v3/echo.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/echo/echo.h"
 #include "extensions/filters/network/well_known_names.h"
 
@@ -12,37 +15,28 @@ namespace Echo {
 /**
  * Config registration for the echo filter. @see NamedNetworkFilterConfigFactory.
  */
-class EchoConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
+class EchoConfigFactory
+    : public Common::FactoryBase<envoy::extensions::filters::network::echo::v3::Echo> {
 public:
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Server::Configuration::FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<EchoFilter>());
-    };
-  }
+  EchoConfigFactory() : FactoryBase(NetworkFilterNames::get().Echo) {}
 
+private:
   Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::FactoryContext&) override {
+  createFilterFactoryFromProtoTyped(const envoy::extensions::filters::network::echo::v3::Echo&,
+                                    Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<EchoFilter>());
     };
   }
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
-  }
-
-  std::string name() override { return NetworkFilterNames::get().ECHO; }
+  bool isTerminalFilter() override { return true; }
 };
 
 /**
  * Static registration for the echo filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<EchoConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(EchoConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory){"envoy.echo"};
 
 } // namespace Echo
 } // namespace NetworkFilters

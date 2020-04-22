@@ -1,5 +1,7 @@
 #include "server/backtrace.h"
 
+#include "test/test_common/logging.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -7,9 +9,12 @@ TEST(Backward, Basic) {
   // There isn't much to test here and this feature is really just useful for
   // debugging. This test simply verifies that we do not cause a crash when
   // logging a backtrace, and covers the added lines.
+  const bool save_log_to_stderr = BackwardsTrace::logToStderr();
+  BackwardsTrace::setLogToStderr(false);
   BackwardsTrace tracer;
   tracer.capture();
-  tracer.logTrace();
+  EXPECT_LOG_CONTAINS("critical", "Envoy version:", tracer.logTrace());
+  BackwardsTrace::setLogToStderr(save_log_to_stderr);
 }
 
 TEST(Backward, InvalidUsageTest) {

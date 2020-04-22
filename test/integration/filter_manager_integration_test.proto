@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package test.integration.filter_manager;
+
+message Throttler {
+  int32 tick_interval_ms = 1;
+  int64 max_chunk_length = 2;
+}

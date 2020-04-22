@@ -1,9 +1,15 @@
 #pragma once
 
-#include "envoy/api/v2/listener/listener.pb.h"
+#include <vector>
+
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/server/api_listener.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/guarddog.h"
@@ -18,7 +24,7 @@ namespace Server {
  */
 class LdsApi {
 public:
-  virtual ~LdsApi() {}
+  virtual ~LdsApi() = default;
 
   /**
    * @return std::string the last received version by the xDS API for LDS.
@@ -26,31 +32,48 @@ public:
   virtual std::string versionInfo() const PURE;
 };
 
-typedef std::unique_ptr<LdsApi> LdsApiPtr;
+using LdsApiPtr = std::unique_ptr<LdsApi>;
+
+struct ListenSocketCreationParams {
+  ListenSocketCreationParams(bool bind_to_port, bool duplicate_parent_socket = true)
+      : bind_to_port(bind_to_port), duplicate_parent_socket(duplicate_parent_socket) {}
+
+  // For testing.
+  bool operator==(const ListenSocketCreationParams& rhs) const;
+  bool operator!=(const ListenSocketCreationParams& rhs) const;
+
+  // whether to actually bind the socket.
+  bool bind_to_port;
+  // whether to duplicate socket from hot restart parent.
+  bool duplicate_parent_socket;
+};
 
 /**
  * Factory for creating listener components.
  */
 class ListenerComponentFactory {
 public:
-  virtual ~ListenerComponentFactory() {}
+  virtual ~ListenerComponentFactory() = default;
 
   /**
    * @return an LDS API provider.
    * @param lds_config supplies the management server configuration.
    */
-  virtual LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) PURE;
+  virtual LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) PURE;
 
   /**
    * Creates a socket.
    * @param address supplies the socket's address.
+   * @param socket_type the type of socket (stream or datagram) to create.
    * @param options to be set on the created socket just before calling 'bind()'.
-   * @param bind_to_port supplies whether to actually bind the socket.
+   * @param params used to control how a socket being created.
    * @return Network::SocketSharedPtr an initialized and potentially bound socket.
    */
   virtual Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                     const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) PURE;
+                     Network::Address::SocketType socket_type,
+                     const Network::Socket::OptionsSharedPtr& options,
+                     const ListenSocketCreationParams& params) PURE;
 
   /**
    * Creates a list of filter factories.
@@ -59,8 +82,8 @@ public:
    * @return std::vector<Network::FilterFactoryCb> the list of filter factories.
    */
   virtual std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-      Configuration::FactoryContext& context) PURE;
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
+      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
 
   /**
    * Creates a list of listener filter factories.
@@ -69,14 +92,25 @@ public:
    * @return std::vector<Network::ListenerFilterFactoryCb> the list of filter factories.
    */
   virtual std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context) PURE;
+
+  /**
+   * Creates a list of UDP listener filter factories.
+   * @param filters supplies the configuration.
+   * @param context supplies the factory creation context.
+   * @return std::vector<Network::UdpListenerFilterFactoryCb> the list of filter factories.
+   */
+  virtual std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 
   /**
    * @return DrainManagerPtr a new drain manager.
    * @param drain_type supplies the type of draining to do for the owning listener.
    */
-  virtual DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) PURE;
+  virtual DrainManagerPtr
+  createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) PURE;
 
   /**
    * @return uint64_t a listener tag usable for connection handler tracking.
@@ -89,7 +123,15 @@ public:
  */
 class ListenerManager {
 public:
-  virtual ~ListenerManager() {}
+  // Indicates listeners to stop.
+  enum class StopListenersType {
+    // Listeners in the inbound direction are only stopped.
+    InboundOnly,
+    // All listeners are stopped.
+    All,
+  };
+
+  virtual ~ListenerManager() = default;
 
   /**
    * Add or update a listener. Listeners are referenced by a unique name. If no name is provided,
@@ -107,7 +149,7 @@ public:
    *         a duplicate of the existing listener. This routine will throw an EnvoyException if
    *         there is a fundamental error preventing the listener from being added or updated.
    */
-  virtual bool addOrUpdateListener(const envoy::api::v2::Listener& config,
+  virtual bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                    const std::string& version_info, bool modifiable) PURE;
 
   /**
@@ -116,7 +158,7 @@ public:
    * pieces of the server existing.
    * @param lds_config supplies the management server configuration.
    */
-  virtual void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) PURE;
+  virtual void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) PURE;
 
   /**
    * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of the currently
@@ -128,7 +170,7 @@ public:
   /**
    * @return uint64_t the total number of connections owned by all listeners across all workers.
    */
-  virtual uint64_t numConnections() PURE;
+  virtual uint64_t numConnections() const PURE;
 
   /**
    * Remove a listener by name.
@@ -147,15 +189,38 @@ public:
 
   /**
    * Stop all listeners from accepting new connections without actually removing any of them. This
-   * is used for server draining.
+   * is used for server draining and /drain_listeners admin endpoint. This method directly stops the
+   * listeners on workers. Once a listener is stopped, any listener modifications are not allowed.
+   * @param stop_listeners_type indicates listeners to stop.
    */
-  virtual void stopListeners() PURE;
+  virtual void stopListeners(StopListenersType stop_listeners_type) PURE;
 
   /**
    * Stop all threaded workers from running. When this routine returns all worker threads will
    * have exited.
    */
   virtual void stopWorkers() PURE;
+
+  /*
+   * Warn the listener manager of an impending update. This allows the listener to clear per-update
+   * state.
+   */
+  virtual void beginListenerUpdate() PURE;
+
+  /*
+   * Inform the listener manager that the update has completed, and informs the listener of any
+   * errors handled by the reload source.
+   */
+  using FailureStates = std::vector<std::unique_ptr<envoy::admin::v3::UpdateFailureState>>;
+  virtual void endListenerUpdate(FailureStates&& failure_states) PURE;
+
+  // TODO(junr03): once ApiListeners support warming and draining, this function should return a
+  // weak_ptr to its caller. This would allow the caller to verify if the
+  // ApiListener is available to receive API calls on it.
+  /**
+   * @return the server's API Listener if it exists, nullopt if it does not.
+   */
+  virtual ApiListenerOptRef apiListener() PURE;
 };
 
 } // namespace Server

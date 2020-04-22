@@ -13,11 +13,13 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//include/envoy/ssl:certificate_validation_context_config_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/ssl:context_config_interface",
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/stats:stats_interface",
         "//test/mocks/secret:secret_mocks",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

@@ -1,14 +1,15 @@
 #include "test/test_common/network_utility.h"
 
-#include <netinet/ip.h>
-#include <sys/socket.h>
-
 #include <cstdint>
 #include <string>
 
+#include "envoy/common/platform.h"
+
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
+#include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
@@ -26,46 +27,38 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
-  const int fd = addr_port->socket(type);
-  if (fd < 0) {
-    const int err = errno;
-    ADD_FAILURE() << "socket failed for '" << addr_port->asString()
-                  << "' with error: " << strerror(err) << " (" << err << ")";
-    return nullptr;
-  }
-  ScopedFdCloser closer(fd);
+  IoHandlePtr io_handle = addr_port->socket(type);
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
-  int rc = addr_port->bind(fd);
+  Api::SysCallIntResult result = addr_port->bind(io_handle->fd());
   const char* failing_fn = nullptr;
-  if (rc != 0) {
+  if (result.rc_ != 0) {
     failing_fn = "bind";
   } else if (type == Address::SocketType::Stream) {
     // Try listening on the port also, if the type is TCP.
-    rc = ::listen(fd, 1);
-    if (rc != 0) {
+    result = Api::OsSysCallsSingleton::get().listen(io_handle->fd(), 1);
+    if (result.rc_ != 0) {
       failing_fn = "listen";
     }
   }
   if (failing_fn != nullptr) {
-    const int err = errno;
-    if (err == EADDRINUSE) {
+    if (result.errno_ == EADDRINUSE) {
       // The port is already in use. Perfectly normal.
       return nullptr;
-    } else if (err == EACCES) {
+    } else if (result.errno_ == EACCES) {
       // A privileged port, and we don't have privileges. Might want to log this.
       return nullptr;
     }
     // Unexpected failure.
     ADD_FAILURE() << failing_fn << " failed for '" << addr_port->asString()
-                  << "' with error: " << strerror(err) << " (" << err << ")";
+                  << "' with error: " << strerror(result.errno_) << " (" << result.errno_ << ")";
     return nullptr;
   }
   // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
   // any), and we need to find out the port number that the OS picked so we can return it.
   if (addr_port->ip()->port() == 0) {
-    return Address::addressFromFd(fd);
+    return Address::addressFromFd(io_handle->fd());
   }
   return addr_port;
 }
@@ -102,6 +95,13 @@ const std::string getAnyAddressUrlString(const Address::IpVersion version) {
   return std::string("0.0.0.0");
 }
 
+const std::string getAnyAddressString(const Address::IpVersion version) {
+  if (version == Address::IpVersion::v6) {
+    return std::string("::");
+  }
+  return std::string("0.0.0.0");
+}
+
 const std::string addressVersionAsString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
     return std::string("v4");
@@ -117,6 +117,7 @@ Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(Address::IpVersion v
 }
 
 namespace {
+
 // There is no portable way to initialize sockaddr_in6 with a static initializer, do it with a
 // helper function instead.
 sockaddr_in6 sockaddrIn6Any() {
@@ -126,6 +127,7 @@ sockaddr_in6 sockaddrIn6Any() {
 
   return v6any;
 }
+
 } // namespace
 
 Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, bool v4_compat) {
@@ -147,40 +149,41 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, 
 
 bool supportsIpVersion(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  const int fd = addr->socket(Address::SocketType::Stream);
-  if (fd < 0) {
-    // Socket creation failed.
-    return false;
-  }
-  if (0 != addr->bind(fd)) {
+  IoHandlePtr io_handle = addr->socket(Address::SocketType::Stream);
+  if (0 != addr->bind(io_handle->fd()).rc_) {
     // Socket bind failed.
-    RELEASE_ASSERT(::close(fd) == 0);
+    RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
     return false;
   }
-  RELEASE_ASSERT(::close(fd) == 0);
+  RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
   return true;
 }
 
-std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
-                                                                     Address::SocketType type) {
+std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
+  switch (version) {
+  case Network::Address::IpVersion::v4:
+    return "V4_ONLY";
+  case Network::Address::IpVersion::v6:
+    return "V6_ONLY";
+  }
+
+  // This seems to be needed on the coverage build for some reason.
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+std::pair<Address::InstanceConstSharedPtr, Network::IoHandlePtr>
+bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  const char* failing_fn = nullptr;
-  const int fd = addr->socket(type);
-  if (fd < 0) {
-    failing_fn = "socket";
-  } else if (0 != addr->bind(fd)) {
-    failing_fn = "bind";
-  } else {
-    return std::make_pair(Address::addressFromFd(fd), fd);
+  IoHandlePtr io_handle = addr->socket(type);
+  Api::SysCallIntResult result = addr->bind(io_handle->fd());
+  if (0 != result.rc_) {
+    io_handle->close();
+    std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
+                                  addr->asString(), strerror(result.errno_), result.errno_);
+    ADD_FAILURE() << msg;
+    throw EnvoyException(msg);
   }
-  const int err = errno;
-  if (fd >= 0) {
-    close(fd);
-  }
-  std::string msg = fmt::format("{} failed for address {} with error: {} ({})", failing_fn,
-                                addr->asString(), strerror(err), err);
-  ADD_FAILURE() << msg;
-  throw EnvoyException(msg);
+  return std::make_pair(Address::addressFromFd(io_handle->fd()), std::move(io_handle));
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
@@ -196,6 +199,54 @@ createEmptyFilterChain(TransportSocketFactoryPtr&& transport_socket_factory) {
 
 const Network::FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets() {
   return createEmptyFilterChain(createRawBufferSocketFactory());
+}
+
+namespace {
+struct SyncPacketProcessor : public Network::UdpPacketProcessor {
+  SyncPacketProcessor(std::list<Network::UdpRecvData>& data) : data_(data) {}
+
+  void processPacket(Network::Address::InstanceConstSharedPtr local_address,
+                     Network::Address::InstanceConstSharedPtr peer_address,
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time) override {
+    Network::UdpRecvData datagram{
+        {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
+    data_.push_back(std::move(datagram));
+  }
+  uint64_t maxPacketSize() const override { return Network::MAX_UDP_PACKET_SIZE; }
+
+  std::list<Network::UdpRecvData>& data_;
+};
+} // namespace
+
+Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
+                                       std::list<UdpRecvData>& data) {
+  SyncPacketProcessor processor(data);
+  return Network::Utility::readFromSocket(handle, local_address, processor,
+                                          MonotonicTime(std::chrono::seconds(0)), nullptr);
+}
+
+UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version)
+    : socket_(
+          std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)) {
+  RELEASE_ASSERT(
+      Api::OsSysCallsSingleton::get().setsocketblocking(socket_->ioHandle().fd(), true).rc_ != -1,
+      "");
+}
+
+void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Instance& peer) {
+  const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
+                                                  nullptr, peer);
+  ASSERT_EQ(rc.rc_, buffer.length());
+}
+
+void UdpSyncPeer::recv(Network::UdpRecvData& datagram) {
+  if (received_datagrams_.empty()) {
+    const auto rc = Network::Test::readFromSocket(socket_->ioHandle(), *socket_->localAddress(),
+                                                  received_datagrams_);
+    ASSERT_TRUE(rc.ok());
+  }
+  datagram = std::move(received_datagrams_.front());
+  received_datagrams_.pop_front();
 }
 
 } // namespace Test
