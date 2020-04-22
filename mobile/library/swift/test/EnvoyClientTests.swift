@@ -2,20 +2,6 @@
 import Foundation
 import XCTest
 
-private final class MockEnvoyEngine: EnvoyEngine {
-  func run(withConfig config: EnvoyConfiguration, logLevel: String) -> Int32 {
-    return 0
-  }
-
-  func run(withConfigYAML configYAML: String, logLevel: String) -> Int32 {
-    return 0
-  }
-
-  func startStream(with callbacks: EnvoyHTTPCallbacks) -> EnvoyHTTPStream {
-    return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-  }
-}
-
 final class EnvoyClientTests: XCTestCase {
   override func tearDown() {
     super.tearDown()

@@ -6,6 +6,7 @@ envoy_mobile_swift_test(
     name = "envoy_client_tests",
     srcs = [
         "EnvoyClientTests.swift",
+        "MockEnvoyEngine.swift",
         "MockEnvoyHTTPStream.swift",
     ],
 )
@@ -14,6 +15,7 @@ envoy_mobile_swift_test(
     name = "envoy_client_builder_tests",
     srcs = [
         "EnvoyClientBuilderTests.swift",
+        "MockEnvoyEngine.swift",
         "MockEnvoyHTTPStream.swift",
     ],
 )
