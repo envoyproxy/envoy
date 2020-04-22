@@ -223,7 +223,7 @@ public:
   bool isAboveWriteBufferHighWatermark() const override { return false; }
 
 protected:
-  bool call_failed() const { return call_failed_; }
+  bool callFailed() const { return call_failed_; }
 
 private:
   // Process queued events in completed_ops_ with handleOpCompletion() on
