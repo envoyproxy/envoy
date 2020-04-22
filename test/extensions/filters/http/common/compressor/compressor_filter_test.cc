@@ -25,9 +25,9 @@ using testing::_;
 using testing::AtLeast;
 using testing::Return;
 
-class MockCompressorFilterConfig : public CompressorFilterConfig {
+class TestCompressorFilterConfig : public CompressorFilterConfig {
 public:
-  MockCompressorFilterConfig(
+  TestCompressorFilterConfig(
       const envoy::extensions::filters::http::compressor::v3::Compressor& compressor,
       const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
       const std::string& compressor_name)
@@ -104,7 +104,7 @@ protected:
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson(json, compressor);
     config_ =
-        std::make_shared<MockCompressorFilterConfig>(compressor, "test.", stats_, runtime_, "test");
+        std::make_shared<TestCompressorFilterConfig>(compressor, "test.", stats_, runtime_, "test");
     filter_ = std::make_unique<CompressorFilter>(config_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -379,7 +379,7 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
                               compressor);
     CompressorFilterConfigSharedPtr config2;
     config2 =
-        std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test2");
+        std::make_shared<TestCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test2");
     std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter2->setDecoderFilterCallbacks(decoder_callbacks);
@@ -412,7 +412,7 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
                               compressor);
     CompressorFilterConfigSharedPtr config2;
     config2 =
-        std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "gzip");
+        std::make_shared<TestCompressorFilterConfig>(compressor, "test2.", stats, runtime, "gzip");
     std::unique_ptr<CompressorFilter> gzip_filter = std::make_unique<CompressorFilter>(config2);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     gzip_filter->setDecoderFilterCallbacks(decoder_callbacks);
@@ -441,7 +441,7 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
                               compressor);
     CompressorFilterConfigSharedPtr config2;
     config2 =
-        std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test");
+        std::make_shared<TestCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test");
     std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter2->setDecoderFilterCallbacks(decoder_callbacks);
@@ -470,7 +470,7 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
                               compressor);
     CompressorFilterConfigSharedPtr config2;
     config2 =
-        std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test");
+        std::make_shared<TestCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test");
     std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter2->setDecoderFilterCallbacks(decoder_callbacks);
@@ -499,11 +499,11 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
                               compressor);
     CompressorFilterConfigSharedPtr config1;
     config1 =
-        std::make_shared<MockCompressorFilterConfig>(compressor, "test1.", stats, runtime, "test1");
+        std::make_shared<TestCompressorFilterConfig>(compressor, "test1.", stats, runtime, "test1");
     std::unique_ptr<CompressorFilter> filter1 = std::make_unique<CompressorFilter>(config1);
     CompressorFilterConfigSharedPtr config2;
     config2 =
-        std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test2");
+        std::make_shared<TestCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test2");
     std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter1->setDecoderFilterCallbacks(decoder_callbacks);
@@ -538,11 +538,11 @@ TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
                               compressor);
     CompressorFilterConfigSharedPtr config1;
     config1 =
-        std::make_shared<MockCompressorFilterConfig>(compressor, "test1.", stats, runtime, "test1");
+        std::make_shared<TestCompressorFilterConfig>(compressor, "test1.", stats, runtime, "test1");
     std::unique_ptr<CompressorFilter> filter1 = std::make_unique<CompressorFilter>(config1);
     CompressorFilterConfigSharedPtr config2;
     config2 =
-        std::make_shared<MockCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test2");
+        std::make_shared<TestCompressorFilterConfig>(compressor, "test2.", stats, runtime, "test2");
     std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter1->setDecoderFilterCallbacks(decoder_callbacks);
