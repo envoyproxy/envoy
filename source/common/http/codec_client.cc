@@ -129,22 +129,21 @@ void CodecClient::onData(Buffer::Instance& data) {
     // Soon we won't need to catch these exceptions, as they'll be propagated through the error
     // statuses callbacks and returned from dispatch.
   } catch (CodecProtocolException& e) {
-    status = Envoy::Http::codecProtocolError(e.what());
+    status = codecProtocolError(e.what());
   } catch (PrematureResponseException& e) {
-    status = Envoy::Http::prematureResponseError(e.what(), e.responseCode());
+    status = prematureResponseError(e.what(), e.responseCode());
   }
 
-  if (Envoy::Http::isCodecProtocolError(status)) {
+  if (isCodecProtocolError(status)) {
     ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, status.message());
     close();
     protocol_error = true;
-  } else if (Envoy::Http::isPrematureResponseError(status)) {
+  } else if (isPrematureResponseError(status)) {
     ENVOY_CONN_LOG(debug, "premature response", *connection_);
     close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
-    if (!active_requests_.empty() ||
-        Envoy::Http::getPrematureResponseHttpCode(status) != Code::RequestTimeout) {
+    if (!active_requests_.empty() || getPrematureResponseHttpCode(status) != Code::RequestTimeout) {
       protocol_error = true;
     }
   }

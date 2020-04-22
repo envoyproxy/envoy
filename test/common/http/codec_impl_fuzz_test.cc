@@ -346,7 +346,7 @@ public:
   }
 
   void drain() {
-    Envoy::Http::Status status = Http::okStatus();
+    Status status = Http::okStatus();
     while (!bufs_.empty()) {
       Buffer::OwnedImpl& buf = bufs_.front();
       while (buf.length() > 0) {
