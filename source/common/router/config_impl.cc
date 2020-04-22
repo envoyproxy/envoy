@@ -931,8 +931,7 @@ ConnectRouteEntryImpl::ConnectRouteEntryImpl(
 
 void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                               bool insert_envoy_original_path) const {
-  const absl::string_view path =
-      Http::PathUtil::removeQueryAndFragment(headers.Path()->value().getStringView());
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(getPath(headers));
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 

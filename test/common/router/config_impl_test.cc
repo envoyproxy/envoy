@@ -466,6 +466,14 @@ virtual_hosts:
         regex: ".*"
     route:
       cluster: connect_fallthrough
+- name: connect2
+  domains:
+  - bat4.com
+  routes:
+  - match:
+        connect_matcher:
+          {}
+    redirect: { path_redirect: /new_path }
 - name: default
   domains:
   - "*"
@@ -504,6 +512,14 @@ virtual_hosts:
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/rewrote?works=true", headers.get_(Http::Headers::get().Path));
+  }
+  // Prefix rewrite for CONNECT without path (for non-crashing)
+  {
+    Http::TestRequestHeaderMapImpl headers = genPathlessHeaders("bat4.com", "CONNECT");
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    ASSERT(redirect != nullptr);
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://bat4.com/new_path", redirect->newPath(headers));
   }
 }
 
