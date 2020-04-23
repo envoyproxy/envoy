@@ -103,6 +103,7 @@ public:
   const envoy::config::bootstrap::v3::Bootstrap& configProto() const override {
     return config_proto_;
   }
+  const absl::optional<uint32_t>& bootstrapVersion() const override { return bootstrap_version_; }
   const std::string& configYaml() const override { return config_yaml_; }
   bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
   bool rejectUnknownDynamicFields() const override { return reject_unknown_dynamic_fields_; }
@@ -156,6 +157,7 @@ private:
   uint32_t concurrency_;
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
+  absl::optional<uint32_t> bootstrap_version_;
   std::string config_yaml_;
   bool allow_unknown_static_fields_{false};
   bool reject_unknown_dynamic_fields_{false};
