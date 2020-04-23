@@ -18,6 +18,13 @@ WINDOWS_SKIP_TARGETS = [
 # archives, e.g. cares.
 BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])"""
 
+# To initialize http_archive REPOSITORY_LOCATIONS dictionaries must be stripped of annotations.
+# See repository_locations.bzl for the list of annotation attributes.
+def _strip_annotations(location):
+    stripped = dict(location)
+    stripped.pop("use_category", None)
+    return stripped
+
 def _repository_impl(name, **kwargs):
     envoy_http_archive(
         name,
@@ -211,7 +218,7 @@ def _com_github_circonus_labs_libcircllhist():
     )
 
 def _com_github_c_ares_c_ares():
-    location = REPOSITORY_LOCATIONS["com_github_c_ares_c_ares"]
+    location = _strip_annotations(REPOSITORY_LOCATIONS["com_github_c_ares_c_ares"])
     http_archive(
         name = "com_github_c_ares_c_ares",
         patches = ["@envoy//bazel/foreign_cc:cares-win32-nameser.patch"],
@@ -280,7 +287,7 @@ def _com_github_gabime_spdlog():
     )
 
 def _com_github_google_benchmark():
-    location = REPOSITORY_LOCATIONS["com_github_google_benchmark"]
+    location = _strip_annotations(REPOSITORY_LOCATIONS["com_github_google_benchmark"])
     http_archive(
         name = "com_github_google_benchmark",
         **location
@@ -297,7 +304,7 @@ def _com_github_google_libprotobuf_mutator():
     )
 
 def _com_github_jbeder_yaml_cpp():
-    location = REPOSITORY_LOCATIONS["com_github_jbeder_yaml_cpp"]
+    location = _strip_annotations(REPOSITORY_LOCATIONS["com_github_jbeder_yaml_cpp"])
     http_archive(
         name = "com_github_jbeder_yaml_cpp",
         build_file_content = BUILD_ALL_CONTENT,
@@ -309,7 +316,7 @@ def _com_github_jbeder_yaml_cpp():
     )
 
 def _com_github_libevent_libevent():
-    location = REPOSITORY_LOCATIONS["com_github_libevent_libevent"]
+    location = _strip_annotations(REPOSITORY_LOCATIONS["com_github_libevent_libevent"])
     http_archive(
         name = "com_github_libevent_libevent",
         build_file_content = BUILD_ALL_CONTENT,
@@ -323,7 +330,7 @@ def _com_github_libevent_libevent():
     )
 
 def _net_zlib():
-    location = REPOSITORY_LOCATIONS["net_zlib"]
+    location = _strip_annotations(REPOSITORY_LOCATIONS["net_zlib"])
 
     http_archive(
         name = "net_zlib",
@@ -346,7 +353,7 @@ def _com_google_cel_cpp():
     _repository_impl("com_google_cel_cpp")
 
 def _com_github_nghttp2_nghttp2():
-    location = REPOSITORY_LOCATIONS["com_github_nghttp2_nghttp2"]
+    location = _strip_annotations(REPOSITORY_LOCATIONS["com_github_nghttp2_nghttp2"])
     http_archive(
         name = "com_github_nghttp2_nghttp2",
         build_file_content = BUILD_ALL_CONTENT,
@@ -560,7 +567,7 @@ def _com_google_protobuf():
     )
 
 def _io_opencensus_cpp():
-    location = REPOSITORY_LOCATIONS["io_opencensus_cpp"]
+    location = _strip_annotations(REPOSITORY_LOCATIONS["io_opencensus_cpp"])
     http_archive(
         name = "io_opencensus_cpp",
         **location
@@ -604,7 +611,7 @@ def _io_opencensus_cpp():
 
 def _com_github_curl():
     # Used by OpenCensus Zipkin exporter.
-    location = REPOSITORY_LOCATIONS["com_github_curl"]
+    location = _strip_annotations(REPOSITORY_LOCATIONS["com_github_curl"])
     http_archive(
         name = "com_github_curl",
         build_file_content = BUILD_ALL_CONTENT + """
@@ -620,7 +627,7 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
     )
 
 def _com_googlesource_chromium_v8():
-    location = REPOSITORY_LOCATIONS["com_googlesource_chromium_v8"]
+    location = _strip_annotations(REPOSITORY_LOCATIONS["com_googlesource_chromium_v8"])
     genrule_repository(
         name = "com_googlesource_chromium_v8",
         genrule_cmd_file = "@envoy//bazel/external:wee8.genrule_cmd",
@@ -738,7 +745,7 @@ def _com_github_google_jwt_verify():
     )
 
 def _com_github_luajit_luajit():
-    location = REPOSITORY_LOCATIONS["com_github_luajit_luajit"]
+    location = _strip_annotations(REPOSITORY_LOCATIONS["com_github_luajit_luajit"])
     http_archive(
         name = "com_github_luajit_luajit",
         build_file_content = BUILD_ALL_CONTENT,
@@ -754,7 +761,7 @@ def _com_github_luajit_luajit():
     )
 
 def _com_github_moonjit_moonjit():
-    location = REPOSITORY_LOCATIONS["com_github_moonjit_moonjit"]
+    location = _strip_annotations(REPOSITORY_LOCATIONS["com_github_moonjit_moonjit"])
     http_archive(
         name = "com_github_moonjit_moonjit",
         build_file_content = BUILD_ALL_CONTENT,
@@ -770,7 +777,7 @@ def _com_github_moonjit_moonjit():
     )
 
 def _com_github_gperftools_gperftools():
-    location = REPOSITORY_LOCATIONS["com_github_gperftools_gperftools"]
+    location = _strip_annotations(REPOSITORY_LOCATIONS["com_github_gperftools_gperftools"])
     http_archive(
         name = "com_github_gperftools_gperftools",
         build_file_content = BUILD_ALL_CONTENT,
@@ -802,7 +809,7 @@ filegroup(
         name = "kafka_source",
         build_file_content = KAFKASOURCE_BUILD_CONTENT,
         patches = ["@envoy//bazel/external:kafka_int32.patch"],
-        **REPOSITORY_LOCATIONS["kafka_source"]
+        **_strip_annotations(REPOSITORY_LOCATIONS["kafka_source"])
     )
 
     # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration
@@ -810,7 +817,7 @@ filegroup(
     http_archive(
         name = "kafka_server_binary",
         build_file_content = BUILD_ALL_CONTENT,
-        **REPOSITORY_LOCATIONS["kafka_server_binary"]
+        **_strip_annotations(REPOSITORY_LOCATIONS["kafka_server_binary"])
     )
 
     # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
@@ -818,7 +825,7 @@ filegroup(
     http_archive(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,
-        **REPOSITORY_LOCATIONS["kafka_python_client"]
+        **_strip_annotations(REPOSITORY_LOCATIONS["kafka_python_client"])
     )
 
 def _foreign_cc_dependencies():
