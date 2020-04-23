@@ -25,36 +25,7 @@ UberFilterFuzzer::UberFilterFuzzer() {
         filter_->setDecoderFilterCallbacks(callbacks_);
       }));
   // Set expectations for particular filters that may get fuzzed.
-  setExpectations();
-}
-
-void UberFilterFuzzer::setExpectations() {
-  prepareExtAuthz();
-  prepareCache();
-  prepareTap();
-}
-
-void UberFilterFuzzer::prepareExtAuthz() {
-  // Preparing the expectations for the ext_authz filter.
-  addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
-  ON_CALL(connection_, remoteAddress()).WillByDefault(testing::ReturnRef(addr_));
-  ON_CALL(connection_, localAddress()).WillByDefault(testing::ReturnRef(addr_));
-  ON_CALL(callbacks_, connection()).WillByDefault(testing::Return(&connection_));
-  ON_CALL(callbacks_, activeSpan())
-      .WillByDefault(testing::ReturnRef(Tracing::NullSpan::instance()));
-  callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
-}
-
-void UberFilterFuzzer::prepareCache() {
-  // Prepare expectations for dynamic forward proxy.
-  ON_CALL(factory_context_.dispatcher_, createDnsResolver(_, _))
-      .WillByDefault(testing::Return(resolver_));
-}
-
-void UberFilterFuzzer::prepareTap() {
-  // Prepare expectations for TAP config.
-  ON_CALL(factory_context_.admin_, addHandler(_, _, _, _, _)).WillByDefault(testing::Return(true));
-  ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
+  perFilterSetup();
 }
 
 void UberFilterFuzzer::decode(Http::StreamDecoderFilter* filter, const test::fuzz::HttpData& data) {
