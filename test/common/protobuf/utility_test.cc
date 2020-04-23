@@ -1373,9 +1373,9 @@ protected:
         runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")) {
     envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
-    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-        Runtime::LoaderPtr{new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, store_,
-                                                   generator_, validation_visitor_, *api_)});
+    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(Runtime::LoaderPtr{
+        new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, init_manager_, store_,
+                                generator_, validation_visitor_, *api_)});
   }
 
   void checkForDeprecation(const Protobuf::Message& message) {
@@ -1399,6 +1399,7 @@ protected:
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
   Stats::Counter& runtime_deprecated_feature_use_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Init::MockManager init_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 

@@ -285,7 +285,6 @@ private:
   void terminate();
   void notifyCallbacksForStage(
       Stage stage, Event::PostCb completion_cb = [] {});
-  void onRuntimeReady();
 
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
@@ -306,9 +305,6 @@ private:
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   TimeSource& time_source_;
-  // Delete local_info_ as late as possible as some members below may reference it during their
-  // destruction.
-  LocalInfo::LocalInfoPtr local_info_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;
@@ -332,6 +328,7 @@ private:
   Configuration::MainImpl config_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
+  LocalInfo::LocalInfoPtr local_info_;
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
