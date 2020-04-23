@@ -1606,8 +1606,7 @@ message InternalRedirectPolicy {
   // If not specified, at most one redirect will be followed.
   google.protobuf.UInt32Value max_internal_redirects = 2;
 
-  // Defines what upstream response codes can trigger the internal redirect
-  // behavior. This is ignored unless
+  // Defines what upstream response codes are allowed to trigger internal redirect. This is ignored unless
   // :ref:`internal_redirect_action
   // <envoy_api_field_config.route.v4alpha.InternalRedirectPolicy.internal_redirect_action>`
   // is set to
@@ -1615,12 +1614,12 @@ message InternalRedirectPolicy {
   // <envoy_api_enum_value_config.route.v4alpha.InternalRedirectPolicy.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
   repeated uint32 redirect_response_codes = 3;
 
-  // Specifies a list of predicates that is queries when an upstream response is deemed to be able
+  // Specifies a list of predicates that are queried when an upstream response is deemed
   // to trigger an internal redirect by all other criterias. Any predicate in the list can reject
-  // the redirect.
+  // the redirect, causing the response to be proxied to downstream.
   repeated Predicate predicates = 4;
 
-  // Specifies what combinations of dowstream and redirect target scheme is allowed to trigger an
+  // Specifies what combinations of downstream and redirect target scheme are allowed to trigger an
   // internal redirect.
   repeated DownstreamAndRedirectTargetSchemePair allowed_downstream_and_target_scheme_pairs = 5;
 }

@@ -6,6 +6,7 @@
 
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
+
 #include "extensions/internal_redirect/well_known_names.h"
 #include "extensions/internal_redirect/whitelisted_routes/whitelisted_routes.h"
 
