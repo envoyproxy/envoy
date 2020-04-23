@@ -12,6 +12,8 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
@@ -108,15 +110,15 @@ TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
                                       absl::nullopt /*headers*/);
 
   const XRay::Span* xray_parent_span = static_cast<XRay::Span*>(parent_span.get());
-  const std::string expected_parent_id = xray_parent_span->Id();
-  auto on_send = [&](const std::string& json) {
+  const std::string expected_parent_id = xray_parent_span->id();
+  auto on_send = [xray_parent_span, expected_parent_id](const std::string& json) {
     ASSERT_FALSE(json.empty());
     daemon::Segment s;
     MessageUtil::loadFromJson(json, s, ProtobufMessage::getNullValidationVisitor());
     ASSERT_STREQ(expected_parent_id.c_str(), s.parent_id().c_str());
     ASSERT_STREQ(expected_span_name, s.name().c_str());
     ASSERT_STREQ(xray_parent_span->traceId().c_str(), s.trace_id().c_str());
-    ASSERT_STRNE(xray_parent_span->Id().c_str(), s.id().c_str());
+    ASSERT_STRNE(xray_parent_span->id().c_str(), s.id().c_str());
   };
 
   EXPECT_CALL(broker, send(_)).WillOnce(Invoke(on_send));
@@ -181,6 +183,47 @@ TEST_F(XRayTracerTest, TraceIDFormatTest) {
   ASSERT_EQ(1, parts[0].length());
   ASSERT_EQ(8, parts[1].length());
   ASSERT_EQ(24, parts[2].length());
+}
+
+class XRayDaemonTest : public testing::TestWithParam<Network::Address::IpVersion> {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, XRayDaemonTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(XRayDaemonTest, VerifyUdpPacketContents) {
+  NiceMock<Server::MockInstance> server;
+  Network::Test::UdpSyncPeer xray_fake_daemon(GetParam());
+  const std::string daemon_endpoint = xray_fake_daemon.localAddress()->asString();
+  Tracer tracer{"my_segment", std::make_unique<DaemonBrokerImpl>(daemon_endpoint),
+                server.timeSource()};
+  auto span = tracer.startSpan("ingress" /*operation name*/, server.timeSource().systemTime(),
+                               absl::nullopt /*headers*/);
+
+  span->setTag("http.status_code", "202");
+  span->finishSpan();
+
+  Network::UdpRecvData datagram;
+  xray_fake_daemon.recv(datagram);
+
+  const std::string header_json = R"EOF({"format":"json","version":1})EOF";
+  // The UDP datagram contains two independent, consecutive JSON documents; a header and a body.
+  const std::string payload = datagram.buffer_->toString();
+  // Make sure the payload has enough data.
+  ASSERT_GT(payload.length(), header_json.length());
+  // Skip the header since we're only interested in the body.
+  const std::string body = payload.substr(header_json.length());
+
+  EXPECT_EQ(0, payload.find(header_json));
+
+  // Deserialize the body to verify it.
+  source::extensions::tracers::xray::daemon::Segment seg;
+  MessageUtil::loadFromJson(body, seg, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_STREQ("my_segment", seg.name().c_str());
+  for (auto&& f : seg.http().request().fields()) {
+    // there should only be a single field
+    EXPECT_EQ(202, f.second.number_value());
+  }
 }
 
 } // namespace
