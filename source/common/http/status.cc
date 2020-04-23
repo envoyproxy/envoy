@@ -1,5 +1,7 @@
 #include "common/http/status.h"
 
+#include "common/common/assert.h"
+
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
