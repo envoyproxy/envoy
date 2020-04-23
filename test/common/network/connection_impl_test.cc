@@ -168,14 +168,12 @@ protected:
     // Other calls for server sessions will by default get a normal OwnedImpl.
     EXPECT_CALL(*factory, create_(_, _, _))
         .Times(AnyNumber())
-        .WillOnce(Invoke([&](std::function<void()> below_low,
-                             std::function<void()> above_high,
+        .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                              std::function<void()> above_overflow) -> Buffer::Instance* {
           client_write_buffer_ = new MockWatermarkBuffer(below_low, above_high, above_overflow);
           return client_write_buffer_;
         }))
-        .WillRepeatedly(Invoke([](std::function<void()> below_low,
-                                  std::function<void()> above_high,
+        .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                   std::function<void()> above_overflow) -> Buffer::Instance* {
           return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
         }));
@@ -193,8 +191,7 @@ protected:
   ConnectionMocks createConnectionMocks() {
     auto dispatcher = std::make_unique<NiceMock<Event::MockDispatcher>>();
     EXPECT_CALL(dispatcher->buffer_factory_, create_(_, _, _))
-        .WillRepeatedly(Invoke([](std::function<void()> below_low,
-                                  std::function<void()> above_high,
+        .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                   std::function<void()> above_overflow) -> Buffer::Instance* {
           // ConnectionImpl calls Envoy::MockBufferFactory::create(), which calls create_() and
           // wraps the returned raw pointer below with a unique_ptr.
@@ -1271,8 +1268,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
   NiceMock<MockConnectionCallbacks> callbacks;
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(dispatcher.buffer_factory_, create_(_, _, _))
-      .WillRepeatedly(Invoke([](std::function<void()> below_low,
-                                std::function<void()> above_high,
+      .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                 std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
@@ -1460,8 +1456,7 @@ class MockTransportConnectionImplTest : public testing::Test {
 public:
   MockTransportConnectionImplTest() : stream_info_(dispatcher_.timeSource()) {
     EXPECT_CALL(dispatcher_.buffer_factory_, create_(_, _, _))
-        .WillRepeatedly(Invoke([](std::function<void()> below_low,
-                                  std::function<void()> above_high,
+        .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                   std::function<void()> above_overflow) -> Buffer::Instance* {
           return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
         }));

@@ -694,10 +694,10 @@ void TcpProxySslIntegrationTest::setupConnections() {
 
   EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](std::function<void()> below_low,
-                           std::function<void()> above_high,
+      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                            std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
+        client_write_buffer_ =
+            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
         ON_CALL(*client_write_buffer_, move(_))
             .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
         ON_CALL(*client_write_buffer_, drain(_))

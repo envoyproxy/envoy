@@ -60,9 +60,8 @@ public:
   }
 
   void waitForExtAuthzRequest(const std::string& expected_check_request_yaml) {
-    AssertionResult result =
-        fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_,
-                                                      std::chrono::milliseconds(100000));
+    AssertionResult result = fake_upstreams_.back()->waitForHttpConnection(
+        *dispatcher_, fake_ext_authz_connection_, std::chrono::milliseconds(100000));
     RELEASE_ASSERT(result, result.message());
     result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
     RELEASE_ASSERT(result, result.message());

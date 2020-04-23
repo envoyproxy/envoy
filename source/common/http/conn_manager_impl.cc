@@ -2275,7 +2275,8 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::cre
       std::make_unique<Buffer::WatermarkBuffer>([this]() -> void { this->requestDataDrained(); },
                                                 [this]() -> void { this->requestDataTooLarge(); },
                                                 [this]() -> void { this->requestDataOverflow(); });
-  buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_, parent_.buffer_limit_ + 1);
+  buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_,
+                        parent_.buffer_limit_ + 1);
   return buffer;
 }
 
@@ -2457,7 +2458,8 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::cre
   auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
                                             [this]() -> void { this->responseDataTooLarge(); },
                                             [this]() -> void { this->responseDataOverflow(); });
-  buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_, parent_.buffer_limit_ + 1);
+  buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_,
+                        parent_.buffer_limit_ + 1);
   return Buffer::WatermarkBufferPtr{buffer};
 }
 

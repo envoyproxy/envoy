@@ -21,8 +21,10 @@ public:
 
   Buffer::WatermarkBuffer buffer_{[&]() -> void { ++times_low_watermark_called_; },
                                   [&]() -> void { ++times_high_watermark_called_; },
-                                  [&]() -> bool { ++times_overflow_watermark_called_;
-                                                  return true; }};
+                                  [&]() -> bool {
+                                    ++times_overflow_watermark_called_;
+                                    return true;
+                                  }};
   uint32_t times_low_watermark_called_{0};
   uint32_t times_high_watermark_called_{0};
   uint32_t times_overflow_watermark_called_{0};
@@ -103,8 +105,10 @@ TEST_F(WatermarkBufferTest, PrependBuffer) {
   uint32_t prefix_buffer_overflow_watermark_hits{0};
   WatermarkBuffer prefixBuffer{[&]() -> void { ++prefix_buffer_low_watermark_hits; },
                                [&]() -> void { ++prefix_buffer_high_watermark_hits; },
-                               [&]() -> bool { ++prefix_buffer_overflow_watermark_hits;
-                                               return true; }};
+                               [&]() -> bool {
+                                 ++prefix_buffer_overflow_watermark_hits;
+                                 return true;
+                               }};
   prefixBuffer.setWatermarks(5, 10);
   prefixBuffer.add(prefix);
   prefixBuffer.add(suffix);
@@ -313,8 +317,10 @@ TEST_F(WatermarkBufferTest, MoveBackWithWatermarks) {
   int overflow_watermark_buffer1 = 0;
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
-                                  [&]() -> bool { ++overflow_watermark_buffer1;
-                                                  return true; }};
+                                  [&]() -> bool {
+                                    ++overflow_watermark_buffer1;
+                                    return true;
+                                  }};
   buffer1.setWatermarks(5, 10);
 
   // Stick 20 bytes in buffer_ and expect the high watermark is hit.

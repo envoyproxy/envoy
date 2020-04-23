@@ -68,7 +68,8 @@ Api::IoCallUint64Result WatermarkBuffer::write(Network::IoHandle& io_handle) {
   return result;
 }
 
-void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_watermark, uint32_t overflow_watermark) {
+void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_watermark,
+                                    uint32_t overflow_watermark) {
   ASSERT((low_watermark < high_watermark || (high_watermark == 0 && low_watermark == 0)) &&
          (overflow_watermark == 0 || overflow_watermark > high_watermark));
   low_watermark_ = low_watermark;
@@ -91,8 +92,8 @@ void WatermarkBuffer::checkLowWatermark() {
 void WatermarkBuffer::checkOverflowAndHighWatermarks() {
   // Check if overflow watermark is enabled, wasn't previously triggered,
   // and the buffer size is above the threshold
-  if (above_overflow_watermark_ && overflow_watermark_ != 0 &&
-      !above_overflow_watermark_called_ && OwnedImpl::length() > overflow_watermark_) {
+  if (above_overflow_watermark_ && overflow_watermark_ != 0 && !above_overflow_watermark_called_ &&
+      OwnedImpl::length() > overflow_watermark_) {
     above_overflow_watermark_called_ = true;
     above_overflow_watermark_();
   }

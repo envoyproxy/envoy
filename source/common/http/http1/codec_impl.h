@@ -210,7 +210,9 @@ public:
   Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow
   bool wantsToWrite() override { return false; }
-  void onUnderlyingConnectionAboveWriteBufferOverflowWatermark() override { onAboveOverflowWatermark(); }
+  void onUnderlyingConnectionAboveWriteBufferOverflowWatermark() override {
+    onAboveOverflowWatermark();
+  }
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 

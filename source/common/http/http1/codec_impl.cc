@@ -451,7 +451,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
     // Disable watermarking
     output_buffer_.setWatermarks(0);
   } else {
-    output_buffer_.setWatermarks(connection_buffer_limit / 2, connection_buffer_limit, connection_buffer_limit + 1);
+    output_buffer_.setWatermarks(connection_buffer_limit / 2, connection_buffer_limit,
+                                 connection_buffer_limit + 1);
   }
   http_parser_init(&parser_, type);
   parser_.data = this;

@@ -232,7 +232,8 @@ public:
                              absl::string_view transport_failure_reason) PURE;
 
   /**
-   * Fires when a stream, or the connection the stream is sending to, goes over its overflow watermark.
+   * Fires when a stream, or the connection the stream is sending to, goes over its overflow
+   * watermark.
    */
   virtual void onAboveWriteBufferOverflowWatermark() PURE;
 
@@ -415,8 +416,8 @@ public:
   virtual ~DownstreamWatermarkCallbacks() = default;
 
   /**
-   * Called when the downstream connection or stream goes over its overflow watermark. Note that this
-   * may be called separately for both the stream going over and the connection going over.
+   * Called when the downstream connection or stream goes over its overflow watermark. Note that
+   * this may be called separately for both the stream going over and the connection going over.
    */
   virtual void onAboveWriteBufferOverflowWatermark() PURE;
 

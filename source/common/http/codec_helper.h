@@ -47,7 +47,6 @@ public:
     }
   }
 
-
   void runResetCallbacks(StreamResetReason reason) {
     // Reset callbacks are a special case, and the only StreamCallbacks allowed
     // to run after local_end_stream_.

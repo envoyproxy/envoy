@@ -253,7 +253,6 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferOverflowWatermark() {
   ENVOY_CONN_LOG(warn, "recv buffer overflowing ", parent_.connection_);
 }
 
-
 void ConnectionImpl::ClientStreamImpl::decodeHeaders(bool allow_waiting_for_informational_headers) {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
   if (allow_waiting_for_informational_headers &&

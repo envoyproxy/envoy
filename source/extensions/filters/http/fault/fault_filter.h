@@ -162,8 +162,8 @@ public:
    * @param scope the stream's scope
    */
   StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
-                    std::function<void()> overflow_data_cb,
-                    std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
+                    std::function<void()> overflow_data_cb, std::function<void()> pause_data_cb,
+                    std::function<void()> resume_data_cb,
                     std::function<void(Buffer::Instance&, bool)> write_data_cb,
                     std::function<void()> continue_cb, TimeSource& time_source,
                     Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope);

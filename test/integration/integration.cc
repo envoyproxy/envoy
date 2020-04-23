@@ -155,10 +155,10 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, create_(_, _, _))
-      .WillOnce(Invoke([&](std::function<void()> below_low,
-                           std::function<void()> above_high,
+      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                            std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
+        client_write_buffer_ =
+            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
         return client_write_buffer_;
       }));
 
@@ -266,8 +266,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // necessary right now.
   timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, create_(_, _, _))
-      .WillByDefault(Invoke([](std::function<void()> below_low,
-                               std::function<void()> above_high,
+      .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));

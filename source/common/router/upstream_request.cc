@@ -188,7 +188,8 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
       if (decoder_buffer_limit == 0) {
         buffered_request_body_->setWatermarks(0);
       } else {
-        buffered_request_body_->setWatermarks(decoder_buffer_limit / 2, decoder_buffer_limit, decoder_buffer_limit + 1);
+        buffered_request_body_->setWatermarks(decoder_buffer_limit / 2, decoder_buffer_limit,
+                                              decoder_buffer_limit + 1);
       }
     }
 
@@ -426,7 +427,8 @@ void UpstreamRequest::clearRequestEncoder() {
 void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferOverflowWatermark() {
   ASSERT(parent_.upstream_);
   // TODO(adip): Test counters
-  ENVOY_STREAM_LOG(warn, "upstream request buffer overflow from multiple downstreams", *parent_.parent_.callbacks());
+  ENVOY_STREAM_LOG(warn, "upstream request buffer overflow from multiple downstreams",
+                   *parent_.parent_.callbacks());
   parent_.parent_.cluster()->stats().upstream_buffer_overflow_multiple_downstreams_total_.inc();
 }
 
@@ -494,11 +496,11 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
 void UpstreamRequest::overflowDataFromDownstream() {
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
   // TODO(adip): Test counters
-  ENVOY_STREAM_LOG(warn, "Upstream request buffer overflow from single Downstream", *parent_.callbacks());
+  ENVOY_STREAM_LOG(warn, "Upstream request buffer overflow from single Downstream",
+                   *parent_.callbacks());
   parent_.cluster()->stats().upstream_buffer_overflow_single_downstream_total_.inc();
   parent_.callbacks()->onDecoderFilterAboveWriteBufferOverflowWatermark();
 }
-
 
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   callbacks_ = callbacks;

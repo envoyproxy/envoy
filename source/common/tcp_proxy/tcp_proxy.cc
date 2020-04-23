@@ -296,11 +296,12 @@ StreamInfo::StreamInfo& Filter::getStreamInfo() {
 
 void Filter::DownstreamCallbacks::onAboveWriteBufferOverflowWatermark() {
   // TODO(adip): Test counters
-  ENVOY_CONN_LOG(warn, "TCP filter downstream buffer overflow", parent_.read_callbacks_->connection());
+  ENVOY_CONN_LOG(warn, "TCP filter downstream buffer overflow",
+                 parent_.read_callbacks_->connection());
   parent_.read_callbacks_->upstreamHost()
-    ->cluster()
-    .stats()
-    .upstream_tcp_downstream_buffer_overflow_total_.inc();
+      ->cluster()
+      .stats()
+      .upstream_tcp_downstream_buffer_overflow_total_.inc();
 }
 
 void Filter::DownstreamCallbacks::onAboveWriteBufferHighWatermark() {
@@ -327,11 +328,12 @@ void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
 
 void Filter::UpstreamCallbacks::onAboveWriteBufferOverflowWatermark() {
   // TODO(adip): Add log and counters
-  ENVOY_CONN_LOG(warn, "TCP filter upstream buffer overflow", parent_->read_callbacks_->connection());
+  ENVOY_CONN_LOG(warn, "TCP filter upstream buffer overflow",
+                 parent_->read_callbacks_->connection());
   parent_->read_callbacks_->upstreamHost()
-    ->cluster()
-    .stats()
-    .upstream_tcp_upstream_buffer_overflow_total_.inc();
+      ->cluster()
+      .stats()
+      .upstream_tcp_upstream_buffer_overflow_total_.inc();
 }
 
 void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {

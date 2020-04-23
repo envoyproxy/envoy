@@ -38,7 +38,8 @@ public:
   void postProcess() override { checkLowWatermark(); }
 
   void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark, 0); }
-  void setWatermarks(uint32_t low_watermark, uint32_t high_watermark, uint32_t overflow_watermark = 0);
+  void setWatermarks(uint32_t low_watermark, uint32_t high_watermark,
+                     uint32_t overflow_watermark = 0);
   uint32_t highWatermark() const { return high_watermark_; }
 
 private:
@@ -69,8 +70,8 @@ public:
   InstancePtr create(std::function<void()> below_low_watermark,
                      std::function<void()> above_high_watermark,
                      std::function<void()> above_overflow_watermark) override {
-    return InstancePtr{new WatermarkBuffer(below_low_watermark, above_high_watermark,
-                                           above_overflow_watermark)};
+    return InstancePtr{
+        new WatermarkBuffer(below_low_watermark, above_high_watermark, above_overflow_watermark)};
   }
 };
 
