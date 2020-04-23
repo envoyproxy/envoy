@@ -121,7 +121,7 @@ def envoy_cc_fuzz_test(
             ],
         }),
         size = size,
-        tags = tags,
+        tags = tags + ["nocoverage"],
     )
 
     # This target exists only for
@@ -166,32 +166,18 @@ def envoy_cc_test(
         local = False,
         size = "medium",
         flaky = False):
-    if coverage:
-        coverage_tags = tags + ["coverage_test_lib"]
-    else:
-        coverage_tags = tags
-    _envoy_cc_test_infrastructure_library(
-        name = name + "_lib_internal_only",
-        srcs = srcs,
-        data = data,
-        external_deps = external_deps,
-        deps = deps + [repository + "//test/test_common:printers_includes"],
-        repository = repository,
-        tags = coverage_tags,
-        copts = copts,
-        # Allow public visibility so these can be consumed in coverage tests in external projects.
-        visibility = ["//visibility:public"],
-    )
-    if coverage:
-        coverage_tags = tags + ["coverage_test"]
+
+    coverage_tags = tags + ([] if coverage else ["nocoverage"])
+
     native.cc_test(
         name = name,
+        srcs = srcs,
+        data = data,
         copts = envoy_copts(repository, test = True) + copts,
         linkopts = _envoy_test_linkopts(),
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
-        deps = envoy_stdlib_deps() + [
-            ":" + name + "_lib_internal_only",
+        deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
             repository + "//test:main",
         ],
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
@@ -304,27 +290,13 @@ def envoy_sh_test(
         coverage = True,
         tags = [],
         **kargs):
-    if coverage:
-        test_runner_cc = name + "_test_runner.cc"
-        native.genrule(
-            name = name + "_gen_test_runner",
-            srcs = srcs,
-            outs = [test_runner_cc],
-            cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
-            tools = ["//bazel:gen_sh_test_runner.sh"],
-        )
-        envoy_cc_test_library(
-            name = name + "_lib",
-            srcs = [test_runner_cc],
-            data = srcs + data,
-            tags = tags + ["coverage_test_lib"],
-            deps = ["//test/test_common:environment_lib"],
-        )
+    coverage_tags = tags + ([] if coverage else ["nocoverage"])
+
     native.sh_test(
         name = name,
         srcs = ["//bazel:sh_test_wrapper.sh"],
         data = srcs + data,
         args = srcs,
-        tags = tags,
+        tags = coverage_tags,
         **kargs
     )
