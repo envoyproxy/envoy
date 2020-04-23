@@ -22,14 +22,12 @@ else
 fi
 
 bazel coverage ${BAZEL_BUILD_OPTIONS} --test_output=errors \
-    --instrumentation_filter=//source/...,//include/...,-//source/common/chromium_url/... \
+    --instrumentation_filter="//source(?!/common/chromium_url|/extensions/quic_listeners/quiche/platform)[/:],//include[/:]" \
     --combined_report=lcov "${COVERAGE_TARGETS}"
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
 mkdir -p "${COVERAGE_DIR}"
 
-COVERAGE_IGNORE_REGEX="(/external/|pb\.(validate\.)?(h|cc)|/chromium_url/|/test/|/tmp|/tools/|/third_party/|/source/extensions/quic_listeners/quiche/)"
-COVERAGE_BINARY="bazel-bin/test/coverage/coverage_tests"
 COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
 
 cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
