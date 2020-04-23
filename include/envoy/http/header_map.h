@@ -626,7 +626,10 @@ public:
    */
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
 
-  std::unique_ptr<HeaderListView> headerListView() const override;
+  /**
+   * @return get headerList reference wrapper.
+   */
+  virtual std::unique_ptr<HeaderListView> headerListView() const PURE;
 
   /**
    * Allow easy pretty-printing of the key/value pairs in HeaderMap
