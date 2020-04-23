@@ -1,7 +1,7 @@
 # Envoy dependencies may be annotated with the following attributes:
 #
 # use_category - list of the categories describing how the dependency is being used. This attribute is used
-#                automatically track security posture of Envoy's dependencies.
+#                for automatic tracking of security posture of Envoy's dependencies.
 #                Possible values are documented in the USE_CATEGORIES list.
 
 # NOTE: If a dependency use case is either dataplane or controlplane, the other uses are not needed
