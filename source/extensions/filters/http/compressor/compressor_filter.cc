@@ -10,7 +10,7 @@ CompressorFilterConfig::CompressorFilterConfig(
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
     Compression::Compressor::CompressorFactoryPtr compressor_factory)
     : Common::Compressors::CompressorFilterConfig(
-          generic_compressor, stats_prefix + compressor_factory->statsPrefix(), scope, runtime,
+          generic_compressor, stats_prefix + "compressor." + compressor_factory->statsPrefix(), scope, runtime,
           compressor_factory->contentEncoding()),
       compressor_factory_(std::move(compressor_factory)) {}
 
