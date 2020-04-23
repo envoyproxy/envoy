@@ -3,7 +3,6 @@
 #include "envoy/router/internal_redirect.h"
 
 #include "common/stream_info/filter_state_impl.h"
-
 #include "extensions/internal_redirect/previous_routes/config.h"
 #include "extensions/internal_redirect/well_known_names.h"
 
@@ -17,9 +16,9 @@ namespace Extensions {
 namespace InternalRedirect {
 namespace {
 
-class ConfigTest : public testing::Test {
+class PreviousRoutesTest : public testing::Test {
 protected:
-  ConfigTest() : filter_state_(StreamInfo::FilterState::LifeSpan::FilterChain) {
+  PreviousRoutesTest() : filter_state_(StreamInfo::FilterState::LifeSpan::FilterChain) {
     factory_ = Registry::FactoryRegistry<Router::InternalRedirectPredicateFactory>::getFactory(
         InternalRedirectPredicateValues::get().PreviousRoutesPredicate);
     config_ = factory_->createEmptyConfigProto();
@@ -30,7 +29,7 @@ protected:
   ProtobufTypes::MessagePtr config_;
 };
 
-TEST_F(ConfigTest, TargetIsOnlyTakenOnce) {
+TEST_F(PreviousRoutesTest, TargetIsOnlyTakenOnce) {
   std::string current_route_name = "fake_current_route";
   // Create the predicate for the first time. It should remember nothing in the
   // filter state, so it allows the redirect.
@@ -53,7 +52,7 @@ TEST_F(ConfigTest, TargetIsOnlyTakenOnce) {
   }
 }
 
-TEST_F(ConfigTest, RoutesAreIndependent) {
+TEST_F(PreviousRoutesTest, RoutesAreIndependent) {
   // Create the predicate on route_0.
   {
     auto predicate = factory_->createInternalRedirectPredicate(*config_, "route_0");
