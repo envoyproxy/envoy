@@ -11,6 +11,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -824,6 +825,12 @@ public:
    * @return a map of route-specific upgrades to their enabled/disabled status.
    */
   virtual const UpgradeMap& upgradeMap() const PURE;
+
+  using ConnectConfig = envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig;
+  /**
+   * If present, informs how to handle proxying CONNECT requests on this route.
+   */
+  virtual const absl::optional<ConnectConfig>& connectConfig() const PURE;
 
   /**
    * @returns the internal redirect action which should be taken on this route.

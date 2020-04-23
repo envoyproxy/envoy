@@ -371,7 +371,7 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RouteMatch";
 
@@ -391,6 +391,13 @@ message RouteMatch {
     // If specified, the route will match against whether or not a certificate is validated.
     // If not specified, certificate validation status (true or false) will not be considered when route matching.
     google.protobuf.BoolValue validated = 2;
+  }
+
+  // [#not-implemented-hide:]
+  // An extensible message for matching CONNECT requests.
+  message ConnectMatcher {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.route.v3.RouteMatch.ConnectMatcher";
   }
 
   reserved 5, 3;
@@ -421,6 +428,16 @@ message RouteMatch {
     // on :path, etc. The issue with that is it is unclear how to generically deal with query string
     // stripping. This needs more thought.]
     type.matcher.v3.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
+
+    // [#not-implemented-hide:]
+    // If this is used as the matcher, the matcher will only match CONNECT requests.
+    // Note that this will not match HTTP/2 upgrade-style CONNECT requests
+    // (WebSocket and the like) as they are normalized in Envoy as HTTP/1.1 style
+    // upgrades.
+    // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2,
+    // where CONNECT requests may have a path, the path matchers will work if
+    // there is a path present.
+    ConnectMatcher connect_matcher = 12;
   }
 
   // Indicates that prefix/path matching should be case insensitive. The default
@@ -706,6 +723,16 @@ message RouteAction {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.route.v3.RouteAction.UpgradeConfig";
 
+    // [#not-implemented-hide:]
+    // Configuration for sending data upstream as a raw data payload. This is used for
+    // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+    message ConnectConfig {
+      // TODO(alyssawilk) add proxy proto configuration here.
+
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.route.v3.RouteAction.UpgradeConfig.ConnectConfig";
+    }
+
     // The case-insensitive name of this upgrade, e.g. "websocket".
     // For each upgrade type present in upgrade_configs, requests with
     // Upgrade: [upgrade_type] will be proxied upstream.
@@ -714,6 +741,11 @@ message RouteAction {
 
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
+
+    // [#not-implemented-hide:]
+    // Configuration for sending data upstream as a raw data payload. This is used for
+    // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+    ConnectConfig connect_config = 3;
   }
 
   reserved 12, 18, 19, 16, 22, 21, 10;
