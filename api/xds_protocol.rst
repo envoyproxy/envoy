@@ -626,8 +626,8 @@ resources after a specified period of time if contact with the management server
 be used, for example, to terminate a fault injection test when the management server can no longer
 be reached.
 
-State of the World TTL
-^^^^^^^^^^^^^^^^^^^^^^
+SotW TTL
+^^^^^^^^
 
 A TTL field in the :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` specifies the TTL for
 all resources contained in the response. A timer is started when the response is received. When the
