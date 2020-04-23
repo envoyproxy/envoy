@@ -72,8 +72,9 @@ Note that this filter also supports per route configuration:
       routes:
       - match: { prefix: "/version-to-metadata" }
         route: { cluster: service }
-        per_filter_config:
+        typed_per_filter_config:
           envoy.filters.http.header_to_metadata:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
             request_rules:
               - header: x-version
                 on_header_present:
