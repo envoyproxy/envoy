@@ -92,7 +92,7 @@ public:
 
 class MetricsServiceSinkTest : public testing::Test {
 public:
-  MetricsServiceSinkTest() {}
+  MetricsServiceSinkTest() = default;
 
   NiceMock<Stats::MockMetricSnapshot> snapshot_;
   Event::SimulatedTimeSystem time_system_;
