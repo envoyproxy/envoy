@@ -849,7 +849,8 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
 }
 
 void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upstream_complete,
-                                                       bool with_encoder_filter) {
+                                                       bool with_encoder_filter,
+                                                       bool with_multiple_100_continue) {
   if (with_encoder_filter) {
     // Because 100-continue only affects encoder filters, make sure it plays well with one.
     config_helper_.addFilter("name: envoy.filters.http.cors");
@@ -891,6 +892,11 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
     upstream_request_->encode100ContinueHeaders(
         Http::TestResponseHeaderMapImpl{{":status", "100"}});
     response->waitForContinueHeaders();
+    if (with_multiple_100_continue) {
+      upstream_request_->encode100ContinueHeaders(
+          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      response->waitForContinueHeaders(true);
+    }
   }
   // Send all of the request data and wait for it to be received upstream.
   codec_client_->sendData(*request_encoder_, 10, true);

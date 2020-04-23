@@ -46,7 +46,7 @@ public:
   const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadata_map() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
-  void waitForContinueHeaders();
+  void waitForContinueHeaders(bool wait_for_additional = false);
   void waitForHeaders();
   // This function waits until body_ has at least size bytes in it (it might have more). clearBody()
   // can be used if the previous body data is not relevant and the test wants to wait for a specific

@@ -115,7 +115,7 @@ private:
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
         : parent_(parent), iteration_state_(IterationState::Continue),
           iterate_from_current_filter_(false), headers_continued_(false),
-          continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter),
+          end_stream_(false), dual_filter_(dual_filter),
           decode_headers_called_(false), encode_headers_called_(false) {}
 
     // Functions in the following block are called after the filter finishes processing
@@ -203,13 +203,13 @@ private:
     };
     ActiveStream& parent_;
     IterationState iteration_state_;
+    uint32_t continue_headers_continued_{0};
     // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter
     // hasn't parsed data and trailers. As a result, the filter iteration should start with the
     // current filter instead of the next one. If true, filter iteration starts with the current
     // filter. Otherwise, starts with the next filter in the chain.
     bool iterate_from_current_filter_ : 1;
     bool headers_continued_ : 1;
-    bool continue_headers_continued_ : 1;
     // If true, end_stream is called for this filter.
     bool end_stream_ : 1;
     const bool dual_filter_ : 1;
@@ -353,7 +353,7 @@ private:
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_response_data_; }
     bool complete() override { return parent_.state_.local_complete_; }
     bool has100Continueheaders() override {
-      return parent_.state_.has_continue_headers_ && !continue_headers_continued_;
+      return parent_.state_.continue_headers_count_ < continue_headers_continued_;
     }
     void do100ContinueHeaders() override {
       parent_.encode100ContinueHeaders(this, *parent_.continue_headers_);
@@ -568,7 +568,7 @@ private:
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
       os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_)
-         << DUMP_MEMBER(state_.has_continue_headers_) << DUMP_MEMBER(state_.is_head_request_)
+         << DUMP_MEMBER(state_.continue_headers_count_) << DUMP_MEMBER(state_.is_head_request_)
          << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
          << "\n";
 
@@ -626,7 +626,7 @@ private:
       State()
           : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
             saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
-            is_internally_created_(false), decorated_propagate_(true), has_continue_headers_(false),
+            is_internally_created_(false), decorated_propagate_(true),
             is_head_request_(false) {}
 
       uint32_t filter_call_state_{0};
@@ -651,9 +651,6 @@ private:
       bool is_internally_created_ : 1;
 
       bool decorated_propagate_ : 1;
-      // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
-      // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
-      bool has_continue_headers_ : 1;
       bool is_head_request_ : 1;
       // Whether a filter has indicated that the request should be treated as a headers only
       // request.
@@ -661,6 +658,9 @@ private:
       // Whether a filter has indicated that the response should be treated as a headers only
       // response.
       bool encoding_headers_only_{false};
+
+      // Count the number of continue headers observevd.
+      uint32_t continue_headers_count_{0};
 
       // Used to track which filter is the latest filter that has received data.
       ActiveStreamEncoderFilter* latest_data_encoding_filter_{};

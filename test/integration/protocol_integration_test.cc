@@ -901,6 +901,10 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxyingEarly100Continue) {
   testEnvoyProxying100Continue(true);
 }
 
+TEST_P(ProtocolIntegrationTest, EnvoyProxyingMultiple100Continue) {
+  testEnvoyProxying100Continue(true, false, true);
+}
+
 TEST_P(ProtocolIntegrationTest, EnvoyProxyingLate100Continue) {
   testEnvoyProxying100Continue(false);
 }

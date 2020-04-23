@@ -56,10 +56,11 @@ namespace Envoy {
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
-void IntegrationStreamDecoder::waitForContinueHeaders() {
-  if (!continue_headers_.get()) {
+void IntegrationStreamDecoder::waitForContinueHeaders(bool wait_for_additional) {
+  if (wait_for_additional || !continue_headers_.get()) {
     waiting_for_continue_headers_ = true;
     dispatcher_.run(Event::Dispatcher::RunType::Block);
+    waiting_for_continue_headers_ = false;
   }
 }
 
@@ -67,6 +68,7 @@ void IntegrationStreamDecoder::waitForHeaders() {
   if (!headers_.get()) {
     waiting_for_headers_ = true;
     dispatcher_.run(Event::Dispatcher::RunType::Block);
+    waiting_for_headers_ = false;
   }
 }
 

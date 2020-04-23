@@ -1551,7 +1551,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   resetIdleTimer();
   ASSERT(connection_manager_.config_.proxy100Continue());
   // Make sure commonContinue continues encode100ContinueHeaders.
-  state_.has_continue_headers_ = true;
+  state_.continue_headers_count_++;
 
   // Similar to the block in encodeHeaders, run encode100ContinueHeaders on each
   // filter. This is simpler than that case because 100 continue implies no
@@ -2123,7 +2123,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
 
   // Only resume with do100ContinueHeaders() if we've actually seen a 100-Continue.
   if (has100Continueheaders()) {
-    continue_headers_continued_ = true;
+    continue_headers_continued_++;
     do100ContinueHeaders();
     // If the response headers have not yet come in, don't continue on with
     // headers and body. doHeaders expects request headers to exist.
@@ -2155,8 +2155,8 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
 
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfter100ContinueHeadersCallback(
     FilterHeadersStatus status) {
-  ASSERT(parent_.state_.has_continue_headers_);
-  ASSERT(!continue_headers_continued_);
+  ASSERT(parent_.state_.continue_headers_count_ > 0);
+  ASSERT(continue_headers_continued_ < parent.state_.continue_headers_count);
   ASSERT(canIterate());
 
   if (status == FilterHeadersStatus::StopIteration) {
@@ -2164,7 +2164,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfter100Continue
     return false;
   } else {
     ASSERT(status == FilterHeadersStatus::Continue);
-    continue_headers_continued_ = true;
+    continue_headers_continued_++;
     return true;
   }
 }
