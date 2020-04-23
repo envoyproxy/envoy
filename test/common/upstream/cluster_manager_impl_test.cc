@@ -41,7 +41,6 @@ public:
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *api_, http_context_, grpc_context_);
-    cluster_manager_->initializeSecondaryClusters(bootstrap);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -2830,7 +2829,6 @@ TEST_F(ClusterManagerInitHelperTest, ImmediateInitialize) {
   cluster1.initialize_callback_();
 
   init_helper_.onStaticLoadComplete();
-  init_helper_.startInitializingSecondaryClusters();
 
   ReadyWatcher cm_initialized;
   EXPECT_CALL(cm_initialized, ready());
@@ -2851,10 +2849,8 @@ TEST_F(ClusterManagerInitHelperTest, StaticSdsInitialize) {
   ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
-  init_helper_.onStaticLoadComplete();
-
   EXPECT_CALL(cluster1, initialize(_));
-  init_helper_.startInitializingSecondaryClusters();
+  init_helper_.onStaticLoadComplete();
 
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
@@ -2905,9 +2901,8 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
   ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
-  init_helper_.onStaticLoadComplete();
   EXPECT_CALL(cluster1, initialize(_));
-  init_helper_.startInitializingSecondaryClusters();
+  init_helper_.onStaticLoadComplete();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
   EXPECT_CALL(cm_initialized, ready());
@@ -2928,10 +2923,8 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithEdsPaused) {
   ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
-  init_helper_.onStaticLoadComplete();
-
   EXPECT_CALL(cluster1, initialize(_));
-  init_helper_.startInitializingSecondaryClusters();
+  init_helper_.onStaticLoadComplete();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
   EXPECT_CALL(cm_initialized, ready());
@@ -2979,9 +2972,6 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
   ON_CALL(cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster);
 
-  // onStaticLoadComplete() must not initialize secondary clusters
-  init_helper_.onStaticLoadComplete();
-
   // Set up the scenario seen in Issue 903 where initialize() ultimately results
   // in the removeCluster() call. In the real bug this was a long and complex call
   // chain.
@@ -2989,9 +2979,9 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
     init_helper_.removeCluster(cluster);
   }));
 
-  // Now call initializeSecondaryClusters which will exercise maybeFinishInitialize()
+  // Now call onStaticLoadComplete which will exercise maybeFinishInitialize()
   // which calls initialize() on the members of the secondary init list.
-  init_helper_.startInitializingSecondaryClusters();
+  init_helper_.onStaticLoadComplete();
 }
 
 // Validate that when options are set in the ClusterManager and/or Cluster, we see the socket option
