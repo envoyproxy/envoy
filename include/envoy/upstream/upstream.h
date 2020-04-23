@@ -110,7 +110,7 @@ public:
   virtual CreateConnectionData
   createHealthCheckConnection(Event::Dispatcher& dispatcher,
                               Network::TransportSocketOptionsSharedPtr transport_socket_options,
-                              absl::optional<MetadataConstSharedPtr> metadata) const PURE;
+                              MetadataConstSharedPtr metadata) const PURE;
 
   /**
    * @return host specific gauges.

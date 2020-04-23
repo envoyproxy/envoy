@@ -136,7 +136,7 @@ public:
   CreateConnectionData
   createHealthCheckConnection(Event::Dispatcher& dispatcher,
                               Network::TransportSocketOptionsSharedPtr,
-                              absl::optional<MetadataConstSharedPtr>) const override {
+                              MetadataConstSharedPtr) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, nullptr);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }

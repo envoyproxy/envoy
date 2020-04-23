@@ -184,7 +184,7 @@ public:
   CreateConnectionData
   createHealthCheckConnection(Event::Dispatcher& dispatcher,
                               Network::TransportSocketOptionsSharedPtr transport_socket_options,
-                              const absl::optional<MetadataConstSharedPtr> metadata) const override;
+                              MetadataConstSharedPtr metadata) const override;
 
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
   gauges() const override {

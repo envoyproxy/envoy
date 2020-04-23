@@ -56,7 +56,7 @@ HealthCheckerImplBase::initTransportSocketOptions(
   return std::make_shared<const Network::TransportSocketOptionsImpl>();
 }
 
-absl::optional<MetadataConstSharedPtr> HealthCheckerImplBase::initTransportSocketMatchMetadata(
+MetadataConstSharedPtr HealthCheckerImplBase::initTransportSocketMatchMetadata(
     const envoy::config::core::v3::HealthCheck& config) {
   if (config.has_transport_socket_match_criteria()) {
     std::unique_ptr<envoy::config::core::v3::Metadata> metadata =
@@ -64,10 +64,10 @@ absl::optional<MetadataConstSharedPtr> HealthCheckerImplBase::initTransportSocke
     metadata->mutable_filter_metadata()->operator[](
         Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH) =
         config.transport_socket_match_criteria();
-    return absl::optional<MetadataConstSharedPtr>(std::move(metadata));
+    return MetadataConstSharedPtr(std::move(metadata));
   }
 
-  return absl::optional<MetadataConstSharedPtr>();
+  return MetadataConstSharedPtr();
 }
 
 HealthCheckerImplBase::~HealthCheckerImplBase() {
