@@ -77,6 +77,7 @@ proto_library(
         "//envoy/config/filter/network/rate_limit/v2:pkg",
         "//envoy/config/filter/network/rbac/v2:pkg",
         "//envoy/config/filter/network/redis_proxy/v2:pkg",
+        "//envoy/config/filter/network/rocketmq_proxy/v3:pkg",
         "//envoy/config/filter/network/sni_cluster/v2:pkg",
         "//envoy/config/filter/network/tcp_proxy/v2:pkg",
         "//envoy/config/filter/network/thrift_proxy/v2alpha1:pkg",
