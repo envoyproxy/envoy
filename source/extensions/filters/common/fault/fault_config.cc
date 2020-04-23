@@ -104,10 +104,10 @@ envoy::type::v3::FractionalPercent FaultAbortConfig::HeaderAbortProvider::percen
   if (request_headers != nullptr &&
       request_headers->get(Filters::Common::Fault::HeaderNames::get().AbortGrpcRequest) !=
           nullptr) {
-    return grpcHeaderPercentageProvider_.percentage(request_headers);
+    return grpc_header_percentage_provider_.percentage(request_headers);
   }
 
-  return httpHeaderPercentageProvider_.percentage(request_headers);
+  return http_header_percentage_provider_.percentage(request_headers);
 }
 
 FaultDelayConfig::FaultDelayConfig(

@@ -124,8 +124,9 @@ private:
   class HeaderAbortProvider : public AbortProvider {
   public:
     HeaderAbortProvider(const envoy::type::v3::FractionalPercent& percentage)
-        : grpcHeaderPercentageProvider_(HeaderNames::get().AbortGrpcRequestPercentage, percentage),
-          httpHeaderPercentageProvider_(HeaderNames::get().AbortRequestPercentage, percentage) {}
+        : grpc_header_percentage_provider_(HeaderNames::get().AbortGrpcRequestPercentage,
+                                           percentage),
+          http_header_percentage_provider_(HeaderNames::get().AbortRequestPercentage, percentage) {}
 
     absl::optional<Http::Code>
     httpStatusCode(const Http::RequestHeaderMap* request_headers) const override;
@@ -137,8 +138,8 @@ private:
     percentage(const Http::RequestHeaderMap* request_headers) const override;
 
   private:
-    HeaderPercentageProvider grpcHeaderPercentageProvider_;
-    HeaderPercentageProvider httpHeaderPercentageProvider_;
+    HeaderPercentageProvider grpc_header_percentage_provider_;
+    HeaderPercentageProvider http_header_percentage_provider_;
   };
 
   using AbortProviderPtr = std::unique_ptr<AbortProvider>;
@@ -207,7 +208,7 @@ private:
   class HeaderDelayProvider : public DelayProvider {
   public:
     HeaderDelayProvider(const envoy::type::v3::FractionalPercent& percentage)
-        : headerPercentageProvider_(HeaderNames::get().DelayRequestPercentage, percentage) {}
+        : header_percentage_provider_(HeaderNames::get().DelayRequestPercentage, percentage) {}
 
     // DelayProvider
     absl::optional<std::chrono::milliseconds>
@@ -215,11 +216,11 @@ private:
 
     envoy::type::v3::FractionalPercent
     percentage(const Http::RequestHeaderMap* request_headers) const override {
-      return headerPercentageProvider_.percentage(request_headers);
+      return header_percentage_provider_.percentage(request_headers);
     }
 
   private:
-    HeaderPercentageProvider headerPercentageProvider_;
+    HeaderPercentageProvider header_percentage_provider_;
   };
 
   using DelayProviderPtr = std::unique_ptr<DelayProvider>;
@@ -287,16 +288,17 @@ private:
   class HeaderRateLimitProvider : public RateLimitProvider {
   public:
     HeaderRateLimitProvider(const envoy::type::v3::FractionalPercent& percentage)
-        : headerPercentageProvider_(HeaderNames::get().ThroughputResponsePercentage, percentage) {}
+        : header_percentage_provider_(HeaderNames::get().ThroughputResponsePercentage, percentage) {
+    }
     // RateLimitProvider
     absl::optional<uint64_t> rateKbps(const Http::RequestHeaderMap* request_headers) const override;
     envoy::type::v3::FractionalPercent
     percentage(const Http::RequestHeaderMap* request_headers) const override {
-      return headerPercentageProvider_.percentage(request_headers);
+      return header_percentage_provider_.percentage(request_headers);
     }
 
   private:
-    HeaderPercentageProvider headerPercentageProvider_;
+    HeaderPercentageProvider header_percentage_provider_;
   };
 
   using RateLimitProviderPtr = std::unique_ptr<RateLimitProvider>;
