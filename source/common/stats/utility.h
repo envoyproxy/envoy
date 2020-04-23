@@ -14,16 +14,20 @@ namespace Envoy {
 namespace Stats {
 
 /**
- * Represents a stat name token, using either a StatName or a string_view,
- * which will be treated as a dynamic string. We subclass string_view simply
- * to make it a bit more explicit when we are creating a dynamic stat name,
- * since those are expensive.
+ * Represents a dynamically created stat name token based on absl::string_view.
+ * This class wrapper is used in the 'Element' variant so that call-sites
+ * can express explicit intent to create dynamic stat names, which are more
+ * expensive than symbolic stat names. We use dynamic stat names only for
+ * building stats based on names discovered in the line of a request.
  */
 class DynamicName : public absl::string_view {
 public:
   DynamicName(absl::string_view s) : absl::string_view(s) {}
 };
 
+/**
+ * Holds either a symbolic StatName or a dynamic string.
+ */
 using Element = absl::variant<StatName, DynamicName>;
 using ElementVec = std::vector<Element>;
 
@@ -57,6 +61,9 @@ public:
    * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
    * for more detail on why symbolic StatNames are preferred when possible.
    *
+   * See also counterFromStatNames, which is slightly faster but does not allow
+   * passing DynamicName(string)s as names.
+   *
    * @param scope The scope in which to create the counter.
    * @param elements The vector of mixed string_view and StatName
    * @param tags optionally specified tags.
@@ -66,11 +73,32 @@ public:
                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
 
   /**
+   * Creates a counter from a vector of tokens which are used to create the
+   * name. The tokens can be specified as string_view or StatName. For
+   * tokens specified as string_view, a dynamic StatName will be created. See
+   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
+   * for more detail on why symbolic StatNames are preferred when possible.
+   *
+   * See also counterFromElements, which is slightly slower, but allows
+   * passing DynamicName(string)s as elements.
+   *
+   * @param scope The scope in which to create the counter.
+   * @param names The vector of StatNames
+   * @param tags optionally specified tags.
+   * @return A counter named using the joined elements.
+   */
+  static Counter& counterFromStatNames(Scope& scope, const StatNameVec& names,
+                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
+
+  /**
    * Creates a gauge from a vector of tokens which are used to create the
    * name. The tokens can be specified as string_view or StatName. For
    * tokens specified as string_view, a dynamic StatName will be created. See
    * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
    * for more detail on why symbolic StatNames are preferred when possible.
+   *
+   * See also gaugeFromStatNames, which is slightly faster but does not allow
+   * passing DynamicName(string)s as names.
    *
    * @param scope The scope in which to create the counter.
    * @param elements The vector of mixed string_view and StatName
@@ -83,11 +111,34 @@ public:
                                   StatNameTagVectorOptConstRef tags = absl::nullopt);
 
   /**
+   * Creates a gauge from a vector of tokens which are used to create the
+   * name. The tokens can be specified as string_view or StatName. For
+   * tokens specified as string_view, a dynamic StatName will be created. See
+   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
+   * for more detail on why symbolic StatNames are preferred when possible.
+   *
+   * See also gaugeFromElements, which is slightly slower, but allows
+   * passing DynamicName(string)s as elements.
+   *
+   * @param scope The scope in which to create the counter.
+   * @param names The vector of StatNames
+   * @param import_mode Whether hot-restart should accumulate this value.
+   * @param tags optionally specified tags.
+   * @return A gauge named using the joined elements.
+   */
+  static Gauge& gaugeFromStatNames(Scope& scope, const StatNameVec& elements,
+                                   Gauge::ImportMode import_mode,
+                                   StatNameTagVectorOptConstRef tags = absl::nullopt);
+
+  /**
    * Creates a histogram from a vector of tokens which are used to create the
    * name. The tokens can be specified as string_view or StatName. For
    * tokens specified as string_view, a dynamic StatName will be created. See
    * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
    * for more detail on why symbolic StatNames are preferred when possible.
+   *
+   * See also histogramFromStatNames, which is slightly faster but does not allow
+   * passing DynamicName(string)s as names.
    *
    * @param scope The scope in which to create the counter.
    * @param elements The vector of mixed string_view and StatName
@@ -98,6 +149,26 @@ public:
   static Histogram& histogramFromElements(Scope& scope, const ElementVec& elements,
                                           Histogram::Unit unit,
                                           StatNameTagVectorOptConstRef tags = absl::nullopt);
+
+  /**
+   * Creates a histogram from a vector of tokens which are used to create the
+   * name. The tokens can be specified as string_view or StatName. For
+   * tokens specified as string_view, a dynamic StatName will be created. See
+   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
+   * for more detail on why symbolic StatNames are preferred when possible.
+   *
+   * See also histogramFromElements, which is slightly slower, but allows
+   * passing DynamicName(string)s as elements.
+   *
+   * @param scope The scope in which to create the counter.
+   * @param elements The vector of mixed string_view and StatName
+   * @param unit The unit of measurement.
+   * @param tags optionally specified tags.
+   * @return A histogram named using the joined elements.
+   */
+  static Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements,
+                                           Histogram::Unit unit,
+                                           StatNameTagVectorOptConstRef tags = absl::nullopt);
 };
 
 } // namespace Stats

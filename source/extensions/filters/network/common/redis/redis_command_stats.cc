@@ -37,16 +37,16 @@ Stats::TimespanPtr RedisCommandStats::createCommandTimer(Stats::Scope& scope,
                                                          Stats::StatName command,
                                                          Envoy::TimeSource& time_source) {
   return std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      Stats::Utility::histogramFromElements(scope, {prefix_, command, latency_},
-                                            Stats::Histogram::Unit::Microseconds),
+      Stats::Utility::histogramFromStatNames(scope, {prefix_, command, latency_},
+                                             Stats::Histogram::Unit::Microseconds),
       time_source);
 }
 
 Stats::TimespanPtr RedisCommandStats::createAggregateTimer(Stats::Scope& scope,
                                                            Envoy::TimeSource& time_source) {
   return std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      Stats::Utility::histogramFromElements(scope, {prefix_, upstream_rq_time_},
-                                            Stats::Histogram::Unit::Microseconds),
+      Stats::Utility::histogramFromStatNames(scope, {prefix_, upstream_rq_time_},
+                                             Stats::Histogram::Unit::Microseconds),
       time_source);
 }
 
@@ -72,15 +72,15 @@ Stats::StatName RedisCommandStats::getCommandFromRequest(const RespValue& reques
 }
 
 void RedisCommandStats::updateStatsTotal(Stats::Scope& scope, Stats::StatName command) {
-  Stats::Utility::counterFromElements(scope, {prefix_, command, total_}).inc();
+  Stats::Utility::counterFromStatNames(scope, {prefix_, command, total_}).inc();
 }
 
 void RedisCommandStats::updateStats(Stats::Scope& scope, Stats::StatName command,
                                     const bool success) {
   if (success) {
-    Stats::Utility::counterFromElements(scope, {prefix_, command, success_}).inc();
+    Stats::Utility::counterFromStatNames(scope, {prefix_, command, success_}).inc();
   } else {
-    Stats::Utility::counterFromElements(scope, {prefix_, command, failure_}).inc();
+    Stats::Utility::counterFromStatNames(scope, {prefix_, command, failure_}).inc();
   }
 }
 

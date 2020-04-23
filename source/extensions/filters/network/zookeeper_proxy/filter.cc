@@ -154,7 +154,7 @@ void ZooKeeperFilter::onPing() {
 }
 
 void ZooKeeperFilter::onAuthRequest(const std::string& scheme) {
-  Stats::Counter& counter = Stats::Utility::counterFromElements(
+  Stats::Counter& counter = Stats::Utility::counterFromStatNames(
       config_->scope_, {config_->stat_prefix_, config_->auth_,
                         config_->stat_name_set_->getBuiltin(absl::StrCat(scheme, "_rq"),
                                                             config_->unknown_scheme_rq_)});
@@ -313,7 +313,7 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
     opcode_latency = opcode_info.latency_name_;
   }
 
-  Stats::Histogram& histogram = Stats::Utility::histogramFromElements(
+  Stats::Histogram& histogram = Stats::Utility::histogramFromStatNames(
       config_->scope_, {config_->stat_prefix_, opcode_latency},
       Stats::Histogram::Unit::Milliseconds);
   histogram.recordValue(latency.count());

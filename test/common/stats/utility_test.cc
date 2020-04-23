@@ -45,6 +45,9 @@ TEST_F(StatsUtilityTest, Counters) {
   StatName suffix = pool_.add("suffix");
   Counter& c3 = Utility::counterFromElements(*scope, {token, suffix});
   EXPECT_EQ("scope.token.suffix", c3.name());
+  Counter& c4 = Utility::counterFromStatNames(*scope, {token, suffix});
+  EXPECT_EQ("scope.token.suffix", c4.name());
+  EXPECT_EQ(&c3, &c4);
 
   Counter& ctags =
       Utility::counterFromElements(*scope, {DynamicName("x"), token, DynamicName("y")}, tags_);
@@ -65,6 +68,9 @@ TEST_F(StatsUtilityTest, Gauges) {
   StatName suffix = pool_.add("suffix");
   Gauge& g3 = Utility::gaugeFromElements(*scope, {token, suffix}, Gauge::ImportMode::NeverImport);
   EXPECT_EQ("scope.token.suffix", g3.name());
+  Gauge& g4 = Utility::gaugeFromStatNames(*scope, {token, suffix}, Gauge::ImportMode::NeverImport);
+  EXPECT_EQ("scope.token.suffix", g4.name());
+  EXPECT_EQ(&g3, &g4);
 }
 
 TEST_F(StatsUtilityTest, Histograms) {
@@ -82,6 +88,8 @@ TEST_F(StatsUtilityTest, Histograms) {
   Histogram& h3 = Utility::histogramFromElements(*scope, {token, suffix}, Histogram::Unit::Bytes);
   EXPECT_EQ("scope.token.suffix", h3.name());
   EXPECT_EQ(Histogram::Unit::Bytes, h3.unit());
+  Histogram& h4 = Utility::histogramFromStatNames(*scope, {token, suffix}, Histogram::Unit::Bytes);
+  EXPECT_EQ(&h3, &h4);
 }
 
 } // namespace

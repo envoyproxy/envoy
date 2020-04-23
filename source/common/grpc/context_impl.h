@@ -17,8 +17,8 @@ namespace Envoy {
 namespace Grpc {
 
 struct Context::RequestStatNames {
-  Stats::StatName service_; // supplies the service name.
-  Stats::StatName method_;  // supplies the method name.
+  Stats::Element service_; // supplies the service name.
+  Stats::Element method_;  // supplies the method name.
 };
 
 class ContextImpl : public Context {
@@ -60,14 +60,6 @@ public:
   StatNames& statNames() override { return stat_names_; }
 
 private:
-  // Makes a stat name from a string, if we don't already have one for it.
-  // This always takes a lock on mutex_, and if we haven't seen the name
-  // before, it also takes a lock on the symbol table.
-  //
-  // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/7008 for
-  // a lock-free approach to creating dynamic stat-names based on requests.
-  Stats::StatName makeDynamicStatName(absl::string_view name);
-
   // Gets the stat prefix and underlying storage, depending on whether request_names is empty
   // or not.
   // Prefix will be "<protocol>" if request_names is empty, or
@@ -75,10 +67,7 @@ private:
   Stats::ElementVec getPrefix(Protocol protocol,
                               const absl::optional<RequestStatNames>& request_names);
 
-  Stats::SymbolTable& symbol_table_;
-  mutable Thread::MutexBasicLockable mutex_;
-  Stats::StatNamePool stat_name_pool_ ABSL_GUARDED_BY(mutex_);
-  StringMap<Stats::StatName> stat_name_map_ ABSL_GUARDED_BY(mutex_);
+  Stats::StatNamePool stat_name_pool_;
   const Stats::StatName grpc_;
   const Stats::StatName grpc_web_;
   const Stats::StatName success_;

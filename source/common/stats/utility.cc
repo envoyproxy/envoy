@@ -69,6 +69,12 @@ Counter& Utility::counterFromElements(Scope& scope, const ElementVec& elements,
   return scope.counterFromStatNameWithTags(visitor.makeStatName(elements), tags);
 }
 
+Counter& Utility::counterFromStatNames(Scope& scope, const StatNameVec& elements,
+                                       StatNameTagVectorOptConstRef tags) {
+  SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
+  return scope.counterFromStatNameWithTags(StatName(joined.get()), tags);
+}
+
 Gauge& Utility::gaugeFromElements(Scope& scope, const ElementVec& elements,
                                   Gauge::ImportMode import_mode,
                                   StatNameTagVectorOptConstRef tags) {
@@ -76,10 +82,24 @@ Gauge& Utility::gaugeFromElements(Scope& scope, const ElementVec& elements,
   return scope.gaugeFromStatNameWithTags(visitor.makeStatName(elements), tags, import_mode);
 }
 
+Gauge& Utility::gaugeFromStatNames(Scope& scope, const StatNameVec& elements,
+                                   Gauge::ImportMode import_mode,
+                                   StatNameTagVectorOptConstRef tags) {
+  SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
+  return scope.gaugeFromStatNameWithTags(StatName(joined.get()), tags, import_mode);
+}
+
 Histogram& Utility::histogramFromElements(Scope& scope, const ElementVec& elements,
                                           Histogram::Unit unit, StatNameTagVectorOptConstRef tags) {
   ElementVisitor visitor(scope.symbolTable());
   return scope.histogramFromStatNameWithTags(visitor.makeStatName(elements), tags, unit);
+}
+
+Histogram& Utility::histogramFromStatNames(Scope& scope, const StatNameVec& elements,
+                                           Histogram::Unit unit,
+                                           StatNameTagVectorOptConstRef tags) {
+  SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
+  return scope.histogramFromStatNameWithTags(StatName(joined.get()), tags, unit);
 }
 
 } // namespace Stats

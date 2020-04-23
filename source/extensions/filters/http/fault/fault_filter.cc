@@ -86,7 +86,8 @@ FaultFilterConfig::FaultFilterConfig(
       stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))) {}
 
 void FaultFilterConfig::incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name) {
-  Stats::Utility::counterFromElements(scope_, {stats_prefix_, downstream_cluster, stat_name}).inc();
+  Stats::Utility::counterFromStatNames(scope_, {stats_prefix_, downstream_cluster, stat_name})
+      .inc();
 }
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
