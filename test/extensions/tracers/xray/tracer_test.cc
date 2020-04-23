@@ -12,6 +12,7 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
 #include "absl/strings/str_format.h"
@@ -184,9 +185,15 @@ TEST_F(XRayTracerTest, TraceIDFormatTest) {
   ASSERT_EQ(24, parts[2].length());
 }
 
-TEST(XRayDaemon, VerifyUdpPacketContents) {
+class XRayDaemonTest : public testing::TestWithParam<Network::Address::IpVersion> {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, XRayDaemonTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(XRayDaemonTest, VerifyUdpPacketContents) {
   NiceMock<Server::MockInstance> server;
-  Network::Test::UdpSyncPeer xray_fake_daemon(Network::Address::IpVersion::v4);
+  Network::Test::UdpSyncPeer xray_fake_daemon(GetParam());
   const std::string daemon_endpoint = xray_fake_daemon.localAddress()->asString();
   Tracer tracer{"my_segment", std::make_unique<DaemonBrokerImpl>(daemon_endpoint),
                 server.timeSource()};
