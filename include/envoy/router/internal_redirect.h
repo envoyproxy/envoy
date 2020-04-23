@@ -30,7 +30,7 @@ public:
 using InternalRedirectPredicateSharedPtr = std::shared_ptr<InternalRedirectPredicate>;
 
 /**
- * Factory for InternalRedirectPredicte.
+ * Factory for InternalRedirectPredicate.
  */
 class InternalRedirectPredicateFactory : public Config::TypedFactory {
 public:

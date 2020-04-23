@@ -9,7 +9,7 @@ namespace Extensions {
 namespace InternalRedirect {
 
 /**
- * Well-known internal redirect predidate names.
+ * Well-known internal redirect predicate names.
  */
 class InternalRedirectPredicatesNameValues {
 public:
