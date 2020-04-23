@@ -649,7 +649,7 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   // Currently we only support TCP filter chain update.
   if (Network::Utility::protobufAddressSocketType(config_.address()) !=
           Network::Address::SocketType::Stream ||
-      etwork::Utility::protobufAddressSocketType(config.address()) !=
+      Network::Utility::protobufAddressSocketType(config.address()) !=
           Network::Address::SocketType::Stream) {
     return false;
   }
