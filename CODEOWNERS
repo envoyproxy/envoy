@@ -16,6 +16,8 @@
 extensions/filters/common/original_src @snowp @klarose
 # dubbo_proxy extension
 /*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan
+# rocketmq_proxy extension
+/*/extensions/filters/network/rocketmq_proxy @aaron-ai @lizhanhui @lizan
 # thrift_proxy extension
 /*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
 # compressor used by http compression filters
