@@ -21,17 +21,24 @@ public:
 
     auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
     handle.mutable_routes(0)->set_name("redirect");
-    handle.mutable_routes(0)->mutable_route()->set_internal_redirect_action(
-        envoy::config::route::v3::RouteAction::HANDLE_INTERNAL_REDIRECT);
+    handle.mutable_routes(0)
+        ->mutable_route()
+        ->mutable_internal_redirect_policy()
+        ->set_internal_redirect_action(
+            envoy::config::route::v3::InternalRedirectPolicy::HANDLE_INTERNAL_REDIRECT);
     config_helper_.addVirtualHost(handle);
 
     auto handle_max_3_hop =
         config_helper_.createVirtualHost("handle.internal.redirect.max.three.hop");
     handle_max_3_hop.mutable_routes(0)->set_name("max_three_hop");
-    handle_max_3_hop.mutable_routes(0)->mutable_route()->set_internal_redirect_action(
-        envoy::config::route::v3::RouteAction::HANDLE_INTERNAL_REDIRECT);
     handle_max_3_hop.mutable_routes(0)
         ->mutable_route()
+        ->mutable_internal_redirect_policy()
+        ->set_internal_redirect_action(
+            envoy::config::route::v3::InternalRedirectPolicy::HANDLE_INTERNAL_REDIRECT);
+    handle_max_3_hop.mutable_routes(0)
+        ->mutable_route()
+        ->mutable_internal_redirect_policy()
         ->mutable_max_internal_redirects()
         ->set_value(3);
     config_helper_.addVirtualHost(handle_max_3_hop);
