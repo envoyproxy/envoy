@@ -293,15 +293,15 @@ FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
 
 AbortHttpAndGrpcStatus FaultFilter::abortStatus(const Http::RequestHeaderMap& request_headers) {
   if (!isAbortEnabled(request_headers)) {
-    return AbortHttpAndGrpcStatus(absl::nullopt, absl::nullopt);
+    return AbortHttpAndGrpcStatus{absl::nullopt, absl::nullopt};
   }
 
   auto grpc_status = abortGrpcStatus(request_headers);
 
   // If gRPC status code is set, then HTTP will be set to Http::Code::OK (200).
   return grpc_status.has_value()
-             ? AbortHttpAndGrpcStatus(Http::Code::OK, grpc_status)
-             : AbortHttpAndGrpcStatus(abortHttpStatus(request_headers), absl::nullopt);
+             ? AbortHttpAndGrpcStatus{Http::Code::OK, grpc_status}
+             : AbortHttpAndGrpcStatus{abortHttpStatus(request_headers), absl::nullopt};
 }
 
 absl::optional<Http::Code>
