@@ -652,7 +652,7 @@ TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromPbText) {
 }
 
 // Validate that we correctly parse a V2 file when configured to do so.
-TEST_P(ServerInstanceImplTest, LoadsV2ConfigWhenV2SelectedFromPbText) {
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2ConfigWhenV2SelectedFromPbText)) {
   options_.bootstrap_version_ = 2;
 
   initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
