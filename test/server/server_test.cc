@@ -642,6 +642,48 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2BootstrapFromPbTex
   EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
 }
 
+// Validate that bootstrap v3 pb_text with new fields loads fails if V2 config is specified.
+TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromPbText) {
+  options_.bootstrap_version_ = 2;
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text"),
+      EnvoyException, "Unable to parse file");
+}
+
+// Validate that we correctly parse a V2 file when configured to do so.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2ConfigWhenV2SelectedFromPbText)) {
+  options_.bootstrap_version_ = 2;
+
+  initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
+  EXPECT_EQ(server_->localInfo().node().id(), "bootstrap_id");
+}
+
+// Validate that we correctly parse a V3 file when configured to do so.
+TEST_P(ServerInstanceImplTest, LoadsV3ConfigWhenV2SelectedFromPbText) {
+  options_.bootstrap_version_ = 3;
+
+  initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text");
+}
+
+// Validate that bootstrap v2 pb_text with deprecated fields loads fails if V3 config is specified.
+TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromPbText) {
+  options_.bootstrap_version_ = 3;
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
+      EnvoyException, "Unable to parse file");
+}
+
+// Validate that we blow up on invalid version number.
+TEST_P(ServerInstanceImplTest, InvalidBootstrapVersion) {
+  options_.bootstrap_version_ = 1;
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
+      EnvoyException, "Unknown bootstrap version 1.");
+}
+
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
   options_.config_proto_.mutable_node()->set_id("foo");
   initialize("test/server/test_data/server/node_bootstrap.yaml");
