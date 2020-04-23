@@ -72,7 +72,7 @@ public:
 
   // Creates a new test client, expecting a new connection to be created and associated
   // with the new client.
-  void expectClientCreate(absl::optional<uint32_t> buffer_limits = {}) {
+  void expectClientCreate(absl::optional<uint32_t> buffer_limits = {}, ) {
     test_clients_.emplace_back();
     TestCodecClient& test_client = test_clients_.back();
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
@@ -219,6 +219,22 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionIdle) {
 
   EXPECT_CALL(*this, onClientDestroy());
   pool_.drainConnections();
+}
+
+/**
+ * Verify that we set the ALPN fallback.
+ */
+TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
+  NiceMock<MockResponseDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate(Protocol::Http11, std::vector<std::string>{"http/2"});
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+  EXPECT_NE(nullptr, handle);
+
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  EXPECT_CALL(callbacks.pool_failure_, ready());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
 }
 
 /**

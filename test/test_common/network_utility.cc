@@ -174,7 +174,7 @@ bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
   return std::make_pair(Address::addressFromFd(io_handle->fd()), std::move(io_handle));
 }
 
-TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
+TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(nullptr); }
 
 TransportSocketFactoryPtr createRawBufferSocketFactory() {
   return std::make_unique<RawBufferSocketFactory>();

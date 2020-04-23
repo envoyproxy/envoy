@@ -77,7 +77,7 @@ public:
   MOCK_METHOD(CodecClient*, createCodecClient_, ());
   MOCK_METHOD(void, onClientDestroy, ());
 
-  void expectClientCreate(Protocol protocol = Protocol::Http11) {
+  void expectClientCreate(Protocol protocol = Protocol::Http11, absl::optional<std::vector<std::string>> alpn_fallback = {}) {
     test_clients_.emplace_back();
     TestCodecClient& test_client = test_clients_.back();
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
@@ -99,7 +99,14 @@ public:
         },
         Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
-        .WillOnce(Return(test_client.connection_));
+        .WillOnce(
+          Invoke([&test_client, alpn_fallback](auto, auto, auto&& transport_socket, const auto&) {
+            if (alpn_fallback) {
+              EXPECT_EQ(*alpn_fallback, transport_socket->options()->applicationProtocolListFallback());
+            }
+
+            return test_client.connection_;
+          }));
     EXPECT_CALL(*this, createCodecClient_()).WillOnce(Return(test_client.codec_client_));
     EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
     ON_CALL(*test_client.codec_, protocol()).WillByDefault(Return(protocol));
@@ -261,6 +268,22 @@ TEST_F(Http1ConnPoolImplTest, VerifyTimingStats) {
   r1.completeResponse(false);
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * Verify that we set the ALPN fallback.
+ */
+TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
+  NiceMock<MockResponseDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate(Protocol::Http11, std::vector<std::string>{"http/1.1"});
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+  EXPECT_NE(nullptr, handle);
+
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  EXPECT_CALL(callbacks.pool_failure_, ready());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }

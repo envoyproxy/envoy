@@ -91,6 +91,11 @@ public:
   virtual void flushWriteBuffer() PURE;
 };
 
+class TransportSocketOptions;
+
+// TODO(mattklein123): Rename to TransportSocketOptionsConstSharedPtr in a dedicated follow up.
+using TransportSocketOptionsSharedPtr = std::shared_ptr<const TransportSocketOptions>;
+
 /**
  * A transport socket that does actual read / write. It can also do some transformations on
  * the data (e.g. TLS).
@@ -153,6 +158,11 @@ public:
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr ssl() const PURE;
+
+  /**
+   * @return the const socket options used to create this TransportSocket, or nullptr if none was provided.
+   */
+  virtual TransportSocketOptionsSharedPtr options() const PURE;
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;
@@ -197,9 +207,6 @@ public:
    */
   virtual void hashKey(std::vector<uint8_t>& key) const PURE;
 };
-
-// TODO(mattklein123): Rename to TransportSocketOptionsConstSharedPtr in a dedicated follow up.
-using TransportSocketOptionsSharedPtr = std::shared_ptr<const TransportSocketOptions>;
 
 /**
  * A factory for creating transport socket. It will be associated to filter chains and clusters.
