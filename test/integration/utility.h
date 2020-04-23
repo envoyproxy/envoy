@@ -80,7 +80,7 @@ public:
   void clearShouldExit() { should_exit_ = false; }
 
   void close();
-  Network::ConnectionEvent last_connection_event() const {
+  Network::ConnectionEvent lastConnectionEvent() const {
     return callbacks_->last_connection_event_;
   }
 

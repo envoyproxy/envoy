@@ -983,7 +983,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
   // Issue a local close and check that the client did not pick up a remote close which can happen
   // when delayed close semantics are disabled.
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::LocalClose);
 }
 
 // Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
@@ -1020,7 +1020,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
   // Therefore, avoid checking response code/payload here and instead simply look for the remote
   // close.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
 }
 
 // Test that delay closed connections are eventually force closed when the timeout triggers.
@@ -1054,7 +1054,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   response->waitForEndStream();
   // The delayed close timeout should trigger since client is not closing the connection.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(2000)));
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
 }
