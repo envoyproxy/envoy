@@ -618,13 +618,17 @@ protected:
                                        Stats::Gauge::ImportMode::Accumulate));
   }
 
-  void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {
-    histograms_.push_back(histogram);
-  }
-
   using MockHistogramSharedPtr = Stats::RefcountPtr<NiceMock<Stats::MockParentHistogram>>;
-  MockHistogramSharedPtr makeHistogram() {
-    return MockHistogramSharedPtr(new NiceMock<Stats::MockParentHistogram>());
+  void addHistogram(MockHistogramSharedPtr histogram) { histograms_.push_back(histogram); }
+
+  MockHistogramSharedPtr makeHistogram(const std::string& name,
+                                       Stats::StatNameTagVector cluster_tags) {
+    auto histogram = MockHistogramSharedPtr(new NiceMock<Stats::MockParentHistogram>());
+    histogram->name_ = baseName(name, cluster_tags);
+    histogram->setTagExtractedName(name);
+    histogram->setTags(cluster_tags);
+    histogram->used_ = true;
+    return histogram;
   }
 
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
@@ -635,9 +639,8 @@ protected:
   std::string baseName(const std::string& name, Stats::StatNameTagVector cluster_tags) {
     std::string result = name;
     for (const auto& name_tag : cluster_tags) {
-      // It's difficult to get a raw string out of a StatName, so just use the hash value. It just
-      // needs to be unique; this string is never output or compared in the test.
-      result.append(fmt::format("<{}:{}>", name_tag.first.hash(), name_tag.second.hash()));
+      result.append(fmt::format("<{}:{}>", symbol_table_->toString(name_tag.first),
+                                symbol_table_->toString(name_tag.second)));
     }
     return result;
   }
@@ -737,9 +740,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
   h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram = makeHistogram();
-  histogram->name_ = "histogram1";
-  histogram->used_ = true;
+  auto histogram = makeHistogram("histogram1", {});
   ON_CALL(*histogram, cumulativeStatistics())
       .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
 
@@ -791,9 +792,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
 
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram = makeHistogram();
-  histogram->name_ = "histogram1";
-  histogram->used_ = true;
+  auto histogram = makeHistogram("histogram1", {});
   ON_CALL(*histogram, cumulativeStatistics())
       .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
 
@@ -848,11 +847,10 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = makeHistogram();
-  histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  auto histogram1 =
+      makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("key1"), makeStat("value1")},
+                                                        {makeStat("key2"), makeStat("value2")}});
   histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-  histogram1->used_ = true;
-  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
   EXPECT_CALL(*histogram1, cumulativeStatistics())
       .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
@@ -924,11 +922,8 @@ TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
     addGauge("cluster.upstream_rq_active", tags);
 
     for (const char* hist_name : {"cluster.upstream_rq_time", "cluster.upstream_response_time"}) {
-      auto histogram1 = makeHistogram();
-      histogram1->name_ = hist_name;
+      auto histogram1 = makeHistogram(hist_name, tags);
       histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-      histogram1->used_ = true;
-      histogram1->setTags({Stats::Tag{"cluster", cluster}});
       addHistogram(histogram1);
       EXPECT_CALL(*histogram1, cumulativeStatistics())
           .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
@@ -1116,11 +1111,10 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = makeHistogram();
-  histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  auto histogram1 =
+      makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("key1"), makeStat("value1")},
+                                                        {makeStat("key2"), makeStat("value2")}});
   histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-  histogram1->used_ = true;
-  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
   EXPECT_CALL(*histogram1, cumulativeStatistics())
       .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
@@ -1165,11 +1159,11 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = makeHistogram();
-  histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  auto histogram1 =
+      makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("key1"), makeStat("value1")},
+                                                        {makeStat("key2"), makeStat("value2")}});
   histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->used_ = false;
-  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
 
   {
@@ -1209,10 +1203,10 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = makeHistogram();
-  histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  auto histogram1 =
+      makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("key1"), makeStat("value1")},
+                                                        {makeStat("key2"), makeStat("value2")}});
   histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
 
   Buffer::OwnedImpl response;

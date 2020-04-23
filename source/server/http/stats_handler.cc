@@ -191,59 +191,93 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
     const bool used_only, const absl::optional<std::regex>& regex) {
 
-  // From
-  // https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#grouping-and-sorting:
-  //
-  // All lines for a given metric must be provided as one single group, with the optional HELP and
-  // TYPE lines first (in no particular order). Beyond that, reproducible sorting in repeated
-  // expositions is preferred but not required, i.e. do not sort if the computational cost is
-  // prohibitive.
+  /*
+   * From
+   * https:*github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#grouping-and-sorting:
+   *
+   * All lines for a given metric must be provided as one single group, with the optional HELP and
+   * TYPE lines first (in no particular order). Beyond that, reproducible sorting in repeated
+   * expositions is preferred but not required, i.e. do not sort if the computational cost is
+   * prohibitive.
+   */
 
-  // Processes a metric type (counter, gauge, histogram) by generating all output lines, sorting
-  // them by metric name, and then outputting them in the correct sorted order into response.
-  auto process_type = [&](const auto& metrics, const auto& generate_name_and_output,
+  /**
+   * Processes a metric type (counter, gauge, histogram) by generating all output lines, sorting
+   * them by tag-extracted metric name, and then outputting them in the correct sorted order into
+   * response.
+   *
+   * @param metrics A vector of pointers to a metric type.
+   * @param generate_output A std::function<std::string(const MetricType& metric, const std::string&
+   *        prefixedTagExtractedName)> which returns the output text for this metric.
+   */
+  auto process_type = [&](const auto& metrics, const auto& generate_output,
                           absl::string_view type) -> uint64_t {
+    using MetricType = typename std::remove_reference<decltype(metrics)>::type::value_type;
+
+    struct MetricLessThan {
+      bool operator()(const MetricType& a, const MetricType& b) const {
+        ASSERT(&a->constSymbolTable() == &b->constSymbolTable());
+        return a->constSymbolTable().lessThan(a->statName(), b->statName());
+      }
+    };
+
     // This is a sorted collection to satisfy the "preferred" ordering from the prometheus
     // spec: metrics will be sorted by their tags' textual representation, which will be consistent
     // across calls.
-    std::map<std::string, std::set<std::string>> groups;
+    using MetricTypeSortedCollection = std::set<MetricType, MetricLessThan>;
+
+    // Return early to avoid crashing when getting the symbol table from the first metric.
+    if (metrics.empty()) {
+      return 0;
+    }
+
+    // There should only be one symbol table for all of the stats in the admin
+    // interface. If this assumption changes, the name comparisons in this function
+    // will have to change to compare to convert all StatNames to strings before
+    // comparison.
+    const Stats::SymbolTable& global_symbol_table = metrics.front()->constSymbolTable();
+
+    // Sorted collection of metrics sorted by their tagExtractedName, to satisfy the requirements
+    // of the exposition format.
+    std::map<Stats::StatName, MetricTypeSortedCollection, Stats::StatNameLessThan> groups(
+        global_symbol_table);
+
     for (const auto& metric : metrics) {
+      ASSERT(&global_symbol_table == &metric->constSymbolTable());
+
       if (!shouldShowMetric(*metric, used_only, regex)) {
         continue;
       }
 
-      const auto name_output_pair = generate_name_and_output(*metric);
-      groups[name_output_pair.first].emplace(std::move(name_output_pair.second));
+      groups[metric->tagExtractedStatName()].emplace(metric);
     }
 
     for (const auto& group : groups) {
-      response.add(fmt::format("# TYPE {0} {1}\n", group.first, type));
-      for (const auto& output : group.second) {
-        response.add(output);
+      const std::string metric_name = metricName(global_symbol_table.toString(group.first));
+      response.add(fmt::format("# TYPE {0} {1}\n", metric_name, type));
+
+      for (const auto& metric : group.second) {
+        response.add(generate_output(*metric, metric_name));
       }
       response.add("\n");
     }
     return groups.size();
   };
 
-  // Returns a pair of metric_name and prometheus output line for a counter or a gauge.
-  auto generate_counter_and_gauge_output =
-      [](const auto& metric) -> std::pair<std::string, std::string> {
+  // Returns the prometheus output line for a counter or a gauge.
+  auto generate_counter_and_gauge_output = [](const auto& metric,
+                                              const std::string& metric_name) -> std::string {
     const std::string tags = formattedTags(metric.tags());
-    const std::string metric_name = metricName(metric.tagExtractedName());
-    return std::make_pair(metric_name,
-                          fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, metric.value()));
+    return fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, metric.value());
   };
 
-  // Returns a pair of metric_name and prometheus output for a histogram. The output is
-  // a multi-line string (with embedded newlines) that contains all the individual bucket counts
-  // and sum/count for a single histogram (metric_name plus all tags).
-  auto generate_histogram_output =
-      [](const Stats::ParentHistogram& histogram) -> std::pair<std::string, std::string> {
+  // Returns the prometheus output for a histogram. The output is a multi-line string (with embedded
+  // newlines) that contains all the individual bucket counts and sum/count for a single histogram
+  // (metric_name plus all tags).
+  auto generate_histogram_output = [](const Stats::ParentHistogram& histogram,
+                                      const std::string& metric_name) -> std::string {
     const std::string tags = formattedTags(histogram.tags());
     const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
-
-    const std::string metric_name = metricName(histogram.tagExtractedName());
 
     const Stats::HistogramStatistics& stats = histogram.cumulativeStatistics();
     const std::vector<double>& supported_buckets = stats.supportedBuckets();
@@ -266,7 +300,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     output.append(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", metric_name, tags, stats.sampleSum()));
     output.append(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
 
-    return std::make_pair(metric_name, output);
+    return output;
   };
 
   uint64_t metric_name_count = 0;
@@ -275,7 +309,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   metric_name_count += process_type(histograms, generate_histogram_output, "histogram");
 
   return metric_name_count;
-}
+} // namespace Server
 
 std::string
 StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
