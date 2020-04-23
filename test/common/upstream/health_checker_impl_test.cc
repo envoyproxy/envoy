@@ -2527,9 +2527,9 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
 
   cluster_->info_->transport_socket_matcher_.reset(transport_socket_match.release());
 
-  health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                      dispatcher_, runtime_, random_,
-                                                      HealthCheckEventLoggerPtr(event_logger_)));
+  health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      HealthCheckEventLoggerPtr(event_logger_));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -2569,9 +2569,9 @@ TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
 
   cluster_->info_->transport_socket_matcher_.reset(transport_socket_match.release());
 
-  health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                      dispatcher_, runtime_, random_,
-                                                      HealthCheckEventLoggerPtr(event_logger_)));
+  health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      HealthCheckEventLoggerPtr(event_logger_));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
