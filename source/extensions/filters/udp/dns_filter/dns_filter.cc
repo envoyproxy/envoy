@@ -93,7 +93,6 @@ void DnsFilter::sendDnsResponse(DnsQueryContextPtr query_context) {
 
 void DnsFilter::onReceiveError(Api::IoError::IoErrorCode error_code) {
   UNREFERENCED_PARAMETER(error_code);
-  // config_->stats().downstream_sess_rx_errors_.inc();
 }
 
 } // namespace DnsFilter
