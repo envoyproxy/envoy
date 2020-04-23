@@ -97,6 +97,8 @@ versioning guidelines:
   colon. Examples:
   * "docs: fix grammar error"
   * "http conn man: add new feature"
+* Your PR commit message will be used as the commit message when your PR is merged. You should 
+  update this field if your PR diverges during review.
 * Your PR description should have details on what the PR does. If it fixes an existing issue it
   should end with "Fixes #XXX".
 * When all of the tests are passing and all other conditions described herein are satisfied, a
@@ -190,10 +192,12 @@ and false.
   organization specific shortcuts into the code.
 * If there is a question on who should review a PR please discuss in Slack.
 * Anyone is welcome to review any PR that they want, whether they are a maintainer or not.
+* Please make sure that the PR title, commit message, and description are updated if the PR changes 
+  significantly during review.
 * Please **clean up the title and body** before merging. By default, GitHub fills the squash merge
   title with the original title, and the commit body with every individual commit from the PR.
   The maintainer doing the merge should make sure the title follows the guidelines above and should
-  overwrite the body with the original extended description from the PR (cleaning it up if necessary)
+  overwrite the body with the original commit message from the PR (cleaning it up if necessary)
   while preserving the PR author's final DCO sign-off.
 * If a PR includes a deprecation/breaking change, notification should be sent to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.

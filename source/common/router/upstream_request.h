@@ -52,7 +52,7 @@ class GenericConnectionPoolCallbacks {
 public:
   virtual ~GenericConnectionPoolCallbacks() = default;
 
-  virtual void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+  virtual void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                              absl::string_view transport_failure_reason,
                              Upstream::HostDescriptionConstSharedPtr host) PURE;
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
@@ -97,7 +97,7 @@ public:
   void enableDataFromDownstreamForFlowControl();
 
   // GenericConnPool
-  void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
@@ -159,6 +159,8 @@ private:
   Http::ResponseTrailerMapPtr upstream_trailers_;
   Http::MetadataMapVector downstream_metadata_map_vector_;
 
+  // Tracks the number of times the flow of data from downstream has been disabled.
+  uint32_t downstream_data_disabled_{};
   bool calling_encode_headers_ : 1;
   bool upstream_canary_ : 1;
   bool decode_complete_ : 1;
@@ -186,7 +188,7 @@ public:
   absl::optional<Http::Protocol> protocol() const override;
 
   // Http::ConnectionPool::Callbacks
-  void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Http::RequestEncoder& callbacks_encoder,

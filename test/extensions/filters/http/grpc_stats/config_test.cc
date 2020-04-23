@@ -436,6 +436,33 @@ TEST_F(GrpcStatsFilterConfigTest, UpstreamStats) {
   doRequestResponse(request_headers);
 }
 
+TEST_F(GrpcStatsFilterConfigTest, UpstreamStatsWithTrailersOnly) {
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  config_.set_emit_filter_state(true);
+  config_.set_enable_upstream_stats(true);
+  initialize();
+
+  ON_CALL(stream_info_, lastUpstreamRxByteReceived())
+      .WillByDefault(testing::Return(
+          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(30000000))));
+  ON_CALL(stream_info_, lastUpstreamTxByteSent())
+      .WillByDefault(testing::Return(
+          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(20000000))));
+
+  EXPECT_CALL(stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name,
+                           "grpc.lyft.users.BadCompanions.GetBadCompanions.upstream_rq_time"),
+                  10ul));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc+proto"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+}
+
 } // namespace
 } // namespace GrpcStats
 } // namespace HttpFilters

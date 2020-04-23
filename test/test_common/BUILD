@@ -88,6 +88,12 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "resources_lib",
+    hdrs = ["resources.h"],
+    deps = ["//source/common/singleton:const_singleton"],
+)
+
+envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -96,6 +102,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":file_system_for_test_lib",
+        ":resources_lib",
         ":test_time_lib",
         ":thread_factory_for_test_lib",
         "//include/envoy/buffer:buffer_interface",
@@ -105,7 +112,6 @@ envoy_cc_test_library(
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
-        "//source/common/config:resources_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
