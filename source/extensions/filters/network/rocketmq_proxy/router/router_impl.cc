@@ -26,6 +26,10 @@ RouterImpl::~RouterImpl() {
 
 Upstream::HostDescriptionConstSharedPtr RouterImpl::upstreamHost() { return upstream_host_; }
 
+void RouterImpl::onAboveWriteBufferOverflowWatermark() {
+  ENVOY_LOG(trace, "Above write buffer overflow watermark");
+}
+
 void RouterImpl::onAboveWriteBufferHighWatermark() {
   ENVOY_LOG(trace, "Above write buffer high watermark");
 }
