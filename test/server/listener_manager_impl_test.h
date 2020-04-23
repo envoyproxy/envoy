@@ -134,8 +134,12 @@ protected:
     return raw_listener;
   }
 
-  ListenerHandle* expectListenerOverridden(bool need_init) {
+  ListenerHandle* expectListenerOverridden(bool need_init, ListenerHandle* origin = nullptr) {
     auto raw_listener = new ListenerHandle(false);
+    // Simulate ListenerImpl: drain manager is copied from origin.
+    if (origin != nullptr) {
+      raw_listener->drain_manager_ = origin->drain_manager_;
+    }
     // Overridden listener is always added by api.
     EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
     EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
@@ -262,10 +266,10 @@ protected:
   }
 
   ABSL_MUST_USE_RESULT
-  auto enableInplaceUpdateForThisTest() {
+  auto disableInplaceUpdateForThisTest() {
     auto scoped_runtime = std::make_unique<TestScopedRuntime>();
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.listener_in_place_filterchain_update", "true"}});
+        {{"envoy.reloadable_features.listener_in_place_filterchain_update", "false"}});
     return scoped_runtime;
   }
 

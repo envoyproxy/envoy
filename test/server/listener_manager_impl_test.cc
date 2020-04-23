@@ -797,11 +797,103 @@ static_listeners:
   }
 }
 
+TEST_F(ListenerManagerImplTest, RuntimeDisabledInPlaceUpdateFallbacksToTraditionalUpdate) {
+  InSequence s;
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
+
+  // Add foo listener again.
+  const std::string listener_foo_update1_yaml = R"EOF(
+  name: foo
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+  filter_chains:
+  - filters: []
+    filter_chain_match:
+      destination_port: 1234
+    )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerOverridden(false, listener_foo);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  auto* timer = new Event::MockTimer(dynamic_cast<Event::MockDispatcher*>(&server_.dispatcher()));
+  EXPECT_CALL(*timer, enableTimer(_, _));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  worker_->callAddCompletion(true);
+
+  EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
+  timer->invokeCallback();
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callDrainFilterChainsComplete();
+
+  // Update foo again. This time we disable in place filter chain update.
+  auto in_place_update_disabled_guard = disableInplaceUpdateForThisTest();
+  const std::string listener_foo_update2_yaml = R"EOF(
+  name: foo
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+  filter_chains:
+  - filters:
+    filter_chain_match:
+      destination_port: 2345
+    )EOF";
+
+  ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update2_yaml), "", true));
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo_update1->drain_manager_->drain_sequence_completion_();
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  worker_->callRemovalCompletion();
+
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
+  EXPECT_CALL(*listener_foo_update2->drain_manager_, startDrainSequence(_));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo_update2->drain_manager_->drain_sequence_completion_();
+
+  EXPECT_CALL(*listener_foo_update2, onDestroy());
+  worker_->callRemovalCompletion();
+  EXPECT_EQ(0UL, manager_->listeners().size());
+}
+
 TEST_F(ListenerManagerImplTest, OverrideListener) {
-  auto feature_guard = enableInplaceUpdateForThisTest();
+  InSequence s;
 
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
-
   auto* lds_api = new MockLdsApi();
   EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
   envoy::config::core::v3::ConfigSource lds_config;
@@ -4034,8 +4126,6 @@ api_listener:
 }
 
 TEST_F(ListenerManagerImplTest, StopInplaceWarmingListener) {
-  auto feature_guard = enableInplaceUpdateForThisTest();
-
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -4094,8 +4184,6 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplTest, RemoveInplaceUpdatingListener) {
-  auto feature_guard = enableInplaceUpdateForThisTest();
-
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -4161,7 +4249,6 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplTest, UpdateInplaceWarmingListener) {
-  auto feature_guard = enableInplaceUpdateForThisTest();
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -4221,8 +4308,6 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplTest, DrainageDuringInplaceUpdate) {
-  auto feature_guard = enableInplaceUpdateForThisTest();
-
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));

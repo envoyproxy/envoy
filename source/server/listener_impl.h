@@ -238,9 +238,11 @@ public:
                uint32_t concurrency);
   ~ListenerImpl() override;
 
+  // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
+  // update.
   /**
    * Execute in place filter chain update. The filter chain update is less expensive than full
-   * listener update.
+   * listener update because connections may not need to drained.
    */
   std::unique_ptr<ListenerImpl>
   newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,

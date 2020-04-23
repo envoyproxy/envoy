@@ -630,6 +630,11 @@ void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr&
 
 bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
                                             bool worker_started) {
+  // If a listener is in active list but stopped, the in place update will fail. The only known case
+  // is that listener is stopped by admin interface. It is ok if that admin method is called only
+  // prior to stop envoy. Otherwise we need to track the stopping state and execute full listener
+  // update.
+
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.listener_in_place_filterchain_update")) {
     return false;
@@ -642,8 +647,10 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   }
 
   // Currently we only support TCP filter chain update.
-  if (Network::Utility::protobufAddressSocketType(config.address()) !=
-      Network::Address::SocketType::Stream) {
+  if (Network::Utility::protobufAddressSocketType(config_.address()) !=
+          Network::Address::SocketType::Stream ||
+      etwork::Utility::protobufAddressSocketType(config.address()) !=
+          Network::Address::SocketType::Stream) {
     return false;
   }
 
