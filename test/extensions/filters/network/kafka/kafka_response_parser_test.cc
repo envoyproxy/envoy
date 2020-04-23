@@ -2,7 +2,6 @@
 
 #include "test/extensions/filters/network/kafka/buffer_based_test.h"
 #include "test/extensions/filters/network/kafka/serialization_utilities.h"
-#include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
 

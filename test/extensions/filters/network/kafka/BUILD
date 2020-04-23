@@ -100,7 +100,6 @@ envoy_extension_cc_test(
         ":buffer_based_test_lib",
         ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:kafka_request_parser_lib",
-        "//test/mocks/server:server_mocks",
     ],
 )
 
@@ -111,7 +110,6 @@ envoy_extension_cc_test(
     deps = [
         ":buffer_based_test_lib",
         "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
-        "//test/mocks/server:server_mocks",
     ],
 )
 
@@ -123,7 +121,6 @@ envoy_extension_cc_test(
         ":buffer_based_test_lib",
         ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
-        "//test/mocks/server:server_mocks",
     ],
 )
 
@@ -135,7 +132,6 @@ envoy_extension_cc_test(
         ":buffer_based_test_lib",
         ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
-        "//test/mocks/server:server_mocks",
     ],
 )
 
@@ -146,7 +142,6 @@ envoy_extension_cc_test(
     deps = [
         ":buffer_based_test_lib",
         "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
-        "//test/mocks/server:server_mocks",
     ],
 )
 
@@ -180,7 +175,6 @@ envoy_extension_cc_test(
         ":buffer_based_test_lib",
         ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:kafka_response_parser_lib",
-        "//test/mocks/server:server_mocks",
     ],
 )
 
@@ -191,7 +185,6 @@ envoy_extension_cc_test(
     deps = [
         ":buffer_based_test_lib",
         "//source/extensions/filters/network/kafka:kafka_response_codec_lib",
-        "//test/mocks/server:server_mocks",
     ],
 )
 
@@ -203,7 +196,6 @@ envoy_extension_cc_test(
         ":buffer_based_test_lib",
         ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:kafka_response_codec_lib",
-        "//test/mocks/server:server_mocks",
     ],
 )
 
@@ -215,7 +207,6 @@ envoy_extension_cc_test(
         ":buffer_based_test_lib",
         ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:kafka_response_codec_lib",
-        "//test/mocks/server:server_mocks",
     ],
 )
 
@@ -226,7 +217,6 @@ envoy_extension_cc_test(
     deps = [
         ":buffer_based_test_lib",
         "//source/extensions/filters/network/kafka:kafka_response_codec_lib",
-        "//test/mocks/server:server_mocks",
     ],
 )
 
