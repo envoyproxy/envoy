@@ -9,14 +9,14 @@ namespace Envoy {
 namespace Router {
 
 /**
- * Used to decide if a internal redirect is allowed to be followed based on the target route.
+ * Used to decide if an internal redirect is allowed to be followed based on the target route.
  */
 class InternalRedirectPredicate {
 public:
   virtual ~InternalRedirectPredicate() = default;
 
   /**
-   * A FilterState is provided so that predicate implementation canuse it to preserve state across
+   * A FilterState is provided so that predicate implementation can use it to preserve state across
    * internal redirects.
    *
    * @return whether the route specified by target_route_name is allowed to be followed. Any
