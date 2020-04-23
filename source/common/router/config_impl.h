@@ -53,6 +53,9 @@ public:
   virtual RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
                                       const StreamInfo::StreamInfo& stream_info,
                                       uint64_t random_value) const PURE;
+
+  // By default, matchers do not support null Path headers.
+  virtual bool supportsPathlessHeaders() const { return false; }
 };
 
 class PerFilterConfigs {
@@ -465,6 +468,7 @@ public:
   bool includeAttemptCountInResponse() const override {
     return vhost_.includeAttemptCountInResponse();
   }
+  const absl::optional<ConnectConfig>& connectConfig() const override { return connect_config_; }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
   InternalRedirectAction internalRedirectAction() const override {
     return internal_redirect_action_;
@@ -494,6 +498,7 @@ protected:
   std::string regex_rewrite_substitution_;
   const std::string host_rewrite_;
   bool include_vh_rate_limits_;
+  absl::optional<ConnectConfig> connect_config_;
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
 
@@ -590,6 +595,9 @@ private:
     }
     bool includeAttemptCountInResponse() const override {
       return parent_->includeAttemptCountInResponse();
+    }
+    const absl::optional<ConnectConfig>& connectConfig() const override {
+      return parent_->connectConfig();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
     InternalRedirectAction internalRedirectAction() const override {
@@ -824,6 +832,29 @@ private:
   std::string regex_str_;
 };
 
+/**
+ * Route entry implementation for CONNECT requests.
+ */
+class ConnectRouteEntryImpl : public RouteEntryImplBase {
+public:
+  ConnectRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+                        Server::Configuration::ServerFactoryContext& factory_context,
+                        ProtobufMessage::ValidationVisitor& validator);
+
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return EMPTY_STRING; }
+  PathMatchType matchType() const override { return PathMatchType::None; }
+
+  // Router::Matchable
+  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
+
+  // Router::DirectResponseEntry
+  void rewritePathHeader(Http::RequestHeaderMap&, bool) const override;
+
+  bool supportsPathlessHeaders() const override { return true; }
+};
 /**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.
  * This is split out mainly to help with unit testing.

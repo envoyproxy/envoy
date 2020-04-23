@@ -1,7 +1,7 @@
-#include <sys/socket.h>
-
 #include <cstddef>
 #include <memory>
+
+#include "envoy/common/platform.h"
 
 #include "common/network/address_impl.h"
 

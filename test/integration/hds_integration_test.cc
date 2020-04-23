@@ -7,7 +7,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/config/metadata.h"
-#include "common/config/resources.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/health_checker_impl.h"
@@ -17,6 +16,7 @@
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"

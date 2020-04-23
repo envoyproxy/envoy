@@ -233,6 +233,9 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
   static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
   const std::regex command_w_args_regex(R"EOF(%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
+  static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
+  static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
+
   for (size_t pos = 0; pos < format.length(); ++pos) {
     if (format[pos] == '%') {
       if (!current_token.empty()) {
@@ -292,12 +295,21 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
         std::vector<std::string> path;
         const size_t start = FILTER_STATE_TOKEN.size();
 
-        parseCommand(token, start, "", key, path, max_length);
+        parseCommand(token, start, ":", key, path, max_length);
         if (key.empty()) {
           throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
         }
 
-        formatters.push_back(std::make_unique<FilterStateFormatter>(key, max_length));
+        const absl::string_view serialize_type =
+            !path.empty() ? path[path.size() - 1] : TYPED_SERIALIZATION;
+
+        if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
+          throw EnvoyException("Invalid filter state serialize type, only support PLAIN/TYPED.");
+        }
+        const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
+
+        formatters.push_back(
+            std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string));
       } else if (absl::StartsWith(token, "START_TIME")) {
         const size_t parameters_length = pos + StartTimeParamStart + 1;
         const size_t parameters_end = command_end_position - parameters_length;
@@ -966,25 +978,38 @@ DynamicMetadataFormatter::formatValue(const Http::RequestHeaderMap&, const Http:
 }
 
 FilterStateFormatter::FilterStateFormatter(const std::string& key,
-                                           absl::optional<size_t> max_length)
-    : key_(key), max_length_(max_length) {}
+                                           absl::optional<size_t> max_length,
+                                           bool serialize_as_string)
+    : key_(key), max_length_(max_length), serialize_as_string_(serialize_as_string) {}
 
-ProtobufTypes::MessagePtr
+const Envoy::StreamInfo::FilterState::Object*
 FilterStateFormatter::filterState(const StreamInfo::StreamInfo& stream_info) const {
   const StreamInfo::FilterState& filter_state = stream_info.filterState();
   if (!filter_state.hasDataWithName(key_)) {
     return nullptr;
   }
-
-  const auto& object = filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(key_);
-  return object.serializeAsProto();
+  return &filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(key_);
 }
 
 std::string FilterStateFormatter::format(const Http::RequestHeaderMap&,
                                          const Http::ResponseHeaderMap&,
                                          const Http::ResponseTrailerMap&,
                                          const StreamInfo::StreamInfo& stream_info) const {
-  ProtobufTypes::MessagePtr proto = filterState(stream_info);
+  const Envoy::StreamInfo::FilterState::Object* state = filterState(stream_info);
+  if (!state) {
+    return UnspecifiedValueString;
+  }
+
+  if (serialize_as_string_) {
+    absl::optional<std::string> plain_value = state->serializeAsString();
+    if (plain_value.has_value()) {
+      truncate(plain_value.value(), max_length_);
+      return plain_value.value();
+    }
+    return UnspecifiedValueString;
+  }
+
+  ProtobufTypes::MessagePtr proto = state->serializeAsProto();
   if (proto == nullptr) {
     return UnspecifiedValueString;
   }
@@ -1005,8 +1030,22 @@ ProtobufWkt::Value
 FilterStateFormatter::formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                   const Http::ResponseTrailerMap&,
                                   const StreamInfo::StreamInfo& stream_info) const {
-  ProtobufTypes::MessagePtr proto = filterState(stream_info);
-  if (proto == nullptr) {
+  const Envoy::StreamInfo::FilterState::Object* state = filterState(stream_info);
+  if (!state) {
+    return unspecifiedValue();
+  }
+
+  if (serialize_as_string_) {
+    absl::optional<std::string> plain_value = state->serializeAsString();
+    if (plain_value.has_value()) {
+      truncate(plain_value.value(), max_length_);
+      return ValueUtil::stringValue(plain_value.value());
+    }
+    return unspecifiedValue();
+  }
+
+  ProtobufTypes::MessagePtr proto = state->serializeAsProto();
+  if (!proto) {
     return unspecifiedValue();
   }
 

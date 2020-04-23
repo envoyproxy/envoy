@@ -274,14 +274,6 @@ for the next health check interval. The host can become healthy again via standa
 checks. See the :ref:`health checking overview <arch_overview_health_checking>` for more
 information.
 
-.. _config_http_filters_router_x-envoy-overloaded_consumed:
-
-x-envoy-overloaded
-^^^^^^^^^^^^^^^^^^
-
-If this header is set by upstream, Envoy will not retry. Currently the value of the header is not
-looked at, only its presence.
-
 .. _config_http_filters_router_x-envoy-ratelimited:
 
 x-envoy-ratelimited
@@ -388,7 +380,6 @@ owning HTTP connection manager.
   rq_direct_response, Counter, Total requests that resulted in a direct response
   rq_total, Counter, Total routed requests
   rq_reset_after_downstream_response_started, Counter, Total requests that were reset after downstream response had started
-  rq_retry_skipped_request_not_complete, Counter, Total retries that were skipped as the request is not yet complete
 
 .. _config_http_filters_router_vcluster_stats:
 
