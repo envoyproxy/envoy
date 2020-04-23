@@ -133,10 +133,9 @@ public:
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
-  CreateConnectionData
-  createHealthCheckConnection(Event::Dispatcher& dispatcher,
-                              Network::TransportSocketOptionsSharedPtr,
-                              MetadataConstSharedPtr) const override {
+  CreateConnectionData createHealthCheckConnection(Event::Dispatcher& dispatcher,
+                                                   Network::TransportSocketOptionsSharedPtr,
+                                                   MetadataConstSharedPtr) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, nullptr);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }

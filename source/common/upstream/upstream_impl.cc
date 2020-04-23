@@ -241,7 +241,7 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
 
 HostDescriptionImpl::HostDescriptionImpl(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-    Network::Address::InstanceConstSharedPtr dest_address, const MetadataConstSharedPtr& metadata,
+    Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
     const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority)
@@ -310,9 +310,8 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
     MetadataConstSharedPtr metadata) const {
 
   Network::TransportSocketFactory& factory =
-      (metadata)
-          ? resolveTransportSocketFactory(healthCheckAddress(), metadata.get())
-          : socket_factory_;
+      (metadata) ? resolveTransportSocketFactory(healthCheckAddress(), metadata.get())
+                 : socket_factory_;
   return {createConnection(dispatcher, *cluster_, healthCheckAddress(), factory, nullptr,
                            transport_socket_options),
           shared_from_this()};

@@ -73,7 +73,7 @@ class HostDescriptionImpl : virtual public HostDescription,
 public:
   HostDescriptionImpl(
       ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-      Network::Address::InstanceConstSharedPtr dest_address, const MetadataConstSharedPtr& metadata,
+      Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
       const envoy::config::core::v3::Locality& locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority);
