@@ -55,9 +55,9 @@ FaultAbortConfig::FaultAbortConfig(
   }
 }
 
-absl::optional<Http::Code>
-FaultAbortConfig::HeaderAbortProvider::httpStatusCode(const Http::RequestHeaderMap* request_headers) const {
-  if(request_headers == nullptr) {
+absl::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::httpStatusCode(
+    const Http::RequestHeaderMap* request_headers) const {
+  if (request_headers == nullptr) {
     return absl::nullopt;
   }
 
@@ -79,9 +79,9 @@ FaultAbortConfig::HeaderAbortProvider::httpStatusCode(const Http::RequestHeaderM
   return ret;
 }
 
-absl::optional<Grpc::Status::GrpcStatus>
-FaultAbortConfig::HeaderAbortProvider::grpcStatusCode(const Http::RequestHeaderMap* request_headers) const {
-  if(request_headers == nullptr) {
+absl::optional<Grpc::Status::GrpcStatus> FaultAbortConfig::HeaderAbortProvider::grpcStatusCode(
+    const Http::RequestHeaderMap* request_headers) const {
+  if (request_headers == nullptr) {
     return absl::nullopt;
   }
 
@@ -96,6 +96,18 @@ FaultAbortConfig::HeaderAbortProvider::grpcStatusCode(const Http::RequestHeaderM
   }
 
   return static_cast<Grpc::Status::GrpcStatus>(code);
+}
+
+envoy::type::v3::FractionalPercent FaultAbortConfig::HeaderAbortProvider::percentage(
+    const Http::RequestHeaderMap* request_headers) const {
+  // if the abort fault is for grpc status, then use grpc fault request percentage.
+  if (request_headers != nullptr &&
+      request_headers->get(Filters::Common::Fault::HeaderNames::get().AbortGrpcRequest) !=
+          nullptr) {
+    return grpcHeaderPercentageProvider_.percentage(request_headers);
+  }
+
+  return httpHeaderPercentageProvider_.percentage(request_headers);
 }
 
 FaultDelayConfig::FaultDelayConfig(

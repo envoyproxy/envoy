@@ -21,9 +21,11 @@ public:
   const char* prefix() { return ThreadSafeSingleton<Http::PrefixValue>::get().prefix(); }
 
   const Http::LowerCaseString AbortRequest{absl::StrCat(prefix(), "-fault-abort-request")};
-  const Http::LowerCaseString AbortGrpcRequest{absl::StrCat(prefix(), "-fault-abort-grpc-request")};
   const Http::LowerCaseString AbortRequestPercentage{
       absl::StrCat(prefix(), "-fault-abort-request-percentage")};
+  const Http::LowerCaseString AbortGrpcRequest{absl::StrCat(prefix(), "-fault-abort-grpc-request")};
+  const Http::LowerCaseString AbortGrpcRequestPercentage{
+      absl::StrCat(prefix(), "-fault-abort-grpc-request-percentage")};
   const Http::LowerCaseString DelayRequest{absl::StrCat(prefix(), "-fault-delay-request")};
   const Http::LowerCaseString DelayRequestPercentage{
       absl::StrCat(prefix(), "-fault-delay-request-percentage")};
@@ -58,7 +60,8 @@ public:
   absl::optional<Http::Code> httpStatusCode(const Http::RequestHeaderMap* request_headers) const {
     return provider_->httpStatusCode(request_headers);
   }
-  absl::optional<Grpc::Status::GrpcStatus> grpcStatusCode(const Http::RequestHeaderMap* request_headers) const {
+  absl::optional<Grpc::Status::GrpcStatus>
+  grpcStatusCode(const Http::RequestHeaderMap* request_headers) const {
     return provider_->grpcStatusCode(request_headers);
   }
 
@@ -75,7 +78,8 @@ private:
 
     // Return the HTTP status code to use. Optionally passed HTTP headers that may contain the
     // HTTP status code depending on the provider implementation.
-    virtual absl::optional<Http::Code> httpStatusCode(const Http::RequestHeaderMap* request_headers) const PURE;
+    virtual absl::optional<Http::Code>
+    httpStatusCode(const Http::RequestHeaderMap* request_headers) const PURE;
 
     // Return the gRPC status code to use. Optionally passed an HTTP header that may contain the
     // gRPC status code depending on the provider implementation.
@@ -117,20 +121,24 @@ private:
   };
 
   // Abort provider the reads a status code from an HTTP header.
-  class HeaderAbortProvider : public AbortProvider, public HeaderPercentageProvider {
+  class HeaderAbortProvider : public AbortProvider {
   public:
     HeaderAbortProvider(const envoy::type::v3::FractionalPercent& percentage)
-        : HeaderPercentageProvider(HeaderNames::get().AbortRequestPercentage, percentage) {}
+        : grpcHeaderPercentageProvider_(HeaderNames::get().AbortGrpcRequestPercentage, percentage),
+          httpHeaderPercentageProvider_(HeaderNames::get().AbortRequestPercentage, percentage) {}
 
-    absl::optional<Http::Code> httpStatusCode(const Http::RequestHeaderMap* request_headers) const override;
+    absl::optional<Http::Code>
+    httpStatusCode(const Http::RequestHeaderMap* request_headers) const override;
 
     absl::optional<Grpc::Status::GrpcStatus>
     grpcStatusCode(const Http::RequestHeaderMap* request_headers) const override;
 
     envoy::type::v3::FractionalPercent
-    percentage(const Http::RequestHeaderMap* request_headers) const override {
-      return HeaderPercentageProvider::percentage(request_headers);
-    }
+    percentage(const Http::RequestHeaderMap* request_headers) const override;
+
+  private:
+    HeaderPercentageProvider grpcHeaderPercentageProvider_;
+    HeaderPercentageProvider httpHeaderPercentageProvider_;
   };
 
   using AbortProviderPtr = std::unique_ptr<AbortProvider>;
@@ -196,10 +204,10 @@ private:
   };
 
   // Delay provider the reads a delay from an HTTP header.
-  class HeaderDelayProvider : public DelayProvider, public HeaderPercentageProvider {
+  class HeaderDelayProvider : public DelayProvider {
   public:
     HeaderDelayProvider(const envoy::type::v3::FractionalPercent& percentage)
-        : HeaderPercentageProvider(HeaderNames::get().DelayRequestPercentage, percentage) {}
+        : headerPercentageProvider_(HeaderNames::get().DelayRequestPercentage, percentage) {}
 
     // DelayProvider
     absl::optional<std::chrono::milliseconds>
@@ -207,8 +215,11 @@ private:
 
     envoy::type::v3::FractionalPercent
     percentage(const Http::RequestHeaderMap* request_headers) const override {
-      return HeaderPercentageProvider::percentage(request_headers);
+      return headerPercentageProvider_.percentage(request_headers);
     }
+
+  private:
+    HeaderPercentageProvider headerPercentageProvider_;
   };
 
   using DelayProviderPtr = std::unique_ptr<DelayProvider>;
@@ -273,16 +284,19 @@ private:
   };
 
   // Rate limit provider that reads the rate limit from an HTTP header.
-  class HeaderRateLimitProvider : public RateLimitProvider, public HeaderPercentageProvider {
+  class HeaderRateLimitProvider : public RateLimitProvider {
   public:
     HeaderRateLimitProvider(const envoy::type::v3::FractionalPercent& percentage)
-        : HeaderPercentageProvider(HeaderNames::get().ThroughputResponsePercentage, percentage) {}
+        : headerPercentageProvider_(HeaderNames::get().ThroughputResponsePercentage, percentage) {}
     // RateLimitProvider
     absl::optional<uint64_t> rateKbps(const Http::RequestHeaderMap* request_headers) const override;
     envoy::type::v3::FractionalPercent
     percentage(const Http::RequestHeaderMap* request_headers) const override {
-      return HeaderPercentageProvider::percentage(request_headers);
+      return headerPercentageProvider_.percentage(request_headers);
     }
+
+  private:
+    HeaderPercentageProvider headerPercentageProvider_;
   };
 
   using RateLimitProviderPtr = std::unique_ptr<RateLimitProvider>;

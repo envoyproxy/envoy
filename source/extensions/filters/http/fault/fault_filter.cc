@@ -151,6 +151,8 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
         fmt::format("fault.http.{}.delay.fixed_duration_ms", downstream_cluster_);
     downstream_cluster_abort_http_status_key_ =
         fmt::format("fault.http.{}.abort.http_status", downstream_cluster_);
+    downstream_cluster_abort_grpc_status_key_ =
+        fmt::format("fault.http.{}.abort.grpc_status", downstream_cluster_);
   }
 
   maybeSetupResponseRateLimit(headers);
@@ -297,8 +299,9 @@ AbortHttpAndGrpcStatus FaultFilter::abortStatus(const Http::RequestHeaderMap& re
   auto grpc_status = abortGrpcStatus(request_headers);
 
   // If gRPC status code is set, then HTTP will be set to Http::Code::OK (200).
-  return grpc_status.has_value() ? AbortHttpAndGrpcStatus(Http::Code::OK, grpc_status)
-                                 : AbortHttpAndGrpcStatus(abortHttpStatus(request_headers), absl::nullopt);
+  return grpc_status.has_value()
+             ? AbortHttpAndGrpcStatus(Http::Code::OK, grpc_status)
+             : AbortHttpAndGrpcStatus(abortHttpStatus(request_headers), absl::nullopt);
 }
 
 absl::optional<Http::Code>
@@ -311,30 +314,31 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
   }
 
   auto default_http_status_code = static_cast<uint64_t>(http_status.value());
-  auto runtime_http_status_code = static_cast<Http::Code>(config_->runtime().snapshot().getInteger(
-      fault_settings_->abortHttpStatusRuntime(), default_http_status_code));
+  auto runtime_http_status_code = config_->runtime().snapshot().getInteger(
+      fault_settings_->abortHttpStatusRuntime(), default_http_status_code);
 
   if (!downstream_cluster_abort_http_status_key_.empty()) {
-    runtime_http_status_code = static_cast<Http::Code>(config_->runtime().snapshot().getInteger(
-        downstream_cluster_abort_http_status_key_, default_http_status_code));
+    runtime_http_status_code = config_->runtime().snapshot().getInteger(
+        downstream_cluster_abort_http_status_key_, default_http_status_code);
   }
 
-  return runtime_http_status_code;
+  return static_cast<Http::Code>(runtime_http_status_code);
 }
 
 absl::optional<Grpc::Status::GrpcStatus>
 FaultFilter::abortGrpcStatus(const Http::RequestHeaderMap& request_headers) {
   auto grpc_status = fault_settings_->requestAbort()->grpcStatusCode(&request_headers);
+  if (!grpc_status.has_value()) {
+    return absl::nullopt;
+  }
 
-  auto default_grpc_status_code = grpc_status.has_value()
-                                      ? static_cast<uint64_t>(grpc_status.value())
-                                      : std::numeric_limits<uint64_t>::max();
-
+  auto default_grpc_status_code = static_cast<uint64_t>(grpc_status.value());
   auto runtime_grpc_status_code = config_->runtime().snapshot().getInteger(
       fault_settings_->abortGrpcStatusRuntime(), default_grpc_status_code);
 
-  if (runtime_grpc_status_code == std::numeric_limits<uint64_t>::max()) {
-    return absl::nullopt;
+  if (!downstream_cluster_abort_grpc_status_key_.empty()) {
+    runtime_grpc_status_code = config_->runtime().snapshot().getInteger(
+        downstream_cluster_abort_grpc_status_key_, default_grpc_status_code);
   }
 
   return static_cast<Grpc::Status::GrpcStatus>(runtime_grpc_status_code);

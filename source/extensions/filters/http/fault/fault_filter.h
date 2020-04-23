@@ -279,6 +279,7 @@ private:
   std::string downstream_cluster_abort_percent_key_{};
   std::string downstream_cluster_delay_duration_key_{};
   std::string downstream_cluster_abort_http_status_key_{};
+  std::string downstream_cluster_abort_grpc_status_key_{};
 };
 
 } // namespace Fault

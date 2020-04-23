@@ -253,6 +253,28 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortGrpcConfig) {
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
 
+// Request abort with grpc status, controlled via header configuration.
+TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortGrpcConfig0PercentageHeader) {
+  initializeFilter(header_fault_config_);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-envoy-fault-abort-grpc-request", "5"},
+                                     {"x-envoy-fault-abort-grpc-request-percentage", "0"},
+                                     {"content-type", "application/grpc"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+}
+
 // Request abort with grpc status, controlled via configuration.
 TEST_P(FaultIntegrationTestAllProtocols, FaultAbortGrpcConfig) {
   initializeFilter(abort_grpc_fault_config_);

@@ -42,13 +42,6 @@ x-envoy-fault-abort-request
   In order for the header to work, :ref:`header_abort
   <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set.
 
-x-envoy-fault-abort-grpc-request
-  gRPC status code to abort a request with. The header value should be a non-negative integer that specifies
-  the gRPC status code to return in response to a request. Its value range is [0, UInt32.Max] instead of [0, 16]
-  to allow testing even not well-defined gRPC status codes. When this header is set, the HTTP response status code
-  will be set to 200. In order for the header to work, :ref:`header_abort
-  <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set. 
-
 x-envoy-fault-abort-request-percentage
   The percentage of requests that should be failed with a status code that's defined
   by the value of *x-envoy-fault-abort-request* HTTP header. The header value should be an integer
@@ -60,6 +53,25 @@ x-envoy-fault-abort-request-percentage
   In order for the header to work, :ref:`header_abort
   <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set and
   *x-envoy-fault-abort-request* HTTP header needs to be a part of a request.
+
+x-envoy-fault-abort-grpc-request
+  gRPC status code to abort a request with. The header value should be a non-negative integer that specifies
+  the gRPC status code to return in response to a request. Its value range is [0, UInt32.Max] instead of [0, 16]
+  to allow testing even not well-defined gRPC status codes. When this header is set, the HTTP response status code
+  will be set to 200. In order for the header to work, :ref:`header_abort
+  <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set. 
+
+x-envoy-fault-abort-grpc-request-percentage
+  The percentage of gRPC requests that should be failed with a status code that's defined
+  by the value of *x-envoy-fault-abort-grpc-request* HTTP header. The header value should be an integer
+  that specifies the numerator of the percentage of request to apply aborts to and must be greater
+  or equal to 0 and its maximum value is capped by the value of the numerator of
+  :ref:`percentage <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>` field.
+  Percentage's denominator is equal to default percentage's denominator
+  :ref:`percentage <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>` field.
+  In order for the header to work, :ref:`header_abort
+  <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set and
+  *x-envoy-fault-abort-grpc-request* HTTP header needs to be a part of a request.
 
 x-envoy-fault-delay-request
   The duration to delay a request by. The header value should be an integer that specifies the number
