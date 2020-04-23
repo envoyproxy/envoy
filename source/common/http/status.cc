@@ -42,7 +42,10 @@ template <typename T> void storePayload(absl::Status& status, const T& payload) 
   status.SetPayload(EnvoyPayloadUrl, std::move(cord));
 }
 
-template <typename T = EnvoyStatusPayload> const T* getPayload(const absl::Status& status) {
+template <typename T = EnvoyStatusPayload> const T& getPayload(const absl::Status& status) {
+  // The only way to get a reference to the payload owned by the absl::Status is through the
+  // ForEachPayload method. All other methods create a copy of the payload, which is not convenient
+  // for peeking at the payload value.
   const T* payload = nullptr;
   status.ForEachPayload([&payload](absl::string_view url, const absl::Cord& cord) {
     if (url == EnvoyPayloadUrl) {
@@ -54,7 +57,7 @@ template <typename T = EnvoyStatusPayload> const T* getPayload(const absl::Statu
     }
   });
   ASSERT(payload);
-  return payload;
+  return *payload;
 }
 
 } // namespace
@@ -101,7 +104,7 @@ Status codecClientError(absl::string_view message) {
 
 // Methods for checking and extracting error information
 StatusCode getStatusCode(const Status& status) {
-  return status.ok() ? StatusCode::Ok : getPayload(status)->status_code_;
+  return status.ok() ? StatusCode::Ok : getPayload(status).status_code_;
 }
 
 bool isCodecProtocolError(const Status& status) {
@@ -117,10 +120,10 @@ bool isPrematureResponseError(const Status& status) {
 }
 
 Http::Code getPrematureResponseHttpCode(const Status& status) {
-  const auto* payload = getPayload<PrematureResponsePayload>(status);
-  ASSERT(payload->status_code_ == StatusCode::PrematureResponseError,
+  const auto& payload = getPayload<PrematureResponsePayload>(status);
+  ASSERT(payload.status_code_ == StatusCode::PrematureResponseError,
          "Must be PrematureResponseError");
-  return payload->http_code_;
+  return payload.http_code_;
 }
 
 bool isCodecClientError(const Status& status) {
