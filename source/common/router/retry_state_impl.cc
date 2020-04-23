@@ -281,10 +281,6 @@ RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callba
 }
 
 bool RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) {
-  if (response_headers.EnvoyOverloaded() != nullptr) {
-    return false;
-  }
-
   // We never retry if the request is rate limited.
   if (response_headers.EnvoyRateLimited() != nullptr) {
     return false;

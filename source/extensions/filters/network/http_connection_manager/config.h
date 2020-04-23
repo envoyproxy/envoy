@@ -109,6 +109,7 @@ public:
   FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() const override { return generate_request_id_; }
   bool preserveExternalRequestId() const override { return preserve_external_request_id_; }
+  bool alwaysSetRequestIdInResponse() const override { return always_set_request_id_in_response_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
@@ -216,6 +217,7 @@ private:
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
   const bool preserve_external_request_id_;
+  const bool always_set_request_id_in_response_;
   Http::DateProvider& date_provider_;
   Http::ConnectionManagerListenerStats listener_stats_;
   const bool proxy_100_continue_;

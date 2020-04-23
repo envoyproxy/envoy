@@ -218,6 +218,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:api_version_lib",
         "//source/common/config:config_provider_lib",
+        "//source/common/config:resource_name_lib",
         "//source/common/config:subscription_base_interface",
         "//source/common/config:version_converter_lib",
         "//source/common/init:manager_lib",
