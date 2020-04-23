@@ -3,6 +3,7 @@
 #include "envoy/router/internal_redirect.h"
 
 #include "common/stream_info/filter_state_impl.h"
+
 #include "extensions/internal_redirect/previous_routes/config.h"
 #include "extensions/internal_redirect/well_known_names.h"
 
