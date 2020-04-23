@@ -4,6 +4,8 @@ package envoy.config.metrics.v3;
 
 import "envoy/config/core/v3/grpc_service.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -28,5 +30,5 @@ message MetricsServiceConfig {
 
   // If true, counters are reported as the delta between flushing intervals. Otherwise, the current
   // counter value is reported. Defaults to false.
-  bool report_counters_as_deltas = 2;
+  google.protobuf.BoolValue report_counters_as_deltas = 2;
 }
