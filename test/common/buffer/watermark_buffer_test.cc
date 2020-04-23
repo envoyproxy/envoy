@@ -274,6 +274,9 @@ TEST_F(WatermarkBufferTest, MoveWatermarks) {
   buffer_.drain(9);
   EXPECT_EQ(3, times_low_watermark_called_);
   EXPECT_EQ(0, buffer_.length());
+
+  // Overflow is disabled by default
+  EXPECT_EQ(0, times_overflow_watermark_called_);
 }
 
 TEST_F(WatermarkBufferTest, GetRawSlices) {
@@ -323,18 +326,89 @@ TEST_F(WatermarkBufferTest, MoveBackWithWatermarks) {
   buffer1.move(buffer_, 10);
   EXPECT_EQ(0, times_low_watermark_called_);
   EXPECT_EQ(0, high_watermark_buffer1);
+  EXPECT_EQ(0, overflow_watermark_buffer1);
 
   // Move 10 more bytes to the new buffer. Both buffers should hit watermark callbacks.
   buffer1.move(buffer_, 10);
   EXPECT_EQ(1, times_low_watermark_called_);
   EXPECT_EQ(1, high_watermark_buffer1);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  EXPECT_EQ(0, overflow_watermark_buffer1);
 
   // Now move all the data back to the original buffer. Watermarks should trigger immediately.
   buffer_.move(buffer1);
   EXPECT_EQ(2, times_high_watermark_called_);
   EXPECT_EQ(1, low_watermark_buffer1);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  EXPECT_EQ(0, overflow_watermark_buffer1);
 }
 
+TEST_F(WatermarkBufferTest, OverflowWatermark) {
+  buffer_.setWatermarks(5, 10, 15);
+
+  buffer_.add(TEN_BYTES, 10);
+  EXPECT_EQ(0, times_high_watermark_called_);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  buffer_.add("a", 1);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  buffer_.add(TEN_BYTES, 4);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  buffer_.add("a", 1);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(16, buffer_.length());
+  buffer_.add("a", 1);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(17, buffer_.length());
+
+  // Overflow is only triggered once
+  buffer_.drain(16);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(1, times_low_watermark_called_);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  buffer_.add(TEN_BYTES, 10);
+  EXPECT_EQ(2, times_high_watermark_called_);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  buffer_.add(TEN_BYTES, 6);
+  EXPECT_EQ(2, times_high_watermark_called_);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+}
+
+TEST_F(WatermarkBufferTest, MoveWatermarksOverflow) {
+  buffer_.setWatermarks(5, 10, 15);
+  buffer_.add(TEN_BYTES, 9);
+  EXPECT_EQ(0, times_high_watermark_called_);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  buffer_.setWatermarks(1, 9, 15);
+  EXPECT_EQ(0, times_high_watermark_called_);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  buffer_.setWatermarks(1, 8, 15);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  buffer_.setWatermarks(1, 6, 9);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  buffer_.setWatermarks(1, 6, 8);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+
+  buffer_.setWatermarks(3, 6, 7);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+
+  // Overflow is only triggered once
+  buffer_.setWatermarks(3, 6, 10);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  buffer_.drain(7);
+  buffer_.add(TEN_BYTES, 9);
+  EXPECT_EQ(11, buffer_.length());
+  EXPECT_EQ(2, times_high_watermark_called_);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+}
 } // namespace
 } // namespace Buffer
 } // namespace Envoy

@@ -1621,7 +1621,7 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithContentLength) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
-  EXPECT_CALL(connection_, bufferLimit()).WillOnce(Return(10));
+  EXPECT_CALL(connection_, bufferLimit()).WillOnce(Return(96));
   initialize();
 
   NiceMock<MockRequestDecoder> decoder;
@@ -1645,8 +1645,14 @@ TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
 
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
-  TestResponseHeaderMapImpl headers{{":status", "200"}};
+  TestResponseHeaderMapImpl headers{{"Content-Location", std::string(30, 'a')}, {":status", "200"}};
   response_encoder->encodeHeaders(headers, false);
+
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferOverflowWatermark());
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
+  TestResponseHeaderMapImpl headers_overflow{{"Content-Location", std::string(81, 'a')}, {":status", "200"}};
+  response_encoder->encodeHeaders(headers_overflow, false);
 
   // Fake out the underlying Network::Connection buffer being drained.
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
@@ -2031,7 +2037,7 @@ TEST_F(Http1ClientConnectionImplTest, ConnectRejected) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {
-  EXPECT_CALL(connection_, bufferLimit()).WillOnce(Return(10));
+  EXPECT_CALL(connection_, bufferLimit()).WillOnce(Return(48));
   initialize();
 
   InSequence s;
@@ -2052,6 +2058,12 @@ TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   request_encoder.encodeHeaders(headers, true);
+
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferOverflowWatermark());
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
+  TestRequestHeaderMapImpl headers_overflow{{":method", "GET"}, {":path", "/a"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers_overflow, true);
 
   // Fake out the underlying Network::Connection buffer being drained.
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());

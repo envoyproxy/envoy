@@ -445,7 +445,14 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
                      [&]() -> void { this->onAboveHighWatermark(); },
                      [&]() -> void { this->onAboveOverflowWatermark(); }),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
-  output_buffer_.setWatermarks(connection.bufferLimit());
+
+  const uint32_t connection_buffer_limit = connection.bufferLimit();
+  if (connection_buffer_limit == 0) {
+    // Disable watermarking
+    output_buffer_.setWatermarks(0);
+  } else {
+    output_buffer_.setWatermarks(connection_buffer_limit / 2, connection_buffer_limit, connection_buffer_limit + 1);
+  }
   http_parser_init(&parser_, type);
   parser_.data = this;
 }

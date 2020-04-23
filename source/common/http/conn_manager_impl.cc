@@ -2013,13 +2013,14 @@ void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
 }
 
 void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
-  ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", *this, new_limit);
+  ENVOY_STREAM_LOG(debug, "setting buffer limit to {} and overflow threshold to {}", *this,
+                   new_limit, new_limit + 1);
   buffer_limit_ = new_limit;
   if (buffered_request_data_) {
-    buffered_request_data_->setWatermarks(buffer_limit_);
+    buffered_request_data_->setWatermarks(buffer_limit_ / 2, buffer_limit_, buffer_limit_ + 1);
   }
   if (buffered_response_data_) {
-    buffered_response_data_->setWatermarks(buffer_limit_);
+    buffered_response_data_->setWatermarks(buffer_limit_ / 2, buffer_limit_, buffer_limit_ + 1);
   }
 }
 
@@ -2274,7 +2275,7 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::cre
       std::make_unique<Buffer::WatermarkBuffer>([this]() -> void { this->requestDataDrained(); },
                                                 [this]() -> void { this->requestDataTooLarge(); },
                                                 [this]() -> void { this->requestDataOverflow(); });
-  buffer->setWatermarks(parent_.buffer_limit_);
+  buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_, parent_.buffer_limit_ + 1);
   return buffer;
 }
 
@@ -2456,7 +2457,7 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::cre
   auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
                                             [this]() -> void { this->responseDataTooLarge(); },
                                             [this]() -> void { this->responseDataOverflow(); });
-  buffer->setWatermarks(parent_.buffer_limit_);
+  buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_, parent_.buffer_limit_ + 1);
   return Buffer::WatermarkBufferPtr{buffer};
 }
 

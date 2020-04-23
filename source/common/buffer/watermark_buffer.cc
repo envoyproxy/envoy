@@ -2,6 +2,8 @@
 
 #include "common/common/assert.h"
 
+#include <iostream>
+
 namespace Envoy {
 namespace Buffer {
 
@@ -74,6 +76,9 @@ void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_waterm
   low_watermark_ = low_watermark;
   high_watermark_ = high_watermark;
   overflow_watermark_ = overflow_watermark;
+  //if (overflow_watermark_ > 0) {
+    std::cout << "Overflow_watermark_ is: " << overflow_watermark_ << std::endl;
+  //}
   checkOverflowAndHighWatermarks();
   checkLowWatermark();
 }
@@ -94,6 +99,7 @@ void WatermarkBuffer::checkOverflowAndHighWatermarks() {
   if (above_overflow_watermark_ && overflow_watermark_ != 0 &&
       !above_overflow_watermark_called_ && OwnedImpl::length() > overflow_watermark_) {
     above_overflow_watermark_called_ = true;
+    std::cout << "above_overflow_watermark_ called!" << std::endl;
     above_overflow_watermark_();
   }
 

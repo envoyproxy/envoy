@@ -184,7 +184,12 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
           [this]() -> void { this->enableDataFromDownstreamForFlowControl(); },
           [this]() -> void { this->disableDataFromDownstreamForFlowControl(); },
           [this]() -> void { this->overflowDataFromDownstream(); });
-      buffered_request_body_->setWatermarks(parent_.callbacks()->decoderBufferLimit());
+      const uint32_t decoder_buffer_limit = parent_.callbacks()->decoderBufferLimit();
+      if (decoder_buffer_limit == 0) {
+        buffered_request_body_->setWatermarks(0);
+      } else {
+        buffered_request_body_->setWatermarks(decoder_buffer_limit / 2, decoder_buffer_limit, decoder_buffer_limit + 1);
+      }
     }
 
     buffered_request_body_->move(data);
