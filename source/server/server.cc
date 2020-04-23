@@ -162,6 +162,12 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   for (const auto& histogram : snapped_histograms_) {
     histograms_.push_back(*histogram);
   }
+
+  snapped_text_readouts_ = store.textReadouts();
+  text_readouts_.reserve(snapped_text_readouts_.size());
+  for (const auto& text_readout : snapped_text_readouts_) {
+    text_readouts_.push_back(*text_readout);
+  }
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
