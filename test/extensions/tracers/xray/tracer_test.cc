@@ -185,10 +185,9 @@ TEST_F(XRayTracerTest, TraceIDFormatTest) {
 }
 
 TEST(XRayDaemon, VerifyUdpPacketContents) {
-  constexpr auto daemon_endpoint = "127.0.0.1:2000";
   NiceMock<Server::MockInstance> server;
-  Network::Test::UdpSyncPeer xray_fake_daemon(
-      Network::Utility::parseInternetAddressAndPort(daemon_endpoint, false /*v6only*/));
+  Network::Test::UdpSyncPeer xray_fake_daemon(Network::Address::IpVersion::v4);
+  const std::string daemon_endpoint = xray_fake_daemon.localAddress()->asString();
   Tracer tracer{"my_segment", std::make_unique<DaemonBrokerImpl>(daemon_endpoint),
                 server.timeSource()};
   auto span = tracer.startSpan("ingress" /*operation name*/, server.timeSource().systemTime(),

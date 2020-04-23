@@ -225,15 +225,13 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
                                           MonotonicTime(std::chrono::seconds(0)), nullptr);
 }
 
-UdpSyncPeer::UdpSyncPeer(Network::Address::InstanceConstSharedPtr address)
-    : socket_(std::make_unique<UdpListenSocket>(address, nullptr, true)) {
+UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version)
+    : socket_(
+          std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)) {
   RELEASE_ASSERT(
       Api::OsSysCallsSingleton::get().setsocketblocking(socket_->ioHandle().fd(), true).rc_ != -1,
       "");
 }
-
-UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version)
-    : UdpSyncPeer(getCanonicalLoopbackAddress(version)) {}
 
 void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Instance& peer) {
   const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
@@ -247,7 +245,6 @@ void UdpSyncPeer::recv(Network::UdpRecvData& datagram) {
                                                   received_datagrams_);
     ASSERT_TRUE(rc.ok());
   }
-
   datagram = std::move(received_datagrams_.front());
   received_datagrams_.pop_front();
 }

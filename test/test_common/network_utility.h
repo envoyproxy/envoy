@@ -180,11 +180,8 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
  */
 class UdpSyncPeer {
 public:
-  // Create a peer that listens on the given version of the loopback address.
   UdpSyncPeer(Network::Address::IpVersion version);
 
-  // Create a peer that listens on the given address:port.
-  UdpSyncPeer(Network::Address::InstanceConstSharedPtr address);
   // Writer a datagram to a remote peer.
   void write(const std::string& buffer, const Network::Address::Instance& peer);
 
