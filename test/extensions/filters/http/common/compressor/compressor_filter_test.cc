@@ -22,7 +22,6 @@ namespace Common {
 namespace Compressors {
 
 using testing::_;
-using testing::AtLeast;
 using testing::Return;
 
 class TestCompressorFilterConfig : public CompressorFilterConfig {
@@ -36,9 +35,14 @@ public:
 
   Envoy::Compression::Compressor::CompressorPtr makeCompressor() override {
     auto compressor = std::make_unique<Compression::Compressor::MockCompressor>();
-    EXPECT_CALL(*compressor, compress(_, _)).Times(AtLeast(1));
+    EXPECT_CALL(*compressor, compress(_, _)).Times(expected_compress_calls_);
     return compressor;
   }
+
+  void setExpectedCompressCalls(uint32_t calls) { expected_compress_calls_ = calls; }
+
+private:
+  uint32_t expected_compress_calls_{1};
 };
 
 class CompressorFilterTest : public testing::Test {
@@ -169,7 +173,7 @@ protected:
     EXPECT_EQ(1, stats_.counter("test.test.not_compressed").value());
   }
 
-  CompressorFilterConfigSharedPtr config_;
+  std::shared_ptr<TestCompressorFilterConfig> config_;
   std::unique_ptr<CompressorFilter> filter_;
   Buffer::OwnedImpl data_;
   std::string expected_str_;
@@ -227,6 +231,7 @@ TEST_F(CompressorFilterTest, AcceptanceTestEncodingWithTrailers) {
   Http::TestRequestTrailerMapImpl trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
   Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
+  config_->setExpectedCompressCalls(2);
   doResponseCompression(headers, true);
 }
 
