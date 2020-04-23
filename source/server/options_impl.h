@@ -103,9 +103,7 @@ public:
   const envoy::config::bootstrap::v3::Bootstrap& configProto() const override {
     return config_proto_;
   }
-  virtual const absl::optional<uint32_t>& bootstrapVersion() const override {
-    return bootstrap_version_;
-  }
+  const absl::optional<uint32_t>& bootstrapVersion() const override { return bootstrap_version_; }
   const std::string& configYaml() const override { return config_yaml_; }
   bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
   bool rejectUnknownDynamicFields() const override { return reject_unknown_dynamic_fields_; }
