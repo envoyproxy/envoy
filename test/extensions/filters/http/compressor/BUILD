@@ -12,6 +12,20 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "compressor_filter_test",
+    srcs = [
+        "compressor_filter_test.cc",
+    ],
+    extension_name = "envoy.filters.http.compressor",
+    deps = [
+        "//source/extensions/filters/http/compressor:compressor_filter_lib",
+        "//test/mocks/compression/compressor:compressor_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "compressor_filter_integration_test",
     srcs = [
         "compressor_filter_integration_test.cc",
