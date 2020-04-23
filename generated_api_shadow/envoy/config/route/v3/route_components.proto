@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.route.v3;
 
+import "envoy/config/common/accesslog/v3/common.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
@@ -1238,6 +1239,10 @@ message DirectResponseAction {
   //   :ref:`envoy_api_msg_config.route.v3.Route`, :ref:`envoy_api_msg_config.route.v3.RouteConfiguration` or
   //   :ref:`envoy_api_msg_config.route.v3.VirtualHost`.
   core.v3.DataSource body = 2;
+
+  // Specifies the access log response flags to record after sending the response.
+  // If the value is set, it must be a valid `%RESPONSE_FLAGS%`` from access log.
+  common.accesslog.v3.ResponseFlagFilter response_flag = 3;
 }
 
 message Decorator {
