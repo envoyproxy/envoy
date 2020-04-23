@@ -12,6 +12,7 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/test_common/network_utility.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
@@ -183,14 +184,40 @@ TEST_F(XRayTracerTest, TraceIDFormatTest) {
   ASSERT_EQ(24, parts[2].length());
 }
 
-TEST(XRayDaemon, SendBytesOverUDP) {
+TEST(XRayDaemon, VerifyUdpPacketContents) {
+  constexpr auto daemon_endpoint = "127.0.0.1:2000";
   NiceMock<Server::MockInstance> server;
-  DaemonBrokerPtr broker_ptr = std::make_unique<DaemonBrokerImpl>("127.0.0.1:2000");
-  Tracer tracer{"my_segment", std::move(broker_ptr), server.timeSource()};
+  Network::Test::UdpSyncPeer xray_fake_daemon(
+      Network::Utility::parseInternetAddressAndPort(daemon_endpoint, false /*v6only*/));
+  Tracer tracer{"my_segment", std::make_unique<DaemonBrokerImpl>(daemon_endpoint),
+                server.timeSource()};
   auto span = tracer.startSpan("ingress" /*operation name*/, server.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
-  span->setTag("user_agent", "envoy");
+
+  span->setTag("http.status_code", "202");
   span->finishSpan();
+
+  Network::UdpRecvData datagram;
+  xray_fake_daemon.recv(datagram);
+
+  const std::string header_json = R"EOF({"format":"json","version":1})EOF";
+  // The UDP datagram contains two independent, consecutive JSON documents; a header and a body.
+  const std::string payload = datagram.buffer_->toString();
+  // Make sure the payload has enough data.
+  ASSERT_GT(payload.length(), header_json.length());
+  // Skip the header since we're only interested in the body.
+  const std::string body = payload.substr(header_json.length());
+
+  EXPECT_EQ(0, payload.find(header_json));
+
+  // Deserialize the body to verify it.
+  source::extensions::tracers::xray::daemon::Segment seg;
+  MessageUtil::loadFromJson(body, seg, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_STREQ("my_segment", seg.name().c_str());
+  for (auto&& f : seg.http().request().fields()) {
+    // there should only be a single field
+    EXPECT_EQ(202, f.second.number_value());
+  }
 }
 
 } // namespace
