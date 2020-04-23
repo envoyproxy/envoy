@@ -583,8 +583,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
                   end_stream);
     return;
   }
-  if (!Grpc::Common::hasGrpcContentType(*headers)) {
-    onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "invalid gRPC content-type", false);
+  if (!Grpc::Common::isGrpcResponseHeaders(*headers, end_stream)) {
+    onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "not a gRPC request", false);
     return;
   }
   if (end_stream) {
@@ -793,9 +793,11 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
     case grpc::health::v1::HealthCheckResponse::UNKNOWN:
       service_status = "unknown";
       break;
+    case grpc::health::v1::HealthCheckResponse::SERVICE_UNKNOWN:
+      service_status = "service_unknown";
+      break;
     default:
-      // Should not happen really, Protobuf should not parse undefined enums values.
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      service_status = "unknown_healthcheck_response";
       break;
     }
   }

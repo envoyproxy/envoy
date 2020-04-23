@@ -86,10 +86,12 @@ public:
   RunHelperTest() {
     InSequence s;
 
+#ifndef WIN32
     sigterm_ = new Event::MockSignalEvent(&dispatcher_);
     sigint_ = new Event::MockSignalEvent(&dispatcher_);
     sigusr1_ = new Event::MockSignalEvent(&dispatcher_);
     sighup_ = new Event::MockSignalEvent(&dispatcher_);
+#endif
     EXPECT_CALL(overload_manager_, start());
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
@@ -109,10 +111,12 @@ public:
   ReadyWatcher start_workers_;
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;
+#ifndef WIN32
   Event::MockSignalEvent* sigterm_;
   Event::MockSignalEvent* sigint_;
   Event::MockSignalEvent* sigusr1_;
   Event::MockSignalEvent* sighup_;
+#endif
   bool shutdown_ = false;
 };
 
@@ -121,13 +125,18 @@ TEST_F(RunHelperTest, Normal) {
   cm_init_callback_();
 }
 
+// no signals on Windows
+#ifndef WIN32
 TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
   EXPECT_CALL(start_workers_, ready()).Times(0);
   sigterm_->callback_();
   EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   cm_init_callback_();
 }
+#endif
 
+// no signals on Windows
+#ifndef WIN32
 TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   EXPECT_CALL(start_workers_, ready()).Times(0);
   Init::ExpectableTargetImpl target;
@@ -138,6 +147,7 @@ TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   target.ready();
 }
+#endif
 
 class InitializingInitManager : public Init::ManagerImpl {
 public:
@@ -671,7 +681,6 @@ TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
-  EXPECT_EQ("foobar", server_->runtime().snapshot().getLayers()[3]->name());
 }
 
 // Validate that a runtime absent an admin layer will fail mutating operations
@@ -688,6 +697,22 @@ TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
       Http::Code::ServiceUnavailable,
       server_->admin().request("/runtime_modify?foo=bar", "POST", response_headers, response_body));
   EXPECT_EQ("No admin layer specified", response_body);
+}
+
+// Verify that bootstrap fails if RTDS is configured through an EDS cluster
+TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughEdsFails) {
+  options_.service_cluster_name_ = "some_service";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/runtime_bootstrap_eds.yaml"),
+                          EnvoyException, "must have a statically defined non-EDS cluster");
+}
+
+// Verify that bootstrap fails if RTDS is configured through an ADS using EDS cluster
+TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
+  options_.service_cluster_name_ = "some_service";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/runtime_bootstrap_ads_eds.yaml"),
+                          EnvoyException, "Unknown gRPC client cluster");
 }
 
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(InvalidLegacyBootstrapRuntime)) {
