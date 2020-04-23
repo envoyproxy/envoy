@@ -23,7 +23,7 @@ public:
    *         predicate returning false will prevent the redirect from being followed, causing the
    *         response to be proxied to the downstream.
    */
-  virtual bool acceptTargetRoute(StreamInfo::FilterState& filter_State,
+  virtual bool acceptTargetRoute(StreamInfo::FilterState& filter_state,
                                  absl::string_view target_route_name) PURE;
 };
 

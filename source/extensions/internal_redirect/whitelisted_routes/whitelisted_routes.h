@@ -20,7 +20,7 @@ public:
       : whitelisted_routes_(config.whitelisted_route_names().begin(),
                             config.whitelisted_route_names().end()) {}
 
-  bool acceptTargetRoute(StreamInfo::FilterState&, absl::string_view route_name) {
+  bool acceptTargetRoute(StreamInfo::FilterState&, absl::string_view route_name) override {
     return whitelisted_routes_.contains(route_name);
   }
 
