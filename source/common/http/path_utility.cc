@@ -67,7 +67,7 @@ void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
   const absl::string_view prefix = absl::StartsWith(path, "/") ? "/" : absl::string_view();
   const absl::string_view suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
   headers.setPath(absl::StrCat(
-      prefix, absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"), query, suffix));
+      prefix, absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"), suffix, query));
 }
 
 absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path) {
