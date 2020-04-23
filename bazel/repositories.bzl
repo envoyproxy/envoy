@@ -5,8 +5,14 @@ load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
-# dict of {build recipe name: longform extension name,}
-PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
+PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
+
+WINDOWS_SKIP_TARGETS = [
+    "envoy.tracers.dynamic_ot",
+    "envoy.tracers.lightstep",
+    "envoy.tracers.datadog",
+    "envoy.tracers.opencensus",
+]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
@@ -512,6 +518,14 @@ def _com_google_absl():
         name = "abseil_algorithm",
         actual = "@com_google_absl//absl/algorithm:algorithm",
     )
+    native.bind(
+        name = "abseil_variant",
+        actual = "@com_google_absl//absl/types:variant",
+    )
+    native.bind(
+        name = "abseil_status",
+        actual = "@com_google_absl//absl/status",
+    )
 
 def _com_google_protobuf():
     _repository_impl("rules_python")
@@ -787,6 +801,7 @@ filegroup(
     http_archive(
         name = "kafka_source",
         build_file_content = KAFKASOURCE_BUILD_CONTENT,
+        patches = ["@envoy//bazel/external:kafka_int32.patch"],
         **REPOSITORY_LOCATIONS["kafka_source"]
     )
 

@@ -1239,7 +1239,7 @@ void HttpIntegrationTest::testMaxStreamDuration() {
   }
 }
 
-void HttpIntegrationTest::testMaxStreamDurationWithRetry() {
+void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstream_disconnect) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
@@ -1273,17 +1273,27 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
 
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers, true);
 
-  response->waitForHeaders();
-  codec_client_->close();
+  if (invoke_retry_upstream_disconnect) {
+    test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 2);
+    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+      codec_client_->waitForDisconnect();
+    } else {
+      response->waitForReset();
+      codec_client_->close();
+    }
 
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(0U, upstream_request_->bodyLength());
+    EXPECT_EQ("408", response->headers().Status()->value().getStringView());
+  } else {
+    Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+    upstream_request_->encodeHeaders(response_headers, true);
 
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    response->waitForHeaders();
+    codec_client_->close();
+
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  }
 }
 
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {

@@ -32,7 +32,6 @@
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/router.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -101,6 +100,12 @@ UpstreamRequest::~UpstreamRequest() {
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
     upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
                       upstream_trailers_.get(), stream_info_);
+  }
+
+  while (downstream_data_disabled_ != 0) {
+    parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
+    parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
+    --downstream_data_disabled_;
   }
 }
 
@@ -293,17 +298,21 @@ void UpstreamRequest::onPerTryTimeout() {
   }
 }
 
-void UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) {
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
   switch (reason) {
-  case Http::ConnectionPool::PoolFailureReason::Overflow:
+  case ConnectionPool::PoolFailureReason::Overflow:
     reset_reason = Http::StreamResetReason::Overflow;
     break;
-  case Http::ConnectionPool::PoolFailureReason::ConnectionFailure:
+  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    FALLTHRU;
+  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
+  case ConnectionPool::PoolFailureReason::Timeout:
+    reset_reason = Http::StreamResetReason::LocalReset;
   }
 
   // Mimic an upstream reset.
@@ -331,6 +340,8 @@ void UpstreamRequest::onPoolReady(
 
   onUpstreamHostSelected(host);
 
+  stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
+      info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
   stream_info_.setUpstreamLocalAddress(upstream_local_address);
   parent_.callbacks()->streamInfo().setUpstreamLocalAddress(upstream_local_address);
 
@@ -438,7 +449,6 @@ void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermar
   // can disable reads from upstream.
   ASSERT(!parent_.parent_.finalUpstreamRequest() ||
          &parent_ == parent_.parent_.finalUpstreamRequest());
-
   // The downstream connection is overrun. Pause reads from upstream.
   // If there are multiple calls to readDisable either the codec (H2) or the underlying
   // Network::Connection (H1) will handle reference counting.
@@ -468,6 +478,7 @@ void UpstreamRequest::disableDataFromDownstreamForFlowControl() {
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
   parent_.cluster()->stats().upstream_flow_control_backed_up_total_.inc();
   parent_.callbacks()->onDecoderFilterAboveWriteBufferHighWatermark();
+  ++downstream_data_disabled_;
 }
 
 void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
@@ -483,6 +494,10 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
   parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
   parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
+  ASSERT(downstream_data_disabled_ != 0);
+  if (downstream_data_disabled_ > 0) {
+    --downstream_data_disabled_;
+  }
 }
 
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
@@ -508,7 +523,7 @@ bool HttpConnPool::cancelAnyPendingRequest() {
 
 absl::optional<Http::Protocol> HttpConnPool::protocol() const { return conn_pool_.protocol(); }
 
-void HttpConnPool::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                  absl::string_view transport_failure_reason,
                                  Upstream::HostDescriptionConstSharedPtr host) {
   callbacks_->onPoolFailure(reason, transport_failure_reason, host);

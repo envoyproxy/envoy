@@ -22,7 +22,6 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/new_grpc_mux_impl.h"
-#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/grpc/async_client_manager_impl.h"
@@ -124,12 +123,12 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   // Do not do anything if we are still doing the initial static load or if we are waiting for
   // CDS initialize.
   ENVOY_LOG(debug, "maybe finish initialize state: {}", enumToInt(state_));
-  if (state_ == State::Loading || state_ == State::WaitingForCdsInitialize) {
+  if (state_ == State::Loading || state_ == State::WaitingToStartCdsInitialization) {
     return;
   }
 
   // If we are still waiting for primary clusters to initialize, do nothing.
-  ASSERT(state_ == State::WaitingForStaticInitialize || state_ == State::CdsInitialized);
+  ASSERT(state_ == State::WaitingToStartSecondaryInitialization || state_ == State::CdsInitialized);
   ENVOY_LOG(debug, "maybe finish initialize primary init clusters empty: {}",
             primary_init_clusters_.empty());
   if (!primary_init_clusters_.empty()) {
@@ -142,17 +141,17 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
             secondary_init_clusters_.empty());
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
+      const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          envoy::config::core::v3::ApiVersion::V2);
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      if (cm_.adsMux() == nullptr ||
-          cm_.adsMux()->paused(Config::TypeUrl::get().ClusterLoadAssignment)) {
+      if (cm_.adsMux() == nullptr || cm_.adsMux()->paused(type_url)) {
         initializeSecondaryClusters();
       } else {
-        cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
-        Cleanup eds_resume(
-            [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+        cm_.adsMux()->pause(type_url);
+        Cleanup eds_resume([this, type_url] { cm_.adsMux()->resume(type_url); });
         initializeSecondaryClusters();
       }
     }
@@ -163,9 +162,9 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   // directly to initialized.
   started_secondary_initialize_ = false;
   ENVOY_LOG(debug, "maybe finish initialize cds api ready: {}", cds_ != nullptr);
-  if (state_ == State::WaitingForStaticInitialize && cds_) {
+  if (state_ == State::WaitingToStartSecondaryInitialization && cds_) {
     ENVOY_LOG(info, "cm init: initializing cds");
-    state_ = State::WaitingForCdsInitialize;
+    state_ = State::WaitingToStartCdsInitialization;
     cds_->initialize();
   } else {
     ENVOY_LOG(info, "cm init: all clusters initialized");
@@ -178,7 +177,14 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
 
 void ClusterManagerInitHelper::onStaticLoadComplete() {
   ASSERT(state_ == State::Loading);
-  state_ = State::WaitingForStaticInitialize;
+  // After initialization of primary clusters has completed, transition to
+  // waiting for signal to initialize secondary clusters and then CDS.
+  state_ = State::WaitingToStartSecondaryInitialization;
+}
+
+void ClusterManagerInitHelper::startInitializingSecondaryClusters() {
+  ASSERT(state_ == State::WaitingToStartSecondaryInitialization);
+  ENVOY_LOG(debug, "continue initializing secondary clusters");
   maybeFinishInitialize();
 }
 
@@ -187,7 +193,7 @@ void ClusterManagerInitHelper::setCds(CdsApi* cds) {
   cds_ = cds;
   if (cds_) {
     cds_->setInitializedCb([this]() -> void {
-      ASSERT(state_ == State::WaitingForCdsInitialize);
+      ASSERT(state_ == State::WaitingToStartCdsInitialization);
       state_ = State::CdsInitialized;
       maybeFinishInitialize();
     });
@@ -347,15 +353,22 @@ ClusterManagerImpl::ClusterManagerImpl(
   init_helper_.onStaticLoadComplete();
 
   ads_mux_->start();
+}
 
+void ClusterManagerImpl::initializeSecondaryClusters(
+    const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  init_helper_.startInitializingSecondaryClusters();
+
+  const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
+
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info, *this, stats,
+        local_info_, *this, stats_,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
-                                                       stats, false)
+                                                       stats_, false)
             ->create(),
-        load_stats_config.transport_api_version(), main_thread_dispatcher);
+        load_stats_config.transport_api_version(), dispatcher_);
   }
 }
 
@@ -752,11 +765,13 @@ void ClusterManagerImpl::updateClusterCounts() {
   // signal to ADS to proceed with RDS updates.
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   if (ads_mux_) {
+    const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+        envoy::config::core::v3::ApiVersion::V2);
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      ads_mux_->pause(Config::TypeUrl::get().Cluster);
+      ads_mux_->pause(type_url);
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
-      ads_mux_->resume(Config::TypeUrl::get().Cluster);
+      ads_mux_->resume(type_url);
     }
   }
   cm_stats_.active_clusters_.set(active_clusters_.size());

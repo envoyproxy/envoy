@@ -89,6 +89,7 @@ protected:
     Stats::TimespanPtr conn_length_;
     Event::TimerPtr connect_timer_;
     bool resources_released_{false};
+    bool timed_out_{false};
   };
 
   using ActiveClientPtr = std::unique_ptr<ActiveClient>;
@@ -126,7 +127,8 @@ protected:
 
   // Fails all pending requests, calling onPoolFailure on the associated callbacks.
   void purgePendingRequests(const Upstream::HostDescriptionConstSharedPtr& host_description,
-                            absl::string_view failure_reason);
+                            absl::string_view failure_reason,
+                            ConnectionPool::PoolFailureReason pool_failure_reason);
 
   // Closes any idle connections.
   void closeIdleConnections();

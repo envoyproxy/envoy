@@ -248,8 +248,9 @@ private:
   void abortWithHTTPStatus(Http::Code abort_code);
   bool matchesTargetUpstreamCluster();
   bool matchesDownstreamNodes(const Http::RequestHeaderMap& headers);
-  bool isAbortEnabled();
-  bool isDelayEnabled();
+  bool isAbortEnabled(const Http::RequestHeaderMap& request_headers);
+  bool isDelayEnabled(const Http::RequestHeaderMap& request_headers);
+  bool isResponseRateLimitEnabled(const Http::RequestHeaderMap& request_headers);
   absl::optional<std::chrono::milliseconds>
   delayDuration(const Http::RequestHeaderMap& request_headers);
   absl::optional<Http::Code> abortHttpStatus(const Http::RequestHeaderMap& request_headers);
