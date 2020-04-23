@@ -102,5 +102,17 @@ Histogram& Utility::histogramFromStatNames(Scope& scope, const StatNameVec& elem
   return scope.histogramFromStatNameWithTags(StatName(joined.get()), tags, unit);
 }
 
+TextReadout& Utility::textReadoutFromElements(Scope& scope, const ElementVec& elements,
+                                              StatNameTagVectorOptConstRef tags) {
+  ElementVisitor visitor(scope.symbolTable());
+  return scope.textReadoutFromStatNameWithTags(visitor.makeStatName(elements), tags);
+}
+
+TextReadout& Utility::textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
+                                               StatNameTagVectorOptConstRef tags) {
+  SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
+  return scope.textReadoutFromStatNameWithTags(StatName(joined.get()), tags);
+}
+
 } // namespace Stats
 } // namespace Envoy

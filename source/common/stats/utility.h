@@ -26,7 +26,12 @@ public:
 };
 
 /**
- * Holds either a symbolic StatName or a dynamic string.
+ * Holds either a symbolic StatName or a dynamic string, for the purpose of
+ * composing a vector to pass to Utility::counterFromElements, etc. This is
+ * a programming convenience to create joined stat names. It is easier to
+ * call the above helpers than to use SymbolTable::join(), because the helpers
+ * hide the memory management of the joined storage, and they allow easier
+ * co-mingling of symbolic and dynamic stat-name components.
  */
 using Element = absl::variant<StatName, DynamicName>;
 using ElementVec = std::vector<Element>;
@@ -169,6 +174,44 @@ public:
   static Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements,
                                            Histogram::Unit unit,
                                            StatNameTagVectorOptConstRef tags = absl::nullopt);
+
+  /**
+   * Creates a TextReadout from a vector of tokens which are used to create the
+   * name. The tokens can be specified as string_view or StatName. For
+   * tokens specified as string_view, a dynamic StatName will be created. See
+   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
+   * for more detail on why symbolic StatNames are preferred when possible.
+   *
+   * See also TextReadoutFromStatNames, which is slightly faster but does not allow
+   * passing DynamicName(string)s as names.
+   *
+   * @param scope The scope in which to create the counter.
+   * @param elements The vector of mixed string_view and StatName
+   * @param unit The unit of measurement.
+   * @param tags optionally specified tags.
+   * @return A TextReadout named using the joined elements.
+   */
+  static TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
+                                              StatNameTagVectorOptConstRef tags = absl::nullopt);
+
+  /**
+   * Creates a TextReadout from a vector of tokens which are used to create the
+   * name. The tokens can be specified as string_view or StatName. For
+   * tokens specified as string_view, a dynamic StatName will be created. See
+   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
+   * for more detail on why symbolic StatNames are preferred when possible.
+   *
+   * See also TextReadoutFromElements, which is slightly slower, but allows
+   * passing DynamicName(string)s as elements.
+   *
+   * @param scope The scope in which to create the counter.
+   * @param elements The vector of mixed string_view and StatName
+   * @param unit The unit of measurement.
+   * @param tags optionally specified tags.
+   * @return A TextReadout named using the joined elements.
+   */
+  static TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
+                                               StatNameTagVectorOptConstRef tags = absl::nullopt);
 };
 
 } // namespace Stats

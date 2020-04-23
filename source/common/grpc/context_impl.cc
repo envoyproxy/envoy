@@ -19,13 +19,14 @@ ContextImpl::ContextImpl(Stats::SymbolTable& symbol_table)
       upstream_rq_time_(stat_name_pool_.add("upstream_rq_time")), stat_names_(symbol_table) {}
 
 // Gets the stat prefix and underlying storage, depending on whether request_names is empty
-Stats::ElementVec ContextImpl::getPrefix(Protocol protocol,
-                                         const absl::optional<RequestStatNames>& request_names) {
+Stats::ElementVec ContextImpl::statElements(Protocol protocol,
+                                            const absl::optional<RequestStatNames>& request_names,
+                                            Stats::Element suffix) {
   const Stats::StatName protocolName = protocolStatName(protocol);
   if (request_names) {
-    return Stats::ElementVec{protocolName, request_names->service_, request_names->method_};
+    return Stats::ElementVec{protocolName, request_names->service_, request_names->method_, suffix};
   }
-  return Stats::ElementVec{protocolName};
+  return Stats::ElementVec{protocolName, suffix};
 }
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
@@ -37,19 +38,17 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol prot
 
   absl::string_view status_str = grpc_status->value().getStringView();
   auto iter = stat_names_.status_names_.find(status_str);
-  Stats::Element status_stat_name = (iter != stat_names_.status_names_.end())
-                                        ? Stats::Element(iter->second)
-                                        : Stats::DynamicName(status_str);
-  Stats::ElementVec elements = getPrefix(protocol, request_names);
-  elements.push_back(status_stat_name);
+  Stats::ElementVec elements =
+      statElements(protocol, request_names,
+                   (iter != stat_names_.status_names_.end()) ? Stats::Element(iter->second)
+                                                             : Stats::DynamicName(status_str));
   Stats::Utility::counterFromElements(cluster.statsScope(), elements).inc();
   chargeStat(cluster, protocol, request_names, (status_str == "0"));
 }
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
                              const absl::optional<RequestStatNames>& request_names, bool success) {
-  Stats::ElementVec elements = getPrefix(protocol, request_names);
-  elements.push_back(successStatName(success));
+  Stats::ElementVec elements = statElements(protocol, request_names, successStatName(success));
   Stats::Utility::counterFromElements(cluster.statsScope(), elements).inc();
   elements.back() = total_;
   Stats::Utility::counterFromElements(cluster.statsScope(), elements).inc();
@@ -63,24 +62,21 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster,
 void ContextImpl::chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
                                            const absl::optional<RequestStatNames>& request_names,
                                            uint64_t amount) {
-  Stats::ElementVec elements = getPrefix(Protocol::Grpc, request_names);
-  elements.push_back(request_message_count_);
+  Stats::ElementVec elements = statElements(Protocol::Grpc, request_names, request_message_count_);
   Stats::Utility::counterFromElements(cluster.statsScope(), elements).add(amount);
 }
 
 void ContextImpl::chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
                                             const absl::optional<RequestStatNames>& request_names,
                                             uint64_t amount) {
-  Stats::ElementVec elements = getPrefix(Protocol::Grpc, request_names);
-  elements.push_back(response_message_count_);
+  Stats::ElementVec elements = statElements(Protocol::Grpc, request_names, response_message_count_);
   Stats::Utility::counterFromElements(cluster.statsScope(), elements).add(amount);
 }
 
 void ContextImpl::chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
                                      const absl::optional<RequestStatNames>& request_names,
                                      std::chrono::milliseconds duration) {
-  Stats::ElementVec elements = getPrefix(Protocol::Grpc, request_names);
-  elements.push_back(upstream_rq_time_);
+  Stats::ElementVec elements = statElements(Protocol::Grpc, request_names, upstream_rq_time_);
   Stats::Utility::histogramFromElements(cluster.statsScope(), elements,
                                         Stats::Histogram::Unit::Milliseconds)
       .recordValue(duration.count());

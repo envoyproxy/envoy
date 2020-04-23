@@ -77,11 +77,8 @@ void RedisCommandStats::updateStatsTotal(Stats::Scope& scope, Stats::StatName co
 
 void RedisCommandStats::updateStats(Stats::Scope& scope, Stats::StatName command,
                                     const bool success) {
-  if (success) {
-    Stats::Utility::counterFromStatNames(scope, {prefix_, command, success_}).inc();
-  } else {
-    Stats::Utility::counterFromStatNames(scope, {prefix_, command, failure_}).inc();
-  }
+  Stats::StatName status = success ? success_ : failure_;
+  Stats::Utility::counterFromStatNames(scope, {prefix_, command, status}).inc();
 }
 
 } // namespace Redis

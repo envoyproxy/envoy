@@ -60,12 +60,11 @@ public:
   StatNames& statNames() override { return stat_names_; }
 
 private:
-  // Gets the stat prefix and underlying storage, depending on whether request_names is empty
-  // or not.
-  // Prefix will be "<protocol>" if request_names is empty, or
-  // "<protocol>.<service>.<method>" if it is not empty.
-  Stats::ElementVec getPrefix(Protocol protocol,
-                              const absl::optional<RequestStatNames>& request_names);
+  // Creates an array of stat-name elements, comprising the protocol, optional
+  // service and method, and a suffix.
+  Stats::ElementVec statElements(Protocol protocol,
+                                 const absl::optional<RequestStatNames>& request_names,
+                                 Stats::Element suffix);
 
   Stats::StatNamePool stat_name_pool_;
   const Stats::StatName grpc_;

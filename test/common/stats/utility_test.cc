@@ -92,6 +92,21 @@ TEST_F(StatsUtilityTest, Histograms) {
   EXPECT_EQ(&h3, &h4);
 }
 
+TEST_F(StatsUtilityTest, TextReadouts) {
+  ScopePtr scope = store_->createScope("scope.");
+  TextReadout& t1 = Utility::textReadoutFromElements(*scope, {DynamicName("a"), DynamicName("b")});
+  EXPECT_EQ("scope.a.b", t1.name());
+  StatName token = pool_.add("token");
+  TextReadout& t2 =
+      Utility::textReadoutFromElements(*scope, {DynamicName("a"), token, DynamicName("b")});
+  EXPECT_EQ("scope.a.token.b", t2.name());
+  StatName suffix = pool_.add("suffix");
+  TextReadout& t3 = Utility::textReadoutFromElements(*scope, {token, suffix});
+  EXPECT_EQ("scope.token.suffix", t3.name());
+  TextReadout& t4 = Utility::textReadoutFromStatNames(*scope, {token, suffix});
+  EXPECT_EQ(&t3, &t4);
+}
+
 } // namespace
 } // namespace Stats
 } // namespace Envoy
