@@ -907,6 +907,19 @@ TEST(HeaderMapImplTest, Get) {
   }
 }
 
+TEST(HeaderMapImplTest, TestHeaderList) {
+  std::array<Http::LowerCaseString, 2> keys{Headers::get().Path, LowerCaseString("hello")};
+  std::array<std::string, 2> values{"/", "world"};
+
+  auto headers = createHeaderMap<TestHeaderMapImpl>({{keys[0], values[0]}, {keys[1], values[1]}});
+  const auto header_keys = headers->headerListView()->keys();
+  const auto header_values = headers->headerListView()->values();
+  for (size_t i = 0; i < keys.size(); ++i) {
+    EXPECT_EQ(keys[i].get(), header_keys[i]->getStringView());
+    EXPECT_EQ(values[i], header_values[i]->getStringView());
+  }
+}
+
 TEST(HeaderMapImplTest, TestAppendHeader) {
   // Test appending to a string with a value.
   {

@@ -263,6 +263,20 @@ private:
   void value(const char*); // Do not allow auto conversion to std::string
 };
 
+struct HeaderListView {
+  virtual ~HeaderListView() = default;
+
+  /**
+   * @return all of header keys.
+   */
+  virtual std::vector<const HeaderString*> keys() const PURE;
+
+  /**
+   * @return all of header values.
+   */
+  virtual std::vector<const HeaderString*> values() const PURE;
+};
+
 /**
  * The following defines all request headers that Envoy allows direct access to inside of the
  * header map. In practice, these are all headers used during normal Envoy request flow
@@ -611,6 +625,8 @@ public:
    * This function is called on Envoy fatal errors so should avoid memory allocation where possible.
    */
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  std::unique_ptr<HeaderListView> headerListView() const override;
 
   /**
    * Allow easy pretty-printing of the key/value pairs in HeaderMap

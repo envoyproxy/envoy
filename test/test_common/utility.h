@@ -777,6 +777,9 @@ public:
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     header_map_.dumpState(os, indent_level);
   }
+  std::unique_ptr<HeaderListView> headerListView() const override {
+    return header_map_.headerListView();
+  }
 
   Impl header_map_;
 };

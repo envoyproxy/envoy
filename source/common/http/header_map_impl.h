@@ -91,6 +91,7 @@ public:
   size_t size() const override { return headers_.size(); }
   bool empty() const override { return headers_.empty(); }
   void dumpState(std::ostream& os, int indent_level = 0) const override;
+  std::unique_ptr<HeaderListView> headerListView() const override;
 
 protected:
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {
@@ -205,6 +206,30 @@ protected:
   private:
     std::list<HeaderEntryImpl> headers_;
     std::list<HeaderEntryImpl>::iterator pseudo_headers_end_;
+  };
+
+  class HeaderListViewImpl : public HeaderListView {
+  public:
+    HeaderListViewImpl(const HeaderList* headers) : headers_(headers) {}
+
+    std::vector<const HeaderString*> keys() const {
+      std::vector<const HeaderString*> header_keys;
+      for (auto i = headers_->begin(); i != headers_->end(); ++i) {
+        header_keys.emplace_back(&(i->key()));
+      }
+      return header_keys;
+    }
+
+    std::vector<const HeaderString*> values() const {
+      std::vector<const HeaderString*> header_values;
+      for (auto i = headers_->begin(); i != headers_->end(); ++i) {
+        header_values.emplace_back(&(i->value()));
+      }
+      return header_values;
+    }
+
+  private:
+    const HeaderList* headers_;
   };
 
   void insertByKey(HeaderString&& key, HeaderString&& value);

@@ -557,6 +557,10 @@ void HeaderMapImpl::dumpState(std::ostream& os, int indent_level) const {
       &iterate_data);
 }
 
+std::unique_ptr<HeaderListView> HeaderMapImpl::headerListView() const {
+  return std::make_unique<HeaderMapImpl::HeaderListViewImpl>(&headers_);
+}
+
 HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl** entry,
                                                                  const LowerCaseString& key) {
   if (*entry) {
