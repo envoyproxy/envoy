@@ -40,20 +40,22 @@ namespace {
 // Helper class for the three Utility::*FromElements implementations to build up
 // a joined StatName from a mix of StatName and string_view.
 struct ElementVisitor {
-  ElementVisitor(SymbolTable& symbol_table) : symbol_table_(symbol_table), pool_(symbol_table) {}
+  ElementVisitor(SymbolTable& symbol_table, const ElementVec& elements)
+      : symbol_table_(symbol_table), pool_(symbol_table) {
+    for (const Element& element : elements) {
+      absl::visit(*this, element);
+    }
+    joined_ = symbol_table_.join(stat_names_);
+  }
 
   // Overloads provides for absl::visit to call.
   void operator()(StatName stat_name) { stat_names_.push_back(stat_name); }
   void operator()(absl::string_view name) { stat_names_.push_back(pool_.add(name)); }
 
-  // Generates a StatName from the elements.
-  StatName makeStatName(const ElementVec& elements) {
-    for (const Element& element : elements) {
-      absl::visit(*this, element);
-    }
-    joined_ = symbol_table_.join(stat_names_);
-    return StatName(joined_.get());
-  }
+  /**
+   * @return the StatName constructed by joining the elements.
+   */
+  StatName statName() { return StatName(joined_.get()); }
 
   SymbolTable& symbol_table_;
   StatNameVec stat_names_;
@@ -65,8 +67,8 @@ struct ElementVisitor {
 
 Counter& Utility::counterFromElements(Scope& scope, const ElementVec& elements,
                                       StatNameTagVectorOptConstRef tags) {
-  ElementVisitor visitor(scope.symbolTable());
-  return scope.counterFromStatNameWithTags(visitor.makeStatName(elements), tags);
+  ElementVisitor visitor(scope.symbolTable(), elements);
+  return scope.counterFromStatNameWithTags(visitor.statName(), tags);
 }
 
 Counter& Utility::counterFromStatNames(Scope& scope, const StatNameVec& elements,
@@ -78,8 +80,8 @@ Counter& Utility::counterFromStatNames(Scope& scope, const StatNameVec& elements
 Gauge& Utility::gaugeFromElements(Scope& scope, const ElementVec& elements,
                                   Gauge::ImportMode import_mode,
                                   StatNameTagVectorOptConstRef tags) {
-  ElementVisitor visitor(scope.symbolTable());
-  return scope.gaugeFromStatNameWithTags(visitor.makeStatName(elements), tags, import_mode);
+  ElementVisitor visitor(scope.symbolTable(), elements);
+  return scope.gaugeFromStatNameWithTags(visitor.statName(), tags, import_mode);
 }
 
 Gauge& Utility::gaugeFromStatNames(Scope& scope, const StatNameVec& elements,
@@ -91,8 +93,8 @@ Gauge& Utility::gaugeFromStatNames(Scope& scope, const StatNameVec& elements,
 
 Histogram& Utility::histogramFromElements(Scope& scope, const ElementVec& elements,
                                           Histogram::Unit unit, StatNameTagVectorOptConstRef tags) {
-  ElementVisitor visitor(scope.symbolTable());
-  return scope.histogramFromStatNameWithTags(visitor.makeStatName(elements), tags, unit);
+  ElementVisitor visitor(scope.symbolTable(), elements);
+  return scope.histogramFromStatNameWithTags(visitor.statName(), tags, unit);
 }
 
 Histogram& Utility::histogramFromStatNames(Scope& scope, const StatNameVec& elements,
@@ -104,8 +106,8 @@ Histogram& Utility::histogramFromStatNames(Scope& scope, const StatNameVec& elem
 
 TextReadout& Utility::textReadoutFromElements(Scope& scope, const ElementVec& elements,
                                               StatNameTagVectorOptConstRef tags) {
-  ElementVisitor visitor(scope.symbolTable());
-  return scope.textReadoutFromStatNameWithTags(visitor.makeStatName(elements), tags);
+  ElementVisitor visitor(scope.symbolTable(), elements);
+  return scope.textReadoutFromStatNameWithTags(visitor.statName(), tags);
 }
 
 TextReadout& Utility::textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,

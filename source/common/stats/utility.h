@@ -22,6 +22,9 @@ namespace Stats {
  */
 class DynamicName : public absl::string_view {
 public:
+  // This is intentionally left as an implicit conversion from string_view to
+  // make call-sites easier to read, e.g.
+  //    Utility::counterFromElements(*scope, {DynamicName("a"), DynamicName("b")});
   DynamicName(absl::string_view s) : absl::string_view(s) {}
 };
 
@@ -61,8 +64,8 @@ public:
 
   /**
    * Creates a counter from a vector of tokens which are used to create the
-   * name. The tokens can be specified as string_view or StatName. For
-   * tokens specified as string_view, a dynamic StatName will be created. See
+   * name. The tokens can be specified as DynamicName or StatName. For
+   * tokens specified as DynamicName, a dynamic StatName will be created. See
    * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
    * for more detail on why symbolic StatNames are preferred when possible.
    *
@@ -70,7 +73,7 @@ public:
    * passing DynamicName(string)s as names.
    *
    * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed string_view and StatName
+   * @param elements The vector of mixed DynamicName and StatName
    * @param tags optionally specified tags.
    * @return A counter named using the joined elements.
    */
@@ -79,10 +82,7 @@ public:
 
   /**
    * Creates a counter from a vector of tokens which are used to create the
-   * name. The tokens can be specified as string_view or StatName. For
-   * tokens specified as string_view, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
-   * for more detail on why symbolic StatNames are preferred when possible.
+   * name. The tokens must be of type StatName.
    *
    * See also counterFromElements, which is slightly slower, but allows
    * passing DynamicName(string)s as elements.
@@ -97,8 +97,8 @@ public:
 
   /**
    * Creates a gauge from a vector of tokens which are used to create the
-   * name. The tokens can be specified as string_view or StatName. For
-   * tokens specified as string_view, a dynamic StatName will be created. See
+   * name. The tokens can be specified as DynamicName or StatName. For
+   * tokens specified as DynamicName, a dynamic StatName will be created. See
    * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
    * for more detail on why symbolic StatNames are preferred when possible.
    *
@@ -106,7 +106,7 @@ public:
    * passing DynamicName(string)s as names.
    *
    * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed string_view and StatName
+   * @param elements The vector of mixed DynamicName and StatName
    * @param import_mode Whether hot-restart should accumulate this value.
    * @param tags optionally specified tags.
    * @return A gauge named using the joined elements.
@@ -117,10 +117,7 @@ public:
 
   /**
    * Creates a gauge from a vector of tokens which are used to create the
-   * name. The tokens can be specified as string_view or StatName. For
-   * tokens specified as string_view, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
-   * for more detail on why symbolic StatNames are preferred when possible.
+   * name. The tokens must be of type StatName.
    *
    * See also gaugeFromElements, which is slightly slower, but allows
    * passing DynamicName(string)s as elements.
@@ -137,8 +134,8 @@ public:
 
   /**
    * Creates a histogram from a vector of tokens which are used to create the
-   * name. The tokens can be specified as string_view or StatName. For
-   * tokens specified as string_view, a dynamic StatName will be created. See
+   * name. The tokens can be specified as DynamicName or StatName. For
+   * tokens specified as DynamicName, a dynamic StatName will be created. See
    * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
    * for more detail on why symbolic StatNames are preferred when possible.
    *
@@ -146,7 +143,7 @@ public:
    * passing DynamicName(string)s as names.
    *
    * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed string_view and StatName
+   * @param elements The vector of mixed DynamicName and StatName
    * @param unit The unit of measurement.
    * @param tags optionally specified tags.
    * @return A histogram named using the joined elements.
@@ -157,16 +154,13 @@ public:
 
   /**
    * Creates a histogram from a vector of tokens which are used to create the
-   * name. The tokens can be specified as string_view or StatName. For
-   * tokens specified as string_view, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
-   * for more detail on why symbolic StatNames are preferred when possible.
+   * name. The tokens must be of type StatName.
    *
    * See also histogramFromElements, which is slightly slower, but allows
    * passing DynamicName(string)s as elements.
    *
    * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed string_view and StatName
+   * @param elements The vector of mixed DynamicName and StatName
    * @param unit The unit of measurement.
    * @param tags optionally specified tags.
    * @return A histogram named using the joined elements.
@@ -177,8 +171,8 @@ public:
 
   /**
    * Creates a TextReadout from a vector of tokens which are used to create the
-   * name. The tokens can be specified as string_view or StatName. For
-   * tokens specified as string_view, a dynamic StatName will be created. See
+   * name. The tokens can be specified as DynamicName or StatName. For
+   * tokens specified as DynamicName, a dynamic StatName will be created. See
    * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
    * for more detail on why symbolic StatNames are preferred when possible.
    *
@@ -186,7 +180,7 @@ public:
    * passing DynamicName(string)s as names.
    *
    * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed string_view and StatName
+   * @param elements The vector of mixed DynamicName and StatName
    * @param unit The unit of measurement.
    * @param tags optionally specified tags.
    * @return A TextReadout named using the joined elements.
@@ -196,16 +190,13 @@ public:
 
   /**
    * Creates a TextReadout from a vector of tokens which are used to create the
-   * name. The tokens can be specified as string_view or StatName. For
-   * tokens specified as string_view, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
-   * for more detail on why symbolic StatNames are preferred when possible.
+   * name. The tokens must be of type StatName.
    *
    * See also TextReadoutFromElements, which is slightly slower, but allows
    * passing DynamicName(string)s as elements.
    *
    * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed string_view and StatName
+   * @param elements The vector of mixed DynamicName and StatName
    * @param unit The unit of measurement.
    * @param tags optionally specified tags.
    * @return A TextReadout named using the joined elements.
