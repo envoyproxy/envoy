@@ -7,6 +7,7 @@
 
 #include "common/stats/symbol_table_impl.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -37,7 +38,7 @@ public:
  * co-mingling of symbolic and dynamic stat-name components.
  */
 using Element = absl::variant<StatName, DynamicName>;
-using ElementVec = std::vector<Element>;
+using ElementVec = absl::InlinedVector<Element, 8>;
 
 /**
  * Common stats utility routines.

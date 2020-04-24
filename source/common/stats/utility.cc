@@ -42,6 +42,7 @@ namespace {
 struct ElementVisitor {
   ElementVisitor(SymbolTable& symbol_table, const ElementVec& elements)
       : symbol_table_(symbol_table), pool_(symbol_table) {
+    stat_names_.resize(elements.size());
     for (const Element& element : elements) {
       absl::visit(*this, element);
     }
