@@ -53,9 +53,9 @@ name: fault
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
   abort:
+    grpc_status: 5
     percentage:
       numerator: 100
-    grpc_status: 5
 )EOF";
 };
 

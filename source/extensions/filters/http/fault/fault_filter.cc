@@ -296,12 +296,19 @@ AbortHttpAndGrpcStatus FaultFilter::abortStatus(const Http::RequestHeaderMap& re
     return AbortHttpAndGrpcStatus{absl::nullopt, absl::nullopt};
   }
 
-  auto grpc_status = abortGrpcStatus(request_headers);
+  auto http_status = abortHttpStatus(request_headers);
+  // If http status code is set, then gRPC status won't be used.
+  if (http_status.has_value()) {
+    return AbortHttpAndGrpcStatus{http_status, absl::nullopt};
+  }
 
-  // If gRPC status code is set, then HTTP will be set to Http::Code::OK (200).
-  return grpc_status.has_value()
-             ? AbortHttpAndGrpcStatus{Http::Code::OK, grpc_status}
-             : AbortHttpAndGrpcStatus{abortHttpStatus(request_headers), absl::nullopt};
+  auto grpc_status = abortGrpcStatus(request_headers);
+  // If gRPC status code is set, then http status will be set to Http::Code::OK (200)
+  if (grpc_status.has_value()) {
+    return AbortHttpAndGrpcStatus{Http::Code::OK, grpc_status};
+  }
+
+  return AbortHttpAndGrpcStatus{absl::nullopt, absl::nullopt};
 }
 
 absl::optional<Http::Code>

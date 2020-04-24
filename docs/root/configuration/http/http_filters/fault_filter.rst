@@ -59,7 +59,10 @@ x-envoy-fault-abort-grpc-request
   the gRPC status code to return in response to a request. Its value range is [0, UInt32.Max] instead of [0, 16]
   to allow testing even not well-defined gRPC status codes. When this header is set, the HTTP response status code
   will be set to 200. In order for the header to work, :ref:`header_abort
-  <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set. 
+  <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set. If both 
+  *x-envoy-fault-abort-request* and *x-envoy-fault-abort-grpc-request* headers are set then 
+  *x-envoy-fault-abort-grpc-request* header will be **ignored** and fault response http status code will be
+  set to *x-envoy-fault-abort-request* header value.
 
 x-envoy-fault-abort-grpc-request-percentage
   The percentage of gRPC requests that should be failed with a status code that's defined
@@ -71,7 +74,8 @@ x-envoy-fault-abort-grpc-request-percentage
   :ref:`percentage <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>` field.
   In order for the header to work, :ref:`header_abort
   <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set and
-  *x-envoy-fault-abort-grpc-request* HTTP header needs to be a part of a request.
+  *x-envoy-fault-abort-grpc-request* HTTP header needs to be a part of the request and 
+  *x-envoy-fault-abort-request* header should not be present in the request.
 
 x-envoy-fault-delay-request
   The duration to delay a request by. The header value should be an integer that specifies the number
