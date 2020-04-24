@@ -294,8 +294,7 @@ public:
   Filter(FilterConfig& config)
       : config_(config), final_upstream_request_(nullptr), downstream_response_started_(false),
         downstream_end_stream_(false), is_retry_(false),
-        attempting_internal_redirect_with_complete_stream_(false),
-        allow_full_streaming_retry_(false) {}
+        attempting_internal_redirect_with_complete_stream_(false) {}
 
   ~Filter() override;
 
