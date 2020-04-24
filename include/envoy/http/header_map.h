@@ -269,12 +269,12 @@ struct HeaderListView {
   /**
    * @return all of header keys.
    */
-  virtual std::vector<const HeaderString*> keys() const PURE;
+  virtual std::vector<std::reference_wrapper<const HeaderString>> keys() const PURE;
 
   /**
    * @return all of header values.
    */
-  virtual std::vector<const HeaderString*> values() const PURE;
+  virtual std::vector<std::reference_wrapper<const HeaderString>> values() const PURE;
 };
 
 /**

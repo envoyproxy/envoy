@@ -212,18 +212,18 @@ protected:
   public:
     HeaderListViewImpl(const HeaderList* headers) : headers_(headers) {}
 
-    std::vector<const HeaderString*> keys() const {
-      std::vector<const HeaderString*> header_keys;
-      for (auto i = headers_->begin(); i != headers_->end(); ++i) {
-        header_keys.emplace_back(&(i->key()));
+    std::vector<std::reference_wrapper<const HeaderString>> keys() const {
+      std::vector<std::reference_wrapper<const HeaderString>> header_keys;
+      for (const auto& header : *headers_) {
+        header_keys.emplace_back(header.key());
       }
       return header_keys;
     }
 
-    std::vector<const HeaderString*> values() const {
-      std::vector<const HeaderString*> header_values;
-      for (auto i = headers_->begin(); i != headers_->end(); ++i) {
-        header_values.emplace_back(&(i->value()));
+    std::vector<std::reference_wrapper<const HeaderString>> values() const {
+      std::vector<std::reference_wrapper<const HeaderString>> header_values;
+      for (const auto& header : *headers_) {
+        header_values.emplace_back(header.value());
       }
       return header_values;
     }
