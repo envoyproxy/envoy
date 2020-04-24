@@ -85,9 +85,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/mirror/tclap/archive/tclap-1-2-1-release-final.tar.gz"],
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "f1907a58d5e86e6c382e51441d92ad9e23aea63827ba47fd647eacc0d3a16c78",
-        strip_prefix = "fmt-6.0.0",
-        urls = ["https://github.com/fmtlib/fmt/archive/6.0.0.tar.gz"],
+        sha256 = "fe6e4ff397e01c379fc4532519339c93da47404b9f6674184a458a9967a76575",
+        strip_prefix = "fmt-6.2.0",
+        urls = ["https://github.com/fmtlib/fmt/archive/6.2.0.tar.gz"],
     ),
     com_github_gabime_spdlog = dict(
         sha256 = "afd18f62d1bc466c60bef088e6b637b0284be88c515cedc59ad4554150af6043",
