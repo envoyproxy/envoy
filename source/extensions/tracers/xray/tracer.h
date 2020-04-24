@@ -8,6 +8,7 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/common/hex.h"
+#include "common/protobuf/utility.h"
 
 #include "extensions/tracers/xray/daemon_broker.h"
 #include "extensions/tracers/xray/sampling_strategy.h"
@@ -23,7 +24,7 @@ namespace XRay {
 
 constexpr auto XRayTraceHeader = "x-amzn-trace-id";
 
-class Span : public Tracing::Span {
+class Span : public Tracing::Span, Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Creates a new Span.
@@ -112,7 +113,7 @@ public:
   /**
    * Gets this Span's ID.
    */
-  const std::string& Id() const { return id_; }
+  const std::string& id() const { return id_; }
 
   const std::string& parentId() const { return parent_segment_id_; }
 
@@ -147,8 +148,8 @@ private:
   std::string trace_id_;
   std::string parent_segment_id_;
   std::string name_;
-  absl::flat_hash_map<std::string, std::string> http_request_annotations_;
-  absl::flat_hash_map<std::string, std::string> http_response_annotations_;
+  absl::flat_hash_map<std::string, ProtobufWkt::Value> http_request_annotations_;
+  absl::flat_hash_map<std::string, ProtobufWkt::Value> http_response_annotations_;
   absl::flat_hash_map<std::string, std::string> custom_annotations_;
   Envoy::TimeSource& time_source_;
   DaemonBroker& broker_;

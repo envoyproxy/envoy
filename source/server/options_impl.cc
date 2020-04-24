@@ -15,6 +15,7 @@
 
 #include "server/options_impl_platform.h"
 
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "spdlog/spdlog.h"
@@ -65,6 +66,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<std::string> config_yaml(
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
+  TCLAP::ValueArg<uint32_t> bootstrap_version(
+      "", "bootstrap-version",
+      "API version to parse the bootstrap config as (e.g. 3). If "
+      "unset, all known versions will be attempted",
+      false, 0, "string", cmd);
 
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
                                         "allow unknown fields in static configuration (DEPRECATED)",
@@ -92,6 +98,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg log_format_escaped("", "log-format-escaped",
                                       "Escape c-style escape sequences in the application logs",
                                       cmd, false);
+  TCLAP::ValueArg<bool> log_format_prefix_with_location(
+      "", "log-format-prefix-with-location",
+      "Prefix all occurrences of '%v' in log format with with '[%g:%#] ' ('[path/to/file.cc:99] "
+      "').",
+      false, true, "bool", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
@@ -168,6 +179,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 
   log_format_ = log_format.getValue();
+  if (log_format_prefix_with_location.getValue()) {
+    log_format_ = absl::StrReplaceAll(log_format_, {{"%%", "%%"}, {"%v", "[%g:%#] %v"}});
+  }
   log_format_escaped_ = log_format_escaped.getValue();
 
   parseComponentLogLevels(component_log_level.getValue());
@@ -211,6 +225,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
+  if (bootstrap_version.getValue() != 0) {
+    bootstrap_version_ = bootstrap_version.getValue();
+  }
   if (allow_unknown_fields.getValue()) {
     ENVOY_LOG(warn,
               "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.");

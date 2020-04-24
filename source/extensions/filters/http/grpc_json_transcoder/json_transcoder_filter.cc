@@ -259,7 +259,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     const Http::RequestHeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
     std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info) {
-  if (Grpc::Common::hasGrpcContentType(headers)) {
+  if (Grpc::Common::isGrpcRequestHeaders(headers)) {
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
                                 "Request headers has application/grpc content-type");
   }
@@ -361,8 +361,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     // just pass-through the request to upstream.
     return Http::FilterHeadersStatus::Continue;
   }
-  has_http_body_response_ =
-      !method_->descriptor_->server_streaming() && method_->response_type_is_http_body_;
+
   if (method_->request_type_is_http_body_) {
     if (headers.ContentType() != nullptr) {
       absl::string_view content_type = headers.ContentType()->value().getStringView();
@@ -477,7 +476,7 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
-  if (!Grpc::Common::isGrpcResponseHeader(headers, end_stream)) {
+  if (!Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
     error_ = true;
   }
 
@@ -502,11 +501,14 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
   }
 
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  if (!method_->descriptor_->server_streaming()) {
-    return Http::FilterHeadersStatus::StopIteration;
-  }
 
-  return Http::FilterHeadersStatus::Continue;
+  // In case of HttpBody in response - content type is unknown at this moment.
+  // So "Continue" only for regular streaming use case and StopIteration for
+  // all other cases (non streaming, streaming + httpBody)
+  if (method_->descriptor_->server_streaming() && !method_->response_type_is_http_body_) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -516,10 +518,12 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
 
   has_body_ = true;
 
-  // TODO(dio): Add support for streaming case.
-  if (has_http_body_response_) {
+  if (method_->response_type_is_http_body_) {
     buildResponseFromHttpBodyOutput(*response_headers_, data);
-    return Http::FilterDataStatus::StopIterationAndBuffer;
+    if (!method_->descriptor_->server_streaming()) {
+      return Http::FilterDataStatus::StopIterationAndBuffer;
+    }
+    return Http::FilterDataStatus::Continue;
   }
 
   response_in_.move(data);
@@ -539,6 +543,13 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   return Http::FilterDataStatus::Continue;
 }
 
+Http::FilterTrailersStatus
+JsonTranscoderFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  doTrailers(trailers);
+
+  return Http::FilterTrailersStatus::Continue;
+}
+
 void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers) {
   if (error_ || !transcoder_) {
     return;
@@ -549,6 +560,12 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
       Grpc::Common::getGrpcStatus(headers_or_trailers, true);
   if (grpc_status && maybeConvertGrpcStatus(*grpc_status, headers_or_trailers)) {
+    return;
+  }
+
+  if (method_->response_type_is_http_body_ && method_->descriptor_->server_streaming()) {
+    // Do not add empty json when HttpBody + streaming
+    // Also, headers already sent, just continue.
     return;
   }
 
@@ -667,8 +684,15 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
 
       data.add(body);
 
-      response_headers.setContentType(http_body.content_type());
-      response_headers.setContentLength(body.size());
+      if (!method_->descriptor_->server_streaming()) {
+        // Non streaming case: single message with content type / length
+        response_headers.setContentType(http_body.content_type());
+        response_headers.setContentLength(body.size());
+      } else if (!http_body_response_headers_set_) {
+        // Streaming case: set content type only once from first HttpBody message
+        response_headers.setContentType(http_body.content_type());
+        http_body_response_headers_set_ = true;
+      }
       return;
     }
   }

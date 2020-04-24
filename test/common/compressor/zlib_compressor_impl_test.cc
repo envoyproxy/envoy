@@ -61,9 +61,9 @@ protected:
 
   void drainBuffer(Buffer::OwnedImpl& buffer) { buffer.drain(buffer.length()); }
 
-  static const int64_t gzip_window_bits{31};
-  static const int64_t memory_level{8};
-  static const uint64_t default_input_size{796};
+  static constexpr int64_t gzip_window_bits{31};
+  static constexpr int64_t memory_level{8};
+  static constexpr uint64_t default_input_size{796};
 };
 
 class ZlibCompressorImplTester : public ZlibCompressorImpl {

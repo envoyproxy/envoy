@@ -298,8 +298,11 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
       &json_req);
 
   // Wrap the Query String
-  for (auto&& kv_pair : Http::Utility::parseQueryString(headers.Path()->value().getStringView())) {
-    json_req.mutable_query_string_parameters()->insert({kv_pair.first, kv_pair.second});
+  if (headers.Path()) {
+    for (auto&& kv_pair :
+         Http::Utility::parseQueryString(headers.Path()->value().getStringView())) {
+      json_req.mutable_query_string_parameters()->insert({kv_pair.first, kv_pair.second});
+    }
   }
 
   // Wrap the body
