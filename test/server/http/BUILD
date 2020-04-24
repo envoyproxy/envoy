@@ -74,6 +74,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "prometheus_stats_test",
+    srcs = ["prometheus_stats_test.cc"],
+    deps = [
+        "//source/server/http:prometheus_stats_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "config_tracker_impl_test",
     srcs = ["config_tracker_impl_test.cc"],
     deps = [
