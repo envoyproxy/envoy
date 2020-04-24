@@ -10,6 +10,8 @@ static_resources:
       - name: envoy.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          tracing:
+            verbose: true          
           codec_type: auto
           stat_prefix: ingress_http
           route_config:
