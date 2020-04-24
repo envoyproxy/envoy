@@ -225,7 +225,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
       }
     };
 
-    // This is an unsorted colllection of dumb-pointers (no need to increment then decrement every
+    // This is an unsorted collection of dumb-pointers (no need to increment then decrement every
     // refcount; ownership is held throughout by `metrics`). It is unsorted for efficiency, but will
     // be sorted before producing the final output to satisfy the "preferred" ordering from the
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will be
