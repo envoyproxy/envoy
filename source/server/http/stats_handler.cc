@@ -206,25 +206,31 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
    * them by tag-extracted metric name, and then outputting them in the correct sorted order into
    * response.
    *
-   * @param metrics A vector of pointers to a metric type.
+   * @param metrics A vector of Stats::RefcountPtr to a metric type.
    * @param generate_output A std::function<std::string(const MetricType& metric, const std::string&
    *        prefixedTagExtractedName)> which returns the output text for this metric.
    */
-  auto process_type = [&](const auto& metrics, const auto& generate_output,
-                          absl::string_view type) -> uint64_t {
-    using MetricType = typename std::remove_reference<decltype(metrics)>::type::value_type;
+  auto process_type = [&response, &regex, used_only](const auto& metrics,
+                                                     const auto& generate_output,
+                                                     absl::string_view type) -> uint64_t {
+    // Get the inner element type (MetricType) from a `const
+    // std::vector<Stats::MetricTypeSharedPtr>&`
+    using MetricType =
+        typename std::remove_reference<decltype(metrics)>::type::value_type::element_type;
 
     struct MetricLessThan {
-      bool operator()(const MetricType& a, const MetricType& b) const {
+      bool operator()(const MetricType* a, const MetricType* b) const {
         ASSERT(&a->constSymbolTable() == &b->constSymbolTable());
         return a->constSymbolTable().lessThan(a->statName(), b->statName());
       }
     };
 
-    // This is a sorted collection to satisfy the "preferred" ordering from the prometheus
-    // spec: metrics will be sorted by their tags' textual representation, which will be consistent
-    // across calls.
-    using MetricTypeSortedCollection = std::set<MetricType, MetricLessThan>;
+    // This is an unsorted colllection of dumb-pointers (no need to increment then decrement every
+    // refcount; ownership is held throughout by `metrics`). It is unsorted for efficiency, but will
+    // be sorted before producing the final output to satisfy the "preferred" ordering from the
+    // prometheus spec: metrics will be sorted by their tags' textual representation, which will be
+    // consistent across calls.
+    using MetricTypeUnsortedCollection = std::vector<const MetricType*>;
 
     // Return early to avoid crashing when getting the symbol table from the first metric.
     if (metrics.empty()) {
@@ -239,7 +245,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
 
     // Sorted collection of metrics sorted by their tagExtractedName, to satisfy the requirements
     // of the exposition format.
-    std::map<Stats::StatName, MetricTypeSortedCollection, Stats::StatNameLessThan> groups(
+    std::map<Stats::StatName, MetricTypeUnsortedCollection, Stats::StatNameLessThan> groups(
         global_symbol_table);
 
     for (const auto& metric : metrics) {
@@ -249,12 +255,17 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
         continue;
       }
 
-      groups[metric->tagExtractedStatName()].emplace(metric);
+      groups[metric->tagExtractedStatName()].push_back(metric.get());
     }
 
-    for (const auto& group : groups) {
+    for (auto& group : groups) {
       const std::string metric_name = metricName(global_symbol_table.toString(group.first));
       response.add(fmt::format("# TYPE {0} {1}\n", metric_name, type));
+
+      // Sort before producing the final output to satisfy the "preferred" ordering from the
+      // prometheus spec: metrics will be sorted by their tags' textual representation, which will
+      // be consistent across calls.
+      std::sort(group.second.begin(), group.second.end(), MetricLessThan());
 
       for (const auto& metric : group.second) {
         response.add(generate_output(*metric, metric_name));
