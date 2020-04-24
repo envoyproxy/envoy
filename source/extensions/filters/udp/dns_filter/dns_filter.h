@@ -56,14 +56,14 @@ public:
   bool forwardQueries() const { return forward_queries_; }
   const std::chrono::milliseconds resolverTimeout() const { return resolver_timeout_ms_; }
 
-  static constexpr uint64_t DefaultResolverTimeoutMs = 500;
-  static constexpr uint64_t DefaultResolverTTLs = 300;
-
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
     const auto final_prefix = absl::StrCat("dns_filter.", stat_prefix);
     return {ALL_DNS_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
+
+  std::chrono::milliseconds DefaultResolverTimeout = std::chrono::milliseconds(500);
+  std::chrono::seconds DefaultResolverTTL = std::chrono::seconds(300);
 
   Stats::Scope& root_scope_;
 

@@ -26,7 +26,6 @@ inline void BaseDnsRecord::serializeName(Buffer::OwnedImpl& output) {
   auto iter = name_.begin();
 
   while (count != std::string::npos) {
-
     count -= last;
     output.writeBEInt<uint8_t>(count);
     for (size_t i = 0; i < count; i++) {
@@ -91,7 +90,6 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   DnsQueryParseState state_{DnsQueryParseState::Init};
 
   while (state_ != DnsQueryParseState::Finish) {
-
     // Ensure that we have enough data remaining in the buffer to parse the query
     if (available_bytes < field_size) {
       ENVOY_LOG(error,
@@ -143,9 +141,6 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
 
     case DnsQueryParseState::Finish:
       break;
-
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 
@@ -221,8 +216,6 @@ DnsQueryRecordPtr DnsMessageParser::parseDnsQueryRecord(const Buffer::InstancePt
   record_class = buffer->peekBEInt<uint16_t>(name_offset);
   name_offset += sizeof(record_class);
 
-  // This is shared because we use the query from a list when building the response.
-  // Using a shared pointer avoids duplicating this data in the asynchronous resolution path
   auto rec = std::make_unique<DnsQueryRecord>(record_name, record_type, record_class);
 
   // stop reading he buffer here since we aren't parsing additional records
