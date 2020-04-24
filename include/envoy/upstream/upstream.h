@@ -110,7 +110,7 @@ public:
   virtual CreateConnectionData
   createHealthCheckConnection(Event::Dispatcher& dispatcher,
                               Network::TransportSocketOptionsSharedPtr transport_socket_options,
-                              MetadataConstSharedPtr metadata) const PURE;
+                              const envoy::config::core::v3::Metadata* metadata) const PURE;
 
   /**
    * @return host specific gauges.

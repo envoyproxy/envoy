@@ -307,11 +307,11 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
 Host::CreateConnectionData HostImpl::createHealthCheckConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsSharedPtr transport_socket_options,
-    MetadataConstSharedPtr metadata) const {
+    const envoy::config::core::v3::Metadata* metadata) const {
 
   Network::TransportSocketFactory& factory =
-      (metadata) ? resolveTransportSocketFactory(healthCheckAddress(), metadata.get())
-                 : socket_factory_;
+      (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
+                            : socket_factory_;
   return {createConnection(dispatcher, *cluster_, healthCheckAddress(), factory, nullptr,
                            transport_socket_options),
           shared_from_this()};

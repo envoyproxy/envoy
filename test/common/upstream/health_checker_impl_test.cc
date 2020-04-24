@@ -2496,7 +2496,7 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
 
   auto default_socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
   // We expect that this default_socket_factory will NOT be used to create a transport socket for
-  // the health check connection
+  // the health check connection.
   EXPECT_CALL(*default_socket_factory, createTransportSocket(_)).Times(0);
   auto transport_socket_match = std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(
       std::move(default_socket_factory));
@@ -2508,24 +2508,24 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
         key: value
   )EOF");
 
-  // We expect resolve() to be called twice, once for endpoint socket matching (with no metadata in
-  // this test) and once for health check socket matching. In the latter we expect metadata that
-  // matches the above object.
-  EXPECT_CALL(*transport_socket_match, resolve(nullptr));
-
   Stats::IsolatedStoreImpl stats_store;
   auto health_transport_socket_stats = TransportSocketMatchStats{
       ALL_TRANSPORT_SOCKET_MATCH_STATS(POOL_COUNTER_PREFIX(stats_store, "test"))};
   auto health_check_only_socket_factory =
       std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+
+  // We expect resolve() to be called twice, once for endpoint socket matching (with no metadata in
+  // this test) and once for health check socket matching. In the latter we expect metadata that
+  // matches the above object.
+  EXPECT_CALL(*transport_socket_match, resolve(nullptr));
   EXPECT_CALL(*transport_socket_match, resolve(MetadataEq(metadata)))
       .WillOnce(Return(TransportSocketMatcher::MatchData(
           *health_check_only_socket_factory, health_transport_socket_stats, "health_check_only")));
   // The health_check_only_socket_factory should be used to create a transport socket for the health
-  // check connection
+  // check connection.
   EXPECT_CALL(*health_check_only_socket_factory, createTransportSocket(_));
 
-  cluster_->info_->transport_socket_matcher_.reset(transport_socket_match.release());
+  cluster_->info_->transport_socket_matcher_ = std::move(transport_socket_match);
 
   health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
       *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,

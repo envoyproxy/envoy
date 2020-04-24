@@ -67,7 +67,7 @@ MetadataConstSharedPtr HealthCheckerImplBase::initTransportSocketMatchMetadata(
     return metadata;
   }
 
-  return MetadataConstSharedPtr();
+  return nullptr;
 }
 
 HealthCheckerImplBase::~HealthCheckerImplBase() {
