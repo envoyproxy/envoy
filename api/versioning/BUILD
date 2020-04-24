@@ -210,7 +210,6 @@ proto_library(
         "//envoy/config/filter/network/thrift_proxy/v2alpha1:pkg",
         "//envoy/config/filter/network/zookeeper_proxy/v1alpha1:pkg",
         "//envoy/config/filter/thrift/rate_limit/v2alpha1:pkg",
-        "//envoy/config/filter/udp/dns_filter/v2alpha:pkg",
         "//envoy/config/grpc_credential/v2alpha:pkg",
         "//envoy/config/listener/v2:pkg",
         "//envoy/config/metrics/v2:pkg",
