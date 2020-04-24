@@ -412,5 +412,6 @@ envoy_cc_library(
     ],
     deps = [
         "//include/envoy/http:codes_interface",
+        "//source/common/common:assert_lib",
     ],
 )
