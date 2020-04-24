@@ -252,8 +252,6 @@ public:
             InvokeWithoutArgs([this, decode_header_status]() -> Http::FilterHeadersStatus {
               header_status_ = fromHeaderStatus(decode_header_status);
               return *header_status_;
-              return Http::FilterHeadersStatus::
-                  Continue; //;fromTrailerStatus(trailers_action.status());
             }));
     fakeOnData();
     FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
