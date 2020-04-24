@@ -65,7 +65,7 @@ message DnsFilterConfig {
   ServerContextConfig server_config = 2;
 
   // Client context configuration controls Envoy's behavior when it must use external
-  // resolvers to answer a query.  This object is optional and if omitted instructs
+  // resolvers to answer a query. This object is optional and if omitted instructs
   // the filter to resolve queries from the data in the server_config
   ClientContextConfig client_config = 3;
 }
