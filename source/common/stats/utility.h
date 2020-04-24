@@ -26,7 +26,7 @@ public:
   // This is intentionally left as an implicit conversion from string_view to
   // make call-sites easier to read, e.g.
   //    Utility::counterFromElements(*scope, {DynamicName("a"), DynamicName("b")});
-  using absl::string_view::string_view;
+  DynamicName(absl::string_view str) : absl::string_view(str) {}
 };
 
 /**
