@@ -357,6 +357,7 @@ public:
    **/
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
                                      bool disconnect_after_headers_complete = false);
+
   std::unique_ptr<RawConnectionDriver>
   sendRawHttpAndWaitForHeader(uint8_t host_id, int port, const char* raw_http,
                               std::string* response,

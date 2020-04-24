@@ -227,8 +227,11 @@ protected:
             }));
   }
 
-  void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t warming,
-                  uint64_t active, uint64_t draining) {
+  void checkStats(int line_num, uint64_t added, uint64_t modified, uint64_t removed,
+                  uint64_t warming, uint64_t active, uint64_t draining,
+                  uint64_t draining_filter_chains) {
+    SCOPED_TRACE(line_num);
+
     EXPECT_EQ(added, server_.stats_store_.counter("listener_manager.listener_added").value());
     EXPECT_EQ(modified, server_.stats_store_.counter("listener_manager.listener_modified").value());
     EXPECT_EQ(removed, server_.stats_store_.counter("listener_manager.listener_removed").value());
@@ -244,11 +247,6 @@ protected:
                             .gauge("listener_manager.total_listeners_draining",
                                    Stats::Gauge::ImportMode::NeverImport)
                             .value());
-  }
-
-  void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t warming,
-                  uint64_t active, uint64_t draining, uint64_t draining_filter_chains) {
-    checkStats(added, modified, removed, warming, active, draining);
     EXPECT_EQ(draining_filter_chains, server_.stats_store_
                                           .gauge("listener_manager.total_filter_chains_draining",
                                                  Stats::Gauge::ImportMode::NeverImport)

@@ -152,8 +152,8 @@ public:
     drain_timer_->enableTimer(drain_time);
   }
 
-  void addFilterChainToDrain(const Network::FilterChain* filter_chain) {
-    draining_filter_chains_.push_back(filter_chain);
+  void addFilterChainToDrain(const Network::FilterChain& filter_chain) {
+    draining_filter_chains_.push_back(&filter_chain);
   }
 
   uint32_t numDrainingFilterChains() const { return draining_filter_chains_.size(); }
@@ -250,13 +250,14 @@ private:
   void drainListener(ListenerImplPtr&& listener);
 
   /**
-   * Mark filter chains which owned by listener for draining. The new listener should have taken
-   * over the listener socket and partial of the filter chains from listener.
-   * @param listener supplies the listener to be replaced.
-   * @param new_listener supplies the new listener config which is going to replace the old
+   * Start to draining filter chains that are owned by draining listener but not owned by
+   * new_listener. The new listener should have taken over the listener socket and partial of the
+   * filter chains from listener. This method is used by in place filter chain update.
+   * @param draining_listener supplies the listener to be replaced.
+   * @param new_listener supplies the new listener config which is going to replace the draining
    * listener.
    */
-  void drainFilterChains(ListenerImplPtr&& listener, ListenerImpl& new_listener);
+  void drainFilterChains(ListenerImplPtr&& draining_listener, ListenerImpl& new_listener);
 
   /**
    * Stop a listener. The listener will stop accepting new connections and its socket will be

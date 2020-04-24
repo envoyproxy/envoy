@@ -634,14 +634,15 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   // is that listener is stopped by admin interface. It is ok if that admin method is called only
   // prior to stop envoy. Otherwise we need to track the stopping state and execute full listener
   // update.
+  // TODO(lambdai): Track the stopped listener and print warning message.
 
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.listener_in_place_filterchain_update")) {
     return false;
   }
 
-  // The in place update execution flow is to replace the active listener. worker_started is the
-  // sufficient condition and is very close to the necessary condition.
+  // The in place update needs the active listener in worker thread. worker_started guarantees the
+  // existence of that active listener.
   if (!worker_started) {
     return false;
   }
@@ -675,19 +676,20 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
 ListenerImplPtr
 ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                                          bool workers_started, uint64_t hash) {
-  return std::make_unique<ListenerImpl>(
-      *this, config, version_info_, parent_, name_, added_via_api_,
-      /* new new workers started state */ workers_started,
-      /* use new hash */ hash, parent_.server_.options().concurrency());
+  // Use WrapUnique since the constructor is private.
+  return absl::WrapUnique(
+      new ListenerImpl(*this, config, version_info_, parent_, name_, added_via_api_,
+                       /* new new workers started state */ workers_started,
+                       /* use new hash */ hash, parent_.server_.options().concurrency()));
 }
 
-void ListenerImpl::diffFilterChain(const ListenerImpl& listener,
+void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
                                    std::function<void(Network::DrainableFilterChain&)> callback) {
   for (const auto& message_and_filter_chain : filter_chain_manager_.filterChainsByMessage()) {
-    if (listener.filter_chain_manager_.filterChainsByMessage().find(
+    if (another_listener.filter_chain_manager_.filterChainsByMessage().find(
             message_and_filter_chain.first) ==
-        listener.filter_chain_manager_.filterChainsByMessage().end()) {
-      // exists in this listener but not in other
+        another_listener.filter_chain_manager_.filterChainsByMessage().end()) {
+      // The filter chain exists in `this` listener but not in the listener passed in.
       callback(*message_and_filter_chain.second);
     }
   }

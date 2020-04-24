@@ -28,8 +28,8 @@ class ListenerMessageUtil {
 public:
   /**
    * This function is used by determine if the lhs config could be updated to rhs config by
-   * upgrading the ListenerConfig at ConnectionHandler. It depends on the implementation of
-   * ConnectionHandler.
+   * upgrading the ListenerConfig at ConnectionHandler. This function also need to keep updated
+   * with Listener message.
    * @return true if listener update from lhs to rhs could go through fast path.
    */
   static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
@@ -228,14 +228,6 @@ public:
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                bool workers_started, uint64_t hash, uint32_t concurrency);
-  /**
-   * Create a new listener from an existing listener and the new config message. This should be
-   * called only if the new config differs among filter chains.
-   */
-  ListenerImpl(const ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
-               const std::string& version_info, ListenerManagerImpl& parent,
-               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
-               uint32_t concurrency);
   ~ListenerImpl() override;
 
   // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
@@ -257,7 +249,7 @@ public:
    * Run the callback on each filter chain that exists in this listener but not in the passed
    * listener config.
    */
-  void diffFilterChain(const ListenerImpl& listener,
+  void diffFilterChain(const ListenerImpl& another_listener,
                        std::function<void(Network::DrainableFilterChain&)> callback);
 
   /**
@@ -338,6 +330,14 @@ public:
   SystemTime last_updated_;
 
 private:
+  /**
+   * Create a new listener from an existing listener and the new config message if the in place
+   * filter chain update is decided. Should be called only by newListenerWithFilterChain().
+   */
+  ListenerImpl(const ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
+               const std::string& version_info, ListenerManagerImpl& parent,
+               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
+               uint32_t concurrency);
   // Helpers for constructor.
   void buildAccessLog();
   void buildUdpListenerFactory(Network::Address::SocketType socket_type, uint32_t concurrency);

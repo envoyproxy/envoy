@@ -122,6 +122,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t dst_port, Buffer::Instance& in
             return false;
           },
           version) {}
+
 RawConnectionDriver::RawConnectionDriver(uint8_t src_host_id, uint32_t dst_port,
                                          Buffer::Instance& initial_data,
                                          ExitableReadCallback data_callback,
@@ -145,10 +146,12 @@ RawConnectionDriver::RawConnectionDriver(uint8_t src_host_id, uint32_t dst_port,
 RawConnectionDriver::~RawConnectionDriver() = default;
 
 void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_->run(run_type); }
+
 void RawConnectionDriver::write(absl::string_view payload) {
   Buffer::OwnedImpl buffer(payload);
   client_->write(buffer, false);
 }
+
 void RawConnectionDriver::runUntil() {
   while (!should_exit_) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
