@@ -19,9 +19,11 @@ filters.
   local_rate_limit_filter
   mongo_proxy_filter
   mysql_proxy_filter
+  postgres_proxy_filter
   rate_limit_filter
   rbac_filter
   redis_proxy_filter
+  rocketmq_proxy_filter
   tcp_proxy_filter
   thrift_proxy_filter
   sni_cluster_filter
