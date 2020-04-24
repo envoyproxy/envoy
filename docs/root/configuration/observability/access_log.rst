@@ -274,7 +274,7 @@ The following command operators are supported:
       :ref:`strictly-checked header <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>` in addition to 400 response code.
     * **SI**: Stream idle timeout in addition to 408 response code.
     * **DPE**: The downstream request had an HTTP protocol error.
-    * **UMSDR**: THe upstream request reached to max stream duration.
+    * **UMSDR**: The upstream request reached to max stream duration.
 
 %ROUTE_NAME%
   Name of the route.

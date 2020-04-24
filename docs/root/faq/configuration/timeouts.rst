@@ -59,7 +59,7 @@ context request/stream is interchangeable.
   HTTP request/response streams periodically. You can't use :ref:`request_timeout 
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_timeout>`
   in this situation because this timer will be disarmed if a response header is received on the request/response streams.
-  You can available this both on upstream and downstream.
+  This timeout is available on both upstream and downstream connections.
 
 Route timeouts
 ^^^^^^^^^^^^^^

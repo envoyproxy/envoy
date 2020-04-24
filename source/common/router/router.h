@@ -537,7 +537,6 @@ private:
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
-  bool allow_full_streaming_retry_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 

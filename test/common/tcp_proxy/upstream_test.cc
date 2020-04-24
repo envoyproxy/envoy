@@ -28,7 +28,6 @@ public:
   Http::MockRequestEncoder encoder_;
   NiceMock<Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
   std::unique_ptr<HttpUpstream> upstream_;
-  testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::string hostname_{"default.host.com"};
 };
 
