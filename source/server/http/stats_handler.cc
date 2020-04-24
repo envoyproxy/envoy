@@ -184,12 +184,13 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extracted_na
   return sanitizeName(fmt::format("envoy_{0}", extracted_name));
 }
 
-// TODO(efimki): Add support of text readouts stats.
-uint64_t PrometheusStatsFormatter::statsAsPrometheus(
-    const std::vector<Stats::CounterSharedPtr>& counters,
-    const std::vector<Stats::GaugeSharedPtr>& gauges,
-    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
-    const bool used_only, const absl::optional<std::regex>& regex) {
+template <class StatType>
+uint64_t PrometheusStatsFormatter::outputStatType(
+    Buffer::Instance& response, const bool used_only, const absl::optional<std::regex>& regex,
+    const std::vector<Stats::RefcountPtr<StatType>>& metrics,
+    const std::function<std::string(
+        const StatType& metric, const std::string& prefixed_tag_extracted_name)>& generate_output,
+    absl::string_view type) {
 
   /*
    * From
@@ -201,126 +202,116 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
    * prohibitive.
    */
 
-  /**
-   * Processes a metric type (counter, gauge, histogram) by generating all output lines, sorting
-   * them by tag-extracted metric name, and then outputting them in the correct sorted order into
-   * response.
-   *
-   * @param metrics A vector of Stats::RefcountPtr to a metric type.
-   * @param generate_output A std::function<std::string(const MetricType& metric, const std::string&
-   *        prefixedTagExtractedName)> which returns the output text for this metric.
-   */
-  auto process_type = [&response, &regex, used_only](const auto& metrics,
-                                                     const auto& generate_output,
-                                                     absl::string_view type) -> uint64_t {
-    // Get the inner element type (MetricType) from a `const
-    // std::vector<Stats::MetricTypeSharedPtr>&`
-    using MetricType =
-        typename std::remove_reference<decltype(metrics)>::type::value_type::element_type;
+  // This is an unsorted collection of dumb-pointers (no need to increment then decrement every
+  // refcount; ownership is held throughout by `metrics`). It is unsorted for efficiency, but will
+  // be sorted before producing the final output to satisfy the "preferred" ordering from the
+  // prometheus spec: metrics will be sorted by their tags' textual representation, which will be
+  // consistent across calls.
+  using StatTypeUnsortedCollection = std::vector<const StatType*>;
 
-    struct MetricLessThan {
-      bool operator()(const MetricType* a, const MetricType* b) const {
-        ASSERT(&a->constSymbolTable() == &b->constSymbolTable());
-        return a->constSymbolTable().lessThan(a->statName(), b->statName());
-      }
-    };
+  // Return early to avoid crashing when getting the symbol table from the first metric.
+  if (metrics.empty()) {
+    return 0;
+  }
 
-    // This is an unsorted collection of dumb-pointers (no need to increment then decrement every
-    // refcount; ownership is held throughout by `metrics`). It is unsorted for efficiency, but will
-    // be sorted before producing the final output to satisfy the "preferred" ordering from the
-    // prometheus spec: metrics will be sorted by their tags' textual representation, which will be
-    // consistent across calls.
-    using MetricTypeUnsortedCollection = std::vector<const MetricType*>;
+  // There should only be one symbol table for all of the stats in the admin
+  // interface. If this assumption changes, the name comparisons in this function
+  // will have to change to compare to convert all StatNames to strings before
+  // comparison.
+  const Stats::SymbolTable& global_symbol_table = metrics.front()->constSymbolTable();
 
-    // Return early to avoid crashing when getting the symbol table from the first metric.
-    if (metrics.empty()) {
-      return 0;
+  // Sorted collection of metrics sorted by their tagExtractedName, to satisfy the requirements
+  // of the exposition format.
+  std::map<Stats::StatName, StatTypeUnsortedCollection, Stats::StatNameLessThan> groups(
+      global_symbol_table);
+
+  for (const auto& metric : metrics) {
+    ASSERT(&global_symbol_table == &metric->constSymbolTable());
+
+    if (!shouldShowMetric(*metric, used_only, regex)) {
+      continue;
     }
 
-    // There should only be one symbol table for all of the stats in the admin
-    // interface. If this assumption changes, the name comparisons in this function
-    // will have to change to compare to convert all StatNames to strings before
-    // comparison.
-    const Stats::SymbolTable& global_symbol_table = metrics.front()->constSymbolTable();
+    groups[metric->tagExtractedStatName()].push_back(metric.get());
+  }
 
-    // Sorted collection of metrics sorted by their tagExtractedName, to satisfy the requirements
-    // of the exposition format.
-    std::map<Stats::StatName, MetricTypeUnsortedCollection, Stats::StatNameLessThan> groups(
-        global_symbol_table);
+  for (auto& group : groups) {
+    const std::string prefixed_tag_extracted_name =
+        metricName(global_symbol_table.toString(group.first));
+    response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
 
-    for (const auto& metric : metrics) {
-      ASSERT(&global_symbol_table == &metric->constSymbolTable());
+    // Sort before producing the final output to satisfy the "preferred" ordering from the
+    // prometheus spec: metrics will be sorted by their tags' textual representation, which will
+    // be consistent across calls.
+    std::sort(group.second.begin(), group.second.end(), MetricLessThan());
 
-      if (!shouldShowMetric(*metric, used_only, regex)) {
-        continue;
-      }
-
-      groups[metric->tagExtractedStatName()].push_back(metric.get());
+    for (const auto& metric : group.second) {
+      response.add(generate_output(*metric, prefixed_tag_extracted_name));
     }
+    response.add("\n");
+  }
+  return groups.size();
+}
 
-    for (auto& group : groups) {
-      const std::string metric_name = metricName(global_symbol_table.toString(group.first));
-      response.add(fmt::format("# TYPE {0} {1}\n", metric_name, type));
+template <class StatType>
+std::string
+PrometheusStatsFormatter::generateNumericOutput(const StatType& metric,
+                                                const std::string& prefixed_tag_extracted_name) {
+  const std::string tags = formattedTags(metric.tags());
+  return fmt::format("{0}{{{1}}} {2}\n", prefixed_tag_extracted_name, tags, metric.value());
+}
 
-      // Sort before producing the final output to satisfy the "preferred" ordering from the
-      // prometheus spec: metrics will be sorted by their tags' textual representation, which will
-      // be consistent across calls.
-      std::sort(group.second.begin(), group.second.end(), MetricLessThan());
+std::string
+PrometheusStatsFormatter::generateHistogramOutput(const Stats::ParentHistogram& histogram,
+                                                  const std::string& prefixed_tag_extracted_name) {
+  const std::string tags = formattedTags(histogram.tags());
+  const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
 
-      for (const auto& metric : group.second) {
-        response.add(generate_output(*metric, metric_name));
-      }
-      response.add("\n");
-    }
-    return groups.size();
-  };
+  const Stats::HistogramStatistics& stats = histogram.cumulativeStatistics();
+  const std::vector<double>& supported_buckets = stats.supportedBuckets();
+  const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
+  std::string output;
+  for (size_t i = 0; i < supported_buckets.size(); ++i) {
+    double bucket = supported_buckets[i];
+    uint64_t value = computed_buckets[i];
+    // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
+    // doesn't have a specific modifier to format as a fixed-point value only so we use the
+    // 'g' operator which prints the number in general fixed point format or scientific format
+    // with precision 50 to round the number up to 32 significant digits in fixed point format
+    // which should cover pretty much all cases
+    output.append(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n", prefixed_tag_extracted_name,
+                              hist_tags, bucket, value));
+  }
 
-  // Returns the prometheus output line for a counter or a gauge.
-  auto generate_counter_and_gauge_output = [](const auto& metric,
-                                              const std::string& metric_name) -> std::string {
-    const std::string tags = formattedTags(metric.tags());
-    return fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, metric.value());
-  };
+  output.append(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", prefixed_tag_extracted_name,
+                            hist_tags, stats.sampleCount()));
+  output.append(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", prefixed_tag_extracted_name, tags,
+                            stats.sampleSum()));
+  output.append(fmt::format("{0}_count{{{1}}} {2}\n", prefixed_tag_extracted_name, tags,
+                            stats.sampleCount()));
 
-  // Returns the prometheus output for a histogram. The output is a multi-line string (with embedded
-  // newlines) that contains all the individual bucket counts and sum/count for a single histogram
-  // (metric_name plus all tags).
-  auto generate_histogram_output = [](const Stats::ParentHistogram& histogram,
-                                      const std::string& metric_name) -> std::string {
-    const std::string tags = formattedTags(histogram.tags());
-    const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
+  return output;
+};
 
-    const Stats::HistogramStatistics& stats = histogram.cumulativeStatistics();
-    const std::vector<double>& supported_buckets = stats.supportedBuckets();
-    const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
-    std::string output;
-    for (size_t i = 0; i < supported_buckets.size(); ++i) {
-      double bucket = supported_buckets[i];
-      uint64_t value = computed_buckets[i];
-      // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
-      // doesn't have a specific modifier to format as a fixed-point value only so we use the
-      // 'g' operator which prints the number in general fixed point format or scientific format
-      // with precision 50 to round the number up to 32 significant digits in fixed point format
-      // which should cover pretty much all cases
-      output.append(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n", metric_name, hist_tags,
-                                bucket, value));
-    }
-
-    output.append(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", metric_name, hist_tags,
-                              stats.sampleCount()));
-    output.append(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", metric_name, tags, stats.sampleSum()));
-    output.append(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
-
-    return output;
-  };
+// TODO(efimki): Add support of text readouts stats.
+uint64_t PrometheusStatsFormatter::statsAsPrometheus(
+    const std::vector<Stats::CounterSharedPtr>& counters,
+    const std::vector<Stats::GaugeSharedPtr>& gauges,
+    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
+    const bool used_only, const absl::optional<std::regex>& regex) {
 
   uint64_t metric_name_count = 0;
-  metric_name_count += process_type(counters, generate_counter_and_gauge_output, "counter");
-  metric_name_count += process_type(gauges, generate_counter_and_gauge_output, "gauge");
-  metric_name_count += process_type(histograms, generate_histogram_output, "histogram");
+  metric_name_count += outputStatType<Stats::Counter>(
+      response, used_only, regex, counters, generateNumericOutput<Stats::Counter>, "counter");
+
+  metric_name_count += outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
+                                                    generateNumericOutput<Stats::Gauge>, "gauge");
+
+  metric_name_count += outputStatType<Stats::ParentHistogram>(
+      response, used_only, regex, histograms, generateHistogramOutput, "histogram");
 
   return metric_name_count;
-} // namespace Server
+}
 
 std::string
 StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,

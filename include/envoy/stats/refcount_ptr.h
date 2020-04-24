@@ -25,8 +25,6 @@ namespace Stats {
 // API in years.
 template <class T> class RefcountPtr {
 public:
-  using element_type = T;
-
   RefcountPtr() : ptr_(nullptr) {}
 
   // Constructing a reference-counted object from a pointer; this is safe to

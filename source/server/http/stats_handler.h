@@ -109,6 +109,53 @@ private:
     return ((!used_only || metric.used()) &&
             (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
   }
+
+  /**
+   * Processes a stat type (counter, gauge, histogram) by generating all output lines, sorting
+   * them by tag-extracted metric name, and then outputting them in the correct sorted order into
+   * response.
+   *
+   * @param response The buffer to put the output into.
+   * @param used_only Whether to only output stats that are used.
+   * @param regex A filter on which stats to output.
+   * @param metrics The metrics to output stats for. This must contain all stats of the given type
+   *        to be included in the same output.
+   * @param generate_output A function which returns the output text for this metric.
+   * @param type The name of the prometheus metric type for used in TYPE annotations.
+   */
+  template <class StatType>
+  static uint64_t outputStatType(
+      Buffer::Instance& response, const bool used_only, const absl::optional<std::regex>& regex,
+      const std::vector<Stats::RefcountPtr<StatType>>& metrics,
+      const std::function<std::string(
+          const StatType& metric, const std::string& prefixed_tag_extracted_name)>& generate_output,
+      absl::string_view type);
+
+  /*
+   * Return the prometheus output for a numeric Stat (Counter or Gauge).
+   */
+  template <class StatType>
+  static std::string generateNumericOutput(const StatType& metric,
+                                           const std::string& prefixed_tag_extracted_name);
+
+  /*
+   * Returns the prometheus output for a histogram. The output is a multi-line string (with embedded
+   * newlines) that contains all the individual bucket counts and sum/count for a single histogram
+   * (metric_name plus all tags).
+   */
+  static std::string generateHistogramOutput(const Stats::ParentHistogram& histogram,
+                                             const std::string& prefixed_tag_extracted_name);
+
+  /*
+   * Comparator for Stats::Metric that does not require a string representation
+   * to make the comparison, for memory efficiency.
+   */
+  struct MetricLessThan {
+    bool operator()(const Stats::Metric* a, const Stats::Metric* b) const {
+      ASSERT(&a->constSymbolTable() == &b->constSymbolTable());
+      return a->constSymbolTable().lessThan(a->statName(), b->statName());
+    }
+  };
 };
 
 } // namespace Server
