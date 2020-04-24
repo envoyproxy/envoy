@@ -111,7 +111,7 @@ TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
 
   const XRay::Span* xray_parent_span = static_cast<XRay::Span*>(parent_span.get());
   const std::string expected_parent_id = xray_parent_span->id();
-  auto on_send = [xray_parent_span, expected_parent_id](const std::string& json) {
+  auto on_send = [&](const std::string& json) {
     ASSERT_FALSE(json.empty());
     daemon::Segment s;
     MessageUtil::loadFromJson(json, s, ProtobufMessage::getNullValidationVisitor());
