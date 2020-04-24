@@ -48,7 +48,6 @@ public:
               client_request_.buffer_->move(send_data.buffer_);
               return makeNoError(client_request_.buffer_->length());
             }));
-
     EXPECT_CALL(callbacks_.udp_listener_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
   }
 
@@ -123,9 +122,7 @@ TEST_F(DnsFilterTest, InvalidQuery) {
   InSequence s;
 
   setup(forward_query_off_config);
-
   sendQueryFromClient("10.0.0.1:1000", "hello");
-
   query_ctx_ = response_parser_->createQueryContext(client_request_);
   ASSERT_FALSE(query_ctx_->parse_status_);
 }
@@ -134,12 +131,10 @@ TEST_F(DnsFilterTest, SingleTypeAQuery) {
   InSequence s;
 
   setup(forward_query_off_config);
-
   const std::string domain("www.foo3.com");
   const std::string query =
       Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
   ASSERT_FALSE(query.empty());
-
   sendQueryFromClient("10.0.0.1:1000", query);
   query_ctx_ = response_parser_->createQueryContext(client_request_);
 

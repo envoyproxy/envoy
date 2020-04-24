@@ -20,14 +20,12 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
 
   // TODO(abaptiste): Read the external DataSource
   if (server_config.has_inline_dns_table()) {
-
     const auto& dns_table = server_config.inline_dns_table();
     const size_t entries = dns_table.virtual_domains().size();
 
     virtual_domains_.reserve(entries);
     for (const auto& virtual_domain : dns_table.virtual_domains()) {
       AddressConstPtrVec addrs{};
-
       if (virtual_domain.endpoint().has_address_list()) {
         const auto& address_list = virtual_domain.endpoint().address_list().address();
         addrs.reserve(address_list.size());
@@ -39,7 +37,6 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         }
       }
       virtual_domains_.emplace(virtual_domain.name(), std::move(addrs));
-
       uint64_t ttl = virtual_domain.has_answer_ttl()
                          ? DurationUtil::durationToSeconds(virtual_domain.answer_ttl())
                          : DefaultResolverTTL.count();
