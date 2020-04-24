@@ -128,9 +128,10 @@ bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
   auto rid_extension = stream_info.getRequestIDExtension();
   uint64_t random_value;
   if (use_independent_randomness_ ||
-      !rid_extension->modBy(
-          request_headers, random_value,
-          ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator()))) {
+      (rid_extension &&
+       !rid_extension->modBy(
+           request_headers, random_value,
+           ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator())))) {
     random_value = random_.random();
   }
 
