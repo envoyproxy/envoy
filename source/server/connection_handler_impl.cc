@@ -376,7 +376,7 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket) {
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
-      parent_.dispatcher_.timeSource(), StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+      parent_.dispatcher_.timeSource(), StreamInfo::FilterState::LifeSpan::Connection);
   stream_info->setDownstreamLocalAddress(socket->localAddress());
   stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
   stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
