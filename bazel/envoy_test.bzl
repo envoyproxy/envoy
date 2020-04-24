@@ -166,7 +166,6 @@ def envoy_cc_test(
         local = False,
         size = "medium",
         flaky = False):
-
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
 
     native.cc_test(
@@ -288,15 +287,34 @@ def envoy_sh_test(
         srcs = [],
         data = [],
         coverage = True,
+        cc_binary = [],
         tags = [],
         **kargs):
-    coverage_tags = tags + ([] if coverage else ["nocoverage"])
+    if coverage:
+        if cc_binary == []:
+            fail("cc_binary is required for coverage-enabled test.")
+        test_runner_cc = name + "_test_runner.cc"
+        native.genrule(
+            name = name + "_gen_test_runner",
+            srcs = srcs,
+            outs = [test_runner_cc],
+            cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
+            tools = ["//bazel:gen_sh_test_runner.sh"],
+        )
+        envoy_cc_test(
+            name = name,
+            srcs = [test_runner_cc],
+            data = srcs + data + cc_binary,
+            tags = tags,
+            deps = ["//test/test_common:environment_lib"] + cc_binary,
+        )
 
-    native.sh_test(
-        name = name,
-        srcs = ["//bazel:sh_test_wrapper.sh"],
-        data = srcs + data,
-        args = srcs,
-        tags = coverage_tags,
-        **kargs
-    )
+    else:
+        native.sh_test(
+            name = name,
+            srcs = ["//bazel:sh_test_wrapper.sh"],
+            data = srcs + data + cc_binary,
+            args = srcs,
+            tags = tags + ["nocoverage"],
+            **kargs
+        )

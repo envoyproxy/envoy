@@ -22,7 +22,6 @@ else
 fi
 
 bazel coverage ${BAZEL_BUILD_OPTIONS} --test_output=errors \
-    --instrumentation_filter="//source(?!/common/chromium_url|/extensions/quic_listeners/quiche/platform)[/:],//include[/:]" \
     --test_tag_filters=-nocoverage --build_tests_only \
     --combined_report=lcov "${COVERAGE_TARGETS}"
 
