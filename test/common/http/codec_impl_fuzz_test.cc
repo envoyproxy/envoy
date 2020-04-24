@@ -42,6 +42,14 @@ template <class T> T fromSanitizedHeaders(const test::fuzz::Headers& headers) {
   return Fuzz::fromHeaders<T>(headers, {"transfer-encoding"});
 }
 
+// Template specialization for TestRequestHeaderMapImpl to include a Host header.
+template <>
+TestRequestHeaderMapImpl
+fromSanitizedHeaders<TestRequestHeaderMapImpl>(const test::fuzz::Headers& headers) {
+  return Fuzz::fromHeaders<TestRequestHeaderMapImpl>(headers, {"transfer-encoding"},
+                                                     {":authority"});
+}
+
 // Convert from test proto Http1ServerSettings to Http1Settings.
 Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& settings) {
   Http1Settings h1_settings;
