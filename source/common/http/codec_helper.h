@@ -1,10 +1,10 @@
 #pragma once
 
-#include <vector>
-
 #include "envoy/http/codec.h"
 
 #include "common/common/assert.h"
+
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Http {
@@ -54,11 +54,6 @@ public:
   bool local_end_stream_{};
 
 protected:
-  StreamCallbackHelper() {
-    // Set space for 8 callbacks (64 bytes).
-    callbacks_.reserve(8);
-  }
-
   void addCallbacks_(StreamCallbacks& callbacks) {
     ASSERT(!reset_callbacks_started_ && !local_end_stream_);
     callbacks_.push_back(&callbacks);
@@ -82,7 +77,7 @@ protected:
   }
 
 private:
-  std::vector<StreamCallbacks*> callbacks_;
+  absl::InlinedVector<StreamCallbacks*, 8> callbacks_;
   bool reset_callbacks_started_{};
   uint32_t high_watermark_callbacks_{};
 };
