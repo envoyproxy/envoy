@@ -1437,7 +1437,8 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDisallowed))
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated_fatal("foo");
   EXPECT_THROW_WITH_REGEX(
-      checkForDeprecation(base), ProtoValidationException,
+      checkForDeprecation(base),
+      Envoy::ProtobufMessage::ValidationError::DeprecatedProtoFieldException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
 }
 
@@ -1448,7 +1449,8 @@ TEST_P(DeprecatedFieldsTest,
 
   // Make sure this is set up right.
   EXPECT_THROW_WITH_REGEX(
-      checkForDeprecation(base), ProtoValidationException,
+      checkForDeprecation(base),
+      Envoy::ProtobufMessage::ValidationError::DeprecatedProtoFieldException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
   // The config will be rejected, so the feature will not be used.
   EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
@@ -1481,7 +1483,8 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
       {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.is_deprecated", " false"}});
 
   EXPECT_THROW_WITH_REGEX(
-      checkForDeprecation(base), ProtoValidationException,
+      checkForDeprecation(base),
+      Envoy::ProtobufMessage::ValidationError::DeprecatedProtoFieldException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
@@ -1496,7 +1499,8 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MixOfFatalAndWarnings)) {
   EXPECT_LOG_CONTAINS(
       "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'", {
         EXPECT_THROW_WITH_REGEX(
-            checkForDeprecation(base), ProtoValidationException,
+            checkForDeprecation(base),
+            Envoy::ProtobufMessage::ValidationError::DeprecatedProtoFieldException,
             "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
       });
 }
@@ -1589,7 +1593,8 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)
       {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_DEFAULT", "false"}});
 
   // Make sure this is set up right.
-  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), ProtoValidationException,
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base),
+                          Envoy::ProtobufMessage::ValidationError::DeprecatedProtoFieldException,
                           "Using the default now-deprecated value DEPRECATED_DEFAULT");
 }
 
@@ -1598,7 +1603,8 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
   envoy::test::deprecation_test::Base base;
   base.mutable_enum_container()->set_deprecated_enum(
       envoy::test::deprecation_test::Base::DEPRECATED_FATAL);
-  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), ProtoValidationException,
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base),
+                          Envoy::ProtobufMessage::ValidationError::DeprecatedProtoFieldException,
                           "Using deprecated value DEPRECATED_FATAL");
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
