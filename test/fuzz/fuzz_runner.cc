@@ -47,6 +47,10 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
   static auto* logging_context =
       new Logger::Context(log_level_, TestEnvironment::getOptions().logFormat(), *lock, false);
   UNREFERENCED_PARAMETER(logging_context);
+
+  // Suppress all libprotobuf logging as long as this object exists.
+  // For fuzzing, this disables all logs when parsing text-format corpus fails.
+  static auto* log_silencer = new Protobuf::LogSilencer();
 }
 
 } // namespace Fuzz
