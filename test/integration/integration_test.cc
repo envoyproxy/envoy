@@ -256,6 +256,16 @@ TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
   testEnvoyProxying100Continue(false, true);
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/10923.
+TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
+  config_helper_.addFilter(R"EOF(
+  name: stop-iteration-and-continue-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  testEnvoyProxying100Continue(true);
+}
+
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
 // pending request is not sent on a connection that has been half-closed.
 TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {

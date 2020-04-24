@@ -139,6 +139,7 @@ private:
     virtual Buffer::WatermarkBufferPtr createBuffer() PURE;
     virtual Buffer::WatermarkBufferPtr& bufferedData() PURE;
     virtual bool complete() PURE;
+    virtual bool has100Continueheaders() PURE;
     virtual void do100ContinueHeaders() PURE;
     virtual void doHeaders(bool end_stream) PURE;
     virtual void doData(bool end_stream) PURE;
@@ -237,6 +238,7 @@ private:
     Buffer::WatermarkBufferPtr createBuffer() override;
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_request_data_; }
     bool complete() override { return parent_.state_.remote_complete_; }
+    bool has100Continueheaders() override { return false; }
     void do100ContinueHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
     void doHeaders(bool end_stream) override {
       parent_.decodeHeaders(this, *parent_.request_headers_, end_stream);
@@ -349,6 +351,9 @@ private:
     Buffer::WatermarkBufferPtr createBuffer() override;
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_response_data_; }
     bool complete() override { return parent_.state_.local_complete_; }
+    bool has100Continueheaders() override {
+      return parent_.state_.has_continue_headers_ && !continue_headers_continued_;
+    }
     void do100ContinueHeaders() override {
       parent_.encode100ContinueHeaders(this, *parent_.continue_headers_);
     }
