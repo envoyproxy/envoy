@@ -8,6 +8,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/config/runtime_utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -642,6 +643,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   // Double getting.
   EXPECT_EQ(1.1, loader_->snapshot().getDouble("file_with_words", 1.1));
   EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
+  EXPECT_EQ(2.0, loader_->snapshot().getDouble("file3", 3.3));
 
   // Boolean getting.
   const auto snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
@@ -795,7 +797,7 @@ class DiskLayerTest : public testing::Test {
 protected:
   DiskLayerTest() : api_(Api::createApiForTest()) {}
 
-  static void SetUpTestSuite() {
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     TestEnvironment::exec(
         {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
   }

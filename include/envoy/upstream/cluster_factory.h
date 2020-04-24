@@ -126,7 +126,7 @@ public:
  */
 class ClusterFactory : public Config::UntypedFactory {
 public:
-  virtual ~ClusterFactory() = default;
+  ~ClusterFactory() override = default;
 
   /**
    * Create a new instance of cluster. If the implementation is unable to produce a cluster instance

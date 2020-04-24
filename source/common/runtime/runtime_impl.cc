@@ -32,36 +32,6 @@
 
 namespace Envoy {
 namespace Runtime {
-namespace {
-
-bool isRuntimeFeature(absl::string_view feature) {
-  return RuntimeFeaturesDefaults::get().enabledByDefault(feature) ||
-         RuntimeFeaturesDefaults::get().existsButDisabled(feature);
-}
-
-} // namespace
-
-bool runtimeFeatureEnabled(absl::string_view feature) {
-  ASSERT(isRuntimeFeature(feature));
-  if (Runtime::LoaderSingleton::getExisting()) {
-    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
-        feature);
-  }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
-                      "Unable to use runtime singleton for feature {}", feature);
-  return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
-}
-
-uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
-  ASSERT(absl::StartsWith(feature, "envoy."));
-  if (Runtime::LoaderSingleton::getExisting()) {
-    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
-        std::string(feature), default_value);
-  }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
-                      "Unable to use runtime singleton for feature {}", feature);
-  return default_value;
-}
 
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
@@ -542,7 +512,9 @@ void LoaderImpl::initialize(Upstream::ClusterManager& cm) { cm_ = &cm; }
 RtdsSubscription::RtdsSubscription(
     LoaderImpl& parent, const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
     Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
+    : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(
+          rtds_layer.rtds_config().resource_api_version()),
+      parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }),
       validation_visitor_(validation_visitor) {}
@@ -583,7 +555,7 @@ void RtdsSubscription::start() {
   // We have to delay the subscription creation until init-time, since the
   // cluster manager resources are not available in the constructor when
   // instantiated in the server instance.
-  const auto resource_name = getResourceName(config_source_.resource_api_version());
+  const auto resource_name = getResourceName();
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
       config_source_, Grpc::Common::typeUrl(resource_name), store_, *this);
   subscription_->start({resource_name_});

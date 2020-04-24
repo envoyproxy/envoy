@@ -2,17 +2,16 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
-    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_hot_restart",
 )
-load(
-    "//source/extensions:all_extensions.bzl",
-    "envoy_all_extensions",
-)
+load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
+load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 
 envoy_package()
 
@@ -152,6 +151,7 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -252,7 +252,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
     srcs = ["listener_manager_impl_quic_only_test.cc"],
-    tags = ["nofips"],
+    tags = [
+        "nofips",
+        # Skipping as quiche quic_stream_send_buffer.cc does not currently compile on Windows
+        "skip_on_windows",
+    ],
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
@@ -309,7 +313,11 @@ envoy_cc_fuzz_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:test_time_lib",
-    ] + envoy_all_extensions(),
+    ] + select({
+        "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
+        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//conditions:default": envoy_all_extensions(),
+    }),
 )
 
 filegroup(
@@ -348,11 +356,13 @@ envoy_cc_test(
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/tracers/zipkin:config",
+        "//source/server:process_context_lib",
         "//source/server:server_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
@@ -396,7 +406,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_binary(
+envoy_cc_benchmark_binary(
     name = "filter_chain_benchmark_test",
     srcs = ["filter_chain_benchmark_test.cc"],
     external_deps = [
@@ -412,4 +422,10 @@ envoy_cc_test_binary(
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
     ],
+)
+
+envoy_benchmark_test(
+    name = "filter_chain_benchmark_test_benchmark_test",
+    timeout = "long",
+    benchmark_binary = "filter_chain_benchmark_test",
 )

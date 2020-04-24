@@ -26,6 +26,7 @@
 #endif
 
 #include "gtest/gtest.h"
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace {
@@ -90,6 +91,7 @@ int main(int argc, char** argv) {
   }
 
   testing::InitGoogleTest(&argc, argv);
+  testing::InitGoogleMock(&argc, argv);
   Envoy::Fuzz::Runner::setupEnvironment(argc, argv, spdlog::level::info);
 
   return RUN_ALL_TESTS();

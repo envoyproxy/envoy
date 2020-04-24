@@ -246,6 +246,11 @@ public:
   virtual bool preserveExternalRequestId() const PURE;
 
   /**
+   * @return whether the x-request-id should always be set in the response.
+   */
+  virtual bool alwaysSetRequestIdInResponse() const PURE;
+
+  /**
    * @return optional idle timeout for incoming connection manager connections.
    */
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
@@ -418,6 +423,13 @@ public:
    * one.
    */
   virtual bool shouldMergeSlashes() const PURE;
+
+  /**
+   * @return the action HttpConnectionManager should take when receiving client request
+   * headers containing underscore characters.
+   */
+  virtual envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+  headersWithUnderscoresAction() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

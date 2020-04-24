@@ -13,8 +13,8 @@ public:
   EchoIntegrationTest() : BaseIntegrationTest(GetParam(), echo_config) {}
 
   // Called once by the gtest framework before any EchoIntegrationTests are run.
-  static void SetUpTestSuite() {
-    echo_config = ConfigHelper::BASE_CONFIG + R"EOF(
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    echo_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
         name: ratelimit
@@ -25,7 +25,7 @@ public:
           descriptors: [{"key": "foo", "value": "bar"}]
       filters:
         name: envoy.filters.network.echo
-      )EOF";
+      )EOF");
   }
 
   /**
@@ -133,7 +133,7 @@ filter_chains:
         [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
     while (connection2.connecting()) {
       // Don't busy loop, but macOS often needs a moment to decide this connection isn't happening.
-      timeSystem().sleep(std::chrono::milliseconds(10));
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
 
       connection2.run(Event::Dispatcher::RunType::NonBlock);
     }

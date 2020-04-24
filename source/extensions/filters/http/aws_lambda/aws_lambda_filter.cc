@@ -17,6 +17,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/singleton/const_singleton.h"
 
 #include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
 
@@ -30,15 +31,28 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AwsLambdaFilter {
 
+class LambdaFilterNameValues {
+public:
+  Http::LowerCaseString InvocationTypeHeader{std::string{"x-amz-invocation-type"}};
+  Http::LowerCaseString FunctionErrorHeader{std::string{"x-amz-function-error"}};
+};
+
+using LambdaFilterNames = ConstSingleton<LambdaFilterNameValues>;
+
 namespace {
 
 constexpr auto filter_metadata_key = "com.amazonaws.lambda";
 constexpr auto egress_gateway_metadata_key = "egress_gateway";
 
-void setLambdaHeaders(Http::RequestHeaderMap& headers, absl::string_view function_name) {
+void setLambdaHeaders(Http::RequestHeaderMap& headers, absl::string_view function_name,
+                      InvocationMode mode) {
   headers.setMethod(Http::Headers::get().MethodValues.Post);
   headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", function_name));
-  headers.setCopy(Http::LowerCaseString{"x-amz-invocation-type"}, "RequestResponse");
+  if (mode == InvocationMode::Synchronous) {
+    headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "RequestResponse");
+  } else {
+    headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "Event");
+  }
 }
 
 /**
@@ -102,9 +116,9 @@ bool isContentTypeTextual(const Http::RequestOrResponseHeaderMap& headers) {
 
 } // namespace
 
-Filter::Filter(const FilterSettings& settings,
+Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
                const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer)
-    : settings_(settings), sigv4_signer_(sigv4_signer) {}
+    : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer) {}
 
 absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
   if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
@@ -120,21 +134,15 @@ absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
   return *settings;
 }
 
-std::string Filter::resolveSettings() {
+void Filter::resolveSettings() {
   if (auto route_settings = getRouteSpecificSettings()) {
-    if (auto route_arn = parseArn(route_settings->arn())) {
-      arn_.swap(route_arn);
-      payload_passthrough_ = route_settings->payloadPassthrough();
-    } else {
-      // TODO(marcomagdy): add stats for this error
-      ENVOY_LOG(debug, "Found route specific configuration but failed to parse Lambda ARN {}.",
-                route_settings->arn());
-      return "Invalid AWS Lambda ARN";
-    }
+    payload_passthrough_ = route_settings->payloadPassthrough();
+    invocation_mode_ = route_settings->invocationMode();
+    arn_ = std::move(route_settings)->arn();
   } else {
     payload_passthrough_ = settings_.payloadPassthrough();
+    invocation_mode_ = settings_.invocationMode();
   }
-  return {};
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
@@ -145,25 +153,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::Continue;
   }
 
-  const auto err = resolveSettings();
-
-  if (!err.empty()) {
-    skip_ = true;
-    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, err, nullptr /*modify_headers*/,
-                                       absl::nullopt /*grpc_status*/, "" /*details*/);
-    return Http::FilterHeadersStatus::StopIteration;
-  }
+  resolveSettings();
 
   if (!arn_) {
-    arn_ = parseArn(settings_.arn());
-    if (!arn_.has_value()) {
-      ENVOY_LOG(error, "Failed to parse Lambda ARN {}.", settings_.arn());
-      skip_ = true;
-      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "Invalid AWS Lambda ARN",
-                                         nullptr /*modify_headers*/, absl::nullopt /*grpc_status*/,
-                                         "" /*details*/);
-      return Http::FilterHeadersStatus::StopIteration;
-    }
+    arn_ = settings_.arn();
   }
 
   if (!end_stream) {
@@ -172,7 +165,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   if (payload_passthrough_) {
-    setLambdaHeaders(headers, arn_->functionName());
+    setLambdaHeaders(headers, arn_->functionName(), invocation_mode_);
     sigv4_signer_->sign(headers);
     return Http::FilterHeadersStatus::Continue;
   }
@@ -181,7 +174,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   jsonizeRequest(headers, nullptr, json_buf);
   // We must call setLambdaHeaders *after* the JSON transformation of the request. That way we
   // reflect the actual incoming request headers instead of the overwritten ones.
-  setLambdaHeaders(headers, arn_->functionName());
+  setLambdaHeaders(headers, arn_->functionName(), invocation_mode_);
   headers.setContentLength(json_buf.length());
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
@@ -206,7 +199,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   // Just the existence of this header means we have an error, so skip.
-  if (headers.get(Http::LowerCaseString("x-amz-function-error"))) {
+  if (headers.get(LambdaFilterNames::get().FunctionErrorHeader)) {
     skip_ = true;
     return Http::FilterHeadersStatus::Continue;
   }
@@ -241,14 +234,15 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     request_headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   }
 
-  setLambdaHeaders(*request_headers_, arn_->functionName());
+  setLambdaHeaders(*request_headers_, arn_->functionName(), invocation_mode_);
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
   sigv4_signer_->sign(*request_headers_, hash);
+  stats().upstream_rq_payload_size_.recordValue(decoding_buffer.length());
   return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (skip_ || payload_passthrough_) {
+  if (skip_ || payload_passthrough_ || invocation_mode_ == InvocationMode::Asynchronous) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -304,8 +298,11 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
       &json_req);
 
   // Wrap the Query String
-  for (auto&& kv_pair : Http::Utility::parseQueryString(headers.Path()->value().getStringView())) {
-    json_req.mutable_query_string_parameters()->insert({kv_pair.first, kv_pair.second});
+  if (headers.Path()) {
+    for (auto&& kv_pair :
+         Http::Utility::parseQueryString(headers.Path()->value().getStringView())) {
+      json_req.mutable_query_string_parameters()->insert({kv_pair.first, kv_pair.second});
+    }
   }
 
   // Wrap the body
@@ -326,7 +323,7 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
 }
 
 void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::Instance& json_buf,
-                               Buffer::Instance& body) const {
+                               Buffer::Instance& body) {
   using source::extensions::filters::http::aws_lambda::Response;
   Response json_resp;
   try {
@@ -339,8 +336,7 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
     // 3- There was no x-amz-function-error header
     // 4- The body contains invalid JSON
     headers.setStatus(static_cast<int>(Http::Code::InternalServerError));
-    // TODO(marcomagdy): Replace the following log with a stat instead
-    ENVOY_LOG(debug, "Failed to parse JSON response from AWS Lambda.\n{}", ex.what());
+    stats().server_error_.inc();
     return;
   }
 
@@ -398,6 +394,12 @@ absl::optional<Arn> parseArn(absl::string_view arn) {
   }
 
   return Arn{partition, service, region, account_id, resource_type, function_name};
+}
+
+FilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+  const std::string final_prefix = prefix + "aws_lambda.";
+  return {ALL_AWS_LAMBDA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                      POOL_HISTOGRAM_PREFIX(scope, final_prefix))};
 }
 
 } // namespace AwsLambdaFilter

@@ -13,6 +13,7 @@ from tools.type_whisperer.types_pb2 import Types, TypeDescription
 # Regexes governing v3upgrades. TODO(htuch): The regex approach will have
 # to be rethought as we go beyond v3, this is WiP.
 TYPE_UPGRADE_REGEXES = [
+    (r'(envoy[\w\.]*\.)(v3alpha|v3)', r'\1v4alpha'),
     (r'(envoy[\w\.]*\.)(v1alpha\d?|v1)', r'\1v3'),
     (r'(envoy[\w\.]*\.)(v2alpha\d?|v2)', r'\1v3'),
     # These are special cases, e.g. upgrading versionless packages.
@@ -70,6 +71,8 @@ def UpgradedTypeWithDescription(type_name, type_desc):
   upgrade_type_desc.qualified_package = UpgradedPackage(type_desc)
   upgrade_type_desc.proto_path = UpgradedPath(type_desc.proto_path,
                                               upgrade_type_desc.qualified_package)
+  upgrade_type_desc.deprecated_type = type_desc.deprecated_type
+  upgrade_type_desc.map_entry = type_desc.map_entry
   return (UpgradedType(type_name, type_desc), upgrade_type_desc)
 
 
@@ -149,12 +152,16 @@ if __name__ == '__main__':
       if NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo)
   ]).union(set(['envoy.config.retry.previous_priorities', 'envoy.config.cluster.redis']))
 
-  # Generate type map entries for upgraded types.
-  type_map.update([
-      UpgradedTypeWithDescription(type_name, type_desc)
-      for type_name, type_desc in type_map.items()
-      if type_desc.qualified_package in next_versions_pkgs
-  ])
+  # Generate type map entries for upgraded types. We run this twice to allow
+  # things like a v2 deprecated map field's synthesized map entry to forward
+  # propagate to v4alpha (for shadowing purposes).
+  for _ in range(2):
+    type_map.update([
+        UpgradedTypeWithDescription(type_name, type_desc)
+        for type_name, type_desc in type_map.items()
+        if type_desc.qualified_package in next_versions_pkgs and
+        (type_desc.active or type_desc.deprecated_type or type_desc.map_entry)
+    ])
 
   # Generate the type database proto. To provide some stability across runs, in
   # terms of the emitted proto binary blob that we track in git, we sort before

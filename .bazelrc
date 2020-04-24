@@ -10,7 +10,7 @@
 # Startup options cannot be selected via config.
 startup --host_jvm_args=-Xmx2g
 
-build --workspace_status_command=bazel/get_workspace_status
+build --workspace_status_command="bash bazel/get_workspace_status"
 build --experimental_local_memory_estimate
 build --experimental_strict_action_env=true
 build --host_force_python=PY3
@@ -158,8 +158,8 @@ build:remote-msan --config=rbe-toolchain-clang-libc++
 build:remote-msan --config=rbe-toolchain-msan
 
 # Docker sandbox
-# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu@sha256:ebf534b8aa505e8ff5663a31eed782942a742ae4d656b54f4236b00399f17911
+# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:09a5a914c904faa39dbc641181cb43b68cabf626
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -204,6 +204,47 @@ build:compdb -c fastbuild
 build:compdb --strip=always
 build:compdb --build_tag_filters=-nocompdb
 build:compdb --define=ENVOY_CONFIG_COMPILATION_DATABASE=1
+
+# Windows build quirks
+build:windows --action_env=TMPDIR
+build:windows --define signal_trace=disabled
+build:windows --define hot_restart=disabled
+build:windows --define tcmalloc=disabled
+build:windows --define manual_stamp=manual_stamp
+
+# Should not be required after upstream fix to bazel,
+# and already a no-op to linux/macos builds
+# see issue https://github.com/bazelbuild/rules_foreign_cc/issues/301
+build:windows --copt="-DCARES_STATICLIB"
+build:windows --copt="-DNGHTTP2_STATICLIB"
+build:windows --copt="-DCURL_STATICLIB"
+
+# Required to work around build defects on Windows MSVC cl
+# Unguarded gcc pragmas in quiche are not recognized by MSVC
+build:msvc-cl --copt="/wd4068"
+# Allows 'nodiscard' function return values to be discarded
+build:msvc-cl --copt="/wd4834"
+# Allows inline functions to be undefined
+build:msvc-cl --copt="/wd4506"
+build:msvc-cl --copt="-D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING"
+
+# Required to work around Windows clang-cl build defects
+# Ignore conflicting definitions of _WIN32_WINNT
+# Overriding __TIME__ etc is problematic (and is actually an invalid no-op)
+build:clang-cl --copt="-Wno-macro-redefined"
+build:clang-cl --copt="-Wno-builtin-macro-redefined"
+build:clang-cl --action_env=USE_CLANG_CL=1
+
+# Defaults to 'auto' - Off for windows, so override to linux behavior
+build:windows --enable_runfiles=yes
+
+# This should become adopted by bazel as the default
+build:windows --features=compiler_param_file
+
+# These options attempt to force a monolithic binary including the CRT
+build:windows --features=fully_static_link
+build:windows --features=static_link_msvcrt
+build:windows --dynamic_mode=off
 
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc

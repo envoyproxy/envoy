@@ -60,7 +60,6 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::Matcher;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
@@ -294,6 +293,7 @@ public:
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() const override { return true; }
   bool preserveExternalRequestId() const override { return false; }
+  bool alwaysSetRequestIdInResponse() const override { return false; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
@@ -348,6 +348,10 @@ public:
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
   RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+  headersWithUnderscoresAction() const override {
+    return headers_with_underscores_action_;
+  }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -404,6 +408,8 @@ public:
   Http::Http1Settings http1_settings_;
   bool normalize_path_ = false;
   bool merge_slashes_ = false;
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
@@ -2559,6 +2565,29 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
   conn_manager_->onData(fake_input, false);
 }
 
+// Make sure CONNECT requests hit the upgrade filter path.
+TEST_F(HttpConnectionManagerImplTest, ConnectAsUpgrade) {
+  setup(false, "envoy-custom-server", false);
+
+  NiceMock<MockResponseEncoder> encoder;
+  RequestDecoder* decoder = nullptr;
+
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
+      .WillRepeatedly(Return(true));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "CONNECT"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+    data.drain(4);
+  }));
+
+  // Kick off the incoming data. Use extra data which should cause a redispatch.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/10138
 TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   InSequence s;
@@ -4138,6 +4167,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol(Envoy::Http::Protocol::Http11));
   conn_manager_->onData(fake_input, false);
 }
 
@@ -4613,6 +4643,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol(Envoy::Http::Protocol::Http11));
   conn_manager_->onData(fake_input, false);
 
   Buffer::OwnedImpl decoded_data_to_forward;
@@ -4791,6 +4822,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol(Envoy::Http::Protocol::Http11));
   conn_manager_->onData(fake_input, false);
 
   // Mimic a decoder filter that trapped data and now sends it on, since the data was buffered
@@ -5380,11 +5412,11 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
           decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_request", std::make_unique<SimpleType>(2),
               StreamInfo::FilterState::StateType::ReadOnly,
-              StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+              StreamInfo::FilterState::LifeSpan::Request);
           decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_connection", std::make_unique<SimpleType>(3),
               StreamInfo::FilterState::StateType::ReadOnly,
-              StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+              StreamInfo::FilterState::LifeSpan::Connection);
           return FilterHeadersStatus::StopIteration;
         }));
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))

@@ -22,7 +22,6 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/new_grpc_mux_impl.h"
-#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/grpc/async_client_manager_impl.h"
@@ -142,17 +141,17 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
             secondary_init_clusters_.empty());
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
+      const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          envoy::config::core::v3::ApiVersion::V2);
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      if (cm_.adsMux() == nullptr ||
-          cm_.adsMux()->paused(Config::TypeUrl::get().ClusterLoadAssignment)) {
+      if (cm_.adsMux() == nullptr || cm_.adsMux()->paused(type_url)) {
         initializeSecondaryClusters();
       } else {
-        cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
-        Cleanup eds_resume(
-            [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+        cm_.adsMux()->pause(type_url);
+        Cleanup eds_resume([this, type_url] { cm_.adsMux()->resume(type_url); });
         initializeSecondaryClusters();
       }
     }
@@ -225,8 +224,8 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
-      outlier_event_logger_.reset(
-          new Outlier::EventLoggerImpl(log_manager, event_log_file_path, time_source_));
+      outlier_event_logger_ = std::make_shared<Outlier::EventLoggerImpl>(
+          log_manager, event_log_file_path, time_source_);
     }
   }
 
@@ -264,23 +263,31 @@ ClusterManagerImpl::ClusterManagerImpl(
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
       ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats)
+                                                         dyn_resources.ads_config(), stats, false)
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v2.AggregatedDiscoveryService.DeltaAggregatedResources"),
+              dyn_resources.ads_config().transport_api_version() ==
+                      envoy::config::core::v3::ApiVersion::V3
+                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
+                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
+                  ? "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"
+                  : "envoy.service.discovery.v2.AggregatedDiscoveryService."
+                    "DeltaAggregatedResources"),
           dyn_resources.ads_config().transport_api_version(), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats)
+                                                         dyn_resources.ads_config(), stats, false)
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               dyn_resources.ads_config().transport_api_version() ==
                       envoy::config::core::v3::ApiVersion::V3
+                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
+                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
                   ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
                     "StreamAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
@@ -345,7 +352,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info, *this, stats,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
-                                                       stats)
+                                                       stats, false)
             ->create(),
         load_stats_config.transport_api_version(), main_thread_dispatcher);
   }
@@ -744,11 +751,13 @@ void ClusterManagerImpl::updateClusterCounts() {
   // signal to ADS to proceed with RDS updates.
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   if (ads_mux_) {
+    const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+        envoy::config::core::v3::ApiVersion::V2);
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      ads_mux_->pause(Config::TypeUrl::get().Cluster);
+      ads_mux_->pause(type_url);
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
-      ads_mux_->resume(Config::TypeUrl::get().Cluster);
+      ads_mux_->resume(type_url);
     }
   }
   cm_stats_.active_clusters_.set(active_clusters_.size());
