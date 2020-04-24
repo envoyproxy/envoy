@@ -183,6 +183,24 @@ void HeaderMapImpl::HeaderEntryImpl::value(const HeaderEntry& header) {
   value(header.value().getStringView());
 }
 
+std::vector<std::reference_wrapper<const HeaderString>>
+HeaderMapImpl::HeaderListViewImpl::keys() const {
+  std::vector<std::reference_wrapper<const HeaderString>> header_keys;
+  for (const auto& header : *headers_) {
+    header_keys.emplace_back(header.key());
+  }
+  return header_keys;
+}
+
+std::vector<std::reference_wrapper<const HeaderString>>
+HeaderMapImpl::HeaderListViewImpl::values() const {
+  std::vector<std::reference_wrapper<const HeaderString>> header_values;
+  for (const auto& header : *headers_) {
+    header_values.emplace_back(header.value());
+  }
+  return header_values;
+}
+
 #define INLINE_HEADER_STATIC_MAP_ENTRY(name)                                                       \
   add(Headers::get().name.get().c_str(), [](HeaderMapType& h) -> StaticLookupResponse {            \
     return {&h.inline_headers_.name##_, &Headers::get().name};                                     \
