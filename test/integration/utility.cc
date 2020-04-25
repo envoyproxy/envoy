@@ -112,31 +112,17 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
   return makeSingleRequest(addr, method, url, body, type, host, content_type);
 }
 
-RawConnectionDriver::RawConnectionDriver(uint32_t dst_port, Buffer::Instance& initial_data,
+RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
                                          ReadCallback data_callback,
-                                         Network::Address::IpVersion version)
-    : RawConnectionDriver(
-          /*src_host_id=*/1, dst_port, initial_data,
-          [data_callback](Network::ClientConnection& conn, const Buffer::Instance& buf) {
-            data_callback(conn, buf);
-            return false;
-          },
-          version) {}
-
-RawConnectionDriver::RawConnectionDriver(uint8_t src_host_id, uint32_t dst_port,
-                                         Buffer::Instance& initial_data,
-                                         ExitableReadCallback data_callback,
                                          Network::Address::IpVersion version) {
   api_ = Api::createApiForTest(stats_store_);
   Event::GlobalTimeSystem time_system;
   dispatcher_ = api_->allocateDispatcher("test_thread");
   callbacks_ = std::make_unique<ConnectionCallbacks>();
   client_ = dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(fmt::format(
-          "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), dst_port)),
-      Network::Utility::resolveUrl(fmt::format(
-          "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version, src_host_id), 0)),
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Utility::resolveUrl(
+          fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
   client_->addConnectionCallbacks(*callbacks_);
   client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, data_callback)});
   client_->write(initial_data, false);
@@ -146,17 +132,6 @@ RawConnectionDriver::RawConnectionDriver(uint8_t src_host_id, uint32_t dst_port,
 RawConnectionDriver::~RawConnectionDriver() = default;
 
 void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_->run(run_type); }
-
-void RawConnectionDriver::write(absl::string_view payload) {
-  Buffer::OwnedImpl buffer(payload);
-  client_->write(buffer, false);
-}
-
-void RawConnectionDriver::runUntil() {
-  while (!should_exit_) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-}
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
 
