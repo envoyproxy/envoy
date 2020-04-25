@@ -208,8 +208,8 @@ protected:
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
 
     // Http::Stream
-    void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
-    void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
+    void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
+    void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
     void resetStream(StreamResetReason reason) override;
     void readDisable(bool disable) override;
     uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }

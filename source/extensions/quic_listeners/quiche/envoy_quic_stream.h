@@ -72,9 +72,11 @@ public:
 
   void addCallbacks(Http::StreamCallbacks& callbacks) override {
     ASSERT(!local_end_stream_);
-    addCallbacks_(callbacks);
+    addCallbacksHelper(callbacks);
   }
-  void removeCallbacks(Http::StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
+  void removeCallbacks(Http::StreamCallbacks& callbacks) override {
+    removeCallbacksHelper(callbacks);
+  }
   uint32_t bufferLimit() override { return send_buffer_simulation_.highWatermark(); }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
     return connection()->localAddress();
