@@ -97,5 +97,6 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:timespan_lib",
+        "//source/common/stats:utility_lib",
     ],
 )

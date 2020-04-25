@@ -31,23 +31,21 @@ MongoStats::MongoStats(Stats::Scope& scope, absl::string_view prefix)
   stat_name_set_->rememberBuiltins({"insert", "query", "update", "delete"});
 }
 
-Stats::SymbolTable::StoragePtr MongoStats::addPrefix(const std::vector<Stats::StatName>& names) {
-  std::vector<Stats::StatName> names_with_prefix;
+Stats::ElementVec MongoStats::addPrefix(const Stats::ElementVec& names) {
+  Stats::ElementVec names_with_prefix;
   names_with_prefix.reserve(1 + names.size());
   names_with_prefix.push_back(prefix_);
   names_with_prefix.insert(names_with_prefix.end(), names.begin(), names.end());
-  return scope_.symbolTable().join(names_with_prefix);
+  return names_with_prefix;
 }
 
-void MongoStats::incCounter(const std::vector<Stats::StatName>& names) {
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  scope_.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+void MongoStats::incCounter(const Stats::ElementVec& names) {
+  Stats::Utility::counterFromElements(scope_, addPrefix(names)).inc();
 }
 
-void MongoStats::recordHistogram(const std::vector<Stats::StatName>& names,
-                                 Stats::Histogram::Unit unit, uint64_t sample) {
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit).recordValue(sample);
+void MongoStats::recordHistogram(const Stats::ElementVec& names, Stats::Histogram::Unit unit,
+                                 uint64_t sample) {
+  Stats::Utility::histogramFromElements(scope_, addPrefix(names), unit).recordValue(sample);
 }
 
 } // namespace MongoProxy

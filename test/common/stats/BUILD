@@ -241,3 +241,12 @@ envoy_cc_test_binary(
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "utility_test",
+    srcs = ["utility_test.cc"],
+    deps = [
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:utility_lib",
+    ],
+)
