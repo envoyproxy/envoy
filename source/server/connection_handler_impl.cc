@@ -486,8 +486,7 @@ ConnectionHandlerImpl::ActiveConnections::~ActiveConnections() {
 
 ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
     ActiveConnections& active_connections, Network::ConnectionPtr&& new_connection,
-    TimeSource& time_source, 
-    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
+    TimeSource& time_source, std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
     : stream_info_(std::move(stream_info)), active_connections_(active_connections),
       connection_(std::move(new_connection)),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(

@@ -3,9 +3,9 @@
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/integration/ssl_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
-#include "test/integration/ssl_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -86,7 +86,7 @@ public:
     - filter_chain_match:
         application_protocols: ["alpn1"]
       filters:
-       -  name: envoy.filters.network.echo  
+       -  name: envoy.filters.network.echo
 )EOF") {}
 
   ~LdsInplaceUpdateIntegrationTest() override = default;
@@ -112,33 +112,6 @@ public:
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   }
 
-  IntegrationTcpClientPtr setupConnections(const std::string& alpn) {
-    initialize();
-
-    // Set up the SSL client.
-    Network::Address::InstanceConstSharedPtr address =
-        Ssl::getSslAddress(version_, lookupPort("echo"));
-    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
-
-    MockWatermarkBuffer* client_write_buffer;
-    EXPECT_CALL(*mock_buffer_factory_, create_(_, _))
-        .WillOnce(
-            Invoke([&client_write_buffer](std::function<void()> below_low,
-                                          std::function<void()> above_high) -> Buffer::Instance* {
-              client_write_buffer = new NiceMock<MockWatermarkBuffer>(below_low, above_high);
-              return client_write_buffer;
-            }));
-    auto ssl_conn = dispatcher_->createClientConnection(
-        address, Network::Address::InstanceConstSharedPtr(),
-        context_->createTransportSocket(
-            // nullptr
-            std::make_shared<Network::TransportSocketOptionsImpl>(
-                absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})),
-        nullptr);
-    return std::make_unique<IntegrationTcpClient>(*dispatcher_, std::move(ssl_conn),
-                                                  client_write_buffer);
-  }
-
   class SslClient {
   public:
     SslClient(Network::ClientConnectionPtr ssl_conn, Event::Dispatcher& dispatcher)
@@ -158,41 +131,21 @@ public:
   };
 
   std::unique_ptr<SslClient> connect(const std::string& alpn) {
-    // initialize();
-    // Set up the SSL client.
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("echo"));
     auto ssl_conn = dispatcher_->createClientConnection(
         address, Network::Address::InstanceConstSharedPtr(),
-        context_->createTransportSocket(
-            // nullptr
-            std::make_shared<Network::TransportSocketOptionsImpl>(
-                absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})),
+        context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+            absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})),
         nullptr);
-
     return std::make_unique<SslClient>(std::move(ssl_conn), *dispatcher_);
   }
   std::unique_ptr<Ssl::ContextManager> context_manager_;
   Network::TransportSocketFactoryPtr context_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
 };
-TEST_P(LdsInplaceUpdateIntegrationTest, Dummy) {
-  initialize();
-  auto client = connect("alpn0");
 
-  Buffer::OwnedImpl buffer("hello");
-  client->ssl_conn_->write(buffer, false);
-  client->payload_reader_->set_data_to_wait_for("hello");
-  client->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
-
-  client->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
-  ENVOY_LOG_MISC(debug, "close return");
-
-  while (!client->connect_callbacks_.closed()) {
-    ENVOY_LOG_MISC(debug, "wait for close ");
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-}
+// Verify that client 1 is closed while client 0 survives when deleting filter chain 1.
 TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigDeletingFilterChain) {
   initialize();
 
@@ -209,28 +162,61 @@ TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigDeletingFilterChain) {
   new_config_helper.setLds("1");
 
   while (!client_1->connect_callbacks_.closed()) {
-    ENVOY_LOG_MISC(debug, "wait for close 1 ");
-    std::this_thread::sleep_for(std::chrono::seconds(5));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  ENVOY_LOG_MISC(debug, "verify client 0 start");
 
   Buffer::OwnedImpl buffer("hello");
   client_0->ssl_conn_->write(buffer, false);
   client_0->payload_reader_->set_data_to_wait_for("hello");
   client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  ENVOY_LOG_MISC(debug, "verify client 0 done");
-
   client_0->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
-  ENVOY_LOG_MISC(debug, "closing client 0");
 
   while (!client_0->connect_callbacks_.closed()) {
-    ENVOY_LOG_MISC(debug, "wait for close 0");
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 }
 
-TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigAddingFilterChain) {}
+// Verify that client 0 survives while adding new filter chain 2.
+TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigAddingFilterChain) {
+  initialize();
+  auto client_0 = connect("alpn0");
+
+  ConfigHelper new_config_helper(version_, *api_,
+                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(0));
+        *listener->mutable_filter_chains(2)
+             ->mutable_filter_chain_match()
+             ->mutable_application_protocols(0) = "alpn2";
+      });
+  new_config_helper.setLds("1");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  auto client_2 = connect("alpn2");
+
+  Buffer::OwnedImpl buffer2("hello");
+  client_2->ssl_conn_->write(buffer2, false);
+  client_2->payload_reader_->set_data_to_wait_for("hello");
+  client_2->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  client_2->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
+
+  while (!client_2->connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  Buffer::OwnedImpl buffer("hello");
+  client_0->ssl_conn_->write(buffer, false);
+  client_0->payload_reader_->set_data_to_wait_for("hello");
+  client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  client_0->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
+
+  while (!client_0->connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

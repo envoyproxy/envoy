@@ -98,8 +98,6 @@ class IntegrationTcpClient {
 public:
   IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
                        Network::Address::IpVersion version, bool enable_half_close = false);
-  IntegrationTcpClient(Event::Dispatcher& dispatcher, Network::ClientConnectionPtr connection_,
-                       MockWatermarkBuffer* client_write_buffer);
 
   void close();
   void waitForData(const std::string& data, bool exact_match = true);
@@ -109,12 +107,6 @@ public:
   void waitForHalfClose();
   void readDisable(bool disabled);
   void write(const std::string& data, bool end_stream = false, bool verify = true);
-
-  // Write and wait until data sent.
-  // Could be used by ssl in which the exact sent bytes is unknown.
-  // Use with caution: expect os send all data in one dispatcher cycle.
-  void writeOnce(const std::string& data, bool end_stream = false);
-
   const std::string& data() { return payload_reader_->data(); }
   bool connected() const { return !disconnected_; }
   // clear up to the `count` number of bytes of received data
