@@ -149,6 +149,18 @@ void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason, abs
 }
 
 IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
+                                           Network::ClientConnectionPtr connection,
+                                           MockWatermarkBuffer* client_write_buffer)
+    : payload_reader_(new WaitForPayloadReader(dispatcher)),
+      callbacks_(new ConnectionCallbacks(*this)), connection_(std::move(connection)),
+      client_write_buffer_(client_write_buffer) {
+
+  connection_->addConnectionCallbacks(*callbacks_);
+  connection_->addReadFilter(payload_reader_);
+  connection_->connect();
+}
+
+IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
                                            MockBufferFactory& factory, uint32_t port,
                                            Network::Address::IpVersion version,
                                            bool enable_half_close)
@@ -238,6 +250,19 @@ void IntegrationTcpClient::write(const std::string& data, bool end_stream, bool 
     // expected to succeed.
     EXPECT_TRUE(!disconnected_ || client_write_buffer_->bytes_written() == bytes_expected);
   }
+}
+
+void IntegrationTcpClient::writeOnce(const std::string& data, bool end_stream) {
+  Buffer::OwnedImpl buffer(data);
+  ENVOY_LOG_MISC(debug, "before write {}", client_write_buffer_->bytes_written());
+  int bytes_before = client_write_buffer_->bytes_written();
+
+  connection_->write(buffer, end_stream);
+  do {
+    ENVOY_LOG_MISC(debug, "during write {}", client_write_buffer_->bytes_written());
+
+    connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+  } while (client_write_buffer_->bytes_written() == bytes_before && !disconnected_);
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
