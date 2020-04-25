@@ -246,6 +246,11 @@ public:
   virtual bool preserveExternalRequestId() const PURE;
 
   /**
+   * @return whether the x-request-id should always be set in the response.
+   */
+  virtual bool alwaysSetRequestIdInResponse() const PURE;
+
+  /**
    * @return optional idle timeout for incoming connection manager connections.
    */
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
