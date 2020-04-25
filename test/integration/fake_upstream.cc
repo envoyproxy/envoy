@@ -283,18 +283,23 @@ AssertionResult SharedConnectionWrapper::waitForDisconnect(milliseconds timeout,
 
 AssertionResult FakeConnectionBase::waitForHalfClose(bool /*ignore_spurious_events*/,
                                                      milliseconds timeout) {
-  auto end_time = time_system_.monotonicTime() + timeout;
+  //auto end_time = time_system_.monotonicTime() + timeout;
   Thread::LockGuard lock(lock_);
+  if (!time_system_.await(half_closed_, lock_, timeout)) {
+    return AssertionFailure() << "Timed out waiting for half close.";
+  }
+  return AssertionSuccess();
+  /*
   while (!half_closed_) {
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for half close.";
     }
     time_system_.waitFor(lock_, connection_event_, 5ms);
   }
-
   return half_closed_
              ? AssertionSuccess()
              : (AssertionFailure() << "Expected half close event, but got a different event.");
+  */
 }
 
 AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dispatcher,
