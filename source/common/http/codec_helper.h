@@ -54,7 +54,7 @@ public:
   bool local_end_stream_{};
 
 protected:
-  void addCallbacks_(StreamCallbacks& callbacks) {
+  void addCallbacksHelper(StreamCallbacks& callbacks) {
     ASSERT(!reset_callbacks_started_ && !local_end_stream_);
     callbacks_.push_back(&callbacks);
     for (uint32_t i = 0; i < high_watermark_callbacks_; ++i) {
@@ -62,12 +62,12 @@ protected:
     }
   }
 
-  void removeCallbacks_(StreamCallbacks& callbacks) {
+  void removeCallbacksHelper(StreamCallbacks& callbacks) {
     // For performance reasons we just clear the callback and do not resize the vector.
     // Reset callbacks scale with the number of filters per request and do not get added and
     // removed multiple times.
     // The vector may not be safely resized without making sure the run.*Callbacks() helper
-    // functions above still handle removeCallbacks_() calls mid-loop.
+    // functions above still handle removeCallbacksHelper() calls mid-loop.
     for (auto& callback : callbacks_) {
       if (callback == &callbacks) {
         callback = nullptr;
