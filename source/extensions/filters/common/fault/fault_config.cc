@@ -85,16 +85,6 @@ absl::optional<Grpc::Status::GrpcStatus> FaultAbortConfig::HeaderAbortProvider::
   return static_cast<Grpc::Status::GrpcStatus>(code);
 }
 
-envoy::type::v3::FractionalPercent FaultAbortConfig::HeaderAbortProvider::percentage(
-    const Http::RequestHeaderMap* request_headers) const {
-  // if the abort fault contains http status header, then use http status request percentage.
-  if (request_headers->get(Filters::Common::Fault::HeaderNames::get().AbortRequest) != nullptr) {
-    return http_header_percentage_provider_.percentage(request_headers);
-  }
-
-  return grpc_header_percentage_provider_.percentage(request_headers);
-}
-
 FaultDelayConfig::FaultDelayConfig(
     const envoy::extensions::filters::common::fault::v3::FaultDelay& delay_config) {
   switch (delay_config.fault_delay_secifier_case()) {

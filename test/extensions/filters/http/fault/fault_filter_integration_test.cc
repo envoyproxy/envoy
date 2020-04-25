@@ -264,7 +264,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortGrpcConfig0PercentageHe
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {"x-envoy-fault-abort-grpc-request", "5"},
-                                     {"x-envoy-fault-abort-grpc-request-percentage", "0"},
+                                     {"x-envoy-fault-abort-request-percentage", "0"},
                                      {"content-type", "application/grpc"}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);

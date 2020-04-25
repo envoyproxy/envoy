@@ -24,8 +24,6 @@ public:
   const Http::LowerCaseString AbortRequestPercentage{
       absl::StrCat(prefix(), "-fault-abort-request-percentage")};
   const Http::LowerCaseString AbortGrpcRequest{absl::StrCat(prefix(), "-fault-abort-grpc-request")};
-  const Http::LowerCaseString AbortGrpcRequestPercentage{
-      absl::StrCat(prefix(), "-fault-abort-grpc-request-percentage")};
   const Http::LowerCaseString DelayRequest{absl::StrCat(prefix(), "-fault-delay-request")};
   const Http::LowerCaseString DelayRequestPercentage{
       absl::StrCat(prefix(), "-fault-delay-request-percentage")};
@@ -124,9 +122,7 @@ private:
   class HeaderAbortProvider : public AbortProvider {
   public:
     HeaderAbortProvider(const envoy::type::v3::FractionalPercent& percentage)
-        : grpc_header_percentage_provider_(HeaderNames::get().AbortGrpcRequestPercentage,
-                                           percentage),
-          http_header_percentage_provider_(HeaderNames::get().AbortRequestPercentage, percentage) {}
+        : header_percentage_provider_(HeaderNames::get().AbortRequestPercentage, percentage) {}
 
     absl::optional<Http::Code>
     httpStatusCode(const Http::RequestHeaderMap* request_headers) const override;
@@ -135,11 +131,12 @@ private:
     grpcStatusCode(const Http::RequestHeaderMap* request_headers) const override;
 
     envoy::type::v3::FractionalPercent
-    percentage(const Http::RequestHeaderMap* request_headers) const override;
+    percentage(const Http::RequestHeaderMap* request_headers) const override {
+      return header_percentage_provider_.percentage(request_headers);
+    }
 
   private:
-    HeaderPercentageProvider grpc_header_percentage_provider_;
-    HeaderPercentageProvider http_header_percentage_provider_;
+    HeaderPercentageProvider header_percentage_provider_;
   };
 
   using AbortProviderPtr = std::unique_ptr<AbortProvider>;

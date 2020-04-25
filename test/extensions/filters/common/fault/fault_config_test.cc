@@ -65,103 +65,27 @@ TEST(FaultConfigTest, FaultAbortPercentageHeaderConfig) {
   FaultAbortConfig config(proto_config);
 
   // Header with bad data - fallback to proto config.
-  Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request", "401"},
-                                             {"x-envoy-fault-abort-request-percentage", "abc"}};
+  Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request-percentage", "abc"}};
   const auto bad_headers_percentage = config.percentage(&bad_headers);
   EXPECT_EQ(proto_config.percentage().numerator(), bad_headers_percentage.numerator());
   EXPECT_EQ(proto_config.percentage().denominator(), bad_headers_percentage.denominator());
 
   // Out of range header, value too low - fallback to proto config.
-  Http::TestRequestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-request", "401"},
-                                                 {"x-envoy-fault-abort-request-percentage", "-1"}};
+  Http::TestRequestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-request-percentage", "-1"}};
   const auto too_low_headers_percentage = config.percentage(&too_low_headers);
   EXPECT_EQ(proto_config.percentage().numerator(), too_low_headers_percentage.numerator());
   EXPECT_EQ(proto_config.percentage().denominator(), too_low_headers_percentage.denominator());
 
   // Valid header with value greater than the value of the numerator of default percentage - use
   // proto config.
-  Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-abort-request", "401"},
-                                              {"x-envoy-fault-abort-request-percentage", "90"}};
-  const auto good_headers_percentage = config.percentage(&good_headers);
-  EXPECT_EQ(proto_config.percentage().numerator(), good_headers_percentage.numerator());
-  EXPECT_EQ(proto_config.percentage().denominator(), good_headers_percentage.denominator());
-
-  // Headers contains grpc-request-percentage instead of abort-request-percentage - fallback to
-  // proto config.
-  Http::TestRequestHeaderMapImpl grpc_request_numerator_headers{
-      {"x-envoy-fault-abort-request", "401"},
-      {"x-envoy-fault-abort-grpc-request-percentage", "60"}};
-  const auto grpc_request_numerator_headers_percentage =
-      config.percentage(&grpc_request_numerator_headers);
-  EXPECT_EQ(proto_config.percentage().numerator(),
-            grpc_request_numerator_headers_percentage.numerator());
-  EXPECT_EQ(proto_config.percentage().denominator(),
-            grpc_request_numerator_headers_percentage.denominator());
-
-  // Headers contains both grpc-request-percentage and abort-request-percentage - use
-  // abort-request-percentage header value.
-  Http::TestRequestHeaderMapImpl http_and_grpc_request_numerator_headers{
-      {"x-envoy-fault-abort-request", "401"},
-      {"x-envoy-fault-abort-request-percentage", "60"},
-      {"x-envoy-fault-abort-grpc-request", "401"},
-      {"x-envoy-fault-abort-grpc-request-percentage", "40"}};
-  const auto http_and_grpc_request_numerator_headers_percentage =
-      config.percentage(&http_and_grpc_request_numerator_headers);
-  EXPECT_EQ(60, http_and_grpc_request_numerator_headers_percentage.numerator());
-  EXPECT_EQ(proto_config.percentage().denominator(),
-            http_and_grpc_request_numerator_headers_percentage.denominator());
-
-  // Valid header with value lesser than the value of the numerator of default percentage.
-  Http::TestRequestHeaderMapImpl greater_numerator_headers{
-      {"x-envoy-fault-abort-request", "401"}, {"x-envoy-fault-abort-request-percentage", "60"}};
-  const auto greater_numerator_headers_percentage = config.percentage(&greater_numerator_headers);
-  EXPECT_EQ(60, greater_numerator_headers_percentage.numerator());
-  EXPECT_EQ(proto_config.percentage().denominator(),
-            greater_numerator_headers_percentage.denominator());
-}
-
-TEST(FaultConfigTest, FaultAbortGrpcPercentageHeaderConfig) {
-  envoy::extensions::filters::http::fault::v3::FaultAbort proto_config;
-  proto_config.mutable_header_abort();
-  proto_config.mutable_percentage()->set_numerator(80);
-  proto_config.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
-  FaultAbortConfig config(proto_config);
-
-  // Header with bad data - fallback to proto config.
-  Http::TestRequestHeaderMapImpl bad_headers{
-      {"x-envoy-fault-abort-grpc-request", "5"},
-      {"x-envoy-fault-abort-grpc-request-percentage", "abc"}};
-  const auto bad_headers_percentage = config.percentage(&bad_headers);
-  EXPECT_EQ(proto_config.percentage().numerator(), bad_headers_percentage.numerator());
-  EXPECT_EQ(proto_config.percentage().denominator(), bad_headers_percentage.denominator());
-
-  // Out of range header, value too low - fallback to proto config.
-  Http::TestRequestHeaderMapImpl too_low_headers{
-      {"x-envoy-fault-abort-grpc-request", "5"},
-      {"x-envoy-fault-abort-grpc-request-percentage", "-1"}};
-  const auto too_low_headers_percentage = config.percentage(&too_low_headers);
-  EXPECT_EQ(proto_config.percentage().numerator(), too_low_headers_percentage.numerator());
-  EXPECT_EQ(proto_config.percentage().denominator(), too_low_headers_percentage.denominator());
-
-  // Missing grpc request percentage header - use proto config.
-  Http::TestRequestHeaderMapImpl missing_header{{"x-envoy-fault-abort-grpc-request", "5"}};
-  const auto missing_header_percentage = config.percentage(&missing_header);
-  EXPECT_EQ(proto_config.percentage().numerator(), missing_header_percentage.numerator());
-  EXPECT_EQ(proto_config.percentage().denominator(), missing_header_percentage.denominator());
-
-  // Valid header with value greater than the value of the numerator of default percentage - use
-  // proto config.
-  Http::TestRequestHeaderMapImpl good_headers{
-      {"x-envoy-fault-abort-grpc-request", "5"},
-      {"x-envoy-fault-abort-grpc-request-percentage", "90"}};
+  Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-abort-request-percentage", "90"}};
   const auto good_headers_percentage = config.percentage(&good_headers);
   EXPECT_EQ(proto_config.percentage().numerator(), good_headers_percentage.numerator());
   EXPECT_EQ(proto_config.percentage().denominator(), good_headers_percentage.denominator());
 
   // Valid header with value lesser than the value of the numerator of default percentage.
   Http::TestRequestHeaderMapImpl greater_numerator_headers{
-      {"x-envoy-fault-abort-grpc-request", "5"},
-      {"x-envoy-fault-abort-grpc-request-percentage", "60"}};
+      {"x-envoy-fault-abort-request-percentage", "60"}};
   const auto greater_numerator_headers_percentage = config.percentage(&greater_numerator_headers);
   EXPECT_EQ(60, greater_numerator_headers_percentage.numerator());
   EXPECT_EQ(proto_config.percentage().denominator(),
