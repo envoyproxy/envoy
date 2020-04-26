@@ -289,38 +289,21 @@ AssertionResult FakeConnectionBase::waitForHalfClose(bool /*ignore_spurious_even
     return AssertionFailure() << "Timed out waiting for half close.";
   }
   return AssertionSuccess();
-  /*
-  while (!half_closed_) {
-    if (time_system_.monotonicTime() >= end_time) {
-      return AssertionFailure() << "Timed out waiting for half close.";
-    }
-    time_system_.waitFor(lock_, connection_event_, 5ms);
-  }
-  return half_closed_
-             ? AssertionSuccess()
-             : (AssertionFailure() << "Expected half close event, but got a different event.");
-  */
 }
 
 AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dispatcher,
                                                      FakeStreamPtr& stream,
                                                      bool /*ignore_spurious_events*/,
                                                      milliseconds timeout) {
-  auto end_time = time_system_.monotonicTime() + timeout;
   Thread::LockGuard lock(lock_);
-  while (new_streams_.empty()) {
-    if (time_system_.monotonicTime() >= end_time) {
-      return AssertionFailure() << "Timed out waiting for new stream.";
-    }
-    time_system_.waitFor(lock_, connection_event_, 5ms);
-    if (new_streams_.empty()) {
-      // Run the client dispatcher since we may need to process window updates, etc.
-      client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-    }
-  }
-
-  if (new_streams_.empty()) {
-    return AssertionFailure() << "Expected new stream event, but got a different event.";
+  if (!time_system_.await([this, &client_dispatcher]() -> bool {
+                            if (!new_streams_.empty()) {
+                              return true;
+                            }
+                            client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+                            return false;
+                          }, lock_, timeout)) {
+    return AssertionFailure() << "Timed out waiting for new stream.";
   }
   stream = std::move(new_streams_.front());
   new_streams_.pop_front();
