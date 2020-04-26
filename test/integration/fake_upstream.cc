@@ -449,7 +449,7 @@ AssertionResult FakeUpstream::waitForHttpConnection(
       }
     }
 #else
-    if (!time_system.await([this, &client_dispatcher]() NO_THREAD_SAFETY_ANALYSIS -> bool {
+    if (!time_system.await([this, &client_dispatcher]() EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
                              if (!new_connections_.empty()) {
                                return true;
                              }
@@ -512,7 +512,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
                                                    milliseconds timeout) {
   {
     Thread::LockGuard lock(lock_);
-    if (!time_system_.await([this]() NO_THREAD_SAFETY_ANALYSIS -> bool {
+    if (!time_system_.await([this]() EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
                               return !new_connections_.empty(); }, lock_, timeout)) {
       return AssertionFailure() << "Timed out waiting for raw connection";
     }
@@ -535,12 +535,9 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
 testing::AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& data_to_fill,
                                                           std::chrono::milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  auto end_time = time_system_.monotonicTime() + timeout;
-  while (received_datagrams_.empty()) {
-    if (time_system_.monotonicTime() >= end_time) {
-      return AssertionFailure() << "Timed out waiting for UDP datagram.";
-    }
-    time_system_.waitFor(lock_, upstream_event_, 5ms); // Safe since CondVar::waitFor won't throw.
+  if (!time_system_.await([this]() EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
+        return !received_datagrams_.empty(); }, lock_, timeout)) {
+    return AssertionFailure() << "Timed out waiting for UDP datagram.";
   }
   data_to_fill = std::move(received_datagrams_.front());
   received_datagrams_.pop_front();
