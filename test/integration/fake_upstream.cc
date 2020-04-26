@@ -563,12 +563,9 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
                                                milliseconds timeout) {
   Thread::LockGuard lock(lock_);
   ENVOY_LOG(debug, "waiting for {} bytes of data", num_bytes);
-  auto end_time = time_system_.monotonicTime() + timeout;
-  while (data_.size() != num_bytes) {
-    if (time_system_.monotonicTime() >= end_time) {
-      return AssertionFailure() << "Timed out waiting for data.";
-    }
-    time_system_.waitFor(lock_, connection_event_, 5ms); // Safe since CondVar::waitFor won't throw.
+  if (!time_system_.await([this, num_bytes]() -> bool { return data_.size() == num_bytes; },
+                          lock_, timeout)) {
+    return AssertionFailure() << "Timed out waiting for data.";
   }
   if (data != nullptr) {
     *data = data_;
@@ -581,12 +578,9 @@ FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& da
                                std::string* data, milliseconds timeout) {
   Thread::LockGuard lock(lock_);
   ENVOY_LOG(debug, "waiting for data");
-  auto end_time = time_system_.monotonicTime() + timeout;
-  while (!data_validator(data_)) {
-    if (time_system_.monotonicTime() >= end_time) {
-      return AssertionFailure() << "Timed out waiting for data.";
-    }
-    time_system_.waitFor(lock_, connection_event_, 5ms); // Safe since CondVar::waitFor won't throw.
+  if (!time_system_.await([this, data_validator]() -> bool { return data_validator(data_); },
+                          lock_, timeout)) {
+    return AssertionFailure() << "Timed out waiting for data.";
   }
   if (data != nullptr) {
     *data = data_;
