@@ -10,10 +10,8 @@ load(
     "envoy_package",
     "envoy_select_hot_restart",
 )
-load(
-    "//source/extensions:all_extensions.bzl",
-    "envoy_all_extensions",
-)
+load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
+load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 
 envoy_package()
 
@@ -254,7 +252,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
     srcs = ["listener_manager_impl_quic_only_test.cc"],
-    tags = ["nofips"],
+    tags = [
+        "nofips",
+        # Skipping as quiche quic_stream_send_buffer.cc does not currently compile on Windows
+        "skip_on_windows",
+    ],
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
@@ -311,7 +313,11 @@ envoy_cc_fuzz_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:test_time_lib",
-    ] + envoy_all_extensions(),
+    ] + select({
+        "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
+        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//conditions:default": envoy_all_extensions(),
+    }),
 )
 
 filegroup(

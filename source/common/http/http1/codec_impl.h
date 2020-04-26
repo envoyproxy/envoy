@@ -61,8 +61,8 @@ public:
   void disableChunkEncoding() override { disable_chunk_encoding_ = true; }
 
   // Http::Stream
-  void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
-  void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
+  void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
+  void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
   // After this is called, for the HTTP/1 codec, the connection should be closed, i.e. no further
   // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
@@ -71,7 +71,8 @@ public:
   absl::string_view responseDetails() override { return details_; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
 
-  void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
+  void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
+  void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
 
 protected:
@@ -88,6 +89,7 @@ protected:
   bool chunk_encoding_ : 1;
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
+  bool is_response_to_connect_request_ : 1;
   bool is_content_length_allowed_ : 1;
 
 private:
@@ -145,6 +147,7 @@ public:
   RequestEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
       : StreamEncoderImpl(connection, header_key_formatter) {}
   bool headRequest() { return head_request_; }
+  bool connectRequest() { return connect_request_; }
 
   // Http::RequestEncoder
   void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
@@ -154,6 +157,7 @@ public:
 
 private:
   bool head_request_{};
+  bool connect_request_{};
 };
 
 /**

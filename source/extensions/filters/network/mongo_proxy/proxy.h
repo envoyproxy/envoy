@@ -167,12 +167,12 @@ private:
   // Increment counters related to queries. 'names' is passed by non-const
   // reference so the implementation can mutate it without copying, though it
   // always restores it to its prior state prior to return.
-  void chargeQueryStats(Stats::StatNameVec& names, QueryMessageInfo::QueryType query_type);
+  void chargeQueryStats(Stats::ElementVec& names, QueryMessageInfo::QueryType query_type);
 
   // Add samples to histograms related to replies. 'names' is passed by
   // non-const reference so the implementation can mutate it without copying,
   // though it always restores it to its prior state prior to return.
-  void chargeReplyStats(ActiveQuery& active_query, Stats::StatNameVec& names,
+  void chargeReplyStats(ActiveQuery& active_query, Stats::ElementVec& names,
                         const ReplyMessage& message);
 
   void doDecode(Buffer::Instance& buffer);

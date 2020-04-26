@@ -122,8 +122,10 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
   :ref:`retry priority <envoy_api_field_route.RetryPolicy.retry_priority>` can be
   configured to adjust the priority load used when selecting a priority for retries.
 
-Note that retries may be disabled depending on the contents of the :ref:`x-envoy-overloaded
-<config_http_filters_router_x-envoy-overloaded_consumed>`.
+Note that Envoy retries requests when :ref:`x-envoy-overloaded
+<config_http_filters_router_x-envoy-overloaded_set>` is present. It is recommended to either configure
+:ref:`retry budgets (preferred) <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>` or set
+:ref:`maximum active retries circuit breaker <arch_overview_circuit_break>` to an appropriate value to avoid retry storms.
 
 .. _arch_overview_http_routing_hedging:
 
