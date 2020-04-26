@@ -6,6 +6,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/stats/symbol_table_impl.h"
+#include "common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,9 +17,8 @@ class DynamoStats {
 public:
   DynamoStats(Stats::Scope& scope, const std::string& prefix);
 
-  void incCounter(const Stats::StatNameVec& names);
-  void recordHistogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
-                       uint64_t value);
+  void incCounter(const Stats::ElementVec& names);
+  void recordHistogram(const Stats::ElementVec& names, Stats::Histogram::Unit unit, uint64_t value);
 
   /**
    * Creates the partition id stats string. The stats format is
@@ -42,7 +42,7 @@ public:
   Stats::SymbolTable& symbolTable() { return scope_.symbolTable(); }
 
 private:
-  Stats::SymbolTable::StoragePtr addPrefix(const Stats::StatNameVec& names);
+  Stats::ElementVec addPrefix(const Stats::ElementVec& names);
 
   Stats::Scope& scope_;
   Stats::StatNameSetPtr stat_name_set_;

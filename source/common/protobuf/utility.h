@@ -216,13 +216,16 @@ public:
   static std::size_t hash(const Protobuf::Message& message);
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor);
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           bool do_boosting = true);
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor);
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           bool do_boosting = true);
   static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                           bool do_boosting = true);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.

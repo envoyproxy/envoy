@@ -12,13 +12,21 @@ explaining the overall change. Both the component and the explanation must be lo
 * router:add x-envoy-overloaded header
 * tls: add support for specifying TLS session ticket keys
 
-### <a name="desc"></a>Description
+### <a name="desc"></a>Commit Message
 
-The description field should include a more verbose explanation of what this PR
-does. If this PR causes a change in behavior it should document the behavior
-before and after   If fixing a bug, please describe what the original issue is and
-how the change resolves it. If it is configuration controlled, it should note
-how the feature is enabled etc...
+The commit message field should include an explanation of what this PR
+does. This will be used as the final commit message that maintainers will use to
+populate the commit message when merging. If this PR causes a change in behavior
+it should document the behavior before and after. If fixing a bug, please
+describe what the original issue is and how the change resolves it. If it is
+configuration controlled, it should note how the feature is enabled etc...
+
+
+### <a name="desc"></a>Additional Description
+
+The additional description field should include information of what this PR does
+that may be out of scope for a commit message. This could include additional
+information or context useful to reviewers.
 
 ### <a name="risk"></a>Risk
 

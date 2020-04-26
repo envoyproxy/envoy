@@ -50,7 +50,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
     pool_ready_.ready();
   }
 
-  void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     reason_ = reason;
     host_ = host;
