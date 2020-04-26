@@ -2248,14 +2248,10 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
 
 Router::RouteConstSharedPtr
 ConnectionManagerImpl::ActiveStreamFilterBase::route(const Router::RouteCallback& cb) {
-  if (cb && parent_.cached_route_.has_value()) {
-    clearRouteCache();
+  if (parent_.cached_route_.has_value()) {
+    return parent_.cached_route_.value();
   }
-
-  if (!parent_.cached_route_.has_value()) {
-    parent_.refreshCachedRoute(cb);
-  }
-
+  parent_.refreshCachedRoute(cb);
   return parent_.cached_route_.value();
 }
 

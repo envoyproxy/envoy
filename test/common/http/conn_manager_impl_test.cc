@@ -949,6 +949,14 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
                     decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
+          // Not clearing cached route returns cached route and doesn't invoke cb.
+          Router::RouteConstSharedPtr route = decoder_filters_[0]->callbacks_->route(
+              [](Router::RouteConstSharedPtr, Router::RouteEvalStatus) -> Router::RouteMatchStatus {
+                ADD_FAILURE() << "When route cache is not cleared CB should not be invoked";
+                return Router::RouteMatchStatus::Accept;
+              });
+          EXPECT_EQ(default_route, route);
+
           int ctr = 0;
           const Router::RouteCallback& cb =
               [&](Router::RouteConstSharedPtr route,
@@ -984,8 +992,10 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
             return Router::RouteMatchStatus::Accept;
           };
 
-          decoder_filters_[0]->callbacks_->route(cb);
+          decoder_filters_[0]->callbacks_->clearRouteCache();
+          route = decoder_filters_[0]->callbacks_->route(cb);
 
+          EXPECT_EQ(default_route, route);
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
           EXPECT_EQ(default_route->routeEntry(),
                     decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
@@ -1041,6 +1051,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
             return Router::RouteMatchStatus::Accept;
           };
 
+          decoder_filters_[0]->callbacks_->clearRouteCache();
           decoder_filters_[1]->callbacks_->route(cb);
 
           EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->route());

@@ -959,11 +959,8 @@ public:
     return nullptr;
   }
 
-  RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap&,
+  RouteConstSharedPtr route(const RouteCallback&, const Http::RequestHeaderMap&,
                             const StreamInfo::StreamInfo&, uint64_t) const override {
-    if (cb) {
-      cb(nullptr, RouteEvalStatus::NoMoreRoutes);
-    }
     return nullptr;
   }
 

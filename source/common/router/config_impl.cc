@@ -1150,7 +1150,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
 
   // Check for a route that matches the request.
   for (auto route = routes_.begin(); route != routes_.end(); ++route) {
-    if (!headers.Path() && !route->supportsPathlessHeaders()) {
+    if (!headers.Path() && !(*route)->supportsPathlessHeaders()) {
       continue;
     }
 

@@ -167,7 +167,6 @@ LDS
 LEV
 LF
 LHS
-LLC
 LLVM
 LPT
 LRS
@@ -949,7 +948,6 @@ ruleset
 runfiles
 runtime
 runtimes
-rvalue
 rver
 rxhash
 sandboxed
@@ -994,7 +992,6 @@ stacktrace
 startup
 stateful
 statsd
-statusor
 stderr
 stdev
 stdout

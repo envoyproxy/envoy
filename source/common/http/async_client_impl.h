@@ -332,9 +332,8 @@ private:
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
   Router::RouteConstSharedPtr route() override { return route_; }
-  Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override {
-    cb(route_, Router::RouteEvalStatus::NoMoreRoutes);
-    return route_;
+  Router::RouteConstSharedPtr route(const Router::RouteCallback&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
