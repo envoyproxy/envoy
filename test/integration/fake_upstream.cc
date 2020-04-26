@@ -512,13 +512,8 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
                                                    milliseconds timeout) {
   {
     Thread::LockGuard lock(lock_);
-    if (new_connections_.empty()) {
-      ENVOY_LOG(debug, "waiting for raw connection");
-      time_system_.waitFor(lock_, upstream_event_,
-                           timeout); // Safe since CondVar::waitFor won't throw.
-    }
-
-    if (new_connections_.empty()) {
+    if (!time_system_.await([this]() NO_THREAD_SAFETY_ANALYSIS -> bool {
+                              return !new_connections_.empty(); }, lock_, timeout)) {
       return AssertionFailure() << "Timed out waiting for raw connection";
     }
     connection = std::make_unique<FakeRawConnection>(consumeConnection(), timeSystem());
