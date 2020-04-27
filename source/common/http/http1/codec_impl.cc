@@ -557,7 +557,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   }
 
   header_parsing_state_ = HeaderParsingState::Value;
-  if (current_header_value_.getStringView().empty()) {
+  if (current_header_value_.empty()) {
     // Strip leading whitespace if the current header value input contains the first bytes of the
     // encoded header value. Trailing whitespace is stripped once the full header value is known in
     // ConnectionImpl::completeLastHeader. http_parser does not strip leading or trailing whitespace
