@@ -61,8 +61,8 @@ public:
   void disableChunkEncoding() override { disable_chunk_encoding_ = true; }
 
   // Http::Stream
-  void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
-  void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
+  void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
+  void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
   // After this is called, for the HTTP/1 codec, the connection should be closed, i.e. no further
   // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
