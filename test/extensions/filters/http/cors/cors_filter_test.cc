@@ -64,7 +64,7 @@ public:
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
   CorsFilterConfigSharedPtr config_;
   CorsFilter filter_;
   Buffer::OwnedImpl data_;
@@ -700,6 +700,16 @@ TEST_F(CorsFilterTest, OptionsRequestNotMatchingOriginByRegex) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
+}
+
+// Test that the deprecated extension name still functions.
+TEST(CorsFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.cors";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace Cors

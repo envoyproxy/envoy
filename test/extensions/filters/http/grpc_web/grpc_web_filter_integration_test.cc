@@ -17,7 +17,7 @@ public:
 
   void SetUp() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    config_helper_.addFilter("name: envoy.grpc_web");
+    config_helper_.addFilter("name: envoy.filters.http.grpc_web");
   }
 };
 

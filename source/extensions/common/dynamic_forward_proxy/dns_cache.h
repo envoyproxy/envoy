@@ -175,7 +175,9 @@ using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;
  */
 DnsCacheManagerSharedPtr getCacheManager(Singleton::Manager& manager,
                                          Event::Dispatcher& main_thread_dispatcher,
-                                         ThreadLocal::SlotAllocator& tls, Stats::Scope& root_scope);
+                                         ThreadLocal::SlotAllocator& tls,
+                                         Runtime::RandomGenerator& random,
+                                         Stats::Scope& root_scope);
 
 /**
  * Factory for getting a DNS cache manager.

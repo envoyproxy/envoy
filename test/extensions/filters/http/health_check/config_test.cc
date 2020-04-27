@@ -266,6 +266,16 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
   testHealthCheckHeaderMatch(config, headers, false);
 }
 
+// Test that the deprecated extension name still functions.
+TEST(HealthCheckFilterConfig, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.health_check";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
+}
+
 } // namespace
 } // namespace HealthCheck
 } // namespace HttpFilters

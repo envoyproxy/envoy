@@ -42,6 +42,7 @@
 #include "common/config/well_known_names.h"
 #include "common/init/manager_impl.h"
 #include "common/network/utility.h"
+#include "common/shared_pool/shared_pool.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
@@ -72,8 +73,7 @@ class HostDescriptionImpl : virtual public HostDescription,
 public:
   HostDescriptionImpl(
       ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-      Network::Address::InstanceConstSharedPtr dest_address,
-      const envoy::config::core::v3::Metadata& metadata,
+      Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
       const envoy::config::core::v3::Locality& locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority);
@@ -91,13 +91,13 @@ public:
   // endpoints churning during a deploy of a large cluster). A possible improvement
   // would be to use TLS and post metadata updates from the main thread. This model would
   // possibly benefit other related and expensive computations too (e.g.: updating subsets).
-  const std::shared_ptr<envoy::config::core::v3::Metadata> metadata() const override {
+  MetadataConstSharedPtr metadata() const override {
     absl::ReaderMutexLock lock(&metadata_mutex_);
     return metadata_;
   }
-  void metadata(const envoy::config::core::v3::Metadata& new_metadata) override {
+  void metadata(MetadataConstSharedPtr new_metadata) override {
     absl::WriterMutexLock lock(&metadata_mutex_);
-    metadata_ = std::make_shared<envoy::config::core::v3::Metadata>(new_metadata);
+    metadata_ = new_metadata;
   }
 
   const ClusterInfo& cluster() const override { return *cluster_; }
@@ -120,6 +120,7 @@ public:
     }
   }
   HostStats& stats() const override { return stats_; }
+  const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
@@ -135,16 +136,17 @@ public:
 private:
   Network::TransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
-                                const envoy::config::core::v3::Metadata& metadata);
+                                const envoy::config::core::v3::Metadata* metadata);
 
 protected:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
+  const std::string health_checks_hostname_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
   mutable absl::Mutex metadata_mutex_;
-  std::shared_ptr<envoy::config::core::v3::Metadata> metadata_ ABSL_GUARDED_BY(metadata_mutex_);
+  MetadataConstSharedPtr metadata_ ABSL_GUARDED_BY(metadata_mutex_);
   const envoy::config::core::v3::Locality locality_;
   Stats::StatNameManagedStorage locality_zone_stat_name_;
   mutable HostStats stats_;
@@ -162,9 +164,8 @@ class HostImpl : public HostDescriptionImpl,
                  public std::enable_shared_from_this<HostImpl> {
 public:
   HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-           Network::Address::InstanceConstSharedPtr address,
-           const envoy::config::core::v3::Metadata& metadata, uint32_t initial_weight,
-           const envoy::config::core::v3::Locality& locality,
+           Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr metadata,
+           uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
@@ -536,7 +537,9 @@ public:
   }
   uint64_t features() const override { return features_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
-  const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
+  const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const override {
+    return http2_options_;
+  }
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
@@ -623,7 +626,7 @@ private:
   const absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
   const uint64_t features_;
   const Http::Http1Settings http1_settings_;
-  const Http::Http2Settings http2_settings_;
+  const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const std::map<std::string, ProtocolOptionsConfigConstSharedPtr> extension_protocol_options_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
@@ -702,6 +705,9 @@ public:
                     HostsPerLocalityConstSharedPtr>
   partitionHostsPerLocality(const HostsPerLocality& hosts);
   Stats::SymbolTable& symbolTable() { return symbol_table_; }
+  Config::ConstMetadataSharedPoolSharedPtr constMetadataSharedPool() {
+    return const_metadata_shared_pool_;
+  }
 
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
@@ -767,6 +773,7 @@ private:
   uint64_t pending_initialize_health_checks_{};
   const bool local_cluster_;
   Stats::SymbolTable& symbol_table_;
+  Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;

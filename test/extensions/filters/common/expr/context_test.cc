@@ -23,7 +23,7 @@ namespace {
 constexpr absl::string_view Undefined = "undefined";
 
 TEST(Context, EmptyHeadersAttributes) {
-  HeadersWrapper headers(nullptr);
+  HeadersWrapper<Http::RequestHeaderMap> headers(nullptr);
   auto header = headers[CelValue::CreateStringView(Referer)];
   EXPECT_FALSE(header.has_value());
   EXPECT_EQ(0, headers.size());
@@ -33,7 +33,7 @@ TEST(Context, EmptyHeadersAttributes) {
 TEST(Context, RequestAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   NiceMock<StreamInfo::MockStreamInfo> empty_info;
-  Http::TestHeaderMapImpl header_map{
+  Http::TestRequestHeaderMapImpl header_map{
       {":method", "POST"},           {":scheme", "http"},      {":path", "/meow?yes=1"},
       {":authority", "kittens.com"}, {"referer", "dogs.com"},  {"user-agent", "envoy-mobile"},
       {"content-length", "10"},      {"x-request-id", "blah"},
@@ -195,7 +195,7 @@ TEST(Context, RequestAttributes) {
 
 TEST(Context, RequestFallbackAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
-  Http::TestHeaderMapImpl header_map{
+  Http::TestRequestHeaderMapImpl header_map{
       {":method", "POST"},
       {":scheme", "http"},
       {":path", "/meow?yes=1"},
@@ -225,8 +225,8 @@ TEST(Context, ResponseAttributes) {
   const std::string header_name = "test-header";
   const std::string trailer_name = "test-trailer";
   const std::string grpc_status = "grpc-status";
-  Http::TestHeaderMapImpl header_map{{header_name, "a"}};
-  Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}, {grpc_status, "8"}};
+  Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}};
+  Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}, {grpc_status, "8"}};
   ResponseWrapper response(&header_map, &trailer_map, info);
   ResponseWrapper empty_response(nullptr, nullptr, empty_info);
 
@@ -323,8 +323,8 @@ TEST(Context, ResponseAttributes) {
   }
 
   {
-    Http::TestHeaderMapImpl header_map{{header_name, "a"}, {grpc_status, "7"}};
-    Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}};
+    Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}, {grpc_status, "7"}};
+    Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}};
     ResponseWrapper response_header_status(&header_map, &trailer_map, info);
     auto value = response_header_status[CelValue::CreateStringView(GrpcStatus)];
     EXPECT_TRUE(value.has_value());
@@ -332,8 +332,8 @@ TEST(Context, ResponseAttributes) {
     EXPECT_EQ(0x7, value.value().Int64OrDie());
   }
   {
-    Http::TestHeaderMapImpl header_map{{header_name, "a"}};
-    Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}};
+    Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}};
+    Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}};
     ResponseWrapper response_no_status(&header_map, &trailer_map, info);
     auto value = response_no_status[CelValue::CreateStringView(GrpcStatus)];
     EXPECT_TRUE(value.has_value());
@@ -342,8 +342,8 @@ TEST(Context, ResponseAttributes) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> info_without_code;
-    Http::TestHeaderMapImpl header_map{{header_name, "a"}};
-    Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}};
+    Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}};
+    Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}};
     ResponseWrapper response_no_status(&header_map, &trailer_map, info_without_code);
     auto value = response_no_status[CelValue::CreateStringView(GrpcStatus)];
     EXPECT_FALSE(value.has_value());

@@ -14,7 +14,7 @@ public:
   CorsFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
-    config_helper_.addFilter("name: envoy.cors");
+    config_helper_.addFilter("name: envoy.filters.http.cors");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {

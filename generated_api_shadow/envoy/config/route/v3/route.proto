@@ -8,13 +8,14 @@ import "envoy/config/route/v3/route_components.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.route.v3";
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP route configuration]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
@@ -45,7 +46,9 @@ message RouteConfiguration {
   // will consider to be internal only. If they are found on external requests they will be cleaned
   // prior to filter invocation. See :ref:`config_http_conn_man_headers_x-envoy-internal` for more
   // information.
-  repeated string internal_only_headers = 3;
+  repeated string internal_only_headers = 3 [
+    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+  ];
 
   // Specifies a list of HTTP headers that should be added to each response that
   // the connection manager encodes. Headers specified at this level are applied
@@ -58,7 +61,9 @@ message RouteConfiguration {
 
   // Specifies a list of HTTP headers that should be removed from each response
   // that the connection manager encodes.
-  repeated string response_headers_to_remove = 5;
+  repeated string response_headers_to_remove = 5 [
+    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+  ];
 
   // Specifies a list of HTTP headers that should be added to each request
   // routed by the HTTP connection manager. Headers specified at this level are
@@ -71,7 +76,9 @@ message RouteConfiguration {
 
   // Specifies a list of HTTP headers that should be removed from each request
   // routed by the HTTP connection manager.
-  repeated string request_headers_to_remove = 8;
+  repeated string request_headers_to_remove = 8 [
+    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+  ];
 
   // By default, headers that should be added/removed are evaluated from most to least specific:
   //

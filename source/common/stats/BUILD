@@ -48,10 +48,12 @@ envoy_cc_library(
         ":histogram_lib",
         ":null_counter_lib",
         ":null_gauge_lib",
+        ":null_text_readout_lib",
         ":scope_prefixer_lib",
         ":stats_lib",
         ":store_impl_lib",
         ":symbol_table_creator_lib",
+        ":tag_utility_lib",
         "//include/envoy/stats:stats_macros",
         "//source/common/stats:allocator_lib",
     ],
@@ -69,6 +71,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "tag_utility_lib",
+    srcs = ["tag_utility.cc"],
+    hdrs = ["tag_utility.h"],
+    deps = [
+        ":symbol_table_lib",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:symbol_table_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "null_counter_lib",
     hdrs = ["null_counter.h"],
     deps = [
@@ -81,6 +94,16 @@ envoy_cc_library(
 envoy_cc_library(
     name = "null_gauge_lib",
     hdrs = ["null_gauge.h"],
+    deps = [
+        ":metric_impl_lib",
+        ":symbol_table_lib",
+        "//include/envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "null_text_readout_lib",
+    hdrs = ["null_text_readout.h"],
     deps = [
         ":metric_impl_lib",
         ":symbol_table_lib",
@@ -228,10 +251,12 @@ envoy_cc_library(
         ":allocator_lib",
         ":null_counter_lib",
         ":null_gauge_lib",
+        ":null_text_readout_lib",
         ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_matcher_lib",
         ":tag_producer_lib",
+        ":tag_utility_lib",
         "//include/envoy/thread_local:thread_local_interface",
     ],
 )

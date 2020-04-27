@@ -31,18 +31,29 @@ TEST(HttpInspectorConfigFactoryTest, TestCreateFactory) {
   Server::Configuration::MockListenerFactoryContext context;
   EXPECT_CALL(context, scope()).Times(1);
   Network::ListenerFilterFactoryCb cb =
-      factory->createFilterFactoryFromProto(*proto_config, context);
+      factory->createListenerFilterFactoryFromProto(*proto_config, nullptr, context);
 
   Network::MockListenerFilterManager manager;
   Network::ListenerFilterPtr added_filter;
-  EXPECT_CALL(manager, addAcceptFilter_(_))
-      .WillOnce(Invoke([&added_filter](Network::ListenerFilterPtr& filter) {
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&added_filter](const Network::ListenerFilterMatcherSharedPtr&,
+                                       Network::ListenerFilterPtr& filter) {
         added_filter = std::move(filter);
       }));
   cb(manager);
 
   // Make sure we actually create the correct type!
   EXPECT_NE(dynamic_cast<HttpInspector::Filter*>(added_filter.get()), nullptr);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(HttpInspectorConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.listener.http_inspector";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<
+          Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(deprecated_name));
 }
 
 } // namespace

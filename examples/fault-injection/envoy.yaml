@@ -28,7 +28,7 @@ static_resources:
                 route:
                   cluster: local_service
           http_filters:
-          - name: envoy.fault
+          - name: envoy.filters.http.fault
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
               abort:
@@ -36,7 +36,7 @@ static_resources:
                 percentage:
                   numerator: 0
                   denominator: HUNDRED
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
   clusters:
   - name: local_service

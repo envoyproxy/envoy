@@ -32,9 +32,9 @@ static_resources:
                 route:
                   cluster: backend-proxy
           http_filters:
-          - name: envoy.grpc_http1_bridge
+          - name: envoy.filters.http.grpc_http1_bridge
             typed_config: {}
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
   clusters:
   - name: backend-proxy

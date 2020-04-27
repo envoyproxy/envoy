@@ -46,11 +46,16 @@ public:
   virtual ~DnsResolver() = default;
 
   /**
-   * Called when a resolution attempt is complete.
-   * @param response supplies the list of resolved IP addresses and TTLs. The list will be empty if
-   *                     the resolution failed.
+   * Final status for a DNS resolution.
    */
-  using ResolveCb = std::function<void(std::list<DnsResponse>&& response)>;
+  enum class ResolutionStatus { Success, Failure };
+
+  /**
+   * Called when a resolution attempt is complete.
+   * @param status supplies the final status of the resolution.
+   * @param response supplies the list of resolved IP addresses and TTLs.
+   */
+  using ResolveCb = std::function<void(ResolutionStatus status, std::list<DnsResponse>&& response)>;
 
   /**
    * Initiate an async DNS resolution.

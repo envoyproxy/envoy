@@ -29,8 +29,9 @@ TcpGrpcAccessLog::TcpGrpcAccessLog(
   });
 }
 
-void TcpGrpcAccessLog::emitLog(const Http::HeaderMap&, const Http::HeaderMap&,
-                               const Http::HeaderMap&, const StreamInfo::StreamInfo& stream_info) {
+void TcpGrpcAccessLog::emitLog(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                               const Http::ResponseTrailerMap&,
+                               const StreamInfo::StreamInfo& stream_info) {
   // Common log properties.
   envoy::data::accesslog::v3::TCPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),

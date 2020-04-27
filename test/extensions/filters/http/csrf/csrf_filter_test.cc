@@ -83,7 +83,7 @@ public:
         .WillByDefault(Return(enabled));
   }
 
-  const std::string filter_name_ = "envoy.csrf";
+  const std::string filter_name_ = "envoy.filters.http.csrf";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   Buffer::OwnedImpl data_;
   Router::MockDirectResponseEntry direct_response_entry_;
@@ -376,6 +376,17 @@ TEST_F(CsrfFilterTest, RequestFromInvalidAdditionalRegexOrigin) {
   EXPECT_EQ(1U, config_->stats().request_invalid_.value());
   EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
+
+// Test that the deprecated extension name still functions.
+TEST(CsrfFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.csrf";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
+}
+
 } // namespace Csrf
 } // namespace HttpFilters
 } // namespace Extensions

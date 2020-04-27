@@ -8,7 +8,7 @@ class LocalRateLimitIntegrationTest : public Event::TestUsingSimulatedTime,
                                       public BaseIntegrationTest {
 public:
   LocalRateLimitIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::TCP_PROXY_CONFIG) {}
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
 
   ~LocalRateLimitIntegrationTest() override {
     test_server_.reset();
@@ -28,7 +28,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, LocalRateLimitIntegrationTest,
 // Make sure the filter works in the basic case.
 TEST_P(LocalRateLimitIntegrationTest, NoRateLimiting) {
   setup(R"EOF(
-name: envoy.filters.network.local_ratelimit
+name: ratelimit
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.network.local_rate_limit.v2alpha.LocalRateLimit
   stat_prefix: local_rate_limit_stats

@@ -17,15 +17,16 @@ public:
       : BaseIntegrationTest(Network::Address::IpVersion::v4, renderConfig(status_code, delay_s)) {}
 
   static std::string renderConfig(int status_code, int delay_s) {
-    return fmt::format(ConfigHelper::BASE_CONFIG + R"EOF(
+    return absl::StrCat(ConfigHelper::baseConfig(),
+                        fmt::format(R"EOF(
     filter_chains:
       filters:
-        name: envoy.filters.network.http_connection_manager
+        name: http
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: metadata_test
           http_filters:
-            - name: envoy.fault
+            - name: fault
               typed_config:
                 "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
                 delay:
@@ -35,7 +36,7 @@ public:
                   percentage:
                     numerator: 100
                     denominator: HUNDRED
-            - name: envoy.router
+            - name: envoy.filters.http.router
           codec_type: HTTP1
           route_config:
             virtual_hosts:
@@ -66,7 +67,7 @@ public:
               domains: "*"
             name: route_config_0
       )EOF",
-                       delay_s, delay_s > 0 ? 0 : 1000, status_code, status_code);
+                                    delay_s, delay_s > 0 ? 0 : 1000, status_code, status_code));
   }
 
   void SetUp() override { BaseIntegrationTest::initialize(); }

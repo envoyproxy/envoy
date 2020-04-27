@@ -106,12 +106,16 @@ public:
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
   }
+  void flushStats() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
+  }
+  void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
+    http_context_.setDefaultTracingConfig(tracing_config);
   }
 
   // Server::ListenerComponentFactory

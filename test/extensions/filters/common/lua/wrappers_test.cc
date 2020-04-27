@@ -141,7 +141,7 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
 
   const std::string yaml = R"EOF(
     filter_metadata:
-      envoy.lua:
+      envoy.filters.http.lua:
         make.delicious.bread:
           name: pulla
           origin: finland
@@ -166,7 +166,7 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
     )EOF";
 
   envoy::config::core::v3::Metadata metadata = parseMetadataFromYaml(yaml);
-  const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
+  const auto filter_metadata = metadata.filter_metadata().at("envoy.filters.http.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
 
   EXPECT_CALL(*this, testPrint("pulla"));
@@ -202,7 +202,7 @@ TEST_F(LuaMetadataMapWrapperTest, Iterators) {
 
   const std::string yaml = R"EOF(
     filter_metadata:
-      envoy.lua:
+      envoy.filters.http.lua:
         make.delicious.bread:
           name: pulla
         make.delicious.cookie:
@@ -222,7 +222,7 @@ TEST_F(LuaMetadataMapWrapperTest, Iterators) {
   setup(SCRIPT);
 
   envoy::config::core::v3::Metadata metadata = parseMetadataFromYaml(yaml);
-  const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
+  const auto filter_metadata = metadata.filter_metadata().at("envoy.filters.http.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
 
   EXPECT_CALL(*this, testPrint("'make.delicious.bread' 'pulla'"));
@@ -249,7 +249,7 @@ TEST_F(LuaMetadataMapWrapperTest, DontFinishIteration) {
 
   const std::string yaml = R"EOF(
     filter_metadata:
-      envoy.lua:
+      envoy.filters.http.lua:
         make.delicious.bread:
           name: pulla
         make.delicious.cookie:
@@ -259,7 +259,7 @@ TEST_F(LuaMetadataMapWrapperTest, DontFinishIteration) {
     )EOF";
 
   envoy::config::core::v3::Metadata metadata = parseMetadataFromYaml(yaml);
-  const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
+  const auto filter_metadata = metadata.filter_metadata().at("envoy.filters.http.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
   EXPECT_THROW_WITH_MESSAGE(
       start("callMe"), LuaException,

@@ -93,12 +93,14 @@ TEST(RouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   cb(filter_callback);
 }
 
-TEST(RouterFilterConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<RouterFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>()),
-      EnvoyException,
-      fmt::format("Double registration for name: '{}'", HttpFilterNames::get().Router));
+// Test that the deprecated extension name still functions.
+TEST(RouterFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.router";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace

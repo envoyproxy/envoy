@@ -18,7 +18,7 @@ public:
     headers_.setPath(path_value);
     return *headers_.Path();
   }
-  HeaderMapImpl headers_;
+  RequestHeaderMapImpl headers_;
 };
 
 // Already normalized path don't change.

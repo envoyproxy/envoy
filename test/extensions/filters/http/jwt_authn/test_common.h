@@ -134,7 +134,7 @@ const char NotYetValidToken[] =
     "V1AdwgX_5n3SmQTacVN0WcSgk6YJRZG6VE8PjxZP9bEameBmbSB0810giKRpdTU1-"
     "RJtjq6aCSTD4CYXtW38T5uko4V-S4zifK3BXeituUTebkgoA";
 
-// A token with aud as invalid_service
+// A token with "aud" as invalid_service
 // Payload:
 // {"iss":"https://example.com","sub":"test@example.com","aud":"invalid_service","exp":2001001001}
 const char InvalidAudToken[] =

@@ -25,7 +25,7 @@ public:
     validation_ = std::make_unique<Api::ValidationImpl>(Thread::threadFactoryForTest(),
                                                         stats_store_, test_time_.timeSystem(),
                                                         Filesystem::fileSystemForTest());
-    dispatcher_ = validation_->allocateDispatcher();
+    dispatcher_ = validation_->allocateDispatcher("test_thread");
   }
 
   DangerousDeprecatedTestTime test_time_;
@@ -39,7 +39,7 @@ private:
 
 // Simple test which creates a connection to fake upstream client. This is to test if
 // ValidationDispatcher can call createClientConnection without crashing.
-TEST_P(ConfigValidation, createConnection) {
+TEST_P(ConfigValidation, CreateConnection) {
   Network::Address::InstanceConstSharedPtr address(
       Network::Test::getCanonicalLoopbackAddress(GetParam()));
   dispatcher_->createClientConnection(address, address, Network::Test::createRawBufferSocket(),

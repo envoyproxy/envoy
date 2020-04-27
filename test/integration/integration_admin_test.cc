@@ -68,7 +68,7 @@ TEST_P(IntegrationAdminTest, HealthCheckWithoutServerStats) {
 }
 
 TEST_P(IntegrationAdminTest, HealthCheckWithBufferFilter) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
   initialize();
 
   BufferingStreamDecoderPtr response;
@@ -117,7 +117,8 @@ std::string ContentType(const BufferingStreamDecoderPtr& response) {
 } // namespace
 
 TEST_P(IntegrationAdminTest, Admin) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+  Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer;
+  symbol_table_creator_test_peer.setUseFakeSymbolTables(false);
   initialize();
 
   BufferingStreamDecoderPtr response;
@@ -266,13 +267,17 @@ TEST_P(IntegrationAdminTest, Admin) {
   switch (GetParam().downstream_protocol) {
   case Http::CodecClient::Type::HTTP1:
     EXPECT_EQ("   Count Lookup\n"
+              "       1 http1.dropped_headers_with_underscores\n"
               "       1 http1.metadata_not_supported_error\n"
+              "       1 http1.requests_rejected_with_underscores_in_headers\n"
+              "       1 http1.response_flood\n"
               "\n"
-              "total: 1\n",
+              "total: 4\n",
               response->body());
     break;
   case Http::CodecClient::Type::HTTP2:
     EXPECT_EQ("   Count Lookup\n"
+              "       1 http2.dropped_headers_with_underscores\n"
               "       1 http2.header_overflow\n"
               "       1 http2.headers_cb_no_stream\n"
               "       1 http2.inbound_empty_frames_flood\n"
@@ -280,13 +285,14 @@ TEST_P(IntegrationAdminTest, Admin) {
               "       1 http2.inbound_window_update_frames_flood\n"
               "       1 http2.outbound_control_flood\n"
               "       1 http2.outbound_flood\n"
+              "       1 http2.requests_rejected_with_underscores_in_headers\n"
               "       1 http2.rx_messaging_error\n"
               "       1 http2.rx_reset\n"
               "       1 http2.too_many_header_frames\n"
               "       1 http2.trailers\n"
               "       1 http2.tx_reset\n"
               "\n"
-              "total: 12\n",
+              "total: 14\n",
               response->body());
     break;
   case Http::CodecClient::Type::HTTP3:

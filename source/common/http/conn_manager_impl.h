@@ -26,6 +26,7 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -265,7 +266,7 @@ private:
     // Http::StreamDecoderFilterCallbacks
     void addDecodedData(Buffer::Instance& data, bool streaming) override;
     void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
-    HeaderMap& addDecodedTrailers() override;
+    RequestTrailerMap& addDecodedTrailers() override;
     MetadataMapVector& addDecodedMetadata() override;
     void continueDecoding() override;
     const Buffer::Instance* decodingBuffer() override {
@@ -378,7 +379,7 @@ private:
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
     void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
-    HeaderMap& addEncodedTrailers() override;
+    ResponseTrailerMap& addEncodedTrailers() override;
     void addEncodedMetadata(MetadataMapPtr&& metadata_map) override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
@@ -391,6 +392,11 @@ private:
     void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) override {
       ASSERT(parent_.state_.latest_data_encoding_filter_ == this);
       callback(*parent_.buffered_response_data_.get());
+    }
+    Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
+      // TODO(mattklein123): At some point we might want to actually wrap this interface but for now
+      // we give the filter direct access to the encoder options.
+      return parent_.response_encoder_->http1StreamEncoderOptions();
     }
 
     void responseDataTooLarge();
@@ -450,7 +456,7 @@ private:
 
     void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
-    void chargeStats(const HeaderMap& headers);
+    void chargeStats(const ResponseHeaderMap& headers);
     // Returns the encoder filter to start iteration with.
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream,
@@ -461,7 +467,7 @@ private:
                        FilterIterationStartState filter_iteration_start_state);
     const Network::Connection* connection();
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
-    HeaderMap& addDecodedTrailers();
+    RequestTrailerMap& addDecodedTrailers();
     MetadataMapVector& addDecodedMetadata();
     void decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHeaderMap& headers,
                        bool end_stream);
@@ -474,7 +480,7 @@ private:
     void disarmRequestTimeout();
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
-    HeaderMap& addEncodedTrailers();
+    ResponseTrailerMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         bool is_head_request,
@@ -608,7 +614,7 @@ private:
           : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
             saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
             is_internally_created_(false), decorated_propagate_(true), has_continue_headers_(false),
-            is_head_request_(false), decoding_headers_only_(false), encoding_headers_only_(false) {}
+            is_head_request_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -638,10 +644,10 @@ private:
       bool is_head_request_ : 1;
       // Whether a filter has indicated that the request should be treated as a headers only
       // request.
-      bool decoding_headers_only_;
+      bool decoding_headers_only_{false};
       // Whether a filter has indicated that the response should be treated as a headers only
       // response.
-      bool encoding_headers_only_;
+      bool encoding_headers_only_{false};
 
       // Used to track which filter is the latest filter that has received data.
       ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
@@ -658,7 +664,8 @@ private:
     void resetIdleTimer();
     // Per-stream request timeout callback
     void onRequestTimeout();
-
+    // Per-stream alive duration reached.
+    void onStreamMaxDurationReached();
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
 
     friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
@@ -701,6 +708,8 @@ private:
     Event::TimerPtr stream_idle_timer_;
     // Per-stream request timeout.
     Event::TimerPtr request_timer_;
+    // Per-stream alive duration.
+    Event::TimerPtr max_stream_duration_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
     StreamInfo::StreamInfoImpl stream_info_;
@@ -743,8 +752,10 @@ private:
   void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
-  Tracing::HttpTracer& tracer() { return http_context_.tracer(); }
+  Tracing::HttpTracer& tracer() { return *config_.tracer(); }
   void handleCodecException(const char* error);
+  void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
+                         absl::optional<StreamInfo::ResponseFlag> response_flag);
 
   enum class DrainState { NotDraining, Draining, Closing };
 

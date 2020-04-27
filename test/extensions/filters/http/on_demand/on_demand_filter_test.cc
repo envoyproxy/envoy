@@ -90,7 +90,7 @@ TEST_F(OnDemandFilterTest, TestOnRouteConfigUpdateCompletionContinuesDecodingWit
 }
 
 // tests onRouteConfigUpdateCompletion() when ActiveStream recreation fails
-TEST_F(OnDemandFilterTest, onRouteConfigUpdateCompletionContinuesDecodingIfRedirectFails) {
+TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionContinuesDecodingIfRedirectFails) {
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(nullptr));
   EXPECT_CALL(decoder_callbacks_, recreateStream()).WillOnce(Return(false));
@@ -98,7 +98,7 @@ TEST_F(OnDemandFilterTest, onRouteConfigUpdateCompletionContinuesDecodingIfRedir
 }
 
 // tests onRouteConfigUpdateCompletion() when route was resolved
-TEST_F(OnDemandFilterTest, onRouteConfigUpdateCompletionRestartsActiveStream) {
+TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStream) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(nullptr));
   EXPECT_CALL(decoder_callbacks_, recreateStream()).WillOnce(Return(true));
   filter_->onRouteConfigUpdateCompletion(true);

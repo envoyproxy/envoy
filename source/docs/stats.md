@@ -8,6 +8,8 @@ binary program restarts. The metrics are tracked as:
  * Histograms: mapping ranges of values to frequency. The ranges are auto-adjusted as
    data accumulates. Unlike counters and gauges, histogram data is not retained across
    binary program restarts.
+ * TextReadouts: Unicode strings. Unlike counters and gauges, text readout data
+   is not retained across binary program restarts.
 
 In order to support restarting the Envoy binary program without losing counter and gauge
 values, they are passed from parent to child in an RPC protocol.
@@ -79,7 +81,7 @@ followed.
 
 Stat names are replicated in several places in various forms.
 
- * Held with the stat values, in `CounterImpl` and `GaugeImpl`, which are defined in
+ * Held with the stat values, in `CounterImpl`, `GaugeImpl` and `TextReadoutImpl`, which are defined in
    [allocator_impl.cc](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/allocator_impl.cc)
  * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
@@ -215,6 +217,21 @@ StatNameDynamicPool | | Holds backing store for any number of dynamic StatNames.
 StatNameList | | Provides packed backing store for an ordered collection of StatNames, that are only accessed sequentially. Used for MetricImpl.
 StatNameStorageSet | | Implements a set of StatName with lookup via StatName. Used for rejected stats.
 StatNameSet | | Implements a set of StatName with lookup via string_view. Used to remember well-known names during startup, e.g. Redis commands.
+
+### Hot Restart
+
+Continuity of stat counters and gauges over hot-restart is supported. This occurs via
+a sequence of RPCs from parent to child, issued while child is in lame-duck. These
+RPCs contain a map of stat-name strings to values.
+
+One implementation complexity is that when decoding these names in the child, we
+must know which segments of the stat names were encoded dynamically. This is
+implemented by sending an auxiliary map of stat-name strings to lists of spans,
+where the spans identify dynamic segments.
+
+Dynamic segments are rare, used only by Dynamo, Mongo, IP Tagging Filter, Fault
+Filter, and `x-envoy-upstream-alt-stat-name` as of this writing. So in most
+cases this dynamic-segment map is empty.
 
 ## Tags and Tag Extraction
 

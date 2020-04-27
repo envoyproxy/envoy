@@ -17,6 +17,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -41,7 +42,7 @@ namespace {
 TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
-  Stats::IsolatedStoreImpl store;
+  Stats::TestUtil::TestStore store;
   Stats::Counter& c = store.counter("hello");
   c.inc();
   store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
@@ -229,9 +230,6 @@ protected:
     EXPECT_EQ(BUILD_VERSION_NUMBER, version_string);
   }
 
-  // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
-  Tracing::HttpTracer* tracer() { return &server_->httpContext().tracer(); };
-
   Network::Address::IpVersion version_;
   testing::NiceMock<MockOptions> options_;
   DefaultListenerHooks hooks_;
@@ -257,7 +255,7 @@ protected:
 // Custom StatsSink that just increments a counter when flush is called.
 class CustomStatsSink : public Stats::Sink {
 public:
-  CustomStatsSink(Stats::Scope& scope) : stats_flushed_(scope.counter("stats.flushed")) {}
+  CustomStatsSink(Stats::Scope& scope) : stats_flushed_(scope.counterFromString("stats.flushed")) {}
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot&) override { stats_flushed_.inc(); }
@@ -289,13 +287,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-/**
- * Static registration for the custom sink factory. @see RegisterFactory.
- */
-REGISTER_FACTORY(CustomStatsSinkFactory, Server::Configuration::StatsSinkFactory);
-
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+
   auto server_thread =
       startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
 
@@ -324,9 +320,10 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
   // Validate that initialization_time histogram value has been set.
-  EXPECT_TRUE(
-      stats_store_.histogram("server.initialization_time_ms", Stats::Histogram::Unit::Milliseconds)
-          .used());
+  EXPECT_TRUE(stats_store_
+                  .histogramFromString("server.initialization_time_ms",
+                                       Stats::Histogram::Unit::Milliseconds)
+                  .used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }
 
@@ -469,23 +466,54 @@ TEST_P(ServerInstanceImplTest, Stats) {
 class TestWithSimTimeAndRealSymbolTables : public Event::TestUsingSimulatedTime {
 protected:
   TestWithSimTimeAndRealSymbolTables() {
-    Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+    symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
   }
+
+private:
+  Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
 };
 
-class ServerStatsTest : public TestWithSimTimeAndRealSymbolTables, public ServerInstanceImplTest {
+class ServerStatsTest
+    : public TestWithSimTimeAndRealSymbolTables,
+      public ServerInstanceImplTestBase,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 protected:
+  ServerStatsTest() {
+    version_ = std::get<0>(GetParam());
+    manual_flush_ = std::get<1>(GetParam());
+  }
+
   void flushStats() {
-    // Default flush interval is 5 seconds.
-    simTime().sleep(std::chrono::seconds(6));
+    if (manual_flush_) {
+      server_->flushStats();
+    } else {
+      // Default flush interval is 5 seconds.
+      simTime().advanceTimeAsync(std::chrono::seconds(6));
+    }
     server_->dispatcher().run(Event::Dispatcher::RunType::Block);
   }
+
+  bool manual_flush_;
 };
+
+std::string ipFlushingModeTestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+  return fmt::format(
+      "{}_{}",
+      TestUtility::ipTestParamsToString(
+          ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
+      std::get<1>(params.param) ? "with_manual_flush" : "with_time_based_flush");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsFlushingMode, ServerStatsTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    ipFlushingModeTestParamsToString);
 
 TEST_P(ServerStatsTest, FlushStats) {
   initialize("test/server/test_data/server/empty_bootstrap.yaml");
-  Stats::Gauge& recent_lookups =
-      stats_store_.gauge("server.stats_recent_lookups", Stats::Gauge::ImportMode::NeverImport);
+  Stats::Gauge& recent_lookups = stats_store_.gaugeFromString(
+      "server.stats_recent_lookups", Stats::Gauge::ImportMode::NeverImport);
   EXPECT_EQ(0, recent_lookups.value());
   flushStats();
   uint64_t strobed_recent_lookups = recent_lookups.value();
@@ -504,10 +532,6 @@ TEST_P(ServerStatsTest, FlushStats) {
   flushStats();
   EXPECT_EQ(recent_lookups.value(), strobed_recent_lookups);
 }
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, ServerStatsTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
 
 // Default validation mode
 TEST_P(ServerInstanceImplTest, ValidationDefault) {
@@ -644,9 +668,9 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
-  EXPECT_EQ("bar", server_->runtime().snapshot().get("foo", ""));
+  EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
-  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz", ""));
+  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
   EXPECT_EQ("foobar", server_->runtime().snapshot().getLayers()[3]->name());
 }
 
@@ -911,22 +935,15 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(tracer()));
-  EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
+  EXPECT_THAT(envoy::config::trace::v3::Tracing{},
+              ProtoEq(server_->httpContext().defaultTracingConfig()));
 }
 
-TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(ZipkinHttpTracingEnabled)) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  EXPECT_NO_THROW(initialize("test/server/test_data/server/zipkin_tracing.yaml"));
-  EXPECT_EQ(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(tracer()));
-
-  // Note: there is no ZipkinTracerImpl object;
-  // source/extensions/tracers/zipkin/config.cc instantiates the tracer with
-  //     std::make_unique<Tracing::HttpTracerImpl>(std::move(zipkin_driver), server.localInfo());
-  // so we look for a successful dynamic cast to HttpTracerImpl, rather
-  // than HttpNullTracer.
-  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/zipkin_tracing_deprecated_config.yaml"));
+  EXPECT_EQ("zipkin", server_->httpContext().defaultTracingConfig().http().name());
 }
 
 class TestObject : public ProcessObject {
@@ -1049,13 +1066,14 @@ public:
   std::string name() const override { return "envoy.callbacks_stats_sink"; }
 };
 
-REGISTER_FACTORY(CallbacksStatsSinkFactory, Server::Configuration::StatsSinkFactory);
-
 // This test ensures that a stats sink can use cluster update callbacks properly. Using only a
 // cluster update callback is insufficient to protect against double-free bugs, so a server
 // lifecycle callback is also used to ensure that the cluster update callback is freed during
 // Server::Instance's destruction. See issue #9292 for more details.
 TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
+  CallbacksStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+
   initialize("test/server/test_data/server/callbacks_stats_sink_bootstrap.yaml");
   // Necessary to trigger server lifecycle callbacks, otherwise only terminate() is called.
   server_->shutdown();
@@ -1063,11 +1081,13 @@ TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
 
 // Validate that disabled extension is reflected in the list of Node extensions.
 TEST_P(ServerInstanceImplTest, DisabledExtension) {
-  OptionsImpl::disableExtensions({"envoy.filters.http/envoy.buffer"});
+  OptionsImpl::disableExtensions({"envoy.filters.http/envoy.filters.http.buffer"});
   initialize("test/server/test_data/server/node_bootstrap.yaml");
   bool disabled_filter_found = false;
   for (const auto& extension : server_->localInfo().node().extensions()) {
-    if (extension.category() == "envoy.filters.http" && extension.name() == "envoy.buffer") {
+    // TODO(zuercher): remove envoy.buffer when old-style name deprecation is completed.
+    if (extension.category() == "envoy.filters.http" &&
+        (extension.name() == "envoy.filters.http.buffer" || extension.name() == "envoy.buffer")) {
       ASSERT_TRUE(extension.disabled());
       disabled_filter_found = true;
     } else {

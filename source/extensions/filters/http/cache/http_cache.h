@@ -90,7 +90,7 @@ public:
 
 private:
   uint64_t first_;
-  const uint64_t last_;
+  uint64_t last_;
 };
 
 inline bool operator==(const AdjustedByteRange& lhs, const AdjustedByteRange& rhs) {
@@ -115,7 +115,7 @@ struct LookupResult {
   CacheEntryStatus cache_entry_status_ = CacheEntryStatus::Unusable;
 
   // Headers of the cached response.
-  Http::HeaderMapPtr headers_;
+  Http::ResponseHeaderMapPtr headers_;
 
   // Size of the full response body. Cache filter will generate a content-length
   // header with this value, replacing any preexisting content-length header.
@@ -160,7 +160,7 @@ public:
   using HeaderVector = std::vector<Http::HeaderEntry>;
 
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
-  LookupRequest(const Http::HeaderMap& request_headers, SystemTime timestamp);
+  LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp);
 
   // Caches may modify the key according to local needs, though care must be
   // taken to ensure that meaningfully distinct responses have distinct keys.
@@ -168,7 +168,7 @@ public:
   Key& key() { return key_; }
 
   // Returns the subset of this request's headers that are listed in
-  // envoy::config::filter::http::cache::v3::CacheConfig::allowed_vary_headers. If a cache
+  // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers. If a cache
   // storage implementation forwards lookup requests to a remote cache server that supports *vary*
   // headers, that server may need to see these headers. For local implementations, it may be
   // simpler to instead call makeLookupResult with each potential response.
@@ -187,11 +187,11 @@ public:
   // - LookupResult::content_length == content_length.
   // - LookupResult::response_ranges entries are satisfiable (as documented
   // there).
-  LookupResult makeLookupResult(Http::HeaderMapPtr&& response_headers,
+  LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
                                 uint64_t content_length) const;
 
 private:
-  bool isFresh(const Http::HeaderMap& response_headers) const;
+  bool isFresh(const Http::ResponseHeaderMap& response_headers) const;
 
   Key key_;
   std::vector<RawByteRange> request_range_spec_;
@@ -208,14 +208,14 @@ struct CacheInfo {
 
 using LookupBodyCallback = std::function<void(Buffer::InstancePtr&&)>;
 using LookupHeadersCallback = std::function<void(LookupResult&&)>;
-using LookupTrailersCallback = std::function<void(Http::HeaderMapPtr&&)>;
+using LookupTrailersCallback = std::function<void(Http::ResponseTrailerMapPtr&&)>;
 using InsertCallback = std::function<void(bool success_ready_for_more)>;
 
 // Manages the lifetime of an insertion.
 class InsertContext {
 public:
   // Accepts response_headers for caching. Only called once.
-  virtual void insertHeaders(const Http::HeaderMap& response_headers, bool end_stream) PURE;
+  virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers, bool end_stream) PURE;
 
   // The insertion is streamed into the cache in chunks whose size is determined
   // by the client, but with a pace determined by the cache. To avoid streaming
@@ -229,7 +229,7 @@ public:
                           bool end_stream) PURE;
 
   // Inserts trailers into the cache.
-  virtual void insertTrailers(const Http::HeaderMap& trailers) PURE;
+  virtual void insertTrailers(const Http::ResponseTrailerMap& trailers) PURE;
 
   virtual ~InsertContext() = default;
 };
@@ -240,13 +240,12 @@ using InsertContextPtr = std::unique_ptr<InsertContext>;
 // an in-progress lookup by simply dropping the LookupContextPtr.
 class LookupContext {
 public:
-  virtual ~LookupContext() = default;
-
   // Get the headers from the cache. It is a programming error to call this
   // twice.
   virtual void getHeaders(LookupHeadersCallback&& cb) PURE;
 
   // Reads the next chunk from the cache, calling cb when the chunk is ready.
+  // The Buffer::InstancePtr passed to cb must not be null.
   //
   // The cache must call cb with a range of bytes starting at range.start() and
   // ending at or before range.end(). Caller is responsible for tracking what
@@ -264,9 +263,11 @@ public:
   // getBody requests bytes 20-23 .......... callback with bytes 20-23
   virtual void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) PURE;
 
-  // Get the trailers from the cache. Only called if LookupResult::has_trailers
-  // == true.
+  // Get the trailers from the cache. Only called if LookupResult::has_trailers == true. The
+  // Http::ResponseTrailerMapPtr passed to cb must not be null.
   virtual void getTrailers(LookupTrailersCallback&& cb) PURE;
+
+  virtual ~LookupContext() = default;
 };
 using LookupContextPtr = std::unique_ptr<LookupContext>;
 
@@ -292,7 +293,7 @@ public:
   // This is called when an expired cache entry is successfully validated, to
   // update the cache entry.
   virtual void updateHeaders(LookupContextPtr&& lookup_context,
-                             Http::HeaderMapPtr&& response_headers) PURE;
+                             Http::ResponseHeaderMapPtr&& response_headers) PURE;
 
   // Returns statically known information about a cache.
   virtual CacheInfo cacheInfo() const PURE;
@@ -310,7 +311,7 @@ public:
   // as the calling CacheFilter).
   virtual HttpCache&
   getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) PURE;
-  virtual ~HttpCacheFactory() = default;
+  ~HttpCacheFactory() override = default;
 
 private:
   const std::string name_;

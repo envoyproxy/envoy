@@ -9,7 +9,6 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/stats/sink.h"
-#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "absl/types/optional.h"
@@ -30,11 +29,6 @@ public:
    *         This will be nullptr if the cluster manager has not initialized yet.
    */
   virtual Upstream::ClusterManager* clusterManager() PURE;
-
-  /**
-   * @return Tracing::HttpTracer& singleton for use by the entire server.
-   */
-  virtual Tracing::HttpTracer& httpTracer() PURE;
 
   /**
    * @return std::list<Stats::SinkPtr>& the list of stats sinks initialized from the configuration.

@@ -110,7 +110,7 @@ public:
 
 private:
   void determinePolicy();
-  bool isValid(const absl::string_view source_origin, Http::HeaderMap& headers);
+  bool isValid(const absl::string_view source_origin, Http::RequestHeaderMap& headers);
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   CsrfFilterConfigSharedPtr config_;

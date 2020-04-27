@@ -7,19 +7,20 @@ import "envoy/config/cluster/v3/cluster.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.common.dynamic_forward_proxy.v3";
 option java_outer_classname = "DnsCacheProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Dynamic forward proxy common configuration]
 
 // Configuration for the dynamic forward proxy DNS cache. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message DnsCacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig";
@@ -48,7 +49,12 @@ message DnsCacheConfig {
   //
   //  The returned DNS TTL is not currently used to alter the refresh rate. This feature will be
   //  added in a future change.
-  google.protobuf.Duration dns_refresh_rate = 3 [(validate.rules).duration = {gt {}}];
+  //
+  // .. note:
+  //
+  // The refresh rate is rounded to the closest millisecond, and must be at least 1ms.
+  google.protobuf.Duration dns_refresh_rate = 3
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // The TTL for hosts that are unused. Hosts that have not been used in the configured time
   // interval will be purged. If not specified defaults to 5m.
@@ -72,4 +78,9 @@ message DnsCacheConfig {
   //   it is possible for the maximum hosts in the cache to go slightly above the configured
   //   value depending on timing. This is similar to how other circuit breakers work.
   google.protobuf.UInt32Value max_hosts = 5 [(validate.rules).uint32 = {gt: 0}];
+
+  // If the DNS failure refresh rate is specified,
+  // this is used as the cache's DNS refresh rate when DNS requests are failing. If this setting is
+  // not specified, the failure refresh rate defaults to the dns_refresh_rate.
+  config.cluster.v3.Cluster.RefreshRate dns_failure_refresh_rate = 6;
 }

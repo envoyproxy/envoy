@@ -44,7 +44,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:context_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
-        "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -120,6 +119,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -158,6 +158,7 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         ":admin_interface",
+        ":drain_manager_interface",
         ":lifecycle_notifier_interface",
         ":process_context_interface",
         "//include/envoy/access_log:access_log_interface",
@@ -245,6 +246,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "request_id_extension_config_interface",
+    hdrs = ["request_id_extension_config.h"],
+    deps = [
+        ":filter_config_interface",
+        "//include/envoy/http:request_id_extension_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "resource_monitor_config_interface",
     hdrs = ["resource_monitor_config.h"],
     deps = [
@@ -268,7 +279,7 @@ envoy_cc_library(
     name = "tracer_config_interface",
     hdrs = ["tracer_config.h"],
     deps = [
-        ":instance_interface",
+        ":filter_config_interface",
         "//include/envoy/config:typed_config_interface",
         "//source/common/protobuf",
     ],

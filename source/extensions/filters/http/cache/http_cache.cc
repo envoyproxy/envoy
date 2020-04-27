@@ -37,18 +37,19 @@ std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
   return os << "[" << range.begin() << "," << range.end() << ")";
 }
 
-LookupRequest::LookupRequest(const Http::HeaderMap& request_headers, SystemTime timestamp)
+LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp)
     : timestamp_(timestamp),
       request_cache_control_(request_headers.CacheControl() == nullptr
                                  ? ""
                                  : request_headers.CacheControl()->value().getStringView()) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
   // CacheFilter doesn't create LookupRequests for such requests.
-  ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::HeaderMap "
+  ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
                                  "with null Path.");
-  ASSERT(request_headers.ForwardedProto(),
-         "Can't form cache lookup key for malformed Http::HeaderMap with null ForwardedProto.");
-  ASSERT(request_headers.Host(), "Can't form cache lookup key for malformed Http::HeaderMap "
+  ASSERT(
+      request_headers.ForwardedProto(),
+      "Can't form cache lookup key for malformed Http::RequestHeaderMap with null ForwardedProto.");
+  ASSERT(request_headers.Host(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
                                  "with null Host.");
   const Http::HeaderString& forwarded_proto = request_headers.ForwardedProto()->value();
   const auto& scheme_values = Http::Headers::get().SchemeValues;
@@ -71,7 +72,7 @@ size_t stableHashKey(const Key& key) { return MessageUtil::hash(key); }
 size_t localHashKey(const Key& key) { return stableHashKey(key); }
 
 // Returns true if response_headers is fresh.
-bool LookupRequest::isFresh(const Http::HeaderMap& response_headers) const {
+bool LookupRequest::isFresh(const Http::ResponseHeaderMap& response_headers) const {
   if (!response_headers.Date()) {
     return false;
   }
@@ -86,7 +87,7 @@ bool LookupRequest::isFresh(const Http::HeaderMap& response_headers) const {
   return timestamp_ <= Utils::httpTime(response_headers.get(Http::Headers::get().Expires));
 }
 
-LookupResult LookupRequest::makeLookupResult(Http::HeaderMapPtr&& response_headers,
+LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
                                              uint64_t content_length) const {
   // TODO(toddmgreer): Implement all HTTP caching semantics.
   ASSERT(response_headers);

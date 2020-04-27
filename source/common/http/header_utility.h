@@ -94,7 +94,16 @@ public:
    * http://tools.ietf.org/html/rfc7230#section-3.2
    * @return bool true if the header values are valid, according to the aforementioned RFC.
    */
-  static bool headerIsValid(const absl::string_view header_value);
+  static bool headerValueIsValid(const absl::string_view header_value);
+
+  /**
+   * Checks if header name contains underscore characters.
+   * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
+   * as a security measure due to systems that treat '_' and '-' as interchangeable. Envoy by
+   * default allows headers with underscore characters.
+   * @return bool true if header name contains underscore characters.
+   */
+  static bool headerNameContainsUnderscore(const absl::string_view header_name);
 
   /**
    * Validates that the characters in the authority are valid.
@@ -112,7 +121,7 @@ public:
   /**
    * @brief a helper function to determine if the headers represent an envoy internal request
    */
-  static bool isEnvoyInternalRequest(const HeaderMap& headers);
+  static bool isEnvoyInternalRequest(const RequestHeaderMap& headers);
 
   /**
    * Determines if request headers pass Envoy validity checks.
@@ -120,7 +129,7 @@ public:
    * @return details of the error if an error is present, otherwise absl::nullopt
    */
   static absl::optional<std::reference_wrapper<const absl::string_view>>
-  requestHeadersValid(const HeaderMap& headers);
+  requestHeadersValid(const RequestHeaderMap& headers);
 };
 } // namespace Http
 } // namespace Envoy

@@ -75,7 +75,7 @@ protected:
     return new_stream;
   }
 
-  Http::TestHeaderMapImpl redirect_response_{
+  Http::TestResponseHeaderMapImpl redirect_response_{
       {":status", "302"}, {"content-length", "0"}, {"location", "http://authority2/new/url"}};
 
   std::vector<FakeHttpConnectionPtr> upstream_connections_;

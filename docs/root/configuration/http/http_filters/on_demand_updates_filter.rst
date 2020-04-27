@@ -15,4 +15,4 @@ Configuration
 -------------
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.on_demand.v2.OnDemand>`
 * This filter should be configured with the name *envoy.filters.http.on_demand*.
-* The filter should be placed before *envoy.router* filter in the HttpConnectionManager's filter chain.
+* The filter should be placed before *envoy.filters.http.router* filter in the HttpConnectionManager's filter chain.

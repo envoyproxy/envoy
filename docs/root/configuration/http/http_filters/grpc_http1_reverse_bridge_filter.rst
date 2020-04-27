@@ -96,7 +96,7 @@ How to disable HTTP/1.1 reverse bridge filter per route
                 "@type": type.googleapis.com/envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1.FilterConfig
                 content_type: application/grpc+proto
                 withhold_grpc_frames: true
-            - name: envoy.router
+            - name: envoy.filters.http.router
               typed_config: {}
     clusters:
     - name: other

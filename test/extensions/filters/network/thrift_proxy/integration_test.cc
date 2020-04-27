@@ -22,11 +22,11 @@ class ThriftConnManagerIntegrationTest
     : public testing::TestWithParam<std::tuple<TransportType, ProtocolType, bool>>,
       public BaseThriftIntegrationTest {
 public:
-  static void SetUpTestSuite() {
-    thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    thrift_config_ = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
-        - name: envoy.filters.network.thrift_proxy
+        - name: thrift
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy
             stat_prefix: thrift_stats
@@ -64,7 +64,7 @@ public:
                     method_name: "poke"
                   route:
                     cluster: "cluster_3"
-      )EOF";
+      )EOF");
   }
 
   void initializeCall(DriverMode mode) {

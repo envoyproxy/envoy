@@ -87,7 +87,7 @@ public:
       const AuthFactory& factory);
 
   // Factory method for creating verifier contexts.
-  static ContextSharedPtr createContext(Http::HeaderMap& headers, Tracing::Span& parent_span,
+  static ContextSharedPtr createContext(Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
                                         Callbacks* callback);
 };
 

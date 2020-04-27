@@ -15,7 +15,7 @@ class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine, No
 public:
   RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v3::RBAC& rules);
 
-  bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool allowed(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info, std::string* effective_policy_id) const override;
 
   bool allowed(const Network::Connection& connection, const StreamInfo::StreamInfo& info,

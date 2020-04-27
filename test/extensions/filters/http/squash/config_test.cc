@@ -37,6 +37,16 @@ TEST(SquashFilterConfigFactoryTest, SquashFilterCorrectYaml) {
   cb(filter_callback);
 }
 
+// Test that the deprecated extension name still functions.
+TEST(SquashFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.squash";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
+}
+
 } // namespace
 } // namespace Squash
 } // namespace HttpFilters

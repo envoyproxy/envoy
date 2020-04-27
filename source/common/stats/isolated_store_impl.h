@@ -13,6 +13,7 @@
 #include "common/stats/null_gauge.h"
 #include "common/stats/store_impl.h"
 #include "common/stats/symbol_table_impl.h"
+#include "common/stats/tag_utility.h"
 #include "common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -28,11 +29,13 @@ public:
   using CounterAllocator = std::function<RefcountPtr<Base>(StatName name)>;
   using GaugeAllocator = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
   using HistogramAllocator = std::function<RefcountPtr<Base>(StatName, Histogram::Unit)>;
+  using TextReadoutAllocator = std::function<RefcountPtr<Base>(StatName name, TextReadout::Type)>;
   using BaseOptConstRef = absl::optional<std::reference_wrapper<const Base>>;
 
   IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
   IsolatedStatsCache(GaugeAllocator alloc) : gauge_alloc_(alloc) {}
   IsolatedStatsCache(HistogramAllocator alloc) : histogram_alloc_(alloc) {}
+  IsolatedStatsCache(TextReadoutAllocator alloc) : text_readout_alloc_(alloc) {}
 
   Base& get(StatName name) {
     auto stat = stats_.find(name);
@@ -67,6 +70,17 @@ public:
     return *new_stat;
   }
 
+  Base& get(StatName name, TextReadout::Type type) {
+    auto stat = stats_.find(name);
+    if (stat != stats_.end()) {
+      return *stat->second;
+    }
+
+    RefcountPtr<Base> new_stat = text_readout_alloc_(name, type);
+    stats_.emplace(new_stat->statName(), new_stat);
+    return *new_stat;
+  }
+
   std::vector<RefcountPtr<Base>> toVector() const {
     std::vector<RefcountPtr<Base>> vec;
     vec.reserve(stats_.size());
@@ -92,6 +106,7 @@ private:
   CounterAllocator counter_alloc_;
   GaugeAllocator gauge_alloc_;
   HistogramAllocator histogram_alloc_;
+  TextReadoutAllocator text_readout_alloc_;
 };
 
 class IsolatedStoreImpl : public StoreImpl {
@@ -100,24 +115,43 @@ public:
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
 
   // Stats::Scope
-  Counter& counterFromStatName(StatName name) override { return counters_.get(name); }
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override {
+    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
+    Counter& counter = counters_.get(joiner.nameWithTags());
+    return counter;
+  }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    Gauge& gauge = gauges_.get(name, import_mode);
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   Gauge::ImportMode import_mode) override {
+    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
+    Gauge& gauge = gauges_.get(joiner.nameWithTags(), import_mode);
     gauge.mergeImportMode(import_mode);
     return gauge;
   }
   NullCounterImpl& nullCounter() { return *null_counter_; }
   NullGaugeImpl& nullGauge(const std::string&) override { return *null_gauge_; }
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
-    Histogram& histogram = histograms_.get(name, unit);
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                           Histogram::Unit unit) override {
+    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
+    Histogram& histogram = histograms_.get(joiner.nameWithTags(), unit);
     return histogram;
+  }
+  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptConstRef tags) override {
+    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
+    TextReadout& text_readout =
+        text_readouts_.get(joiner.nameWithTags(), TextReadout::Type::Default);
+    return text_readout;
   }
   CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
   GaugeOptConstRef findGauge(StatName name) const override { return gauges_.find(name); }
   HistogramOptConstRef findHistogram(StatName name) const override {
     return histograms_.find(name);
+  }
+  TextReadoutOptConstRef findTextReadout(StatName name) const override {
+    return text_readouts_.find(name);
   }
 
   // Stats::Store
@@ -133,30 +167,36 @@ public:
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     return std::vector<ParentHistogramSharedPtr>{};
   }
+  std::vector<TextReadoutSharedPtr> textReadouts() const override {
+    return text_readouts_.toVector();
+  }
 
-  Counter& counter(const std::string& name) override {
+  Counter& counterFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return counterFromStatName(storage.statName());
   }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName(), unit);
+  }
+  TextReadout& textReadoutFromString(const std::string& name) override {
+    StatNameManagedStorage storage(name, symbolTable());
+    return textReadoutFromStatName(storage.statName());
   }
 
 private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
-
-  std::string toString(StatName stat_name) { return alloc_.symbolTable().toString(stat_name); }
 
   SymbolTablePtr symbol_table_storage_;
   AllocatorImpl alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
+  IsolatedStatsCache<TextReadout> text_readouts_;
   RefcountPtr<NullCounterImpl> null_counter_;
   RefcountPtr<NullGaugeImpl> null_gauge_;
 };

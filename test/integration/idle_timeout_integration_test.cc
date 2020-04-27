@@ -59,7 +59,9 @@ public:
     return response;
   }
 
-  void sleep() { test_time_.timeSystem().sleep(std::chrono::milliseconds(IdleTimeoutMs / 2)); }
+  void sleep() {
+    test_time_.timeSystem().advanceTimeWait(std::chrono::milliseconds(IdleTimeoutMs / 2));
+  }
 
   void waitForTimeout(IntegrationStreamDecoder& response, absl::string_view stat_name = "",
                       absl::string_view stat_prefix = "http.config_test") {
@@ -282,7 +284,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
 // Successful request/response when per-stream idle timeout is configured.
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutRequestAndResponse) {
   enable_per_stream_idle_timeout_ = true;
-  testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
+  testRouterRequestAndResponseWithBody(1024, 1024, false);
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutConfiguredRequestResponse) {
@@ -292,7 +294,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutConfiguredRequestResponse) {
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutConfiguredRequestResponseWithBody) {
   enable_request_timeout_ = true;
-  testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
+  testRouterRequestAndResponseWithBody(1024, 1024, false);
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnBodilessPost) {

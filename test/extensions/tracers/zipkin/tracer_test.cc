@@ -42,7 +42,7 @@ protected:
   Event::SimulatedTimeSystem time_system_;
 };
 
-TEST_F(ZipkinTracerTest, spanCreation) {
+TEST_F(ZipkinTracerTest, SpanCreation) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
@@ -56,7 +56,7 @@ TEST_F(ZipkinTracerTest, spanCreation) {
   // Test the creation of a root span --> CS
   // ==============
   ON_CALL(random_generator, random()).WillByDefault(Return(1000));
-  time_system_.sleep(std::chrono::milliseconds(1));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(1));
   SpanPtr root_span = tracer.startSpan(config, "my_span", timestamp);
 
   EXPECT_EQ("my_span", root_span->name());
@@ -226,7 +226,7 @@ TEST_F(ZipkinTracerTest, spanCreation) {
   EXPECT_FALSE(new_shared_context_span->isSetDuration());
 }
 
-TEST_F(ZipkinTracerTest, finishSpan) {
+TEST_F(ZipkinTracerTest, FinishSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
@@ -309,7 +309,7 @@ TEST_F(ZipkinTracerTest, finishSpan) {
   EXPECT_EQ("my_service_name", endpoint.serviceName());
 }
 
-TEST_F(ZipkinTracerTest, finishNotSampledSpan) {
+TEST_F(ZipkinTracerTest, FinishNotSampledSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;

@@ -18,6 +18,11 @@
 #include <mswsock.h>
 #include <ws2tcpip.h>
 
+// This is introduced in Windows SDK 10.0.17063.0 which is required
+// to build Envoy on Windows (we will reevaluate whether earlier builds
+// of Windows can be detected and PipeInstance marked unsupported at runtime.)
+#include <afunix.h>
+
 // <windows.h> defines some frequently used symbols, so we need to undef these
 // interfering symbols.
 #undef DELETE
@@ -28,6 +33,21 @@
 
 #include <io.h>
 #include <stdint.h>
+#include <time.h>
+
+#define htole16(x) (x)
+#define htole32(x) (x)
+#define htole64(x) (x)
+#define le16toh(x) (x)
+#define le32toh(x) (x)
+#define le64toh(x) (x)
+
+#define htobe16(x) htons((x))
+#define htobe32(x) htonl((x))
+#define htobe64(x) htonll((x))
+#define be16toh(x) ntohs((x))
+#define be32toh(x) ntohl((x))
+#define be64toh(x) ntohll((x))
 
 #define PACKED_STRUCT(definition, ...)                                                             \
   __pragma(pack(push, 1)) definition, ##__VA_ARGS__;                                               \
@@ -122,6 +142,24 @@ struct msghdr {
 #include <sys/wait.h>
 #include <unistd.h>
 
+#ifdef __APPLE__
+#include <libkern/OSByteOrder.h>
+#define htole16(x) OSSwapHostToLittleInt16((x))
+#define htole32(x) OSSwapHostToLittleInt32((x))
+#define htole64(x) OSSwapHostToLittleInt64((x))
+#define le16toh(x) OSSwapLittleToHostInt16((x))
+#define le32toh(x) OSSwapLittleToHostInt32((x))
+#define le64toh(x) OSSwapLittleToHostInt64((x))
+#define htobe16(x) OSSwapHostToBigInt16((x))
+#define htobe32(x) OSSwapHostToBigInt32((x))
+#define htobe64(x) OSSwapHostToBigInt64((x))
+#define be16toh(x) OSSwapBigToHostInt16((x))
+#define be32toh(x) OSSwapBigToHostInt32((x))
+#define be64toh(x) OSSwapBigToHostInt64((x))
+#else
+#include <endian.h>
+#endif
+
 #if defined(__linux__)
 #include <linux/netfilter_ipv4.h>
 #endif
@@ -146,4 +184,24 @@ using os_fd_t = int;
 #define ENVOY_SHUT_WR SHUT_WR
 #define ENVOY_SHUT_RDWR SHUT_RDWR
 
+#endif
+
+// Note: chromium disabled recvmmsg regardless of ndk version. However, the only Android target
+// currently actively using Envoy is Envoy Mobile, where recvmmsg is not actively disabled. In fact,
+// defining mmsghdr here caused a conflicting definition with the ndk's definition of the struct
+// (https://github.com/lyft/envoy-mobile/pull/772/checks?check_run_id=534152886#step:4:64).
+// Therefore, we decided to remove the Android check introduced here in
+// https://github.com/envoyproxy/envoy/pull/10120. If someone out there encounters problems with
+// this please bring up in Envoy's slack channel #envoy-udp-quic-dev.
+#if defined(__linux__)
+#define ENVOY_MMSG_MORE 1
+#else
+#define ENVOY_MMSG_MORE 0
+#define MSG_WAITFORONE 0x10000 // recvmmsg(): block until 1+ packets avail.
+// Posix structure for describing messages sent by 'sendmmsg` and received by
+// 'recvmmsg'
+struct mmsghdr {
+  struct msghdr msg_hdr;
+  unsigned int msg_len;
+};
 #endif

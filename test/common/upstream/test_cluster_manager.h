@@ -24,6 +24,7 @@
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
 #include "test/integration/clusters/custom_static_cluster.h"
 #include "test/mocks/access_log/mocks.h"
@@ -120,7 +121,7 @@ public:
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
   MOCK_METHOD(CdsApi*, createCds_, ());
 
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
@@ -163,9 +164,10 @@ public:
                          AccessLog::AccessLogManager& log_manager,
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                          ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                         Http::Context& http_context)
+                         Http::Context& http_context, Grpc::Context& grpc_context)
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                           main_thread_dispatcher, admin, validation_context, api, http_context) {}
+                           main_thread_dispatcher, admin, validation_context, api, http_context,
+                           grpc_context) {}
 
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
@@ -187,10 +189,10 @@ public:
       AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
       Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
       MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,
-      Http::Context& http_context)
+      Http::Context& http_context, Grpc::Context& grpc_context)
       : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info,
                                log_manager, main_thread_dispatcher, admin, validation_context, api,
-                               http_context),
+                               http_context, grpc_context),
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:

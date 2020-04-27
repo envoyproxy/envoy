@@ -25,7 +25,7 @@ public:
    *                   there are none headers available.
    * @return  true if request is a match, false otherwise.
    */
-  virtual bool matches(const Http::HeaderMap& headers) const PURE;
+  virtual bool matches(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
    * Factory method to create a shared instance of a matcher based on the rule defined.

@@ -6,7 +6,7 @@
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"
@@ -143,9 +143,13 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   return match != header_data.invert_match_;
 }
 
-bool HeaderUtility::headerIsValid(const absl::string_view header_value) {
+bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
   return nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
                                     header_value.size()) != 0;
+}
+
+bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_name) {
+  return header_name.find('_') != absl::string_view::npos;
 }
 
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
@@ -166,14 +170,14 @@ void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_a
       &headers);
 }
 
-bool HeaderUtility::isEnvoyInternalRequest(const HeaderMap& headers) {
+bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
   const HeaderEntry* internal_request_header = headers.EnvoyInternalRequest();
   return internal_request_header != nullptr &&
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
 }
 
 absl::optional<std::reference_wrapper<const absl::string_view>>
-HeaderUtility::requestHeadersValid(const HeaderMap& headers) {
+HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   // Make sure the host is valid.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
       headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {

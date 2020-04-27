@@ -22,7 +22,7 @@ namespace Quic {
 
 // Envoy specific provider of server connection id and decision maker of
 // accepting new connection or not.
-class EnvoyQuicCryptoServerStreamHelper : public quic::QuicCryptoServerStream::Helper {
+class EnvoyQuicCryptoServerStreamHelper : public quic::QuicCryptoServerStreamBase::Helper {
 public:
   ~EnvoyQuicCryptoServerStreamHelper() override = default;
 

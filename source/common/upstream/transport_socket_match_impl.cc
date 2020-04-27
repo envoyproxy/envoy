@@ -37,7 +37,7 @@ TransportSocketMatchStats TransportSocketMatcherImpl::generateStats(const std::s
 }
 
 TransportSocketMatcher::MatchData
-TransportSocketMatcherImpl::resolve(const envoy::config::core::v3::Metadata& metadata) const {
+TransportSocketMatcherImpl::resolve(const envoy::config::core::v3::Metadata* metadata) const {
   for (const auto& match : matches_) {
     if (Config::Metadata::metadataLabelMatch(
             match.label_set, metadata,

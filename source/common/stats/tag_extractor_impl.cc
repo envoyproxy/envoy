@@ -66,7 +66,7 @@ bool TagExtractorImpl::substrMismatch(absl::string_view stat_name) const {
   return !substr_.empty() && stat_name.find(substr_) == absl::string_view::npos;
 }
 
-bool TagExtractorImpl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
+bool TagExtractorImpl::extractTag(absl::string_view stat_name, TagVector& tags,
                                   IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 

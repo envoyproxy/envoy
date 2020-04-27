@@ -66,7 +66,8 @@ AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shar
                                                    Stats::Store& store, Type type,
                                                    AutonomousUpstream& upstream)
     : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem(),
-                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT),
+                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+                         envoy::config::core::v3::HttpProtocolOptions::ALLOW),
       upstream_(upstream) {}
 
 Http::RequestDecoder& AutonomousHttpConnection::newStream(Http::ResponseEncoder& response_encoder,
@@ -101,16 +102,16 @@ void AutonomousUpstream::createUdpListenerFilterChain(Network::UdpListenerFilter
 
 void AutonomousUpstream::setLastRequestHeaders(const Http::HeaderMap& headers) {
   Thread::LockGuard lock(headers_lock_);
-  last_request_headers_ = std::make_unique<Http::TestHeaderMapImpl>(headers);
+  last_request_headers_ = std::make_unique<Http::TestRequestHeaderMapImpl>(headers);
 }
 
-std::unique_ptr<Http::TestHeaderMapImpl> AutonomousUpstream::lastRequestHeaders() {
+std::unique_ptr<Http::TestRequestHeaderMapImpl> AutonomousUpstream::lastRequestHeaders() {
   Thread::LockGuard lock(headers_lock_);
   return std::move(last_request_headers_);
 }
 
 void AutonomousUpstream::setResponseHeaders(
-    std::unique_ptr<Http::TestHeaderMapImpl>&& response_headers) {
+    std::unique_ptr<Http::TestResponseHeaderMapImpl>&& response_headers) {
   Thread::LockGuard lock(headers_lock_);
   response_headers_ = std::move(response_headers);
 }

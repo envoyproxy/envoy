@@ -13,6 +13,7 @@
 
 #include "server/transport_socket_config_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -94,8 +95,8 @@ protected:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
         singleton_manager_, tls_, validation_visitor_, *api_);
-    cluster_.reset(
-        new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope), false));
+    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
+                                                std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
@@ -113,7 +114,7 @@ protected:
   }
 
   bool initialized_{};
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
   Ssl::MockContextManager ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;
   NiceMock<MockClusterManager> cm_;
@@ -365,26 +366,27 @@ TEST_F(EdsTest, EndpointMetadata) {
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 2);
   EXPECT_EQ(hosts[0]->metadata()->filter_metadata_size(), 2);
-  EXPECT_EQ(Config::Metadata::metadataValue(*hosts[0]->metadata(),
+  EXPECT_EQ(Config::Metadata::metadataValue(hosts[0]->metadata().get(),
                                             Config::MetadataFilters::get().ENVOY_LB, "string_key")
                 .string_value(),
             std::string("string_value"));
-  EXPECT_EQ(Config::Metadata::metadataValue(*hosts[0]->metadata(), "custom_namespace", "num_key")
-                .number_value(),
-            1.1);
-  EXPECT_FALSE(Config::Metadata::metadataValue(*hosts[0]->metadata(),
+  EXPECT_EQ(
+      Config::Metadata::metadataValue(hosts[0]->metadata().get(), "custom_namespace", "num_key")
+          .number_value(),
+      1.1);
+  EXPECT_FALSE(Config::Metadata::metadataValue(hosts[0]->metadata().get(),
                                                Config::MetadataFilters::get().ENVOY_LB,
                                                Config::MetadataEnvoyLbKeys::get().CANARY)
                    .bool_value());
   EXPECT_FALSE(hosts[0]->canary());
 
   EXPECT_EQ(hosts[1]->metadata()->filter_metadata_size(), 1);
-  EXPECT_TRUE(Config::Metadata::metadataValue(*hosts[1]->metadata(),
+  EXPECT_TRUE(Config::Metadata::metadataValue(hosts[1]->metadata().get(),
                                               Config::MetadataFilters::get().ENVOY_LB,
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value());
   EXPECT_TRUE(hosts[1]->canary());
-  EXPECT_EQ(Config::Metadata::metadataValue(*hosts[1]->metadata(),
+  EXPECT_EQ(Config::Metadata::metadataValue(hosts[1]->metadata().get(),
                                             Config::MetadataFilters::get().ENVOY_LB, "version")
                 .string_value(),
             "v1");
@@ -400,7 +402,7 @@ TEST_F(EdsTest, EndpointMetadata) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   auto& nhosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(nhosts.size(), 2);
-  EXPECT_EQ(Config::Metadata::metadataValue(*nhosts[1]->metadata(),
+  EXPECT_EQ(Config::Metadata::metadataValue(nhosts[1]->metadata().get(),
                                             Config::MetadataFilters::get().ENVOY_LB, "version")
                 .string_value(),
             "v2");
@@ -530,6 +532,37 @@ TEST_F(EdsTest, EndpointHealthStatus) {
 
   // Since the host health didn't change, expect no rebuild.
   EXPECT_EQ(rebuild_container + 1, stats_.counter("cluster.name.update_no_rebuild").value());
+}
+
+// Validate that onConfigUpdate() updates the hostname.
+TEST_F(EdsTest, Hostname) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  endpoint->set_hostname("foo");
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  EXPECT_EQ(hosts[0]->hostname(), "foo");
+}
+
+TEST_F(EdsTest, UseHostnameForHealthChecks) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  endpoint->mutable_health_check_config()->set_hostname("foo");
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  EXPECT_EQ(hosts[0]->hostnameForHealthChecks(), "foo");
 }
 
 // Verify that a host is removed if it is removed from discovery, stabilized, and then later

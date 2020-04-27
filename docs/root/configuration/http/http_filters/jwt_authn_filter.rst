@@ -114,7 +114,7 @@ Above example uses config inline string to specify JWKS. The JWT token will be e
 
 JWT payload will be added to the request header as following format::
 
-    x-jwt-payload: base64_encoded(jwt_payload_in_JSON)
+    x-jwt-payload: base64url_encoded(jwt_payload_in_JSON)
 
 RequirementRule
 ~~~~~~~~~~~~~~~

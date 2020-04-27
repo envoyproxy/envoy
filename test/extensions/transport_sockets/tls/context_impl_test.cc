@@ -18,6 +18,7 @@
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/extensions/transport_sockets/tls/test_data/no_san_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns3_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_ip_cert_info.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -260,6 +261,60 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
 
   std::string cert_chain_json = R"EOF({
  "path": "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem",
+ }
+)EOF";
+
+  // This is similar to the hack above, but right now we generate the ca_cert and it expires in 15
+  // days only in the first second that it's valid. We will partially match for up until Days until
+  // Expiration: 1.
+  // For the cert_chain, it is dynamically created when we run_envoy_test.sh which changes the
+  // serial number with
+  // every build. For cert_chain output, we check only for the certificate path.
+  std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
+  std::string cert_chain_partial_output(TestEnvironment::substitute(cert_chain_json));
+  envoy::admin::v3::CertificateDetails certificate_details, cert_chain_details;
+  TestUtility::loadFromJson(ca_cert_partial_output, certificate_details);
+  TestUtility::loadFromJson(cert_chain_partial_output, cert_chain_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
+}
+
+TEST_F(SslContextImplTest, TestGetCertInformationWithIPSAN) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_chain.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_cert.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  ClientContextConfigImpl cfg(tls_context, factory_context_);
+
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  std::string ca_cert_json = absl::StrCat(R"EOF({
+ "path": "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_cert.pem",
+ "serial_number": ")EOF",
+                                          TEST_SAN_IP_CERT_SERIAL, R"EOF(",
+ "subject_alt_names": [
+  {
+   "ip_address": "1.1.1.1"
+  }
+ ]
+ }
+)EOF");
+
+  std::string cert_chain_json = R"EOF({
+ "path": "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_chain.pem",
  }
 )EOF";
 
@@ -533,7 +588,7 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySdsNotReady) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
   EXPECT_CALL(factory_context_, localInfo()).WillOnce(ReturnRef(local_info));
-  EXPECT_CALL(factory_context_, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   // EXPECT_CALL(factory_context_, random()).WillOnce(ReturnRef(random));
   EXPECT_CALL(factory_context_, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(factory_context_, clusterManager()).WillOnce(ReturnRef(cluster_manager));
@@ -648,6 +703,75 @@ TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
   EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
                             "SAN-based verification of peer certificates without trusted CA "
                             "is insecure and not allowed");
+}
+
+TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledByDefault) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_FALSE(server_context_config.disableStatelessSessionResumption());
+}
+
+TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionExplicitlyEnabled) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  disable_stateless_session_resumption: false
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_FALSE(server_context_config.disableStatelessSessionResumption());
+}
+
+TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionDisabled) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  disable_stateless_session_resumption: true
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_TRUE(server_context_config.disableStatelessSessionResumption());
+}
+
+TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledWhenKeyIsConfigured) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+)EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_FALSE(server_context_config.disableStatelessSessionResumption());
 }
 
 class ClientContextConfigImplTest : public SslCertsTest {};
@@ -877,7 +1001,7 @@ TEST_F(ClientContextConfigImplTest, SecretNotReady) {
   EXPECT_CALL(factory_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context_, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(Return(&init_manager));
-  EXPECT_CALL(factory_context_, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
   sds_secret_configs->set_name("abc.com");
@@ -909,7 +1033,7 @@ TEST_F(ClientContextConfigImplTest, ValidationContextNotReady) {
   EXPECT_CALL(factory_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context_, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(Return(&init_manager));
-  EXPECT_CALL(factory_context_, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
   sds_secret_configs->set_name("abc.com");
@@ -1215,7 +1339,7 @@ TEST_F(ServerContextConfigImplTest, SecretNotReady) {
   EXPECT_CALL(factory_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context_, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(Return(&init_manager));
-  EXPECT_CALL(factory_context_, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
   sds_secret_configs->set_name("abc.com");
@@ -1247,7 +1371,7 @@ TEST_F(ServerContextConfigImplTest, ValidationContextNotReady) {
   EXPECT_CALL(factory_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context_, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(Return(&init_manager));
-  EXPECT_CALL(factory_context_, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
   sds_secret_configs->set_name("abc.com");

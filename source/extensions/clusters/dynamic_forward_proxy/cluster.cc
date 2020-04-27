@@ -165,12 +165,22 @@ void Cluster::onDnsHostRemove(const std::string& host) {
 
 Upstream::HostConstSharedPtr
 Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
-  if (!context || !context->downstreamHeaders()) {
+  if (!context) {
     return nullptr;
   }
 
-  const auto host_it =
-      host_map_->find(context->downstreamHeaders()->Host()->value().getStringView());
+  absl::string_view host;
+  if (context->downstreamHeaders()) {
+    host = context->downstreamHeaders()->Host()->value().getStringView();
+  } else if (context->downstreamConnection()) {
+    host = context->downstreamConnection()->requestedServerName();
+  }
+
+  if (host.empty()) {
+    return nullptr;
+  }
+
+  const auto host_it = host_map_->find(host);
   if (host_it == host_map_->end()) {
     return nullptr;
   } else {
@@ -187,7 +197,8 @@ ClusterFactory::createClusterWithConfig(
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context.singletonManager(), context.dispatcher(), context.tls(), context.stats());
+      context.singletonManager(), context.dispatcher(), context.tls(), context.random(),
+      context.stats());
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (cluster_config.has_upstream_http_protocol_options()) {
     if (!cluster_config.upstream_http_protocol_options().auto_sni() ||

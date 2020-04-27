@@ -7,9 +7,9 @@ namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
 
-DynamicOpenTracingDriver::DynamicOpenTracingDriver(Stats::Store& stats, const std::string& library,
+DynamicOpenTracingDriver::DynamicOpenTracingDriver(Stats::Scope& scope, const std::string& library,
                                                    const std::string& tracer_config)
-    : OpenTracingDriver{stats} {
+    : OpenTracingDriver{scope} {
   std::string error_message;
   opentracing::expected<opentracing::DynamicTracingLibraryHandle> library_handle_maybe =
       opentracing::DynamicallyLoadTracingLibrary(library.c_str(), error_message);

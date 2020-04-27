@@ -1,17 +1,79 @@
 #include "common/stats/stat_merger.h"
 
+#include <algorithm>
+
 namespace Envoy {
 namespace Stats {
 
-StatMerger::StatMerger(Stats::Store& target_store) : temp_scope_(target_store.createScope("")) {}
+StatMerger::StatMerger(Store& target_store) : temp_scope_(target_store.createScope("")) {}
 
-void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas) {
+StatName StatMerger::DynamicContext::makeDynamicStatName(const std::string& name,
+                                                         const DynamicsMap& map) {
+  auto iter = map.find(name);
+  if (iter == map.end()) {
+    return symbolic_pool_.add(name);
+  }
+
+  const DynamicSpans& dynamic_spans = iter->second;
+  auto dynamic = dynamic_spans.begin();
+  auto dynamic_end = dynamic_spans.end();
+
+  // Name has embedded dynamic segments; we'll need to join together the
+  // static/dynamic StatName segments.
+  std::vector<StatName> segments;
+  uint32_t segment_index = 0;
+  std::vector<absl::string_view> dynamic_segments;
+
+  for (auto segment : absl::StrSplit(name, '.')) {
+    if (dynamic != dynamic_end && dynamic->first == segment_index) {
+      // Handle start of dynamic span. We note that we are in a dynamic
+      // span by adding to dynamic_segments, which should of course be
+      // non-empty.
+      ASSERT(dynamic_segments.empty());
+      if (dynamic->second == segment_index) {
+        // Handle start==end (a one-segment span).
+        segments.push_back(dynamic_pool_.add(segment));
+        ++dynamic;
+      } else {
+        // Handle start<end, so we save the first segment in dynamic_segments.
+        dynamic_segments.push_back(segment);
+      }
+    } else if (dynamic_segments.empty()) {
+      // Handle that we are not in dynamic mode; we are just allocating
+      // a symbolic segment.
+      segments.push_back(symbolic_pool_.add(segment));
+    } else {
+      // Handle the next dynamic segment.
+      dynamic_segments.push_back(segment);
+      if (dynamic->second == segment_index) {
+        // Handle that this dynamic segment is the last one, and we're flipping
+        // back to symbolic mode.
+        segments.push_back(dynamic_pool_.add(absl::StrJoin(dynamic_segments, ".")));
+        dynamic_segments.clear();
+        ++dynamic;
+      }
+    }
+    ++segment_index;
+  }
+  ASSERT(dynamic_segments.empty());
+  ASSERT(dynamic == dynamic_end);
+
+  storage_ptr_ = symbol_table_.join(segments);
+  return StatName(storage_ptr_.get());
+}
+
+void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
+                               const DynamicsMap& dynamic_map) {
   for (const auto& counter : counter_deltas) {
-    temp_scope_->counter(counter.first).add(counter.second);
+    const std::string& name = counter.first;
+    StatMerger::DynamicContext dynamic_context(temp_scope_->symbolTable());
+    StatName stat_name = dynamic_context.makeDynamicStatName(name, dynamic_map);
+    temp_scope_->counterFromStatName(stat_name).add(counter.second);
   }
 }
 
-void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges) {
+void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
+                             const DynamicsMap& dynamic_map) {
   for (const auto& gauge : gauges) {
     // Merging gauges via RPC from the parent has 3 cases; case 1 and 3b are the
     // most common.
@@ -33,8 +95,8 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
     // 3b. Child later initializes gauges as Accumulate: the parent value is
     //     retained.
 
-    StatNameManagedStorage storage(gauge.first, temp_scope_->symbolTable());
-    StatName stat_name = storage.statName();
+    StatMerger::DynamicContext dynamic_context(temp_scope_->symbolTable());
+    StatName stat_name = dynamic_context.makeDynamicStatName(gauge.first, dynamic_map);
     GaugeOptConstRef gauge_opt = temp_scope_->findGauge(stat_name);
 
     Gauge::ImportMode import_mode = Gauge::ImportMode::Uninitialized;
@@ -45,6 +107,7 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
       }
     }
 
+    // TODO(snowp): Propagate tag values during hot restarts.
     auto& gauge_ref = temp_scope_->gaugeFromStatName(stat_name, import_mode);
     if (gauge_ref.importMode() == Gauge::ImportMode::NeverImport) {
       // On the first iteration through the loop, the gauge will not be loaded into the scope
@@ -74,9 +137,10 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
 }
 
 void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
-                            const Protobuf::Map<std::string, uint64_t>& gauges) {
-  mergeCounters(counter_deltas);
-  mergeGauges(gauges);
+                            const Protobuf::Map<std::string, uint64_t>& gauges,
+                            const DynamicsMap& dynamics) {
+  mergeCounters(counter_deltas, dynamics);
+  mergeGauges(gauges, dynamics);
 }
 
 } // namespace Stats

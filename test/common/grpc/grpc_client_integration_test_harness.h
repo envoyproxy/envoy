@@ -226,7 +226,8 @@ public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())),
-        dispatcher_(api_->allocateDispatcher()), http_context_(stats_store_->symbolTable()) {}
+        dispatcher_(api_->allocateDispatcher("test_thread")),
+        http_context_(stats_store_->symbolTable()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -315,7 +316,8 @@ public:
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
     return std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *google_tls_, stub_factory,
-                                                   stats_scope_, createGoogleGrpcConfig(), *api_);
+                                                   stats_scope_, createGoogleGrpcConfig(), *api_,
+                                                   google_grpc_stat_names_);
 #else
     NOT_REACHED_GCOVR_EXCL_LINE;
 #endif
@@ -426,6 +428,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   DispatcherHelper dispatcher_helper_{*dispatcher_};
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
+  Grpc::StatNames google_grpc_stat_names_{stats_store_->symbolTable()};
   TestMetadata service_wide_initial_metadata_;
 #ifdef ENVOY_GOOGLE_GRPC
   std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;

@@ -23,7 +23,7 @@ namespace {
 class XRayDriverTest : public ::testing::Test {
 public:
   const std::string operation_name_ = "test_operation_name";
-  NiceMock<Server::MockInstance> server_;
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Tracing::MockConfig> tracing_config_;
   Http::TestRequestHeaderMapImpl request_headers_{
@@ -34,7 +34,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
   request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8;Sampled=0");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/};
-  Driver driver(config, server_);
+  Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
   Envoy::SystemTime start_time;
@@ -49,7 +49,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
   request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8;Sampled=1");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/};
-  Driver driver(config, server_);
+  Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
   Envoy::SystemTime start_time;
@@ -62,7 +62,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
   request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/};
-  Driver driver(config, server_);
+  Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
   Envoy::SystemTime start_time;
@@ -77,7 +77,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
 
 TEST_F(XRayDriverTest, NoXRayTracerHeader) {
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/};
-  Driver driver(config, server_);
+  Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
   Envoy::SystemTime start_time;

@@ -21,7 +21,7 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
-bool isModifyMethod(const Http::HeaderMap& headers) {
+bool isModifyMethod(const Http::RequestHeaderMap& headers) {
   const Envoy::Http::HeaderEntry* method = headers.Method();
   if (method == nullptr) {
     return false;
@@ -43,7 +43,7 @@ absl::string_view hostAndPort(const Http::HeaderEntry* header) {
   return EMPTY_STRING;
 }
 
-absl::string_view sourceOriginValue(const Http::HeaderMap& headers) {
+absl::string_view sourceOriginValue(const Http::RequestHeaderMap& headers) {
   const absl::string_view origin = hostAndPort(headers.Origin());
   if (origin != EMPTY_STRING) {
     return origin;
@@ -51,7 +51,7 @@ absl::string_view sourceOriginValue(const Http::HeaderMap& headers) {
   return hostAndPort(headers.Referer());
 }
 
-absl::string_view targetOriginValue(const Http::HeaderMap& headers) {
+absl::string_view targetOriginValue(const Http::RequestHeaderMap& headers) {
   return hostAndPort(headers.Host());
 }
 
@@ -122,7 +122,7 @@ void CsrfFilter::determinePolicy() {
   }
 }
 
-bool CsrfFilter::isValid(const absl::string_view source_origin, Http::HeaderMap& headers) {
+bool CsrfFilter::isValid(const absl::string_view source_origin, Http::RequestHeaderMap& headers) {
   const absl::string_view target_origin = targetOriginValue(headers);
   if (source_origin == target_origin) {
     return true;

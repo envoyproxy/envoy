@@ -9,7 +9,7 @@ and if it is HTTP, it detects the HTTP protocol (HTTP/1.x or HTTP/2) further. Th
 of a :ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>`.
 
 * :ref:`Listener filter v2 API reference <envoy_api_msg_config.filter.listener.http_inspector.v2.HttpInspector>`
-* This filter should be configured with the name *envoy.listener.http_inspector*.
+* This filter should be configured with the name *envoy.filters.listener.http_inspector*.
 
 Example
 -------
@@ -19,7 +19,7 @@ A sample filter configuration could be:
 .. code-block:: yaml
 
   listener_filters:
-    - name: "envoy.listener.http_inspector"
+    - name: "envoy.filters.listener.http_inspector"
       typed_config: {}
 
 Statistics

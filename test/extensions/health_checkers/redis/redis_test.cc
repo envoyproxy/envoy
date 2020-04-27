@@ -44,7 +44,7 @@ public:
     unhealthy_threshold: 1
     healthy_threshold: 1
     custom_health_check:
-      name: envoy.health_checkers.redis
+      name: redis
       typed_config:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";
@@ -53,9 +53,9 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(new RedisHealthChecker(
+    health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
   void setupAlwaysLogHealthCheckFailures() {
@@ -68,7 +68,7 @@ public:
     healthy_threshold: 1
     always_log_health_check_failures: true
     custom_health_check:
-      name: envoy.health_checkers.redis
+      name: redis
       typed_config:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";
@@ -77,9 +77,9 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(new RedisHealthChecker(
+    health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
   void setupExistsHealthcheck() {
@@ -91,7 +91,7 @@ public:
     unhealthy_threshold: 1
     healthy_threshold: 1
     custom_health_check:
-      name: envoy.health_checkers.redis
+      name: redis
       typed_config:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
         key: foo
@@ -101,9 +101,9 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(new RedisHealthChecker(
+    health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
   void setupExistsHealthcheckDeprecated() {
@@ -124,9 +124,9 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(new RedisHealthChecker(
+    health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
   void setupDontReuseConnection() {
@@ -139,7 +139,7 @@ public:
     healthy_threshold: 1
     reuse_connection: false
     custom_health_check:
-      name: envoy.health_checkers.redis
+      name: redis
       typed_config:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";
@@ -148,9 +148,9 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(new RedisHealthChecker(
+    health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr

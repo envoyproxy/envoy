@@ -15,9 +15,7 @@ int main(int argc, char* argv[]) {
 
   try {
     Envoy::RouterCheckTool checktool =
-        options.isProto() ? Envoy::RouterCheckTool::create(options.configPath(),
-                                                           options.disableDeprecationCheck())
-                          : Envoy::RouterCheckTool::create(options.unlabelledConfigPath(), true);
+        Envoy::RouterCheckTool::create(options.configPath(), options.disableDeprecationCheck());
 
     if (options.isDetailed()) {
       checktool.setShowDetails();
@@ -27,9 +25,7 @@ int main(int argc, char* argv[]) {
       checktool.setOnlyShowFailures();
     }
 
-    bool is_equal = options.isProto()
-                        ? checktool.compareEntries(options.testPath())
-                        : checktool.compareEntriesInJson(options.unlabelledTestPath());
+    bool is_equal = checktool.compareEntries(options.testPath());
     // Test fails if routes do not match what is expected
     if (!is_equal) {
       return EXIT_FAILURE;

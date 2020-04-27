@@ -5,7 +5,7 @@ Rate limit
 
 * Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>`
-* This filter should be configured with the name *envoy.rate_limit*.
+* This filter should be configured with the name *envoy.filters.http.ratelimit*.
 
 The HTTP rate limit filter will call the rate limit service when the request's route or virtual host
 has one or more :ref:`rate limit configurations<envoy_api_field_route.VirtualHost.rate_limits>`
@@ -101,7 +101,7 @@ ratelimit.http_filter_enabled
   % of requests that will call the rate limit service. Defaults to 100.
 
 ratelimit.http_filter_enforcing
-  % of requests that will call the rate limit service and enforce the decision. Defaults to 100.
+  % of requests that that will have the rate limit service decision enforced. Defaults to 100.
   This can be used to test what would happen before fully enforcing the outcome.
 
 ratelimit.<route_key>.http_filter_enabled

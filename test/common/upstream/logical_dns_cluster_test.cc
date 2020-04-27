@@ -52,8 +52,8 @@ protected:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
-    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, factory_context,
-                                         std::move(scope), false));
+    cluster_ = std::make_shared<LogicalDnsCluster>(cluster_config, runtime_, dns_resolver_,
+                                                   factory_context, std::move(scope), false);
     cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
@@ -79,7 +79,8 @@ protected:
     EXPECT_CALL(membership_updated_, ready());
     EXPECT_CALL(initialized_, ready());
     EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-    dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+                  TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -108,7 +109,8 @@ protected:
 
     // Should not cause any changes.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-    dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+                  TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
@@ -140,7 +142,8 @@ protected:
 
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-    dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+                  TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
@@ -156,10 +159,22 @@ protected:
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     resolve_timer_->invokeCallback();
 
-    // Empty should not cause any change.
+    // Failure should not cause any change.
     ON_CALL(random_, random()).WillByDefault(Return(6000));
     EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(6000), _));
-    dns_callback_({});
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, {});
+
+    EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+    EXPECT_CALL(dispatcher_,
+                createClientConnection_(
+                    PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
+        .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
+    logical_host->createConnection(dispatcher_, nullptr, nullptr);
+
+    // Empty Success should not cause any change.
+    ON_CALL(random_, random()).WillByDefault(Return(6000));
+    EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(6000), _));
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, {});
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(dispatcher_,
@@ -260,7 +275,8 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-        cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
+        cb(Network::DnsResolver::ResolutionStatus::Success,
+           TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
   setupFromV2Yaml(yaml);
@@ -269,6 +285,88 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   EXPECT_EQ("foo.bar.com",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthChecker().setUnhealthy();
+  tls_.shutdownThread();
+}
+
+TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
+  const std::string yaml = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_refresh_rate: 4s
+  dns_failure_refresh_rate:
+    base_interval: 7s
+    max_interval: 10s
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
+  dns_lookup_family: V4_ONLY
+  hosts:
+  - socket_address:
+      address: foo.bar.com
+      port_value: 443
+  )EOF";
+
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  setupFromV2Yaml(yaml);
+
+  // Failing response kicks the failure refresh backoff strategy.
+  ON_CALL(random_, random()).WillByDefault(Return(8000));
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, {});
+
+  // Successful call should reset the failure backoff strategy.
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+                TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+
+  // Therefore, a subsequent failure should get a [0,base * 1] refresh.
+  ON_CALL(random_, random()).WillByDefault(Return(8000));
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, {});
+
+  tls_.shutdownThread();
+}
+
+TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
+  const std::string yaml = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_refresh_rate: 4s
+  respect_dns_ttl: true
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
+  dns_lookup_family: V4_ONLY
+  hosts:
+  - socket_address:
+      address: foo.bar.com
+      port_value: 443
+  )EOF";
+
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  setupFromV2Yaml(yaml);
+
+  // TTL is recorded when the DNS response is successful and not empty
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(5000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+                TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(5)));
+
+  // If the response is successful but empty, the cluster uses the cluster configured refresh rate.
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+                TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
+
+  // On failure, the cluster uses the cluster configured refresh rate.
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Failure,
+                TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
+
   tls_.shutdownThread();
 }
 

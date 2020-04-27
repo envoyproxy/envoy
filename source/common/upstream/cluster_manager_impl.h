@@ -39,19 +39,17 @@ namespace Upstream {
  */
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
-  ProdClusterManagerFactory(Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-                            ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
-                            Network::DnsResolverSharedPtr dns_resolver,
-                            Ssl::ContextManager& ssl_context_manager,
-                            Event::Dispatcher& main_thread_dispatcher,
-                            const LocalInfo::LocalInfo& local_info,
-                            Secret::SecretManager& secret_manager,
-                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                            Http::Context& http_context, AccessLog::AccessLogManager& log_manager,
-                            Singleton::Manager& singleton_manager)
+  ProdClusterManagerFactory(
+      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
+      ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
+      Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
+      Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
+      Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
+      Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+      AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager)
       : main_thread_dispatcher_(main_thread_dispatcher), validation_context_(validation_context),
-        api_(api), http_context_(http_context), admin_(admin), runtime_(runtime), stats_(stats),
-        tls_(tls), random_(random), dns_resolver_(dns_resolver),
+        api_(api), http_context_(http_context), grpc_context_(grpc_context), admin_(admin),
+        runtime_(runtime), stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), local_info_(local_info),
         secret_manager_(secret_manager), log_manager_(log_manager),
         singleton_manager_(singleton_manager) {}
@@ -80,6 +78,7 @@ protected:
   ProtobufMessage::ValidationContext& validation_context_;
   Api::Api& api_;
   Http::Context& http_context_;
+  Grpc::Context& grpc_context_;
   Server::Admin& admin_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
@@ -186,7 +185,7 @@ public:
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                     Http::Context& http_context);
+                     Http::Context& http_context, Grpc::Context& grpc_context);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 

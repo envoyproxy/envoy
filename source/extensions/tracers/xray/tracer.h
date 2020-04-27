@@ -102,7 +102,7 @@ public:
   /**
    * Adds X-Ray trace header to the set of outgoing headers.
    */
-  void injectContext(Http::HeaderMap& request_headers) override;
+  void injectContext(Http::RequestHeaderMap& request_headers) override;
 
   /**
    * Gets the start time of this Span.
@@ -166,8 +166,7 @@ public:
   /**
    * Starts a tracing span for X-Ray
    */
-  Tracing::SpanPtr startSpan(const std::string& span_name, const std::string& operation_name,
-                             Envoy::SystemTime start_time,
+  Tracing::SpanPtr startSpan(const std::string& operation_name, Envoy::SystemTime start_time,
                              const absl::optional<XRayHeader>& xray_header);
   /**
    * Creates a Span that is marked as not-sampled.

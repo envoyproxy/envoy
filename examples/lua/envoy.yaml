@@ -24,7 +24,7 @@ static_resources:
                 route: 
                   cluster: web_service
           http_filters:
-          - name: envoy.lua
+          - name: envoy.filters.http.lua
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
               inline_code: |
@@ -37,7 +37,7 @@ static_resources:
                   body_size = response_handle:body():length()
                   response_handle:headers():add("response-body-size", tostring(body_size))
                 end
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
 
   clusters:

@@ -34,7 +34,7 @@ static_resources:
                     allow_origin:
                     - "test-origin-1"
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
   clusters:
   - name: service_google
     connect_timeout: 0.25s

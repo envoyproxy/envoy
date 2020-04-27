@@ -1,5 +1,6 @@
 #include "common/network/raw_buffer_socket.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/http/headers.h"
@@ -55,7 +56,7 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       if (end_stream && !shutdown_) {
         // Ignore the result. This can only fail if the connection failed. In that case, the
         // error will be detected on the next read, and dealt with appropriately.
-        ::shutdown(callbacks_->ioHandle().fd(), SHUT_WR);
+        Api::OsSysCallsSingleton::get().shutdown(callbacks_->ioHandle().fd(), ENVOY_SHUT_WR);
         shutdown_ = true;
       }
       action = PostIoAction::KeepOpen;

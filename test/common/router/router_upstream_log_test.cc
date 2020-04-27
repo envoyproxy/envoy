@@ -1,4 +1,5 @@
 #include <ctime>
+#include <memory>
 #include <regex>
 
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
@@ -60,7 +61,8 @@ public:
   using Filter::Filter;
 
   // Filter
-  RetryStatePtr createRetryState(const RetryPolicy&, Http::HeaderMap&, const Upstream::ClusterInfo&,
+  RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
+                                 const Upstream::ClusterInfo&, const VirtualCluster*,
                                  Runtime::Loader&, Runtime::RandomGenerator&, Event::Dispatcher&,
                                  Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
@@ -91,9 +93,9 @@ public:
       current_upstream_log->CopyFrom(upstream_log.value());
     }
 
-    config_.reset(new FilterConfig("prefix.", context_, ShadowWriterPtr(new MockShadowWriter()),
-                                   router_proto));
-    router_.reset(new TestFilter(*config_));
+    config_ = std::make_shared<FilterConfig>("prefix.", context_,
+                                             ShadowWriterPtr(new MockShadowWriter()), router_proto);
+    router_ = std::make_shared<TestFilter>(*config_);
     router_->setDecoderFilterCallbacks(callbacks_);
     EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(testing::AnyNumber());
 

@@ -146,7 +146,7 @@ public:
 
   const std::string admin_filter_config_ =
       R"EOF(
-name: envoy.filters.http.tap
+name: tap
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
   common_config:
@@ -166,7 +166,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TapIntegrationTest,
 TEST_P(TapIntegrationTest, StaticFilePerTap) {
   const std::string filter_config =
       R"EOF(
-name: envoy.filters.http.tap
+name: tap
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
   common_config:
@@ -452,7 +452,7 @@ tap_config:
 TEST_P(TapIntegrationTest, StaticFilePerTapStreaming) {
   const std::string filter_config =
       R"EOF(
-name: envoy.filters.http.tap
+name: tap
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
   common_config:
@@ -497,7 +497,7 @@ typed_config:
 TEST_P(TapIntegrationTest, StaticFilePerTapStreamingWithRequestBuffering) {
   const std::string filter_config =
       R"EOF(
-name: envoy.filters.http.tap
+name: tap
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
   common_config:

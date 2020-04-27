@@ -29,7 +29,7 @@ bool getSamplingFlags(char c, const Tracing::Decision tracing_decision) {
 
 } // namespace
 
-SpanContextExtractor::SpanContextExtractor(Http::HeaderMap& request_headers)
+SpanContextExtractor::SpanContextExtractor(Http::RequestHeaderMap& request_headers)
     : request_headers_(request_headers) {}
 
 SpanContextExtractor::~SpanContextExtractor() = default;

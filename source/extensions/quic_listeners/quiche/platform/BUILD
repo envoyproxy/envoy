@@ -125,7 +125,6 @@ envoy_cc_library(
         "quic_macros_impl.h",
         "quic_map_util_impl.h",
         "quic_mem_slice_impl.h",
-        "quic_optional_impl.h",
         "quic_prefetch_impl.h",
         "quic_ptr_util_impl.h",
         "quic_reference_counted_impl.h",

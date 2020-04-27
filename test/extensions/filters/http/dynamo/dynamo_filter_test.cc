@@ -52,7 +52,7 @@ public:
   Http::TestRequestTrailerMapImpl request_trailers_;
 };
 
-TEST_F(DynamoFilterTest, operatorPresent) {
+TEST_F(DynamoFilterTest, OperatorPresent) {
   setup(true);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-amz-target", "version.Get"},
@@ -98,7 +98,7 @@ TEST_F(DynamoFilterTest, operatorPresent) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 }
 
-TEST_F(DynamoFilterTest, jsonBodyNotWellFormed) {
+TEST_F(DynamoFilterTest, JsonBodyNotWellFormed) {
   setup(true);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-amz-target", "version.GetItem"},
@@ -114,7 +114,7 @@ TEST_F(DynamoFilterTest, jsonBodyNotWellFormed) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
-TEST_F(DynamoFilterTest, bothOperationAndTableIncorrect) {
+TEST_F(DynamoFilterTest, BothOperationAndTableIncorrect) {
   setup(true);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-amz-target", "version"}, {"random", "random"}};
@@ -128,7 +128,7 @@ TEST_F(DynamoFilterTest, bothOperationAndTableIncorrect) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 }
 
-TEST_F(DynamoFilterTest, handleErrorTypeTableMissing) {
+TEST_F(DynamoFilterTest, HandleErrorTypeTableMissing) {
   setup(true);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-amz-target", "version"}, {"random", "random"}};
@@ -490,7 +490,7 @@ TEST_F(DynamoFilterTest, BatchMultipleTablesInvalidResponseBody) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
 }
 
-TEST_F(DynamoFilterTest, bothOperationAndTableCorrect) {
+TEST_F(DynamoFilterTest, BothOperationAndTableCorrect) {
   setup(true);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-amz-target", "version.GetItem"}};
@@ -556,7 +556,7 @@ TEST_F(DynamoFilterTest, bothOperationAndTableCorrect) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 }
 
-TEST_F(DynamoFilterTest, operatorPresentRuntimeDisabled) {
+TEST_F(DynamoFilterTest, OperatorPresentRuntimeDisabled) {
   setup(false);
 
   EXPECT_CALL(stats_, counter(_)).Times(0);

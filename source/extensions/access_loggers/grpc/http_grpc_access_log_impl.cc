@@ -43,9 +43,9 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
   });
 }
 
-void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
-                                const Http::HeaderMap& response_headers,
-                                const Http::HeaderMap& response_trailers,
+void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
+                                const Http::ResponseHeaderMap& response_headers,
+                                const Http::ResponseTrailerMap& response_trailers,
                                 const StreamInfo::StreamInfo& stream_info) {
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.

@@ -75,7 +75,7 @@ public:
         .WillRepeatedly(ReturnRef(stream_info_));
 
     EXPECT_CALL(log_manager_, createAccessLog(_)).WillOnce(Return(file_));
-    access_log_.reset(new AccessLog("test", log_manager_, dispatcher_.timeSource()));
+    access_log_ = std::make_shared<AccessLog>("test", log_manager_, dispatcher_.timeSource());
   }
 
   void initializeFilter(bool emit_dynamic_metadata = false) {
@@ -96,7 +96,7 @@ public:
     fault.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
     fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
 
-    fault_config_.reset(new Filters::Common::Fault::FaultDelayConfig(fault));
+    fault_config_ = std::make_shared<Filters::Common::Fault::FaultDelayConfig>(fault);
 
     EXPECT_CALL(runtime_.snapshot_,
                 featureEnabled("mongo.fault.fixed_delay.percent",
@@ -493,6 +493,21 @@ TEST_F(MongoProxyFilterTest, MaxTime) {
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create()->addInt32("$maxTimeMS", 100));
+    filter_->callbacks_->decodeQuery(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_EQ(0U, store_.counter("test.op_query_no_max_time").value());
+}
+
+TEST_F(MongoProxyFilterTest, MaxTimeCursor) {
+  initializeFilter();
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    QueryMessagePtr message(new QueryMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1110010);
+    message->query(Bson::DocumentImpl::create()->addInt32("maxTimeMS", 500));
     filter_->callbacks_->decodeQuery(std::move(message));
   }));
   filter_->onData(fake_data_, false);

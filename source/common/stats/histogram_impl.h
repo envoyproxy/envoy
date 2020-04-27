@@ -49,9 +49,9 @@ private:
 
 class HistogramImplHelper : public MetricImpl<Histogram> {
 public:
-  HistogramImplHelper(StatName name, const std::string& tag_extracted_name,
-                      const std::vector<Tag>& tags, SymbolTable& symbol_table)
-      : MetricImpl<Histogram>(name, tag_extracted_name, tags, symbol_table) {}
+  HistogramImplHelper(StatName name, StatName tag_extracted_name,
+                      const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table)
+      : MetricImpl<Histogram>(name, tag_extracted_name, stat_name_tags, symbol_table) {}
   HistogramImplHelper(SymbolTable& symbol_table) : MetricImpl<Histogram>(symbol_table) {}
 
   // RefcountInterface
@@ -68,10 +68,10 @@ private:
  */
 class HistogramImpl : public HistogramImplHelper {
 public:
-  HistogramImpl(StatName name, Unit unit, Store& parent, const std::string& tag_extracted_name,
-                const std::vector<Tag>& tags)
-      : HistogramImplHelper(name, tag_extracted_name, tags, parent.symbolTable()), unit_(unit),
-        parent_(parent) {}
+  HistogramImpl(StatName name, Unit unit, Store& parent, StatName tag_extracted_name,
+                const StatNameTagVector& stat_name_tags)
+      : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, parent.symbolTable()),
+        unit_(unit), parent_(parent) {}
   ~HistogramImpl() override {
     // We must explicitly free the StatName here in order to supply the
     // SymbolTable reference. An RAII alternative would be to store a

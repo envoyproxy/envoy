@@ -40,7 +40,8 @@ public:
    *                   there are none headers available.
    * @param metadata   the additional information about the action/principal.
    */
-  virtual bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  virtual bool matches(const Network::Connection& connection,
+                       const Envoy::Http::RequestHeaderMap& headers,
                        const StreamInfo::StreamInfo& info) const PURE;
 
   /**
@@ -61,7 +62,7 @@ public:
  */
 class AlwaysMatcher : public Matcher {
 public:
-  bool matches(const Network::Connection&, const Envoy::Http::HeaderMap&,
+  bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                const StreamInfo::StreamInfo&) const override {
     return true;
   }
@@ -76,7 +77,7 @@ public:
   AndMatcher(const envoy::config::rbac::v3::Permission::Set& rules);
   AndMatcher(const envoy::config::rbac::v3::Principal::Set& ids);
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -94,7 +95,7 @@ public:
   OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules);
   OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids);
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -108,7 +109,7 @@ public:
   NotMatcher(const envoy::config::rbac::v3::Principal& principal)
       : matcher_(Matcher::create(principal)) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -123,7 +124,7 @@ class HeaderMatcher : public Matcher {
 public:
   HeaderMatcher(const envoy::config::route::v3::HeaderMatcher& matcher) : header_(matcher) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -131,20 +132,22 @@ private:
 };
 
 /**
- * Perform a match against an IP CIDR range. This rule can be applied to either the source
- * (remote) or the destination (local) IP.
+ * Perform a match against an IP CIDR range. This rule can be applied to connection remote,
+ * downstream local address, downstream direct remote address or downstream remote address.
  */
 class IPMatcher : public Matcher {
 public:
-  IPMatcher(const envoy::config::core::v3::CidrRange& range, bool destination)
-      : range_(Network::Address::CidrRange::create(range)), destination_(destination) {}
+  enum Type { ConnectionRemote = 0, DownstreamLocal, DownstreamDirectRemote, DownstreamRemote };
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
-               const StreamInfo::StreamInfo&) const override;
+  IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type)
+      : range_(Network::Address::CidrRange::create(range)), type_(type) {}
+
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo& info) const override;
 
 private:
   const Network::Address::CidrRange range_;
-  const bool destination_;
+  const Type type_;
 };
 
 /**
@@ -154,8 +157,8 @@ class PortMatcher : public Matcher {
 public:
   PortMatcher(const uint32_t port) : port_(port) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
-               const StreamInfo::StreamInfo&) const override;
+  bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+               const StreamInfo::StreamInfo& info) const override;
 
 private:
   const uint32_t port_;
@@ -172,7 +175,7 @@ public:
                      ? absl::make_optional<Matchers::StringMatcherImpl>(auth.principal_name())
                      : absl::nullopt) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -194,7 +197,7 @@ public:
     }
   }
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -209,7 +212,7 @@ class MetadataMatcher : public Matcher {
 public:
   MetadataMatcher(const Envoy::Matchers::MetadataMatcher& matcher) : matcher_(matcher) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -225,7 +228,7 @@ public:
   RequestedServerNameMatcher(const envoy::type::matcher::v3::StringMatcher& requested_server_name)
       : Envoy::Matchers::StringMatcherImpl(requested_server_name) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 };
 
@@ -238,7 +241,7 @@ public:
   PathMatcher(const envoy::type::matcher::v3::PathMatcher& path_matcher)
       : path_matcher_(path_matcher) {}
 
-  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:

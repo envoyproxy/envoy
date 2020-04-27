@@ -3,15 +3,16 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
 #include "common/common/base64.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
@@ -46,20 +47,23 @@ TEST(HttpTracerUtilityTest, IsTracing) {
   Runtime::RandomGeneratorImpl random;
   std::string not_traceable_guid = random.uuid();
 
+  auto rid_extension = Http::RequestIDExtensionFactory::defaultInstance(random);
+  ON_CALL(stream_info, getRequestIDExtension()).WillByDefault(Return(rid_extension));
+
   std::string forced_guid = random.uuid();
-  UuidUtils::setTraceableUuid(forced_guid, UuidTraceStatus::Forced);
-  Http::TestHeaderMapImpl forced_header{{"x-request-id", forced_guid}};
+  Http::TestRequestHeaderMapImpl forced_header{{"x-request-id", forced_guid}};
+  rid_extension->setTraceStatus(forced_header, Http::TraceStatus::Forced);
 
   std::string sampled_guid = random.uuid();
-  UuidUtils::setTraceableUuid(sampled_guid, UuidTraceStatus::Sampled);
-  Http::TestHeaderMapImpl sampled_header{{"x-request-id", sampled_guid}};
+  Http::TestRequestHeaderMapImpl sampled_header{{"x-request-id", sampled_guid}};
+  rid_extension->setTraceStatus(sampled_header, Http::TraceStatus::Sampled);
 
   std::string client_guid = random.uuid();
-  UuidUtils::setTraceableUuid(client_guid, UuidTraceStatus::Client);
-  Http::TestHeaderMapImpl client_header{{"x-request-id", client_guid}};
+  Http::TestRequestHeaderMapImpl client_header{{"x-request-id", client_guid}};
+  rid_extension->setTraceStatus(client_header, Http::TraceStatus::Client);
 
-  Http::TestHeaderMapImpl not_traceable_header{{"x-request-id", not_traceable_guid}};
-  Http::TestHeaderMapImpl empty_header{};
+  Http::TestRequestHeaderMapImpl not_traceable_header{{"x-request-id", not_traceable_guid}};
+  Http::TestRequestHeaderMapImpl empty_header{};
 
   // Force traced.
   {
@@ -81,7 +85,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
   // Health Check request.
   {
-    Http::TestHeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
+    Http::TestRequestHeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
     EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(true));
 
     Decision result = HttpTracerUtility::isTracing(stream_info, traceable_header_hc);
@@ -100,7 +104,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
   // No request id.
   {
-    Http::TestHeaderMapImpl headers;
+    Http::TestRequestHeaderMapImpl headers;
     EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(false));
     Decision result = HttpTracerUtility::isTracing(stream_info, headers);
     EXPECT_EQ(Reason::NotTraceableRequestId, result.reason);
@@ -109,7 +113,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
   // Broken request id.
   {
-    Http::TestHeaderMapImpl headers{{"x-request-id", "not-real-x-request-id"}};
+    Http::TestRequestHeaderMapImpl headers{{"x-request-id", "not-real-x-request-id"}};
     EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(false));
     Decision result = HttpTracerUtility::isTracing(stream_info, headers);
     EXPECT_EQ(Reason::NotTraceableRequestId, result.reason);
@@ -350,12 +354,12 @@ TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
 }
 
 TEST_F(HttpConnManFinalizerImplTest, UnixDomainSocketPeerAddressTag) {
-  Http::TestHeaderMapImpl request_headers{{"x-request-id", "id"},
-                                          {":path", "/test"},
-                                          {":method", "GET"},
-                                          {"x-forwarded-proto", "https"}};
-  Http::TestHeaderMapImpl response_headers;
-  Http::TestHeaderMapImpl response_trailers;
+  Http::TestRequestHeaderMapImpl request_headers{{"x-request-id", "id"},
+                                                 {":path", "/test"},
+                                                 {":method", "GET"},
+                                                 {"x-forwarded-proto", "https"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
   const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
   const auto remote_address = Network::Utility::resolveUrl("unix://" + path_);
 
@@ -715,7 +719,7 @@ public:
   HttpTracerImplTest() {
     driver_ = new MockDriver();
     DriverPtr driver_ptr(driver_);
-    tracer_ = std::make_unique<HttpTracerImpl>(std::move(driver_ptr), local_info_);
+    tracer_ = std::make_shared<HttpTracerImpl>(std::move(driver_ptr), local_info_);
   }
 
   Http::TestRequestHeaderMapImpl request_headers_{
@@ -726,7 +730,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   MockConfig config_;
   MockDriver* driver_;
-  HttpTracerPtr tracer_;
+  HttpTracerSharedPtr tracer_;
 };
 
 TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {

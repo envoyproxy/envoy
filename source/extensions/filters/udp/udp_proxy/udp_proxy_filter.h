@@ -113,7 +113,7 @@ private:
   public:
     ActiveSession(ClusterInfo& parent, Network::UdpRecvData::LocalPeerAddresses&& addresses,
                   const Upstream::HostConstSharedPtr& host);
-    ~ActiveSession();
+    ~ActiveSession() override;
     const Network::UdpRecvData::LocalPeerAddresses& addresses() const { return addresses_; }
     const Upstream::Host& host() const { return *host_; }
     void write(const Buffer::Instance& buffer);
@@ -211,7 +211,7 @@ private:
       return {ALL_UDP_PROXY_UPSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
     }
 
-    Common::CallbackHandle* member_update_cb_handle_;
+    Envoy::Common::CallbackHandle* member_update_cb_handle_;
     absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,
                         HeterogeneousActiveSessionEqual>
         sessions_;

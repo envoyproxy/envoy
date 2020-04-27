@@ -23,6 +23,7 @@ HTTP proxies should additionally configure:
 * :ref:`HTTP/2 maximum concurrent streams limit <envoy_api_field_core.Http2ProtocolOptions.max_concurrent_streams>` to 100,
 * :ref:`HTTP/2 initial stream window size limit <envoy_api_field_core.Http2ProtocolOptions.initial_stream_window_size>` to 64 KiB,
 * :ref:`HTTP/2 initial connection window size limit <envoy_api_field_core.Http2ProtocolOptions.initial_connection_window_size>` to 1 MiB.
+* :ref:`headers_with_underscores_action setting <envoy_api_field_core.HttpProtocolOptions.headers_with_underscores_action>` to REJECT_REQUEST, to protect upstream services that treat '_' and '-' as interchangeable.
 
 The following is a YAML example of the above recommendation.
 
@@ -62,7 +63,7 @@ The following is a YAML example of the above recommendation.
           address: 0.0.0.0
           port_value: 443
       listener_filters:
-      - name: "envoy.listener.tls_inspector"
+      - name: "envoy.filters.listener.tls_inspector"
         typed_config: {}
       per_connection_buffer_limit_bytes: 32768 # 32 KiB
       filter_chains:
@@ -83,6 +84,7 @@ The following is a YAML example of the above recommendation.
             use_remote_address: true
             common_http_protocol_options:
               idle_timeout: 3600s # 1 hour
+              headers_with_underscores_action: REJECT_REQUEST
             http2_protocol_options:
               max_concurrent_streams: 100
               initial_stream_window_size: 65536 # 64 KiB

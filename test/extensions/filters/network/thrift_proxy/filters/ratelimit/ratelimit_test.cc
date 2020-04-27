@@ -55,9 +55,9 @@ public:
         proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
 
-    config_.reset(new Config(proto_config, local_info_, stats_store_, runtime_, cm_));
+    config_ = std::make_shared<Config>(proto_config, local_info_, stats_store_, runtime_, cm_);
 
-    request_metadata_.reset(new ThriftProxy::MessageMetadata());
+    request_metadata_ = std::make_shared<ThriftProxy::MessageMetadata>();
 
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
@@ -399,7 +399,7 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponseWithHeaders) {
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
 
-  Http::HeaderMapPtr h{new Http::TestHeaderMapImpl(*rl_headers)};
+  Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl(*rl_headers)};
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h),
                                nullptr);
 

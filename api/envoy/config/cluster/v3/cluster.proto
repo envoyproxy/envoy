@@ -18,14 +18,15 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/versioning.proto";
-
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.cluster.v3";
 option java_outer_classname = "ClusterProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Cluster configuration]
 
@@ -373,7 +374,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message CommonLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.CommonLbConfig";
@@ -409,6 +410,16 @@ message Cluster {
     message LocalityWeightedLbConfig {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.Cluster.CommonLbConfig.LocalityWeightedLbConfig";
+    }
+
+    // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
+    message ConsistentHashingLbConfig {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.Cluster.CommonLbConfig.ConsistentHashingLbConfig";
+
+      // If set to `true`, the cluster will use hostname instead of the resolved
+      // address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
+      bool use_hostname_for_hashing = 1;
     }
 
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.
@@ -465,6 +476,9 @@ message Cluster {
     // If set to `true`, the cluster manager will drain all existing
     // connections to upstream hosts whenever hosts are added or removed from the cluster.
     bool close_connections_on_host_set_change = 6;
+
+    //Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
+    ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
   }
 
   message RefreshRate {
@@ -645,9 +659,6 @@ message Cluster {
   // other than :ref:`STRICT_DNS<envoy_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>` and
   // :ref:`LOGICAL_DNS<envoy_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>` this setting is
   // ignored.
-  //
-  // Note: Currently, DNS failures and empty DNS responses are not treated differently and this
-  // configuration is applied in both situations.
   RefreshRate dns_failure_refresh_rate = 44;
 
   // Optional configuration for setting cluster's DNS refresh rate. If the value is set to true,
@@ -736,7 +747,7 @@ message Cluster {
   // cluster. It can be used for stats, logging, and varying filter behavior.
   // Fields should use reverse DNS notation to denote which entity within Envoy
   // will need the information. For instance, if the metadata is intended for
-  // the Router filter, the filter name should be specified as *envoy.router*.
+  // the Router filter, the filter name should be specified as *envoy.filters.http.router*.
   core.v3.Metadata metadata = 25;
 
   // Determines how Envoy selects the protocol used to speak to upstream hosts.

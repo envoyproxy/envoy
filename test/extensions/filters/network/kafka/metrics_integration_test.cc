@@ -1,8 +1,7 @@
-#include "common/stats/isolated_store_impl.h"
-
 #include "extensions/filters/network/kafka/external/request_metrics.h"
 #include "extensions/filters/network/kafka/external/response_metrics.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/kafka/message_utilities.h"
 
 #include "gtest/gtest.h"
@@ -15,14 +14,14 @@ namespace MetricsIntegrationTest {
 
 class MetricsIntegrationTest : public testing::Test {
 protected:
-  Stats::IsolatedStoreImpl scope_;
+  Stats::TestUtil::TestStore scope_;
   RichRequestMetricsImpl request_metrics_{scope_, "prefix"};
   RichResponseMetricsImpl response_metrics_{scope_, "prefix"};
 };
 
 constexpr static int32_t UPDATE_COUNT = 42;
 
-TEST_F(MetricsIntegrationTest, shouldUpdateRequestMetrics) {
+TEST_F(MetricsIntegrationTest, ShouldUpdateRequestMetrics) {
   for (int16_t api_key = 0; api_key < MessageUtilities::apiKeys(); ++api_key) {
     // given
     // when
@@ -36,7 +35,7 @@ TEST_F(MetricsIntegrationTest, shouldUpdateRequestMetrics) {
   };
 }
 
-TEST_F(MetricsIntegrationTest, shouldHandleUnparseableRequest) {
+TEST_F(MetricsIntegrationTest, ShouldHandleUnparseableRequest) {
   // given
   // when
   for (int i = 0; i < UPDATE_COUNT; ++i) {
@@ -47,7 +46,7 @@ TEST_F(MetricsIntegrationTest, shouldHandleUnparseableRequest) {
   ASSERT_EQ(scope_.counter("kafka.prefix.request.unknown").value(), UPDATE_COUNT);
 }
 
-TEST_F(MetricsIntegrationTest, shouldUpdateResponseMetrics) {
+TEST_F(MetricsIntegrationTest, ShouldUpdateResponseMetrics) {
   for (int16_t api_key = 0; api_key < MessageUtilities::apiKeys(); ++api_key) {
     // given
     // when
@@ -61,7 +60,7 @@ TEST_F(MetricsIntegrationTest, shouldUpdateResponseMetrics) {
   };
 }
 
-TEST_F(MetricsIntegrationTest, shouldHandleUnparseableResponse) {
+TEST_F(MetricsIntegrationTest, ShouldHandleUnparseableResponse) {
   // given
   // when
   for (int i = 0; i < UPDATE_COUNT; ++i) {

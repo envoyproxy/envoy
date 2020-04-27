@@ -53,13 +53,17 @@ public:
 
   MOCK_METHOD(void, onNewStream, (MatchStatusVector & statuses), (const));
   MOCK_METHOD(void, onHttpRequestHeaders,
-              (const Http::HeaderMap& request_headers, MatchStatusVector& statuses), (const));
+              (const Http::RequestHeaderMap& request_headers, MatchStatusVector& statuses),
+              (const));
   MOCK_METHOD(void, onHttpRequestTrailers,
-              (const Http::HeaderMap& request_trailers, MatchStatusVector& statuses), (const));
+              (const Http::RequestTrailerMap& request_trailers, MatchStatusVector& statuses),
+              (const));
   MOCK_METHOD(void, onHttpResponseHeaders,
-              (const Http::HeaderMap& response_headers, MatchStatusVector& statuses), (const));
+              (const Http::ResponseHeaderMap& response_headers, MatchStatusVector& statuses),
+              (const));
   MOCK_METHOD(void, onHttpResponseTrailers,
-              (const Http::HeaderMap& response_trailers, MatchStatusVector& statuses), (const));
+              (const Http::ResponseTrailerMap& response_trailers, MatchStatusVector& statuses),
+              (const));
 };
 
 } // namespace Tap

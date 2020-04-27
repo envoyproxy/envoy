@@ -6,14 +6,15 @@ import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
 
-import "udpa/annotations/versioning.proto";
-
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.common.fault.v3";
 option java_outer_classname = "FaultProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common fault injection types]
 
@@ -30,7 +31,7 @@ message FaultDelay {
   }
 
   // Fault delays are controlled via an HTTP header (if applicable). See the
-  // :ref:`http fault filter <config_http_filters_fault_injection_http_header>` documentation for
+  // :ref:`HTTP fault filter <config_http_filters_fault_injection_http_header>` documentation for
   // more information.
   message HeaderDelay {
     option (udpa.annotations.versioning).previous_message_type =
@@ -75,7 +76,7 @@ message FaultRateLimit {
   }
 
   // Rate limits are controlled via an HTTP header (if applicable). See the
-  // :ref:`http fault filter <config_http_filters_fault_injection_http_header>` documentation for
+  // :ref:`HTTP fault filter <config_http_filters_fault_injection_http_header>` documentation for
   // more information.
   message HeaderLimit {
     option (udpa.annotations.versioning).previous_message_type =

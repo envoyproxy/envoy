@@ -57,7 +57,7 @@ template <typename T> std::shared_ptr<T> ResponseTest::serializeAndDeserialize(T
   (put "string" as std::string, 32 as uint32_t, etc.).
 #}
 {% for message_type in message_types %}{% for field_list in message_type.compute_field_lists() %}
-TEST_F(ResponseTest, shouldParse{{ message_type.name }}V{{ field_list.version }}) {
+TEST_F(ResponseTest, ShouldParse{{ message_type.name }}V{{ field_list.version }}) {
   // given
   {{ message_type.name }} data = { {{ field_list.example_value() }} };
   Response<{{ message_type.name }}> message = { {

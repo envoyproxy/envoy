@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/stream_info/filter_state_impl.h"
@@ -87,8 +88,13 @@ public:
   MOCK_METHOD(const std::string&, requestedServerName, (), (const));
   MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view));
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
-  MOCK_METHOD(void, setRequestHeaders, (const Http::HeaderMap&));
-  MOCK_METHOD(const Http::HeaderMap*, getRequestHeaders, (), (const));
+  MOCK_METHOD(void, setRequestHeaders, (const Http::RequestHeaderMap&));
+  MOCK_METHOD(const Http::RequestHeaderMap*, getRequestHeaders, (), (const));
+  MOCK_METHOD(void, setUpstreamClusterInfo, (const Upstream::ClusterInfoConstSharedPtr&));
+  MOCK_METHOD(absl::optional<Upstream::ClusterInfoConstSharedPtr>, upstreamClusterInfo, (),
+              (const));
+  MOCK_METHOD(Http::RequestIDExtensionSharedPtr, getRequestIDExtension, (), (const));
+  MOCK_METHOD(void, setRequestIDExtension, (Http::RequestIDExtensionSharedPtr));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};

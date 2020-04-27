@@ -30,7 +30,7 @@ static_resources:
                     numerator: 100
                     denominator: HUNDRED
               per_filter_config:
-                envoy.csrf:
+                envoy.filters.http.csrf:
                   filter_enabled:
                     default_value:
                       numerator: 100
@@ -47,7 +47,7 @@ static_resources:
                 route:
                   cluster: generic_service
                 per_filter_config:
-                  envoy.csrf:
+                  envoy.filters.http.csrf:
                     filter_enabled:
                       default_value:
                         numerator: 0
@@ -57,7 +57,7 @@ static_resources:
                 route:
                   cluster: generic_service
                 per_filter_config:
-                  envoy.csrf:
+                  envoy.filters.http.csrf:
                     filter_enabled:
                       default_value:
                         numerator: 0
@@ -71,7 +71,7 @@ static_resources:
                 route:
                   cluster: generic_service
                 per_filter_config:
-                  envoy.csrf:
+                  envoy.filters.http.csrf:
                     filter_enabled:
                       default_value:
                         numerator: 100
@@ -83,15 +83,15 @@ static_resources:
                 route:
                   cluster: generic_service
           http_filters:
-          - name: envoy.cors
+          - name: envoy.filters.http.cors
             typed_config: {}
-          - name: envoy.csrf
+          - name: envoy.filters.http.csrf
             config:
               filter_enabled:
                 default_value:
                   numerator: 0
                   denominator: HUNDRED
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
   clusters:
   - name: generic_service

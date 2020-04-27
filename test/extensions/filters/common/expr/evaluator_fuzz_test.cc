@@ -36,7 +36,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTest
   auto request_headers = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.request_headers());
   auto response_headers =
       Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(input.response_headers());
-  auto response_trailers = Fuzz::fromHeaders<Http::TestHeaderMapImpl>(input.trailers());
+  auto response_trailers = Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(input.trailers());
 
   try {
     // Create the CEL expression.

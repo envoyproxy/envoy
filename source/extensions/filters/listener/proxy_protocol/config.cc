@@ -17,13 +17,15 @@ namespace ProxyProtocol {
 class ProxyProtocolConfigFactory : public Server::Configuration::NamedListenerFilterConfigFactory {
 public:
   // NamedListenerFilterConfigFactory
-  Network::ListenerFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::ListenerFactoryContext& context) override {
+  Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message&,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      Server::Configuration::ListenerFactoryContext& context) override {
     ConfigSharedPtr config(new Config(context.scope()));
-    return [config](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(std::make_unique<Filter>(config));
-    };
+    return
+        [listener_filter_matcher, config](Network::ListenerFilterManager& filter_manager) -> void {
+          filter_manager.addAcceptFilter(listener_filter_matcher, std::make_unique<Filter>(config));
+        };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -38,7 +40,8 @@ public:
  * Static registration for the proxy protocol filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(ProxyProtocolConfigFactory,
-                 Server::Configuration::NamedListenerFilterConfigFactory);
+                 Server::Configuration::NamedListenerFilterConfigFactory){
+    "envoy.listener.proxy_protocol"};
 
 } // namespace ProxyProtocol
 } // namespace ListenerFilters

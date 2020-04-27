@@ -33,13 +33,14 @@ std::string clustersJson(const std::vector<std::string>& clusters) {
 class ClusterManagerImplTest : public testing::Test {
 public:
   ClusterManagerImplTest()
-      : api_(Api::createApiForTest()), http_context_(factory_.stats_.symbolTable()) {}
+      : api_(Api::createApiForTest()), http_context_(factory_.stats_.symbolTable()),
+        grpc_context_(factory_.stats_.symbolTable()) {}
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *api_, http_context_);
+        *api_, http_context_, grpc_context_);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -74,7 +75,7 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *api_, local_cluster_update_, local_hosts_removed_, http_context_);
+        *api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -102,7 +103,7 @@ public:
     EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());
   }
 
-  envoy::config::core::v3::Metadata buildMetadata(const std::string& version) const {
+  MetadataConstSharedPtr buildMetadata(const std::string& version) const {
     envoy::config::core::v3::Metadata metadata;
 
     if (!version.empty()) {
@@ -111,7 +112,7 @@ public:
           .set_string_value(version);
     }
 
-    return metadata;
+    return std::make_shared<const envoy::config::core::v3::Metadata>(metadata);
   }
 
   Event::SimulatedTimeSystem time_system_;
@@ -124,6 +125,7 @@ public:
   MockLocalClusterUpdate local_cluster_update_;
   MockLocalHostsRemoved local_hosts_removed_;
   Http::ContextImpl http_context_;
+  Grpc::ContextImpl grpc_context_;
 };
 
 envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
@@ -343,7 +345,7 @@ static_resources:
       ->second.get()
       .info()
       ->statsScope()
-      .counter("foo")
+      .counterFromString("foo")
       .inc();
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster.cluster_name.foo").value());
 }
@@ -1326,7 +1328,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(callbacks.get()));
 }
 
-TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
+TEST_F(ClusterManagerImplTest, AddOrUpdateClusterStaticExists) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                         clustersJson({defaultStaticClusterJson("fake_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
@@ -1702,7 +1704,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
   // initialize callback.
@@ -1761,7 +1764,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
   tcp_drained_cb();
@@ -1792,7 +1796,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
 
@@ -1871,7 +1876,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
   // initialize callback.
@@ -1978,7 +1984,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
   tcp_drained_cb();
@@ -2033,7 +2040,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
 
@@ -2154,7 +2162,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   create(parseBootstrapFromV2Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
       .WillOnce(ReturnNew<Http::ConnectionPool::MockInstance>());
@@ -2179,7 +2188,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   // Remove the first host, this should lead to the cp being drained, without
   // crash.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
 }
@@ -2233,7 +2242,8 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   create(parseBootstrapFromV2Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   MockConnPoolWithDestroy* mock_cp = new MockConnPoolWithDestroy();
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(mock_cp));
@@ -2254,7 +2264,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb;
   EXPECT_CALL(*tcp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
 
   // The drained callback might get called when the CP is being destroyed.
   EXPECT_CALL(*mock_cp, onDestroy()).WillOnce(Invoke(drained_cb));
@@ -2463,7 +2473,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
   // The first update should be applied immediately, because even though it's mergeable
   // it's outside the default merge window of 3 seconds (found in debugger as value of
   // cluster.info()->lbConfig().update_merge_window() in ClusterManagerImpl::scheduleUpdate.
-  time_system_.sleep(std::chrono::seconds(60));
+  time_system_.advanceTimeWait(std::chrono::seconds(60));
   cluster.prioritySet().updateHosts(
       0,
       updateHostsParams(hosts, hosts_per_locality,
@@ -2490,7 +2500,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
   // 3 seconds (found in debugger as value of cluster.info()->lbConfig().update_merge_window()
   // in ClusterManagerImpl::scheduleUpdate. Note that initially the update-time is
   // default-initialized to a monotonic time of 0, as is SimulatedTimeSystem::monotonic_time_.
-  time_system_.sleep(std::chrono::seconds(2));
+  time_system_.advanceTimeWait(std::chrono::seconds(2));
   cluster.prioritySet().updateHosts(
       0,
       updateHostsParams(hosts, hosts_per_locality,

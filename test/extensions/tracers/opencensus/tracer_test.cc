@@ -5,7 +5,7 @@
 #include <iostream>
 #include <vector>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/opencensus.pb.h"
 
 #include "common/common/base64.h"
 
@@ -207,7 +207,7 @@ void testIncomingHeaders(
 
   const std::string operation_name{"my_operation_2"};
   SystemTime start_time;
-  Http::TestHeaderMapImpl injected_headers;
+  Http::TestRequestHeaderMapImpl injected_headers;
   {
     Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
                                               {Tracing::Reason::Sampling, false});

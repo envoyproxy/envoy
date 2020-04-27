@@ -17,6 +17,8 @@
 namespace Envoy {
 namespace Upstream {
 
+using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Metadata>;
+
 /**
  * All per host stats. @see stats_macros.h
  *
@@ -73,12 +75,12 @@ public:
   /**
    * @return the metadata associated with this host
    */
-  virtual const std::shared_ptr<envoy::config::core::v3::Metadata> metadata() const PURE;
+  virtual MetadataConstSharedPtr metadata() const PURE;
 
   /**
    * Set the current metadata.
    */
-  virtual void metadata(const envoy::config::core::v3::Metadata& new_metadata) PURE;
+  virtual void metadata(MetadataConstSharedPtr new_metadata) PURE;
 
   /**
    * @return the cluster the host is a member of.
@@ -94,6 +96,11 @@ public:
    * @return the host's health checker monitor.
    */
   virtual HealthCheckHostMonitor& healthChecker() const PURE;
+
+  /**
+   * @return The hostname used as the host header for health checking.
+   */
+  virtual const std::string& hostnameForHealthChecks() const PURE;
 
   /**
    * @return the hostname associated with the host if any.
@@ -174,7 +181,7 @@ public:
    * @param metadata the metadata of the given host.
    * @return the match information of the transport socket selected.
    */
-  virtual MatchData resolve(const envoy::config::core::v3::Metadata& metadata) const PURE;
+  virtual MatchData resolve(const envoy::config::core::v3::Metadata* metadata) const PURE;
 };
 
 using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;

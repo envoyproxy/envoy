@@ -91,6 +91,24 @@ service Bookstore {
       get: "/index"
     };
   }
+  rpc PostBody(EchoBodyRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/postBody"
+      body: "nested.content"
+    };
+  }
+  rpc StreamBody(stream EchoBodyRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/streamBody"
+      body: "nested.content"
+    };
+  }
+  rpc EchoBody(EchoBodyRequest) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      post: "/echoBody"
+      body: "nested.content"
+    };
+  }
   rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
     option (google.api.http) = {
       post: "/echoStruct"
@@ -201,8 +219,31 @@ message GetAuthorRequest {
   int64 author = 1;
 }
 
+message EchoBodyRequest {
+  message Nested {
+    google.api.HttpBody content = 1;
+  }
+  string arg = 1;
+  string unused = 2;
+  Nested nested = 3;
+}
+
 // Request and Response message for EchoStructReqResp method.
 message EchoStructReqResp {
   // The content of request.
   google.protobuf.Struct content = 1;
+}
+
+// Test message for deeply-nested HttpBody field.
+message DeepNestedBody {
+  message Nested {
+    message Nested {
+      message Nested {
+        google.api.HttpBody body = 500000000;
+      }
+      Nested nested = 100000000;
+    }
+    Nested nested = 1000000;
+  }
+  Nested nested = 1;
 }

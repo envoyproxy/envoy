@@ -20,6 +20,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {
@@ -52,6 +53,12 @@ public:
   virtual ~Dispatcher() = default;
 
   /**
+   * Returns the name that identifies this dispatcher, such as "worker_2" or "main_thread".
+   * @return const std::string& the name that identifies this dispatcher.
+   */
+  virtual const std::string& name() PURE;
+
+  /**
    * Returns a time-source to use with this dispatcher.
    */
   virtual TimeSource& timeSource() PURE;
@@ -61,9 +68,11 @@ public:
    * time, since the main and worker thread dispatchers are constructed before
    * ThreadLocalStoreImpl::initializeThreading.
    * @param scope the scope to contain the new per-dispatcher stats created here.
-   * @param prefix the stats prefix to identify this dispatcher.
+   * @param prefix the stats prefix to identify this dispatcher. If empty, the dispatcher will be
+   *               identified by its name.
    */
-  virtual void initializeStats(Stats::Scope& scope, const std::string& prefix) PURE;
+  virtual void initializeStats(Stats::Scope& scope,
+                               const absl::optional<std::string>& prefix = absl::nullopt) PURE;
 
   /**
    * Clears any items in the deferred deletion queue.
@@ -75,11 +84,13 @@ public:
    * @param socket supplies an open file descriptor and connection metadata to use for the
    *        connection. Takes ownership of the socket.
    * @param transport_socket supplies a transport socket to be used by the connection.
+   * @param stream_info info object for the server connection
    * @return Network::ConnectionPtr a server connection that is owned by the caller.
    */
   virtual Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
-                         Network::TransportSocketPtr&& transport_socket) PURE;
+                         Network::TransportSocketPtr&& transport_socket,
+                         StreamInfo::StreamInfo& stream_info) PURE;
 
   /**
    * Creates an instance of Envoy's Network::ClientConnection. Does NOT initiate the connection;
@@ -186,8 +197,8 @@ public:
    *              run() will return.
    */
   enum class RunType {
-    Block,       // Executes any events that have been activated, then exit.
-    NonBlock,    // Waits for any pending events to activate, executes them,
+    Block,       // Runs the event-loop until there are no pending events.
+    NonBlock,    // Checks for any pending events to activate, executes them,
                  // then exits. Exits immediately if there are no pending or
                  // active events.
     RunUntilExit // Runs the event-loop until loopExit() is called, blocking

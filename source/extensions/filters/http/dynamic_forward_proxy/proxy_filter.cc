@@ -66,7 +66,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   uint16_t default_port = 80;
   if (cluster_info_->transportSocketMatcher()
-          .resolve(envoy::config::core::v3::Metadata())
+          .resolve(nullptr)
           .factory_.implementsSecureTransport()) {
     default_port = 443;
   }

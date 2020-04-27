@@ -50,7 +50,7 @@ void HystrixSink::addHistogramToStream(const QuantileLatencyMap& latency_map, ab
   // TODO: Consider if we better use join here
   ss << ", \"" << key << "\": {";
   bool is_first = true;
-  for (const std::pair<double, double>& element : latency_map) {
+  for (const auto& element : latency_map) {
     const std::string quantile = fmt::sprintf("%g", element.first * 100);
     HystrixSink::addDoubleToStream(quantile, element.second, ss, is_first);
     is_first = false;
@@ -283,7 +283,7 @@ HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
 }
 
 Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
-                                                  Http::HeaderMap& response_headers,
+                                                  Http::ResponseHeaderMap& response_headers,
                                                   Buffer::Instance&,
                                                   Server::AdminStream& admin_stream) {
 
@@ -299,10 +299,8 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
       admin_stream.getDecoderFilterCallbacks();
 
   // Disable chunk-encoding in HTTP/1.x.
-  // TODO: This request should be propagated to codecs via API, instead of using a pseudo-header.
-  //       See: https://github.com/envoyproxy/envoy/issues/9749
   if (stream_decoder_filter_callbacks.streamInfo().protocol() < Http::Protocol::Http2) {
-    response_headers.setNoChunks(0);
+    admin_stream.http1StreamEncoderOptions().value().get().disableChunkEncoding();
   }
 
   registerConnection(&stream_decoder_filter_callbacks);
@@ -380,7 +378,7 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
         *cluster_stats_cache_ptr, cluster_info->name(),
         cluster_info->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().max(),
         cluster_info->statsScope()
-            .gaugeFromStatName(membership_total_, Stats::Gauge::ImportMode::Accumulate)
+            .gaugeFromStatName(membership_total_, Stats::Gauge::ImportMode::NeverImport)
             .value(),
         server_.statsFlushInterval(), time_histograms[cluster_info->name()], ss);
   }

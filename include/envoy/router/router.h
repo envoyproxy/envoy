@@ -48,7 +48,7 @@ public:
    * @param headers supplies the response headers, which may be modified during this call.
    * @param stream_info holds additional information about the request.
    */
-  virtual void finalizeResponseHeaders(Http::HeaderMap& headers,
+  virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
@@ -71,7 +71,7 @@ public:
    * @return std::string the redirect URL if this DirectResponseEntry is a redirect,
    *         or an empty string otherwise.
    */
-  virtual std::string newPath(const Http::HeaderMap& headers) const PURE;
+  virtual std::string newPath(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
    * Returns the response body to send with direct responses.
@@ -87,7 +87,7 @@ public:
    * @param headers supplies the request headers, which may be modified during this call.
    * @param insert_envoy_original_path insert x-envoy-original-path header?
    */
-  virtual void rewritePathHeader(Http::HeaderMap& headers,
+  virtual void rewritePathHeader(Http::RequestHeaderMap& headers,
                                  bool insert_envoy_original_path) const PURE;
 
   /**
@@ -264,7 +264,7 @@ public:
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
-  virtual RetryStatus shouldRetryHeaders(const Http::HeaderMap& response_headers,
+  virtual RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                          DoRetryCallback callback) PURE;
 
   /**
@@ -275,7 +275,7 @@ public:
    * @param response_headers supplies the response headers.
    * @return bool true if a retry would be warranted based on the retry policy.
    */
-  virtual bool wouldRetryFromHeaders(const Http::HeaderMap& response_headers) PURE;
+  virtual bool wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) PURE;
 
   /**
    * Determine whether a request should be retried after a reset based on the reason for the reset.
@@ -361,9 +361,32 @@ public:
    *         present.
    */
   virtual const envoy::type::v3::FractionalPercent& defaultValue() const PURE;
+
+  /**
+   * @return true if the trace span should be sampled.
+   */
+  virtual bool traceSampled() const PURE;
 };
 
 using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
+
+/**
+ * All virtual cluster stats. @see stats_macro.h
+ */
+#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER)                                                         \
+  COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
+  COUNTER(upstream_rq_retry_overflow)                                                              \
+  COUNTER(upstream_rq_retry_success)                                                               \
+  COUNTER(upstream_rq_timeout)                                                                     \
+  COUNTER(upstream_rq_total)
+
+/**
+ * Struct definition for all virtual cluster stats. @see stats_macro.h
+ */
+struct VirtualClusterStats {
+  ALL_VIRTUAL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -377,6 +400,15 @@ public:
    * @return the stat-name of the virtual cluster.
    */
   virtual Stats::StatName statName() const PURE;
+
+  /**
+   * @return VirtualClusterStats& strongly named stats for this virtual cluster.
+   */
+  virtual VirtualClusterStats& stats() const PURE;
+
+  static VirtualClusterStats generateStats(Stats::Scope& scope) {
+    return {ALL_VIRTUAL_CLUSTER_STATS(POOL_COUNTER(scope))};
+  }
 };
 
 class RateLimitPolicy;
@@ -438,7 +470,12 @@ public:
   /**
    * @return bool whether to include the request count header in upstream requests.
    */
-  virtual bool includeAttemptCount() const PURE;
+  virtual bool includeAttemptCountInRequest() const PURE;
+
+  /**
+   * @return bool whether to include the request count header in the downstream response.
+   */
+  virtual bool includeAttemptCountInResponse() const PURE;
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
@@ -615,7 +652,7 @@ public:
    * @param stream_info holds additional information about the request.
    * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
    */
-  virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
+  virtual void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                       const StreamInfo::StreamInfo& stream_info,
                                       bool insert_envoy_original_path) const PURE;
 
@@ -773,7 +810,14 @@ public:
    * count header.
    * @return bool whether x-envoy-attempt-count should be included on the upstream request.
    */
-  virtual bool includeAttemptCount() const PURE;
+  virtual bool includeAttemptCountInRequest() const PURE;
+
+  /**
+   * True if the virtual host this RouteEntry belongs to is configured to include the attempt
+   * count header.
+   * @return bool whether x-envoy-attempt-count should be included on the downstream response.
+   */
+  virtual bool includeAttemptCountInResponse() const PURE;
 
   using UpgradeMap = std::map<std::string, bool>;
   /**
@@ -921,7 +965,7 @@ public:
    *        allows stable choices between calls if desired.
    * @return the route or nullptr if there is no matching route for the request.
    */
-  virtual RouteConstSharedPtr route(const Http::HeaderMap& headers,
+  virtual RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const PURE;
 

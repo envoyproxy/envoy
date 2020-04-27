@@ -1,5 +1,6 @@
 #include <vector>
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 
@@ -43,7 +44,7 @@ class FastMockFileEvent : public Event::FileEvent {
 
 class FastMockDispatcher : public Event::MockDispatcher {
 public:
-  Event::FileEventPtr createFileEvent(int, Event::FileReadyCb cb, Event::FileTriggerType,
+  Event::FileEventPtr createFileEvent(os_fd_t, Event::FileReadyCb cb, Event::FileTriggerType,
                                       uint32_t) override {
     file_event_callback_ = cb;
     return std::make_unique<FastMockFileEvent>();
@@ -56,7 +57,7 @@ class FastMockOsSysCalls : public Api::MockOsSysCalls {
 public:
   FastMockOsSysCalls(const std::vector<uint8_t>& client_hello) : client_hello_(client_hello) {}
 
-  Api::SysCallSizeResult recv(int, void* buffer, size_t length, int) override {
+  Api::SysCallSizeResult recv(os_fd_t, void* buffer, size_t length, int) override {
     RELEASE_ASSERT(length >= client_hello_.size(), "");
     memcpy(buffer, client_hello_.data(), client_hello_.size());
     return Api::SysCallSizeResult{ssize_t(client_hello_.size()), 0};
@@ -66,8 +67,9 @@ public:
 };
 
 static void BM_TlsInspector(benchmark::State& state) {
-  NiceMock<FastMockOsSysCalls> os_sys_calls(
-      Tls::Test::generateClientHello("example.com", "\x02h2\x08http/1.1"));
+  NiceMock<FastMockOsSysCalls> os_sys_calls(Tls::Test::generateClientHello(
+      Config::TLS_MIN_SUPPORTED_VERSION, Config::TLS_MAX_SUPPORTED_VERSION, "example.com",
+      "\x02h2\x08http/1.1"));
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls};
   NiceMock<Stats::MockStore> store;
   ConfigSharedPtr cfg(std::make_shared<Config>(store));
@@ -79,7 +81,7 @@ static void BM_TlsInspector(benchmark::State& state) {
   for (auto _ : state) {
     Filter filter(cfg);
     filter.onAccept(cb);
-    dispatcher.file_event_callback_(Event::FileReadyType::Read);
+    RELEASE_ASSERT(dispatcher.file_event_callback_ == nullptr, "");
     RELEASE_ASSERT(socket.detectedTransportProtocol() == "tls", "");
     RELEASE_ASSERT(socket.requestedServerName() == "example.com", "");
     RELEASE_ASSERT(socket.requestedApplicationProtocols().size() == 2 &&
@@ -97,16 +99,3 @@ BENCHMARK(BM_TlsInspector)->Unit(benchmark::kMicrosecond);
 } // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy
-
-// Boilerplate main(), which discovers benchmarks in the same file and runs them.
-int main(int argc, char** argv) {
-  Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Context logging_context(spdlog::level::warn,
-                                         Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
-
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
-  }
-  benchmark::RunSpecifiedBenchmarks();
-}

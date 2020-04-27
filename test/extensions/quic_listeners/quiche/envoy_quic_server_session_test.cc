@@ -5,6 +5,7 @@
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 
 #include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/core/quic_crypto_server_stream.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/core/quic_versions.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
@@ -88,7 +89,7 @@ public:
   explicit TestQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
                                       quic::QuicCompressedCertsCache* compressed_certs_cache,
                                       quic::QuicSession* session,
-                                      quic::QuicCryptoServerStream::Helper* helper)
+                                      quic::QuicCryptoServerStreamBase::Helper* helper)
       : quic::QuicCryptoServerStream(crypto_config, compressed_certs_cache, session, helper) {}
 
   using quic::QuicCryptoServerStream::QuicCryptoServerStream;
@@ -99,10 +100,10 @@ public:
 class EnvoyQuicServerSessionTest : public testing::TestWithParam<bool> {
 public:
   EnvoyQuicServerSessionTest()
-      : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()),
-        connection_helper_(*dispatcher_),
+      : api_(Api::createApiForTest(time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_t099, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -126,7 +127,7 @@ public:
 
     // Advance time and trigger update of Dispatcher::approximateMonotonicTime()
     // because zero QuicTime is considered uninitialized.
-    time_system_.sleep(std::chrono::milliseconds(1));
+    time_system_.advanceTimeWait(std::chrono::milliseconds(1));
     connection_helper_.GetClock()->Now();
 
     ON_CALL(writer_, WritePacket(_, _, _, _, _))
@@ -170,7 +171,7 @@ public:
           return request_decoder;
         }));
     quic::QuicStreamId stream_id =
-        quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 4u : 5u;
+        quic_version_[0].transport_version == quic::QUIC_VERSION_IETF_DRAFT_27 ? 4u : 5u;
     return envoy_quic_session_.GetOrCreateStream(stream_id);
   }
 
@@ -222,7 +223,7 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillOnce(testing::ReturnRef(request_decoder));
   quic::QuicStreamId stream_id =
-      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 4u : 5u;
+      quic_version_[0].transport_version == quic::QUIC_VERSION_IETF_DRAFT_27 ? 4u : 5u;
   auto stream =
       reinterpret_cast<quic::QuicSpdyStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
   // Receive a GET request on created stream.
@@ -251,7 +252,7 @@ TEST_P(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {
   Http::MockStreamCallbacks stream_callbacks;
   // IETF stream 5 and G-Quic stream 2 are server initiated.
   quic::QuicStreamId stream_id =
-      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 5u : 2u;
+      quic_version_[0].transport_version == quic::QUIC_VERSION_IETF_DRAFT_27 ? 5u : 2u;
   std::string data("aaaa");
   quic::QuicStreamFrame stream_frame(stream_id, false, 0, data);
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false)).Times(0);
@@ -268,7 +269,7 @@ TEST_P(EnvoyQuicServerSessionTest, NoNewStreamForInvalidIncomingStream) {
   Http::MockStreamCallbacks stream_callbacks;
   // IETF stream 5 and G-Quic stream 2 are server initiated.
   quic::QuicStreamId stream_id =
-      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 5u : 2u;
+      quic_version_[0].transport_version == quic::QUIC_VERSION_IETF_DRAFT_27 ? 5u : 2u;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false)).Times(0);
   EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_INVALID_STREAM_ID,
                                                            "Data for nonexistent stream"));
@@ -286,7 +287,7 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
   quic::QuicRstStreamFrame rst1(/*control_frame_id=*/1u, stream1->id(),
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
-  if (quic_version_[0].transport_version < quic::QUIC_VERSION_99) {
+  if (quic_version_[0].transport_version < quic::QUIC_VERSION_IETF_DRAFT_27) {
     EXPECT_CALL(*quic_connection_, SendControlFrame(_))
         .WillOnce(Invoke([stream_id = stream1->id()](const quic::QuicFrame& frame) {
           EXPECT_EQ(stream_id, frame.rst_stream_frame->stream_id);
@@ -451,7 +452,7 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWrite);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
-  time_system_.sleep(std::chrono::milliseconds(10));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // Another write event without updating flow control window shouldn't trigger
   // connection close, but it should update the timer.
@@ -459,7 +460,7 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   EXPECT_TRUE(envoy_quic_session_.HasDataToWrite());
 
   // Timer shouldn't fire at original deadline.
-  time_system_.sleep(std::chrono::milliseconds(90));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(90));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
@@ -468,7 +469,7 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
   // Advance the time to fire connection close timer.
-  time_system_.sleep(std::chrono::milliseconds(10));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
@@ -550,7 +551,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   EXPECT_TRUE(envoy_quic_session_.HasDataToWrite());
 
   // No timeout set, so alarm shouldn't fire.
-  time_system_.sleep(std::chrono::milliseconds(100));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(100));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
@@ -580,7 +581,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithTimeout) {
 
   // Advance the time a bit and try to close again. The delay close timer
   // shouldn't be rescheduled by this call.
-  time_system_.sleep(std::chrono::milliseconds(10));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
@@ -589,7 +590,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithTimeout) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
   // Advance the time to fire connection close timer.
-  time_system_.sleep(std::chrono::milliseconds(90));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(90));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
@@ -609,10 +610,10 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithTimeout) {
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
   // Unblocking the stream shouldn't close the connection as it should be
   // delayed.
-  time_system_.sleep(std::chrono::milliseconds(10));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10));
   envoy_quic_session_.OnCanWrite();
   // delay close alarm should have been rescheduled.
-  time_system_.sleep(std::chrono::milliseconds(90));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(90));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
@@ -621,7 +622,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithTimeout) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
   // Advance the time to fire connection close timer.
-  time_system_.sleep(std::chrono::milliseconds(10));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
@@ -640,7 +641,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWrite);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
-  time_system_.sleep(std::chrono::milliseconds(10));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10));
   // The closing behavior should be changed.
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWriteAndDelay);
   // Unblocking the stream shouldn't close the connection as it should be
@@ -648,7 +649,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
   envoy_quic_session_.OnCanWrite();
 
   // delay close alarm should have been rescheduled.
-  time_system_.sleep(std::chrono::milliseconds(90));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(90));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
@@ -657,7 +658,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
   // Advance the time to fire connection close timer.
-  time_system_.sleep(std::chrono::milliseconds(10));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
@@ -672,7 +673,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithNoPendingData) {
 
   // Advance the time a bit and try to close again. The delay close timer
   // shouldn't be rescheduled by this call.
-  time_system_.sleep(std::chrono::milliseconds(10));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10));
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
@@ -680,7 +681,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithNoPendingData) {
               SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   // Advance the time to fire connection close timer.
-  time_system_.sleep(std::chrono::milliseconds(90));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(90));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
 }
@@ -695,9 +696,7 @@ TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
 
 TEST_P(EnvoyQuicServerSessionTest, GoAway) {
   installReadFilter();
-  if (quic_version_[0].transport_version < quic::QUIC_VERSION_99) {
-    EXPECT_CALL(*quic_connection_, SendControlFrame(_));
-  }
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
   http_connection_->goAway();
 }
 
@@ -803,7 +802,7 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
         return request_decoder;
       }));
   quic::QuicStreamId stream_id =
-      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 4u : 5u;
+      quic_version_[0].transport_version == quic::QUIC_VERSION_IETF_DRAFT_27 ? 4u : 5u;
   auto stream1 =
       dynamic_cast<EnvoyQuicServerStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
 

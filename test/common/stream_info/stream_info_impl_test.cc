@@ -11,6 +11,7 @@
 
 #include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
@@ -175,6 +176,12 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     absl::string_view sni_name = "stubserver.org";
     stream_info.setRequestedServerName(sni_name);
     EXPECT_EQ(std::string(sni_name), stream_info.requestedServerName());
+
+    EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
+    Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
+    stream_info.setUpstreamClusterInfo(cluster_info);
+    EXPECT_NE(absl::nullopt, stream_info.upstreamClusterInfo());
+    EXPECT_EQ("fake_cluster", stream_info.upstreamClusterInfo().value()->name());
   }
 }
 
@@ -184,19 +191,19 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   stream_info.setDynamicMetadata("com.test", MessageUtil::keyValueStruct("test_key", "test_value"));
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(stream_info.dynamicMetadata(), "com.test", "test_key")
+            Config::Metadata::metadataValue(&stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
   ProtobufWkt::Struct struct_obj2;
   ProtobufWkt::Value val2;
   val2.set_string_value("another_value");
   (*struct_obj2.mutable_fields())["another_key"] = val2;
   stream_info.setDynamicMetadata("com.test", struct_obj2);
-  EXPECT_EQ("another_value", Config::Metadata::metadataValue(stream_info.dynamicMetadata(),
+  EXPECT_EQ("another_value", Config::Metadata::metadataValue(&stream_info.dynamicMetadata(),
                                                              "com.test", "another_key")
                                  .string_value());
   // make sure "test_key:test_value" still exists
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(stream_info.dynamicMetadata(), "com.test", "test_key")
+            Config::Metadata::metadataValue(&stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
   std::string json;
   const auto test_struct = stream_info.dynamicMetadata().filter_metadata().at("com.test");
@@ -225,9 +232,27 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
   EXPECT_FALSE(stream_info.getRequestHeaders());
 
-  Http::HeaderMapImpl headers;
+  Http::RequestHeaderMapImpl headers;
   stream_info.setRequestHeaders(headers);
   EXPECT_EQ(&headers, stream_info.getRequestHeaders());
+}
+
+TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
+  StreamInfoImpl stream_info(test_time_.timeSystem());
+  EXPECT_TRUE(stream_info.getRequestIDExtension());
+
+  auto rid_extension = stream_info.getRequestIDExtension();
+
+  Http::RequestHeaderMapImpl request_headers;
+  Http::ResponseHeaderMapImpl response_headers;
+  rid_extension->set(request_headers, false);
+  rid_extension->set(request_headers, true);
+  rid_extension->setInResponse(response_headers, request_headers);
+  uint64_t out = 123;
+  EXPECT_FALSE(rid_extension->modBy(request_headers, out, 10000));
+  EXPECT_EQ(out, 123);
+  rid_extension->setTraceStatus(request_headers, Http::TraceStatus::Forced);
+  EXPECT_EQ(rid_extension->getTraceStatus(request_headers), Http::TraceStatus::NoTrace);
 }
 
 } // namespace

@@ -37,28 +37,30 @@ XRayHeader parseXRayHeader(const Http::LowerCaseString& header) {
 }
 } // namespace
 
-Driver::Driver(const XRayConfiguration& config, Server::Instance& server)
-    : xray_config_(config), tls_slot_ptr_(server.threadLocal().allocateSlot()) {
+Driver::Driver(const XRayConfiguration& config,
+               Server::Configuration::TracerFactoryContext& context)
+    : xray_config_(config),
+      tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()) {
 
   const std::string daemon_endpoint =
       config.daemon_endpoint_.empty() ? DefaultDaemonEndpoint : config.daemon_endpoint_;
 
   ENVOY_LOG(debug, "send X-Ray generated segments to daemon address on {}", daemon_endpoint);
   sampling_strategy_ = std::make_unique<XRay::LocalizedSamplingStrategy>(
-      xray_config_.sampling_rules_, server.random(), server.timeSource());
+      xray_config_.sampling_rules_, context.serverFactoryContext().random(),
+      context.serverFactoryContext().timeSource());
 
   tls_slot_ptr_->set([this, daemon_endpoint,
-                      &server](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    std::string span_name = xray_config_.segment_name_.empty() ? server.localInfo().clusterName()
-                                                               : xray_config_.segment_name_;
-
+                      &context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     DaemonBrokerPtr broker = std::make_unique<DaemonBrokerImpl>(daemon_endpoint);
-    TracerPtr tracer = std::make_unique<Tracer>(span_name, std::move(broker), server.timeSource());
+    TracerPtr tracer = std::make_unique<Tracer>(xray_config_.segment_name_, std::move(broker),
+                                                context.serverFactoryContext().timeSource());
     return std::make_shared<XRay::Driver::TlsTracer>(std::move(tracer), *this);
   });
 }
 
-Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
+Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
+                                   Http::RequestHeaderMap& request_headers,
                                    const std::string& operation_name, Envoy::SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
   // First thing is to determine whether this request will be sampled or not.
@@ -102,7 +104,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
 
   auto* tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
   if (should_trace.value()) {
-    return tracer->startSpan(xray_config_.segment_name_, operation_name, start_time,
+    return tracer->startSpan(operation_name, start_time,
                              header ? absl::optional<XRayHeader>(xray_header) : absl::nullopt);
   }
 

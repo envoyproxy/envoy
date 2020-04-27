@@ -22,6 +22,15 @@ public:
     return std::regex_match(value.begin(), value.end(), regex_);
   }
 
+  // CompiledMatcher
+  std::string replaceAll(absl::string_view value, absl::string_view substitution) const override {
+    try {
+      return std::regex_replace(std::string(value), regex_, std::string(substitution));
+    } catch (const std::regex_error& e) {
+      return std::string(value);
+    }
+  }
+
 private:
   const std::regex regex_;
 };
@@ -46,6 +55,14 @@ public:
   // CompiledMatcher
   bool match(absl::string_view value) const override {
     return re2::RE2::FullMatch(re2::StringPiece(value.data(), value.size()), regex_);
+  }
+
+  // CompiledMatcher
+  std::string replaceAll(absl::string_view value, absl::string_view substitution) const override {
+    std::string result = std::string(value);
+    re2::RE2::GlobalReplace(&result, regex_,
+                            re2::StringPiece(substitution.data(), substitution.size()));
+    return result;
   }
 
 private:

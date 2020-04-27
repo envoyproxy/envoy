@@ -9,15 +9,16 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
 
-import "udpa/annotations/sensitive.proto";
-
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/sensitive.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "GrpcServiceProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: gRPC services]
 
@@ -221,6 +222,6 @@ message GrpcService {
 
   // Additional metadata to include in streams initiated to the GrpcService.
   // This can be used for scenarios in which additional ad hoc authorization
-  // headers (e.g. `x-foo-bar: baz-key`) are to be injected.
+  // headers (e.g. ``x-foo-bar: baz-key``) are to be injected.
   repeated HeaderValue initial_metadata = 5;
 }

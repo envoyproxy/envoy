@@ -30,6 +30,7 @@ request. The router filter supports the following features:
 * :ref:`Automatic host rewriting <envoy_api_field_route.RouteAction.auto_host_rewrite>` based on
   the DNS name of the selected upstream host.
 * :ref:`Prefix rewriting <envoy_api_field_route.RedirectAction.prefix_rewrite>`.
+* :ref:`Path rewriting using a regular expression and capture groups <envoy_api_field_route.RouteAction.regex_rewrite>`.
 * :ref:`Request retries <arch_overview_http_routing_retry>` specified either via HTTP header or via
   route configuration.
 * Request timeout specified either via :ref:`HTTP

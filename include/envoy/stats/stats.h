@@ -8,6 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/symbol_table.h"
+#include "envoy/stats/tag.h"
 
 #include "absl/strings/string_view.h"
 
@@ -15,7 +16,6 @@ namespace Envoy {
 namespace Stats {
 
 class Allocator;
-struct Tag;
 
 /**
  * General interface for all stats objects.
@@ -42,7 +42,7 @@ public:
   /**
    * Returns a vector of configurable tags to identify this Metric.
    */
-  virtual std::vector<Tag> tags() const PURE;
+  virtual TagVector tags() const PURE;
 
   /**
    * See a more detailed description in tagExtractedStatName(), which is the
@@ -155,6 +155,33 @@ public:
 };
 
 using GaugeSharedPtr = RefcountPtr<Gauge>;
+
+/**
+ * A string, possibly non-ASCII.
+ */
+class TextReadout : public virtual Metric {
+public:
+  // Text readout type is used internally to disambiguate isolated store
+  // constructors. In the future we can extend it to specify text encoding or
+  // some such.
+  enum class Type {
+    Default, // No particular meaning.
+  };
+
+  ~TextReadout() override = default;
+
+  /**
+   * Sets the value of this TextReadout by moving the input |value| to minimize
+   * buffer copies under the lock.
+   */
+  virtual void set(std::string&& value) PURE;
+  /**
+   * @return the copy of this TextReadout value.
+   */
+  virtual std::string value() const PURE;
+};
+
+using TextReadoutSharedPtr = RefcountPtr<TextReadout>;
 
 } // namespace Stats
 } // namespace Envoy

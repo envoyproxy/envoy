@@ -38,7 +38,8 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the rate limit filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(RateLimitFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(RateLimitFilterConfig,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.rate_limit"};
 
 } // namespace RateLimitFilter
 } // namespace HttpFilters

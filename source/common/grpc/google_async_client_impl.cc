@@ -73,7 +73,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              GoogleStubFactory& stub_factory,
                                              Stats::ScopeSharedPtr scope,
                                              const envoy::config::core::v3::GrpcService& config,
-                                             Api::Api& api)
+                                             Api::Api& api, const StatNames& stat_names)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       initial_metadata_(config.initial_metadata()), scope_(scope) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
@@ -83,9 +83,11 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   std::shared_ptr<grpc::Channel> channel = GoogleGrpcUtils::createChannel(config, api);
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
-  stats_.streams_total_ = &scope_->counter("streams_total");
+  // TODO(jmarantz): Capture these names in async_client_manager_impl.cc and
+  // pass in a struct of StatName objects so we don't have to take locks here.
+  stats_.streams_total_ = &scope_->counterFromStatName(stat_names.streams_total_);
   for (uint32_t i = 0; i <= Status::WellKnownGrpcStatus::MaximumKnown; ++i) {
-    stats_.streams_closed_[i] = &scope_->counter(absl::StrCat("streams_closed_", i));
+    stats_.streams_closed_[i] = &scope_->counterFromStatName(stat_names.streams_closed_[i]);
   }
 }
 

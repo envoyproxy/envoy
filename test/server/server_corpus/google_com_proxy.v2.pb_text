@@ -20,7 +20,7 @@ static_resources {
                     fields {
                       key: "name"
                       value {
-                        string_value: "envoy.router"
+                        string_value: "envoy.filters.http.router"
                       }
                     }
                   }

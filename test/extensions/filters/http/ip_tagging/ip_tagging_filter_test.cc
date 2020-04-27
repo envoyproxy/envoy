@@ -45,7 +45,7 @@ ip_tags:
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(yaml, config);
-    config_.reset(new IpTaggingFilterConfig(config, "prefix.", stats_, runtime_));
+    config_ = std::make_shared<IpTaggingFilterConfig>(config, "prefix.", stats_, runtime_);
     filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
@@ -286,6 +286,16 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
   request_headers = {};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
+}
+
+// Test that the deprecated extension name still functions.
+TEST(IpTaggingFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.ip_tagging";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace

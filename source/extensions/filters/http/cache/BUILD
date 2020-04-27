@@ -12,6 +12,21 @@ load(
 
 envoy_package()
 
+envoy_cc_library(
+    name = "cache_filter_lib",
+    srcs = ["cache_filter.cc"],
+    hdrs = ["cache_filter.h"],
+    deps = [
+        ":http_cache_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:macros",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
+    ],
+)
+
 envoy_proto_library(
     name = "key",
     srcs = ["key.proto"],
@@ -48,6 +63,14 @@ envoy_cc_library(
 
 envoy_cc_extension(
     name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream_and_upstream",
     status = "wip",
+    deps = [
+        ":cache_filter_lib",
+        "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
+    ],
 )

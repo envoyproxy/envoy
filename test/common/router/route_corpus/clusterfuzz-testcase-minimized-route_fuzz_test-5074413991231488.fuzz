@@ -1,0 +1,72 @@
+config {
+  virtual_hosts {
+    name: "P"
+    domains: "m"
+    routes {
+      match {
+        path: ""
+      }
+      route {
+        cluster: "i"
+        upgrade_configs {
+        }
+        upgrade_configs {
+          upgrade_type: "5"
+        }
+        upgrade_configs {
+          upgrade_type: "2"
+        }
+        upgrade_configs {
+          upgrade_type: "6"
+        }
+        upgrade_configs {
+          upgrade_type: "m"
+        }
+        upgrade_configs {
+          upgrade_type: "Q"
+        }
+        upgrade_configs {
+          upgrade_type: "\361\214\273\215+\003\0ü#34\360\231\250\222\026"
+        }
+        upgrade_configs {
+          upgrade_type: "i"
+        }
+      }
+    }
+  }
+  virtual_hosts {
+    name: "P"
+    domains: "m"
+    routes {
+      match {
+        path: ""
+      }
+      route {
+        cluster: "i"
+        upgrade_configs {
+        }
+        upgrade_configs {
+          upgrade_type: "5"
+        }
+        upgrade_configs {
+          upgrade_type: "2"
+        }
+        upgrade_configs {
+          upgrade_type: "6"
+        }
+        upgrade_configs {
+          upgrade_type: "m"
+        }
+        upgrade_configs {
+          upgrade_type: "Q"
+        }
+        upgrade_configs {
+          upgrade_type: "\361\214\273\215+\003\001\234\360\231\250\222\026"
+        }
+        upgrade_configs {
+          upgrade_type: "i"
+        }
+      }
+    }
+  }
+}

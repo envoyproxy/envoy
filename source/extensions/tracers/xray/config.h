@@ -21,9 +21,9 @@ public:
   XRayTracerFactory();
 
 private:
-  Tracing::HttpTracerPtr
+  Tracing::HttpTracerSharedPtr
   createHttpTracerTyped(const envoy::config::trace::v3::XRayConfig& proto_config,
-                        Server::Instance& server) override;
+                        Server::Configuration::TracerFactoryContext& context) override;
 };
 
 } // namespace XRay

@@ -110,6 +110,7 @@ envoy_cc_test(
         "//source/common/config:version_converter_lib",
         "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
@@ -134,7 +135,7 @@ envoy_cc_test(
         "//source/common/config:resources_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/protobuf",
-        "//source/common/stats:isolated_store_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
@@ -154,6 +155,7 @@ envoy_cc_test(
     srcs = ["grpc_stream_test.cc"],
     deps = [
         "//source/common/config:grpc_stream_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
@@ -284,6 +286,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/config:utility_lib",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 
@@ -402,6 +405,7 @@ envoy_cc_test(
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/common/crypto:utility_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",

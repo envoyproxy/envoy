@@ -144,7 +144,7 @@ private:
     const Network::Connection* downstreamConnection() const override {
       return wrapped_->downstreamConnection();
     }
-    const Http::HeaderMap* downstreamHeaders() const override {
+    const Http::RequestHeaderMap* downstreamHeaders() const override {
       return wrapped_->downstreamHeaders();
     }
     const HealthyAndDegradedLoad&

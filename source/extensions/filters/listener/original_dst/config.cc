@@ -19,11 +19,13 @@ namespace OriginalDst {
 class OriginalDstConfigFactory : public Server::Configuration::NamedListenerFilterConfigFactory {
 public:
   // NamedListenerFilterConfigFactory
-  Network::ListenerFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::ListenerFactoryContext&) override {
-    return [](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(std::make_unique<OriginalDstFilter>());
+  Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message&,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      Server::Configuration::ListenerFactoryContext&) override {
+    return [listener_filter_matcher](Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(listener_filter_matcher,
+                                     std::make_unique<OriginalDstFilter>());
     };
   }
 
@@ -37,7 +39,8 @@ public:
 /**
  * Static registration for the original dst filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(OriginalDstConfigFactory, Server::Configuration::NamedListenerFilterConfigFactory);
+REGISTER_FACTORY(OriginalDstConfigFactory, Server::Configuration::NamedListenerFilterConfigFactory){
+    "envoy.listener.original_dst"};
 
 } // namespace OriginalDst
 } // namespace ListenerFilters

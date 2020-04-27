@@ -19,7 +19,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   case envoy::config::rbac::v3::Permission::RuleCase::kHeader:
     return std::make_shared<const HeaderMatcher>(permission.header());
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationIp:
-    return std::make_shared<const IPMatcher>(permission.destination_ip(), true);
+    return std::make_shared<const IPMatcher>(permission.destination_ip(),
+                                             IPMatcher::Type::DownstreamLocal);
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPort:
     return std::make_shared<const PortMatcher>(permission.destination_port());
   case envoy::config::rbac::v3::Permission::RuleCase::kAny:
@@ -46,7 +47,14 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAuthenticated:
     return std::make_shared<const AuthenticatedMatcher>(principal.authenticated());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kSourceIp:
-    return std::make_shared<const IPMatcher>(principal.source_ip(), false);
+    return std::make_shared<const IPMatcher>(principal.source_ip(),
+                                             IPMatcher::Type::ConnectionRemote);
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kDirectRemoteIp:
+    return std::make_shared<const IPMatcher>(principal.direct_remote_ip(),
+                                             IPMatcher::Type::DownstreamDirectRemote);
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kRemoteIp:
+    return std::make_shared<const IPMatcher>(principal.remote_ip(),
+                                             IPMatcher::Type::DownstreamRemote);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kHeader:
     return std::make_shared<const HeaderMatcher>(principal.header());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAny:
@@ -75,7 +83,7 @@ AndMatcher::AndMatcher(const envoy::config::rbac::v3::Principal::Set& set) {
 }
 
 bool AndMatcher::matches(const Network::Connection& connection,
-                         const Envoy::Http::HeaderMap& headers,
+                         const Envoy::Http::RequestHeaderMap& headers,
                          const StreamInfo::StreamInfo& info) const {
   for (const auto& matcher : matchers_) {
     if (!matcher->matches(connection, headers, info)) {
@@ -99,7 +107,7 @@ OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::P
 }
 
 bool OrMatcher::matches(const Network::Connection& connection,
-                        const Envoy::Http::HeaderMap& headers,
+                        const Envoy::Http::RequestHeaderMap& headers,
                         const StreamInfo::StreamInfo& info) const {
   for (const auto& matcher : matchers_) {
     if (matcher->matches(connection, headers, info)) {
@@ -111,32 +119,47 @@ bool OrMatcher::matches(const Network::Connection& connection,
 }
 
 bool NotMatcher::matches(const Network::Connection& connection,
-                         const Envoy::Http::HeaderMap& headers,
+                         const Envoy::Http::RequestHeaderMap& headers,
                          const StreamInfo::StreamInfo& info) const {
   return !matcher_->matches(connection, headers, info);
 }
 
-bool HeaderMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap& headers,
+bool HeaderMatcher::matches(const Network::Connection&,
+                            const Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo&) const {
   return Envoy::Http::HeaderUtility::matchHeaders(headers, header_);
 }
 
-bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::HeaderMap&,
-                        const StreamInfo::StreamInfo&) const {
-  const Envoy::Network::Address::InstanceConstSharedPtr& ip =
-      destination_ ? connection.localAddress() : connection.remoteAddress();
-
+bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,
+                        const StreamInfo::StreamInfo& info) const {
+  Envoy::Network::Address::InstanceConstSharedPtr ip;
+  switch (type_) {
+  case ConnectionRemote:
+    ip = connection.remoteAddress();
+    break;
+  case DownstreamLocal:
+    ip = info.downstreamLocalAddress();
+    break;
+  case DownstreamDirectRemote:
+    ip = info.downstreamDirectRemoteAddress();
+    break;
+  case DownstreamRemote:
+    ip = info.downstreamRemoteAddress();
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
   return range_.isInRange(*ip.get());
 }
 
-bool PortMatcher::matches(const Network::Connection& connection, const Envoy::Http::HeaderMap&,
-                          const StreamInfo::StreamInfo&) const {
-  const Envoy::Network::Address::Ip* ip = connection.localAddress().get()->ip();
+bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+                          const StreamInfo::StreamInfo& info) const {
+  const Envoy::Network::Address::Ip* ip = info.downstreamLocalAddress().get()->ip();
   return ip && ip->port() == port_;
 }
 
 bool AuthenticatedMatcher::matches(const Network::Connection& connection,
-                                   const Envoy::Http::HeaderMap&,
+                                   const Envoy::Http::RequestHeaderMap&,
                                    const StreamInfo::StreamInfo&) const {
   const auto& ssl = connection.ssl();
   if (!ssl) { // connection was not authenticated
@@ -164,13 +187,13 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
   return matcher_.value().match(ssl->subjectPeerCertificate());
 }
 
-bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap&,
+bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                               const StreamInfo::StreamInfo& info) const {
   return matcher_.match(info.dynamicMetadata());
 }
 
 bool PolicyMatcher::matches(const Network::Connection& connection,
-                            const Envoy::Http::HeaderMap& headers,
+                            const Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& info) const {
   return permissions_.matches(connection, headers, info) &&
          principals_.matches(connection, headers, info) &&
@@ -178,12 +201,12 @@ bool PolicyMatcher::matches(const Network::Connection& connection,
 }
 
 bool RequestedServerNameMatcher::matches(const Network::Connection& connection,
-                                         const Envoy::Http::HeaderMap&,
+                                         const Envoy::Http::RequestHeaderMap&,
                                          const StreamInfo::StreamInfo&) const {
   return match(connection.requestedServerName());
 }
 
-bool PathMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap& headers,
+bool PathMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo&) const {
   if (headers.Path() == nullptr) {
     return false;

@@ -55,7 +55,7 @@ public:
                      bool allow_incomplete_streams)
       : FakeUpstream(address, type, time_system),
         allow_incomplete_streams_(allow_incomplete_streams),
-        response_headers_(std::make_unique<Http::TestHeaderMapImpl>(
+        response_headers_(std::make_unique<Http::TestResponseHeaderMapImpl>(
             Http::TestHeaderMapImpl({{":status", "200"}}))) {}
 
   AutonomousUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
@@ -63,7 +63,7 @@ public:
                      Event::TestTimeSystem& time_system, bool allow_incomplete_streams)
       : FakeUpstream(std::move(transport_socket_factory), port, type, version, time_system),
         allow_incomplete_streams_(allow_incomplete_streams),
-        response_headers_(std::make_unique<Http::TestHeaderMapImpl>(
+        response_headers_(std::make_unique<Http::TestResponseHeaderMapImpl>(
             Http::TestHeaderMapImpl({{":status", "200"}}))) {}
 
   ~AutonomousUpstream() override;
@@ -75,15 +75,15 @@ public:
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
   void setLastRequestHeaders(const Http::HeaderMap& headers);
-  std::unique_ptr<Http::TestHeaderMapImpl> lastRequestHeaders();
-  void setResponseHeaders(std::unique_ptr<Http::TestHeaderMapImpl>&& response_headers);
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> lastRequestHeaders();
+  void setResponseHeaders(std::unique_ptr<Http::TestResponseHeaderMapImpl>&& response_headers);
   Http::TestHeaderMapImpl responseHeaders();
   const bool allow_incomplete_streams_{false};
 
 private:
   Thread::MutexBasicLockable headers_lock_;
-  std::unique_ptr<Http::TestHeaderMapImpl> last_request_headers_;
-  std::unique_ptr<Http::TestHeaderMapImpl> response_headers_;
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> last_request_headers_;
+  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers_;
   std::vector<AutonomousHttpConnectionPtr> http_connections_;
   std::vector<SharedConnectionWrapperPtr> shared_connections_;
 };

@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "//source/common/compressor:compressor_lib",
         "//source/common/decompressor:decompressor_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/http/gzip:config",
         "//source/extensions/filters/http/gzip:gzip_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",

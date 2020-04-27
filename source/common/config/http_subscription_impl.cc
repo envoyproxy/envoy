@@ -7,6 +7,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/macros.h"
+#include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/http/headers.h"
@@ -86,6 +87,7 @@ void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) 
   try {
     callbacks_.onConfigUpdate(message.resources(), message.version_info());
     request_.set_version_info(message.version_info());
+    stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
     stats_.update_success_.inc();
   } catch (const EnvoyException& e) {

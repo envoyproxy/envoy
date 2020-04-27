@@ -13,6 +13,7 @@ filters.
   dubbo_proxy_filter
   client_ssl_auth_filter
   echo_filter
+  direct_response_filter
   ext_authz_filter
   kafka_broker_filter
   local_rate_limit_filter
@@ -24,4 +25,5 @@ filters.
   tcp_proxy_filter
   thrift_proxy_filter
   sni_cluster_filter
+  sni_dynamic_forward_proxy_filter
   zookeeper_proxy_filter

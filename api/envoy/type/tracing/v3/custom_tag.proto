@@ -4,13 +4,14 @@ package envoy.type.tracing.v3;
 
 import "envoy/type/metadata/v3/metadata.proto";
 
+import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.tracing.v3";
 option java_outer_classname = "CustomTagProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Custom Tag]
 
@@ -48,7 +49,8 @@ message CustomTag {
         "envoy.type.tracing.v2.CustomTag.Header";
 
     // Header name to obtain the value to populate the tag value.
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1
+        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     // When the header does not exist,
     // the tag value will be populated with this default value if specified,

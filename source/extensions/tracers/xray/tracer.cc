@@ -89,23 +89,16 @@ void Span::finishSpan() {
     s.mutable_http()->mutable_response()->insert(KeyValue{item.first, item.second});
   }
 
-  // TODO(marcomagdy): test how expensive this validation is. Might be worth turning off in
-  // optimized builds..
-  MessageUtil::validate(s, ProtobufMessage::getStrictValidationVisitor());
-  Protobuf::util::JsonPrintOptions json_options;
-  json_options.preserve_proto_field_names = true;
-  std::string json;
-  const auto status = Protobuf::util::MessageToJsonString(s, &json, json_options);
-  ASSERT(status.ok());
+  const std::string json = MessageUtil::getJsonStringFromMessage(
+      s, false /* pretty_print  */, false /* always_print_primitive_fields */);
+
   broker_.send(json);
 } // namespace XRay
 
-void Span::injectContext(Http::HeaderMap& request_headers) {
+void Span::injectContext(Http::RequestHeaderMap& request_headers) {
   const std::string xray_header_value =
-      fmt::format("root={};parent={};sampled={}", traceId(), Id(), sampled() ? "1" : "0");
-
-  // Set the XRay header into envoy header map for visibility to upstream
-  request_headers.addCopy(Http::LowerCaseString(XRayTraceHeader), xray_header_value);
+      fmt::format("Root={};Parent={};Sampled={}", traceId(), Id(), sampled() ? "1" : "0");
+  request_headers.setCopy(Http::LowerCaseString(XRayTraceHeader), xray_header_value);
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& operation_name,
@@ -113,7 +106,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& ope
   auto child_span = std::make_unique<XRay::Span>(time_source_, broker_);
   const auto ticks = time_source_.monotonicTime().time_since_epoch().count();
   child_span->setId(ticks);
-  child_span->setName(operation_name);
+  child_span->setName(name());
   child_span->setOperation(operation_name);
   child_span->setStartTime(start_time);
   child_span->setParentId(Id());
@@ -122,16 +115,18 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& ope
   return child_span;
 }
 
-Tracing::SpanPtr Tracer::startSpan(const std::string& span_name, const std::string& operation_name,
-                                   Envoy::SystemTime start_time,
+Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, Envoy::SystemTime start_time,
                                    const absl::optional<XRayHeader>& xray_header) {
 
   const auto ticks = time_source_.monotonicTime().time_since_epoch().count();
   auto span_ptr = std::make_unique<XRay::Span>(time_source_, *daemon_broker_);
   span_ptr->setId(ticks);
-  span_ptr->setName(span_name);
+  span_ptr->setName(segment_name_);
   span_ptr->setOperation(operation_name);
+  // Even though we have a TimeSource member in the tracer, we assume the start_time argument has a
+  // more precise value than calling the systemTime() at this point in time.
   span_ptr->setStartTime(start_time);
+
   if (xray_header) { // there's a previous span that this span should be based-on
     span_ptr->setParentId(xray_header->parent_id_);
     span_ptr->setTraceId(xray_header->trace_id_);
@@ -155,7 +150,7 @@ XRay::SpanPtr Tracer::createNonSampledSpan() const {
   auto span_ptr = std::make_unique<XRay::Span>(time_source_, *daemon_broker_);
   const auto ticks = time_source_.monotonicTime().time_since_epoch().count();
   span_ptr->setId(ticks);
-  span_ptr->setName("NotSampled");
+  span_ptr->setName(segment_name_);
   span_ptr->setTraceId(generateTraceId(time_source_.systemTime()));
   span_ptr->setSampled(false);
   return span_ptr;

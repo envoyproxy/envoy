@@ -101,12 +101,12 @@ protected:
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
-    cluster_.reset(new RedisCluster(
+    cluster_ = std::make_shared<RedisCluster>(
         cluster_config,
         TestUtility::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
             config),
         *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false,
-        cluster_callback_));
+        cluster_callback_);
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
     pool_callbacks_ = &cluster_->redis_discovery_session_;
@@ -146,11 +146,13 @@ protected:
 
   void expectResolveDiscovery(Network::DnsLookupFamily dns_lookup_family,
                               const std::string& expected_address,
-                              const std::list<std::string>& resolved_addresses) {
+                              const std::list<std::string>& resolved_addresses,
+                              Network::DnsResolver::ResolutionStatus status =
+                                  Network::DnsResolver::ResolutionStatus::Success) {
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, dns_lookup_family, _))
         .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                              Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-          cb(TestUtility::makeDnsResponse(resolved_addresses));
+          cb(status, TestUtility::makeDnsResponse(resolved_addresses));
           return nullptr;
         }));
   }
@@ -631,7 +633,8 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         std::list<std::string> address_pair = std::get<2>(GetParam());
-        cb(TestUtility::makeDnsResponse(address_pair));
+        cb(Network::DnsResolver::ResolutionStatus::Success,
+           TestUtility::makeDnsResponse(address_pair));
         EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
         expectClusterSlotResponse(
             singleSlotMasterReplica(address_pair.front(), address_pair.back(), 22120));
@@ -651,6 +654,31 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
   const std::list<std::string> resolved_addresses{};
   EXPECT_CALL(*dns_timer, enableTimer(_, _));
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1U, cluster_->info()->stats().update_empty_.value());
+
+  // Does not recreate the timer on subsequent DNS resolve calls.
+  EXPECT_CALL(*dns_timer, enableTimer(_, _));
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  dns_timer->invokeCallback();
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2U, cluster_->info()->stats().update_empty_.value());
+}
+
+TEST_F(RedisClusterTest, FailedDnsResponse) {
+  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  setupFromV2Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{};
+  EXPECT_CALL(*dns_timer, enableTimer(_, _));
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses,
+                         Network::DnsResolver::ResolutionStatus::Failure);
 
   EXPECT_CALL(initialized_, ready());
   cluster_->initialize([&]() -> void { initialized_.ready(); });
@@ -887,14 +915,16 @@ TEST_F(RedisClusterTest, MultipleDnsDiscovery) {
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", _, _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})));
+        cb(Network::DnsResolver::ResolutionStatus::Success,
+           TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})));
         return nullptr;
       }));
 
   EXPECT_CALL(*dns_resolver_, resolve("foo1.bar.com", _, _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.3", "127.0.0.4"})));
+        cb(Network::DnsResolver::ResolutionStatus::Success,
+           TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.3", "127.0.0.4"})));
         return nullptr;
       }));
 

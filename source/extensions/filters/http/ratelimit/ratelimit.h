@@ -117,11 +117,11 @@ public:
 
   // RateLimit::RequestCallbacks
   void complete(Filters::Common::RateLimit::LimitStatus status,
-                Http::HeaderMapPtr&& response_headers_to_add,
-                Http::HeaderMapPtr&& request_headers_to_add) override;
+                Http::ResponseHeaderMapPtr&& response_headers_to_add,
+                Http::RequestHeaderMapPtr&& request_headers_to_add) override;
 
 private:
-  void initiateCall(const Http::HeaderMap& headers);
+  void initiateCall(const Http::RequestHeaderMap& headers);
   void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                                     std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                     const Router::RouteEntry* route_entry,
@@ -139,8 +139,8 @@ private:
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
-  Http::HeaderMapPtr response_headers_to_add_;
-  Http::HeaderMap* request_headers_{};
+  Http::ResponseHeaderMapPtr response_headers_to_add_;
+  Http::RequestHeaderMap* request_headers_{};
 };
 
 } // namespace RateLimitFilter

@@ -90,10 +90,18 @@ private:
 // and symbol strings as production.
 class TestStore : public IsolatedStoreImpl {
 public:
-  TestStore() {}
+  TestStore() = default;
 
   // Constructs a store using a symbol table, allowing for explicit sharing.
   explicit TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
+
+  Counter& counter(const std::string& name) { return counterFromString(name); }
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) {
+    return gaugeFromString(name, import_mode);
+  }
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) {
+    return histogramFromString(name, unit);
+  }
 
   // Override the Stats::Store methods for name-based lookup of stats, to use
   // and update the string-maps in this class. Note that IsolatedStoreImpl
@@ -101,12 +109,15 @@ public:
   // to keep the maps up-to-date.
   //
   // Stats::Scope
-  Counter& counter(const std::string& name) override;
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override;
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override;
-  Counter& counterFromStatName(StatName name) override;
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
+  Counter& counterFromString(const std::string& name) override;
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override;
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                           Histogram::Unit unit) override;
 
   // New APIs available for tests.
   CounterOptConstRef findCounterByString(const std::string& name) const;
@@ -154,9 +165,14 @@ private:
 
 class SymbolTableCreatorTestPeer {
 public:
-  static void setUseFakeSymbolTables(bool use_fakes) {
+  ~SymbolTableCreatorTestPeer() { SymbolTableCreator::setUseFakeSymbolTables(save_use_fakes_); }
+
+  void setUseFakeSymbolTables(bool use_fakes) {
     SymbolTableCreator::setUseFakeSymbolTables(use_fakes);
   }
+
+private:
+  const bool save_use_fakes_{SymbolTableCreator::useFakeSymbolTables()};
 };
 
 // Serializes a number into a uint8_t array, and check that it de-serializes to

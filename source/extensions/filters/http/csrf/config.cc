@@ -31,7 +31,8 @@ CsrfFilterFactory::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the CSRF filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(CsrfFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(CsrfFilterFactory,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.csrf"};
 
 } // namespace Csrf
 } // namespace HttpFilters

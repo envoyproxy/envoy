@@ -2,17 +2,19 @@ syntax = "proto3";
 
 package envoy.api.v2.core;
 
-import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/core/socket_option.proto";
 
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "AddressProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Network addresses]
 
@@ -82,7 +84,7 @@ message TcpKeepalive {
 
   // The number of seconds a connection needs to be idle before keep-alive probes
   // start being sent. Default is to use the OS level configuration (unless
-  // overridden, Linux defaults to 7200s (ie 2 hours.)
+  // overridden, Linux defaults to 7200s (i.e., 2 hours.)
   google.protobuf.UInt32Value keepalive_time = 2;
 
   // The number of seconds between keep-alive probes. Default is to use the OS

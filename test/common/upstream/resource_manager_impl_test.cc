@@ -69,7 +69,8 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   EXPECT_TRUE(resource_manager.connectionPools().canCreate());
 
   // Verify retry budgets override max_retries.
-  EXPECT_CALL(runtime.snapshot_, exists(_)).WillRepeatedly(Return(true));
+  std::string value;
+  EXPECT_CALL(runtime.snapshot_, get(_)).WillRepeatedly(Return(value));
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.runtime_resource_manager_test."
                                             "default.retry_budget.min_retry_concurrency",
                                             _))

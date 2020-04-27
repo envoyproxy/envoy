@@ -332,38 +332,6 @@ TEST(StringMatcher, SafeRegexValueIgnoreCase) {
                             "ignore_case has no effect for safe_regex.");
 }
 
-TEST(LowerCaseStringMatcher, MatchExactValue) {
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_exact("Foo");
-
-  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo"));
-  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo"));
-}
-
-TEST(LowerCaseStringMatcher, MatchPrefixValue) {
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_prefix("Foo.");
-
-  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
-  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo."));
-}
-
-TEST(LowerCaseStringMatcher, MatchSuffixValue) {
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_suffix(".Bar");
-
-  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
-  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match(".Bar"));
-}
-
-TEST(LowerCaseStringMatcher, MatchRegexValue) {
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_hidden_envoy_deprecated_regex("Foo.*");
-
-  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
-  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo.Bar"));
-}
-
 TEST(PathMatcher, MatchExactPath) {
   const auto matcher = Envoy::Matchers::PathMatcher::createExact("/exact", false);
 

@@ -45,7 +45,7 @@ namespace Envoy {
  * re-raising the fatal signal with default handler.
  *
  * It is recommended that this object be instantiated at the highest possible
- * scope, eg, in main(). This enables fatal signal handling for almost all code
+ * scope, e.g., in main(). This enables fatal signal handling for almost all code
  * executed. Because of the save-and-restore behavior it is possible for
  * SignalAction to be used at both wider and tighter scopes without issue.
  */

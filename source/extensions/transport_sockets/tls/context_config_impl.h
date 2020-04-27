@@ -86,12 +86,12 @@ private:
       default_cvc_;
   std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
   // Handle for TLS certificate dynamic secret callback.
-  Common::CallbackHandle* tc_update_callback_handle_{};
+  Envoy::Common::CallbackHandle* tc_update_callback_handle_{};
   Secret::CertificateValidationContextConfigProviderSharedPtr
       certificate_validation_context_provider_;
   // Handle for certificate validation context dynamic secret callback.
-  Common::CallbackHandle* cvc_update_callback_handle_{};
-  Common::CallbackHandle* cvc_validation_callback_handle_{};
+  Envoy::Common::CallbackHandle* cvc_update_callback_handle_{};
+  Envoy::Common::CallbackHandle* cvc_validation_callback_handle_{};
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 };
@@ -147,6 +147,9 @@ public:
   }
 
   void setSecretUpdateCallback(std::function<void()> callback) override;
+  bool disableStatelessSessionResumption() const override {
+    return disable_stateless_session_resumption_;
+  }
 
 private:
   static const unsigned DEFAULT_MIN_VERSION;
@@ -157,14 +160,15 @@ private:
   const bool require_client_certificate_;
   std::vector<SessionTicketKey> session_ticket_keys_;
   const Secret::TlsSessionTicketKeysConfigProviderSharedPtr session_ticket_keys_provider_;
-  Common::CallbackHandle* stk_update_callback_handle_{};
-  Common::CallbackHandle* stk_validation_callback_handle_{};
+  Envoy::Common::CallbackHandle* stk_update_callback_handle_{};
+  Envoy::Common::CallbackHandle* stk_validation_callback_handle_{};
 
   std::vector<ServerContextConfig::SessionTicketKey> getSessionTicketKeys(
       const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys& keys);
   ServerContextConfig::SessionTicketKey getSessionTicketKey(const std::string& key_data);
 
   absl::optional<std::chrono::seconds> session_timeout_;
+  const bool disable_stateless_session_resumption_;
 };
 
 } // namespace Tls

@@ -85,7 +85,7 @@ public:
 
   void expectErrorResponse(const Http::Code& expected_code, const std::string& expected_message) {
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-        .WillOnce(Invoke([=](Http::HeaderMap& headers, bool) {
+        .WillOnce(Invoke([=](Http::ResponseHeaderMap& headers, bool) {
           uint64_t code;
           ASSERT_TRUE(absl::SimpleAtoi(headers.Status()->value().getStringView(), &code));
           EXPECT_EQ(static_cast<uint64_t>(expected_code), code);
@@ -95,7 +95,7 @@ public:
             [=](Buffer::Instance& data, bool) { EXPECT_EQ(expected_message, data.toString()); }));
   }
 
-  void expectRequiredGrpcUpstreamHeaders(const Http::HeaderMap& request_headers) {
+  void expectRequiredGrpcUpstreamHeaders(const Http::RequestHeaderMap& request_headers) {
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
               request_headers.ContentType()->value().getStringView());
     // Ensure we never send content-length upstream
@@ -219,13 +219,14 @@ TEST_P(GrpcWebFilterTest, StatsNormalResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(1UL,
+            decoder_callbacks_.clusterInfo()
+                ->statsScope()
+                .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.success")
+                .value());
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.success")
-                     .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
 }
 
@@ -240,13 +241,14 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "1"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(1UL,
+            decoder_callbacks_.clusterInfo()
+                ->statsScope()
+                .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.failure")
+                .value());
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.failure")
-                     .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
 }
 
@@ -298,8 +300,8 @@ TEST_P(GrpcWebFilterTest, Unary) {
   request_trailers.addCopy(Http::Headers::get().GrpcStatus, "0");
   request_trailers.addCopy(Http::Headers::get().GrpcMessage, "ok");
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
-  EXPECT_EQ("0", request_trailers.GrpcStatus()->value().getStringView());
-  EXPECT_EQ("ok", request_trailers.GrpcMessage()->value().getStringView());
+  EXPECT_EQ("0", request_trailers.get_("grpc-status"));
+  EXPECT_EQ("ok", request_trailers.get_("grpc-message"));
 
   // Tests response headers.
   Http::TestResponseHeaderMapImpl response_headers;

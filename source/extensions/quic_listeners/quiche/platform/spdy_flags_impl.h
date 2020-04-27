@@ -15,3 +15,7 @@
 #define SPDY_CODE_COUNT_N_IMPL(flag, instance, total)                                              \
   do {                                                                                             \
   } while (0)
+
+#define SPDY_CODE_COUNT_IMPL(name)                                                                 \
+  do {                                                                                             \
+  } while (0)

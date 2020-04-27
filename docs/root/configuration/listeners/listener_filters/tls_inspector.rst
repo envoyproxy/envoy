@@ -16,7 +16,7 @@ of a :ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>`.
 
 * :ref:`SNI <faq_how_to_setup_sni>`
 * :ref:`v2 API reference <envoy_api_field_listener.ListenerFilter.name>`
-* This filter should be configured with the name *envoy.listener.tls_inspector*.
+* This filter should be configured with the name *envoy.filters.listener.tls_inspector*.
 
 Example
 -------
@@ -26,7 +26,7 @@ A sample filter configuration could be:
 .. code-block:: yaml
 
   listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       typed_config: {}
 
 Statistics

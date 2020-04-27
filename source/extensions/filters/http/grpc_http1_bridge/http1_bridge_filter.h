@@ -47,18 +47,18 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-  bool doStatTracking() const { return request_names_.has_value(); }
+  bool doStatTracking() const { return request_stat_names_.has_value(); }
 
 private:
-  void chargeStat(const Http::HeaderMap& headers);
-  void setupStatTracking(const Http::HeaderMap& headers);
+  void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
+  void setupStatTracking(const Http::RequestHeaderMap& headers);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
-  Http::HeaderMap* response_headers_{};
+  Http::ResponseHeaderMap* response_headers_{};
   bool do_bridging_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  absl::optional<Grpc::Context::RequestNames> request_names_;
+  absl::optional<Grpc::Context::RequestStatNames> request_stat_names_;
   Grpc::Context& context_;
 };
 

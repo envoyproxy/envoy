@@ -22,7 +22,8 @@ Http::FilterFactoryCb CorsFilterFactory::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the cors filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(CorsFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(CorsFilterFactory,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.cors"};
 
 } // namespace Cors
 } // namespace HttpFilters

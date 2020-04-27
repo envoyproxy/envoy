@@ -19,7 +19,9 @@ public:
               const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
               const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
               const Network::TransportSocketOptionsSharedPtr& override_transport_socket_options)
-      : HostImpl(cluster, hostname, address, lb_endpoint.metadata(),
+      : HostImpl(cluster, hostname, address,
+                 // TODO(zyfjeff): Created through metadata shared pool
+                 std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
                  lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
                  lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
                  lb_endpoint.health_status()),
@@ -74,12 +76,8 @@ public:
   // Upstream:HostDescription
   bool canary() const override { return logical_host_->canary(); }
   void canary(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  const std::shared_ptr<envoy::config::core::v3::Metadata> metadata() const override {
-    return logical_host_->metadata();
-  }
-  void metadata(const envoy::config::core::v3::Metadata&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
+  void metadata(MetadataConstSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return logical_host_->transportSocketFactory();
@@ -90,6 +88,9 @@ public:
     return logical_host_->outlierDetector();
   }
   HostStats& stats() const override { return logical_host_->stats(); }
+  const std::string& hostnameForHealthChecks() const override {
+    return logical_host_->hostnameForHealthChecks();
+  }
   const std::string& hostname() const override { return logical_host_->hostname(); }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const envoy::config::core::v3::Locality& locality() const override {

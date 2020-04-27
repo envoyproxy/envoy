@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/symbol_table.h"
+#include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
 
@@ -16,12 +17,14 @@ namespace Stats {
 class Counter;
 class Gauge;
 class Histogram;
-class Scope;
 class NullGaugeImpl;
+class Scope;
+class TextReadout;
 
 using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>;
 using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;
 using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogram>>;
+using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
 using ScopePtr = std::unique_ptr<Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
@@ -47,24 +50,50 @@ public:
   virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
 
   /**
+   * Creates a Counter from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterFromStatName(StatName name) PURE;
+  Counter& counterFromStatName(const StatName& name) {
+    return counterFromStatNameWithTags(name, absl::nullopt);
+  }
+  /**
+   * Creates a Counter from the stat name and tags. If tags are not provided, tag extraction
+   * will be performed on the name.
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @param tags optionally specified tags.
+   * @return a counter within the scope's namespace.
+   */
+  virtual Counter& counterFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptConstRef tags) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
    * @param name The name, expressed as a string.
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counter(const std::string& name) PURE;
+  virtual Counter& counterFromString(const std::string& name) PURE;
 
   /**
+   * Creates a Gauge from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) PURE;
+  Gauge& gaugeFromStatName(const StatName& name, Gauge::ImportMode import_mode) {
+    return gaugeFromStatNameWithTags(name, absl::nullopt, import_mode);
+  }
+
+  /**
+   * Creates a Gauge from the stat name and tags. If tags are not provided, tag extraction
+   * will be performed on the name.
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @param tags optionally specified tags.
+   * @param import_mode Whether hot-restart should accumulate this value.
+   * @return a gauge within the scope's namespace.
+   */
+  virtual Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                           Gauge::ImportMode import_mode) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use gaugeFromStatName.
@@ -72,7 +101,7 @@ public:
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) PURE;
+  virtual Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) PURE;
 
   /**
    * @return a null gauge within the scope's namespace.
@@ -80,11 +109,26 @@ public:
   virtual NullGaugeImpl& nullGauge(const std::string& name) PURE;
 
   /**
+   * Creates a Histogram from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) PURE;
+  Histogram& histogramFromStatName(const StatName& name, Histogram::Unit unit) {
+    return histogramFromStatNameWithTags(name, absl::nullopt, unit);
+  }
+
+  /**
+   * Creates a Histogram from the stat name and tags. If tags are not provided, tag extraction
+   * will be performed on the name.
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @param tags optionally specified tags.
+   * @param unit The unit of measurement.
+   * @return a histogram within the scope's namespace with a particular value type.
+   */
+  virtual Histogram& histogramFromStatNameWithTags(const StatName& name,
+                                                   StatNameTagVectorOptConstRef tags,
+                                                   Histogram::Unit unit) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use histogramFromStatName.
@@ -92,7 +136,33 @@ public:
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogram(const std::string& name, Histogram::Unit unit) PURE;
+  virtual Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) PURE;
+
+  /**
+   * Creates a TextReadout from the stat name. Tag extraction will be performed on the name.
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @return a text readout within the scope's namespace.
+   */
+  TextReadout& textReadoutFromStatName(const StatName& name) {
+    return textReadoutFromStatNameWithTags(name, absl::nullopt);
+  }
+
+  /**
+   * Creates a TextReadout from the stat name and tags. If tags are not provided, tag extraction
+   * will be performed on the name.
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @param tags optionally specified tags.
+   * @return a text readout within the scope's namespace.
+   */
+  virtual TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                                       StatNameTagVectorOptConstRef tags) PURE;
+
+  /**
+   * TODO(#6667): this variant is deprecated: use textReadoutFromStatName.
+   * @param name The name, expressed as a string.
+   * @return a text readout within the scope's namespace.
+   */
+  virtual TextReadout& textReadoutFromString(const std::string& name) PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
@@ -112,6 +182,12 @@ public:
    * exists.
    */
   virtual HistogramOptConstRef findHistogram(StatName name) const PURE;
+
+  /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a reference to a text readout within the scope's namespace, if it exists.
+   */
+  virtual TextReadoutOptConstRef findTextReadout(StatName name) const PURE;
 
   /**
    * @return a reference to the symbol table.

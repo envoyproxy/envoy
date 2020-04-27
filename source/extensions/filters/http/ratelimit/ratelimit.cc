@@ -25,7 +25,7 @@ struct RcDetailsValues {
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
-void Filter::initiateCall(const Http::HeaderMap& headers) {
+void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   const bool is_internal_request = Http::HeaderUtility::isEnvoyInternalRequest(headers);
   if ((is_internal_request && config_->requestType() == FilterRequestType::External) ||
       (!is_internal_request && config_->requestType() == FilterRequestType::Internal)) {
@@ -125,8 +125,8 @@ void Filter::onDestroy() {
 }
 
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
-                      Http::HeaderMapPtr&& response_headers_to_add,
-                      Http::HeaderMapPtr&& request_headers_to_add) {
+                      Http::ResponseHeaderMapPtr&& response_headers_to_add,
+                      Http::RequestHeaderMapPtr&& request_headers_to_add) {
   state_ = State::Complete;
   response_headers_to_add_ = std::move(response_headers_to_add);
   Http::HeaderMapPtr req_headers_to_add = std::move(request_headers_to_add);
@@ -154,7 +154,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            false};
     httpContext().codeStats().chargeResponseStat(info);
     if (response_headers_to_add_ == nullptr) {
-      response_headers_to_add_ = std::make_unique<Http::HeaderMapImpl>();
+      response_headers_to_add_ = std::make_unique<Http::ResponseHeaderMapImpl>();
     }
     response_headers_to_add_->setReferenceEnvoyRateLimited(
         Http::Headers::get().EnvoyRateLimitedValues.True);

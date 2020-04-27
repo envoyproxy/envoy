@@ -6,6 +6,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/stats/tag.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/hash.h"
@@ -14,6 +15,7 @@
 #include "common/stats/histogram_impl.h"
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
+#include "common/stats/null_text_readout.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
@@ -31,9 +33,8 @@ namespace Stats {
  */
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
-  ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
-                           const std::string& tag_extracted_name, const std::vector<Tag>& tags,
-                           SymbolTable& symbol_table);
+  ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit, StatName tag_extracted_name,
+                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table);
   ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
@@ -80,7 +81,7 @@ class TlsScope;
 class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent, TlsScope& tls_scope,
-                      absl::string_view tag_extracted_name, const std::vector<Tag>& tags);
+                      StatName tag_extracted_name, const StatNameTagVector& stat_name_tags);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
@@ -142,6 +143,7 @@ public:
   /**
    * @return a ThreadLocalHistogram within the scope's namespace.
    * @param name name of the histogram with scope prefix attached.
+   * @param parent the parent histogram.
    */
   virtual Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) PURE;
 };
@@ -158,25 +160,37 @@ public:
   ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
-  Counter& counterFromStatName(StatName name) override {
-    return default_scope_->counterFromStatName(name);
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override {
+    return default_scope_->counterFromStatNameWithTags(name, tags);
   }
-  Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
+  Counter& counterFromString(const std::string& name) override {
+    return default_scope_->counterFromString(name);
+  }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    return default_scope_->gaugeFromStatName(name, import_mode);
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   Gauge::ImportMode import_mode) override {
+    return default_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
   }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
-    return default_scope_->gauge(name, import_mode);
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
+    return default_scope_->gaugeFromString(name, import_mode);
   }
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
-    return default_scope_->histogramFromStatName(name, unit);
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                           Histogram::Unit unit) override {
+    return default_scope_->histogramFromStatNameWithTags(name, tags, unit);
   }
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
-    return default_scope_->histogram(name, unit);
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
+    return default_scope_->histogramFromString(name, unit);
+  }
+  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptConstRef tags) override {
+    return default_scope_->textReadoutFromStatNameWithTags(name, tags);
+  }
+  TextReadout& textReadoutFromString(const std::string& name) override {
+    return default_scope_->textReadoutFromString(name);
   }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
@@ -215,9 +229,22 @@ public:
     }
     return absl::nullopt;
   }
+  TextReadoutOptConstRef findTextReadout(StatName name) const override {
+    TextReadoutOptConstRef found_text_readout;
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      found_text_readout = scope->findTextReadout(name);
+      if (found_text_readout.has_value()) {
+        return found_text_readout;
+      }
+    }
+    return absl::nullopt;
+  }
+
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
+  std::vector<TextReadoutSharedPtr> textReadouts() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
 
   // Stats::StoreRoot
@@ -240,12 +267,13 @@ private:
   template <class Stat> using StatRefMap = StatNameHashMap<std::reference_wrapper<Stat>>;
 
   struct TlsCacheEntry {
-    // The counters and gauges in the TLS cache are stored by reference,
+    // The counters, gauges and text readouts in the TLS cache are stored by reference,
     // depending on the CentralCache for backing store. This avoids a potential
     // contention-storm when destructing a scope, as the counter/gauge ref-count
     // decrement in allocator_impl.cc needs to hold the single allocator mutex.
     StatRefMap<Counter> counters_;
     StatRefMap<Gauge> gauges_;
+    StatRefMap<TextReadout> text_readouts_;
 
     // The histogram objects are not shared with the central cache, and don't
     // require taking a lock when decrementing their ref-count.
@@ -268,6 +296,7 @@ private:
     StatNameHashMap<CounterSharedPtr> counters_;
     StatNameHashMap<GaugeSharedPtr> gauges_;
     StatNameHashMap<ParentHistogramImplSharedPtr> histograms_;
+    StatNameHashMap<TextReadoutSharedPtr> text_readouts_;
     StatNameStorageSet rejected_stats_;
     SymbolTable& symbol_table_;
   };
@@ -278,28 +307,38 @@ private:
     ~ScopeImpl() override;
 
     // Stats::Scope
-    Counter& counterFromStatName(StatName name) override;
+    Counter& counterFromStatNameWithTags(const StatName& name,
+                                         StatNameTagVectorOptConstRef tags) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
+    Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                     Gauge::ImportMode import_mode) override;
+    Histogram& histogramFromStatNameWithTags(const StatName& name,
+                                             StatNameTagVectorOptConstRef tags,
+                                             Histogram::Unit unit) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
+    TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                                 StatNameTagVectorOptConstRef tags) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
     const SymbolTable& constSymbolTable() const override { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
-    Counter& counter(const std::string& name) override {
+    Counter& counterFromString(const std::string& name) override {
       StatNameManagedStorage storage(name, symbolTable());
       return counterFromStatName(storage.statName());
     }
-    Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+    Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
       StatNameManagedStorage storage(name, symbolTable());
       return gaugeFromStatName(storage.statName(), import_mode);
     }
-    Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
+    Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
       StatNameManagedStorage storage(name, symbolTable());
       return histogramFromStatName(storage.statName(), unit);
+    }
+    TextReadout& textReadoutFromString(const std::string& name) override {
+      StatNameManagedStorage storage(name, symbolTable());
+      return textReadoutFromStatName(storage.statName());
     }
 
     NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
@@ -309,25 +348,29 @@ private:
     CounterOptConstRef findCounter(StatName name) const override;
     GaugeOptConstRef findGauge(StatName name) const override;
     HistogramOptConstRef findHistogram(StatName name) const override;
+    TextReadoutOptConstRef findTextReadout(StatName name) const override;
 
     template <class StatType>
-    using MakeStatFn = std::function<RefcountPtr<StatType>(Allocator&, StatName name,
-                                                           absl::string_view tag_extracted_name,
-                                                           const std::vector<Tag>& tags)>;
+    using MakeStatFn = std::function<RefcountPtr<StatType>(
+        Allocator&, StatName name, StatName tag_extracted_name, const StatNameTagVector& tags)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,
      * generating it from the parent allocator, or as a last
      * result, creating it with the heap allocator.
      *
-     * @param name the full name of the stat (not tag extracted).
+     * @param full_stat_name the full name of the stat with appended tags.
+     * @param name_no_tags the full name of the stat (not tag extracted) without appended tags.
+     * @param stat_name_tags the tags provided at creation time. If empty, tag extraction occurs.
      * @param central_cache_map a map from name to the desired object in the central cache.
      * @param make_stat a function to generate the stat object, called if it's not in cache.
      * @param tls_ref possibly null reference to a cache entry for this stat, which will be
      *     used if non-empty, or filled in if empty (and non-null).
      */
     template <class StatType>
-    StatType& safeMakeStat(StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
+    StatType& safeMakeStat(StatName full_stat_name, StatName name_no_tags,
+                           const absl::optional<StatNameTagVector>& stat_name_tags,
+                           StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
                            StatNameStorageSet& central_rejected_stats,
                            MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
@@ -366,7 +409,7 @@ private:
     absl::flat_hash_map<uint64_t, TlsCacheEntry> scope_cache_;
   };
 
-  std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
+  std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopeFromCaches(uint64_t scope_id, CentralCacheEntrySharedPtr central_cache);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb merge_cb);
@@ -394,6 +437,7 @@ private:
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;
   NullHistogramImpl null_histogram_;
+  NullTextReadoutImpl null_text_readout_;
 
   // Retain storage for deleted stats; these are no longer in maps because the
   // matcher-pattern was established after they were created. Since the stats
@@ -406,6 +450,7 @@ private:
   std::vector<CounterSharedPtr> deleted_counters_;
   std::vector<GaugeSharedPtr> deleted_gauges_;
   std::vector<HistogramSharedPtr> deleted_histograms_;
+  std::vector<TextReadoutSharedPtr> deleted_text_readouts_;
 
   Thread::ThreadSynchronizer sync_;
   std::atomic<uint64_t> next_scope_id_{};

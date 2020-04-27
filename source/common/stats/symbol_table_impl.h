@@ -158,6 +158,15 @@ public:
     static void appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block);
 
     /**
+     * Appends stat_name's bytes into mem_block, which must have been allocated to
+     * allow for stat_name.size() bytes.
+     *
+     * @param stat_name the stat_name to append.
+     * @param mem_block the block of memory to append to.
+     */
+    static void appendToMemBlock(StatName stat_name, MemBlockBuilder<uint8_t>& mem_block);
+
+    /**
      * Decodes a byte-array containing a variable-length number.
      *
      * @param The encoded byte array, written previously by appendEncoding.
@@ -197,6 +206,7 @@ public:
   void clearRecentLookups() override;
   void setRecentLookupCapacity(uint64_t capacity) override;
   uint64_t recentLookupCapacity() const override;
+  DynamicSpans getDynamicSpans(StatName stat_name) const override;
 
 private:
   friend class StatName;
@@ -286,12 +296,12 @@ private:
 };
 
 // Base class for holding the backing-storing for a StatName. The two derived
-// classes, StatNameStorage and StatNameDynamicStore, share a need to hold an
+// classes, StatNameStorage and StatNameDynamicStorage, share a need to hold an
 // array of bytes, but use different representations.
 class StatNameStorageBase {
 public:
   StatNameStorageBase(SymbolTable::StoragePtr&& bytes) : bytes_(std::move(bytes)) {}
-  StatNameStorageBase() {}
+  StatNameStorageBase() = default;
 
   /**
    * @return a reference to the owned storage.
@@ -452,6 +462,8 @@ public:
     return size_and_data_ + SymbolTableImpl::Encoding::encodingSizeBytes(dataSize());
   }
 
+  const uint8_t* dataIncludingSize() const { return size_and_data_; }
+
   /**
    * @return A pointer to the buffer, including the size bytes.
    */
@@ -491,6 +503,8 @@ public:
   // generate symbols for it.
   StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
+  StatNameManagedStorage(StatNameManagedStorage&& src)
+      : StatNameStorage(std::move(src)), symbol_table_(src.symbol_table_) {}
 
   ~StatNameManagedStorage() { free(symbol_table_); }
 

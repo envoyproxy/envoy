@@ -79,7 +79,7 @@ host when forwarding. See the example below within the configured routes.
                 dns_cache_config:
                   name: dynamic_forward_proxy_cache_config
                   dns_lookup_family: V4_ONLY
-            - name: envoy.router
+            - name: envoy.filters.http.router
     clusters:
     - name: dynamic_forward_proxy_cluster
       connect_timeout: 1s

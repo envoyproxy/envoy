@@ -39,7 +39,7 @@ void disableHeaderValueOptionAppend(
 
 const std::string http_connection_mgr_config = R"EOF(
 http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
 codec_type: HTTP1
 use_remote_address: false
 xff_num_trusted_hops: 1

@@ -17,7 +17,7 @@ namespace Cache {
 class SimpleHttpCache : public HttpCache {
 private:
   struct Entry {
-    Http::HeaderMapPtr response_headers_;
+    Http::ResponseHeaderMapPtr response_headers_;
     std::string body_;
   };
 
@@ -26,11 +26,11 @@ public:
   LookupContextPtr makeLookupContext(LookupRequest&& request) override;
   InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) override;
   void updateHeaders(LookupContextPtr&& lookup_context,
-                     Http::HeaderMapPtr&& response_headers) override;
+                     Http::ResponseHeaderMapPtr&& response_headers) override;
   CacheInfo cacheInfo() const override;
 
   Entry lookup(const LookupRequest& request);
-  void insert(const Key& key, Http::HeaderMapPtr&& response_headers, std::string&& body);
+  void insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers, std::string&& body);
 
   absl::Mutex mutex_;
   absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ GUARDED_BY(mutex_);

@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Eq;
 using testing::NiceMock;
 using testing::Throw;
 using testing::UnorderedElementsAre;
@@ -80,7 +79,7 @@ populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items)
   return add_to;
 }
 
-// Basic gaining/losing interest in resources should lead to (un)subscriptions.
+// Basic gaining/losing interest in resources should lead to subscription updates.
 TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
   {
     state_.updateSubscriptionInterest({"name4"}, {"name1"});

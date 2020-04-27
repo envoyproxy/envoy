@@ -20,7 +20,7 @@ public:
   TransportSockeMatchIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
-                            ConfigHelper::HTTP_PROXY_CONFIG),
+                            ConfigHelper::httpProxyConfig()),
         num_hosts_{2} {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
@@ -38,7 +38,7 @@ name: "tls_socket"
 match:
   mtlsReady: "true"
 transport_socket:
-  name: envoy.transport_sockets.tls
+  name: tls
   typed_config:
     "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
     common_tls_context:

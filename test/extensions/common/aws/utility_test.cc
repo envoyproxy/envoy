@@ -15,7 +15,7 @@ namespace {
 
 // Headers must be in alphabetical order by virtue of std::map
 TEST(UtilityTest, CanonicalizeHeadersInAlphabeticalOrder) {
-  Http::TestHeaderMapImpl headers{
+  Http::TestRequestHeaderMapImpl headers{
       {"d", "d_value"}, {"f", "f_value"}, {"b", "b_value"},
       {"e", "e_value"}, {"c", "c_value"}, {"a", "a_value"},
   };
@@ -26,7 +26,7 @@ TEST(UtilityTest, CanonicalizeHeadersInAlphabeticalOrder) {
 
 // HTTP pseudo-headers should be ignored
 TEST(UtilityTest, CanonicalizeHeadersSkippingPseudoHeaders) {
-  Http::TestHeaderMapImpl headers{
+  Http::TestRequestHeaderMapImpl headers{
       {":path", "path_value"},
       {":method", "GET"},
       {"normal", "normal_value"},
@@ -37,7 +37,7 @@ TEST(UtilityTest, CanonicalizeHeadersSkippingPseudoHeaders) {
 
 // Repeated headers are joined with commas
 TEST(UtilityTest, CanonicalizeHeadersJoiningDuplicatesWithCommas) {
-  Http::TestHeaderMapImpl headers{
+  Http::TestRequestHeaderMapImpl headers{
       {"a", "a_value1"},
       {"a", "a_value2"},
       {"a", "a_value3"},
@@ -48,7 +48,7 @@ TEST(UtilityTest, CanonicalizeHeadersJoiningDuplicatesWithCommas) {
 
 // We canonicalize the :authority header as host
 TEST(UtilityTest, CanonicalizeHeadersAuthorityToHost) {
-  Http::TestHeaderMapImpl headers{
+  Http::TestRequestHeaderMapImpl headers{
       {":authority", "authority_value"},
   };
   const auto map = Utility::canonicalizeHeaders(headers);
@@ -57,13 +57,13 @@ TEST(UtilityTest, CanonicalizeHeadersAuthorityToHost) {
 
 // Ports 80 and 443 are omitted from the host headers
 TEST(UtilityTest, CanonicalizeHeadersRemovingDefaultPortsFromHost) {
-  Http::TestHeaderMapImpl headers_port80{
+  Http::TestRequestHeaderMapImpl headers_port80{
       {":authority", "example.com:80"},
   };
   const auto map_port80 = Utility::canonicalizeHeaders(headers_port80);
   EXPECT_THAT(map_port80, ElementsAre(Pair("host", "example.com")));
 
-  Http::TestHeaderMapImpl headers_port443{
+  Http::TestRequestHeaderMapImpl headers_port443{
       {":authority", "example.com:443"},
   };
   const auto map_port443 = Utility::canonicalizeHeaders(headers_port443);
@@ -72,7 +72,7 @@ TEST(UtilityTest, CanonicalizeHeadersRemovingDefaultPortsFromHost) {
 
 // Whitespace is trimmed from headers
 TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
-  Http::TestHeaderMapImpl headers{
+  Http::TestRequestHeaderMapImpl headers{
       {"leading", "    leading value"},
       {"trailing", "trailing value    "},
       {"internal", "internal    value"},
@@ -82,6 +82,19 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
   EXPECT_THAT(map,
               ElementsAre(Pair("all", "all value"), Pair("internal", "internal value"),
                           Pair("leading", "leading value"), Pair("trailing", "trailing value")));
+}
+
+// Headers that are likely to mutate are not considered canonical
+TEST(UtilityTest, CanonicalizeHeadersDropMutatingHeaders) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":authority", "example.com"},          {"x-forwarded-for", "1.2.3.4"},
+      {"x-forwarded-proto", "https"},         {"x-amz-date", "20130708T220855Z"},
+      {"x-amz-content-sha256", "e3b0c44..."},
+  };
+  const auto map = Utility::canonicalizeHeaders(headers);
+  EXPECT_THAT(map,
+              ElementsAre(Pair("host", "example.com"), Pair("x-amz-content-sha256", "e3b0c44..."),
+                          Pair("x-amz-date", "20130708T220855Z")));
 }
 
 // Verify the format of a minimalist canonical request

@@ -190,6 +190,14 @@ TEST_P(StatNameTest, TestDynamicPools) {
   EXPECT_NE(dynamic2.data(), dynamic.data());
 }
 
+TEST_P(StatNameTest, TestDynamicHash) {
+  StatNameDynamicPool dynamic(*table_);
+  const StatName d1 = dynamic.add("dynamic");
+  const StatName d2 = dynamic.add("dynamic");
+  EXPECT_EQ(d1, d2);
+  EXPECT_EQ(d1.hash(), d2.hash());
+}
+
 TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
   for (int i = 0; i < 100 * 1000; ++i) {
     const std::string stat_name = absl::StrCat("symbol_", i);

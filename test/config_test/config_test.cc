@@ -87,8 +87,8 @@ public:
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
         server_.random(), server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(),
         server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
-        server_.httpContext(), server_.accessLogManager(), server_.singletonManager(),
-        time_system_);
+        server_.httpContext(), server_.grpcContext(), server_.accessLogManager(),
+        server_.singletonManager(), time_system_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -120,6 +120,7 @@ public:
               return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
                   filters, context);
             }));
+    ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
 
     try {
       main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
@@ -134,6 +135,7 @@ public:
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
+  Server::ServerFactoryContextImpl server_factory_context_{server_};
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
@@ -168,12 +170,10 @@ uint32_t run(const std::string& directory) {
         Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
     ConfigTest test1(options);
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
-    if (Server::InstanceUtil::loadBootstrapConfig(
-            bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api) ==
-        Server::InstanceUtil::BootstrapVersion::V2) {
-      ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
-      ConfigTest test2(asConfigYaml(options, *api));
-    }
+    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options,
+                                              ProtobufMessage::getStrictValidationVisitor(), *api);
+    ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
+    ConfigTest test2(asConfigYaml(options, *api));
     num_tested++;
   }
   return num_tested;

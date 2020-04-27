@@ -4,9 +4,12 @@ package envoy.admin.v2alpha;
 
 import "google/protobuf/timestamp.proto";
 
+import "udpa/annotations/status.proto";
+
 option java_package = "io.envoyproxy.envoy.admin.v2alpha";
 option java_outer_classname = "CertsProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Certificates]
 
@@ -53,5 +56,7 @@ message SubjectAlternateName {
     string dns = 1;
 
     string uri = 2;
+
+    string ip_address = 3;
   }
 }

@@ -19,7 +19,10 @@ public:
   std::vector<MatcherPtr> matchers_;
   Matcher::MatchStatusVector statuses_;
   envoy::config::tap::v3::MatchPredicate config_;
-  Http::TestHeaderMapImpl headers_;
+  Http::TestRequestHeaderMapImpl request_headers_;
+  Http::TestRequestTrailerMapImpl request_trailers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
+  Http::TestResponseTrailerMapImpl response_trailers_;
 };
 
 TEST_F(TapMatcherTest, Any) {
@@ -34,13 +37,13 @@ any_match: true
   statuses_.resize(matchers_.size());
   matchers_[0]->onNewStream(statuses_);
   EXPECT_EQ((Matcher::MatchStatus{true, false}), matchers_[0]->matchStatus(statuses_));
-  matchers_[0]->onHttpRequestHeaders(headers_, statuses_);
+  matchers_[0]->onHttpRequestHeaders(request_headers_, statuses_);
   EXPECT_EQ((Matcher::MatchStatus{true, false}), matchers_[0]->matchStatus(statuses_));
-  matchers_[0]->onHttpRequestTrailers(headers_, statuses_);
+  matchers_[0]->onHttpRequestTrailers(request_trailers_, statuses_);
   EXPECT_EQ((Matcher::MatchStatus{true, false}), matchers_[0]->matchStatus(statuses_));
-  matchers_[0]->onHttpResponseHeaders(headers_, statuses_);
+  matchers_[0]->onHttpResponseHeaders(response_headers_, statuses_);
   EXPECT_EQ((Matcher::MatchStatus{true, false}), matchers_[0]->matchStatus(statuses_));
-  matchers_[0]->onHttpResponseTrailers(headers_, statuses_);
+  matchers_[0]->onHttpResponseTrailers(response_trailers_, statuses_);
   EXPECT_EQ((Matcher::MatchStatus{true, false}), matchers_[0]->matchStatus(statuses_));
 }
 
@@ -57,13 +60,13 @@ not_match:
   statuses_.resize(matchers_.size());
   matchers_[0]->onNewStream(statuses_);
   EXPECT_EQ((Matcher::MatchStatus{false, false}), matchers_[0]->matchStatus(statuses_));
-  matchers_[0]->onHttpRequestHeaders(headers_, statuses_);
+  matchers_[0]->onHttpRequestHeaders(request_headers_, statuses_);
   EXPECT_EQ((Matcher::MatchStatus{false, false}), matchers_[0]->matchStatus(statuses_));
-  matchers_[0]->onHttpRequestTrailers(headers_, statuses_);
+  matchers_[0]->onHttpRequestTrailers(request_trailers_, statuses_);
   EXPECT_EQ((Matcher::MatchStatus{false, false}), matchers_[0]->matchStatus(statuses_));
-  matchers_[0]->onHttpResponseHeaders(headers_, statuses_);
+  matchers_[0]->onHttpResponseHeaders(response_headers_, statuses_);
   EXPECT_EQ((Matcher::MatchStatus{false, false}), matchers_[0]->matchStatus(statuses_));
-  matchers_[0]->onHttpResponseTrailers(headers_, statuses_);
+  matchers_[0]->onHttpResponseTrailers(response_trailers_, statuses_);
   EXPECT_EQ((Matcher::MatchStatus{false, false}), matchers_[0]->matchStatus(statuses_));
 }
 
@@ -84,13 +87,13 @@ and_match:
   statuses_.resize(matchers_.size());
   matchers_[0]->onNewStream(statuses_);
   EXPECT_EQ((Matcher::MatchStatus{false, true}), matchers_[0]->matchStatus(statuses_));
-  matchers_[0]->onHttpRequestHeaders(headers_, statuses_);
+  matchers_[0]->onHttpRequestHeaders(request_headers_, statuses_);
   EXPECT_EQ((Matcher::MatchStatus{false, true}), matchers_[0]->matchStatus(statuses_));
-  matchers_[0]->onHttpRequestTrailers(headers_, statuses_);
+  matchers_[0]->onHttpRequestTrailers(request_trailers_, statuses_);
   EXPECT_EQ((Matcher::MatchStatus{false, true}), matchers_[0]->matchStatus(statuses_));
-  matchers_[0]->onHttpResponseHeaders(headers_, statuses_);
+  matchers_[0]->onHttpResponseHeaders(response_headers_, statuses_);
   EXPECT_EQ((Matcher::MatchStatus{false, false}), matchers_[0]->matchStatus(statuses_));
-  matchers_[0]->onHttpResponseTrailers(headers_, statuses_);
+  matchers_[0]->onHttpResponseTrailers(response_trailers_, statuses_);
   EXPECT_EQ((Matcher::MatchStatus{false, false}), matchers_[0]->matchStatus(statuses_));
 }
 

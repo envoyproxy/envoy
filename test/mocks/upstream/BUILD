@@ -17,6 +17,7 @@ envoy_cc_mock(
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/config:metadata_lib",
+        "//source/common/http:utility_lib",
         "//source/common/network:raw_buffer_socket_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",

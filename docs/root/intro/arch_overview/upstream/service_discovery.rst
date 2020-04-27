@@ -29,8 +29,10 @@ specified DNS targets. Each returned IP address in the DNS result will be consid
 host in the upstream cluster. This means that if the query returns three IP addresses, Envoy will
 assume the cluster has three hosts, and all three should be load balanced to. If a host is removed
 from the result Envoy assumes it no longer exists and will drain traffic from any existing
-connection pools. Note that Envoy never synchronously resolves DNS in the forwarding path. At the
-expense of eventual consistency, there is never a worry of blocking on a long running DNS query.
+connection pools. Consequently, if a successful DNS resolution returns 0 hosts, Envoy will assume
+that the cluster does not have any hosts. Note that Envoy never synchronously resolves DNS in the
+forwarding path. At the expense of eventual consistency, there is never a worry of blocking on a
+long running DNS query.
 
 If a single DNS name resolves to the same IP multiple times, these IPs will be de-duplicated.
 
@@ -39,10 +41,10 @@ This means that care should be taken if active health checking is used with DNS 
 to the same IPs: if an IP is repeated many times between DNS names it might cause undue load on the
 upstream host.
 
-If :ref:`respect_dns_ttl <envoy_api_field_Cluster.respect_dns_ttl>` is enabled, DNS record TTLs and 
-:ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` are used to control DNS refresh rate. 
-For strict DNS cluster, if the minimum of all record TTLs is 0, :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
-will be used as the cluster's DNS refresh rate. :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
+If :ref:`respect_dns_ttl <envoy_api_field_Cluster.respect_dns_ttl>` is enabled, DNS record TTLs and
+:ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` are used to control DNS refresh rate.
+For strict DNS cluster, if the minimum of all record TTLs is 0, :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>`
+will be used as the cluster's DNS refresh rate. :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>`
 defaults to 5000ms if not specified. The :ref:`dns_failure_refresh_rate <envoy_api_field_Cluster.dns_failure_refresh_rate>`
 controls the refresh frequency during failures, and, if not configured, the DNS refresh rate will be used.
 
@@ -55,7 +57,10 @@ Logical DNS uses a similar asynchronous resolution mechanism to strict DNS. Howe
 strictly taking the results of the DNS query and assuming that they comprise the entire upstream
 cluster, a logical DNS cluster only uses the first IP address returned *when a new connection needs
 to be initiated*. Thus, a single logical connection pool may contain physical connections to a
-variety of different upstream hosts. Connections are never drained. This service discovery type is
+variety of different upstream hosts. Connections are never drained,
+including on a successful DNS resolution that returns 0 hosts.
+
+This service discovery type is
 optimal for large scale web services that must be accessed via DNS. Such services typically use
 round robin DNS to return many different IP addresses. Typically a different result is returned for
 each query. If strict DNS were used in this scenario, Envoy would assume that the cluster’s members
@@ -65,10 +70,10 @@ When interacting with large scale web services, this is the best of all possible
 asynchronous/eventually consistent DNS resolution, long lived connections, and zero blocking in the
 forwarding path.
 
-If :ref:`respect_dns_ttl <envoy_api_field_Cluster.respect_dns_ttl>` is enabled, DNS record TTLs and 
-:ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` are used to control DNS refresh rate. 
-For logical DNS cluster, if the TTL of first record is 0, :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
-will be used as the cluster's DNS refresh rate. :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
+If :ref:`respect_dns_ttl <envoy_api_field_Cluster.respect_dns_ttl>` is enabled, DNS record TTLs and
+:ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` are used to control DNS refresh rate.
+For logical DNS cluster, if the TTL of first record is 0, :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>`
+will be used as the cluster's DNS refresh rate. :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>`
 defaults to 5000ms if not specified. The :ref:`dns_failure_refresh_rate <envoy_api_field_Cluster.dns_failure_refresh_rate>`
 controls the refresh frequency during failures, and, if not configured, the DNS refresh rate will be used.
 
@@ -80,14 +85,14 @@ Original destination
 Original destination cluster can be used when incoming connections are redirected to Envoy either
 via an iptables REDIRECT or TPROXY target or with Proxy Protocol. In these cases requests routed
 to an original destination cluster are forwarded to upstream hosts as addressed by the redirection
-metadata, without any explicit host configuration or upstream host discovery. 
+metadata, without any explicit host configuration or upstream host discovery.
 Connections to upstream hosts are pooled and unused hosts are flushed out when they have been idle longer than
 :ref:`cleanup_interval <envoy_api_field_Cluster.cleanup_interval>`, which defaults to
 5000ms. If the original destination address is not available, no upstream connection is opened.
-Envoy can also pickup the original destination from a :ref:`HTTP header 
+Envoy can also pickup the original destination from a :ref:`HTTP header
 <arch_overview_load_balancing_types_original_destination_request_header>`.
 Original destination service discovery must be used with the original destination :ref:`load
-balancer <arch_overview_load_balancing_types_original_destination>`. 
+balancer <arch_overview_load_balancing_types_original_destination>`.
 
 .. _arch_overview_service_discovery_types_eds:
 

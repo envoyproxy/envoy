@@ -53,7 +53,7 @@ public:
     EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
   }
 
-  void expectVerifyStatus(Status expected_status, Http::HeaderMap& headers) {
+  void expectVerifyStatus(Status expected_status, Http::RequestHeaderMap& headers) {
     std::function<void(const Status&)> on_complete_cb = [&expected_status](const Status& status) {
       ASSERT_EQ(status, expected_status);
     };
@@ -99,7 +99,8 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
 
   // Test OK pubkey and its cache
   for (int i = 0; i < 10; i++) {
-    auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+    auto headers =
+        Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
 
     expectVerifyStatus(Status::Ok, headers);
 
@@ -121,7 +122,8 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
       }));
 
   // Test OK pubkey and its cache
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
 
   expectVerifyStatus(Status::Ok, headers);
 
@@ -145,7 +147,8 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
       }));
 
   // Test OK pubkey and its cache
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
 
   expectVerifyStatus(Status::Ok, headers);
 
@@ -167,7 +170,7 @@ TEST_F(AuthenticatorTest, TestJwtWithNonExistKid) {
 
   // Test OK pubkey and its cache
   auto headers =
-      Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NonExistKidToken)}};
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NonExistKidToken)}};
 
   expectVerifyStatus(Status::JwtVerificationFail, headers);
 }
@@ -177,7 +180,7 @@ TEST_F(AuthenticatorTest, TestMissedJWT) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
 
   // Empty headers.
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
 
   expectVerifyStatus(Status::JwtMissed, headers);
 }
@@ -187,7 +190,7 @@ TEST_F(AuthenticatorTest, TestInvalidJWT) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
 
   std::string token = "invalidToken";
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + token}};
+  auto headers = Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + token}};
   expectVerifyStatus(Status::JwtBadFormat, headers);
 }
 
@@ -195,7 +198,7 @@ TEST_F(AuthenticatorTest, TestInvalidJWT) {
 TEST_F(AuthenticatorTest, TestInvalidPrefix) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer-invalid"}};
+  auto headers = Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer-invalid"}};
   expectVerifyStatus(Status::JwtMissed, headers);
 }
 
@@ -205,7 +208,7 @@ TEST_F(AuthenticatorTest, TestNonExpiringJWT) {
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
 
   auto headers =
-      Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NonExpiringToken)}};
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NonExpiringToken)}};
   expectVerifyStatus(Status::JwtAudienceNotAllowed, headers);
 }
 
@@ -213,7 +216,8 @@ TEST_F(AuthenticatorTest, TestNonExpiringJWT) {
 TEST_F(AuthenticatorTest, TestExpiredJWT) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(ExpiredToken)}};
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(ExpiredToken)}};
   expectVerifyStatus(Status::JwtExpired, headers);
 }
 
@@ -222,7 +226,7 @@ TEST_F(AuthenticatorTest, TestNotYetValidJWT) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
 
   auto headers =
-      Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NotYetValidToken)}};
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NotYetValidToken)}};
   expectVerifyStatus(Status::JwtNotYetValid, headers);
 }
 
@@ -235,7 +239,8 @@ TEST_F(AuthenticatorTest, TestInvalidLocalJwks) {
 
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   expectVerifyStatus(Status::JwksNoValidKeys, headers);
 }
 
@@ -244,7 +249,7 @@ TEST_F(AuthenticatorTest, TestNonMatchAudJWT) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
 
   auto headers =
-      Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
   expectVerifyStatus(Status::JwtAudienceNotAllowed, headers);
 }
 
@@ -256,7 +261,8 @@ TEST_F(AuthenticatorTest, TestIssuerNotFound) {
 
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   expectVerifyStatus(Status::JwtUnknownIssuer, headers);
 }
 
@@ -268,7 +274,8 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
         receiver.onJwksError(JwksFetcher::JwksReceiver::Failure::InvalidJwks);
       }));
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   expectVerifyStatus(Status::JwksFetchFail, headers);
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
@@ -284,7 +291,8 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   // Cancel is called once.
   EXPECT_CALL(*raw_fetcher_, cancel()).Times(1);
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   initTokenExtractor();
   auto tokens = extractor_->extract(headers);
   // callback should not be called.
@@ -307,7 +315,8 @@ TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
         receiver.onJwksSuccess(std::move(jwks_));
       }));
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   expectVerifyStatus(Status::Ok, headers);
 
   // Test when forward_payload_header is not set, the output should NOT
@@ -332,7 +341,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleTokens) {
         receiver.onJwksSuccess(std::move(jwks_));
       }));
 
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"a", "Bearer " + std::string(ExpiredToken)},
       {"b", "Bearer " + std::string(GoodToken)},
       {"c", "Bearer " + std::string(InvalidAudToken)},
@@ -344,7 +353,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleTokens) {
   EXPECT_FALSE(headers.has("b"));
   EXPECT_TRUE(headers.has("c"));
 
-  headers = Http::TestHeaderMapImpl{
+  headers = Http::TestRequestHeaderMapImpl{
       {"a", "Bearer " + std::string(GoodToken)},
       {"b", "Bearer " + std::string(GoodToken)},
       {"c", "Bearer " + std::string(GoodToken)},
@@ -382,7 +391,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
         receiver.onJwksSuccess(std::move(jwks));
       }));
 
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"expired-auth", "Bearer " + std::string(ExpiredToken)},
       {"other-auth", "Bearer " + std::string(OtherGoodToken)},
@@ -407,10 +416,10 @@ TEST_F(AuthenticatorTest, TestCustomCheckAudience) {
       }));
 
   auto headers =
-      Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
   expectVerifyStatus(Status::Ok, headers);
 
-  headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  headers = Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   expectVerifyStatus(Status::JwtAudienceNotAllowed, headers);
 }
 
@@ -423,7 +432,8 @@ TEST_F(AuthenticatorTest, TestInvalidPubkeyKey) {
         receiver.onJwksSuccess(std::move(jwks));
       }));
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   expectVerifyStatus(Status::JwksPemBadBase64, headers);
 }
 

@@ -20,7 +20,7 @@ void ValidationAdmin::startHttpListener(const std::string&, const std::string&,
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
-Http::Code ValidationAdmin::request(absl::string_view, absl::string_view, Http::HeaderMap&,
+Http::Code ValidationAdmin::request(absl::string_view, absl::string_view, Http::ResponseHeaderMap&,
                                     std::string&) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }

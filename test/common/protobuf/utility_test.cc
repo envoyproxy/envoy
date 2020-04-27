@@ -16,8 +16,8 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/stats/isolated_store_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -40,7 +40,7 @@ protected:
   Api::ApiPtr api_;
 };
 
-TEST_F(ProtobufUtilityTest, convertPercentNaNDouble) {
+TEST_F(ProtobufUtilityTest, ConvertPercentNaNDouble) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
@@ -48,7 +48,7 @@ TEST_F(ProtobufUtilityTest, convertPercentNaNDouble) {
                EnvoyException);
 }
 
-TEST_F(ProtobufUtilityTest, convertPercentNaN) {
+TEST_F(ProtobufUtilityTest, ConvertPercentNaN) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
@@ -59,7 +59,7 @@ TEST_F(ProtobufUtilityTest, convertPercentNaN) {
 
 namespace ProtobufPercentHelper {
 
-TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
+TEST_F(ProtobufUtilityTest, EvaluateFractionalPercent) {
   { // 0/100 (default)
     envoy::type::v3::FractionalPercent percent;
     EXPECT_FALSE(evaluateFractionalPercent(percent, 0));
@@ -1392,7 +1392,7 @@ protected:
   const bool with_upgrade_;
   Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   Runtime::MockRandomGenerator generator_;
   Api::ApiPtr api_;
   Runtime::MockRandomGenerator rand_;

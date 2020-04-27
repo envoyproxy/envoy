@@ -173,6 +173,16 @@ void SymbolTableImpl::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_blo
   mem_block_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
 }
 
+void SymbolTableImpl::Encoding::appendToMemBlock(StatName stat_name,
+                                                 MemBlockBuilder<uint8_t>& mem_block) {
+  const uint8_t* data = stat_name.dataIncludingSize();
+  if (data == nullptr) {
+    mem_block.appendOne(0);
+  } else {
+    mem_block.appendData(absl::MakeSpan(data, stat_name.size()));
+  }
+}
+
 SymbolTableImpl::SymbolTableImpl()
     // Have to be explicitly initialized, if we want to use the GUARDED_BY macro.
     : next_symbol_(FirstValidSymbol), monotonic_counter_(FirstValidSymbol) {}
@@ -302,6 +312,32 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) const {
     iter(lookup_count.second, lookup_count.first);
   }
   return total;
+}
+
+DynamicSpans SymbolTableImpl::getDynamicSpans(StatName stat_name) const {
+  DynamicSpans dynamic_spans;
+
+  uint32_t index = 0;
+  auto record_dynamic = [&dynamic_spans, &index](absl::string_view str) {
+    DynamicSpan span;
+    span.first = index;
+    index += std::count(str.begin(), str.end(), '.');
+    span.second = index;
+    ++index;
+    dynamic_spans.push_back(span);
+  };
+
+  // Use decodeTokens to suss out which components of stat_name are
+  // symbolic vs dynamic. The lambda that takes a Symbol is called
+  // for symbolic components. The lambda called with a string_view
+  // is called for dynamic components.
+  //
+  // Note that with fake symbol tables, the Symbol lambda is called
+  // once for each character in the string, and no dynamics will
+  // be recorded.
+  Encoding::decodeTokens(
+      stat_name.data(), stat_name.dataSize(), [&index](Symbol) { ++index; }, record_dynamic);
+  return dynamic_spans;
 }
 
 void SymbolTableImpl::setRecentLookupCapacity(uint64_t capacity) {
@@ -516,7 +552,9 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
 SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) const {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
-    num_bytes += stat_name.dataSize();
+    if (!stat_name.empty()) {
+      num_bytes += stat_name.dataSize();
+    }
   }
   MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
   Encoding::appendEncoding(num_bytes, mem_block);
@@ -543,8 +581,8 @@ void SymbolTableImpl::populateList(const StatName* names, uint32_t num_names, St
   mem_block.appendOne(num_names);
   for (uint32_t i = 0; i < num_names; ++i) {
     const StatName stat_name = names[i];
+    Encoding::appendToMemBlock(stat_name, mem_block);
     incRefCount(stat_name);
-    mem_block.appendData(absl::MakeSpan(stat_name.sizeAndData(), stat_name.size()));
   }
 
   // This assertion double-checks the arithmetic where we computed

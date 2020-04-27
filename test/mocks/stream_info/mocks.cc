@@ -8,6 +8,7 @@
 using testing::_;
 using testing::Const;
 using testing::Invoke;
+using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -22,6 +23,9 @@ MockStreamInfo::MockStreamInfo()
       downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
   ON_CALL(*this, setResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag response_flag) {
     response_flags_ |= response_flag;
+  }));
+  ON_CALL(*this, setResponseCodeDetails(_)).WillByDefault(Invoke([this](absl::string_view details) {
+    response_code_details_ = std::string(details);
   }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
@@ -96,6 +100,13 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, hasResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag flag) {
     return response_flags_ & flag;
   }));
+  ON_CALL(*this, intersectResponseFlags(_)).WillByDefault(Invoke([this](uint64_t response_flags) {
+    return (response_flags_ & response_flags) != 0;
+  }));
+  ON_CALL(*this, hasAnyResponseFlag()).WillByDefault(Invoke([this]() {
+    return response_flags_ != 0;
+  }));
+  ON_CALL(*this, responseFlags()).WillByDefault(Return(response_flags_));
   ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
 
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));

@@ -6,14 +6,15 @@ import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
 
-import "udpa/annotations/versioning.proto";
-
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.common.fault.v3";
 option java_outer_classname = "FaultProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common fault injection types]
 
@@ -30,7 +31,7 @@ message FaultDelay {
   }
 
   // Fault delays are controlled via an HTTP header (if applicable). See the
-  // :ref:`http fault filter <config_http_filters_fault_injection_http_header>` documentation for
+  // :ref:`HTTP fault filter <config_http_filters_fault_injection_http_header>` documentation for
   // more information.
   message HeaderDelay {
     option (udpa.annotations.versioning).previous_message_type =
@@ -39,27 +40,26 @@ message FaultDelay {
 
   reserved 2;
 
-  // Unused and deprecated. Will be removed in the next release.
+  // Add a fixed delay before forwarding the operation upstream. See
+  // https://developers.google.com/protocol-buffers/docs/proto3#json for
+  // the JSON/YAML Duration mapping. For HTTP/Mongo/Redis, the specified
+  // delay will be injected before a new request/operation. For TCP
+  // connections, the proxying of the connection upstream will be delayed
+  // for the specified period. This is required if type is FIXED.
+  type.v3.FractionalPercent percentage = 4;
+
+  // Fault delays are controlled via an HTTP header (if applicable).
   FaultDelayType hidden_envoy_deprecated_type = 1
       [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   oneof fault_delay_secifier {
     option (validate.required) = true;
 
-    // Add a fixed delay before forwarding the operation upstream. See
-    // https://developers.google.com/protocol-buffers/docs/proto3#json for
-    // the JSON/YAML Duration mapping. For HTTP/Mongo/Redis, the specified
-    // delay will be injected before a new request/operation. For TCP
-    // connections, the proxying of the connection upstream will be delayed
-    // for the specified period. This is required if type is FIXED.
+    // The percentage of operations/connections/requests on which the delay will be injected.
     google.protobuf.Duration fixed_delay = 3 [(validate.rules).duration = {gt {}}];
 
-    // Fault delays are controlled via an HTTP header (if applicable).
     HeaderDelay header_delay = 5;
   }
-
-  // The percentage of operations/connections/requests on which the delay will be injected.
-  type.v3.FractionalPercent percentage = 4;
 }
 
 // Describes a rate limit to be applied.
@@ -77,23 +77,23 @@ message FaultRateLimit {
   }
 
   // Rate limits are controlled via an HTTP header (if applicable). See the
-  // :ref:`http fault filter <config_http_filters_fault_injection_http_header>` documentation for
+  // :ref:`HTTP fault filter <config_http_filters_fault_injection_http_header>` documentation for
   // more information.
   message HeaderLimit {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.fault.v2.FaultRateLimit.HeaderLimit";
   }
 
+  // A fixed rate limit.
+  type.v3.FractionalPercent percentage = 2;
+
   oneof limit_type {
     option (validate.required) = true;
 
-    // A fixed rate limit.
+    // Rate limits are controlled via an HTTP header (if applicable).
     FixedLimit fixed_limit = 1;
 
-    // Rate limits are controlled via an HTTP header (if applicable).
+    // The percentage of operations/connections/requests on which the rate limit will be injected.
     HeaderLimit header_limit = 3;
   }
-
-  // The percentage of operations/connections/requests on which the rate limit will be injected.
-  type.v3.FractionalPercent percentage = 2;
 }

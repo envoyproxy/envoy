@@ -13,6 +13,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import pathlib
 import paths
 
 # Where does Buildozer live?
@@ -33,7 +34,7 @@ PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_package".*?\)\n)', re.DOTALL)
 # Match Buildozer 'print' output. Example of Buildozer print output:
 # cc_library json_transcoder_filter_lib [json_transcoder_filter.cc] (missing) (missing)
 BUILDOZER_PRINT_REGEX = re.compile(
-    '\s*([\w_]+)\s*([\w_]+)\s*[(\[](.*?)[)\]]\s* [(\[](.*?)[)\]]\s*[(\[](.*?)[)\]]')
+    '\s*([\w_]+)\s+([\w_]+)\s+[(\[](.*?)[)\]]\s+[(\[](.*?)[)\]]\s+[(\[](.*?)[)\]]')
 
 # Match API header include in Envoy source file?
 API_INCLUDE_REGEX = re.compile('#include "(envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
@@ -101,11 +102,11 @@ def FixBuildozerCleanups(contents):
 # Find all the API headers in a C++ source file.
 def FindApiHeaders(source_path):
   api_hdrs = set([])
-  with open(source_path, 'rb') as f:
-    for line in f:
-      match = re.match(API_INCLUDE_REGEX, line.decode('utf-8'))
-      if match:
-        api_hdrs.add(match.group(1))
+  contents = pathlib.Path(source_path).read_text(encoding='utf8')
+  for line in contents.split('\n'):
+    match = re.match(API_INCLUDE_REGEX, line)
+    if match:
+      api_hdrs.add(match.group(1))
   return api_hdrs
 
 

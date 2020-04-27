@@ -60,14 +60,14 @@ protected:
   }
 };
 
-TEST_F(OriginalSrcTest, onNewConnectionUnixSocketSkips) {
+TEST_F(OriginalSrcTest, OnNewConnectionUnixSocketSkips) {
   auto filter = makeDefaultFilter();
   setAddressToReturn("unix://domain.socket");
   EXPECT_CALL(callbacks_.socket_, addOption_(_)).Times(0);
   EXPECT_EQ(filter->onAccept(callbacks_), Network::FilterStatus::Continue);
 }
 
-TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressAddsOption) {
+TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressAddsOption) {
   auto filter = makeDefaultFilter();
 
   Network::Socket::OptionsSharedPtr options;
@@ -85,7 +85,7 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressAddsOption) {
   options->at(0)->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
 }
 
-TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressUsesCorrectAddress) {
+TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressUsesCorrectAddress) {
   auto filter = makeDefaultFilter();
   Network::Socket::OptionsSharedPtr options;
   setAddressToReturn("tcp://1.2.3.4:0");
@@ -101,7 +101,7 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressUsesCorrectAddress) {
   EXPECT_EQ(key, expected_key);
 }
 
-TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressBleachesPort) {
+TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressBleachesPort) {
   auto filter = makeDefaultFilter();
   Network::Socket::OptionsSharedPtr options;
   setAddressToReturn("tcp://1.2.3.4:80");
@@ -118,7 +118,7 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressBleachesPort) {
   options->at(0)->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
 }
 
-TEST_F(OriginalSrcTest, filterAddsTransparentOption) {
+TEST_F(OriginalSrcTest, FilterAddsTransparentOption) {
   if (!ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
@@ -137,7 +137,7 @@ TEST_F(OriginalSrcTest, filterAddsTransparentOption) {
   EXPECT_TRUE(transparent_option.has_value());
 }
 
-TEST_F(OriginalSrcTest, filterAddsMarkOption) {
+TEST_F(OriginalSrcTest, FilterAddsMarkOption) {
   if (!ENVOY_SOCKET_SO_MARK.has_value()) {
     // The option isn't supported on this platform. Just skip the test.
     return;

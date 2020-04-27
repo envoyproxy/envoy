@@ -15,8 +15,6 @@ namespace Network {
 
 class SocketImpl : public virtual Socket {
 public:
-  ~SocketImpl() override { close(); }
-
   // Network::Socket
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
@@ -83,7 +81,7 @@ public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
       : ListenSocketImpl(address->socket(T::type), address) {
-    RELEASE_ASSERT(io_handle_->fd() != -1, "");
+    RELEASE_ASSERT(SOCKET_VALID(io_handle_->fd()), "");
 
     setPrebindSocketOptions();
 
@@ -120,13 +118,17 @@ public:
   ConnectionSocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
-      : SocketImpl(std::move(io_handle), local_address), remote_address_(remote_address) {}
+      : SocketImpl(std::move(io_handle), local_address), remote_address_(remote_address),
+        direct_remote_address_(remote_address) {}
 
   // Network::Socket
   Address::SocketType socketType() const override { return Address::SocketType::Stream; }
 
   // Network::ConnectionSocket
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
+  const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return direct_remote_address_;
+  }
   void restoreLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     setLocalAddress(local_address);
     local_address_restored_ = true;
@@ -158,6 +160,7 @@ public:
 
 protected:
   Address::InstanceConstSharedPtr remote_address_;
+  const Address::InstanceConstSharedPtr direct_remote_address_;
   bool local_address_restored_{false};
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;

@@ -58,12 +58,12 @@ class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
       : api_(Api::createApiForTest()),
-        cluster_manager_factory_(server_.admin(), server_.runtime(), server_.stats(),
-                                 server_.threadLocal(), server_.random(), server_.dnsResolver(),
-                                 server_.sslContextManager(), server_.dispatcher(),
-                                 server_.localInfo(), server_.secretManager(),
-                                 server_.messageValidationContext(), *api_, server_.httpContext(),
-                                 server_.accessLogManager(), server_.singletonManager()) {}
+        cluster_manager_factory_(
+            server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
+            server_.random(), server_.dnsResolver(), server_.sslContextManager(),
+            server_.dispatcher(), server_.localInfo(), server_.secretManager(),
+            server_.messageValidationContext(), *api_, server_.httpContext(), server_.grpcContext(),
+            server_.accessLogManager(), server_.singletonManager()) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -195,7 +195,8 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
+  EXPECT_THAT(envoy::config::trace::v3::Tracing{},
+              ProtoEq(server_.httpContext().defaultTracingConfig()));
 }
 
 TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguration) {
@@ -234,7 +235,8 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
+  EXPECT_THAT(envoy::config::trace::v3::Tracing{},
+              ProtoEq(server_.httpContext().defaultTracingConfig()));
 }
 
 TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
@@ -541,6 +543,191 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
       socket_mock, envoy::config::core::v3::SocketOption::STATE_BOUND);
   ASSERT_NE(detail, absl::nullopt);
   EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(4, 5, "4/5"));
+}
+
+TEST_F(ConfigurationImplTest, ExceedLoadBalancerHostWeightsLimit) {
+  const std::string json = R"EOF(
+  {
+    "static_resources": {
+      "listeners" : [],
+      "clusters": [
+        {
+          "name": "test_cluster",
+          "type": "static",
+          "connect_timeout": "0.01s",
+          "per_connection_buffer_limit_bytes": 8192,
+          "lb_policy": "RING_HASH",
+          "load_assignment": {
+            "cluster_name": "load_test_cluster",
+            "endpoints": [
+              {
+                "priority": 93
+              },
+              {
+                "locality": {
+                  "zone": "zone1"
+                },
+                "lb_endpoints": [
+                  {
+                    "endpoint": {
+                      "address": {
+                        "pipe": {
+                          "path": "path/to/pipe"
+                        }
+                      }
+                    },
+                    "health_status": "TIMEOUT",
+                    "load_balancing_weight": {
+                      "value": 4294967295
+                    }
+                  },
+                  {
+                    "endpoint": {
+                      "address": {
+                        "pipe": {
+                          "path": "path/to/pipe2"
+                        }
+                      }
+                    },
+                    "health_status": "TIMEOUT",
+                    "load_balancing_weight": {
+                      "value": 1
+                    }
+                  }
+                ],
+                "load_balancing_weight": {
+                  "value": 122
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+
+  MainImpl config;
+  EXPECT_THROW_WITH_MESSAGE(
+      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
+      "The sum of weights of all upstream hosts in a locality exceeds 4294967295");
+}
+
+TEST_F(ConfigurationImplTest, ExceedLoadBalancerLocalityWeightsLimit) {
+  const std::string json = R"EOF(
+  {
+    "static_resources": {
+      "listeners" : [],
+      "clusters": [
+        {
+          "name": "test_cluster",
+          "type": "static",
+          "connect_timeout": "0.01s",
+          "per_connection_buffer_limit_bytes": 8192,
+          "lb_policy": "RING_HASH",
+          "load_assignment": {
+            "cluster_name": "load_test_cluster",
+            "endpoints": [
+              {
+                "priority": 93
+              },
+              {
+                "locality": {
+                  "zone": "zone1"
+                },
+                "lb_endpoints": [
+                  {
+                    "endpoint": {
+                      "address": {
+                        "pipe": {
+                          "path": "path/to/pipe"
+                        }
+                      }
+                    },
+                    "health_status": "TIMEOUT",
+                    "load_balancing_weight": {
+                      "value": 7
+                    }
+                  }
+                ],
+                "load_balancing_weight": {
+                  "value": 4294967295
+                }
+              },
+              {
+                "locality": {
+                  "region": "domains",
+                  "sub_zone": "sub_zone1"
+                },
+                "lb_endpoints": [
+                  {
+                    "endpoint": {
+                      "address": {
+                        "pipe": {
+                          "path": "path/to/pipe"
+                        }
+                      }
+                    },
+                    "health_status": "TIMEOUT",
+                    "load_balancing_weight": {
+                      "value": 8
+                    }
+                  }
+                ],
+                "load_balancing_weight": {
+                  "value": 2
+                }
+              }
+            ]
+          },
+          "lb_subset_config": {
+            "fallback_policy": "ANY_ENDPOINT",
+            "subset_selectors": {
+              "keys": [
+                "x"
+              ]
+            },
+            "locality_weight_aware": "true"
+          },
+          "common_lb_config": {
+            "healthy_panic_threshold": {
+              "value": 0.8
+            },
+            "locality_weighted_lb_config": {
+            }
+          }
+        }
+      ]
+    },
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+
+  MainImpl config;
+  EXPECT_THROW_WITH_MESSAGE(
+      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
+      "The sum of weights of all localities at the same priority exceeds 4294967295");
 }
 
 } // namespace

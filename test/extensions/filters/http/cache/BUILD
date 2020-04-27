@@ -26,8 +26,50 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.cache",
     deps = [
         "//source/extensions/filters/http/cache:http_cache_lib",
+        "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "cache_filter_test",
+    srcs = ["cache_filter_test.cc"],
+    extension_name = "envoy.filters.http.cache",
+    deps = [
+        "//source/extensions/filters/http/cache:cache_filter_lib",
+        "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.filters.http.cache",
+    deps = [
+        "//source/extensions/filters/http/cache:config",
+        "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "cache_filter_integration_test",
+    srcs = [
+        "cache_filter_integration_test.cc",
+    ],
+    extension_name = "envoy.filters.http.cache",
+    deps = [
+        "//source/extensions/filters/http/cache:config",
+        "//source/extensions/filters/http/cache:http_cache_lib",
+        "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )

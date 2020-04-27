@@ -131,6 +131,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
+    _com_github_moonjit_moonjit()
     _com_github_nghttp2_nghttp2()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
@@ -142,6 +143,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_envoyproxy_sqlparser()
     _com_googlesource_chromium_v8()
     _com_googlesource_quiche()
+    _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
@@ -206,6 +208,7 @@ def _com_github_c_ares_c_ares():
     location = REPOSITORY_LOCATIONS["com_github_c_ares_c_ares"]
     http_archive(
         name = "com_github_c_ares_c_ares",
+        patches = ["@envoy//bazel/foreign_cc:cares-win32-nameser.patch"],
         build_file_content = BUILD_ALL_CONTENT,
         **location
     )
@@ -367,17 +370,10 @@ def _io_opentracing_cpp():
     )
 
 def _com_lightstep_tracer_cpp():
-    location = REPOSITORY_LOCATIONS["com_lightstep_tracer_cpp"]
     _repository_impl("com_lightstep_tracer_cpp")
-    http_archive(
-        name = "com_lightstep_tracer_cpp",
-        patch_args = ["-p0"],
-        patches = ["@envoy//bazel/foreign_cc:com_lightstep_tracer_cpp.patch"],
-        **location
-    )
     native.bind(
         name = "lightstep",
-        actual = "@com_lightstep_tracer_cpp//:lightstep_tracer",
+        actual = "@com_lightstep_tracer_cpp//:manual_tracer_lib",
     )
 
 def _com_github_datadog_dd_opentracing_cpp():
@@ -512,6 +508,19 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/time:time",
     )
 
+    native.bind(
+        name = "abseil_algorithm",
+        actual = "@com_google_absl//absl/algorithm:algorithm",
+    )
+    native.bind(
+        name = "abseil_variant",
+        actual = "@com_google_absl//absl/types:variant",
+    )
+    native.bind(
+        name = "abseil_status",
+        actual = "@com_google_absl//absl/status",
+    )
+
 def _com_google_protobuf():
     _repository_impl("rules_python")
     _repository_impl(
@@ -595,6 +604,8 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
+        patches = ["@envoy//bazel/foreign_cc:curl-revert-cmake-minreqver.patch"],
+        patch_args = ["-p1"],
         **location
     )
     native.bind(
@@ -644,6 +655,15 @@ def _com_googlesource_quiche():
     native.bind(
         name = "quiche_quic_platform_base",
         actual = "@com_googlesource_quiche//:quic_platform_base",
+    )
+
+def _com_googlesource_googleurl():
+    _repository_impl(
+        name = "com_googlesource_googleurl",
+    )
+    native.bind(
+        name = "googleurl",
+        actual = "@com_googlesource_googleurl//url:url",
     )
 
 def _org_llvm_releases_compiler_rt():
@@ -727,6 +747,22 @@ def _com_github_luajit_luajit():
         actual = "@envoy//bazel/foreign_cc:luajit",
     )
 
+def _com_github_moonjit_moonjit():
+    location = REPOSITORY_LOCATIONS["com_github_moonjit_moonjit"]
+    http_archive(
+        name = "com_github_moonjit_moonjit",
+        build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:moonjit.patch"],
+        patch_args = ["-p1"],
+        patch_cmds = ["chmod u+x build.py"],
+        **location
+    )
+
+    native.bind(
+        name = "moonjit",
+        actual = "@envoy//bazel/foreign_cc:moonjit",
+    )
+
 def _com_github_gperftools_gperftools():
     location = REPOSITORY_LOCATIONS["com_github_gperftools_gperftools"]
     http_archive(
@@ -790,6 +826,9 @@ def _is_arch(ctxt, arch):
 
 def _is_linux_ppc(ctxt):
     return _is_linux(ctxt) and _is_arch(ctxt, "ppc")
+
+def _is_linux_s390x(ctxt):
+    return _is_linux(ctxt) and _is_arch(ctxt, "s390x")
 
 def _is_linux_x86_64(ctxt):
     return _is_linux(ctxt) and _is_arch(ctxt, "x86_64")

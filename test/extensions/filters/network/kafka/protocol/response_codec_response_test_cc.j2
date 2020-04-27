@@ -33,7 +33,7 @@ using ResponseCapturingCallback = CapturingCallback<ResponseCallback, AbstractRe
 
 // Integration test for {{ message_type.name }} messages.
 
-TEST_F(ResponseCodecResponseTest, shouldHandle{{ message_type.name }}Messages) {
+TEST_F(ResponseCodecResponseTest, ShouldHandle{{ message_type.name }}Messages) {
   // given
   const auto callback = std::make_shared<ResponseCapturingCallback>();
   ResponseDecoder testee{ {callback} };

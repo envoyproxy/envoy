@@ -144,7 +144,7 @@ public:
 
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
 
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
+  const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 
   const HealthyAndDegradedLoad&
   determinePriorityLoad(const PrioritySet&,
@@ -272,9 +272,9 @@ private:
   uint32_t tryChooseLocalLocalityHosts(const HostSet& host_set);
 
   /**
-   * @return (number of hosts in a given locality)/(total number of hosts) in ret param.
+   * @return (number of hosts in a given locality)/(total number of hosts) in `ret` param.
    * The result is stored as integer number and scaled by 10000 multiplier for better precision.
-   * Caller is responsible for allocation/de-allocation of ret.
+   * Caller is responsible for allocation/de-allocation of `ret`.
    */
   void calculateLocalityPercentage(const HostsPerLocality& hosts_per_locality, uint64_t* ret);
 

@@ -45,6 +45,7 @@
 
 #include "server/transport_socket_config_impl.h"
 
+#include "extensions/filters/network/common/utility.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/str_cat.h"
@@ -166,18 +167,28 @@ parseExtensionProtocolOptions(const envoy::config::cluster::v3::Cluster& config,
   std::map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
 
   for (const auto& it : config.typed_extension_protocol_options()) {
+    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
+    // We only handle deprecated network filter names here because no existing HTTP filter has
+    // protocol options.
+    auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
+
     auto object = createProtocolOptionsConfig(
-        it.first, it.second, ProtobufWkt::Struct::default_instance(), validation_visitor);
+        name, it.second, ProtobufWkt::Struct::default_instance(), validation_visitor);
     if (object != nullptr) {
-      options[it.first] = std::move(object);
+      options[name] = std::move(object);
     }
   }
 
   for (const auto& it : config.hidden_envoy_deprecated_extension_protocol_options()) {
-    auto object = createProtocolOptionsConfig(it.first, ProtobufWkt::Any::default_instance(),
-                                              it.second, validation_visitor);
+    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
+    // We only handle deprecated network filter names here because no existing HTTP filter has
+    // protocol options.
+    auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
+
+    auto object = createProtocolOptionsConfig(name, ProtobufWkt::Any::default_instance(), it.second,
+                                              validation_visitor);
     if (object != nullptr) {
-      options[it.first] = std::move(object);
+      options[name] = std::move(object);
     }
   }
 
@@ -229,18 +240,20 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
 
 HostDescriptionImpl::HostDescriptionImpl(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-    Network::Address::InstanceConstSharedPtr dest_address,
-    const envoy::config::core::v3::Metadata& metadata,
+    Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
     const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority)
-    : cluster_(cluster), hostname_(hostname), address_(dest_address),
-      canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+    : cluster_(cluster), hostname_(hostname),
+      health_checks_hostname_(health_check_config.hostname()), address_(dest_address),
+      canary_(Config::Metadata::metadataValue(metadata.get(),
+                                              Config::MetadataFilters::get().ENVOY_LB,
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value()),
-      metadata_(std::make_shared<envoy::config::core::v3::Metadata>(metadata)), locality_(locality),
+      metadata_(metadata), locality_(locality),
       locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
-      priority_(priority), socket_factory_(resolveTransportSocketFactory(dest_address, metadata)) {
+      priority_(priority),
+      socket_factory_(resolveTransportSocketFactory(dest_address, metadata_.get())) {
   if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
     // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
     // for a pipe address is a misconfiguration. Throw an exception.
@@ -255,11 +268,12 @@ HostDescriptionImpl::HostDescriptionImpl(
 
 Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFactory(
     const Network::Address::InstanceConstSharedPtr& dest_address,
-    const envoy::config::core::v3::Metadata& metadata) {
+    const envoy::config::core::v3::Metadata* metadata) {
   auto match = cluster_->transportSocketMatcher().resolve(metadata);
   match.stats_.total_match_count_.inc();
   ENVOY_LOG(debug, "transport socket match, socket {} selected for host with address {}",
             match.name_, dest_address ? dest_address->asString() : "empty");
+
   return match.factory_;
 }
 
@@ -619,6 +633,10 @@ public:
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Server::Admin& admin() override { return admin_; }
   TimeSource& timeSource() override { return api().timeSource(); }
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    // Not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   Api::Api& api() override { return api_; }
 
 private:
@@ -660,7 +678,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                                 : absl::nullopt),
       features_(parseFeatures(config)),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
-      http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
+      http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
       extension_protocol_options_(parseExtensionProtocolOptions(config, validation_visitor)),
       resource_managers_(config, runtime, name_, *stats_scope_),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
@@ -845,7 +863,9 @@ ClusterImplBase::ClusterImplBase(
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),
-      symbol_table_(stats_scope->symbolTable()) {
+      symbol_table_(stats_scope->symbolTable()),
+      const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
+          factory_context.singletonManager(), factory_context.dispatcher())) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
@@ -1167,11 +1187,13 @@ void PriorityStateManager::registerHostForPriority(
     const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
-  const HostSharedPtr host(
-      new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
-                   lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
-                   lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
-                   lb_endpoint.health_status()));
+  auto metadata = lb_endpoint.has_metadata()
+                      ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
+                      : nullptr;
+  const HostSharedPtr host(new HostImpl(
+      parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
+      locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
+      locality_lb_endpoint.priority(), lb_endpoint.health_status()));
   registerHostForPriority(host, locality_lb_endpoint);
 }
 
@@ -1338,11 +1360,17 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
           updateHealthFlag(*host, *existing_host->second, Host::HealthFlag::DEGRADED_EDS_HEALTH);
 
       // Did metadata change?
-      const bool metadata_changed = !Protobuf::util::MessageDifferencer::Equivalent(
-          *host->metadata(), *existing_host->second->metadata());
+      bool metadata_changed = true;
+      if (host->metadata() && existing_host->second->metadata()) {
+        metadata_changed = !Protobuf::util::MessageDifferencer::Equivalent(
+            *host->metadata(), *existing_host->second->metadata());
+      } else if (!host->metadata() && !existing_host->second->metadata()) {
+        metadata_changed = false;
+      }
+
       if (metadata_changed) {
         // First, update the entire metadata for the endpoint.
-        existing_host->second->metadata(*host->metadata());
+        existing_host->second->metadata(host->metadata());
 
         // Also, given that the canary attribute of an endpoint is derived from its metadata
         // (e.g.: from envoy.lb/canary), we do a blind update here since it's cheaper than testing
