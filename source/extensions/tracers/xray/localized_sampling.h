@@ -74,13 +74,7 @@ public:
    * Set the percentage of requests to sample _after_ sampling |fixed_target| requests per second.
    */
   void setRate(double rate) { rate_ = rate; }
-
-  const std::string& host() const { return host_; }
-  const std::string& httpMethod() const { return http_method_; }
-  const std::string& urlPath() const { return url_path_; }
-  uint32_t fixedTarget() const { return fixed_target_; }
   double rate() const { return rate_; }
-  const Reservoir& reservoir() const { return reservoir_; }
   Reservoir& reservoir() { return reservoir_; }
 
 private:
