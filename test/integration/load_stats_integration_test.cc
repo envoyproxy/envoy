@@ -159,9 +159,8 @@ public:
     RELEASE_ASSERT(result, result.message());
   }
 
-  void
-  mergeLoadStats(envoy::service::load_stats::v3::LoadStatsRequest& loadstats_request,
-                 envoy::service::load_stats::v3::LoadStatsRequest& local_loadstats_request) {
+  void mergeLoadStats(envoy::service::load_stats::v3::LoadStatsRequest& loadstats_request,
+                      envoy::service::load_stats::v3::LoadStatsRequest& local_loadstats_request) {
     // Strip out "load_report" cluster, so that it doesn't interfere with the test.
     for (auto it = local_loadstats_request.mutable_cluster_stats()->begin();
          it != local_loadstats_request.mutable_cluster_stats()->end(); ++it) {
