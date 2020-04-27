@@ -25,3 +25,6 @@ Recorded talks
 - *Envoy Mobile in Depth: From Server to Multi-platform Library*
   (`EnvoyCon 2019 <https://www.youtube.com/watch?v=3ghO2K1Pd2k&list=PLj6h78yzYM2MF1Ti3Mrfa9P0IlavyZYWt&index=10&t=0s>`_ / `KubeCon NA 2019 <https://www.youtube.com/watch?v=NYb_nVWkP-I&t=1s>`_):
   motivation for the project and deep dive into the library v0.2.
+- *Next Generation Client APIs in Envoy Mobile*
+  (`QCon London 2020 <https://qconlondon.com/london2020/presentation/next-generation-client-apis-envoy-mobile>`_):
+  hear about the journey Lyft made with their APIs and how Envoy Mobile helped.
