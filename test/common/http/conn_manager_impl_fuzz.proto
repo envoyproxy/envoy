@@ -11,12 +11,15 @@ import "test/fuzz/common.proto";
 message NewStream {
   test.fuzz.Headers request_headers = 1;
   bool end_stream = 2;
-  // TODO(htuch): Support stop/continue status with headers.
+  HeaderStatus status = 3;
 }
 
 enum HeaderStatus {
   HEADER_CONTINUE = 0;
   HEADER_STOP_ITERATION = 1;
+  HEADER_CONTINUE_AND_END_STREAM = 2;
+  HEADER_STOP_ALL_ITERATION_AND_BUFFER = 3;
+  HEADER_STOP_ALL_ITERATION_AND_WATERMARK = 4;
 }
 
 enum DataStatus {
