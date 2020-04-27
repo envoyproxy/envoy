@@ -168,6 +168,10 @@ bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_
   // The feature is allowed. It is assumed this check is called when the feature
   // is about to be used, so increment the feature use stat.
   stats_.deprecated_feature_use_.inc();
+
+  // Similar to the above, but a gauge that isn't imported during a hot restart.
+  stats_.deprecated_feature_active_.inc();
+
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
   return false;
 #endif

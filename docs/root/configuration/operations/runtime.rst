@@ -273,7 +273,8 @@ The file system runtime provider emits some statistics in the *runtime.* namespa
   :widths: 1, 1, 2
 
   admin_overrides_active, Gauge, 1 if any admin overrides are active otherwise 0
-  deprecated_feature_use, Gauge, Number of times deprecated features were used. Detailed information about the feature used will be logged to warning logs in the form "Using deprecated option 'X' from file Y".
+  deprecated_feature_use, Counter, Total number of times deprecated features were used. Detailed information about the feature used will be logged to warning logs in the form "Using deprecated option 'X' from file Y".
+  deprecated_feature_active, Gauge, Number of times deprecated features were used. This is not carried over during hot restarts.
   load_error, Counter, Total number of load attempts that resulted in an error in any layer
   load_success, Counter, Total number of load attempts that were successful at all layers
   num_keys, Gauge, Number of keys currently loaded

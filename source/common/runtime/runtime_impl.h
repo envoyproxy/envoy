@@ -51,12 +51,13 @@ public:
  * All runtime stats. @see stats_macros.h
  */
 #define ALL_RUNTIME_STATS(COUNTER, GAUGE)                                                          \
+  COUNTER(deprecated_feature_use)                                                                  \
   COUNTER(load_error)                                                                              \
   COUNTER(load_success)                                                                            \
   COUNTER(override_dir_exists)                                                                     \
   COUNTER(override_dir_not_exists)                                                                 \
   GAUGE(admin_overrides_active, NeverImport)                                                       \
-  GAUGE(deprecated_feature_use, NeverImport)                                                       \
+  GAUGE(deprecated_feature_active, NeverImport)                                                    \
   GAUGE(num_keys, NeverImport)                                                                     \
   GAUGE(num_layers, NeverImport)
 
