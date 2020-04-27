@@ -51,6 +51,12 @@ class StreamEncoderImpl : public virtual StreamEncoder,
                           public StreamCallbackHelper,
                           public Http1StreamEncoderOptions {
 public:
+  ~StreamEncoderImpl() {
+    // When the stream goes away, undo any read blocks to resume reading.
+    while (read_disable_calls_ != 0) {
+      readDisable(false);
+    }
+  }
   // Http::StreamEncoder
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeMetadata(const MetadataMapVector&) override;
@@ -75,6 +81,8 @@ public:
   void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
 
+  void clearReadDisableCalls() { read_disable_calls_ = 0; }
+
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
   void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
@@ -85,6 +93,7 @@ protected:
   static const std::string LAST_CHUNK;
 
   ConnectionImpl& connection_;
+  uint32_t read_disable_calls_{};
   bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
   bool processing_100_continue_ : 1;
@@ -196,7 +205,11 @@ public:
   uint64_t bufferRemainingSize();
   void copyToBuffer(const char* data, uint64_t length);
   void reserveBuffer(uint64_t size);
-  void readDisable(bool disable) { connection_.readDisable(disable); }
+  void readDisable(bool disable) {
+    if (connection_.state() == Network::Connection::State::Open) {
+      connection_.readDisable(disable);
+    }
+  }
   uint32_t bufferLimit() { return connection_.bufferLimit(); }
   virtual bool supports_http_10() { return false; }
   bool maybeDirectDispatch(Buffer::Instance& data);
@@ -399,7 +412,14 @@ public:
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action);
-
+  ~ServerConnectionImpl() {
+    // This ideally would not be necessary, however in the integration test framework the server
+    // connection outlives the Network::Connection, and so the Network::Connection must not be
+    // accessed in this destructor.
+    if (active_request_.has_value()) {
+      active_request_.value().response_encoder_.clearReadDisableCalls();
+    }
+  }
   bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
 private:

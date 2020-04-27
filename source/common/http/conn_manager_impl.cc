@@ -218,15 +218,6 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   }
 
   checkForDeferredClose();
-
-  // Reading may have been disabled for the non-multiplexing case, so enable it again.
-  // Also be sure to unwind any read-disable done by the prior downstream
-  // connection.
-  if (drain_state_ != DrainState::Closing && codec_->protocol() < Protocol::Http2) {
-    while (!read_callbacks_->connection().readEnabled()) {
-      read_callbacks_->connection().readDisable(false);
-    }
-  }
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
@@ -345,10 +336,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
           data.length() > 0 && streams_.empty()) {
         redispatch = true;
-      }
-
-      if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
-        read_callbacks_->connection().readDisable(true);
       }
     }
   } while (redispatch);

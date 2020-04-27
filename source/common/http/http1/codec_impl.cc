@@ -304,7 +304,17 @@ void StreamEncoderImpl::resetStream(StreamResetReason reason) {
   connection_.onResetStreamBase(reason);
 }
 
-void StreamEncoderImpl::readDisable(bool disable) { connection_.readDisable(disable); }
+void StreamEncoderImpl::readDisable(bool disable) {
+  if (disable) {
+    ++read_disable_calls_;
+  } else {
+    ASSERT(read_disable_calls_ != 0);
+    if (read_disable_calls_ != 0) {
+      --read_disable_calls_;
+    }
+  }
+  connection_.readDisable(disable);
+}
 
 uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
 
@@ -880,6 +890,10 @@ void ServerConnectionImpl::onMessageComplete() {
   ASSERT(!handling_upgrade_);
   if (active_request_.has_value()) {
     auto& active_request = active_request_.value();
+
+    if (active_request.request_decoder_) {
+      active_request.response_encoder_.readDisable(true);
+    }
     active_request.remote_complete_ = true;
     if (deferred_end_stream_headers_) {
       active_request.request_decoder_->decodeHeaders(
@@ -1066,17 +1080,6 @@ void ClientConnectionImpl::onMessageComplete() {
     // Encoder is used as part of decode* calls later in this function so pending_response_ can not
     // be reset just yet. Preserve the state in pending_response_done_ instead.
     pending_response_done_ = true;
-
-    // Streams are responsible for unwinding any outstanding readDisable(true)
-    // calls done on the underlying connection as they are destroyed. As this is
-    // the only place a HTTP/1 stream is destroyed where the Network::Connection is
-    // reused, unwind any outstanding readDisable() calls here. Do this before we dispatch
-    // end_stream in case the caller immediately reuses the connection.
-    if (connection_.state() == Network::Connection::State::Open) {
-      while (!connection_.readEnabled()) {
-        connection_.readDisable(false);
-      }
-    }
 
     if (deferred_end_stream_headers_) {
       response.decoder_->decodeHeaders(

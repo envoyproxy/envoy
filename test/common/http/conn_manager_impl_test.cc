@@ -1,4 +1,4 @@
-#include <chrono>
+#include<chrono>
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -51,7 +51,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
+    using testing::_;
 using testing::An;
 using testing::AnyNumber;
 using testing::AtLeast;
@@ -3858,17 +3858,6 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true));
   EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
-  // When the stream ends, the manager should check to see if the connection is
-  // read disabled, and keep calling readDisable(false) until readEnabled()
-  // returns true.
-  EXPECT_CALL(filter_callbacks_.connection_, readEnabled())
-      .Times(2)
-      .WillOnce(Return(false))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
-  expectOnDestroy();
-  decoder_filters_[1]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 }
 
 TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWithLazyCreation) {
