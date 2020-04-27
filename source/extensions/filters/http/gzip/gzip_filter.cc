@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/http/headers.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -84,29 +85,9 @@ GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip:
   // compressor_library field which is mandatory in v3. Here we convert gzip's Compressor to
   // what is accepted by the generic compressor.
   if (gzip.has_compressor()) {
-    compressor.set_allocated_content_length(
-        // According to
-        // https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#embeddedmessage
-        // the message Compressor takes ownership of the allocated Protobuf::Uint32Value object.
-        new Protobuf::UInt32Value(gzip.compressor().content_length()));
-    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
-    for (const std::string& ctype : gzip.compressor().content_type()) {
-      compressor.add_content_type(ctype);
-    }
-    compressor.set_disable_on_etag_header(gzip.compressor().disable_on_etag_header());
-    compressor.set_remove_accept_encoding_header(gzip.compressor().remove_accept_encoding_header());
-    if (gzip.compressor().has_runtime_enabled()) {
-      auto feature_flag(new envoy::config::core::v3::RuntimeFeatureFlag());
-      feature_flag->set_runtime_key(gzip.compressor().runtime_enabled().runtime_key());
-      feature_flag->set_allocated_default_value(
-          // According to
-          // https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#embeddedmessage
-          // the message RuntimeFeatureFlag takes ownership of the allocated Protobuf::BoolValue
-          // object.
-          new Protobuf::BoolValue(gzip.compressor().runtime_enabled().default_value()));
-      // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
-      compressor.set_allocated_runtime_enabled(feature_flag);
-    }
+    ProtobufWkt::Struct tmp;
+    MessageUtil::jsonConvert(gzip.compressor(), tmp);
+    MessageUtil::jsonConvert(tmp, ProtobufMessage::getStrictValidationVisitor(), compressor);
     return compressor;
   }
 
