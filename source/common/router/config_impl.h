@@ -53,6 +53,9 @@ public:
   virtual RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
                                       const StreamInfo::StreamInfo& stream_info,
                                       uint64_t random_value) const PURE;
+
+  // By default, matchers do not support null Path headers.
+  virtual bool supportsPathlessHeaders() const { return false; }
 };
 
 class PerFilterConfigs {
@@ -849,6 +852,8 @@ public:
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override;
+
+  bool supportsPathlessHeaders() const override { return true; }
 };
 /**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.

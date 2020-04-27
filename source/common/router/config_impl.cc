@@ -931,8 +931,7 @@ ConnectRouteEntryImpl::ConnectRouteEntryImpl(
 
 void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                               bool insert_envoy_original_path) const {
-  const absl::string_view path =
-      Http::PathUtil::removeQueryAndFragment(headers.Path()->value().getStringView());
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(getPath(headers));
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 
@@ -1150,9 +1149,8 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::RequestHead
 
   // Check for a route that matches the request.
   for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
-    if (!headers.Path()) {
-      // TODO(alyssawilk) allow specifically for kConnectMatcher routes.
-      return nullptr;
+    if (!headers.Path() && !route->supportsPathlessHeaders()) {
+      continue;
     }
     RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
     if (nullptr != route_entry) {

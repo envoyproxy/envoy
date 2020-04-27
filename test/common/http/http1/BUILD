@@ -64,27 +64,3 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
-
-envoy_cc_test(
-    name = "conn_pool_legacy_test",
-    srcs = ["conn_pool_legacy_test.cc"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/common/event:dispatcher_lib",
-        "//source/common/http:codec_client_lib",
-        "//source/common/http/http1:conn_pool_legacy_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:upstream_includes",
-        "//source/common/upstream:upstream_lib",
-        "//test/common/http:common_lib",
-        "//test/common/upstream:utility_lib",
-        "//test/mocks/buffer:buffer_mocks",
-        "//test/mocks/event:event_mocks",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
