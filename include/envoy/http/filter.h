@@ -160,7 +160,7 @@ public:
    * accepted by the callback.
    *
    * NOTE: clearRouteCache() must be called before invoking this method otherwise cached route will
-   * be retuned directly to the caller and the callback will not be invoked.
+   * be returned directly to the caller and the callback will not be invoked.
    */
   virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
 
