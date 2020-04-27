@@ -161,9 +161,19 @@ public:
 
   void
   mergeLoadStats(envoy::service::load_stats::v3::LoadStatsRequest& loadstats_request,
-                 const envoy::service::load_stats::v3::LoadStatsRequest& local_loadstats_request) {
-    ASSERT(loadstats_request.cluster_stats_size() <= 1);
-    ASSERT(local_loadstats_request.cluster_stats_size() <= 1);
+                 envoy::service::load_stats::v3::LoadStatsRequest& local_loadstats_request) {
+    // Strip out "load_report" cluster, so that it doesn't interfere with the test.
+    for (auto it = local_loadstats_request.mutable_cluster_stats()->begin();
+         it != local_loadstats_request.mutable_cluster_stats()->end(); ++it) {
+      if (it->cluster_name() == "load_report") {
+        local_loadstats_request.mutable_cluster_stats()->erase(it);
+        break;
+      }
+    }
+
+    ASSERT_LE(loadstats_request.cluster_stats_size(), 1) << loadstats_request.DebugString();
+    ASSERT_LE(local_loadstats_request.cluster_stats_size(), 1)
+        << local_loadstats_request.DebugString();
 
     if (local_loadstats_request.cluster_stats_size() == 0) {
       return;
