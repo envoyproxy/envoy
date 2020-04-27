@@ -140,8 +140,8 @@ private:
     ~DirectStream();
 
     // Stream
-    void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
-    void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
+    void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
+    void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
     void resetStream(StreamResetReason) override;
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
       return parent_.address_;
