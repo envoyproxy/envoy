@@ -30,7 +30,10 @@ class RequestTest {
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https",
       authority = "api.foo.com", path = "foo")
         .addRetryPolicy(
-          RetryPolicy(23, listOf(RetryRule.STATUS_5XX, RetryRule.CONNECT_FAILURE), 1234)
+          RetryPolicy(
+              maxRetryCount = 23,
+              retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.CONNECT_FAILURE),
+              perRetryTimeoutMS = 1234)
         )
         .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
         .addHeader("header_a", "value_a1")

@@ -5,6 +5,7 @@ package io.envoyproxy.envoymobile
  *
  * @param maxRetryCount Maximum number of retries that a request may be performed.
  * @param retryOn Whitelist of rules used for retrying.
+ * @param retryStatusCodes Additional list of status codes that should be retried.
  * @param perRetryTimeoutMS Timeout (in milliseconds) to apply to each retry.
  * Must be <= `totalUpstreamTimeoutMS` if it's a positive number.
  * @param totalUpstreamTimeoutMS Total timeout (in milliseconds) that includes all retries.
@@ -12,10 +13,11 @@ package io.envoyproxy.envoymobile
  * upstream response has been completely processed. Null or 0 may be specified to disable it.
  */
 data class RetryPolicy(
-  val maxRetryCount: Int,
-  val retryOn: List<RetryRule>,
-  val perRetryTimeoutMS: Long? = null,
-  val totalUpstreamTimeoutMS: Long? = 15000
+    val maxRetryCount: Int,
+    val retryOn: List<RetryRule>,
+    val retryStatusCodes: List<Int> = emptyList(),
+    val perRetryTimeoutMS: Long? = null,
+    val totalUpstreamTimeoutMS: Long? = 15000
 ) {
   init {
     if (perRetryTimeoutMS != null && totalUpstreamTimeoutMS != null &&
@@ -35,7 +37,6 @@ enum class RetryRule {
   CONNECT_FAILURE,
   REFUSED_STREAM,
   RETRIABLE_4XX,
-  RETRIABLE_STATUS_CODES,
   RETRIABLE_HEADERS,
   RESET,
 }
