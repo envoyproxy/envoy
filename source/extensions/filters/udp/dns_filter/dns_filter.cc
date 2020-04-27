@@ -16,6 +16,9 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     : root_scope_(context.scope()), stats_(generateStats(config.stat_prefix(), root_scope_)) {
   using envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig;
 
+  static constexpr std::chrono::milliseconds DEFAULT_RESOLVER_TIMEOUT{500};
+  static constexpr std::chrono::seconds DEFAULT_RESOLVER_TTL{300};
+
   const auto& server_config = config.server_config();
 
   // TODO(abaptiste): Read the external DataSource
@@ -39,7 +42,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       virtual_domains_.emplace(virtual_domain.name(), std::move(addrs));
       uint64_t ttl = virtual_domain.has_answer_ttl()
                          ? DurationUtil::durationToSeconds(virtual_domain.answer_ttl())
-                         : DefaultResolverTTL.count();
+                         : DEFAULT_RESOLVER_TTL.count();
       domain_ttl_.emplace(virtual_domain.name(), ttl);
     }
 
@@ -61,7 +64,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       resolvers_.push_back(std::move(ipaddr));
     }
     resolver_timeout_ms_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
-        client_config, resolver_timeout, DefaultResolverTimeout.count()));
+        client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
   }
 }
 

@@ -62,9 +62,6 @@ private:
     return {ALL_DNS_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
 
-  std::chrono::milliseconds DefaultResolverTimeout = std::chrono::milliseconds(500);
-  std::chrono::seconds DefaultResolverTTL = std::chrono::seconds(300);
-
   Stats::Scope& root_scope_;
 
   mutable DnsFilterStats stats_;
