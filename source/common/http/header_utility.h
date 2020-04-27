@@ -5,6 +5,7 @@
 #include "envoy/common/regex.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/protocol.h"
 #include "envoy/json/json_object.h"
 #include "envoy/type/v3/range.pb.h"
 
@@ -135,6 +136,15 @@ public:
    */
   static absl::optional<std::reference_wrapper<const absl::string_view>>
   requestHeadersValid(const RequestHeaderMap& headers);
+
+  /**
+   * Determines if the response should be framed by Connection: Close based on protocol
+   * and request headers.
+   * @param protocol the protocol of the request
+   * @param headers the request headers
+   * @return if the response should be framed by Connection: Close
+   */
+  static bool shouldCloseConnection(Http::Protocol protocol, const RequestHeaderMap& headers);
 };
 } // namespace Http
 } // namespace Envoy

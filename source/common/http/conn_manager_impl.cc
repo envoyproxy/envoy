@@ -752,14 +752,20 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 // can't route select properly without full headers), checking state required to
 // serve error responses (connection close, head requests, etc), and
 // modifications which may themselves affect route selection.
-//
-// TODO(alyssawilk) all the calls here should be audited for order priority,
-// e.g. many early returns do not currently handle connection: close properly.
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& headers,
                                                         bool end_stream) {
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
+
+  // Both saw_connection_close_ and is_head_request_ affect local replies: set
+  // them as early as possible.
+  Protocol protocol = connection_manager_.codec_->protocol();
+  state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
+  if (Http::Headers::get().MethodValues.Head ==
+      request_headers_->Method()->value().getStringView()) {
+    state_.is_head_request_ = true;
+  }
 
   // TODO(alyssawilk) remove this synthetic path in a follow-up PR, including
   // auditing of empty path headers. We check for path because HTTP/2 connect requests may have a
@@ -781,10 +787,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->config();
   }
 
-  if (Http::Headers::get().MethodValues.Head ==
-      request_headers_->Method()->value().getStringView()) {
-    state_.is_head_request_ = true;
-  }
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *request_headers_);
 
@@ -822,7 +824,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                                                         connection_manager_.stats_.scope_);
 
   // Make sure we are getting a codec version we support.
-  Protocol protocol = connection_manager_.codec_->protocol();
   if (protocol == Protocol::Http10) {
     // Assume this is HTTP/1.0. This is fine for HTTP/0.9 but this code will also affect any
     // requests with non-standard version numbers (0.9, 1.3), basically anything which is not
@@ -835,31 +836,21 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       sendLocalReply(false, Code::UpgradeRequired, "", nullptr, state_.is_head_request_,
                      absl::nullopt, StreamInfo::ResponseCodeDetails::get().LowVersion);
       return;
-    } else {
-      // HTTP/1.0 defaults to single-use connections. Make sure the connection
-      // will be closed unless Keep-Alive is present.
-      state_.saw_connection_close_ = true;
-      if (request_headers_->Connection() &&
-          absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
-                                 Http::Headers::get().ConnectionValues.KeepAlive)) {
-        state_.saw_connection_close_ = false;
-      }
     }
-  }
-
-  if (!request_headers_->Host()) {
-    if ((protocol == Protocol::Http10) &&
+    if (!request_headers_->Host() &&
         !connection_manager_.config_.http1Settings().default_host_for_http_10_.empty()) {
       // Add a default host if configured to do so.
       request_headers_->setHost(
           connection_manager_.config_.http1Settings().default_host_for_http_10_);
-    } else {
-      // Require host header. For HTTP/1.1 Host has already been translated to :authority.
-      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
-                     nullptr, state_.is_head_request_, absl::nullopt,
-                     StreamInfo::ResponseCodeDetails::get().MissingHost);
-      return;
     }
+  }
+
+  if (!request_headers_->Host()) {
+    // Require host header. For HTTP/1.1 Host has already been translated to :authority.
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
+                   nullptr, state_.is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().MissingHost);
+    return;
   }
 
   // Verify header sanity checks which should have been performed by the codec.
@@ -889,21 +880,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                    nullptr, state_.is_head_request_, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
-  }
-
-  if (protocol == Protocol::Http11 && request_headers_->Connection() &&
-      absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
-                             Http::Headers::get().ConnectionValues.Close)) {
-    state_.saw_connection_close_ = true;
-  }
-  // Note: Proxy-Connection is not a standard header, but is supported here
-  // since it is supported by http-parser the underlying parser for http
-  // requests.
-  if (protocol < Protocol::Http2 && !state_.saw_connection_close_ &&
-      request_headers_->ProxyConnection() &&
-      absl::EqualsIgnoreCase(request_headers_->ProxyConnection()->value().getStringView(),
-                             Http::Headers::get().ConnectionValues.Close)) {
-    state_.saw_connection_close_ = true;
   }
 
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
