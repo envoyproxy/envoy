@@ -15,6 +15,7 @@
 #include "absl/synchronization/blocking_counter.h"
 #include "benchmark/benchmark.h"
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_CreateRace(benchmark::State& state) {
   Envoy::Thread::ThreadFactory& thread_factory = Envoy::Thread::threadFactoryForTest();
 
@@ -57,6 +58,7 @@ static void BM_CreateRace(benchmark::State& state) {
 }
 BENCHMARK(BM_CreateRace);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JoinStatNames(benchmark::State& state) {
   Envoy::Stats::SymbolTableImpl symbol_table;
   Envoy::Stats::IsolatedStoreImpl store(symbol_table);
@@ -72,6 +74,7 @@ static void BM_JoinStatNames(benchmark::State& state) {
 }
 BENCHMARK(BM_JoinStatNames);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JoinElements(benchmark::State& state) {
   Envoy::Stats::SymbolTableImpl symbol_table;
   Envoy::Stats::IsolatedStoreImpl store(symbol_table);
