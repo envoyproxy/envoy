@@ -17,14 +17,14 @@ namespace {
 // Test param is the path to the config file to validate.
 class ValidationServerTest : public testing::TestWithParam<std::string> {
 public:
-  static void SetupTestDirectory() {
+  static void setupTestDirectory() {
     TestEnvironment::exec(
         {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
     directory_ = TestEnvironment::temporaryDirectory() + "/test/config_test/";
   }
 
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
-    SetupTestDirectory();
+    setupTestDirectory();
   }
 
 protected:
@@ -41,8 +41,8 @@ std::string ValidationServerTest::directory_ = "";
 // tests than set of tests for ValidationServerTest.
 class ValidationServerTest_1 : public ValidationServerTest {
 public:
-  static const std::vector<std::string> GetAllConfigFiles() {
-    SetupTestDirectory();
+  static const std::vector<std::string> getAllConfigFiles() {
+    setupTestDirectory();
 
     auto files = TestUtility::listFiles(ValidationServerTest::directory_, false);
 
@@ -59,16 +59,16 @@ public:
 class RuntimeFeatureValidationServerTest : public ValidationServerTest {
 public:
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
-    SetupTestDirectory();
+    setupTestDirectory();
   }
 
-  static void SetupTestDirectory() {
+  static void setupTestDirectory() {
     directory_ =
         TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
   }
 
-  static const std::vector<std::string> GetAllConfigFiles() {
-    SetupTestDirectory();
+  static const std::vector<std::string> getAllConfigFiles() {
+    setupTestDirectory();
 
     auto files = TestUtility::listFiles(ValidationServerTest::directory_, false);
 
@@ -148,7 +148,7 @@ TEST_P(ValidationServerTest_1, RunWithoutCrash) {
 }
 
 INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest_1,
-                         ::testing::ValuesIn(ValidationServerTest_1::GetAllConfigFiles()));
+                         ::testing::ValuesIn(ValidationServerTest_1::getAllConfigFiles()));
 
 TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoaderSingleton) {
   TestConfigFactory factory;
@@ -164,7 +164,7 @@ TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoaderSingleton) {
 
 INSTANTIATE_TEST_SUITE_P(
     AllConfigs, RuntimeFeatureValidationServerTest,
-    ::testing::ValuesIn(RuntimeFeatureValidationServerTest::GetAllConfigFiles()));
+    ::testing::ValuesIn(RuntimeFeatureValidationServerTest::getAllConfigFiles()));
 
 } // namespace
 } // namespace Server
