@@ -25,8 +25,8 @@ public:
       const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
       const std::string& compressor_name,
       Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel level,
-      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy, int64_t window_bits,
-      uint64_t memory_level)
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy,
+      int64_t window_bits, uint64_t memory_level)
       : CompressorFilterConfig(compressor, stats_prefix + compressor_name + ".", scope, runtime,
                                compressor_name),
         level_(level), strategy_(strategy), window_bits_(window_bits), memory_level_(memory_level) {
@@ -46,7 +46,8 @@ public:
 
 using CompressionParams =
     std::tuple<Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel,
-               Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy, int64_t, uint64_t>;
+               Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy, int64_t,
+               uint64_t>;
 
 static constexpr uint64_t TestDataSize = 122880;
 

@@ -34,7 +34,8 @@ GzipFilterConfig::GzipFilterConfig(const envoy::extensions::filters::http::gzip:
       chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, chunk_size, 4096)) {}
 
 Envoy::Compression::Compressor::CompressorPtr GzipFilterConfig::makeCompressor() {
-  auto compressor = std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>(chunk_size_);
+  auto compressor =
+      std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>(chunk_size_);
   compressor->init(compressionLevel(), compressionStrategy(), windowBits(), memoryLevel());
   return compressor;
 }
