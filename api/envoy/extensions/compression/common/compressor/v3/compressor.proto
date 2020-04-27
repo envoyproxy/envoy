@@ -13,7 +13,7 @@ option java_outer_classname = "CompressorProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: CompressorLibrary]
+// [#protodoc-title: Compressor Library]
 
 message CompressorLibrary {
   // Compressor library specific configuration. See the supported libraries for further
