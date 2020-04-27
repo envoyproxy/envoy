@@ -412,6 +412,21 @@ TEST_F(GzipFilterTest, RemoveAcceptEncodingHeader) {
   }
 }
 
+// Test setting zlib's chunk size.
+TEST_F(GzipFilterTest, ChunkSize) {
+  // Default
+  setUpFilter("{}");
+  EXPECT_EQ(config_->chunkSize(), 4096);
+
+  // Override
+  setUpFilter(R"EOF(
+{
+  "chunk_size": 8192
+}
+)EOF");
+  EXPECT_EQ(config_->chunkSize(), 8192);
+}
+
 // Test that the deprecated extension name still functions.
 TEST(GzipFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.gzip";

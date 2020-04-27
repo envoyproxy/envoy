@@ -105,6 +105,7 @@ TEST_F(PathUtilityTest, MergeSlashes) {
   EXPECT_EQ("/a/b/c", mergeSlashes("/a////b/c"));         // quadruple / in the middle
   EXPECT_EQ("/a/b?a=///c", mergeSlashes("/a//b?a=///c")); // slashes in the query are ignored
   EXPECT_EQ("/a/b?", mergeSlashes("/a//b?"));             // empty query
+  EXPECT_EQ("/a/?b", mergeSlashes("//a/?b"));             // ends with slash + query
 }
 
 TEST_F(PathUtilityTest, RemoveQueryAndFragment) {

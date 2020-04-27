@@ -19,6 +19,8 @@
 extensions/filters/common/original_src @snowp @klarose
 # dubbo_proxy extension
 /*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan
+# rocketmq_proxy extension
+/*/extensions/filters/network/rocketmq_proxy @aaron-ai @lizhanhui @lizan
 # thrift_proxy extension
 /*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
 # compressor used by http compression filters
@@ -45,6 +47,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/tracers/xray @marcomagdy @lavignes @mattklein123
 # mysql_proxy extension
 /*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123
+# postgres_proxy extension
+/*/extensions/filters/network/postgres_proxy @fabriziomello @cpakulski @dio
 # quic extension
 /*/extensions/quic_listeners/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin
 # zookeeper_proxy extension

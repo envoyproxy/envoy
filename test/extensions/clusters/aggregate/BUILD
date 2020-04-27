@@ -55,7 +55,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.clusters.aggregate",
     deps = [
         "//source/common/config:protobuf_link_hacks",
-        "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/clusters/aggregate:cluster",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -65,6 +64,7 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],

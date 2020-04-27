@@ -30,10 +30,11 @@ GzipFilterConfig::GzipFilterConfig(const envoy::extensions::filters::http::gzip:
       compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
       memory_level_(memoryLevelUint(gzip.memory_level().value())),
-      window_bits_(windowBitsUint(gzip.window_bits().value())) {}
+      window_bits_(windowBitsUint(gzip.window_bits().value())),
+      chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, chunk_size, 4096)) {}
 
 Envoy::Compression::Compressor::CompressorPtr GzipFilterConfig::makeCompressor() {
-  auto compressor = std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>();
+  auto compressor = std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>(chunk_size_);
   compressor->init(compressionLevel(), compressionStrategy(), windowBits(), memoryLevel());
   return compressor;
 }
