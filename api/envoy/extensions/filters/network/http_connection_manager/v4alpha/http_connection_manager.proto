@@ -508,7 +508,7 @@ message HttpConnectionManager {
   RequestIDExtension request_id_extension = 36;
 
   // Determines if port part should be removed from Host/authority header before any processing
-  // of request by HTTP filters or routing. This affectes the upstream Host header as well.
+  // of request by HTTP filters or routing. This affects the upstream Host header as well.
   // Without setting this option, incoming requests with Host `example:443` will not match against
   // route with `domains` match set to `example`. Defaults to `false`. Note that port removal is not part
   // of `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
