@@ -29,6 +29,8 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "runtime_protos_test",
     srcs = ["runtime_protos_test.cc"],
+    # Pass for the time being, test times out on windows
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/runtime:runtime_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -42,6 +44,9 @@ envoy_cc_test(
     name = "runtime_impl_test",
     srcs = ["runtime_impl_test.cc"],
     data = glob(["test_data/**"]) + ["filesystem_setup.sh"],
+    # Inexplicable failure promoting arguments to mock, see
+    # https://envoyproxy.slack.com/archives/CNAK09BSB/p1571946165007300
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/config:runtime_utility_lib",
         "//source/common/runtime:runtime_lib",
