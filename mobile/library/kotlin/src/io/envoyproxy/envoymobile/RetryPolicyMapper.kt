@@ -9,13 +9,19 @@ internal fun RetryPolicy.outboundHeaders(): Map<String, List<String>> {
   val upstreamTimeoutMS = totalUpstreamTimeoutMS ?: 0L
   val headers = mutableMapOf(
       "x-envoy-max-retries" to listOf("$maxRetryCount"),
-      "x-envoy-retry-on" to retryOn.map { elm -> elm.stringValue() },
       "x-envoy-upstream-rq-timeout-ms" to listOf("$upstreamTimeoutMS")
   )
 
   if (perRetryTimeoutMS != null) {
     headers["x-envoy-upstream-rq-per-try-timeout-ms"] = listOf("$perRetryTimeoutMS")
   }
+
+  val retryOn = retryOn.map { elm -> elm.stringValue() }.toMutableList()
+  if (retryStatusCodes.isNotEmpty()) {
+    retryOn.add("retriable-status-codes")
+    headers["x-envoy-retriable-status-codes"] = retryStatusCodes.map { value -> "$value" }
+  }
+  headers["x-envoy-retry-on"] = retryOn
   return headers
 }
 
@@ -31,7 +37,6 @@ private fun RetryRule.stringValue(): String {
     RetryRule.CONNECT_FAILURE -> "connect-failure"
     RetryRule.REFUSED_STREAM -> "refused-stream"
     RetryRule.RETRIABLE_4XX -> "retriable-4xx"
-    RetryRule.RETRIABLE_STATUS_CODES -> "retriable-status-codes"
     RetryRule.RETRIABLE_HEADERS -> "retriable-headers"
     RetryRule.RESET -> "reset"
   }

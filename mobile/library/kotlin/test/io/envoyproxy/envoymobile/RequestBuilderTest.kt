@@ -7,21 +7,27 @@ class RequestBuilderTest {
   @Test
   fun `adding retry policy should have policy present in request`() {
 
-    val retryPolicy = RetryPolicy(maxRetryCount = 23,
-      retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.CONNECT_FAILURE), perRetryTimeoutMS = 1234)
+    val retryPolicy = RetryPolicy(
+        maxRetryCount = 23,
+        retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.CONNECT_FAILURE),
+        perRetryTimeoutMS = 1234)
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https",
-      authority = "api.foo.com", path = "foo")
+        authority = "api.foo.com", path = "foo")
         .addRetryPolicy(retryPolicy)
         .build()
 
-    assertThat(request.retryPolicy)
-      .isEqualTo(RetryPolicy(23, listOf(RetryRule.STATUS_5XX, RetryRule.CONNECT_FAILURE), 1234))
+    assertThat(request.retryPolicy).isEqualTo(
+        RetryPolicy(
+            maxRetryCount = 23,
+            retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.CONNECT_FAILURE),
+            perRetryTimeoutMS = 1234)
+    )
   }
 
   @Test
   fun `not adding retry policy should have null body in request`() {
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https",
-      authority = "api.foo.com", path = "foo")
+        authority = "api.foo.com", path = "foo")
         .build()
 
     assertThat(request.retryPolicy).isNull()
@@ -29,10 +35,12 @@ class RequestBuilderTest {
 
   @Test
   fun `adding upstream http protocol should have hint present in request`() {
-    val retryPolicy = RetryPolicy(maxRetryCount = 23,
-      retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.CONNECT_FAILURE), perRetryTimeoutMS = 1234)
+    val retryPolicy = RetryPolicy(
+        maxRetryCount = 23,
+        retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.CONNECT_FAILURE),
+        perRetryTimeoutMS = 1234)
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https",
-      authority = "api.foo.com", path = "foo")
+        authority = "api.foo.com", path = "foo")
         .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
         .build()
 
@@ -42,7 +50,7 @@ class RequestBuilderTest {
   @Test
   fun `not adding upstream http protocol should have null upstream protocol in request`() {
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https",
-      authority = "api.foo.com", path = "foo")
+        authority = "api.foo.com", path = "foo")
         .build()
 
     assertThat(request.upstreamHttpProtocol).isNull()
@@ -51,7 +59,7 @@ class RequestBuilderTest {
   @Test
   fun `adding new headers should append to the list of header keys`() {
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https",
-      authority = "api.foo.com", path = "foo")
+        authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")
         .build()
 
@@ -61,7 +69,7 @@ class RequestBuilderTest {
   @Test
   fun `removing headers should clear headers in request`() {
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https",
-      authority = "api.foo.com", path = "foo")
+        authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")
         .removeHeaders("header_a")
         .build()
@@ -72,7 +80,7 @@ class RequestBuilderTest {
   @Test
   fun `removing a specific header value should not be in request`() {
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https",
-      authority = "api.foo.com", path = "foo")
+        authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")
         .addHeader("header_a", "value_a2")
         .removeHeader("header_a", "value_a1")
@@ -84,7 +92,7 @@ class RequestBuilderTest {
   @Test
   fun `removing a specific header value should keep the other header values in request`() {
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https",
-      authority = "api.foo.com", path = "foo")
+        authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")
         .addHeader("header_a", "value_a2")
         .removeHeader("header_a", "value_a1")
@@ -96,7 +104,7 @@ class RequestBuilderTest {
   @Test
   fun `adding a specific header value should keep the other header values in request`() {
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https",
-      authority = "api.foo.com", path = "foo")
+        authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")
         .addHeader("header_a", "value_a2")
         .build()
@@ -107,7 +115,7 @@ class RequestBuilderTest {
   @Test
   fun `removing all header values should remove header list in request`() {
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https",
-      authority = "api.foo.com", path = "foo")
+        authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")
         .removeHeader("header_a", "value_a1")
         .build()
