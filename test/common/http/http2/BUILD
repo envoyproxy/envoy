@@ -14,6 +14,7 @@ envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
     shard_count = 5,
+    tags = ["fails_on_windows"],
     deps = [
         ":codec_impl_test_util",
         "//source/common/event:dispatcher_lib",
@@ -50,6 +51,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http2:conn_pool_lib",
@@ -102,6 +104,7 @@ envoy_cc_test(
         "response_header_corpus/simple_example_huffman",
         "response_header_corpus/simple_example_plain",
     ],
+    tags = ["fails_on_windows"],
     deps = [":frame_replay_lib"],
 )
 

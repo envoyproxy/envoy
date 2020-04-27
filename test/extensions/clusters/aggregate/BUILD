@@ -53,6 +53,7 @@ envoy_extension_cc_test(
     name = "cluster_integration_test",
     srcs = ["cluster_integration_test.cc"],
     extension_name = "envoy.clusters.aggregate",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",

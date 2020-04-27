@@ -57,6 +57,7 @@ envoy_extension_cc_test(
     name = "ext_authz_integration_test",
     srcs = ["ext_authz_integration_test.cc"],
     extension_name = "envoy.filters.http.ext_authz",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/ext_authz:config",
         "//test/integration:http_integration_lib",
