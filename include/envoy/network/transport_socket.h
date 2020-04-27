@@ -158,11 +158,6 @@ public:
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr ssl() const PURE;
-
-  /**
-   * @return the const socket options used to create this TransportSocket, or nullptr if none was provided.
-   */
-  virtual TransportSocketOptionsSharedPtr options() const PURE;
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;
@@ -198,7 +193,7 @@ public:
    * @return the optional fallback for application protocols, for when they are not specified in the
    *         TLS configuration.
    */
-  virtual  const std::vector<std::string>& applicationProtocolListFallback() const PURE;
+  virtual const std::vector<std::string>& applicationProtocolListFallback() const PURE;
 
   /**
    * @param vector of bytes to which the option should append hash key data that will be used
