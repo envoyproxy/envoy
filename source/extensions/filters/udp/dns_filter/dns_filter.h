@@ -86,7 +86,7 @@ class DnsFilter : public Network::UdpListenerReadFilter, Logger::Loggable<Logger
 public:
   DnsFilter(Network::UdpReadFilterCallbacks& callbacks, const DnsFilterEnvoyConfigSharedPtr& config)
       : UdpListenerReadFilter(callbacks), config_(config), listener_(callbacks.udpListener()),
-        message_parser_(std::make_unique<DnsMessageParser>()) {}
+        message_parser_() {}
 
   // Network::UdpListenerReadFilter callbacks
   void onData(Network::UdpRecvData& client_request) override;
@@ -129,7 +129,7 @@ private:
   const DnsFilterEnvoyConfigSharedPtr config_;
   Network::UdpListener& listener_;
 
-  DnsMessageParserPtr message_parser_;
+  DnsMessageParser message_parser_;
 
   Network::Address::InstanceConstSharedPtr local_;
   Network::Address::InstanceConstSharedPtr peer_;

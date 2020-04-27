@@ -70,7 +70,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
 
 void DnsFilter::onData(Network::UdpRecvData& client_request) {
   // Parse the query, if it fails return an response to the client
-  DnsQueryContextPtr query_context = message_parser_->createQueryContext(client_request);
+  DnsQueryContextPtr query_context = message_parser_.createQueryContext(client_request);
   if (!query_context->parse_status_) {
     sendDnsResponse(std::move(query_context));
     return;
