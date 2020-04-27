@@ -4,7 +4,7 @@ Postgres proxy
 ================
 
 The Postgres proxy filter decodes the wire protocol between a Postgres client (downstream) and a Postgres server
-(upstream). The decoded information is currently used only to produce Postgres level statistics like sesions,
+(upstream). The decoded information is currently used only to produce Postgres level statistics like sessions,
 statements or transactions executed, among others. This current version does not decode SQL queries. Future versions may
 add more statistics and more advanced capabilities. When the Postgres filter detects that a session is encrypted, the messages are ignored and no decoding takes
 place. More information:
