@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Load reporting service (LRS)]
 
 // Load Reporting Service is an Envoy API to emit load reports. Envoy will initiate a bi-directional stream with a management server.
-// Upon connecting, the management server can send a LoadStatsResponse to a node it is interested in getting the load reports.
+// Upon connecting, the management server can send a LoadStatsResponse to a node it is interested in getting the load reports for.
 // Envoy in this node will start sending LoadStatsRequests. This is done periodically based on the frequency mentioned in the LoadStatsResponse.
 // For details, take a look at the `sandbox example <https://www.envoyproxy.io/docs/envoy/latest/start/sandboxes/load_reporting_service.html>`_.
 
