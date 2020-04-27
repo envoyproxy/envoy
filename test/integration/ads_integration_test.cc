@@ -7,7 +7,6 @@
 
 #include "common/common/version.h"
 #include "common/config/protobuf_link_hacks.h"
-#include "common/config/resources.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -17,6 +16,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

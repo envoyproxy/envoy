@@ -86,10 +86,12 @@ public:
   RunHelperTest() {
     InSequence s;
 
+#ifndef WIN32
     sigterm_ = new Event::MockSignalEvent(&dispatcher_);
     sigint_ = new Event::MockSignalEvent(&dispatcher_);
     sigusr1_ = new Event::MockSignalEvent(&dispatcher_);
     sighup_ = new Event::MockSignalEvent(&dispatcher_);
+#endif
     EXPECT_CALL(overload_manager_, start());
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
@@ -109,10 +111,12 @@ public:
   ReadyWatcher start_workers_;
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;
+#ifndef WIN32
   Event::MockSignalEvent* sigterm_;
   Event::MockSignalEvent* sigint_;
   Event::MockSignalEvent* sigusr1_;
   Event::MockSignalEvent* sighup_;
+#endif
   bool shutdown_ = false;
 };
 
@@ -121,13 +125,18 @@ TEST_F(RunHelperTest, Normal) {
   cm_init_callback_();
 }
 
+// no signals on Windows
+#ifndef WIN32
 TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
   EXPECT_CALL(start_workers_, ready()).Times(0);
   sigterm_->callback_();
   EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   cm_init_callback_();
 }
+#endif
 
+// no signals on Windows
+#ifndef WIN32
 TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   EXPECT_CALL(start_workers_, ready()).Times(0);
   Init::ExpectableTargetImpl target;
@@ -138,6 +147,7 @@ TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   target.ready();
 }
+#endif
 
 class InitializingInitManager : public Init::ManagerImpl {
 public:
@@ -630,6 +640,48 @@ TEST_P(ServerInstanceImplTest, LoadsBootstrapFromPbText) {
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2BootstrapFromPbText)) {
   initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
   EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
+}
+
+// Validate that bootstrap v3 pb_text with new fields loads fails if V2 config is specified.
+TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromPbText) {
+  options_.bootstrap_version_ = 2;
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text"),
+      EnvoyException, "Unable to parse file");
+}
+
+// Validate that we correctly parse a V2 file when configured to do so.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2ConfigWhenV2SelectedFromPbText)) {
+  options_.bootstrap_version_ = 2;
+
+  initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
+  EXPECT_EQ(server_->localInfo().node().id(), "bootstrap_id");
+}
+
+// Validate that we correctly parse a V3 file when configured to do so.
+TEST_P(ServerInstanceImplTest, LoadsV3ConfigWhenV2SelectedFromPbText) {
+  options_.bootstrap_version_ = 3;
+
+  initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text");
+}
+
+// Validate that bootstrap v2 pb_text with deprecated fields loads fails if V3 config is specified.
+TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromPbText) {
+  options_.bootstrap_version_ = 3;
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
+      EnvoyException, "Unable to parse file");
+}
+
+// Validate that we blow up on invalid version number.
+TEST_P(ServerInstanceImplTest, InvalidBootstrapVersion) {
+  options_.bootstrap_version_ = 1;
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
+      EnvoyException, "Unknown bootstrap version 1.");
 }
 
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {

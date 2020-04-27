@@ -34,6 +34,7 @@ namespace Logger {
   FUNCTION(conn_handler)                                                                           \
   FUNCTION(decompression)                                                                          \
   FUNCTION(dubbo)                                                                                  \
+  FUNCTION(rocketmq)                                                                               \
   FUNCTION(file)                                                                                   \
   FUNCTION(filter)                                                                                 \
   FUNCTION(forward_proxy)                                                                          \
@@ -282,19 +283,15 @@ protected:
 
 } // namespace Logger
 
-// Convert the line macro to a string literal for concatenation in log macros.
-#define DO_STRINGIZE(x) STRINGIZE(x)
-#define STRINGIZE(x) #x
-#define LINE_STRING DO_STRINGIZE(__LINE__)
-#define LOG_PREFIX "[" __FILE__ ":" LINE_STRING "] "
-
 /**
  * Base logging macros. It is expected that users will use the convenience macros below rather than
  * invoke these directly.
  */
 
-#define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)                                                        \
-  (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL) >= LOGGER.level())
+#define ENVOY_SPDLOG_LEVEL(LEVEL)                                                                  \
+  (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL))
+
+#define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) (ENVOY_SPDLOG_LEVEL(LEVEL) >= LOGGER.level())
 
 // Compare levels before invoking logger. This is an optimization to avoid
 // executing expressions computing log contents when they would be suppressed.
@@ -302,7 +299,8 @@ protected:
 #define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
-      LOGGER.LEVEL(LOG_PREFIX __VA_ARGS__);                                                        \
+      LOGGER.log(::spdlog::source_loc{__FILE__, __LINE__, __func__}, ENVOY_SPDLOG_LEVEL(LEVEL),    \
+                 __VA_ARGS__);                                                                     \
     }                                                                                              \
   } while (0)
 
