@@ -57,6 +57,7 @@ envoy_extension_cc_test(
         "postgres_test_config.yaml",
     ],
     extension_name = "envoy.filters.network.postgres_proxy",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/tcp_proxy",
         "//source/extensions/filters/network/postgres_proxy:config",
