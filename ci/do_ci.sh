@@ -95,9 +95,12 @@ CI_TARGET=$1
 
 if [[ $# -gt 1 ]]; then
   shift
-  TEST_TARGETS=$*
+  COVERAGE_TEST_TARGETS=$*
+  TEST_TARGETS="$COVERAGE_TEST_TARGETS"
 else
-  TEST_TARGETS=//test/...
+  # Coverage test will add QUICHE tests by itself.
+  COVERAGE_TEST_TARGETS=//test/...
+  TEST_TARGETS="${COVERAGE_TEST_TARGETS} @com_googlesource_quiche//:ci_tests"
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
@@ -259,14 +262,14 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   setup_clang_toolchain
-  echo "bazel coverage build with tests ${TEST_TARGETS}"
+  echo "bazel coverage build with tests ${COVERAGE_TEST_TARGETS}"
 
   # Reduce the amount of memory Bazel tries to use to prevent it from launching too many subprocesses.
   # This should prevent the system from running out of memory and killing tasks. See discussion on
   # https://github.com/envoyproxy/envoy/pull/5611.
   [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_ram_resources=12288"
 
-  test/run_envoy_bazel_coverage.sh ${TEST_TARGETS}
+  test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
