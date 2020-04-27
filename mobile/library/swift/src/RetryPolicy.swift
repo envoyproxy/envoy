@@ -9,7 +9,6 @@ public enum RetryRule: Int, CaseIterable {
   case connectFailure
   case refusedStream
   case retriable4xx
-  case retriableStatusCodes
   case retriableHeaders
   case reset
 
@@ -26,8 +25,6 @@ public enum RetryRule: Int, CaseIterable {
       return "refused-stream"
     case .retriable4xx:
       return "retriable-4xx"
-    case .retriableStatusCodes:
-      return "retriable-status-codes"
     case .retriableHeaders:
       return "retriable-headers"
     case .reset:
@@ -42,23 +39,24 @@ public enum RetryRule: Int, CaseIterable {
 public final class RetryPolicy: NSObject {
   public let maxRetryCount: UInt
   public let retryOn: [RetryRule]
+  public let retryStatusCodes: [UInt]
   public let perRetryTimeoutMS: UInt?
   public let totalUpstreamTimeoutMS: UInt?
 
   /// Designated initializer.
   ///
-  /// - parameter maxRetryCount:          Maximum number of retries that a request may be
-  ///                                     performed.
+  /// - parameter maxRetryCount:          Maximum number of retries that a request may be performed.
   /// - parameter retryOn:                Whitelist of rules used for retrying.
-  /// - parameter perRetryTimeoutMS:      Timeout (in milliseconds) to apply to each retry. Must
-  ///                                     be <= `totalUpstreamTimeoutMS` if it's a positive number.
-  /// - parameter totalUpstreamTimeoutMS: Total timeout (in milliseconds) that includes all
-  ///                                     retries. Spans the point at which the entire downstream
-  ///                                     request has been processed and when the upstream
-  ///                                     response has been completely processed.
-  ///                                     Nil or 0 may be specified to disable it.
-  public init(maxRetryCount: UInt, retryOn: [RetryRule], perRetryTimeoutMS: UInt? = nil,
-              totalUpstreamTimeoutMS: UInt? = 15_000)
+  /// - parameter retryStatusCodes:       Additional list of status codes that should be retried.
+  /// - parameter perRetryTimeoutMS:      Timeout (in milliseconds) to apply to each retry. Must be
+  ///                                     <= `totalUpstreamTimeoutMS` if it's a positive number.
+  /// - parameter totalUpstreamTimeoutMS: Total timeout (in milliseconds) that includes all retries.
+  ///                                     Spans the point at which the entire downstream request has
+  ///                                     been processed and when the upstream response has been
+  ///                                     completely processed. Nil or 0 may be specified to disable
+  ///                                     it.
+  public init(maxRetryCount: UInt, retryOn: [RetryRule], retryStatusCodes: [UInt] = [],
+              perRetryTimeoutMS: UInt? = nil, totalUpstreamTimeoutMS: UInt? = 15_000)
   {
     if let perRetryTimeoutMS = perRetryTimeoutMS,
       let totalUpstreamTimeoutMS = totalUpstreamTimeoutMS
@@ -69,6 +67,7 @@ public final class RetryPolicy: NSObject {
 
     self.maxRetryCount = maxRetryCount
     self.retryOn = retryOn
+    self.retryStatusCodes = retryStatusCodes
     self.perRetryTimeoutMS = perRetryTimeoutMS
     self.totalUpstreamTimeoutMS = totalUpstreamTimeoutMS
   }
@@ -84,6 +83,7 @@ extension RetryPolicy {
 
     return self.maxRetryCount == other.maxRetryCount
       && self.retryOn == other.retryOn
+      && self.retryStatusCodes == other.retryStatusCodes
       && self.perRetryTimeoutMS == other.perRetryTimeoutMS
       && self.totalUpstreamTimeoutMS == other.totalUpstreamTimeoutMS
   }
