@@ -2494,11 +2494,12 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
       key: value
     )EOF";
 
-  auto default_socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+  auto default_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
   // We expect that this default_socket_factory will NOT be used to create a transport socket for
   // the health check connection.
   EXPECT_CALL(*default_socket_factory, createTransportSocket(_)).Times(0);
-  auto transport_socket_match = std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(
+  EXPECT_CALL(*default_socket_factory, implementsSecureTransport());
+  auto transport_socket_match = std::make_unique<Upstream::MockTransportSocketMatcher>(
       std::move(default_socket_factory));
 
   auto metadata = TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
@@ -2512,7 +2513,7 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
   auto health_transport_socket_stats = TransportSocketMatchStats{
       ALL_TRANSPORT_SOCKET_MATCH_STATS(POOL_COUNTER_PREFIX(stats_store, "test"))};
   auto health_check_only_socket_factory =
-      std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+      std::make_unique<Network::MockTransportSocketFactory>();
 
   // We expect resolve() to be called twice, once for endpoint socket matching (with no metadata in
   // this test) and once for health check socket matching. In the latter we expect metadata that
@@ -2557,17 +2558,18 @@ TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
       path: /healthcheck
     )EOF";
 
-  auto default_socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+  auto default_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
   // The default_socket_factory should be used to create a transport socket for the health check
   // connection.
   EXPECT_CALL(*default_socket_factory, createTransportSocket(_));
-  auto transport_socket_match = std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(
+  EXPECT_CALL(*default_socket_factory, implementsSecureTransport());
+  auto transport_socket_match = std::make_unique<Upstream::MockTransportSocketMatcher>(
       std::move(default_socket_factory));
   // We expect resolve() to be called exactly once for endpoint socket matching. We should not
   // attempt to match again for health checks since there is not match criteria in the config.
   EXPECT_CALL(*transport_socket_match, resolve(nullptr));
 
-  cluster_->info_->transport_socket_matcher_.reset(transport_socket_match.release());
+  cluster_->info_->transport_socket_matcher_ = std::move(transport_socket_match);
 
   health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
       *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
