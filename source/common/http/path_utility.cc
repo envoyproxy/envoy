@@ -73,9 +73,16 @@ void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
 
 void PathUtil::removePortsFromHost(RequestHeaderMap& headers) {
   const auto original_host = headers.Host()->value().getStringView();
-  const absl::string_view::size_type port_start = original_host.find(':');
-  const absl::string_view host = original_host.substr(0, port_start);
-  headers.setHost(host);
+  const absl::string_view::size_type port_start = original_host.rfind(':');
+  if (port_start == absl::string_view::npos) {
+    return;
+  }
+  // according to RFC3986 v6 address is always encloused in "[]". section 3.2.2
+  const auto v6_end_index = original_host.rfind("]");
+  if (v6_end_index == absl::string_view::npos || v6_end_index < port_start) {
+    const absl::string_view host = original_host.substr(0, port_start);
+    headers.setHost(host);
+  }
 }
 
 absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path) {
