@@ -257,6 +257,23 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
+TEST_F(ProtobufUtilityTest, LoadJsonFromFileNoBoosting) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  bootstrap.mutable_cluster_manager()
+      ->mutable_upstream_bind_config()
+      ->mutable_source_address()
+      ->set_address("1.1.1.1");
+
+  std::string bootstrap_text;
+  ASSERT_TRUE(Protobuf::TextFormat::PrintToString(bootstrap, &bootstrap_text));
+  const std::string filename =
+      TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
+
+  envoy::config::bootstrap::v3::Bootstrap proto_from_file;
+  TestUtility::loadFromFile(filename, proto_from_file, *api_);
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
+}
+
 TEST_F(ProtobufUtilityTest, DEPRECATED_FEATURE_TEST(LoadV2TextProtoFromFile)) {
   API_NO_BOOST(envoy::config::bootstrap::v2::Bootstrap) bootstrap;
   bootstrap.mutable_node()->set_build_version("foo");
@@ -1200,6 +1217,15 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonSameVersion) {
   }
 }
 
+// MessageUtility::loadFromJson() avoids boosting when version specified.
+TEST_F(ProtobufUtilityTest, LoadFromJsonNoBoosting) {
+  envoy::config::cluster::v3::Cluster dst;
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
+                                ProtobufMessage::getStrictValidationVisitor(), false),
+      EnvoyException, "INVALID_ARGUMENT:drain_connections_on_host_removal: Cannot find field.");
+}
+
 // MessageUtility::loadFromJson() with API message works across version.
 TEST_F(ProtobufUtilityTest, LoadFromJsonNextVersion) {
   {
@@ -1373,9 +1399,9 @@ protected:
         runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")) {
     envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
-    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-        Runtime::LoaderPtr{new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, store_,
-                                                   generator_, validation_visitor_, *api_)});
+    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(Runtime::LoaderPtr{
+        new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, init_manager_, store_,
+                                generator_, validation_visitor_, *api_)});
   }
 
   void checkForDeprecation(const Protobuf::Message& message) {
@@ -1399,6 +1425,7 @@ protected:
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
   Stats::Counter& runtime_deprecated_feature_use_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Init::MockManager init_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 

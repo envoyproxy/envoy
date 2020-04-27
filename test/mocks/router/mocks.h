@@ -353,6 +353,7 @@ public:
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
+  MOCK_METHOD(const absl::optional<ConnectConfig>&, connectConfig, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(InternalRedirectAction, internalRedirectAction, (), (const));
   MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));
@@ -374,6 +375,7 @@ public:
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   envoy::config::core::v3::Metadata metadata_;
   UpgradeMap upgrade_map_;
+  absl::optional<ConnectConfig> connect_config_;
 };
 
 class MockDecorator : public Decorator {
