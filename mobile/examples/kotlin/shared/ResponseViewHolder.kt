@@ -20,6 +20,8 @@ class ResponseViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
             .getString(R.string.title_string, success.title)
           headerTextView.text = headerTextView.resources
             .getString(R.string.header_string, success.header)
+          headerTextView.visibility = View.VISIBLE
+          itemView.setBackgroundResource(R.color.failed_color)
         },
         { failure ->
           responseTextView.text = responseTextView.resources
