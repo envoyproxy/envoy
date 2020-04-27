@@ -40,7 +40,7 @@ public:
   std::unique_ptr<Subscription>
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return SubscriptionFactoryImpl(local_info_, dispatcher_, cm_, random_, validation_visitor_,
-                                   *api_)
+                                   *api_, runtime_)
         .subscriptionFromConfigSource(config, Config::TypeUrl::get().ClusterLoadAssignment,
                                       stats_store_, callbacks_);
   }
@@ -54,6 +54,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 class SubscriptionFactoryTestApiConfigSource
