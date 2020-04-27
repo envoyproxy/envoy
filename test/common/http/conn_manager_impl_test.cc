@@ -652,28 +652,30 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithDecoderPause) {
 
   RequestDecoder* decoder = nullptr;
   NiceMock<MockResponseEncoder> encoder;
-  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
-    decoder = &conn_manager_->newStream(encoder);
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder = &conn_manager_->newStream(encoder);
 
-    // Test not charging stats on the second call.
-    RequestHeaderMapPtr headers{
-        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    decoder->decodeHeaders(std::move(headers), false);
-    // Allow the decode pipeline to pause.
-    decoder->decodeData(data, false);
+        // Test not charging stats on the second call.
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+        decoder->decodeHeaders(std::move(headers), false);
+        // Allow the decode pipeline to pause.
+        decoder->decodeData(data, false);
 
-    ResponseHeaderMapPtr continue_headers{new TestResponseHeaderMapImpl{{":status", "100"}}};
-    filter->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
+        ResponseHeaderMapPtr continue_headers{new TestResponseHeaderMapImpl{{":status", "100"}}};
+        filter->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
 
-    // Resume decode pipeline after encoding 100 continue headers, we're now ready to trigger
-    // #10923.
-    decoder->decodeData(data, true);
+        // Resume decode pipeline after encoding 100 continue headers, we're now
+        // ready to trigger #10923.
+        decoder->decodeData(data, true);
 
-    ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-    filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
 
-    data.drain(4);
-  }));
+        data.drain(4);
+        return Http::okStatus();
+      }));
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
