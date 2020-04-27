@@ -13,9 +13,9 @@ namespace Extensions {
 namespace HttpFilters {
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& input) {
-  static PostProcessorRegistration reg = {[](test::extensions::filters::http::FilterFuzzTestCase*
-                                                 input,
-                                             unsigned int seed) {
+  static PostProcessorRegistration reg __attribute__((
+      unused)) = {[](test::extensions::filters::http::FilterFuzzTestCase* input,
+                     unsigned int seed) {
     // This ensures that the mutated configs all have valid filter names and type_urls. The list of
     // names and type_urls is pulled from the NamedHttpFilterConfigFactory. All Envoy extensions are
     // built with this test (see BUILD file).
