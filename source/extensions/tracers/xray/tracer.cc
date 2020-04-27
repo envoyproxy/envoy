@@ -71,31 +71,25 @@ void Span::finishSpan() {
 
   daemon::Segment s;
   s.set_name(name());
-  s.set_id(Id());
+  s.set_id(id());
   s.set_trace_id(traceId());
   s.set_start_time(time_point_cast<SecondsWithFraction>(startTime()).time_since_epoch().count());
   s.set_end_time(
       time_point_cast<SecondsWithFraction>(time_source_.systemTime()).time_since_epoch().count());
   s.set_parent_id(parentId());
 
-  // HTTP annotations
-  using StructField = Protobuf::MapPair<std::string, ProtobufWkt::Value>;
-
-  ProtobufWkt::Struct* request = s.mutable_http()->mutable_request();
-  auto* request_fields = request->mutable_fields();
+  auto* request_fields = s.mutable_http()->mutable_request()->mutable_fields();
   for (const auto& field : http_request_annotations_) {
-    request_fields->insert(StructField{field.first, field.second});
+    request_fields->insert({field.first, field.second});
   }
 
-  ProtobufWkt::Struct* response = s.mutable_http()->mutable_response();
-  auto* response_fields = response->mutable_fields();
+  auto* response_fields = s.mutable_http()->mutable_response()->mutable_fields();
   for (const auto& field : http_response_annotations_) {
-    response_fields->insert(StructField{field.first, field.second});
+    response_fields->insert({field.first, field.second});
   }
 
-  using KeyValue = Protobuf::Map<std::string, std::string>::value_type;
   for (const auto& item : custom_annotations_) {
-    s.mutable_annotations()->insert(KeyValue{item.first, item.second});
+    s.mutable_annotations()->insert({item.first, item.second});
   }
 
   const std::string json = MessageUtil::getJsonStringFromMessage(
@@ -106,7 +100,7 @@ void Span::finishSpan() {
 
 void Span::injectContext(Http::RequestHeaderMap& request_headers) {
   const std::string xray_header_value =
-      fmt::format("Root={};Parent={};Sampled={}", traceId(), Id(), sampled() ? "1" : "0");
+      fmt::format("Root={};Parent={};Sampled={}", traceId(), id(), sampled() ? "1" : "0");
   request_headers.setCopy(Http::LowerCaseString(XRayTraceHeader), xray_header_value);
 }
 
@@ -118,7 +112,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& ope
   child_span->setName(name());
   child_span->setOperation(operation_name);
   child_span->setStartTime(start_time);
-  child_span->setParentId(Id());
+  child_span->setParentId(id());
   child_span->setTraceId(traceId());
   child_span->setSampled(sampled());
   return child_span;
