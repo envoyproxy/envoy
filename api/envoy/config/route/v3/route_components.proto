@@ -1573,7 +1573,13 @@ message QueryParameterMatcher {
 message InternalRedirectPolicy {
   // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
   enum InternalRedirectAction {
+    // Redirect responses are proxied to downstream without triggering Internal Redirect.
+    // This is the default value.
     PASS_THROUGH_INTERNAL_REDIRECT = 0;
+    // Redirect responses (specified via :ref:`redirect_response_codes
+    // <envoy_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`),
+    // are followed by Envoy to the new URL. The redirect responses are not visible to
+    // the downstream unless the redirect following is rejected by other criteria.
     HANDLE_INTERNAL_REDIRECT = 1;
   }
 
