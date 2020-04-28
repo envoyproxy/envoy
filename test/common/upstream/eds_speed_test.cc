@@ -147,15 +147,9 @@ public:
 
           for (uint32_t i = 0; i < n; ++i) {
             auto* socket_address = endpoints->add_lb_endpoints()
-<<<<<<< HEAD
                                        ->mutable_endpoint()
                                        ->mutable_address()
                                        ->mutable_socket_address();
-=======
-                                   ->mutable_endpoint()
-                                   ->mutable_address()
-                                   ->mutable_socket_address();
->>>>>>> 00437463ff... Create a benchmark test for eds updates.
 
             socket_address->set_address("10.0.1." + std::to_string(i / 60000));
             socket_address->set_port_value((port + i) % 60000);
