@@ -147,8 +147,8 @@ private:
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
       return parent_.address_;
     }
-    // TODO: stream watermark control.
-    void readDisable(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+    // TODO: https://github.com/lyft/envoy-mobile/issues/825
+    void readDisable(bool /*disable*/) override {}
     uint32_t bufferLimit() override { return 65000; }
 
     void closeLocal(bool end_stream);
