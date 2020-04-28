@@ -125,10 +125,13 @@ versioning guidelines:
 
 # Runtime guarding
 
-Some high risk changes in Envoy are deemed worthy of runtime guarding. Instead of just replacing
+Some changes in Envoy are deemed worthy of runtime guarding. Instead of just replacing
 old code with new code, both code paths are supported for between one Envoy release (if it is
 guarded due to performance concerns) and a full deprecation cycle (if it is a high risk behavioral
-change).
+change). Generally as a community we try to guard both high risk changes (major
+refactors such as replacing Envoy's buffer implementation) and most user-visible
+non-config-guarded changes to HTTP processing (for example additions or changes to HTTP headers or
+how HTTP is serialized out).
 
 The canonical way to runtime guard a feature is
 ```
@@ -156,7 +159,7 @@ time.
 Runtime guarded features may either set true (running the new code by default) in the initial PR,
 after a testing interval, or during the next release cycle, at the PR author's and reviewing
 maintainer's discretion. Generally all runtime guarded features will be set true when a
-release is cut, and the old code path will be deprecated at that time. Runtime features
+release is cut, and the old code path will be deprecated after six months. Runtime features
 are set true by default by inclusion in
 [source/common/runtime/runtime_features.h](https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.h)
 
