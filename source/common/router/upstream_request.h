@@ -138,6 +138,7 @@ public:
   bool createPerTryTimeoutOnRequestComplete() {
     return create_per_try_timeout_on_request_complete_;
   }
+  RouterFilterInterface& parent() { return parent_; }
 
 private:
   RouterFilterInterface& parent_;

@@ -35,6 +35,7 @@
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -538,9 +539,41 @@ void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void TcpUpstream::encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) {
-  if (end_stream) {
-    Buffer::OwnedImpl data;
-    upstream_conn_data_->connection().write(data, true);
+  // Headers should only happen once, so use this opportunity to add the proxy
+  // proto header, if configured.
+  ASSERT(upstream_request_->parent().routeEntry()->connectConfig().has_value());
+  Buffer::OwnedImpl data;
+  if (upstream_request_->parent()
+          .routeEntry()
+          ->connectConfig()
+          .value()
+          .has_proxy_protocol_config()) {
+    auto version = upstream_request_->parent()
+                       .routeEntry()
+                       ->connectConfig()
+                       .value()
+                       .proxy_protocol_config()
+                       .version();
+    // FIXME versions.
+    if (version == envoy::config::core::v3::ProxyProtocolConfig::V1) {
+      auto connection = upstream_request_->parent().callbacks()->connection();
+      Extensions::Common::ProxyProtocol::generateV1Header(
+          connection->localAddress()->ip()->addressAsString(),
+          connection->remoteAddress()->ip()->addressAsString(),
+          connection->localAddress()->ip()->port(), connection->remoteAddress()->ip()->port(),
+          connection->localAddress()->ip()->version(), data);
+    } else if (version == envoy::config::core::v3::ProxyProtocolConfig::V2) {
+      auto connection = upstream_request_->parent().callbacks()->connection();
+      Extensions::Common::ProxyProtocol::generateV2Header(
+          connection->localAddress()->ip()->addressAsString(),
+          connection->remoteAddress()->ip()->addressAsString(),
+          connection->localAddress()->ip()->port(), connection->remoteAddress()->ip()->port(),
+          connection->localAddress()->ip()->version(), data);
+    }
+  }
+
+  if (data.length() != 0 || end_stream) {
+    upstream_conn_data_->connection().write(data, end_stream);
   }
 }
 

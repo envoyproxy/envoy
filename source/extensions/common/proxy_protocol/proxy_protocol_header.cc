@@ -35,6 +35,12 @@ void generateV1Header(const std::string& src_addr, const std::string& dst_addr, 
   out.add(stream.str());
 }
 
+void generateV1Header(const Network::Address::Ip& source_address,
+                      const Network::Address::Ip& dest_address, Buffer::Instance& out) {
+  generateV1Header(source_address.addressAsString(), dest_address.addressAsString(),
+                   source_address.port(), dest_address.port(), source_address.version(), out);
+}
+
 void generateV2Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
                       uint32_t dst_port, Network::Address::IpVersion ip_version,
                       Buffer::Instance& out) {
@@ -93,6 +99,12 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
   memcpy(ports, &net_src_port, 2);
   memcpy(&ports[2], &net_dst_port, 2);
   out.add(ports, 4);
+}
+
+void generateV2Header(const Network::Address::Ip& source_address,
+                      const Network::Address::Ip& dest_address, Buffer::Instance& out) {
+  generateV2Header(source_address.addressAsString(), dest_address.addressAsString(),
+                   source_address.port(), dest_address.port(), source_address.version(), out);
 }
 
 void generateV2LocalHeader(Buffer::Instance& out) {
