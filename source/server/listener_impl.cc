@@ -304,14 +304,8 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
       filter_chain_manager_(address_, origin.listener_factory_context_->parentFactoryContext(),
                             initManager(), origin.filter_chain_manager_),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
-        if (workers_started_) {
-          parent_.inPlaceFilterChainUpdate(*this);
-        } else {
-          // Notify Server that this listener is ready.
-          listener_init_target_.ready();
-        }
-      }) {
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
+                          [this] { parent_.inPlaceFilterChainUpdate(*this); }) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
@@ -630,14 +624,17 @@ void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr&
 
 bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
                                             bool worker_started) {
-  // If a listener is in active list but stopped, the in place update will fail. The only known case
-  // is that listener is stopped by admin interface. It is ok if that admin method is called only
-  // prior to stop envoy. Otherwise we need to track the stopping state and execute full listener
-  // update.
-  // TODO(lambdai): Track the stopped listener and print warning message.
-
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.listener_in_place_filterchain_update")) {
+    return false;
+  }
+
+  // If a listener is in active list but stopped, the in place update will fail. The only known case
+  // is that listener is stopped by admin interface. It is ok if that admin method is called only
+  // prior to stop envoy. Delegate to full listener update for the least user astonishment.
+  // TODO(lambdai): Figure out if we should warn and ignore the update in both in place update and
+  // full listener update.
+  if (is_stopped_) {
     return false;
   }
 

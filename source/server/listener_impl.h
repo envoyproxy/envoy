@@ -27,10 +27,7 @@ namespace Server {
 class ListenerMessageUtil {
 public:
   /**
-   * This function is used by determine if the lhs config could be updated to rhs config by
-   * upgrading the ListenerConfig at ConnectionHandler. This function also need to keep updated
-   * with Listener message.
-   * @return true if listener update from lhs to rhs could go through fast path.
+   * @return true if listener message lhs and rhs are the same if ignoring filter_chains field.
    */
   static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
                                     const envoy::config::listener::v3::Listener& rhs);
@@ -234,7 +231,7 @@ public:
   // update.
   /**
    * Execute in place filter chain update. The filter chain update is less expensive than full
-   * listener update because connections may not need to drained.
+   * listener update because connections may not need to be drained.
    */
   std::unique_ptr<ListenerImpl>
   newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
@@ -327,6 +324,7 @@ public:
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
+  void setStopped() { is_stopped_ = true; }
   SystemTime last_updated_;
 
 private:
@@ -370,6 +368,8 @@ private:
   const std::string name_;
   const bool added_via_api_;
   const bool workers_started_;
+  // If this listener is stopped by admin.
+  bool is_stopped_{};
   const uint64_t hash_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
