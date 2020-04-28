@@ -128,12 +128,9 @@ private:
 
   const DnsFilterEnvoyConfigSharedPtr config_;
   Network::UdpListener& listener_;
-
   DnsMessageParser message_parser_;
-
   Network::Address::InstanceConstSharedPtr local_;
   Network::Address::InstanceConstSharedPtr peer_;
-
   AnswerCallback answer_callback_;
 };
 
