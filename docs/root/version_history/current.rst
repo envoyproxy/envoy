@@ -7,7 +7,7 @@ Changes
 * access loggers: added GRPC_STATUS operator on logging format.
 * access loggers: extened specifier for FilterStateFormatter to output :ref:`unstructured log string <config_access_log_format_filter_state>`.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
-* fault: added support for controlling the percentage of requests that abort, delay and response rate limits faults 
+* fault: added support for controlling the percentage of requests that abort, delay and response rate limits faults
   are applied to using :ref:`HTTP headers <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
 * fault: added support for specifying grpc_status code in abort faults using
   :ref:`HTTP header <config_http_filters_fault_injection_http_header>` or abort fault configuration in HTTP fault filter.
@@ -31,6 +31,7 @@ Changes
   tracing is not forced.
 * router: allow retries of streaming or incomplete requests. This removes stat `rq_retry_skipped_request_not_complete`.
 * router: allow retries by default when upstream responds with :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>`.
+* stats: added the option to :ref:`report counters as deltas <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.report_counters_as_deltas>` to the metrics service stats sink.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
   can now have a separate :ref:`tracing provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
 * upstream: fixed a bug where Envoy would panic when receiving a GRPC SERVICE_UNKNOWN status on the health check.
