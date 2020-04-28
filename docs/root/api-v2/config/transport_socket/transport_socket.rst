@@ -7,3 +7,4 @@ Transport sockets
 
   */v2alpha/*
   */v2/*
+  ../../api/v2/auth/tls.proto

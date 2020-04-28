@@ -1,7 +1,7 @@
 #include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 

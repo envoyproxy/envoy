@@ -1,7 +1,7 @@
 #include "extensions/transport_sockets/tls/config.h"
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 
 #include "common/protobuf/utility.h"
 

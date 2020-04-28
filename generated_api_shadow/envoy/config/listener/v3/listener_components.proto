@@ -4,7 +4,7 @@ package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
-import "envoy/extensions/transport_sockets/tls/v3/cert.proto";
+import "envoy/extensions/transport_sockets/tls/v3/tls.proto";
 import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";

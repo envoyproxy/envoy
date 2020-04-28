@@ -5,7 +5,7 @@
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
