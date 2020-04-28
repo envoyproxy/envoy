@@ -40,9 +40,9 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         }
       }
       virtual_domains_.emplace(virtual_domain.name(), std::move(addrs));
-      uint64_t ttl = virtual_domain.has_answer_ttl()
-                         ? DurationUtil::durationToSeconds(virtual_domain.answer_ttl())
-                         : DEFAULT_RESOLVER_TTL.count();
+      std::chrono::seconds ttl = virtual_domain.has_answer_ttl()
+                                     ? std::chrono::seconds(virtual_domain.answer_ttl().seconds())
+                                     : DEFAULT_RESOLVER_TTL;
       domain_ttl_.emplace(virtual_domain.name(), ttl);
     }
 
@@ -63,7 +63,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       auto ipaddr = Network::Utility::parseInternetAddress(resolver, 0 /* port */);
       resolvers_.push_back(std::move(ipaddr));
     }
-    resolver_timeout_ms_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+    resolver_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
         client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
   }
 }

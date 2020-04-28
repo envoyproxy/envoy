@@ -51,10 +51,12 @@ public:
   DnsFilterStats& stats() const { return stats_; }
   const DnsVirtualDomainConfig& domains() const { return virtual_domains_; }
   const std::vector<Matchers::StringMatcherPtr>& knownSuffixes() const { return known_suffixes_; }
-  const absl::flat_hash_map<std::string, uint64_t>& domainTtl() const { return domain_ttl_; }
+  const absl::flat_hash_map<std::string, std::chrono::seconds>& domainTtl() const {
+    return domain_ttl_;
+  }
   const AddressConstPtrVec& resolvers() const { return resolvers_; }
   bool forwardQueries() const { return forward_queries_; }
-  const std::chrono::milliseconds resolverTimeout() const { return resolver_timeout_ms_; }
+  const std::chrono::milliseconds resolverTimeout() const { return resolver_timeout_; }
 
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
@@ -67,10 +69,10 @@ private:
   mutable DnsFilterStats stats_;
   DnsVirtualDomainConfig virtual_domains_;
   std::vector<Matchers::StringMatcherPtr> known_suffixes_;
-  absl::flat_hash_map<std::string, uint64_t> domain_ttl_;
+  absl::flat_hash_map<std::string, std::chrono::seconds> domain_ttl_;
   bool forward_queries_;
   AddressConstPtrVec resolvers_;
-  std::chrono::milliseconds resolver_timeout_ms_;
+  std::chrono::milliseconds resolver_timeout_;
 };
 
 using DnsFilterEnvoyConfigSharedPtr = std::shared_ptr<const DnsFilterEnvoyConfig>;
