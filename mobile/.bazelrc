@@ -19,7 +19,6 @@ build --xcode_version=11.3.1
 build --incompatible_bzl_disallow_load_after_statement=false
 build --javabase=@bazel_tools//tools/jdk:jdk
 build --define disable_known_issue_asserts=true
-build --features=swift.opt_uses_wmo
 
 # Default flags for builds targeting iOS
 # Manual Stamping is necessary in order to get versioning information in the ios
@@ -42,9 +41,6 @@ build:release-ios --apple_bitcode=embedded
 build:release-ios --config=ios
 build:release-ios --config=release-common
 build:release-ios --copt=-fembed-bitcode
-# This is a workaround because we can't set --compilation_mode=opt because of size issues
-# this forces -O to be passed at least to Swift compiles
-build:release-ios --features=swift.opt
 
 # Flags for release builds targeting Android or the JVM
 build:release-android --config=android
