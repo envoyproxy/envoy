@@ -57,7 +57,7 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
 
 template <class StatMapClass, class StatListClass>
 void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass& list) {
-  std::vector<StatName> remove_list;
+  StatNameVec remove_list;
   for (auto& stat : map) {
     if (rejects(stat.first)) {
       remove_list.push_back(stat.first);
