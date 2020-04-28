@@ -37,7 +37,7 @@ Changes
 * lrs: added new *envoy_api_field_service.load_stats.v2.LoadStatsResponse.send_all_clusters* field
   in LRS response, which allows management servers to avoid explicitly listing all clusters it is
   interested in; behavior is allowed based on new "envoy.lrs.supports_send_all_clusters" capability
-  in :ref:`client_features<envoy_api_field_config.core.v3.Node.client_features>` field.
+  in :ref:`client_features<envoy_v3_api_field_config.core.v3.Node.client_features>` field.
 
 Deprecated
 ----------
