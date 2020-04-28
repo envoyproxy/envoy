@@ -85,7 +85,7 @@ public:
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
-  Runtime::Loader& runtime() override { return *runtime_loader_; }
+  Runtime::Loader& runtime() override { return Runtime::LoaderSingleton::get(); }
   void shutdown() override;
   bool isShutdown() override { return false; }
   void shutdownAdmin() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -192,7 +192,7 @@ private:
   Event::DispatcherPtr dispatcher_;
   Server::ValidationAdmin admin_;
   Singleton::ManagerPtr singleton_manager_;
-  Runtime::LoaderPtr runtime_loader_;
+  std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   Runtime::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Configuration::MainImpl config_;
