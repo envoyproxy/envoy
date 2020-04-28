@@ -74,7 +74,7 @@ message LoadStatsResponse {
 
   // Clusters to report stats for.
   // Not populated if *send_all_clusters* is true.
-  repeated string clusters = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated string clusters = 1;
 
   // If true, the client should send all clusters it knows about.
   // Only clients that advertise the "envoy.lrs.supports_send_all_clusters" capability in their
