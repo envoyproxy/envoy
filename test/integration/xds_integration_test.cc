@@ -112,11 +112,11 @@ public:
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(1);
       filter_chain_1->mutable_transport_socket()->MergeFrom(
           *filter_chain_0->mutable_transport_socket());
-    
-      bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(*bootstrap.mutable_static_resources()->mutable_clusters(0));
+
+      bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(
+          *bootstrap.mutable_static_resources()->mutable_clusters(0));
       bootstrap.mutable_static_resources()->mutable_clusters(1)->set_name("cluster_1");
     });
-
 
     BaseIntegrationTest::initialize();
 
@@ -164,14 +164,10 @@ TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigDeletingFilterChain) {
   initialize();
 
   auto client_0 = connect("alpn0");
-  ENVOY_LOG_MISC(debug, "lambdai: client_0 addr {}", static_cast<void*>(client_0.get()));
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
-  ENVOY_LOG_MISC(debug, "lambdai: before create client 1");
-
   auto client_1 = connect("alpn1");
-  ENVOY_LOG_MISC(debug, "lambdai: client_1 addr {}", static_cast<void*>(client_1.get()));
   FakeRawConnectionPtr fake_upstream_connection_1;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_1));
 
@@ -195,8 +191,8 @@ TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigDeletingFilterChain) {
   ASSERT_TRUE(fake_upstream_connection_0->waitForData(5, &observed_data_0));
   EXPECT_EQ("hello", observed_data_0);
 
-  ASSERT_TRUE(fake_upstream_connection_0->write("hello"));
-  client_0->payload_reader_->set_data_to_wait_for("hello");
+  ASSERT_TRUE(fake_upstream_connection_0->write("world"));
+  client_0->payload_reader_->set_data_to_wait_for("world");
   client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
   client_0->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
 
@@ -207,15 +203,19 @@ TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigDeletingFilterChain) {
 
 // Verify that client 0 survives while adding new filter chain 2.
 TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigAddingFilterChain) {
+  setUpstreamCount(2);
   initialize();
+
   auto client_0 = connect("alpn0");
+  FakeRawConnectionPtr fake_upstream_connection_0;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
   ConfigHelper new_config_helper(version_, *api_,
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(0));
+        listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(1));
         *listener->mutable_filter_chains(2)
              ->mutable_filter_chain_match()
              ->mutable_application_protocols(0) = "alpn2";
@@ -225,10 +225,18 @@ TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigAddingFilterChain) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
 
   auto client_2 = connect("alpn2");
+  FakeRawConnectionPtr fake_upstream_connection_2;
+  ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_2));
 
-  Buffer::OwnedImpl buffer2("hello");
-  client_2->ssl_conn_->write(buffer2, false);
-  client_2->payload_reader_->set_data_to_wait_for("hello");
+  Buffer::OwnedImpl buffer_2("hello");
+  client_2->ssl_conn_->write(buffer_2, false);
+  client_2->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+  std::string observed_data_2;
+  ASSERT_TRUE(fake_upstream_connection_2->waitForData(5, &observed_data_2));
+  EXPECT_EQ("hello", observed_data_2);
+
+  ASSERT_TRUE(fake_upstream_connection_2->write("world"));
+  client_2->payload_reader_->set_data_to_wait_for("world");
   client_2->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
   client_2->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
 
@@ -236,9 +244,15 @@ TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigAddingFilterChain) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  Buffer::OwnedImpl buffer("hello");
-  client_0->ssl_conn_->write(buffer, false);
-  client_0->payload_reader_->set_data_to_wait_for("hello");
+  Buffer::OwnedImpl buffer_0("hello");
+  client_0->ssl_conn_->write(buffer_0, false);
+  client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+  std::string observed_data_0;
+  ASSERT_TRUE(fake_upstream_connection_0->waitForData(5, &observed_data_0));
+  EXPECT_EQ("hello", observed_data_0);
+
+  ASSERT_TRUE(fake_upstream_connection_0->write("world"));
+  client_0->payload_reader_->set_data_to_wait_for("world");
   client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
   client_0->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
 
