@@ -17,7 +17,7 @@ namespace Extensions {
 namespace UdpFilters {
 namespace DnsFilter {
 
-inline void BaseDnsRecord::serializeName(Buffer::OwnedImpl& output) {
+void BaseDnsRecord::serializeName(Buffer::OwnedImpl& output) {
   // Iterate over a name e.g. "www.domain.com" once and produce a buffer containing each name
   // segment prefixed by its length
   static constexpr char SEPARATOR('.');

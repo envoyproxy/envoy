@@ -40,7 +40,7 @@ class DnsQueryRecord : public BaseDnsRecord {
 public:
   DnsQueryRecord(const std::string& rec_name, const uint16_t rec_type, const uint16_t rec_class)
       : BaseDnsRecord(rec_name, rec_type, rec_class) {}
-  ~DnsQueryRecord() = default;
+  ~DnsQueryRecord() override = default;
   void serialize(Buffer::OwnedImpl& output) override;
 };
 
@@ -60,7 +60,7 @@ public:
   DnsAnswerRecord(const std::string& query_name, const uint16_t rec_type, const uint16_t rec_class,
                   const uint32_t ttl, Network::Address::InstanceConstSharedPtr ipaddr)
       : BaseDnsRecord(query_name, rec_type, rec_class), ttl_(ttl), ip_addr_(ipaddr) {}
-  ~DnsAnswerRecord() = default;
+  ~DnsAnswerRecord() override = default;
   void serialize(Buffer::OwnedImpl& output) override { UNREFERENCED_PARAMETER(output); }
 
   const uint32_t ttl_;
