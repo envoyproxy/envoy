@@ -54,7 +54,7 @@ enum HealthStatus {
   DEGRADED = 5;
 }
 
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -302,24 +302,56 @@ message HealthCheck {
   // The default value for "healthy edge interval" is the same as the default interval.
   TlsOptions tls_options = 21;
 
+  // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
+  // If empty, no event log will be written.
+  google.protobuf.Struct transport_socket_match_criteria = 23;
+
   oneof health_checker {
     option (validate.required) = true;
-
-    // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
-    // If empty, no event log will be written.
-    HttpHealthCheck http_health_check = 8;
 
     // [#not-implemented-hide:]
     // The gRPC service for the health check event service.
     // If empty, health check events won't be sent to a remote endpoint.
-    TcpHealthCheck tcp_health_check = 9;
+    HttpHealthCheck http_health_check = 8;
 
     // If set to true, health check failure events will always be logged. If set to false, only the
     // initial health check failure event will be logged.
     // The default value is false.
-    GrpcHealthCheck grpc_health_check = 11;
+    TcpHealthCheck tcp_health_check = 9;
 
     // This allows overriding the cluster TLS settings, just for health check connections.
+    GrpcHealthCheck grpc_health_check = 11;
+
+    // Optional key/value pairs that will be used to match a transport socket from those specified in the cluster's
+    // :ref:`tranport socket matches <envoy_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
+    // For example, the following match criteria
+    //
+    // .. code-block:: yaml
+    //
+    //  transport_socket_match_criteria:
+    //    useMTLS: true
+    //
+    // Will match the following :ref:`cluster socket match <envoy_api_msg_config.cluster.v3.Cluster.TransportSocketMatch>`
+    //
+    // .. code-block:: yaml
+    //
+    //  transport_socket_matches:
+    //  - name: "useMTLS"
+    //    match:
+    //      useMTLS: true
+    //    transport_socket:
+    //      name: envoy.transport_sockets.tls
+    //      config: { ... } # tls socket configuration
+    //
+    // If this field is set, then for health checks it will supersede an entry of *envoy.transport_socket* in the
+    // :ref:`LbEndpoint.Metadata <envoy_api_field_config.endpoint.v3.LbEndpoint.metadata>`.
+    // This allows using different transport socket capabilities for health checking versus proxying to the
+    // endpoint.
+    //
+    // If the key/values pairs specified do not match any
+    // :ref:`transport socket matches <envoy_api_field_config.cluster.v3.Cluster.transport_socket_matches>`,
+    // the cluster's :ref:`transport socket <envoy_api_field_config.cluster.v3.Cluster.transport_socket>`
+    // will be used for health check socket configuration.
     CustomHealthCheck custom_health_check = 13;
   }
 }

@@ -54,7 +54,7 @@ enum HealthStatus {
   DEGRADED = 5;
 }
 
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.HealthCheck";
 
@@ -323,4 +323,36 @@ message HealthCheck {
 
   // This allows overriding the cluster TLS settings, just for health check connections.
   TlsOptions tls_options = 21;
+
+  // Optional key/value pairs that will be used to match a transport socket from those specified in the cluster's
+  // :ref:`tranport socket matches <envoy_api_field_config.cluster.v4alpha.Cluster.transport_socket_matches>`.
+  // For example, the following match criteria
+  //
+  // .. code-block:: yaml
+  //
+  //  transport_socket_match_criteria:
+  //    useMTLS: true
+  //
+  // Will match the following :ref:`cluster socket match <envoy_api_msg_config.cluster.v4alpha.Cluster.TransportSocketMatch>`
+  //
+  // .. code-block:: yaml
+  //
+  //  transport_socket_matches:
+  //  - name: "useMTLS"
+  //    match:
+  //      useMTLS: true
+  //    transport_socket:
+  //      name: envoy.transport_sockets.tls
+  //      config: { ... } # tls socket configuration
+  //
+  // If this field is set, then for health checks it will supersede an entry of *envoy.transport_socket* in the
+  // :ref:`LbEndpoint.Metadata <envoy_api_field_config.endpoint.v3.LbEndpoint.metadata>`.
+  // This allows using different transport socket capabilities for health checking versus proxying to the
+  // endpoint.
+  //
+  // If the key/values pairs specified do not match any
+  // :ref:`transport socket matches <envoy_api_field_config.cluster.v4alpha.Cluster.transport_socket_matches>`,
+  // the cluster's :ref:`transport socket <envoy_api_field_config.cluster.v4alpha.Cluster.transport_socket>`
+  // will be used for health check socket configuration.
+  google.protobuf.Struct transport_socket_match_criteria = 23;
 }
