@@ -4,7 +4,11 @@
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "common/common/enum_to_int.h"
+
 #include "extensions/filters/http/admission_control/admission_control.h"
+#include "extensions/filters/http/admission_control/response_evaluators/default_evaluator.h"
+#include "extensions/filters/http/admission_control/response_evaluators/response_evaluator.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,10 +33,20 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
         return std::make_shared<ThreadLocalControllerImpl>(context.timeSource(), sampling_window);
       });
 
+  std::unique_ptr<ResponseEvaluator> response_evaluator;
+  switch (config.evaluation_criteria_case()) {
+  case AdmissionControlProto::EvaluationCriteriaCase::kDefaultEvalCriteria:
+    response_evaluator = std::make_unique<DefaultResponseEvaluator>(config.default_eval_criteria());
+    break;
+  case AdmissionControlProto::EvaluationCriteriaCase::EVALUATION_CRITERIA_NOT_SET:
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
   AdmissionControlFilterConfigSharedPtr filter_config =
-      std::make_shared<AdmissionControlFilterConfig>(config, context.runtime(),
-                                                     context.timeSource(), context.random(),
-                                                     context.scope(), std::move(tls));
+      std::make_shared<AdmissionControlFilterConfig>(
+          config, context.runtime(), context.timeSource(), context.random(), context.scope(),
+          std::move(tls), std::move(response_evaluator));
 
   return [filter_config, prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<AdmissionControlFilter>(filter_config, prefix));

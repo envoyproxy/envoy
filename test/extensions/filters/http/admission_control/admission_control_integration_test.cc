@@ -13,13 +13,16 @@ const std::string ADMISSION_CONTROL_CONFIG =
 name: envoy.filters.http.admission_control
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.admission_control.v3alpha.AdmissionControl
-  default_success_criteria:
+  default_eval_criteria:
     http_status:
     grpc_status:
   sampling_window: 10s
   aggression_coefficient:
     default_value: 1.0
     runtime_key: "foo.aggression"
+  enabled:
+    default_value: true
+    runtime_key: "foo.enabled"
 )EOF";
 
 class AdmissionControlIntegrationTest : public Event::TestUsingSimulatedTime,
@@ -53,8 +56,6 @@ protected:
   void verifyFailure(IntegrationStreamDecoderPtr response) {
     EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   }
-
-  void waitFor(std::chrono::microseconds us) { timeSystem().sleep(us); }
 
   IntegrationStreamDecoderPtr sendGrpcRequestWithReturnCode(uint64_t code) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -126,7 +127,7 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
   EXPECT_NEAR(throttle_count / request_count, 0.98, 0.03);
 
   // We now wait for the history to become stale.
-  waitFor(std::chrono::seconds(10));
+  timeSystem().sleep(std::chrono::seconds(10));
 
   // We expect a 100% success rate after waiting. No throttling should occur.
   for (int i = 0; i < 100; ++i) {
@@ -166,7 +167,7 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
   EXPECT_NEAR(throttle_count / request_count, 0.98, 0.03);
 
   // We now wait for the history to become stale.
-  waitFor(std::chrono::seconds(10));
+  timeSystem().sleep(std::chrono::seconds(10));
 
   // We expect a 100% success rate after waiting. No throttling should occur.
   for (int i = 0; i < 100; ++i) {

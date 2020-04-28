@@ -1,3 +1,7 @@
+#pragma once
+
+#include "envoy/common/pure.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -12,7 +16,7 @@ public:
 
   /**
    * Returns true if the provided HTTP code constitutes a success.
-   */ 
+   */
   virtual bool isHttpSuccess(uint64_t code) const PURE;
 
   /**

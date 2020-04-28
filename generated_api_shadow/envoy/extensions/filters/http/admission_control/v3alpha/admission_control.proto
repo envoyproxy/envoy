@@ -26,23 +26,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.admission_control]
 
 message AdmissionControl {
-  enum HttpStatusRange {
-    Http1xx = 0;
-    Http2xx = 1;
-    Http3xx = 2;
-    Http4xx = 3;
-    Http5xx = 4;
-  }
-
-  // Default method of specifying what constitutes a successful request. All status codes that
-  // indicate a successful request must be explicitly specified if not relying on the default
+  // Default method of specifying what constitutes a failed request. All status codes that
+  // indicate a failed request must be explicitly specified if not relying on the default
   // values.
-  message DefaultSuccessCriteria {
-    // If HTTP statuses are unspecified, defaults to 2xx.
-    repeated HttpStatusRange http_status = 1;
+  message DefaultEvaluationCriteria {
+    // If HTTP statuses are unspecified, defaults to 5xx.
+    repeated type.v3.Int32Range http_status = 1;
 
     // GRPC status codes to consider as request successes. If unspecified, defaults to "OK".
-    repeated type.v3.Int32Range grpc_status = 2;
+    repeated uint32 grpc_status = 2;
   }
 
   // If set to false, the admission control filter will operate as a pass-through filter. If the
@@ -50,10 +42,10 @@ message AdmissionControl {
   config.core.v3.RuntimeFeatureFlag enabled = 1;
 
   // Defines how a request is considered a success/failure.
-  oneof success_criteria {
+  oneof evaluation_criteria {
     option (validate.required) = true;
 
-    DefaultSuccessCriteria default_success_criteria = 2;
+    DefaultEvaluationCriteria default_eval_criteria = 2;
   }
 
   // The time window over which the success rate is calculated. The window is rounded to the nearest

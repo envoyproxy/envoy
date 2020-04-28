@@ -13,8 +13,14 @@ envoy_package()
 
 envoy_cc_library(
     name = "admission_control_filter_lib",
-    srcs = ["admission_control.cc"],
-    hdrs = ["admission_control.h"],
+    srcs = [
+        "admission_control.cc",
+        "thread_local_controller.cc",
+    ],
+    hdrs = [
+        "admission_control.h",
+        "thread_local_controller.h",
+    ],
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -22,6 +28,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/admission_control/response_evaluators:response_evaluator_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
     ],
@@ -35,8 +42,10 @@ envoy_cc_extension(
     status = "alpha",
     deps = [
         "//include/envoy/registry",
+        "//source/common/common:enum_to_int",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/admission_control:admission_control_filter_lib",
+        "//source/extensions/filters/http/admission_control/response_evaluators:response_evaluator_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
     ],

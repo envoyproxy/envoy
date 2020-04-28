@@ -6,6 +6,9 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "extensions/filters/http/admission_control/admission_control.h"
+#include "extensions/filters/http/admission_control/response_evaluators/default_evaluator.h"
+#include "extensions/filters/http/admission_control/response_evaluators/response_evaluator.h"
+#include "extensions/filters/http/admission_control/thread_local_controller.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -39,9 +42,10 @@ class TestConfig : public AdmissionControlFilterConfig {
 public:
   TestConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
              TimeSource& time_source, Runtime::RandomGenerator& random, Stats::Scope& scope,
-             ThreadLocal::SlotPtr&& tls, MockThreadLocalController& controller)
+             ThreadLocal::SlotPtr&& tls, MockThreadLocalController& controller,
+             std::unique_ptr<ResponseEvaluator> evaluator)
       : AdmissionControlFilterConfig(proto_config, runtime, time_source, random, scope,
-                                     std::move(tls)),
+                                     std::move(tls), std::move(evaluator)),
         controller_(controller) {}
   virtual ThreadLocalController& getController() const override { return controller_; }
 
@@ -49,6 +53,10 @@ private:
   MockThreadLocalController& controller_;
 };
 
+/**
+ * TODO (tonya11en): If another response evaluator is implemented, the tests should be separated
+ * from the filter test.
+ */
 class AdmissionControlTest : public testing::Test {
 public:
   AdmissionControlTest() {}
@@ -57,8 +65,10 @@ public:
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();
+    auto evaluator = std::make_unique<DefaultResponseEvaluator>(proto.default_eval_criteria());
+
     return std::make_shared<TestConfig>(proto, runtime_, time_system_, random_, scope_,
-                                        std::move(tls), controller_);
+                                        std::move(tls), controller_, std::move(evaluator));
   }
 
   void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {
@@ -123,23 +133,23 @@ sampling_window: 10s
 aggression_coefficient:
   default_value: 1.0
   runtime_key: "foo.aggression"
-default_success_criteria:
+default_eval_criteria:
   http_status:
   grpc_status:
 )EOF"};
 };
 
-// Ensure the filter can be disabled.
-TEST_F(AdmissionControlTest, FilterDisabled) {
+// Ensure the filter can be disabled/enabled via runtime.
+TEST_F(AdmissionControlTest, FilterRuntimeOverride) {
   const std::string yaml = R"EOF(
 enabled:
-  default_value: false
+  default_value: true
   runtime_key: "foo.enabled"
 sampling_window: 10s
 aggression_coefficient:
   default_value: 1.0
   runtime_key: "foo.aggression"
-default_success_criteria:
+default_eval_criteria:
   http_status:
   grpc_status:
 )EOF";
@@ -147,8 +157,10 @@ default_success_criteria:
   auto config = makeConfig(yaml);
   setupFilter(config);
 
-  // Fail lots of requests so that we would normally expect a ~100% rejection rate. It should pass
-  // below since the filter is disabled.
+  // "Disable" the filter via runtime.
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo.enabled", true)).WillRepeatedly(Return(false));
+
+  // The filter is bypassed via runtime.
   EXPECT_CALL(controller_, requestTotalCount()).Times(0);
   EXPECT_CALL(controller_, requestSuccessCount()).Times(0);
 
@@ -185,11 +197,11 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
   EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
 
   // We expect rejections due to the failure rate.
-  EXPECT_EQ(0, scope_.counter("test_prefix.rq_rejected").value());
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
-  EXPECT_EQ(1, scope_.counter("test_prefix.rq_rejected").value());
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 1, time_system_);
 
   // Now we pretend as if the historical data has been phased out.
   EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
@@ -220,9 +232,10 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
 // Ensure the HTTP error code range configurations are honored.
 TEST_F(AdmissionControlTest, HttpErrorCodes) {
   const std::string yaml = R"EOF(
-default_success_criteria:
+default_eval_criteria:
   http_status:
-    - Http3xx
+    - start: 300
+      end:   400
   grpc_status:
 )EOF";
 
@@ -254,7 +267,7 @@ default_success_criteria:
 // Verify default behavior of the filter.
 TEST_F(AdmissionControlTest, DefaultBehaviorTest) {
   const std::string yaml = R"EOF(
-default_success_criteria:
+default_eval_criteria:
   http_status:
   grpc_status:
 )EOF";
@@ -267,25 +280,45 @@ default_success_criteria:
 
   setupFilter(config);
   expectGrpcSuccess("0");
+
+  // Aborted.
   setupFilter(config);
-  expectGrpcFail("7");
+  expectGrpcFail("10");
+
+  // Data loss.
+  setupFilter(config);
+  expectGrpcFail("15");
+
+  // Deadline exceeded.
+  setupFilter(config);
+  expectGrpcFail("4");
+
+  // Internal
+  setupFilter(config);
+  expectGrpcFail("13");
+
+  // Resource exhausted.
+  setupFilter(config);
+  expectGrpcFail("8");
+
+  // Unavailable.
   setupFilter(config);
   expectGrpcFail("14");
 
-  // Test 200 range.
   setupFilter(config);
   expectHttpSuccess("200");
   setupFilter(config);
   expectHttpSuccess("201");
   setupFilter(config);
   expectHttpSuccess("204");
+  setupFilter(config);
+  expectHttpSuccess("300");
+  setupFilter(config);
+  expectHttpSuccess("301");
+  setupFilter(config);
+  expectHttpSuccess("404");
 
-  setupFilter(config);
-  expectHttpFail("300");
-  setupFilter(config);
-  expectHttpFail("301");
-  setupFilter(config);
-  expectHttpFail("404");
+  // 500 is a failure by default.
   setupFilter(config);
   expectHttpFail("500");
 }
@@ -293,11 +326,11 @@ default_success_criteria:
 // Ensure that HTTP status codes are not considered when evaluating a GRPC request.
 TEST_F(AdmissionControlTest, HttpCodeInfluence) {
   const std::string yaml = R"EOF(
-default_success_criteria:
+default_eval_criteria:
   http_status:
   grpc_status:
-    - status: PERMISSION_DENIED
-    - status: UNIMPLEMENTED
+    - 7  # PERMISSION_DENIED
+    - 12 # UNIMPLEMENTED
 )EOF";
 
   auto config = makeConfig(yaml);
@@ -320,12 +353,13 @@ default_success_criteria:
 // Ensure that HTTP status codes are not considered when evaluating a GRPC request.
 TEST_F(AdmissionControlTest, HttpCodeInfluence2) {
   const std::string yaml = R"EOF(
-default_success_criteria:
+default_eval_criteria:
   http_status:
-    - Http3xx
+    - start: 300
+      end:   400
   grpc_status:
-    - status: PERMISSION_DENIED
-    - status: UNIMPLEMENTED
+    - 7  # PERMISSION_DENIED
+    - 12 # UNIMPLEMENTED
 )EOF";
 
   auto config = makeConfig(yaml);
@@ -350,11 +384,11 @@ default_success_criteria:
 // Check that GRPC error code configurations are honored.
 TEST_F(AdmissionControlTest, GrpcErrorCodes) {
   const std::string yaml = R"EOF(
-default_success_criteria:
+default_eval_criteria:
   http_status:
   grpc_status:
-    - status: PERMISSION_DENIED
-    - status: UNIMPLEMENTED
+    - 7
+    - 13
 )EOF";
 
   auto config = makeConfig(yaml);
@@ -365,7 +399,11 @@ default_success_criteria:
 
   setupFilter(config);
   expectGrpcFail("0");
+  setupFilter(config);
+  expectGrpcFail("2");
 
+  setupFilter(config);
+  expectGrpcSuccess("13");
   setupFilter(config);
   expectGrpcSuccess("7");
 }
