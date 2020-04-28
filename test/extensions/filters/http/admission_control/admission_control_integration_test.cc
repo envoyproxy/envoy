@@ -12,11 +12,11 @@ const std::string ADMISSION_CONTROL_CONFIG =
     R"EOF(
 name: envoy.filters.http.admission_control
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.admission_control.v3alpha.AdmissionControl
+  "@type": type.googleapis.com/envoy.extensions.filters.http.admission_control.v3alpha.AdmissionControl
   default_eval_criteria:
     http_status:
     grpc_status:
-  sampling_window: 10s
+  sampling_window: 120s
   aggression_coefficient:
     default_value: 1.0
     runtime_key: "foo.aggression"
@@ -45,16 +45,8 @@ protected:
     EXPECT_EQ("0", response->trailers()->GrpcStatus()->value().getStringView());
   }
 
-  void verifyGrpcFailure(IntegrationStreamDecoderPtr response) {
-    EXPECT_EQ("14", response->trailers()->GrpcStatus()->value().getStringView());
-  }
-
-  void verifySuccess(IntegrationStreamDecoderPtr response) {
+  void verifyHttpSuccess(IntegrationStreamDecoderPtr response) {
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  }
-
-  void verifyFailure(IntegrationStreamDecoderPtr response) {
-    EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   }
 
   IntegrationStreamDecoderPtr sendGrpcRequestWithReturnCode(uint64_t code) {
@@ -127,11 +119,11 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
   EXPECT_NEAR(throttle_count / request_count, 0.98, 0.03);
 
   // We now wait for the history to become stale.
-  timeSystem().sleep(std::chrono::seconds(10));
+  timeSystem().sleep(std::chrono::seconds(120));
 
   // We expect a 100% success rate after waiting. No throttling should occur.
   for (int i = 0; i < 100; ++i) {
-    verifySuccess(sendRequestWithReturnCode("200"));
+    verifyHttpSuccess(sendRequestWithReturnCode("200"));
   }
 }
 
@@ -141,15 +133,15 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
   initialize();
 
   // Drop the success rate to a very low value.
-  for (int i = 0; i < 100; ++i) {
-    sendGrpcRequestWithReturnCode(7);
+  for (int i = 0; i < 1000; ++i) {
+    sendGrpcRequestWithReturnCode(14);
   }
 
   // Measure throttling rate from the admission control filter.
   double throttle_count = 0;
   double request_count = 0;
   for (int i = 0; i < 1000; ++i) {
-    auto response = sendGrpcRequestWithReturnCode(2);
+    auto response = sendGrpcRequestWithReturnCode(10);
 
     // When the filter is throttling, it returns an HTTP code 503 and the GRPC status is unset.
     // Otherwise, we expect a GRPC status of "Unknown" as set above.
@@ -157,7 +149,7 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
       ++throttle_count;
     } else {
       auto grpc_status = Grpc::Common::getGrpcStatus(*(response->trailers()));
-      ASSERT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::Unknown);
+      ASSERT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::Aborted);
     }
     ++request_count;
   }
@@ -167,7 +159,7 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
   EXPECT_NEAR(throttle_count / request_count, 0.98, 0.03);
 
   // We now wait for the history to become stale.
-  timeSystem().sleep(std::chrono::seconds(10));
+  timeSystem().sleep(std::chrono::seconds(120));
 
   // We expect a 100% success rate after waiting. No throttling should occur.
   for (int i = 0; i < 100; ++i) {
