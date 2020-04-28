@@ -1,6 +1,7 @@
 #include "extensions/filters/network/common/redis/redis_command_stats.h"
 
 #include "common/stats/timespan_impl.h"
+#include "common/stats/utility.h"
 
 #include "extensions/filters/network/common/redis/supported_commands.h"
 
@@ -32,33 +33,20 @@ RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std
       Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
 }
 
-Stats::Counter& RedisCommandStats::counter(Stats::Scope& scope,
-                                           const Stats::StatNameVec& stat_names) {
-  const Stats::SymbolTable::StoragePtr storage_ptr = symbol_table_.join(stat_names);
-  Stats::StatName full_stat_name = Stats::StatName(storage_ptr.get());
-  return scope.counterFromStatName(full_stat_name);
-}
-
-Stats::Histogram& RedisCommandStats::histogram(Stats::Scope& scope,
-                                               const Stats::StatNameVec& stat_names,
-                                               Stats::Histogram::Unit unit) {
-  const Stats::SymbolTable::StoragePtr storage_ptr = symbol_table_.join(stat_names);
-  Stats::StatName full_stat_name = Stats::StatName(storage_ptr.get());
-  return scope.histogramFromStatName(full_stat_name, unit);
-}
-
 Stats::TimespanPtr RedisCommandStats::createCommandTimer(Stats::Scope& scope,
                                                          Stats::StatName command,
                                                          Envoy::TimeSource& time_source) {
   return std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      histogram(scope, {prefix_, command, latency_}, Stats::Histogram::Unit::Microseconds),
+      Stats::Utility::histogramFromStatNames(scope, {prefix_, command, latency_},
+                                             Stats::Histogram::Unit::Microseconds),
       time_source);
 }
 
 Stats::TimespanPtr RedisCommandStats::createAggregateTimer(Stats::Scope& scope,
                                                            Envoy::TimeSource& time_source) {
   return std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      histogram(scope, {prefix_, upstream_rq_time_}, Stats::Histogram::Unit::Microseconds),
+      Stats::Utility::histogramFromStatNames(scope, {prefix_, upstream_rq_time_},
+                                             Stats::Histogram::Unit::Microseconds),
       time_source);
 }
 
@@ -84,16 +72,13 @@ Stats::StatName RedisCommandStats::getCommandFromRequest(const RespValue& reques
 }
 
 void RedisCommandStats::updateStatsTotal(Stats::Scope& scope, Stats::StatName command) {
-  counter(scope, {prefix_, command, total_}).inc();
+  Stats::Utility::counterFromStatNames(scope, {prefix_, command, total_}).inc();
 }
 
 void RedisCommandStats::updateStats(Stats::Scope& scope, Stats::StatName command,
                                     const bool success) {
-  if (success) {
-    counter(scope, {prefix_, command, success_}).inc();
-  } else {
-    counter(scope, {prefix_, command, failure_}).inc();
-  }
+  Stats::StatName status = success ? success_ : failure_;
+  Stats::Utility::counterFromStatNames(scope, {prefix_, command, status}).inc();
 }
 
 } // namespace Redis

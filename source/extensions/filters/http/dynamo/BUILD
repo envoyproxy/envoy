@@ -61,5 +61,6 @@ envoy_cc_library(
         ":dynamo_request_parser_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )

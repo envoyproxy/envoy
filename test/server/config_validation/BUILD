@@ -48,13 +48,20 @@ envoy_cc_test(
     ],
 )
 
+filegroup(
+    name = "server_test_data",
+    srcs = glob(["test_data/**"]),
+)
+
 envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
     data = [
+        ":server_test_data",
         "//configs:example_configs",
         "//test/config_test:example_configs_test_setup.sh",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
@@ -64,6 +71,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )

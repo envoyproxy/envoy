@@ -74,6 +74,7 @@ public:
   MOCK_METHOD(const std::string&, configPath, (), (const));
   MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, configProto, (), (const));
   MOCK_METHOD(const std::string&, configYaml, (), (const));
+  MOCK_METHOD(const absl::optional<uint32_t>&, bootstrapVersion, (), (const));
   MOCK_METHOD(bool, allowUnknownStaticFields, (), (const));
   MOCK_METHOD(bool, rejectUnknownDynamicFields, (), (const));
   MOCK_METHOD(const std::string&, adminAddressPath, (), (const));
@@ -103,6 +104,7 @@ public:
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
   std::string config_yaml_;
+  absl::optional<uint32_t> bootstrap_version_;
   bool allow_unknown_static_fields_{};
   bool reject_unknown_dynamic_fields_{};
   std::string admin_address_path_;
