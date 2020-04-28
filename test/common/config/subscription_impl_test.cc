@@ -94,18 +94,19 @@ INSTANTIATE_TEST_SUITE_P(SubscriptionImplTest, SubscriptionImplInitFetchTimeoutT
 TEST_P(SubscriptionImplTest, InitialRequestResponse) {
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
-  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
+  deliverConfigUpdate({"cluster0", "cluster1"}, "v25-ubuntu18-beta", true);
+  EXPECT_TRUE(
+      statsAre(2, 1, 0, 0, 0, TEST_TIME_MILLIS, 18202868392629624077U, "v25-ubuntu18-beta"));
 }
 
 // Validate that multiple streamed updates succeed.
 TEST_P(SubscriptionImplTest, ResponseStream) {
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
-  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
-  deliverConfigUpdate({"cluster0", "cluster1"}, "1", true);
-  EXPECT_TRUE(statsAre(3, 2, 0, 0, 0, TEST_TIME_MILLIS, 13237225503670494420U, "1"));
+  deliverConfigUpdate({"cluster0", "cluster1"}, "1.2.3.4", true);
+  EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, TEST_TIME_MILLIS, 14026795738668939420U, "1.2.3.4"));
+  deliverConfigUpdate({"cluster0", "cluster1"}, "5_6_7", true);
+  EXPECT_TRUE(statsAre(3, 2, 0, 0, 0, TEST_TIME_MILLIS, 7612520132475921171U, "5_6_7"));
 }
 
 // Validate that the client can reject a config.
@@ -140,10 +141,10 @@ TEST_P(SubscriptionImplTest, RejectAcceptNextConfig) {
 TEST_P(SubscriptionImplTest, UpdateResources) {
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
-  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
+  deliverConfigUpdate({"cluster0", "cluster1"}, "42", true);
+  EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, TEST_TIME_MILLIS, 7919287270473417401, "42"));
   updateResourceInterest({"cluster2"});
-  EXPECT_TRUE(statsAre(3, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
+  EXPECT_TRUE(statsAre(3, 1, 0, 0, 0, TEST_TIME_MILLIS, 7919287270473417401, "42"));
 }
 
 // Validate that initial fetch timer is created and calls callback on timeout

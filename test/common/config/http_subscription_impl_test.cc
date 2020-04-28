@@ -22,8 +22,8 @@ TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
   EXPECT_TRUE(statsAre(1, 0, 0, 1, 0, 0, 0, ""));
   timerTick();
   EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0, ""));
-  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  EXPECT_TRUE(statsAre(3, 1, 0, 1, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
+  deliverConfigUpdate({"cluster0", "cluster1"}, "42", true);
+  EXPECT_TRUE(statsAre(3, 1, 0, 1, 0, TEST_TIME_MILLIS, 7919287270473417401, "42"));
 }
 
 // Validate that the client can recover from bad JSON responses.

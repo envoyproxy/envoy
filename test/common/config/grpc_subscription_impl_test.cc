@@ -73,10 +73,10 @@ TEST_F(GrpcSubscriptionImplTest, RepeatedNonce) {
   // Now with version "0" update to "1".
   updateResourceInterest({"cluster3"});
   EXPECT_TRUE(statsAre(5, 1, 1, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
-  deliverConfigUpdate({"cluster3"}, "1", false);
+  deliverConfigUpdate({"cluster3"}, "42", false);
   EXPECT_TRUE(statsAre(6, 1, 2, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
-  deliverConfigUpdate({"cluster3"}, "1", true);
-  EXPECT_TRUE(statsAre(7, 2, 2, 0, 0, TEST_TIME_MILLIS, 13237225503670494420U, "1"));
+  deliverConfigUpdate({"cluster3"}, "42", true);
+  EXPECT_TRUE(statsAre(7, 2, 2, 0, 0, TEST_TIME_MILLIS, 7919287270473417401, "42"));
 }
 
 TEST_F(GrpcSubscriptionImplTest, UpdateTimeNotChangedOnUpdateReject) {
