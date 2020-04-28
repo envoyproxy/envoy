@@ -787,6 +787,7 @@ TEST_F(DispatcherTest, EnvoyLocalReply) {
   bridge_callbacks.context = &cc;
   bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
     ASSERT_EQ(error.error_code, ENVOY_CONNECTION_FAILURE);
+    ASSERT_EQ(error.attempt_count, -1);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
   };
@@ -844,6 +845,7 @@ TEST_F(DispatcherTest, EnvoyLocalReplyNon503) {
   bridge_callbacks.context = &cc;
   bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
     ASSERT_EQ(error.error_code, ENVOY_UNDEFINED_ERROR);
+    ASSERT_EQ(error.attempt_count, -1);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
   };
@@ -902,6 +904,7 @@ TEST_F(DispatcherTest, EnvoyLocalReplyWithData) {
   bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
     ASSERT_EQ(error.error_code, ENVOY_CONNECTION_FAILURE);
     ASSERT_EQ(Http::Utility::convertToString(error.message), "error message");
+    ASSERT_EQ(error.attempt_count, -1);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
     error.message.release(error.message.context);
@@ -947,6 +950,64 @@ TEST_F(DispatcherTest, EnvoyLocalReplyWithData) {
   Buffer::InstancePtr response_data{new Buffer::OwnedImpl("error message")};
   response_encoder_->encodeData(*response_data, true);
   ASSERT_EQ(cc.on_data_calls, 0);
+  stream_deletion_post_cb();
+
+  // Ensure that the callbacks on the bridge_callbacks were called.
+  ASSERT_EQ(cc.on_complete_calls, 0);
+  ASSERT_EQ(cc.on_error_calls, 1);
+}
+
+TEST_F(DispatcherTest, EnvoyLocalReplyWithAttemptCount) {
+  ready();
+
+  envoy_stream_t stream = 1;
+  // Setup bridge_callbacks to handle the response headers.
+  envoy_http_callbacks bridge_callbacks;
+  callbacks_called cc = {0, 0, 0, 0, 0, 0};
+  bridge_callbacks.context = &cc;
+  bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
+    ASSERT_EQ(error.error_code, ENVOY_CONNECTION_FAILURE);
+    ASSERT_EQ(error.attempt_count, 123);
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_error_calls++;
+  };
+
+  // Build a set of request headers.
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
+
+  // Create a stream.
+  Event::PostCb start_stream_post_cb;
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
+
+  // Grab the response encoder in order to dispatch responses on the stream.
+  // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
+  // API.
+  EXPECT_CALL(api_listener_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder_ = &encoder;
+        return request_decoder_;
+      }));
+  start_stream_post_cb();
+
+  // Send request headers.
+  Event::PostCb send_headers_post_cb;
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&send_headers_post_cb));
+  http_dispatcher_.sendHeaders(stream, c_headers, true);
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  send_headers_post_cb();
+
+  // Encode response headers. A non-200 code triggers an on_error callback chain. In particular, a
+  // 503 should have an ENVOY_CONNECTION_FAILURE error code.
+  Event::PostCb stream_deletion_post_cb;
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&stream_deletion_post_cb));
+  TestResponseHeaderMapImpl response_headers{{":status", "503"}, {"x-envoy-attempt-count", "123"}};
+  response_encoder_->encodeHeaders(response_headers, true);
+  ASSERT_EQ(cc.on_headers_calls, 0);
   stream_deletion_post_cb();
 
   // Ensure that the callbacks on the bridge_callbacks were called.
@@ -1028,6 +1089,7 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
     ASSERT_EQ(error.error_code, ENVOY_STREAM_RESET);
     ASSERT_EQ(error.message.length, 0);
+    ASSERT_EQ(error.attempt_count, -1);
     // This will use envoy_noop_release.
     error.message.release(error.message.context);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
@@ -1174,6 +1236,7 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRaceLocalWins) {
   bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
     ASSERT_EQ(error.error_code, ENVOY_STREAM_RESET);
     ASSERT_EQ(error.message.length, 0);
+    ASSERT_EQ(error.attempt_count, -1);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
   };
@@ -1267,6 +1330,7 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRemoteWinsDeletesStream) {
   bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
     ASSERT_EQ(error.error_code, ENVOY_STREAM_RESET);
     ASSERT_EQ(error.message.length, 0);
+    ASSERT_EQ(error.attempt_count, 0);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
   };
@@ -1359,6 +1423,7 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRemoteWins) {
   bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
     ASSERT_EQ(error.error_code, ENVOY_STREAM_RESET);
     ASSERT_EQ(error.message.length, 0);
+    ASSERT_EQ(error.attempt_count, 0);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
   };
@@ -1453,6 +1518,7 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRaceLocalWins) {
   bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
     ASSERT_EQ(error.error_code, ENVOY_STREAM_RESET);
     ASSERT_EQ(error.message.length, 0);
+    ASSERT_EQ(error.attempt_count, 0);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
   };
@@ -1543,6 +1609,7 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRemoteWinsDeletesStream) {
   bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
     ASSERT_EQ(error.error_code, ENVOY_STREAM_RESET);
     ASSERT_EQ(error.message.length, 0);
+    ASSERT_EQ(error.attempt_count, -1);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
   };
@@ -1632,6 +1699,7 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRemoteWins) {
   bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
     ASSERT_EQ(error.error_code, ENVOY_STREAM_RESET);
     ASSERT_EQ(error.message.length, 0);
+    ASSERT_EQ(error.attempt_count, -1);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
   };

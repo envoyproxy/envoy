@@ -66,8 +66,13 @@ public final class ResponseHandler: NSObject {
     @escaping (_ error: EnvoyError) -> Void)
     -> ResponseHandler
   {
-    self.underlyingCallbacks.onError = { errorCode, message in
-      closure(EnvoyError(errorCode: errorCode, message: message, cause: nil))
+    self.underlyingCallbacks.onError = { errorCode, message, attemptCount in
+      closure(EnvoyError(errorCode: errorCode, message: message,
+                         // Note that the cast will return nil if attemptCount was negative
+                         // This is the desired behavior because the bridge layer uses -1 to
+                         // signify absence.
+                         attemptCount: UInt32(exactly: attemptCount),
+                         cause: nil))
     }
     return self
   }

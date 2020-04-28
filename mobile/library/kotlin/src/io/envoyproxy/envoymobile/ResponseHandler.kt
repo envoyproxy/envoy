@@ -20,7 +20,7 @@ class ResponseHandler(val executor: Executor) {
       byteBuffer: ByteBuffer, endStream: Boolean
     ) -> Unit = { _, _ -> Unit }
     internal var onTrailersClosure: (trailers: Map<String, List<String>>) -> Unit = { Unit }
-    internal var onErrorClosure: (errorCode: Int, message: String) -> Unit = { _, _ -> Unit }
+    internal var onErrorClosure: (errorCode: Int, message: String, attemptCount: Int) -> Unit = { _, _, _ -> Unit }
     internal var onCancelClosure: () -> Unit = { Unit }
 
     override fun getExecutor(): Executor {
@@ -40,8 +40,8 @@ class ResponseHandler(val executor: Executor) {
       onTrailersClosure(trailers)
     }
 
-    override fun onError(errorCode: Int, message: String) {
-      onErrorClosure(errorCode, message)
+    override fun onError(errorCode: Int, message: String, attemptCount: Int) {
+      onErrorClosure(errorCode, message, attemptCount)
     }
 
     override fun onCancel() {
@@ -99,8 +99,8 @@ class ResponseHandler(val executor: Executor) {
    * @return ResponseHandler, this ResponseHandler.
    */
   fun onError(closure: (error: EnvoyError) -> Unit): ResponseHandler {
-    underlyingCallbacks.onErrorClosure = { errorCode, message ->
-      closure(EnvoyError(errorCode, message))
+    underlyingCallbacks.onErrorClosure = { errorCode, message, attemptCount ->
+      closure(EnvoyError(errorCode, message, if (attemptCount < 0) null else attemptCount))
       Unit
     }
     return this

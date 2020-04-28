@@ -156,7 +156,7 @@ static void ios_on_error(envoy_error error, void *context) {
                                                         length:error.message.length
                                                       encoding:NSUTF8StringEncoding];
       error.message.release(error.message.context);
-      callbacks.onError(error.error_code, errorMessage);
+      callbacks.onError(error.error_code, errorMessage, error.attempt_count);
     }
 
     // TODO: If the callback queue is not serial, clean up is not currently thread-safe.

@@ -103,7 +103,9 @@ class MainActivity : Activity() {
           Unit
         }
         .onError { error ->
-          recyclerView.post { viewAdapter.add(Failure("failed with error " + error.message)) }
+          val msg = "failed with error after ${error.attemptCount ?: -1} attempts: ${error.message}"
+          Log.d("MainActivity", msg)
+          recyclerView.post { viewAdapter.add(Failure(msg)) }
           Unit
         }
 

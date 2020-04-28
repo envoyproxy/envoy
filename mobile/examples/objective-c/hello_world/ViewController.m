@@ -92,6 +92,7 @@ NSString *_REQUEST_SCHEME = @"https";
   }];
 
   [handler onError:^(EnvoyError *error) {
+    // TODO: expose attemptCount. https://github.com/lyft/envoy-mobile/issues/823
     NSLog(@"Error (%i): Request failed: %@", requestID, error.message);
   }];
 

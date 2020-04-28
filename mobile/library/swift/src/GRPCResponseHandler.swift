@@ -132,7 +132,8 @@ public final class GRPCResponseHandler: NSObject {
         // TODO: Support gRPC compression https://github.com/lyft/envoy-mobile/issues/501
         // Call the handler with an error and ignore all future updates.
         let error = EnvoyError(
-          errorCode: 0, message: "Unable to read compressed gRPC response message", cause: nil)
+          errorCode: 0, message: "Unable to read compressed gRPC response message",
+          attemptCount: nil, cause: nil)
         self.internalErrorClosure?(error)
         self.resetHandlers()
         buffer.removeAll()

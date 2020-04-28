@@ -123,6 +123,7 @@ private:
     const envoy_http_callbacks bridge_callbacks_;
     absl::optional<envoy_error_code_t> error_code_;
     absl::optional<envoy_data> error_message_;
+    absl::optional<int32_t> error_attempt_count_;
     Dispatcher& http_dispatcher_;
   };
 

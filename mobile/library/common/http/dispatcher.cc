@@ -88,6 +88,13 @@ void Dispatcher::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& h
   default:
     error_code_ = ENVOY_UNDEFINED_ERROR;
   }
+
+  uint32_t attempt_count;
+  if (headers.EnvoyAttemptCount() &&
+      absl::SimpleAtoi(headers.EnvoyAttemptCount()->value().getStringView(), &attempt_count)) {
+    error_attempt_count_ = attempt_count;
+  }
+
   ENVOY_LOG(debug, "[S{}] intercepted local response", direct_stream_.stream_handle_);
   if (end_stream) {
     // The local stream may or may not have completed.
@@ -186,6 +193,7 @@ void Dispatcher::DirectStreamCallbacks::onReset() {
   ENVOY_LOG(debug, "[S{}] remote reset stream", direct_stream_.stream_handle_);
   envoy_error_code_t code = error_code_.value_or(ENVOY_STREAM_RESET);
   envoy_data message = error_message_.value_or(envoy_nodata);
+  int32_t attempt_count = error_attempt_count_.value_or(-1);
 
   // Testing hook.
   http_dispatcher_.synchronizer_.syncPoint("dispatch_on_error");
@@ -198,7 +206,7 @@ void Dispatcher::DirectStreamCallbacks::onReset() {
   if (direct_stream_.dispatchable(true)) {
     ENVOY_LOG(debug, "[S{}] dispatching to platform remote reset stream",
               direct_stream_.stream_handle_);
-    bridge_callbacks_.on_error({code, message}, bridge_callbacks_.context);
+    bridge_callbacks_.on_error({code, message, attempt_count}, bridge_callbacks_.context);
 
     // All the terminal callbacks only cleanup if they are dispatchable.
     // This ensures that cleanup will happen exactly one time.
