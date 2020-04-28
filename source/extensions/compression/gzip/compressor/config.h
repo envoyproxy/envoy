@@ -18,7 +18,7 @@ namespace Compressor {
 
 namespace {
 
-const std::string& gzipStatsPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "gzip.compressor."); }
+const std::string& gzipStatsPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "gzip."); }
 const std::string& gzipExtensionName() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.compression.gzip.compressor");
 }
