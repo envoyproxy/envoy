@@ -37,12 +37,10 @@ public:
  * contains the ID, domain requested and the flags dictating the type of record that is sought.
  */
 class DnsQueryRecord : public BaseDnsRecord {
-
 public:
   DnsQueryRecord(const std::string& rec_name, const uint16_t rec_type, const uint16_t rec_class)
       : BaseDnsRecord(rec_name, rec_type, rec_class) {}
-
-  ~DnsQueryRecord() override = default;
+  ~DnsQueryRecord() = default;
   void serialize(Buffer::OwnedImpl& output) override;
 };
 
@@ -62,12 +60,11 @@ public:
   DnsAnswerRecord(const std::string& query_name, const uint16_t rec_type, const uint16_t rec_class,
                   const uint32_t ttl, Network::Address::InstanceConstSharedPtr ipaddr)
       : BaseDnsRecord(query_name, rec_type, rec_class), ttl_(ttl), ip_addr_(ipaddr) {}
-
-  ~DnsAnswerRecord() override = default;
+  ~DnsAnswerRecord() = default;
   void serialize(Buffer::OwnedImpl& output) override { UNREFERENCED_PARAMETER(output); }
 
   const uint32_t ttl_;
-  Network::Address::InstanceConstSharedPtr ip_addr_;
+  const Network::Address::InstanceConstSharedPtr ip_addr_;
 };
 
 using DnsAnswerRecordPtr = std::unique_ptr<DnsAnswerRecord>;
@@ -84,8 +81,8 @@ public:
       : local_(std::move(local)), peer_(std::move(peer)), parse_status_(false), id_() {}
   ~DnsQueryContext() = default;
 
-  Network::Address::InstanceConstSharedPtr local_;
-  Network::Address::InstanceConstSharedPtr peer_;
+  const Network::Address::InstanceConstSharedPtr local_;
+  const Network::Address::InstanceConstSharedPtr peer_;
 
   bool parse_status_;
   uint16_t id_;
@@ -99,7 +96,6 @@ using DnsQueryContextPtr = std::unique_ptr<DnsQueryContext>;
  * This class orchestrates parsing a DNS query and building the response to be sent to a client.
  */
 class DnsMessageParser : public Logger::Loggable<Logger::Id::filter> {
-
 public:
   enum DnsResponseCode { NoError, FormatError, ServerFailure, NameError, NotImplemented };
 
@@ -142,7 +138,6 @@ public:
   });
 
   DnsMessageParser() = default;
-  ~DnsMessageParser() = default;
 
   /**
    * @brief parse a single query record from a client request
