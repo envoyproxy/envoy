@@ -113,7 +113,7 @@ public:
   /**
    * Gets this Span's ID.
    */
-  const std::string& Id() const { return id_; }
+  const std::string& id() const { return id_; }
 
   const std::string& parentId() const { return parent_segment_id_; }
 

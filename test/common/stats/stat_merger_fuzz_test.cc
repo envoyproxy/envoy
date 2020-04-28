@@ -31,7 +31,7 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
     // TODO(#10008): We should remove the "1 +" below, so we can get empty
     // segments, which trigger some inconsistent handling as described in that
     // bug.
-    uint32_t num_bytes = 1 + data[index] & 0x7;
+    uint32_t num_bytes = (1 + data[index]) & 0x7;
     num_bytes = std::min(static_cast<uint32_t>(data.size() - 1),
                          num_bytes); // restrict number up to the size of data
 

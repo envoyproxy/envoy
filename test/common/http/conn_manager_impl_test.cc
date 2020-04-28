@@ -617,6 +617,71 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume100Continue) {
   decoder_filters_[1]->callbacks_->encodeHeaders(std::move(response_headers), false);
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/10923.
+TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithDecoderPause) {
+  proxy_100_continue_ = true;
+  setup(false, "envoy-custom-server", false);
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  // Allow headers to pass.
+  EXPECT_CALL(*filter, decodeHeaders(_, false))
+      .WillRepeatedly(
+          InvokeWithoutArgs([]() -> FilterHeadersStatus { return FilterHeadersStatus::Continue; }));
+  // Pause and then resume the decode pipeline, this is key to triggering #10923.
+  EXPECT_CALL(*filter, decodeData(_, false)).WillOnce(InvokeWithoutArgs([]() -> FilterDataStatus {
+    return FilterDataStatus::StopIterationAndBuffer;
+  }));
+  EXPECT_CALL(*filter, decodeData(_, true))
+      .WillRepeatedly(
+          InvokeWithoutArgs([]() -> FilterDataStatus { return FilterDataStatus::Continue; }));
+
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+      }));
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+
+  RequestDecoder* decoder = nullptr;
+  NiceMock<MockResponseEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+
+    // Test not charging stats on the second call.
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+    // Allow the decode pipeline to pause.
+    decoder->decodeData(data, false);
+
+    ResponseHeaderMapPtr continue_headers{new TestResponseHeaderMapImpl{{":status", "100"}}};
+    filter->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
+
+    // Resume decode pipeline after encoding 100 continue headers, we're now ready to trigger
+    // #10923.
+    decoder->decodeData(data, true);
+
+    ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+    filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+
+    data.drain(4);
+  }));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_1xx_.value());
+  EXPECT_EQ(1U, listener_stats_.downstream_rq_1xx_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
+  EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
+  EXPECT_EQ(2U, stats_.named_.downstream_rq_completed_.value());
+  EXPECT_EQ(2U, listener_stats_.downstream_rq_completed_.value());
+}
+
 // By default, Envoy will set the server header to the server name, here "custom-value"
 TEST_F(HttpConnectionManagerImplTest, ServerHeaderOverwritten) {
   setup(false, "custom-value", false);
