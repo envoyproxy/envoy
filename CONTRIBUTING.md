@@ -130,8 +130,8 @@ old code with new code, both code paths are supported for between one Envoy rele
 guarded due to performance concerns) and a full deprecation cycle (if it is a high risk behavioral
 change). Generally as a community we try to guard both high risk changes (major
 refactors such as replacing Envoy's buffer implementation) and most user-visible
-non-config-guarded changes to HTTP processing (for example additions or changes to HTTP headers or
-how HTTP is serialized out).
+non-config-guarded changes to protocol processing (for example additions or changes to HTTP headers or
+how HTTP is serialized out) for non-alpha features.
 
 The canonical way to runtime guard a feature is
 ```
