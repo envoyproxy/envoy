@@ -22,8 +22,8 @@ namespace AccessLoggers {
 namespace GrpcCommon {
 
 /**
- *  * All stats for the grpc access logger. @see stats_macros.h
- *   */
+ * All stats for the grpc access logger. @see stats_macros.h
+ */
 #define ALL_GRPC_ACCESS_LOGGER_STATS(COUNTER)                                                      \
   COUNTER(logs_written)                                                                            \
   COUNTER(logs_dropped)
