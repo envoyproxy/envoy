@@ -6,4 +6,6 @@
 
 cd $(dirname "$0")
 
-"$@"
+if [ $# -gt 0 ]; then
+  "./$@"
+fi
