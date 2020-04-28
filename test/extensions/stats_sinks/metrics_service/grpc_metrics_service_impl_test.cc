@@ -153,6 +153,7 @@ TEST_F(MetricsServiceSinkTest, CheckStatsCount) {
   sink.flush(snapshot_);
 }
 
+// Test that verifies counters are correctly reported as current value when configured to do so.
 TEST_F(MetricsServiceSinkTest, ReportCountersValues) {
   MetricsServiceSink sink(streamer_, time_system_, false);
 
@@ -170,6 +171,7 @@ TEST_F(MetricsServiceSinkTest, ReportCountersValues) {
   sink.flush(snapshot_);
 }
 
+// Test that verifies counters are reported as the delta between flushes when configured to do so.
 TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
   MetricsServiceSink sink(streamer_, time_system_, true);
 
