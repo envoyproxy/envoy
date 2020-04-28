@@ -263,6 +263,11 @@ public:
       AssertionResult result =
           loadstats_stream_->waitForGrpcMessage(*dispatcher_, local_loadstats_request);
       RELEASE_ASSERT(result, result.message());
+      // Check that "envoy.lrs.supports_send_all_clusters" client feature is set.
+      if (local_loadstats_request.has_node()) {
+        EXPECT_THAT(local_loadstats_request.node().client_features(),
+                    ::testing::ElementsAre("envoy.lrs.supports_send_all_clusters"));
+      }
       // Sanity check and clear the measured load report interval.
       for (auto& cluster_stats : *local_loadstats_request.mutable_cluster_stats()) {
         const uint32_t actual_load_report_interval_ms =

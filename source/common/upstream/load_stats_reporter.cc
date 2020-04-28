@@ -21,6 +21,7 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
           "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")),
       time_source_(dispatcher.timeSource()) {
   request_.mutable_node()->MergeFrom(local_info.node());
+  request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
   establishNewStream();
@@ -166,7 +167,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
   }
   clusters_.clear();
   // Reset stats for all hosts in clusters we are tracking.
-  auto handle_cluster_func = [&](const std::string& cluster_name) {
+  auto handle_cluster_func = [this, &existing_clusters](const std::string& cluster_name) {
     clusters_.emplace(cluster_name, existing_clusters.count(cluster_name) > 0
                                         ? existing_clusters[cluster_name]
                                         : time_source_.monotonicTime().time_since_epoch());
