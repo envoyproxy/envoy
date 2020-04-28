@@ -1,4 +1,4 @@
-#include<chrono>
+#include <chrono>
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -51,7 +51,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-    using testing::_;
+using testing::_;
 using testing::An;
 using testing::AnyNumber;
 using testing::AtLeast;
