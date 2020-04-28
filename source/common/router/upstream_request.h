@@ -119,6 +119,7 @@ public:
   };
 
   void readEnable();
+  void encodeBodyAndTrailers();
 
   // Getters and setters
   Upstream::HostDescriptionConstSharedPtr& upstreamHost() { return upstream_host_; }
@@ -172,6 +173,9 @@ private:
   // Tracks whether we deferred a per try timeout because the downstream request
   // had not been completed yet.
   bool create_per_try_timeout_on_request_complete_ : 1;
+  // True if the CONNECT headers have been sent but proxying payload is paused
+  // waiting for response headers.
+  bool paused_for_connect_ : 1;
 
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
   // and if so, if the per-try histogram should record a value.
