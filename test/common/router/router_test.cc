@@ -5693,7 +5693,7 @@ TEST_F(RouterTest, ConnectPauseAndResume) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
-  // Now send the response headers, and ensure the defered payload is proxied.
+  // Now send the response headers, and ensure the deferred payload is proxied.
   EXPECT_CALL(encoder, encodeData(_, _));
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -5725,7 +5725,7 @@ TEST_F(RouterTest, ConnectPauseNoResume) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
-  // Now send the response headers, and ensure the defered payload is not proxied.
+  // Now send the response headers, and ensure the deferred payload is not proxied.
   EXPECT_CALL(encoder, encodeData(_, _)).Times(0);
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "400"}});
