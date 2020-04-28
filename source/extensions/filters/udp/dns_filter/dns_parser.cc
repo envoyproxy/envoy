@@ -82,15 +82,15 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
                                       const Buffer::InstancePtr& buffer) {
   auto available_bytes = buffer->length();
 
-  memset(&incoming_, 0x00, sizeof(incoming_));
+  memset(&header_, 0x00, sizeof(struct DnsHeader));
 
   static constexpr uint64_t field_size = sizeof(uint16_t);
   uint64_t offset = 0;
   uint16_t data;
 
-  DnsQueryParseState state_{DnsQueryParseState::Init};
+  DnsQueryParseState state{DnsQueryParseState::Init};
 
-  while (state_ != DnsQueryParseState::Finish) {
+  while (state != DnsQueryParseState::Finish) {
     // Ensure that we have enough data remaining in the buffer to parse the query
     if (available_bytes < field_size) {
       ENVOY_LOG(error,
@@ -109,35 +109,35 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
       return false;
     }
 
-    switch (state_) {
+    switch (state) {
     case DnsQueryParseState::Init:
-      incoming_.id = data;
-      state_ = DnsQueryParseState::Flags;
+      header_.id = data;
+      state = DnsQueryParseState::Flags;
       break;
 
     case DnsQueryParseState::Flags:
-      ::memcpy(static_cast<void*>(&incoming_.flags), &data, sizeof(uint16_t));
-      state_ = DnsQueryParseState::Questions;
+      ::memcpy(static_cast<void*>(&header_.flags), &data, sizeof(uint16_t));
+      state = DnsQueryParseState::Questions;
       break;
 
     case DnsQueryParseState::Questions:
-      incoming_.questions = data;
-      state_ = DnsQueryParseState::Answers;
+      header_.questions = data;
+      state = DnsQueryParseState::Answers;
       break;
 
     case DnsQueryParseState::Answers:
-      incoming_.answers = data;
-      state_ = DnsQueryParseState::Authority;
+      header_.answers = data;
+      state = DnsQueryParseState::Authority;
       break;
 
     case DnsQueryParseState::Authority:
-      incoming_.authority_rrs = data;
-      state_ = DnsQueryParseState::Authority2;
+      header_.authority_rrs = data;
+      state = DnsQueryParseState::Authority2;
       break;
 
     case DnsQueryParseState::Authority2:
-      incoming_.additional_rrs = data;
-      state_ = DnsQueryParseState::Finish;
+      header_.additional_rrs = data;
+      state = DnsQueryParseState::Finish;
       break;
 
     case DnsQueryParseState::Finish:
@@ -145,6 +145,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     }
   }
 
+  // TODO(abaptiste):  Verify that queries do not contain answer records
   // Verify that we still have available data in the buffer to read answer and query records
   if (offset > buffer->length()) {
     ENVOY_LOG(error, "Buffer read offset[{}] is larget than buffer length [{}].", offset,
@@ -152,12 +153,12 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     return false;
   }
 
-  context->id_ = static_cast<uint16_t>(incoming_.id);
+  context->id_ = static_cast<uint16_t>(header_.id);
 
   // Almost always, we will have only one query here. Per the RFC, QDCOUNT is usually 1
-  context->queries_.reserve(incoming_.questions);
-  for (auto index = 0; index < incoming_.questions; index++) {
-    ENVOY_LOG(trace, "Parsing [{}/{}] questions", index, incoming_.questions);
+  context->queries_.reserve(header_.questions);
+  for (auto index = 0; index < header_.questions; index++) {
+    ENVOY_LOG(trace, "Parsing [{}/{}] questions", index, header_.questions);
     auto rec = parseDnsQueryRecord(buffer, &offset);
     if (rec == nullptr) {
       ENVOY_LOG(error, "Couldn't parse query record from buffer");

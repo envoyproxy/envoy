@@ -158,7 +158,7 @@ public:
   /**
    * @return uint16_t the response code flag value from a parsed dns object
    */
-  uint16_t getQueryResponseCode() { return static_cast<uint16_t>(incoming_.flags.rcode); }
+  uint16_t getQueryResponseCode() { return static_cast<uint16_t>(header_.flags.rcode); }
 
   /**
    * @brief Create a context object for handling a DNS Query
@@ -178,7 +178,7 @@ private:
   const std::string parseDnsNameRecord(const Buffer::InstancePtr& buffer, uint64_t* available_bytes,
                                        uint64_t* name_offset);
 
-  struct DnsHeader incoming_;
+  struct DnsHeader header_;
 };
 
 using DnsMessageParserPtr = std::unique_ptr<DnsMessageParser>;
