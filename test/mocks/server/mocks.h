@@ -74,6 +74,7 @@ public:
   MOCK_METHOD(const std::string&, configPath, (), (const));
   MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, configProto, (), (const));
   MOCK_METHOD(const std::string&, configYaml, (), (const));
+  MOCK_METHOD(const absl::optional<uint32_t>&, bootstrapVersion, (), (const));
   MOCK_METHOD(bool, allowUnknownStaticFields, (), (const));
   MOCK_METHOD(bool, rejectUnknownDynamicFields, (), (const));
   MOCK_METHOD(const std::string&, adminAddressPath, (), (const));
@@ -103,6 +104,7 @@ public:
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
   std::string config_yaml_;
+  absl::optional<uint32_t> bootstrap_version_;
   bool allow_unknown_static_fields_{};
   bool reject_unknown_dynamic_fields_{};
   std::string admin_address_path_;
@@ -336,9 +338,16 @@ public:
     remove_listener_completion_ = nullptr;
   }
 
+  void callDrainFilterChainsComplete() {
+    EXPECT_NE(nullptr, remove_filter_chains_completion_);
+    remove_filter_chains_completion_();
+    remove_filter_chains_completion_ = nullptr;
+  }
+
   // Server::Worker
   MOCK_METHOD(void, addListener,
-              (Network::ListenerConfig & listener, AddListenerCompletion completion));
+              (absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
+               AddListenerCompletion completion));
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, removeListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
@@ -347,9 +356,13 @@ public:
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(void, stopListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
+  MOCK_METHOD(void, removeFilterChains,
+              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
+               std::function<void()> completion));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;
+  std::function<void()> remove_filter_chains_completion_;
 };
 
 class MockOverloadManager : public OverloadManager {
