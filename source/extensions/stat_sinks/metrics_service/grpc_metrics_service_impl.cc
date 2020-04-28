@@ -34,19 +34,26 @@ void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v3::StreamMetricsMes
 }
 
 MetricsServiceSink::MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
-                                       TimeSource& time_source)
-    : grpc_metrics_streamer_(grpc_metrics_streamer), time_source_(time_source) {}
+                                       TimeSource& time_source,
+                                       const bool report_counters_as_deltas)
+    : grpc_metrics_streamer_(grpc_metrics_streamer), time_source_(time_source),
+      report_counters_as_deltas_(report_counters_as_deltas) {}
 
-void MetricsServiceSink::flushCounter(const Stats::Counter& counter) {
+void MetricsServiceSink::flushCounter(
+    const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
   metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
-  metrics_family->set_name(counter.name());
+  metrics_family->set_name(counter_snapshot.counter_.get().name());
   auto* metric = metrics_family->add_metric();
   metric->set_timestamp_ms(std::chrono::duration_cast<std::chrono::milliseconds>(
                                time_source_.systemTime().time_since_epoch())
                                .count());
   auto* counter_metric = metric->mutable_counter();
-  counter_metric->set_value(counter.value());
+  if (report_counters_as_deltas_) {
+    counter_metric->set_value(counter_snapshot.delta_);
+  } else {
+    counter_metric->set_value(counter_snapshot.counter_.get().value());
+  }
 }
 
 void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge) {
@@ -110,7 +117,7 @@ void MetricsServiceSink::flush(Stats::MetricSnapshot& snapshot) {
                                             snapshot.histograms().size());
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      flushCounter(counter.counter_.get());
+      flushCounter(counter);
     }
   }
 
