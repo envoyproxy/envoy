@@ -490,6 +490,16 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   }
 }
 
+void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+                              Upstream::HostDescriptionConstSharedPtr host) {
+  upstream_handle_ = nullptr;
+  Network::Connection& latched_conn = conn_data->connection();
+  auto upstream =
+      std::make_unique<TcpUpstream>(callbacks_->upstreamRequest(), std::move(conn_data));
+  callbacks_->onPoolReady(std::move(upstream), host, latched_conn.localAddress(),
+                          latched_conn.streamInfo());
+}
+
 bool HttpConnPool::cancelAnyPendingRequest() {
   if (conn_pool_stream_handle_) {
     conn_pool_stream_handle_->cancel();
@@ -514,6 +524,69 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   auto upstream = std::make_unique<HttpUpstream>(*callbacks_->upstreamRequest(), &request_encoder);
   callbacks_->onPoolReady(std::move(upstream), host,
                           request_encoder.getStream().connectionLocalAddress(), info);
+}
+
+TcpUpstream::TcpUpstream(UpstreamRequest* upstream_request,
+                         Tcp::ConnectionPool::ConnectionDataPtr&& upstream)
+    : upstream_request_(upstream_request), upstream_conn_data_(std::move(upstream)) {
+  upstream_conn_data_->connection().enableHalfClose(true);
+  upstream_conn_data_->addUpstreamCallbacks(*this);
+}
+
+void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
+  upstream_conn_data_->connection().write(data, end_stream);
+}
+
+void TcpUpstream::encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) {
+  if (end_stream) {
+    Buffer::OwnedImpl data;
+    upstream_conn_data_->connection().write(data, true);
+  }
+}
+
+void TcpUpstream::encodeTrailers(const Http::RequestTrailerMap&) {
+  Buffer::OwnedImpl data;
+  upstream_conn_data_->connection().write(data, true);
+}
+
+void TcpUpstream::readDisable(bool disable) {
+  if (upstream_conn_data_->connection().state() != Network::Connection::State::Open) {
+    return;
+  }
+  upstream_conn_data_->connection().readDisable(disable);
+}
+
+void TcpUpstream::resetStream() {
+  upstream_request_ = nullptr;
+  upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+  if (!sent_headers_) {
+    Http::ResponseHeaderMapPtr headers{
+        Http::createHeaderMap<Http::ResponseHeaderMapImpl>({{Http::Headers::get().Status, "200"}})};
+    upstream_request_->decodeHeaders(std::move(headers), false);
+    sent_headers_ = true;
+  }
+  upstream_request_->decodeData(data, end_stream);
+}
+
+void TcpUpstream::onEvent(Network::ConnectionEvent event) {
+  if (event != Network::ConnectionEvent::Connected && upstream_request_) {
+    upstream_request_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
+  }
+}
+
+void TcpUpstream::onAboveWriteBufferHighWatermark() {
+  if (upstream_request_) {
+    upstream_request_->disableDataFromDownstreamForFlowControl();
+  }
+}
+
+void TcpUpstream::onBelowWriteBufferLowWatermark() {
+  if (upstream_request_) {
+    upstream_request_->enableDataFromDownstreamForFlowControl();
+  }
 }
 
 } // namespace Router

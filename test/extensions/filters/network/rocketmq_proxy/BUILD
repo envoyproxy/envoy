@@ -49,6 +49,7 @@ envoy_extension_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
     extension_name = "envoy.filters.network.rocketmq_proxy",
+    tags = ["fails_on_windows"],
     deps = [
         ":mocks_lib",
         ":utility_lib",
