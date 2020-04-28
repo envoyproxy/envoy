@@ -23,6 +23,10 @@ Changes
 * http: remove legacy connection pool code and their runtime features: `envoy.reloadable_features.new_http1_connection_pool_behavior` and
   `envoy.reloadable_features.new_http2_connection_pool_behavior`.
 * logger: added :ref:`--log-format-prefix-with-location <operations_cli>` command line option to prefix '%v' with file path and line number.
+* lrs: added new *envoy_api_field_service.load_stats.v2.LoadStatsResponse.send_all_clusters* field
+  in LRS response, which allows management servers to avoid explicitly listing all clusters it is
+  interested in; behavior is allowed based on new "envoy.lrs.supports_send_all_clusters" capability
+  in :ref:`client_features<envoy_v3_api_field_config.core.v3.Node.client_features>` field.
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
 * network filters: added a :ref:`rocketmq proxy filter <config_network_filters_rocketmq_proxy>`.
 * prometheus stats: fix the sort order of output lines to comply with the standard.
@@ -34,10 +38,6 @@ Changes
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
   can now have a separate :ref:`tracing provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
 * upstream: fixed a bug where Envoy would panic when receiving a GRPC SERVICE_UNKNOWN status on the health check.
-* lrs: added new *envoy_api_field_service.load_stats.v2.LoadStatsResponse.send_all_clusters* field
-  in LRS response, which allows management servers to avoid explicitly listing all clusters it is
-  interested in; behavior is allowed based on new "envoy.lrs.supports_send_all_clusters" capability
-  in :ref:`client_features<envoy_v3_api_field_config.core.v3.Node.client_features>` field.
 
 Deprecated
 ----------
