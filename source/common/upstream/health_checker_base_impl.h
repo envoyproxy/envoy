@@ -49,6 +49,9 @@ public:
   std::shared_ptr<const Network::TransportSocketOptionsImpl> transportSocketOptions() const {
     return transport_socket_options_;
   }
+  MetadataConstSharedPtr transportSocketMatchMetadata() const {
+    return transport_socket_match_metadata_;
+  }
 
 protected:
   class ActiveHealthCheckSession : public Event::DeferredDeletable {
@@ -137,6 +140,8 @@ private:
   void setUnhealthyCrossThread(const HostSharedPtr& host);
   static std::shared_ptr<const Network::TransportSocketOptionsImpl>
   initTransportSocketOptions(const envoy::config::core::v3::HealthCheck& config);
+  static MetadataConstSharedPtr
+  initTransportSocketMatchMetadata(const envoy::config::core::v3::HealthCheck& config);
 
   static const std::chrono::milliseconds NO_TRAFFIC_INTERVAL;
 
@@ -153,6 +158,7 @@ private:
   uint64_t local_process_healthy_{};
   uint64_t local_process_degraded_{};
   const std::shared_ptr<const Network::TransportSocketOptionsImpl> transport_socket_options_;
+  const MetadataConstSharedPtr transport_socket_match_metadata_;
 };
 
 class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {

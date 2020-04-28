@@ -35,7 +35,8 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
           PROTOBUF_GET_MS_OR_DEFAULT(config, unhealthy_edge_interval, unhealthy_interval_.count())),
       healthy_edge_interval_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, healthy_edge_interval, interval_.count())),
-      transport_socket_options_(initTransportSocketOptions(config)) {
+      transport_socket_options_(initTransportSocketOptions(config)),
+      transport_socket_match_metadata_(initTransportSocketMatchMetadata(config)) {
   cluster_.prioritySet().addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         onClusterMemberUpdate(hosts_added, hosts_removed);
@@ -53,6 +54,20 @@ HealthCheckerImplBase::initTransportSocketOptions(
   }
 
   return std::make_shared<const Network::TransportSocketOptionsImpl>();
+}
+
+MetadataConstSharedPtr HealthCheckerImplBase::initTransportSocketMatchMetadata(
+    const envoy::config::core::v3::HealthCheck& config) {
+  if (config.has_transport_socket_match_criteria()) {
+    std::shared_ptr<envoy::config::core::v3::Metadata> metadata =
+        std::make_shared<envoy::config::core::v3::Metadata>();
+    (*metadata->mutable_filter_metadata())[Envoy::Config::MetadataFilters::get()
+                                               .ENVOY_TRANSPORT_SOCKET_MATCH] =
+        config.transport_socket_match_criteria();
+    return metadata;
+  }
+
+  return nullptr;
 }
 
 HealthCheckerImplBase::~HealthCheckerImplBase() {
