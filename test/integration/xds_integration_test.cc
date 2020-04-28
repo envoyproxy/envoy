@@ -82,11 +82,19 @@ public:
     - filter_chain_match:
         application_protocols: ["alpn0"]
       filters:
-       -  name: envoy.filters.network.echo
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: cluster_0
     - filter_chain_match:
         application_protocols: ["alpn1"]
       filters:
-       -  name: envoy.filters.network.echo
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: cluster_0
 )EOF") {}
 
   ~LdsInplaceUpdateIntegrationTest() override = default;
@@ -147,10 +155,18 @@ public:
 
 // Verify that client 1 is closed while client 0 survives when deleting filter chain 1.
 TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigDeletingFilterChain) {
+  //setUpstreamCount(2);
   initialize();
 
   auto client_0 = connect("alpn0");
+  FakeRawConnectionPtr fake_upstream_connection_0;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
+
   auto client_1 = connect("alpn1");
+  fake_upstreams_.emplace_back(new FakeUpstream(fake_upstreams_[0]->localAddress(), upstreamProtocol(), timeSystem(),
+                                                    enable_half_close_,udp_fake_upstream_));
+  FakeRawConnectionPtr fake_upstream_connection_1;
+  ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_1));
 
   ConfigHelper new_config_helper(version_, *api_,
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
@@ -167,6 +183,9 @@ TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigDeletingFilterChain) {
 
   Buffer::OwnedImpl buffer("hello");
   client_0->ssl_conn_->write(buffer, false);
+  std::string observed_data_0;
+  ASSERT_TRUE(fake_upstream_connection_0->waitForData(5, &observed_data_0));
+  EXPECT_EQ("hello", observed_data_0);
   client_0->payload_reader_->set_data_to_wait_for("hello");
   client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
   client_0->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
