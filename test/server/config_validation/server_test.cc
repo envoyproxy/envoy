@@ -81,11 +81,10 @@ public:
 
   class TestConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
   public:
-    virtual std::string name() const override { return "envoy.filters.network.test"; }
+    std::string name() const override { return "envoy.filters.network.test"; }
 
-    virtual Network::FilterFactoryCb
-    createFilterFactoryFromProto(const Protobuf::Message&,
-                                 Configuration::FactoryContext&) override {
+    Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
+                                                          Configuration::FactoryContext&) override {
       // Validate that the validation server loaded the runtime data and installed the singleton.
       auto* runtime = Runtime::LoaderSingleton::getExisting();
       if (runtime == nullptr) {
@@ -100,11 +99,11 @@ public:
       return [](Network::FilterManager&) {};
     }
 
-    virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Struct()};
     }
 
-    virtual bool isTerminalFilter() override { return true; }
+    bool isTerminalFilter() override { return true; }
   };
 };
 
