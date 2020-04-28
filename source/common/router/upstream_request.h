@@ -202,6 +202,41 @@ private:
   GenericConnectionPoolCallbacks* callbacks_{};
 };
 
+class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
+public:
+  TcpConnPool(Tcp::ConnectionPool::Instance* conn_pool) : conn_pool_(conn_pool) {}
+
+  void newStream(GenericConnectionPoolCallbacks* callbacks) override {
+    callbacks_ = callbacks;
+    upstream_handle_ = conn_pool_->newConnection(*this);
+  }
+
+  bool cancelAnyPendingRequest() override {
+    if (upstream_handle_) {
+      upstream_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+      upstream_handle_ = nullptr;
+      return true;
+    }
+    return false;
+  }
+  absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
+
+  // Tcp::ConnectionPool::Callbacks
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     Upstream::HostDescriptionConstSharedPtr host) override {
+    upstream_handle_ = nullptr;
+    callbacks_->onPoolFailure(reason, "", host);
+  }
+
+  void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+                   Upstream::HostDescriptionConstSharedPtr host) override;
+
+private:
+  Tcp::ConnectionPool::Instance* conn_pool_;
+  Tcp::ConnectionPool::Cancellable* upstream_handle_{};
+  GenericConnectionPoolCallbacks* callbacks_{};
+};
+
 // A generic API which covers common functionality between HTTP and TCP upstreams.
 class GenericUpstream {
 public:
@@ -259,6 +294,30 @@ public:
 private:
   UpstreamRequest& upstream_request_;
   Http::RequestEncoder* request_encoder_{};
+};
+
+class TcpUpstream : public GenericUpstream, public Tcp::ConnectionPool::UpstreamCallbacks {
+public:
+  TcpUpstream(UpstreamRequest* upstream_request, Tcp::ConnectionPool::ConnectionDataPtr&& upstream);
+
+  // GenericUpstream
+  void encodeData(Buffer::Instance& data, bool end_stream) override;
+  void encodeMetadata(const Http::MetadataMapVector&) override {}
+  void encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) override;
+  void encodeTrailers(const Http::RequestTrailerMap&) override;
+  void readDisable(bool disable) override;
+  void resetStream() override;
+
+  // Tcp::ConnectionPool::UpstreamCallbacks
+  void onUpstreamData(Buffer::Instance& data, bool end_stream) override;
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override;
+  void onBelowWriteBufferLowWatermark() override;
+
+private:
+  UpstreamRequest* upstream_request_;
+  Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
+  bool sent_headers_{};
 };
 
 } // namespace Router

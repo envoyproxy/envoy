@@ -7,5 +7,5 @@ HTTP
   http_connection_management
   http_filters
   http_routing
-  websocket
+  upgrades
   http_proxy

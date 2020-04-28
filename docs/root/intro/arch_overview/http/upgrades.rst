@@ -1,19 +1,19 @@
 .. _arch_overview_websocket:
 
-WebSocket and HTTP upgrades
+HTTP upgrades
 ===========================
 
-Envoy Upgrade support is intended mainly for WebSocket but may be used for non-WebSocket
-upgrades as well. Upgrades pass both the HTTP headers and the upgrade payload
+Envoy Upgrade support is intended mainly for WebSocket and CONNECT support, but may be used for
+arbitrary upgrades as well. Upgrades pass both the HTTP headers and the upgrade payload
 through an HTTP filter chain. One may configure the
 :ref:`upgrade_configs <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`
 with or without custom filter chains. If only the
 :ref:`upgrade_type <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfig.upgrade_type>`
-is specified, both the upgrade headers, any request and response body, and WebSocket payload will
+is specified, both the upgrade headers, any request and response body, and HTTP data payload will
 pass through the default HTTP filter chain. To avoid the use of HTTP-only filters for upgrade payload,
 one can set up custom
 :ref:`filters <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfig.filters>`
-for the given upgrade type, up to and including only using the router filter to send the WebSocket
+for the given upgrade type, up to and including only using the router filter to send the HTTP
 data upstream.
 
 Upgrades can be enabled or disabled on a :ref:`per-route <envoy_api_field_route.RouteAction.upgrade_configs>` basis.
@@ -32,12 +32,12 @@ laid out below, but custom filter chains can only be configured on a per-HttpCon
 | F                     | F                       | F                 |
 +-----------------------+-------------------------+-------------------+
 
-Note that the statistics for upgrades are all bundled together so WebSocket
+Note that the statistics for upgrades are all bundled together so WebSocket and other upgrades
 :ref:`statistics <config_http_conn_man_stats>` are tracked by stats such as
 downstream_cx_upgrades_total and downstream_cx_upgrades_active
 
-Handling HTTP/2 hops
-^^^^^^^^^^^^^^^^^^^^
+Websocket over HTTP/2 hops
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 While HTTP/2 support for WebSockets is off by default, Envoy does support tunneling WebSockets over
 HTTP/2 streams for deployments that prefer a uniform HTTP/2 mesh throughout; this enables, for example,
@@ -61,3 +61,31 @@ a GET method on the final Envoy-Upstream hop.
 
 Note that the HTTP/2 upgrade path has very strict HTTP/1.1 compliance, so will not proxy WebSocket
 upgrade requests or responses with bodies.
+
+.. TODO(alyssawilk) unhide this when unhiding config
+.. CONNECT support
+.. ^^^^^^^^^^^^^^^
+
+.. Envoy CONNECT support is off by default (Envoy will send an internally generated 403 in response to
+.. CONNECT requests). CONNECT support can be enabled via the upgrade options described above, setting
+.. the upgrade value to the special keyword "CONNECT".
+
+.. While for HTTP/2, CONNECT request may have a path, in general and for HTTP/1.1 CONNECT requests do
+.. not have a path, and can only be matched using a
+.. :ref:`connect_matcher <envoy_api_field_route.RouteMatch.connect_matcher>`
+..
+.. Envoy can handle CONNECT in one of two ways, either proxying the CONNECT headers through as if they
+.. were any other request, and letting the upstream terminate the CONNECT request, or by terminating the
+.. CONNECT request, and forwarding the payload as raw TCP data. When CONNECT upgrade configuration is
+.. set up, the default behavior is to proxy the CONNECT request, treating it like any other request using
+.. the upgrade path.
+.. If termination is desired, this can be accomplished by setting
+.. :ref:`connect_config <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfig.connect_config>`
+.. If it that message is present for CONNECT requests, the router filter will strip the request headers,
+.. and forward the HTTP payload upstream. On receipt of initial TCP data from upstream, the router
+.. will synthesize 200 response headers, and then forward the TCP data as the HTTP response body.
+
+.. .. warning::
+.. This mode of CONNECT support can create major security holes if configured correctly, as the upstream
+.. will be forwarded *unsanitized* headers if they are in the body payload. Please use with caution
+
