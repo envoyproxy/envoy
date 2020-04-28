@@ -912,8 +912,9 @@ TEST(HeaderMapImplTest, TestHeaderList) {
   std::array<std::string, 2> values{"/", "world"};
 
   auto headers = createHeaderMap<TestHeaderMapImpl>({{keys[0], values[0]}, {keys[1], values[1]}});
-  const auto header_keys = headers->headerListView()->keys();
-  const auto header_values = headers->headerListView()->values();
+  const auto header_list = headers->createHeaderListView();
+  const auto header_keys = header_list->keys();
+  const auto header_values = header_list->values();
   for (size_t i = 0; i < keys.size(); ++i) {
     EXPECT_EQ(keys[i].get(), header_keys[i].get().getStringView());
     EXPECT_EQ(values[i], header_values[i].get().getStringView());

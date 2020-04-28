@@ -91,7 +91,6 @@ public:
   size_t size() const override { return headers_.size(); }
   bool empty() const override { return headers_.empty(); }
   void dumpState(std::ostream& os, int indent_level = 0) const override;
-  std::unique_ptr<HeaderListView> headerListView() const override;
 
 protected:
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {
@@ -208,16 +207,19 @@ protected:
     std::list<HeaderEntryImpl>::iterator pseudo_headers_end_;
   };
 
+public:
   class HeaderListViewImpl : public HeaderListView {
   public:
-    explicit HeaderListViewImpl(const HeaderList* headers) : headers_(headers) {}
+    static std::unique_ptr<HeaderListView> create(const HeaderMapImpl&);
     std::vector<std::reference_wrapper<const HeaderString>> keys() const;
     std::vector<std::reference_wrapper<const HeaderString>> values() const;
+    explicit HeaderListViewImpl(const HeaderList* headers) : headers_(headers) {}
 
   private:
     const HeaderList* headers_;
   };
 
+protected:
   void insertByKey(HeaderString&& key, HeaderString&& value);
   static uint64_t appendToHeader(HeaderString& header, absl::string_view data,
                                  absl::string_view delimiter = ",");
@@ -241,6 +243,8 @@ protected:
   HeaderList headers_;
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
+
+  friend HeaderListViewImpl;
 };
 
 /**

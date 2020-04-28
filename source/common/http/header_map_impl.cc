@@ -183,6 +183,11 @@ void HeaderMapImpl::HeaderEntryImpl::value(const HeaderEntry& header) {
   value(header.value().getStringView());
 }
 
+std::unique_ptr<HeaderListView>
+HeaderMapImpl::HeaderListViewImpl::create(const HeaderMapImpl& header_map) {
+  return std::make_unique<HeaderMapImpl::HeaderListViewImpl>(&(header_map.headers_));
+}
+
 std::vector<std::reference_wrapper<const HeaderString>>
 HeaderMapImpl::HeaderListViewImpl::keys() const {
   std::vector<std::reference_wrapper<const HeaderString>> header_keys;
@@ -573,10 +578,6 @@ void HeaderMapImpl::dumpState(std::ostream& os, int indent_level) const {
         return HeaderMap::Iterate::Continue;
       },
       &iterate_data);
-}
-
-std::unique_ptr<HeaderListView> HeaderMapImpl::headerListView() const {
-  return std::make_unique<HeaderMapImpl::HeaderListViewImpl>(&headers_);
 }
 
 HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl** entry,
