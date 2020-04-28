@@ -42,4 +42,4 @@ Deprecated
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
 * The * :ref:`GoogleRE2.max_program_size<envoy_api_field_RegexMatcher.GoogleRE2.max_program_size>`
   field is now deprecated. Management servers are expected to validate regexp program sizes
-  instead of asking the client to do it.
+  instead of expecting the client to do it.
