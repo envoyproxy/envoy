@@ -94,7 +94,7 @@ public:
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
           stat_prefix: tcp_stats
-          cluster: cluster_0
+          cluster: cluster_1
 )EOF") {}
 
   ~LdsInplaceUpdateIntegrationTest() override = default;
@@ -112,7 +112,12 @@ public:
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(1);
       filter_chain_1->mutable_transport_socket()->MergeFrom(
           *filter_chain_0->mutable_transport_socket());
+    
+      bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(*bootstrap.mutable_static_resources()->mutable_clusters(0));
+      bootstrap.mutable_static_resources()->mutable_clusters(1)->set_name("cluster_1");
     });
+
+
     BaseIntegrationTest::initialize();
 
     context_manager_ =
@@ -155,16 +160,18 @@ public:
 
 // Verify that client 1 is closed while client 0 survives when deleting filter chain 1.
 TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigDeletingFilterChain) {
-  //setUpstreamCount(2);
+  setUpstreamCount(2);
   initialize();
 
   auto client_0 = connect("alpn0");
+  ENVOY_LOG_MISC(debug, "lambdai: client_0 addr {}", static_cast<void*>(client_0.get()));
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
+  ENVOY_LOG_MISC(debug, "lambdai: before create client 1");
+
   auto client_1 = connect("alpn1");
-  fake_upstreams_.emplace_back(new FakeUpstream(fake_upstreams_[0]->localAddress(), upstreamProtocol(), timeSystem(),
-                                                    enable_half_close_,udp_fake_upstream_));
+  ENVOY_LOG_MISC(debug, "lambdai: client_1 addr {}", static_cast<void*>(client_1.get()));
   FakeRawConnectionPtr fake_upstream_connection_1;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_1));
 
@@ -183,9 +190,12 @@ TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigDeletingFilterChain) {
 
   Buffer::OwnedImpl buffer("hello");
   client_0->ssl_conn_->write(buffer, false);
+  client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
   std::string observed_data_0;
   ASSERT_TRUE(fake_upstream_connection_0->waitForData(5, &observed_data_0));
   EXPECT_EQ("hello", observed_data_0);
+
+  ASSERT_TRUE(fake_upstream_connection_0->write("hello"));
   client_0->payload_reader_->set_data_to_wait_for("hello");
   client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
   client_0->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
