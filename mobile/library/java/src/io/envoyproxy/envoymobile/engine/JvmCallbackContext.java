@@ -127,14 +127,15 @@ class JvmCallbackContext {
   /**
    * Dispatches error received from the JNI layer up to the platform.
    *
-   * @param message,   the error message.
-   * @param errorCode, the envoy_error_code_t.
+   * @param errorCode,    the error code.
+   * @param message,      the error message.
+   * @param attemptCount, the number of times an operation was attempted before firing this error.
    */
-  public void onError(byte[] message, int errorCode) {
+  public void onError(int errorCode, byte[] message, int attemptCount) {
     callbacks.getExecutor().execute(new Runnable() {
       public void run() {
         String errorMessage = new String(message);
-        callbacks.onError(errorCode, errorMessage);
+        callbacks.onError(errorCode, errorMessage, attemptCount);
       }
     });
   }

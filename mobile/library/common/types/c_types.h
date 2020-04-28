@@ -138,6 +138,12 @@ extern const envoy_data envoy_nodata;
 typedef struct {
   envoy_error_code_t error_code;
   envoy_data message;
+  // the number of times an operation was attempted before firing this error.
+  // For instance this is used in envoy_on_error_f to account for the number of upstream requests
+  // made in a retry series before the on error callback fired.
+  // -1 is used in scenarios where it does not make sense to have an attempt count for an error.
+  // This is different from 0, which intentionally conveys that the action was _not_ executed.
+  int32_t attempt_count;
 } envoy_error;
 
 #ifdef __cplusplus

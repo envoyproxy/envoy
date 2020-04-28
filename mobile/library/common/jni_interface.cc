@@ -209,7 +209,7 @@ static void jvm_on_error(envoy_error error, void* context) {
   jobject j_context = static_cast<jobject>(context);
 
   jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
-  jmethodID jmid_onError = env->GetMethodID(jcls_JvmObserverContext, "onError", "([BI)V");
+  jmethodID jmid_onError = env->GetMethodID(jcls_JvmObserverContext, "onError", "(I[BI)V");
 
   jbyteArray j_error_message = env->NewByteArray(error.message.length);
   // TODO: check if copied via isCopy.
@@ -221,7 +221,8 @@ static void jvm_on_error(envoy_error error, void* context) {
   // to the JVM and free the c array, where applicable.
   env->ReleasePrimitiveArrayCritical(j_error_message, critical_error_message, 0);
 
-  env->CallVoidMethod(j_context, jmid_onError, j_error_message, error.error_code);
+  env->CallVoidMethod(j_context, jmid_onError, error.error_code, j_error_message,
+                      error.attempt_count);
 
   error.message.release(error.message.context);
   // No further callbacks happen on this context. Delete the reference held by native code.
