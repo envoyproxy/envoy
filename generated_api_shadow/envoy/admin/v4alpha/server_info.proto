@@ -54,7 +54,7 @@ message ServerInfo {
   CommandLineOptions command_line_options = 6;
 }
 
-// [#next-free-field: 29]
+// [#next-free-field: 30]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.CommandLineOptions";
 
@@ -152,4 +152,7 @@ message CommandLineOptions {
 
   // See :option:`--disable-extensions` for details.
   repeated string disabled_extensions = 28;
+
+  // See :option:`--bootstrap-version` for details.
+  uint32 bootstrap_version = 29;
 }
