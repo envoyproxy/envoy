@@ -189,7 +189,7 @@ void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listen
   // according to RFC3986 v6 address is always enclosed in "[]". section 3.2.2
   const auto v6_end_index = original_host.rfind("]");
   if (v6_end_index == absl::string_view::npos || v6_end_index < port_start) {
-    if ((port_start + 2) > original_host.size()) {
+    if ((port_start + 1) > original_host.size()) {
       return;
     }
     const absl::string_view port_str =
