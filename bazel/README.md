@@ -215,6 +215,11 @@ By default Clang drops some debug symbols that are required for pretty printing 
 More information can be found [here](https://bugs.llvm.org/show_bug.cgi?id=24202). The easy solution
 is to set ```--copt=-fno-limit-debug-info``` on the CLI or in your .bazelrc file.
 
+## Removing debug info
+
+If you don't want your debug or release binaries to contain debug info
+to reduce binary size, pass `--define=no_debug_info=1` when building.
+
 # Testing Envoy with Bazel
 
 All the Envoy tests can be built and run with:
