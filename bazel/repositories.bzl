@@ -2,7 +2,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":dev_binding.bzl", "envoy_dev_binding")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
+load(":repository_locations.bzl", "DEPENDENCY_REPOSITORIES", "USE_CATEGORIES")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
@@ -17,6 +17,23 @@ WINDOWS_SKIP_TARGETS = [
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
 BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])"""
+
+# Method for verifying content of the DEPENDENCY_REPOSITORIES defined in bazel/repository_locations.bzl
+# Verification is here so that bazel/repository_locations.bzl can be loaded into other tools written in Python,
+# and as such needs to be free of bazel specific constructs.
+def _repository_locations():
+    locations = dict(DEPENDENCY_REPOSITORIES)
+    for key, location in locations.items():
+        if "use_category" not in location:
+            fail("The 'use_category' attribute must be defined for external dependecy " + str(location["urls"]))
+
+        for category in location["use_category"]:
+            if category not in USE_CATEGORIES:
+                fail("Unknown use_category value '" + category + "' for dependecy " + str(location["urls"]))
+
+    return locations
+
+REPOSITORY_LOCATIONS = _repository_locations()
 
 # To initialize http_archive REPOSITORY_LOCATIONS dictionaries must be stripped of annotations.
 # See repository_locations.bzl for the list of annotation attributes.
@@ -218,7 +235,7 @@ def _com_github_circonus_labs_libcircllhist():
     )
 
 def _com_github_c_ares_c_ares():
-    location = _get_location("com_github_c_ares_c_ares" )
+    location = _get_location("com_github_c_ares_c_ares")
     http_archive(
         name = "com_github_c_ares_c_ares",
         patches = ["@envoy//bazel/foreign_cc:cares-win32-nameser.patch"],
