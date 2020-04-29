@@ -6,7 +6,6 @@
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
-#include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
 
@@ -74,6 +73,7 @@ TEST_P(XdsIntegrationTestTypedStruct, RouterRequestAndResponseWithBodyNoBuffer) 
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
+// TODO(lambdai): Extend RawConnectionDriver with SSL and delete this one.
 class SslClient {
 public:
   SslClient(Network::ClientConnectionPtr ssl_conn, Event::Dispatcher& dispatcher)
@@ -92,10 +92,11 @@ public:
   ConnectionStatusCallbacks connect_callbacks_;
 };
 
-class LdsInplaceUpdateIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                        public BaseIntegrationTest {
+class LdsInplaceUpdateTcpProxyIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public BaseIntegrationTest {
 public:
-  LdsInplaceUpdateIntegrationTest()
+  LdsInplaceUpdateTcpProxyIntegrationTest()
       : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
     filter_chains:
     - filter_chain_match:
@@ -116,7 +117,7 @@ public:
           cluster: cluster_1
 )EOF") {}
 
-  ~LdsInplaceUpdateIntegrationTest() override = default;
+  ~LdsInplaceUpdateTcpProxyIntegrationTest() override = default;
 
   void initialize() override {
     config_helper_.renameListener("tcp");
@@ -159,161 +160,8 @@ public:
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
 };
 
-class LdsInplaceUpdateHttpIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
-      public HttpIntegrationTest {
-public:
-  LdsInplaceUpdateHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
-  void initialize() override {
-    config_helper_.renameListener("http");
-    std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
-    config_helper_.addListenerFilter(tls_inspector_config);
-    config_helper_.addSslConfig();
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* filter_chain_0 =
-          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-      *filter_chain_0->mutable_filter_chain_match()->mutable_application_protocols()->Add() =
-          "alpn0";
-      auto* filter_chain_1 = bootstrap.mutable_static_resources()
-                                 ->mutable_listeners(0)
-                                 ->mutable_filter_chains()
-                                 ->Add();
-      filter_chain_1->MergeFrom(*filter_chain_0);
-
-      // filter chain 1
-      // alpn1, route to cluster_1
-      *filter_chain_1->mutable_filter_chain_match()->mutable_application_protocols(0) = "alpn1";
-
-      auto* config_blob = filter_chain_1->mutable_filters(0)->mutable_typed_config();
-
-      ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::http_connection_manager::v3::
-                                      HttpConnectionManager>());
-      auto hcm_config = MessageUtil::anyConvert<
-          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
-          *config_blob);
-      hcm_config.mutable_route_config()
-          ->mutable_virtual_hosts(0)
-          ->mutable_routes(0)
-          ->mutable_route()
-          ->set_cluster("cluster_1");
-      config_blob->PackFrom(hcm_config);
-      bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(
-          *bootstrap.mutable_static_resources()->mutable_clusters(0));
-      bootstrap.mutable_static_resources()->mutable_clusters(1)->set_name("cluster_1");
-    });
-
-    BaseIntegrationTest::initialize();
-
-    context_manager_ =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
-    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
-  }
-
-  std::unique_ptr<SslClient> connect(const std::string& alpn) {
-    Network::Address::InstanceConstSharedPtr address =
-        Ssl::getSslAddress(version_, lookupPort("http"));
-    auto ssl_conn = dispatcher_->createClientConnection(
-        address, Network::Address::InstanceConstSharedPtr(),
-        context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-            absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})),
-        nullptr);
-    return std::make_unique<SslClient>(std::move(ssl_conn), *dispatcher_);
-  }
-
-  std::unique_ptr<Ssl::ContextManager> context_manager_;
-  Network::TransportSocketFactoryPtr context_;
-  testing::NiceMock<Secret::MockSecretManager> secret_manager_;
-};
-
-TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChainWip) {
-  autonomous_upstream_ = true;
-  setUpstreamCount(2);
-  initialize();
-
-  auto client_0 = connect("alpn0");
-  Buffer::OwnedImpl buffer("GET /client0 HTTP/1.1\r\nHost: default.com\r\n\r\n");
-  client_0->ssl_conn_->write(buffer, false);
-  client_0->payload_reader_->set_data_to_wait_for("\r\n\r\n", false);
-  client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
-
-  ConfigHelper new_config_helper(version_, *api_,
-                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
-  new_config_helper.addConfigModifier(
-      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(1));
-        *listener->mutable_filter_chains(2)
-             ->mutable_filter_chain_match()
-             ->mutable_application_protocols(0) = "alpn2";
-      });
-
-  new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
-  auto client_2 = connect("alpn2");
-  Buffer::OwnedImpl buffer_2("GET /client2 HTTP/1.1\r\nHost: default.com\r\n\r\n");
-  client_2->ssl_conn_->write(buffer_2, false);
-  client_2->payload_reader_->set_data_to_wait_for("\r\n\r\n", false);
-  client_2->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  client_2->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
-  while (!client_2->connect_callbacks_.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-
-  Buffer::OwnedImpl buffer_dup("GET /client0 HTTP/1.1\r\nHost: default.com\r\n\r\n");
-  client_0->ssl_conn_->write(buffer_dup, false);
-  client_0->payload_reader_->set_data_to_wait_for("\r\n\r\n", false);
-  client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  client_0->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
-  while (!client_0->connect_callbacks_.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
-}
-
-TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
-  autonomous_upstream_ = true;
-  setUpstreamCount(2);
-  initialize();
-
-  auto client_1 = connect("alpn1");
-  Buffer::OwnedImpl buffer_1("GET /client1 HTTP/1.1\r\nHost: default.com");
-  client_1->ssl_conn_->write(buffer_1, false);
-  client_1->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-
-  ConfigHelper new_config_helper(version_, *api_,
-                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
-  new_config_helper.addConfigModifier(
-      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        listener->mutable_filter_chains()->RemoveLast();
-      });
-
-  new_config_helper.setLds("1");
-  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
-  Buffer::OwnedImpl rnrn("\r\n\r\n");
-  client_1->ssl_conn_->write(rnrn, false);
-  client_1->payload_reader_->set_data_to_wait_for("connection: close", false);
-  client_1->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  client_1->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
-  while (!client_1->connect_callbacks_.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-
-  auto client_0 = connect("alpn0");
-  Buffer::OwnedImpl buffer("GET /client0 HTTP/1.1\r\nHost: default.com\r\n\r\n");
-  client_0->ssl_conn_->write(buffer, false);
-  client_0->payload_reader_->set_data_to_wait_for("\r\n\r\n", false);
-  client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  client_0->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
-  while (!client_0->connect_callbacks_.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
-}
-
-// Verify that client 1 is closed while client 0 survives when deleting filter chain 1.
-TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigDeletingFilterChain) {
+// Verify that tcp connection 1 is closed while client 0 survives when deleting filter chain 1.
+TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain) {
   setUpstreamCount(2);
   initialize();
 
@@ -355,8 +203,9 @@ TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigDeletingFilterChain) {
   }
 }
 
-// Verify that client 0 survives while adding new filter chain 2.
-TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigAddingFilterChain) {
+// Verify that tcp connection of filter chain 0 survives if new listener config adds new filter
+// chain 2.
+TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
   setUpstreamCount(2);
   initialize();
 
@@ -415,27 +264,17 @@ TEST_P(LdsInplaceUpdateIntegrationTest, ReloadConfigAddingFilterChain) {
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateHttpIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-using LdsIntegrationTest = HttpProtocolIntegrationTest;
-
-INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1}, {FakeHttpConnection::Type::HTTP1})),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
-
-class LdsHttpIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                               public HttpIntegrationTest {
+class LdsInplaceUpdateHttpIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
 public:
-  LdsHttpIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LdsInplaceUpdateHttpIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
+    autonomous_upstream_ = true;
+    setUpstreamCount(2);
+
     config_helper_.renameListener("http");
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
     config_helper_.addListenerFilter(tls_inspector_config);
@@ -478,34 +317,51 @@ public:
     context_manager_ =
         std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+    address_ = Ssl::getSslAddress(version_, lookupPort("http"));
+  }
+
+  IntegrationCodecClientPtr createHttpCodec(const std::string& alpn) {
+    auto ssl_conn = dispatcher_->createClientConnection(
+        address_, Network::Address::InstanceConstSharedPtr(),
+        context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+            absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})),
+        nullptr);
+    return makeHttpConnection(std::move(ssl_conn));
+  }
+
+  void expectResponseHeaderConnectionClose(IntegrationCodecClient& codec_client,
+                                           bool expect_close) {
+    IntegrationStreamDecoderPtr response =
+        codec_client.makeHeaderOnlyRequest(default_request_headers_);
+
+    response->waitForEndStream();
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    if (expect_close) {
+      EXPECT_EQ("close", response->headers().Connection()->value().getStringView());
+
+    } else {
+      EXPECT_EQ(nullptr, response->headers().Connection());
+    }
   }
 
   std::unique_ptr<Ssl::ContextManager> context_manager_;
   Network::TransportSocketFactoryPtr context_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
+  Network::Address::InstanceConstSharedPtr address_;
 };
 
-TEST_P(LdsHttpIntegrationTest, test1) {
-  autonomous_upstream_ = true;
-  setUpstreamCount(2);
+// Verify that http response on filter chain 0 has "Connection: close" header when filter chain 0
+// is deleted during the listener update.
+TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   initialize();
-  Network::Address::InstanceConstSharedPtr address =
-      Ssl::getSslAddress(version_, lookupPort("http"));
-  auto ssl_conn_1 = dispatcher_->createClientConnection(
-      address, Network::Address::InstanceConstSharedPtr(),
-      context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"alpn1"})),
-      nullptr);
-  auto codec_client_1 = makeHttpConnection(std::move(ssl_conn_1));
 
-  auto ssl_conn_0 = dispatcher_->createClientConnection(
-      address, Network::Address::InstanceConstSharedPtr(),
-      context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"alpn0"})),
-      nullptr);
-  auto codec_client_0 = makeHttpConnection(std::move(ssl_conn_0));
-
-
+  auto codec_client_1 = createHttpCodec("alpn1");
+  auto codec_client_0 = createHttpCodec("alpn0");
+  Cleanup cleanup([c1 = codec_client_1.get(), c0 = codec_client_0.get()]() {
+    c1->close();
+    c0->close();
+  });
   ConfigHelper new_config_helper(version_, *api_,
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
@@ -516,50 +372,19 @@ TEST_P(LdsHttpIntegrationTest, test1) {
 
   new_config_helper.setLds("1");
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
+  expectResponseHeaderConnectionClose(*codec_client_1, true);
 
- Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/client1"}, {":authority", "default.com"}};
-  IntegrationStreamDecoderPtr response = codec_client_1->makeHeaderOnlyRequest(request_headers);
-
-  response->waitForEndStream();
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  EXPECT_EQ("close", response->headers().Connection()->value().getStringView());
-  ENVOY_LOG(debug, "my current thread");
-
-  codec_client_1->close();
-
-   IntegrationStreamDecoderPtr response_0 = codec_client_0->makeHeaderOnlyRequest(request_headers);
-
-  response_0->waitForEndStream();
-
-  EXPECT_TRUE(response_0->complete());
-  EXPECT_EQ("200", response_0->headers().Status()->value().getStringView());
-
-  EXPECT_EQ(nullptr, response_0->headers().Connection());
-  codec_client_0->close();
+  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 0);
+  expectResponseHeaderConnectionClose(*codec_client_0, false);
 }
 
-
-TEST_P(LdsHttpIntegrationTest, ReloadConfigAddingFilterChain) {
-    autonomous_upstream_ = true;
-
-  setUpstreamCount(2);
+// Verify that http clients of filter chain 0 survives if new listener config adds new filter
+// chain 2.
+TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   initialize();
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/client1"}, {":authority", "default.com"}};
- 
-  Network::Address::InstanceConstSharedPtr address =
-      Ssl::getSslAddress(version_, lookupPort("http"));
 
-  auto ssl_conn_0 = dispatcher_->createClientConnection(
-      address, Network::Address::InstanceConstSharedPtr(),
-      context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"alpn0"})),
-      nullptr);
-  auto codec_client_0 = makeHttpConnection(std::move(ssl_conn_0));
-
+  auto codec_client_0 = createHttpCodec("alpn0");
+  Cleanup cleanup0([c0 = codec_client_0.get()]() { c0->close(); });
   ConfigHelper new_config_helper(version_, *api_,
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
@@ -574,34 +399,26 @@ TEST_P(LdsHttpIntegrationTest, ReloadConfigAddingFilterChain) {
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
 
-   auto ssl_conn_2 = dispatcher_->createClientConnection(
-      address, Network::Address::InstanceConstSharedPtr(),
-      context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"alpn2"})),
-      nullptr);
-  auto codec_client_2 = makeHttpConnection(std::move(ssl_conn_2));
-
-  IntegrationStreamDecoderPtr response_2 = codec_client_2->makeHeaderOnlyRequest(request_headers);
-
-  response_2->waitForEndStream();
-  EXPECT_TRUE(response_2->complete());
-  EXPECT_EQ("200", response_2->headers().Status()->value().getStringView());
-  EXPECT_EQ(nullptr, response_2->headers().Connection());
-  codec_client_2->close();
-
-  IntegrationStreamDecoderPtr response_0 = codec_client_0->makeHeaderOnlyRequest(request_headers);
-
-  response_0->waitForEndStream();
-
-  EXPECT_TRUE(response_0->complete());
-  EXPECT_EQ("200", response_0->headers().Status()->value().getStringView());
-  EXPECT_EQ(nullptr, response_0->headers().Connection());
-  codec_client_0->close();
+  auto codec_client_2 = createHttpCodec("alpn2");
+  Cleanup cleanup2([c2 = codec_client_2.get()]() { c2->close(); });
+  expectResponseHeaderConnectionClose(*codec_client_2, false);
+  expectResponseHeaderConnectionClose(*codec_client_0, false);
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, LdsHttpIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateHttpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateTcpProxyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+using LdsIntegrationTest = HttpProtocolIntegrationTest;
+
+INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP1}, {FakeHttpConnection::Type::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Sample test making sure our config framework correctly reloads listeners.
 TEST_P(LdsIntegrationTest, ReloadConfig) {
@@ -649,6 +466,5 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
   EXPECT_DEATH_LOG_TO_STDERR(initialize(),
                              "Didn't find a registered implementation for name: 'grewgragra'");
 }
-
 } // namespace
 } // namespace Envoy
