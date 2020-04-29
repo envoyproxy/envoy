@@ -901,7 +901,6 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
                      }
                      for (auto& listener : active_listeners_) {
                        if (listener->listenerTag() == listener_tag) {
-                         listener->setStopped();
                          listener->listenSocketFactory().sharedSocket()->get().close();
                        }
                      }

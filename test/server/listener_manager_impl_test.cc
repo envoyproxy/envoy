@@ -1665,7 +1665,8 @@ filter_chains:
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(listener_foo->target_, initialize());
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  auto foo_inbound_proto = parseListenerFromV2Yaml(listener_foo_yaml);
+  EXPECT_TRUE(manager_->addOrUpdateListener(foo_inbound_proto, "", true));
   checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   listener_foo->target_.ready();
@@ -1733,6 +1734,15 @@ filter_chains:
 - filters: []
   )EOF";
   EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_yaml), "", true));
+
+  // Explicitly validate that in place filter chain update is not allowed.
+  auto in_place_foo_inbound_proto = foo_inbound_proto;
+  in_place_foo_inbound_proto.mutable_filter_chains(0)
+      ->mutable_filter_chain_match()
+      ->mutable_destination_port()
+      ->set_value(9999);
+
+  EXPECT_FALSE(manager_->addOrUpdateListener(in_place_foo_inbound_proto, "", true));
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_CALL(*listener_foo_outbound, onDestroy());
   EXPECT_CALL(*listener_bar_outbound, onDestroy());

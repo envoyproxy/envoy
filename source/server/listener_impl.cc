@@ -631,15 +631,6 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
     return false;
   }
 
-  // If a listener is in active list but stopped, the in place update will fail. The only known case
-  // is that listener is stopped by admin interface. It is ok if that admin method is called only
-  // prior to stop envoy. Delegate to full listener update for the least user astonishment.
-  // TODO(lambdai): Figure out if we should warn and ignore the update in both in place update and
-  // full listener update.
-  if (is_stopped_) {
-    return false;
-  }
-
   // The in place update needs the active listener in worker thread. worker_started guarantees the
   // existence of that active listener.
   if (!worker_started) {

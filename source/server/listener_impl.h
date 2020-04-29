@@ -324,7 +324,6 @@ public:
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
-  void setStopped() { is_stopped_ = true; }
   SystemTime last_updated_;
 
 private:
@@ -368,8 +367,6 @@ private:
   const std::string name_;
   const bool added_via_api_;
   const bool workers_started_;
-  // If this listener is stopped by admin.
-  bool is_stopped_{};
   const uint64_t hash_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
