@@ -268,6 +268,9 @@ private:
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
     }
+    const absl::optional<ConnectConfig>& connectConfig() const override {
+      return connect_config_nullopt_;
+    }
 
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
@@ -292,6 +295,7 @@ private:
     Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
+    static const absl::optional<ConnectConfig> connect_config_nullopt_;
     const std::string route_name_;
   };
 

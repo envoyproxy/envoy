@@ -167,7 +167,7 @@ headers()
 
 .. code-block:: lua
 
-  headers = handle:headers()
+  local headers = handle:headers()
 
 Returns the stream's headers. The headers can be modified as long as they have not been sent to
 the next filter in the header chain. For example, they can be modified after an *httpCall()* or
@@ -181,7 +181,7 @@ body()
 
 .. code-block:: lua
 
-  body = handle:body()
+  local body = handle:body()
 
 Returns the stream's body. This call will cause Envoy to yield the script until the entire body
 has been buffered. Note that all buffering must adhere to the flow control policies in place.
@@ -194,7 +194,7 @@ bodyChunks()
 
 .. code-block:: lua
 
-  iterator = handle:bodyChunks()
+  local iterator = handle:bodyChunks()
 
 Returns an iterator that can be used to iterate through all received body chunks as they arrive.
 Envoy will yield the script in between chunks, but *will not buffer* them. This can be used by
@@ -213,7 +213,7 @@ trailers()
 
 .. code-block:: lua
 
-  trailers = handle:trailers()
+  local trailers = handle:trailers()
 
 Returns the stream's trailers. May return nil if there are no trailers. The trailers may be
 modified before they are sent to the next filter.
@@ -239,7 +239,7 @@ httpCall()
 
 .. code-block:: lua
 
-  headers, body = handle:httpCall(cluster, headers, body, timeout, asynchronous)
+  local headers, body = handle:httpCall(cluster, headers, body, timeout, asynchronous)
 
 Makes an HTTP call to an upstream host. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
 is a table of key/value pairs to send (the value can be a string or table of strings). Note that
@@ -283,7 +283,7 @@ metadata()
 
 .. code-block:: lua
 
-  metadata = handle:metadata()
+  local metadata = handle:metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
 under the filter name i.e. *envoy.filters.http.lua*. Below is an example of a *metadata* in a
@@ -306,7 +306,7 @@ streamInfo()
 
 .. code-block:: lua
 
-  streamInfo = handle:streamInfo()
+  local streamInfo = handle:streamInfo()
 
 Returns :repo:`information <include/envoy/stream_info/stream_info.h>` related to the current request.
 
@@ -317,7 +317,7 @@ connection()
 
 .. code-block:: lua
 
-  connection = handle:connection()
+  local connection = handle:connection()
 
 Returns the current request's underlying :repo:`connection <include/envoy/network/connection.h>`.
 
@@ -328,7 +328,7 @@ importPublicKey()
 
 .. code-block:: lua
 
-  pubkey = handle:importPublicKey(keyder, keyderLength)
+  local pubkey = handle:importPublicKey(keyder, keyderLength)
 
 Returns public key which is used by :ref:`verifySignature <verify_signature>` to verify digital signature.
 
@@ -339,7 +339,7 @@ verifySignature()
 
 .. code-block:: lua
 
-  ok, error = verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
+  local ok, error = verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
 
 Verify signature using provided parameters. *hashFunction* is the variable for hash function which be used
 for verifying signature. *SHA1*, *SHA224*, *SHA256*, *SHA384* and *SHA512* are supported.
@@ -420,7 +420,7 @@ length()
 
 .. code-block:: lua
 
-  size = buffer:length()
+  local size = buffer:length()
 
 Gets the size of the buffer in bytes. Returns an integer.
 
@@ -522,7 +522,7 @@ its keys can only be *string* or *numeric*.
   function envoy_on_request(request_handle)
     local headers = request_handle:headers()
     request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.lua", "request.info", {
-      auth: headers:get("authorization),
+      auth: headers:get("authorization"),
       token: headers:get("x-request-token"),
     })
   end

@@ -8,7 +8,7 @@
 
 #include <cstdlib>
 
-#include "common/filesystem/filesystem_impl.h"
+#include "test/test_common/file_system_for_test.h"
 
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -36,7 +36,7 @@ void QuicRecordTestOutputToFile(const std::string& filename, quiche::QuicheStrin
     output_dir += '/';
   }
 
-  Envoy::Filesystem::InstanceImplPosix file_system;
+  Envoy::Filesystem::Instance& file_system = Envoy::Filesystem::fileSystemForTest();
   if (!file_system.directoryExists(output_dir)) {
     QUIC_LOG(ERROR) << "Directory does not exist while writing test output: " << output_dir;
     return;
@@ -87,7 +87,7 @@ bool QuicLoadTestOutputImpl(quiche::QuicheStringPiece filename, std::string* dat
 
   const std::string read_path = read_dir + filename.data();
 
-  Envoy::Filesystem::InstanceImplPosix file_system;
+  Envoy::Filesystem::Instance& file_system = Envoy::Filesystem::fileSystemForTest();
   if (!file_system.fileExists(read_path)) {
     QUIC_LOG(ERROR) << "Test output file does not exist: " << read_path;
     return false;

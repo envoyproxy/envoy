@@ -21,7 +21,7 @@ following are the command line options that Envoy supports.
 
 .. option:: --config-yaml <yaml string>
 
-  *(optional)* The YAML string for a v2 bootstrap configuration. If :option:`--config-path` is also set,
+  *(optional)* The YAML string for a bootstrap configuration. If :option:`--config-path` is also set,
   the values in this YAML string will override and merge with the bootstrap loaded from :option:`--config-path`.
   Because YAML is a superset of JSON, a JSON string may also be passed to :option:`--config-yaml`.
 
@@ -30,6 +30,13 @@ following are the command line options that Envoy supports.
     .. code-block:: console
 
       ./envoy -c bootstrap.yaml --config-yaml "node: {id: 'node1'}"
+
+.. option:: --bootstrap-version <integer>
+
+   *(optional)* The API version to load the bootstrap as. The value should be a single integer, e.g.
+   to parse the bootstrap configuration as V3, specify ``--bootstrap-version 3``. If unset, Envoy will
+   attempt to load the bootstrap as the previous API version and upgrade it to the latest. If that fails,
+   Envoy will attempt to load the configuration as the latest version.
 
 .. option:: --mode <string>
 
@@ -94,7 +101,13 @@ following are the command line options that Envoy supports.
    *(optional)* The format string to use for laying out the log message metadata. If this is not
    set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] %v"`` is used.
 
-   When used in conjunction with ``--log-format-escaped``, the logger can be configured
+   When used in conjunction with :option:`--log-format-prefix-with-location` set to 0, the logger can be
+   configured to not prefix ``%v`` by a file path and a line number.
+
+   **NOTE**: The default log format will be changed to ``"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"``
+   together with the default value of :option:`--log-format-prefix-with-location` to 0 at 1.16.0 release.
+
+   When used in conjunction with :option:`--log-format-escaped`, the logger can be configured
    to log in a format that is parsable by log viewers. Known integrations are documented
    in the :ref:`application logging configuration <config_application_logs>` section.
 
@@ -129,6 +142,20 @@ following are the command line options that Envoy supports.
    :%T, %X:	ISO 8601 time format (HH:MM:SS), equivalent to %H:%M:%S ("13:25:06")
    :%z:	ISO 8601 offset from UTC in timezone ([+/-]HH:MM) ("-07:00")
    :%%:	The % sign ("%")
+   :%@: Source file and line ("my_file.cc:123")
+   :%s: Basename of the source file ("my_file.cc")
+   :%g: Full relative path of the source file ("/some/dir/my_file.cc")
+   :%#: Source line ("123")
+   :%!: Source function ("myFunc")
+
+.. option:: --log-format-prefix-with-location <1|0>
+
+   *(optional)* This temporary flag allows replacing all entries of ``"%v"`` in the log format by
+   ``"[%g:%#] %v"``. This flag is provided for migration purposes only. If this is not set, a
+   default value 1 is used.
+
+   **NOTE**: The default value will be changed to 0 at 1.16.0 release and the flag will be
+   removed at 1.17.0 release.
 
 .. option:: --log-format-escaped
 
