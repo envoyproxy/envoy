@@ -469,6 +469,12 @@ private:
                    const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                    Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) PURE;
+
+  using HttpOrTcpPool =
+      absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>;
+  HttpOrTcpPool createConnPool(Upstream::HostDescriptionConstSharedPtr& host);
+  UpstreamRequestPtr createUpstreamRequest(Filter::HttpOrTcpPool conn_pool);
+
   Http::ConnectionPool::Instance* getHttpConnPool();
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
