@@ -1259,35 +1259,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   Network::TransportSocketOptionsSharedPtr transport_socket_options =
       context ? context->upstreamTransportSocketOptions() : nullptr;
 
-  // If configured to do so, we override the ALPN to use for the upstream connection to match the
-  // selected protocol.
-  if (cluster_info_->features() &
-      ClusterInfo::Features::PIN_UPSTREAM_ALPN_TO_SELECTED_HTTP_PROTOCOL) {
-    std::vector<std::string> alpn;
-    switch (protocol) {
-    case Http::Protocol::Http10:
-      alpn.push_back("http/1.0");
-      break;
-    case Http::Protocol::Http11:
-      alpn.push_back("http/1.1");
-      break;
-    case Http::Protocol::Http2:
-      alpn.push_back("h2");
-      break;
-    case Http::Protocol::Http3:
-      alpn.push_back("h3");
-      break;
-    }
-
-    if (transport_socket_options) {
-      transport_socket_options = std::make_shared<Network::AlpnDecoratingTransportSocketOptions>(
-          std::move(alpn), transport_socket_options);
-    } else {
-      transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
-          "", std::vector<std::string>{}, std::move(alpn));
-    }
-  }
-
   if (transport_socket_options) {
     transport_socket_options->hashKey(hash_key);
   }

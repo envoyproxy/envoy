@@ -81,9 +81,6 @@ uint64_t parseFeatures(const envoy::config::cluster::v3::Cluster& config) {
   if (config.close_connections_on_host_health_failure()) {
     features |= ClusterInfoImpl::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
   }
-  if (config.common_http_protocol_options().upstream_alpn_from_selected_protocol()) {
-    features |= ClusterInfoImpl::Features::PIN_UPSTREAM_ALPN_TO_SELECTED_HTTP_PROTOCOL;
-  }
   return features;
 }
 
