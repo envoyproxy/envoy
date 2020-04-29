@@ -236,9 +236,8 @@ protected:
     }
 
     void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
-      // Setting the overflow watermark to high_watermark + 16KB
-      pending_recv_data_.setWatermarks(low_watermark, high_watermark, high_watermark + 16384);
-      pending_send_data_.setWatermarks(low_watermark, high_watermark, high_watermark + 16384);
+      pending_recv_data_.setWatermarks(low_watermark, high_watermark);
+      pending_send_data_.setWatermarks(low_watermark, high_watermark);
     }
 
     // If the receive buffer encounters watermark callbacks, enable/disable reads on this stream.

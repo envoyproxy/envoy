@@ -2017,10 +2017,10 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
                    new_limit, new_limit + 1);
   buffer_limit_ = new_limit;
   if (buffered_request_data_) {
-    buffered_request_data_->setWatermarks(buffer_limit_ / 2, buffer_limit_, buffer_limit_ + 1);
+    buffered_request_data_->setWatermarks(buffer_limit_);
   }
   if (buffered_response_data_) {
-    buffered_response_data_->setWatermarks(buffer_limit_ / 2, buffer_limit_, buffer_limit_ + 1);
+    buffered_response_data_->setWatermarks(buffer_limit_);
   }
 }
 
@@ -2275,8 +2275,7 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::cre
       std::make_unique<Buffer::WatermarkBuffer>([this]() -> void { this->requestDataDrained(); },
                                                 [this]() -> void { this->requestDataTooLarge(); },
                                                 [this]() -> void { this->requestDataOverflow(); });
-  buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_,
-                        parent_.buffer_limit_ + 1);
+  buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
 }
 
@@ -2458,8 +2457,7 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::cre
   auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
                                             [this]() -> void { this->responseDataTooLarge(); },
                                             [this]() -> void { this->responseDataOverflow(); });
-  buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_,
-                        parent_.buffer_limit_ + 1);
+  buffer->setWatermarks(parent_.buffer_limit_);
   return Buffer::WatermarkBufferPtr{buffer};
 }
 

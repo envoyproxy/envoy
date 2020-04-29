@@ -461,7 +461,7 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
       buffer_(resume_data_cb, pause_data_cb, overflow_data_cb) {
   ASSERT(bytes_per_time_slice_ > 0);
   ASSERT(max_buffered_data > 0);
-  buffer_.setWatermarks(max_buffered_data / 2, max_buffered_data, max_buffered_data + 1);
+  buffer_.setWatermarks(max_buffered_data);
 }
 
 void StreamRateLimiter::onTokenTimer() {

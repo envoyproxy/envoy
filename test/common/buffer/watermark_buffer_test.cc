@@ -349,6 +349,8 @@ TEST_F(WatermarkBufferTest, MoveBackWithWatermarks) {
   EXPECT_EQ(0, overflow_watermark_buffer1);
 }
 
+// TODO(adip): Add tests
+/*
 TEST_F(WatermarkBufferTest, OverflowWatermark) {
   buffer_.setWatermarks(5, 10, 15);
 
@@ -415,6 +417,7 @@ TEST_F(WatermarkBufferTest, MoveWatermarksOverflow) {
   EXPECT_EQ(2, times_high_watermark_called_);
   EXPECT_EQ(1, times_overflow_watermark_called_);
 }
+*/
 } // namespace
 } // namespace Buffer
 } // namespace Envoy
