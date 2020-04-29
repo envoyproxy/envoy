@@ -1,0 +1,164 @@
+.. _arch_overview_bug_bounty:
+
+Bug bounty
+==========
+
+In the near future, Envoy will have a bug bounty program. This will be open to all security
+researchers and will provide rewards for vulnerabilities discovered and reported according
+to the rules below.
+
+.. note::
+  This is not yet funded, stay tuned and reach out to envoy-security@googlegroups.com for further
+  details.
+
+.. _arch_overview_bug_bounty_rules:
+
+Rules
+-----
+
+The goal of this bug bounty is to provide a formal process to honor contributions from external
+security researchers to Envoy's security. Vulnerabilities should meet the following conditions
+to be eligible for the program:
+
+1. Vulnerabilities must meet one of the below :ref:`objectives
+   <arch_overview_bug_bounty_objectives>`, demonstrated with the supplied Docker-based
+   :ref:`execution environment <arch_overview_bug_bounty_ee>` and be consistent with the
+   program's :ref:`threat model <arch_overview_bug_bounty_threat_model>`.
+
+2. Vulnerabilities must be reported to envoy-security@googlegroups.com and be kept under embargo
+   while triage and potential security releases occur.
+
+3. Vulnerabilities must not be previously known in a public forum, e.g. GitHub issues trackers,
+   CVE databases, etc.
+
+Rewards are at the discretion of the Envoy OSS security team and will be conditioned on the above
+criteria. If multiple instances of the same vulnerability are reported at the same time by
+independent researchers or the vulnerability is already tracked under embargo by the OSS Envoy
+security team, we will aim to fairly divide the reward amongst reporters.
+
+.. _arch_overview_bug_bounty_threat_model:
+
+Threat model
+------------
+
+The base threat model matches that of Envoy's :ref:`OSS security posture
+<arch_overview_threat_model>`. We add a number of temporary restrictions to provide a constrained
+attack surface for the initial stages of this program. We exclude any threat from:
+
+* Untrusted control planes.
+* Runtime services such as access logging, external authorization, etc.
+* Untrusted upstreams.
+* DoS attacks except as stipulated below.
+* Any filters apart from the HTTP connection manager network filter and HTTP router filter.
+* Admin console; this is disabled in the execution environment.
+
+In the future we will relax these restrictions as we increase the sophistication of the
+program's execution environment.
+
+We also explicitly exclude any local attacks (e.g. via local processes, shells, etc.) against
+the Envoy process. All attacks must occur via the network data plane on ports 10000 and
+10001. Similarly, kernel and Docker vulnerabilities are outside the threat model.
+
+.. _arch_overview_bug_bounty_ee:
+
+Execution environment
+---------------------
+
+We supply Docker images that act as the reference environment for this program:
+
+* `envoyproxy/envoy-bugbounty <https://hub.docker.com/r/envoyproxy/envoy-bugbounty/tags/>`_ images
+  are based on Envoy point releases. Only the latest point release at the time of vulnerability
+  submission is eligible for the program.
+
+* `envoyproxy/envoy-bugbounty-dev <https://hub.docker.com/r/envoyproxy/envoy-bugbounty-dev/tags/>`_
+  images are based on Envoy master builds. Only builds within the last 5 days at the time of
+  vulnerability submission are eligible for the program. They must not be subject to any
+  publicly disclosed vulnerability at that point in time.
+
+Two Envoy processes are available when these images are launched via `docker run`:
+
+* The *edge* Envoy is listening on ports 10000 (plain HTTP) and 10001 (HTTPS). It has a :repo:`static
+  configuration </configs/bugbounty/envoy-edge.yaml>` that is configured according to Envoy's
+  :ref:`edge hardening principles <faq_edge>`. It has sinkhole, direct response and request forwarding
+  routing rules:
+
+  * On port 10000 (in order):
+
+    1. `/content/*`: route to the origin Envoy server.
+    2. `/*`: return 403 (denied).
+
+  * On port 10001:
+
+    1. `/*`: return 200 `normal - direct response TLS`.
+
+* The *origin* Envoy is an upstream of the edge Envoy. It has a :repo:`static configuration
+  </configs/bugbounty/envoy-origin.yaml>` that features only direct responses, effectively acting
+  as an HTTP origin server. There are two route rules (in order):
+
+  1. `/blockedz`: return 200 `hidden treasure`. It should never be possible to have
+     traffic on the Envoy edge server's 10000/10001 ports receive this response unless a
+     qualifying vulnerability is present.
+  2. `/*`: return 200 `normal`.
+
+When running the Docker images, the following command line options should be supplied:
+
+* `-m 3g` to ensure that memory is bounded to 3GB. At least this much memory should be available
+  to the execution environment. Each Envoy process has an overload manager configured to limit
+  at 1GB.
+
+* `-e ENVOY_EDGE_EXTRA_ARGS="<...>"` supplies additional CLI args for the edge Envoy. This
+  needs to be set but can be empty.
+
+* `-e ENVOY_ORIGIN_EXTRA_ARGS="<...>"` supplies additional CLI args for the origin Envoy. This
+  needs to be set but can be empty.
+
+.. _arch_overview_bug_bounty_objectives:
+
+Objectives
+----------
+
+Vulnerabilities will be evidenced by requests on 10000/10001 that trigger a failure mode
+that falls into one of these categories:
+
+* Query-of-death: requests that cause the Envoy process to segfault or abort
+  in some immediate way.
+* OOM: requests that cause the edge Envoy process to OOM. There should be no more than
+  100 connections and streams in total involved to cause this to happen (i.e. brute force
+  connection/stream DoS is excluded).
+* Routing rule bypass: requests that are able to access `hidden treasure`.
+* TLS certificate exfiltration: requests that are able to obtain the edge Envoy's
+  `serverkey.pem`.
+* Remote code exploits: any root shell obtained via the network data plane.
+
+Working with the Docker images
+------------------------------
+
+A basic invocation of the execution environment that will bring up the edge Envoy on local
+port 10001/10001 looks like:
+
+.. code-block:: bash
+
+   docker run -m 3g -p 10000:10000 -p 10001:10001 --name envoy-bugbounty \
+     -e ENVOY_EDGE_EXTRA_ARGS="" \
+     -e ENVOY_ORIGIN_EXTRA_ARGS="" \
+     envoyproxy/envoy-bugbounty-dev:latest
+
+When debugging, additional args may prove useful, e.g. in order to obtain trace logs, make
+use of `wireshark` and `gdb`:
+
+.. code-block:: bash
+
+   docker run -m 3g -p 10000:10000 -p 10001:10001 --name envoy-bugbounty \
+     -e ENVOY_EDGE_EXTRA_ARGS="-l trace" \
+     -e ENVOY_ORIGIN_EXTRA_ARGS="-l trace" \
+     --cap-add SYS_PTRACE --cap-add NET_RAW --cap-add NET_ADMIN \
+     envoyproxy/envoy-bugbounty-dev:latest
+
+You can obtain a shell in the Docker container with:
+
+.. code-block:: bash
+
+  docker exec -it envoy-bugbounty /bin/bash
+
+The Docker images include `gdb`, `strace`, `tshark` (feel free to contribute other
+suggestions via PRs updating the :repo:`Docker build file </ci/Dockerfile-envoy-bugbounty>`).

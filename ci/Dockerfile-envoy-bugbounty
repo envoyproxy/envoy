@@ -1,0 +1,20 @@
+FROM envoyproxy/envoy:local
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y supervisor gdb strace tshark \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /var/lib/apt/lists/*
+
+ADD configs/bugbounty/envoy-edge.yaml /etc/envoy/envoy-edge.yaml
+ADD configs/bugbounty/envoy-origin.yaml /etc/envoy/envoy-origin.yaml
+ADD configs/bugbounty/supervisor.conf /etc/supervisor.conf
+ADD test/config/integration/certs/serverkey.pem /etc/envoy/serverkey.pem
+ADD test/config/integration/certs/servercert.pem /etc/envoy/servercert.pem
+
+EXPOSE 10000
+EXPOSE 10001
+
+CMD ["supervisord", "-c", "/etc/supervisor.conf"]
