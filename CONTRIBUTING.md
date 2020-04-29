@@ -131,7 +131,8 @@ guarded due to performance concerns) and a full deprecation cycle (if it is a hi
 change). Generally as a community we try to guard both high risk changes (major
 refactors such as replacing Envoy's buffer implementation) and most user-visible
 non-config-guarded changes to protocol processing (for example additions or changes to HTTP headers or
-how HTTP is serialized out) for non-alpha features.
+how HTTP is serialized out) for non-alpha features.  Feel free to tag @envoyproxy/maintainers
+if you aren't sure if a given change merits runtime guarding.
 
 The canonical way to runtime guard a feature is
 ```
