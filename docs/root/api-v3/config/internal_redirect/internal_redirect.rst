@@ -1,5 +1,5 @@
 Internal Redirect Predicates
-===++++++++++++=============
+============================
 
 .. toctree::
   :glob:

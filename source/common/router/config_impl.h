@@ -402,28 +402,19 @@ public:
 
   uint32_t maxInternalRedirects() const override { return max_internal_redirects_; }
 
-  bool isDownstreamAndRedirectTargetSchemePairAllowed(bool downstream_is_https,
-                                                      bool target_is_https) const override;
+  bool isCrossSchemeRedirectAllowed() const override { return allow_cross_scheme_redirect_; }
 
 private:
-  bool internalRedirectEnabled(
-      const envoy::config::route::v3::InternalRedirectPolicy& policy_config) const;
-
   absl::flat_hash_set<Http::Code> buildRedirectResponseCodes(
       const envoy::config::route::v3::InternalRedirectPolicy& policy_config) const;
-
-  absl::flat_hash_set<uint8_t> buildAllowedSchemePairs(
-      const envoy::config::route::v3::InternalRedirectPolicy& policy_config) const;
-
-  uint8_t compactSchemePair(bool downstream_is_https, bool target_is_https) const;
 
   const bool enabled_{false};
   const std::string current_route_name_;
   const absl::flat_hash_set<Http::Code> redirect_response_codes_;
   const uint32_t max_internal_redirects_{1};
-  const absl::flat_hash_set<uint8_t> allowed_scheme_pairs_;
+  const bool allow_cross_scheme_redirect_{false};
 
-  std::vector<std::pair<InternalRedirectPredicateFactory&, ProtobufTypes::MessagePtr>>
+  std::vector<std::pair<InternalRedirectPredicateFactory*, ProtobufTypes::MessagePtr>>
       predicate_factories_;
 };
 

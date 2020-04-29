@@ -958,6 +958,10 @@ message RouteAction {
 
   repeated UpgradeConfig upgrade_configs = 25;
 
+  // If present, Envoy will try to follow an upstream redirect response instead of proxying the
+  // response back to the downstream. An upstream redirect response is defined
+  // by :ref:`redirect_response_codes
+  // <envoy_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`.
   InternalRedirectPolicy internal_redirect_policy = 34;
 
   InternalRedirectAction internal_redirect_action = 26 [deprecated = true];
@@ -1569,72 +1573,33 @@ message QueryParameterMatcher {
 }
 
 // HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
-// [#next-free-field: 6]
 message InternalRedirectPolicy {
-  // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
-  enum InternalRedirectAction {
-    // Redirect responses are proxied to downstream without triggering Internal Redirect.
-    // This is the default value.
-    PASS_THROUGH_INTERNAL_REDIRECT = 0;
-
-    // Redirect responses (specified via :ref:`redirect_response_codes
-    // <envoy_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`),
-    // are followed by Envoy to the new URL. The redirect responses are not visible to
-    // the downstream unless the redirect following is rejected by other criteria.
-    HANDLE_INTERNAL_REDIRECT = 1;
-  }
-
-  // HTTP scheme combinations that are allowed to be handled as internal
-  // redirect. Downstream scheme comes first and redirect target URL scheme
-  // follows.
-  enum DownstreamAndRedirectTargetSchemePair {
-    HTTP_HTTP = 0;
-    HTTP_HTTPS = 1;
-    HTTPS_HTTP = 2;
-    HTTPS_HTTPS = 3;
-  }
-
   message Predicate {
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
-
-    google.protobuf.Any typed_config = 2;
+    google.protobuf.Any typed_config = 1;
   }
 
-  InternalRedirectAction internal_redirect_action = 1;
-
-  // An internal redirect is handled, iff the number of previous internal redirects that a
-  // downstream request has encountered is lower than this value, and
-  // :ref:`internal_redirect_action
-  // <envoy_api_field_config.route.v3.InternalRedirectPolicy.internal_redirect_action>`
-  // is set to
-  // :ref:`HANDLE_INTERNAL_REDIRECT
-  // <envoy_api_enum_value_config.route.v3.InternalRedirectPolicy.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
+  // An internal redirect is not handled, unless the number of previous internal redirects that a
+  // downstream request has encountered is lower than this value.
   // In the case where a downstream request is bounced among multiple routes by internal redirect,
-  // the first route that hits this threshold, or has
-  // :ref:`internal_redirect_action
-  // <envoy_api_field_config.route.v3.InternalRedirectPolicy.internal_redirect_action>`
-  // set to
-  // :ref:`PASS_THROUGH_INTERNAL_REDIRECT
-  // <envoy_api_enum_value_config.route.v3.InternalRedirectPolicy.InternalRedirectAction.PASS_THROUGH_INTERNAL_REDIRECT>`
+  // the first route that hits this threshold, or does not set :ref:`internal_redirect_policy
+  // <envoy_api_field_config.route.v3.RouteAction.internal_redirect_policy>`
   // will pass the redirect back to downstream.
   //
   // If not specified, at most one redirect will be followed.
-  google.protobuf.UInt32Value max_internal_redirects = 2;
+  google.protobuf.UInt32Value max_internal_redirects = 1;
 
-  // Defines what upstream response codes are allowed to trigger internal redirect. This is ignored unless
-  // :ref:`internal_redirect_action
-  // <envoy_api_field_config.route.v3.InternalRedirectPolicy.internal_redirect_action>`
-  // is set to
-  // :ref:`HANDLE_INTERNAL_REDIRECT
-  // <envoy_api_enum_value_config.route.v3.InternalRedirectPolicy.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
-  repeated uint32 redirect_response_codes = 3;
+  // Defines what upstream response codes are allowed to trigger internal redirect. If unspecified,
+  // only 302 will be treated as internal redirect.
+  // Only 301, 302, 303, 307 and 308 are valid values.
+  repeated uint32 redirect_response_codes = 2
+      [(validate.rules).repeated = {items {uint32 {lte: 308 gte: 301}}}];
 
   // Specifies a list of predicates that are queried when an upstream response is deemed
   // to trigger an internal redirect by all other criteria. Any predicate in the list can reject
   // the redirect, causing the response to be proxied to downstream.
-  repeated Predicate predicates = 4;
+  repeated Predicate predicates = 3;
 
-  // Specifies what combinations of downstream and redirect target scheme are allowed to trigger an
-  // internal redirect.
-  repeated DownstreamAndRedirectTargetSchemePair allowed_downstream_and_target_scheme_pairs = 5;
+  // Allow internal redirect to follow a target URI with a different scheme than the value of
+  // x-forwarded-proto. Default behavior is to not follow such redirects.
+  bool allow_cross_scheme_redirect = 4;
 }

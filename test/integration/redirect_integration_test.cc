@@ -1,6 +1,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/extensions/internal_redirect/whitelisted_routes/v3/whitelisted_routes_config.pb.h"
+#include "envoy/extensions/internal_redirect/allowlisted_routes/v3/allowlisted_routes_config.pb.h"
+#include "envoy/extensions/internal_redirect/previous_routes/v3/previous_routes_config.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 
@@ -23,9 +24,7 @@ public:
     handle.mutable_routes(0)->set_name("redirect");
     handle.mutable_routes(0)
         ->mutable_route()
-        ->mutable_internal_redirect_policy()
-        ->set_internal_redirect_action(
-            envoy::config::route::v3::InternalRedirectPolicy::HANDLE_INTERNAL_REDIRECT);
+        ->mutable_internal_redirect_policy();
     config_helper_.addVirtualHost(handle);
 
     auto handle_max_3_hop =
@@ -33,9 +32,7 @@ public:
     handle_max_3_hop.mutable_routes(0)->set_name("max_three_hop");
     handle_max_3_hop.mutable_routes(0)
         ->mutable_route()
-        ->mutable_internal_redirect_policy()
-        ->set_internal_redirect_action(
-            envoy::config::route::v3::InternalRedirectPolicy::HANDLE_INTERNAL_REDIRECT);
+        ->mutable_internal_redirect_policy();
     handle_max_3_hop.mutable_routes(0)
         ->mutable_route()
         ->mutable_internal_redirect_policy()
@@ -236,11 +233,11 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
   auto* internal_redirect_policy = handle_prevent_repeated_target.mutable_routes(0)
                                        ->mutable_route()
                                        ->mutable_internal_redirect_policy();
-  internal_redirect_policy->set_internal_redirect_action(
-      envoy::config::route::v3::InternalRedirectPolicy::HANDLE_INTERNAL_REDIRECT);
-  internal_redirect_policy->add_predicates()->set_name(
-      "envoy.internal_redirect_predicates.previous_routes");
   internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
+  envoy::extensions::internal_redirect::previous_routes::v3::PreviousRoutesConfig
+      previous_routes_config;
+  internal_redirect_policy->add_predicates()->mutable_typed_config()->PackFrom(
+      previous_routes_config);
   config_helper_.addVirtualHost(handle_prevent_repeated_target);
 
   // Validate that header sanitization is only called once.
@@ -280,25 +277,22 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
                    ->value());
 }
 
-TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByWhitelistedRoutesPredicate) {
-  auto handle_whitelisted_redirect_route =
-      config_helper_.createVirtualHost("handle.internal.redirect.only.whitelisted.target");
-  auto* internal_redirect_policy = handle_whitelisted_redirect_route.mutable_routes(0)
+TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowlistedRoutesPredicate) {
+  auto handle_allowlisted_redirect_route =
+      config_helper_.createVirtualHost("handle.internal.redirect.only.allowlisted.target");
+  auto* internal_redirect_policy = handle_allowlisted_redirect_route.mutable_routes(0)
                                        ->mutable_route()
                                        ->mutable_internal_redirect_policy();
-  internal_redirect_policy->set_internal_redirect_action(
-      envoy::config::route::v3::InternalRedirectPolicy::HANDLE_INTERNAL_REDIRECT);
 
-  auto* whitelisted_routes_predicate = internal_redirect_policy->add_predicates();
-  whitelisted_routes_predicate->set_name("envoy.internal_redirect_predicates.whitelisted_routes");
-  envoy::extensions::internal_redirect::whitelisted_routes::v3::WhitelistedRoutesConfig
-      whitelisted_routes_config;
-  *whitelisted_routes_config.add_whitelisted_route_names() = "max_three_hop";
-  whitelisted_routes_predicate->mutable_typed_config()->PackFrom(whitelisted_routes_config);
+  auto* allowlisted_routes_predicate = internal_redirect_policy->add_predicates();
+  envoy::extensions::internal_redirect::allowlisted_routes::v3::AllowlistedRoutesConfig
+      allowlisted_routes_config;
+  *allowlisted_routes_config.add_allowed_route_names() = "max_three_hop";
+  allowlisted_routes_predicate->mutable_typed_config()->PackFrom(allowlisted_routes_config);
 
   internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
 
-  config_helper_.addVirtualHost(handle_whitelisted_redirect_route);
+  config_helper_.addVirtualHost(handle_allowlisted_redirect_route);
 
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(
@@ -309,7 +303,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByWhitelistedRoutesPred
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  default_request_headers_.setHost("handle.internal.redirect.only.whitelisted.target");
+  default_request_headers_.setHost("handle.internal.redirect.only.allowlisted.target");
   IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
@@ -321,11 +315,11 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByWhitelistedRoutesPred
   auto second_request = waitForNextStream();
   // Redirect back to the original route.
   redirect_response_.setLocation(
-      "http://handle.internal.redirect.only.whitelisted.target/another/path");
+      "http://handle.internal.redirect.only.allowlisted.target/another/path");
   second_request->encodeHeaders(redirect_response_, true);
 
   auto third_request = waitForNextStream();
-  // Redirect to the non-whitelisted route. This should fail.
+  // Redirect to the non-allowlisted route. This should fail.
   redirect_response_.setLocation("http://handle.internal.redirect/yet/another/path");
   third_request->encodeHeaders(redirect_response_, true);
 

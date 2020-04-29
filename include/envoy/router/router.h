@@ -267,11 +267,10 @@ public:
   virtual uint32_t maxInternalRedirects() const PURE;
 
   /**
-   * @return if the pair of HTTP scheme from the downstream request and the target url is allowed
-   *         for internal redirect.
+   * @return if it is allowed to follow the redirect with a different scheme in
+   *         the target URI than the downstream request.
    */
-  virtual bool isDownstreamAndRedirectTargetSchemePairAllowed(bool downstream_is_https,
-                                                              bool target_is_https) const PURE;
+  virtual bool isCrossSchemeRedirectAllowed() const PURE;
 };
 
 /**

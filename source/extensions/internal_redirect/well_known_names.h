@@ -14,8 +14,8 @@ namespace InternalRedirect {
 class InternalRedirectPredicatesNameValues {
 public:
   const std::string PreviousRoutesPredicate = "envoy.internal_redirect_predicates.previous_routes";
-  const std::string WhitelistedRoutesPredicate =
-      "envoy.internal_redirect_predicates.whitelisted_routes";
+  const std::string AllowlistedRoutesPredicate =
+      "envoy.internal_redirect_predicates.allowlisted_routes";
 };
 
 using InternalRedirectPredicateValues = ConstSingleton<InternalRedirectPredicatesNameValues>;

@@ -165,14 +165,14 @@ is subject to the redirect being handled by Envoy.
 For a redirect to be handled successfully it must pass the following checks:
 
 1. Have a response code matching one of :ref:`redirect_response_codes
-   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`.
 2. Have a *location* header with a valid, fully qualified URL matching the scheme of the original
    request.
 3. The request must have been fully processed by Envoy.
 4. The request must not have a body.
-5. The scheme pair of the downstream request and the *location* header is allowed by
-   :ref:`allowed downstream and target scheme pair
-   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.allowed_downstream_and_target_scheme_pairs>`
+5. The scheme of the downstream request and the *location* header are the same or
+   :ref:`allow_cross_scheme_redirect
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.allow_cross_scheme_redirect>` is true.
 6. The number of previously handled internal redirect within a given downstream request does not
    exceed :ref:`max internal redirects
    <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>`
@@ -195,9 +195,9 @@ will cause the redirect to be passed downstream.
 
 Two predicates can be used to create a DAG that defines the redirect chain, the :ref:`previous routes
 <envoy_v3_api_msg_extensions.internal_redirect.previous_routes.v3.PreviousRoutesConfig>` predicate, and
-the :ref:`whitelisted routes
-<envoy_v3_api_msg_extensions.internal_redirect.whitelisted_routes.v3.WhitelistedRoutesConfig>`.
-Specifically, the *whitelisted routes* predicate defines edges of individual node in the DAG
+the :ref:`allowlisted_routes
+<envoy_v3_api_msg_extensions.internal_redirect.allowlisted_routes.v3.AllowlistedRoutesConfig>`.
+Specifically, the *allowlisted routes* predicate defines edges of individual node in the DAG
 and the *previous routes* predicate defines "visited" state of the edges, so that loop can be avoided
 if so desired.
 

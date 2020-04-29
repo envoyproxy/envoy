@@ -46,17 +46,17 @@ constexpr char NumInternalRedirectsFilterStateName[] = "num_internal_redirects";
 
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
-bool schemeIsHttps(const Http::RequestHeaderMap& downstream_headers,
-                   const Network::Connection& connection) {
-  if (!connection.ssl()) {
-    return false;
-  }
+bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
+                  const Network::Connection& connection) {
   if (downstream_headers.ForwardedProto() &&
       downstream_headers.ForwardedProto()->value().getStringView() ==
           Http::Headers::get().SchemeValues.Http) {
-    return false;
+    return true;
   }
-  return true;
+  if (!connection.ssl()) {
+    return true;
+  }
+  return false;
 }
 
 bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
@@ -77,11 +77,10 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
     return false;
   }
 
-  // Don't allow serving TLS responses over plaintext.
-  bool downstream_is_https = schemeIsHttps(downstream_headers, connection);
-  bool target_is_https = absolute_url.scheme() == Http::Headers::get().SchemeValues.Https;
-  if (!policy.isDownstreamAndRedirectTargetSchemePairAllowed(downstream_is_https,
-                                                             target_is_https)) {
+  // Don't allow serving TLS responses over plaintext unless allowed by policy.
+  bool scheme_is_http = schemeIsHttp(downstream_headers, connection);
+  bool target_is_http = absolute_url.scheme() == Http::Headers::get().SchemeValues.Http;
+  if (!policy.isCrossSchemeRedirectAllowed() && scheme_is_http != target_is_http) {
     return false;
   }
 
@@ -103,8 +102,8 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
 
   // Preserve the original request URL for the second pass.
   downstream_headers.setEnvoyOriginalUrl(
-      absl::StrCat(downstream_is_https ? Http::Headers::get().SchemeValues.Https
-                                       : Http::Headers::get().SchemeValues.Http,
+      absl::StrCat(scheme_is_http ? Http::Headers::get().SchemeValues.Http
+                                  : Http::Headers::get().SchemeValues.Https,
                    "://", downstream_headers.Host()->value().getStringView(),
                    downstream_headers.Path()->value().getStringView()));
 

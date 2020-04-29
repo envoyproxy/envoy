@@ -296,8 +296,8 @@ public:
     ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, maxInternalRedirects())
         .WillByDefault(Return(max_internal_redirects));
     ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
-            isDownstreamAndRedirectTargetSchemePairAllowed(_, _))
-        .WillByDefault(Return(true));
+            isCrossSchemeRedirectAllowed())
+        .WillByDefault(Return(false));
     ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
   }
 
@@ -4379,16 +4379,13 @@ TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
                     .value());
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedByDownstreamAndTargetSchemePair) {
+TEST_F(RouterTest, InternalRedirectRejectedByCrossSchemeRedirect) {
   enableRedirects();
 
   sendRequest();
 
   redirect_headers_->setLocation("https://www.foo.com");
 
-  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
-              isDownstreamAndRedirectTargetSchemePairAllowed(false, true))
-      .WillOnce(Return(false));
   EXPECT_CALL(callbacks_, recreateStream()).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
@@ -4397,12 +4394,38 @@ TEST_F(RouterTest, InternalRedirectRejectedByDownstreamAndTargetSchemePair) {
                     .value());
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
+TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
   enableRedirects();
 
   sendRequest();
 
   redirect_headers_->setLocation("https://www.foo.com");
+
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
+              isCrossSchemeRedirectAllowed())
+      .WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
+  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_.onDestroy();
+  EXPECT_EQ(1, callbacks_.streamInfo()
+                   .filterState()
+                   ->getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
+                   .value());
+}
+
+TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
+  enableRedirects();
+
+  sendRequest();
+
+  redirect_headers_->setLocation("http://www.foo.com");
 
   auto mock_predicate = std::make_shared<MockInternalRedirectPredicate>();
 
