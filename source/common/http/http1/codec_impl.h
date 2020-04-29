@@ -81,7 +81,7 @@ public:
   void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
 
-  void clearReadDisableCalls() { read_disable_calls_ = 0; }
+  void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
@@ -412,17 +412,9 @@ public:
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action);
-  ~ServerConnectionImpl() {
-    // This ideally would not be necessary, however in the integration test framework the server
-    // connection outlives the Network::Connection, and so the Network::Connection must not be
-    // accessed in this destructor.
-    if (active_request_.has_value()) {
-      active_request_.value().response_encoder_.clearReadDisableCalls();
-    }
-  }
   bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
-private:
+protected:
   /**
    * An active HTTP/1.1 request.
    */
@@ -435,7 +427,9 @@ private:
     ResponseEncoderImpl response_encoder_;
     bool remote_complete_{};
   };
+  absl::optional<ActiveRequest>& active_request() { return active_request_; }
 
+private:
   /**
    * Manipulate the request's first line, parsing the url and converting to a relative path if
    * necessary. Compute Host / :authority headers based on 7230#5.7 and 7230#6
