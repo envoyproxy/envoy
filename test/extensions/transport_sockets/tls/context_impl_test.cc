@@ -3,7 +3,7 @@
 
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "common/json/json_loader.h"

@@ -34,7 +34,13 @@ FaultAbortConfig::FaultAbortConfig(
   switch (abort_config.error_type_case()) {
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
     provider_ =
-        std::make_unique<FixedAbortProvider>(abort_config.http_status(), abort_config.percentage());
+        std::make_unique<FixedAbortProvider>(static_cast<Http::Code>(abort_config.http_status()),
+                                             absl::nullopt, abort_config.percentage());
+    break;
+  case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kGrpcStatus:
+    provider_ = std::make_unique<FixedAbortProvider>(
+        absl::nullopt, static_cast<Grpc::Status::GrpcStatus>(abort_config.grpc_status()),
+        abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHeaderAbort:
     provider_ = std::make_unique<HeaderAbortProvider>(abort_config.percentage());
@@ -44,10 +50,10 @@ FaultAbortConfig::FaultAbortConfig(
   }
 }
 
-absl::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::statusCode(
+absl::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::httpStatusCode(
     const Http::RequestHeaderMap* request_headers) const {
-  absl::optional<Http::Code> ret;
-  const auto header = request_headers->get(HeaderNames::get().AbortRequest);
+  absl::optional<Http::Code> ret = absl::nullopt;
+  auto header = request_headers->get(Filters::Common::Fault::HeaderNames::get().AbortRequest);
   if (header == nullptr) {
     return ret;
   }
@@ -62,6 +68,21 @@ absl::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::statusCode(
   }
 
   return ret;
+}
+
+absl::optional<Grpc::Status::GrpcStatus> FaultAbortConfig::HeaderAbortProvider::grpcStatusCode(
+    const Http::RequestHeaderMap* request_headers) const {
+  auto header = request_headers->get(Filters::Common::Fault::HeaderNames::get().AbortGrpcRequest);
+  if (header == nullptr) {
+    return absl::nullopt;
+  }
+
+  uint64_t code;
+  if (!absl::SimpleAtoi(header->value().getStringView(), &code)) {
+    return absl::nullopt;
+  }
+
+  return static_cast<Grpc::Status::GrpcStatus>(code);
 }
 
 FaultDelayConfig::FaultDelayConfig(
