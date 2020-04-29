@@ -352,10 +352,10 @@ TEST_P(DecoderStateMachineValueTest, IncompleteListValue) {
   EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::ListValue);
 
-  expectValue(proto_, handler_, field_type, false);
+  expectValue(proto_, handler_, field_type);
 
   EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
-  EXPECT_EQ(dsm.currentState(), ProtocolState::ListValue);
+  EXPECT_EQ(dsm.currentState(), ProtocolState::ListEnd);
 }
 
 TEST_P(DecoderStateMachineValueTest, MultipleListValues) {
@@ -470,7 +470,31 @@ TEST_P(DecoderStateMachineValueTest, MapValueValue) {
   EXPECT_EQ(dsm.currentState(), ProtocolState::MapEnd);
 }
 
-TEST_P(DecoderStateMachineValueTest, IncompleteMapValues) {
+TEST_P(DecoderStateMachineValueTest, IncompleteMapKey) {
+  FieldType field_type = GetParam();
+  Buffer::OwnedImpl buffer;
+  InSequence dummy;
+
+  EXPECT_CALL(proto_, readMapBegin(Ref(buffer), _, _, _))
+      .WillOnce(DoAll(SetArgReferee<1>(field_type), SetArgReferee<2>(FieldType::I32),
+                      SetArgReferee<3>(1), Return(true)));
+
+  expectValue(proto_, handler_, field_type, false); // key
+
+  DecoderStateMachine dsm(proto_, metadata_, handler_);
+
+  dsm.setCurrentState(ProtocolState::MapBegin);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.currentState(), ProtocolState::MapKey);
+
+  expectValue(proto_, handler_, field_type);     // key
+  expectValue(proto_, handler_, FieldType::I32); // value
+
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.currentState(), ProtocolState::MapEnd);
+}
+
+TEST_P(DecoderStateMachineValueTest, IncompleteMapValue) {
   FieldType field_type = GetParam();
   Buffer::OwnedImpl buffer;
   InSequence dummy;
@@ -479,9 +503,8 @@ TEST_P(DecoderStateMachineValueTest, IncompleteMapValues) {
       .WillOnce(DoAll(SetArgReferee<1>(FieldType::I32), SetArgReferee<2>(field_type),
                       SetArgReferee<3>(1), Return(true)));
 
-  expectValue(proto_, handler_, FieldType::I32); // key
-  expectValue(proto_, handler_, field_type, false);     // value
-
+  expectValue(proto_, handler_, FieldType::I32);    // key
+  expectValue(proto_, handler_, field_type, false); // value
 
   DecoderStateMachine dsm(proto_, metadata_, handler_);
 
@@ -489,10 +512,10 @@ TEST_P(DecoderStateMachineValueTest, IncompleteMapValues) {
   EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::MapValue);
 
-  expectValue(proto_, handler_, field_type, false);     // value
+  expectValue(proto_, handler_, field_type); // value
 
   EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
-  EXPECT_EQ(dsm.currentState(), ProtocolState::MapValue);
+  EXPECT_EQ(dsm.currentState(), ProtocolState::MapEnd);
 }
 
 TEST_P(DecoderStateMachineValueTest, MultipleMapKeyValues) {
@@ -567,7 +590,7 @@ TEST_P(DecoderStateMachineValueTest, SetValue) {
   EXPECT_EQ(dsm.currentState(), ProtocolState::SetEnd);
 }
 
-TEST_P(DecoderStateMachineValueTest, IncompleteSetValues) {
+TEST_P(DecoderStateMachineValueTest, IncompleteSetValue) {
   FieldType field_type = GetParam();
   Buffer::OwnedImpl buffer;
   InSequence dummy;
@@ -583,10 +606,10 @@ TEST_P(DecoderStateMachineValueTest, IncompleteSetValues) {
   EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::SetValue);
 
-  expectValue(proto_, handler_, field_type, false);
+  expectValue(proto_, handler_, field_type);
 
   EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
-  EXPECT_EQ(dsm.currentState(), ProtocolState::SetValue);
+  EXPECT_EQ(dsm.currentState(), ProtocolState::SetEnd);
 }
 
 TEST_P(DecoderStateMachineValueTest, MultipleSetValues) {
