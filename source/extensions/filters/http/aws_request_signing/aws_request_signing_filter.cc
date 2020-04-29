@@ -1,8 +1,10 @@
+
 #include "extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
+
+#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 
 #include "common/http/utility.h"
 
-#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
