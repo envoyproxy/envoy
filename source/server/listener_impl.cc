@@ -292,8 +292,8 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
-      listener_init_target_(fmt::format("Listener-init-target {}", name),
-                            [this]() { dynamic_init_manager_->initialize(local_init_watcher_); }),
+      // Never used during in place update because we expect server started.
+      listener_init_target_("", nullptr),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
       config_(config), version_info_(version_info),
@@ -315,9 +315,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
-  if (socket_type == Network::Address::SocketType::Datagram) {
-    return;
-  }
+  // In place update is tcp only so it's safe to apply below tcp only initialization.
   buildSocketOptions();
   buildOriginalDstListenerFilter();
   buildProxyProtocolListenerFilter();

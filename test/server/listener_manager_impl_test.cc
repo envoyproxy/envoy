@@ -4480,6 +4480,29 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
 }
 
+TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateOnZeroFilterChain) {
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  auto listener_proto = createDefaultListener();
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  expectAddListener(listener_proto, listener_foo);
+
+  auto new_listener_proto = listener_proto;
+  new_listener_proto.clear_filter_chains();
+  EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
+  EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
+  EXPECT_CALL(listener_factory_, createDrainManager_(_));
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(new_listener_proto, "", true),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': no filter chains specified");
+
+  expectRemove(listener_proto, listener_foo);
+  EXPECT_EQ(0UL, manager_->listeners().size());
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+}
+
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
        TraditionalUpdateIfListenerConfigHasUpdateOtherThanFilterChain) {
   EXPECT_CALL(*worker_, start(_));
