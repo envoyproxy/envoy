@@ -4117,6 +4117,8 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
   checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   listener_foo->target_.ready();
@@ -4142,6 +4144,8 @@ filter_chains:
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
   EXPECT_EQ(1UL, manager_->listeners().size());
 
   // Stop foo which should remove warming listener.
@@ -4175,6 +4179,8 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
   checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   listener_foo->target_.ready();
@@ -4199,6 +4205,8 @@ filter_chains:
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
 
@@ -4240,6 +4248,8 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
   checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   listener_foo->target_.ready();
@@ -4264,6 +4274,8 @@ filter_chains:
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
 
@@ -4324,6 +4336,7 @@ filter_chains:
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
   EXPECT_EQ(1UL, manager_->listeners().size());
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
   checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
 
   // The warmed up starts the drain timer.
@@ -4513,6 +4526,8 @@ filter_chains:
   EXPECT_CALL(*worker_, addListener(_, _, _));
 
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
   worker_->callAddCompletion(true);
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
@@ -4536,6 +4551,8 @@ filter_chains:
   EXPECT_CALL(*timer, enableTimer(_, _));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
   EXPECT_EQ(1UL, manager_->listeners().size());
   worker_->callAddCompletion(true);
 
@@ -4565,6 +4582,7 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update2_yaml), "", true));
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
 
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo_update1->drain_manager_->drain_sequence_completion_();

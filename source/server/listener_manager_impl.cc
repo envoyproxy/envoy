@@ -412,6 +412,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
               name, hash);
     new_listener =
         (*existing_active_listener)->newListenerWithFilterChain(config, workers_started_, hash);
+    stats_.listener_in_place_updated_.inc();
   } else {
     ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, hash);
     new_listener =
