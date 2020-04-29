@@ -1395,14 +1395,14 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
 
   // Host weight is 1.
   {
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2));
     stats_.max_host_weight_.set(1UL);
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
   // Host weight is 100.
   {
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2));
     stats_.max_host_weight_.set(100UL);
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
@@ -1410,7 +1410,7 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
   HostVector empty;
   {
     hostSet().runCallbacks(empty, empty);
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2));
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
@@ -1469,25 +1469,24 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
 
   // 0 choices configured should default to P2C.
   EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_.chooseHost(nullptr));
 
   // 2 choices configured results in P2C.
   EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_2.chooseHost(nullptr));
 
   // 5 choices configured results in P5C.
-  EXPECT_CALL(random_, random()).Times(6).WillRepeatedly(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_5.chooseHost(nullptr));
+  EXPECT_CALL(random_, random()).Times(5).WillRepeatedly(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr));
 
   // Verify correct host chosen in P5C scenario.
   EXPECT_CALL(random_, random())
-      .Times(6)
+      .Times(5)
       .WillOnce(Return(0))
-      .WillOnce(Return(3))
+      .WillOnce(Return(1))
       .WillOnce(Return(0))
-      .WillOnce(Return(3))
-      .WillOnce(Return(2))
-      .WillOnce(Return(1));
+      .WillOnce(Return(1))
+      .WillOnce(Return(2));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr));
 }
 

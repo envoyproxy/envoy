@@ -717,7 +717,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
     // Nuke existing scheduler if it exists.
     auto& scheduler = scheduler_[source] = Scheduler{};
-    refreshHostSource(source);
+    refreshHostSource(source, hosts);
 
     // Check if the original host weights are equal and skip EDF creation if they are. When all
     // original weights are equal we can rely on unweighted host pick to do optimal round robin and
@@ -804,23 +804,30 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
   }
 }
 
-HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector& hosts_to_use,
-                                                                const HostsSource&) {
+HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector&,
+                                                                const HostsSource& source) {
   HostSharedPtr candidate_host = nullptr;
-  for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
-    const int rand_idx = random_.random() % hosts_to_use.size();
+  uint64_t candidate_active_rq = 0;
+  auto& hosts_to_use = unweighted_hosts_[source];
+  uint32_t size = hosts_to_use.size();
+  const uint32_t choice_count = std::min(choice_count_, size);
+
+  for (uint32_t choice_idx = 0; choice_idx < choice_count; ++choice_idx) {
+    const int rand_idx = random_.random() % size;
     HostSharedPtr sampled_host = hosts_to_use[rand_idx];
+    std::swap(hosts_to_use[rand_idx], hosts_to_use[--size]);
 
     if (candidate_host == nullptr) {
       // Make a first choice to start the comparisons.
       candidate_host = sampled_host;
+      candidate_active_rq = candidate_host->stats().rq_active_.value();
       continue;
     }
 
-    const auto candidate_active_rq = candidate_host->stats().rq_active_.value();
     const auto sampled_active_rq = sampled_host->stats().rq_active_.value();
     if (sampled_active_rq < candidate_active_rq) {
       candidate_host = sampled_host;
+      candidate_active_rq = sampled_active_rq;
     }
   }
 

@@ -376,7 +376,7 @@ protected:
 
 private:
   void refresh(uint32_t priority);
-  virtual void refreshHostSource(const HostsSource& source) PURE;
+  virtual void refreshHostSource(const HostsSource& source, const HostVector& hosts) PURE;
   virtual double hostWeight(const Host& host) PURE;
   virtual HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                                 const HostsSource& source) PURE;
@@ -401,7 +401,7 @@ public:
   }
 
 private:
-  void refreshHostSource(const HostsSource& source) override {
+  void refreshHostSource(const HostsSource& source, const HostVector&) override {
     // insert() is used here on purpose so that we don't overwrite the index if the host source
     // already exists. Note that host sources will never be removed, but given how uncommon this
     // is it probably doesn't matter.
@@ -455,7 +455,13 @@ public:
   }
 
 private:
-  void refreshHostSource(const HostsSource&) override {}
+  void refreshHostSource(const HostsSource& source, const HostVector& hosts) override {
+    // Initialize per-source list of hosts by a copy of given shared pointers.
+    // This list is used later on to guarantee that pick call considers each host at most once.
+    // Note that host sources will never be removed, but given how uncommon this
+    // is it probably doesn't matter.
+    unweighted_hosts_[source] = hosts;
+  }
   double hostWeight(const Host& host) override {
     // Here we scale host weight by the number of active requests at the time we do the pick. We
     // always add 1 to avoid division by 0. It might be possible to do better by picking two hosts
@@ -470,6 +476,9 @@ private:
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
   const uint32_t choice_count_;
+
+  // List of hosts per HostsSource for fair random sampling.
+  std::unordered_map<HostsSource, HostVector, HostsSourceHash> unweighted_hosts_;
 };
 
 /**
