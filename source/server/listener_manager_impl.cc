@@ -413,8 +413,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     new_listener =
         (*existing_active_listener)->newListenerWithFilterChain(config, workers_started_, hash);
   } else {
-        ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}",
-              name, hash);
+    ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, hash);
     new_listener =
         std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
                                        workers_started_, hash, server_.options().concurrency());

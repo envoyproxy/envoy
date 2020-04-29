@@ -107,6 +107,45 @@ public:
     // listener.set_name(name);
     return listener_proto;
   }
+
+  void expectAddListener(const envoy::config::listener::v3::Listener& listener_proto,
+                         ListenerHandle*) {
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+    EXPECT_CALL(*worker_, addListener(_, _, _));
+    manager_->addOrUpdateListener(listener_proto, "", true);
+    worker_->callAddCompletion(true);
+    EXPECT_EQ(1UL, manager_->listeners().size());
+    checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+  }
+  void expectUpdateToThenDrain(const envoy::config::listener::v3::Listener& new_listener_proto,
+                               ListenerHandle* old_listener_handle) {
+    EXPECT_CALL(*worker_, addListener(_, _, _));
+    EXPECT_CALL(*worker_, stopListener(_, _));
+    EXPECT_CALL(*old_listener_handle->drain_manager_, startDrainSequence(_));
+
+    EXPECT_TRUE(manager_->addOrUpdateListener(new_listener_proto, "", true));
+
+    EXPECT_CALL(*worker_, removeListener(_, _));
+    old_listener_handle->drain_manager_->drain_sequence_completion_();
+
+    EXPECT_CALL(*old_listener_handle, onDestroy());
+    worker_->callRemovalCompletion();
+  }
+
+  void expectRemove(const envoy::config::listener::v3::Listener& listener_proto,
+                    ListenerHandle* listener_handle) {
+
+    EXPECT_CALL(*worker_, stopListener(_, _));
+    EXPECT_CALL(*listener_factory_.socket_, close());
+    EXPECT_CALL(*listener_handle->drain_manager_, startDrainSequence(_));
+    EXPECT_TRUE(manager_->removeListener(listener_proto.name()));
+
+    EXPECT_CALL(*worker_, removeListener(_, _));
+    listener_handle->drain_manager_->drain_sequence_completion_();
+
+    EXPECT_CALL(*listener_handle, onDestroy());
+    worker_->callRemovalCompletion();
+  }
 };
 
 class MockLdsApi : public LdsApi {
@@ -4332,10 +4371,13 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWo
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());
-  
+
   // Mutate the listener message as filter chain change only.
   auto new_listener_proto = listener_proto;
-  new_listener_proto.mutable_filter_chains(0)->mutable_filter_chain_match()->mutable_destination_port()->set_value(9999);
+  new_listener_proto.mutable_filter_chains(0)
+      ->mutable_filter_chain_match()
+      ->mutable_destination_port()
+      ->set_value(9999);
 
   EXPECT_CALL(*listener_foo, onDestroy());
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
@@ -4344,35 +4386,31 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWo
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
 }
 
-// TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, 
-// TraditionalUpdateIfAnyListenerIsNotTcp) {
-//   EXPECT_CALL(*worker_, start(_));
-//   manager_->startWorkers(guard_dog_);
+TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfAnyListenerIsNotTcp) {
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
 
-//   auto listener_proto = createDefaultListener();
+  auto listener_proto = createDefaultListener();
 
-//   ListenerHandle* listener_foo = expectListenerCreate(false, true);
-//   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
-//   EXPECT_CALL(*worker_, addListener(_, _, _));
-//   manager_->addOrUpdateListener(listener_proto, "", true);
-//   worker_->callAddCompletion(true);
-//   EXPECT_EQ(1UL, manager_->listeners().size());
-//   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
 
+  expectAddListener(listener_proto, listener_foo);
 
-//   auto new_listener_proto = listener_proto;
-//   new_listener_proto.mutable_address()->mutable_socket_address()->set_protocol(
-//       envoy::config::core::v3::SocketAddress_Protocol::SocketAddress_Protocol_UDP);
-//         ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
+  auto new_listener_proto = listener_proto;
+  new_listener_proto.mutable_address()->mutable_socket_address()->set_protocol(
+      envoy::config::core::v3::SocketAddress_Protocol::SocketAddress_Protocol_UDP);
 
-// manager_->addOrUpdateListener(new_listener_proto, "", true);
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
+  expectUpdateToThenDrain(new_listener_proto, listener_foo);
 
-//   EXPECT_CALL(*listener_foo, onDestroy());
-//   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
-// }
+  expectRemove(new_listener_proto, listener_foo_update1);
+
+  EXPECT_EQ(0UL, manager_->listeners().size());
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+}
 
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
-       TraditionalUpdateIfImplicitListenerFilterChanges) {
+       TraditionalUpdateIfImplicitTlsInspectorChanges) {
 
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);
@@ -4380,50 +4418,66 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
   auto listener_proto = createDefaultListener();
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
-  EXPECT_CALL(*worker_, addListener(_, _, _));
-  manager_->addOrUpdateListener(listener_proto, "", true);
-  worker_->callAddCompletion(true);
-  EXPECT_EQ(1UL, manager_->listeners().size());
-  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
-  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+  expectAddListener(listener_proto, listener_foo);
 
-  ListenerHandle* listener_foo_update1 =
-      expectListenerCreate(false, true);
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
 
   auto new_listener_proto = listener_proto;
-  new_listener_proto.mutable_address()->mutable_socket_address()->set_protocol(
-      envoy::config::core::v3::SocketAddress_Protocol::SocketAddress_Protocol_UDP);
+  *new_listener_proto.mutable_filter_chains(0)
+       ->mutable_filter_chain_match()
+       ->mutable_application_protocols()
+       ->Add() = "alpn";
+  expectUpdateToThenDrain(new_listener_proto, listener_foo);
 
-  EXPECT_CALL(*worker_, addListener(_, _, _));
-  EXPECT_CALL(*worker_, stopListener(_, _));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  expectRemove(new_listener_proto, listener_foo_update1);
 
-  EXPECT_TRUE(manager_->addOrUpdateListener(new_listener_proto, "", true));
-
-  EXPECT_CALL(*worker_, removeListener(_, _));
-  listener_foo->drain_manager_->drain_sequence_completion_();
-
-  EXPECT_CALL(*listener_foo, onDestroy());
-  worker_->callRemovalCompletion();
-
-  EXPECT_CALL(*worker_, stopListener(_, _));
-  EXPECT_CALL(*listener_factory_.socket_, close());
-  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
-  EXPECT_TRUE(manager_->removeListener("foo"));
-
-  EXPECT_CALL(*worker_, removeListener(_, _));
-  listener_foo_update1->drain_manager_->drain_sequence_completion_();
-
-  EXPECT_CALL(*listener_foo_update1, onDestroy());
-  worker_->callRemovalCompletion();
   EXPECT_EQ(0UL, manager_->listeners().size());
-    EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
-
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
 }
 
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
-       TraditionalUpdateIfListenerConfigHasUpdateOtherThanFilterChain) {}
+       TraditionalUpdateIfImplicitProxyProtocolChanges) {
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  auto listener_proto = createDefaultListener();
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  expectAddListener(listener_proto, listener_foo);
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
+
+  auto new_listener_proto = listener_proto;
+  new_listener_proto.mutable_filter_chains(0)->mutable_use_proxy_proto()->set_value(true);
+
+  expectUpdateToThenDrain(new_listener_proto, listener_foo);
+  expectRemove(new_listener_proto, listener_foo_update1);
+  EXPECT_EQ(0UL, manager_->listeners().size());
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+}
+
+TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
+       TraditionalUpdateIfListenerConfigHasUpdateOtherThanFilterChain) {
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  auto listener_proto = createDefaultListener();
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  expectAddListener(listener_proto, listener_foo);
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
+
+  auto new_listener_proto = listener_proto;
+  new_listener_proto.set_traffic_direction(::envoy::config::core::v3::TrafficDirection::INBOUND);
+  expectUpdateToThenDrain(new_listener_proto, listener_foo);
+
+  expectRemove(new_listener_proto, listener_foo_update1);
+
+  EXPECT_EQ(0UL, manager_->listeners().size());
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+}
 
 // This test execute an in place update first, then a traditional listener update.
 // The second update is enforced by runtime.

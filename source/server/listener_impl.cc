@@ -304,10 +304,10 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
       filter_chain_manager_(address_, origin.listener_factory_context_->parentFactoryContext(),
                             initManager(), origin.filter_chain_manager_),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this] { 
-                            ASSERT(workers_started_);
-                            parent_.inPlaceFilterChainUpdate(*this); }) {
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
+        ASSERT(workers_started_);
+        parent_.inPlaceFilterChainUpdate(*this);
+      }) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
