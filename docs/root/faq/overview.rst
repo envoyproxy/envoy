@@ -12,8 +12,8 @@ Build
   build/binaries
   build/boringssl
 
-API versioning
---------------
+API
+---
 .. toctree::
   :maxdepth: 2
 
@@ -23,6 +23,7 @@ API versioning
   api/control_plane
   api/package_naming
   api/why_versioning
+  api/incremental
 
 Performance
 -----------
