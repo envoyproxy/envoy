@@ -1,4 +1,3 @@
-
 #include "extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
