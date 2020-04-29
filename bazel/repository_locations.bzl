@@ -17,6 +17,8 @@ USE_CATEGORIES = [
     "dataplane",
     # This dependency is used to process xDS requests.
     "controlplane",
+    # This dependecy is used for logging, metrics or tracing. It may process unstrusted input.
+    "observability",
     # This dependency does not handle untrusted data and is used for various utility purposes.
     "other",
 ]
@@ -113,7 +115,7 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "libcircllhist-63a16dd6f2fc7bc841bb17ff92be8318df60e2e1",
         # 2019-02-11
         urls = ["https://github.com/circonus-labs/libcircllhist/archive/63a16dd6f2fc7bc841bb17ff92be8318df60e2e1.tar.gz"],
-        use_category = ["dataplane"],
+        use_category = ["observability"],
     ),
     com_github_cyan4973_xxhash = _dependency_location(
         sha256 = "952ebbf5b11fbf59ae5d760a562d1e9112278f244340ad7714e8556cbe54f7f7",
@@ -138,13 +140,13 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "f1907a58d5e86e6c382e51441d92ad9e23aea63827ba47fd647eacc0d3a16c78",
         strip_prefix = "fmt-6.0.0",
         urls = ["https://github.com/fmtlib/fmt/archive/6.0.0.tar.gz"],
-        use_category = ["dataplane", "controlplane"],
+        use_category = ["observability"],
     ),
     com_github_gabime_spdlog = _dependency_location(
         sha256 = "afd18f62d1bc466c60bef088e6b637b0284be88c515cedc59ad4554150af6043",
         strip_prefix = "spdlog-1.4.0",
         urls = ["https://github.com/gabime/spdlog/archive/v1.4.0.tar.gz"],
-        use_category = ["dataplane", "controlplane"],
+        use_category = ["observability"],
     ),
     com_github_google_libprotobuf_mutator = _dependency_location(
         sha256 = "",
@@ -192,20 +194,20 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
         strip_prefix = "opentracing-cpp-1.5.1",
         urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.5.1.tar.gz"],
-        use_category = ["dataplane"],
+        use_category = ["observability"],
     ),
     com_lightstep_tracer_cpp = _dependency_location(
         sha256 = "0e99716598c010e56bc427ea3482be5ad2c534be8b039d172564deec1264a213",
         strip_prefix = "lightstep-tracer-cpp-3efe2372ee3d7c2138d6b26e542d757494a7938d",
         # 2020-03-24
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/3efe2372ee3d7c2138d6b26e542d757494a7938d.tar.gz"],
-        use_category = ["dataplane"],
+        use_category = ["observability"],
     ),
     com_github_datadog_dd_opentracing_cpp = _dependency_location(
         sha256 = "6dc1088ab7f788b6c849fbaa6300517c8fdf88991a70b778be79c284c36857bf",
         strip_prefix = "dd-opentracing-cpp-1.1.3",
         urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.1.3.tar.gz"],
-        use_category = ["dataplane"],
+        use_category = ["observability"],
     ),
     com_github_google_benchmark = _dependency_location(
         sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
@@ -246,7 +248,7 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "433cbcd741e1813db9ae4b2e192b83ac7b1d2dd7968a3e11470eacc6f4ab58d2",
         strip_prefix = "msgpack-3.2.1",
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.1/msgpack-3.2.1.tar.gz"],
-        use_category = ["dataplane"],
+        use_category = ["observability"],
     ),
     com_github_google_jwt_verify = _dependency_location(
         sha256 = "d422a6eadd4bcdd0f9b122cd843a4015f8b18aebea6e1deb004bd4d401a8ef92",
@@ -344,7 +346,7 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "opencensus-cpp-04ed0211931f12b03c1a76b3907248ca4db7bc90",
         # 2020-03-24
         urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/04ed0211931f12b03c1a76b3907248ca4db7bc90.tar.gz"],
-        use_category = ["dataplane"],
+        use_category = ["observability"],
     ),
     com_github_curl = _dependency_location(
         sha256 = "01ae0c123dee45b01bbaef94c0bc00ed2aec89cb2ee0fd598e0d302a6b5e0a98",
