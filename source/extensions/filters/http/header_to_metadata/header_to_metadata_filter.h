@@ -129,7 +129,6 @@ private:
                    ValueEncode) const;
   const std::string& decideNamespace(const std::string& nspace) const;
   const Config* getConfig() const;
-  const Config* getRouteConfig() const;
 };
 
 } // namespace HeaderToMetadataFilter

@@ -4,6 +4,7 @@
 
 #include "common/common/base64.h"
 #include "common/config/well_known_names.h"
+#include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -206,18 +207,6 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
   }
 }
 
-const Config* HeaderToMetadataFilter::getRouteConfig() const {
-  if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
-    return nullptr;
-  }
-
-  const auto* entry = decoder_callbacks_->route()->routeEntry();
-  const auto* per_filter_config =
-      entry->virtualHost().perFilterConfig(HttpFilterNames::get().HeaderToMetadata);
-
-  return dynamic_cast<const Config*>(per_filter_config);
-}
-
 // TODO(rgs1): this belongs in one of the filter interfaces, see issue #10164.
 const Config* HeaderToMetadataFilter::getConfig() const {
   // Cached config pointer.
@@ -225,7 +214,8 @@ const Config* HeaderToMetadataFilter::getConfig() const {
     return effective_config_;
   }
 
-  effective_config_ = getRouteConfig();
+  effective_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<Config>(
+      HttpFilterNames::get().HeaderToMetadata, decoder_callbacks_->route());
   if (effective_config_) {
     return effective_config_;
   }
