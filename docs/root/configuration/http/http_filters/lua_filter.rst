@@ -35,7 +35,7 @@ The design of the filter and Lua support at a high level is as follows:
 * All scripts are run as coroutines. This means that they are written in a synchronous style even
   though they may perform complex asynchronous tasks. This makes the scripts substantially easier
   to write. All network/async processing is performed by Envoy via a set of APIs. Envoy will
-  yield the script as appropriate and resume it when async tasks are complete.
+  suspend execution of the script as appropriate and resume it when async tasks are complete.
 * **Do not perform blocking operations from scripts.** It is critical for performance that
   Envoy APIs are used for all IO.
 
@@ -151,8 +151,9 @@ script defines:
   end
 
 A script can define either or both of these functions. During the request path, Envoy will
-run *envoy_on_request* as a coroutine, passing an API handle. During the response path, Envoy will
-run *envoy_on_response* as a coroutine, passing an API handle.
+run *envoy_on_request* as a coroutine, passing a handle to the request API. During the
+response path, Envoy will run *envoy_on_response* as a coroutine, passing handle to the
+response API.
 
 .. attention::
 
@@ -183,9 +184,10 @@ body()
 
   local body = handle:body()
 
-Returns the stream's body. This call will cause Envoy to yield the script until the entire body
-has been buffered. Note that all buffering must adhere to the flow control policies in place.
-Envoy will not buffer more data than is allowed by the connection manager.
+Returns the stream's body. This call will cause Envoy to suspend execution of the script until
+the entire body has been received in a buffer. Note that all buffering must adhere to the
+flow-control policies in place. Envoy will not buffer more data than is allowed by the connection
+manager.
 
 Returns a :ref:`buffer object <config_http_filters_lua_buffer_wrapper>`.
 
@@ -197,8 +199,8 @@ bodyChunks()
   local iterator = handle:bodyChunks()
 
 Returns an iterator that can be used to iterate through all received body chunks as they arrive.
-Envoy will yield the script in between chunks, but *will not buffer* them. This can be used by
-a script to inspect data as it is streaming by.
+Envoy will suspend executing the script in between chunks, but *will not buffer* them. This can be
+used by a script to inspect data as it is streaming by.
 
 .. code-block:: lua
 
@@ -247,7 +249,7 @@ the *:method*, *:path*, and *:authority* headers must be set. *body* is an optio
 data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
 
 *asynchronous* is a boolean flag. If asynchronous is set to true, Envoy will make the HTTP request and continue,
-regardless of response success or failure. If this is set to false, or not set, Envoy will yield the script
+regardless of response success or failure. If this is set to false, or not set, Envoy will suspend executing the script
 until the call completes or has an error.
 
 Returns *headers* which is a table of response headers. Returns *body* which is the string response
