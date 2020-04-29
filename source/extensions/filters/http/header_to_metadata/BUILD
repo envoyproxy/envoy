@@ -20,6 +20,7 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//source/common/common:base64_lib",
         "//source/extensions/filters/http:well_known_names",
+        "//source/common/http:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3:pkg_cc_proto",
     ],
 )
