@@ -51,9 +51,9 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
-      read_enabled_(true), above_high_watermark_(false), detect_early_close_(true),
-      enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
-      write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
+      above_high_watermark_(false), detect_early_close_(true), enable_half_close_(false),
+      read_end_stream_raised_(false), read_end_stream_(false), write_end_stream_(false),
+      current_write_end_stream_(false), dispatch_buffered_data_(false) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
   RELEASE_ASSERT(SOCKET_VALID(ioHandle().fd()), "");
@@ -268,7 +268,7 @@ void ConnectionImpl::noDelay(bool enable) {
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
-  if (!read_enabled_ || inDelayedClose()) {
+  if (read_disable_count_ != 0 || inDelayedClose()) {
     return;
   }
   ASSERT(ioHandle().isOpen());
@@ -301,7 +301,7 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
   // This code doesn't correctly ensure that EV_CLOSE isn't set if reading is disabled
   // when enabling half-close. This could be fixed, but isn't needed right now, so just
   // ASSERT that it doesn't happen.
-  ASSERT(!enabled || read_enabled_);
+  ASSERT(!enabled || read_disable_count_ == 0);
 
   enable_half_close_ = enabled;
 }
@@ -311,8 +311,8 @@ void ConnectionImpl::readDisable(bool disable) {
   ASSERT(state() == State::Open);
   ASSERT(file_event_ != nullptr);
 
-  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={} state={}", *this, read_enabled_,
-                 disable, static_cast<int>(state()));
+  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable_count={} state={}", *this,
+                 read_disable_count_, disable, static_cast<int>(state()));
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
@@ -322,15 +322,14 @@ void ConnectionImpl::readDisable(bool disable) {
   // closed TCP connections in the sense that we assume that a remote FIN means the remote intends a
   // full close.
   if (disable) {
-    if (!read_enabled_) {
-      ++read_disable_count_;
-      return;
-    }
-    ASSERT(read_enabled_);
-    read_enabled_ = false;
+    ++read_disable_count_;
 
     if (state() != State::Open || file_event_ == nullptr) {
       // If readDisable is called on a closed connection, do not crash.
+      return;
+    }
+    if (read_disable_count_ > 1) {
+      // The socket has already been read disabled.
       return;
     }
 
@@ -342,13 +341,11 @@ void ConnectionImpl::readDisable(bool disable) {
       file_event_->setEnabled(Event::FileReadyType::Write);
     }
   } else {
-    if (read_disable_count_ > 0) {
-      --read_disable_count_;
+    --read_disable_count_;
+    if (read_disable_count_ != 0) {
+      // The socket should stay disabled.
       return;
     }
-    ASSERT(!read_enabled_);
-    read_enabled_ = true;
-
     if (state() != State::Open || file_event_ == nullptr) {
       // If readDisable is called on a closed connection, do not crash.
       return;
@@ -383,7 +380,7 @@ bool ConnectionImpl::readEnabled() const {
   // Calls to readEnabled on a closed socket are considered to be an error.
   ASSERT(state() == State::Open);
   ASSERT(file_event_ != nullptr);
-  return read_enabled_;
+  return read_disable_count_ == 0;
 }
 
 void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
