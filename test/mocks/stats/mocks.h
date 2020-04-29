@@ -137,7 +137,7 @@ public:
 
 private:
   TagVector tags_;
-  std::vector<StatName> tag_names_and_values_;
+  StatNameVec tag_names_and_values_;
   std::string tag_extracted_name_;
   StatNamePool tag_pool_;
   std::unique_ptr<StatNameManagedStorage> tag_extracted_stat_name_;
@@ -279,11 +279,12 @@ public:
   MOCK_METHOD(const std::vector<CounterSnapshot>&, counters, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const Gauge>>&, gauges, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, ());
-  MOCK_METHOD(const std::vector<TextReadout>&, textReadouts, ());
+  MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, ());
 
   std::vector<CounterSnapshot> counters_;
   std::vector<std::reference_wrapper<const Gauge>> gauges_;
   std::vector<std::reference_wrapper<const ParentHistogram>> histograms_;
+  std::vector<std::reference_wrapper<const TextReadout>> text_readouts_;
 };
 
 class MockSink : public Sink {
