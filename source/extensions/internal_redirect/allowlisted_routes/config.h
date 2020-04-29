@@ -7,8 +7,8 @@
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/internal_redirect/well_known_names.h"
 #include "extensions/internal_redirect/allowlisted_routes/allowlisted_routes.h"
+#include "extensions/internal_redirect/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -22,17 +22,13 @@ public:
 
     auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
     handle.mutable_routes(0)->set_name("redirect");
-    handle.mutable_routes(0)
-        ->mutable_route()
-        ->mutable_internal_redirect_policy();
+    handle.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
     config_helper_.addVirtualHost(handle);
 
     auto handle_max_3_hop =
         config_helper_.createVirtualHost("handle.internal.redirect.max.three.hop");
     handle_max_3_hop.mutable_routes(0)->set_name("max_three_hop");
-    handle_max_3_hop.mutable_routes(0)
-        ->mutable_route()
-        ->mutable_internal_redirect_policy();
+    handle_max_3_hop.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
     handle_max_3_hop.mutable_routes(0)
         ->mutable_route()
         ->mutable_internal_redirect_policy()
