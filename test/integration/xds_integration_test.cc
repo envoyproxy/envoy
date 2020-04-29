@@ -491,16 +491,23 @@ TEST_P(LdsHttpIntegrationTest, test1) {
   initialize();
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("http"));
-  auto ssl_conn = dispatcher_->createClientConnection(
+  auto ssl_conn_1 = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
           absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"alpn1"})),
       nullptr);
-  auto codec_client = makeHttpConnection(std::move(ssl_conn));
+  auto codec_client_1 = makeHttpConnection(std::move(ssl_conn_1));
+
+  auto ssl_conn_0 = dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"alpn0"})),
+      nullptr);
+  auto codec_client_0 = makeHttpConnection(std::move(ssl_conn_0));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/client1"}, {":authority", "default.com"}};
-  IntegrationStreamDecoderPtr response = codec_client->makeHeaderOnlyRequest(request_headers);
+  IntegrationStreamDecoderPtr response = codec_client_1->makeHeaderOnlyRequest(request_headers);
 
   waitForNextUpstreamRequest(1);
 
@@ -525,7 +532,24 @@ TEST_P(LdsHttpIntegrationTest, test1) {
   EXPECT_EQ("close", response->headers().Connection()->value().getStringView());
   ENVOY_LOG(debug, "my current thread");
 
-  codec_client->close();
+  codec_client_1->close();
+
+  IntegrationStreamDecoderPtr response_0 = codec_client_0->makeHeaderOnlyRequest(request_headers);
+  FakeHttpConnectionPtr conn_0;
+  FakeStreamPtr upstream_request_0;
+
+  auto _ = fake_upstreams_[0]->waitForHttpConnection(
+      *dispatcher_, conn_0, TestUtility::DefaultTimeout, max_request_headers_kb_,
+      max_request_headers_count_);
+  _ = conn_0->waitForNewStream(*dispatcher_, upstream_request_0);
+
+  _ = upstream_request_0->waitForEndStream(*dispatcher_);
+  upstream_request_0->encodeHeaders(default_response_headers_, true);
+  response_0->waitForEndStream();
+  EXPECT_TRUE(response_0->complete());
+  EXPECT_EQ("200", response_0->headers().Status()->value().getStringView());
+  EXPECT_EQ(nullptr, response_0->headers().Connection());
+  codec_client_0->close();
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, LdsHttpIntegrationTest,
