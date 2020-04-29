@@ -855,16 +855,15 @@ bool ContextImpl::parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl
   if (alpn.empty()) {
     return false;
   }
-    std::vector<uint8_t> parsed_override_alpn =
-        parseAlpnProtocols(absl::StrJoin(alpn, ","));
-    if (!parsed_override_alpn.empty()) {
-      const int rc = SSL_set_alpn_protos(&ssl, parsed_override_alpn.data(),
-                                         parsed_override_alpn.size());
-      RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
-      return true;
-    }
+  std::vector<uint8_t> parsed_override_alpn = parseAlpnProtocols(absl::StrJoin(alpn, ","));
+  if (!parsed_override_alpn.empty()) {
+    const int rc =
+        SSL_set_alpn_protos(&ssl, parsed_override_alpn.data(), parsed_override_alpn.size());
+    RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
+    return true;
+  }
 
-    return false;
+  return false;
 }
 
 bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOptions* options) {
