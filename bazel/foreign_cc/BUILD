@@ -117,8 +117,8 @@ envoy_cmake_external(
         "NGHTTP2_INCLUDE_DIR": "$EXT_BUILD_DEPS/nghttp2/include",
         # ZLIB.
         "CURL_ZLIB": "on",
-        "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib",
-        "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
+        "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/lib",
+        "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/include",
         "CMAKE_CXX_COMPILER_FORCED": "on",
         "CMAKE_C_FLAGS_BAZEL": "-fPIC",
     },
@@ -132,7 +132,7 @@ envoy_cmake_external(
     deps = [
         ":ares",
         ":nghttp2",
-        ":zlib",
+        "//external:zlib",
         "//external:ssl",
     ],
 )
@@ -207,15 +207,3 @@ envoy_cmake_external(
     }),
 )
 
-envoy_cmake_external(
-    name = "zlib",
-    cache_entries = {
-        "BUILD_SHARED_LIBS": "off",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-    },
-    lib_source = "@net_zlib//:all",
-    static_libraries = select({
-        "//bazel:windows_x86_64": ["zlibstatic.lib"],
-        "//conditions:default": ["libz.a"],
-    }),
-)

@@ -323,23 +323,20 @@ def _com_github_libevent_libevent():
     )
 
 def _net_zlib():
-    location = REPOSITORY_LOCATIONS["net_zlib"]
-
-    http_archive(
-        name = "net_zlib",
-        build_file_content = BUILD_ALL_CONTENT,
-        **location
+    _repository_impl(
+        "net_zlib",
+        build_file = "@com_google_protobuf//third_party:zlib.BUILD",
     )
 
     native.bind(
         name = "zlib",
-        actual = "@envoy//bazel/foreign_cc:zlib",
+        actual = "@net_zlib//:zlib",
     )
 
     # Bind for grpc.
     native.bind(
         name = "madler_zlib",
-        actual = "@envoy//bazel/foreign_cc:zlib",
+        actual = "@net_zlib//:zlib",
     )
 
 def _com_google_cel_cpp():
