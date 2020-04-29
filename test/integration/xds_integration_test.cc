@@ -486,7 +486,7 @@ public:
 };
 
 TEST_P(LdsHttpIntegrationTest, test1) {
-  // autonomous_upstream_ = true;
+  autonomous_upstream_ = true;
   setUpstreamCount(2);
   initialize();
   Network::Address::InstanceConstSharedPtr address =
@@ -505,11 +505,7 @@ TEST_P(LdsHttpIntegrationTest, test1) {
       nullptr);
   auto codec_client_0 = makeHttpConnection(std::move(ssl_conn_0));
 
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/client1"}, {":authority", "default.com"}};
-  IntegrationStreamDecoderPtr response = codec_client_1->makeHeaderOnlyRequest(request_headers);
-
-  waitForNextUpstreamRequest(1);
+ 
 
   ConfigHelper new_config_helper(version_, *api_,
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
@@ -522,8 +518,9 @@ TEST_P(LdsHttpIntegrationTest, test1) {
   new_config_helper.setLds("1");
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
 
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  EXPECT_TRUE(upstream_request_->complete());
+ Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/client1"}, {":authority", "default.com"}};
+  IntegrationStreamDecoderPtr response = codec_client_1->makeHeaderOnlyRequest(request_headers);
 
   response->waitForEndStream();
 
@@ -534,20 +531,13 @@ TEST_P(LdsHttpIntegrationTest, test1) {
 
   codec_client_1->close();
 
-  IntegrationStreamDecoderPtr response_0 = codec_client_0->makeHeaderOnlyRequest(request_headers);
-  FakeHttpConnectionPtr conn_0;
-  FakeStreamPtr upstream_request_0;
+   IntegrationStreamDecoderPtr response_0 = codec_client_0->makeHeaderOnlyRequest(request_headers);
 
-  auto _ = fake_upstreams_[0]->waitForHttpConnection(
-      *dispatcher_, conn_0, TestUtility::DefaultTimeout, max_request_headers_kb_,
-      max_request_headers_count_);
-  _ = conn_0->waitForNewStream(*dispatcher_, upstream_request_0);
-
-  _ = upstream_request_0->waitForEndStream(*dispatcher_);
-  upstream_request_0->encodeHeaders(default_response_headers_, true);
   response_0->waitForEndStream();
+
   EXPECT_TRUE(response_0->complete());
   EXPECT_EQ("200", response_0->headers().Status()->value().getStringView());
+
   EXPECT_EQ(nullptr, response_0->headers().Connection());
   codec_client_0->close();
 }
