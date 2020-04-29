@@ -457,6 +457,10 @@ void ConnectionImpl::completeLastHeader() {
   auto& headers_or_trailers = headersOrTrailers();
   if (!current_header_field_.empty()) {
     current_header_field_.inlineTransform([](char c) { return absl::ascii_tolower(c); });
+    // Strip trailing whitespace of the current header value if any. Leading whitespace was trimmed
+    // in ConnectionImpl::onHeaderValue. http_parser does not strip leading or trailing whitespace
+    // as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4
+    current_header_value_.rtrim();
     headers_or_trailers.addViaMove(std::move(current_header_field_),
                                    std::move(current_header_value_));
   }
@@ -562,9 +566,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     maybeAllocTrailers();
   }
 
-  // Work around a bug in http_parser where trailing whitespace is not trimmed
-  // as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4
-  const absl::string_view header_value = StringUtil::trim(absl::string_view(data, length));
+  absl::string_view header_value{data, length};
 
   if (strict_header_validation_) {
     if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
@@ -576,6 +578,13 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   }
 
   header_parsing_state_ = HeaderParsingState::Value;
+  if (current_header_value_.empty()) {
+    // Strip leading whitespace if the current header value input contains the first bytes of the
+    // encoded header value. Trailing whitespace is stripped once the full header value is known in
+    // ConnectionImpl::completeLastHeader. http_parser does not strip leading or trailing whitespace
+    // as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4 .
+    header_value = StringUtil::ltrim(header_value);
+  }
   current_header_value_.append(header_value.data(), header_value.length());
 
   const uint32_t total =

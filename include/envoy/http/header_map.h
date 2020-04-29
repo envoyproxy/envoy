@@ -149,6 +149,12 @@ public:
   }
 
   /**
+   * Trim trailing whitespaces from the HeaderString. Only supported by the "Inline" HeaderString
+   * representation.
+   */
+  void rtrim();
+
+  /**
    * Get an absl::string_view. It will NOT be NUL terminated!
    *
    * @return an absl::string_view.
