@@ -34,8 +34,6 @@ struct FilterStats {
  */
 class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 public:
-  ~FilterConfig() override = default;
-
   /**
    * @return the config's signer.
    */
