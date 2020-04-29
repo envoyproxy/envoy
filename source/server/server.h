@@ -286,6 +286,7 @@ private:
   void notifyCallbacksForStage(
       Stage stage, Event::PostCb completion_cb = [] {});
   void onRuntimeReady();
+  void onClusterManagerPrimaryInitializationComplete();
 
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;

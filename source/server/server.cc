@@ -459,8 +459,8 @@ void InstanceImpl::initialize(const Options& options,
   // instantiated (which in turn relies on runtime...).
   Runtime::LoaderSingleton::get().initialize(clusterManager());
 
-  // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
-  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
+  clusterManager().setPrimaryClustersInitializedCb(
+      [this]() { onClusterManagerPrimaryInitializationComplete(); });
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
     stats_store_.addSink(*sink);
@@ -474,6 +474,11 @@ void InstanceImpl::initialize(const Options& options,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
+}
+
+void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
+  // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
+  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
 }
 
 void InstanceImpl::onRuntimeReady() {
