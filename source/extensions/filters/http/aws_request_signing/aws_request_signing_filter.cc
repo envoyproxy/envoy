@@ -27,21 +27,24 @@ FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const auto& host_rewrite = config_->hostRewrite();
+  const auto* config = getConfig();
+  const auto& host_rewrite = config->hostRewrite();
   if (!host_rewrite.empty()) {
     headers.setHost(host_rewrite);
   }
 
   try {
-    config_->signer().sign(headers);
-    config_->stats().signing_added_.inc();
+    config->signer().sign(headers);
+    config->stats().signing_added_.inc();
   } catch (const EnvoyException& e) {
     ENVOY_LOG(debug, "signing failed: {}", e.what());
-    config_->stats().signing_failed_.inc();
+    config->stats().signing_failed_.inc();
   }
 
   return Http::FilterHeadersStatus::Continue;
 }
+
+
 
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters
