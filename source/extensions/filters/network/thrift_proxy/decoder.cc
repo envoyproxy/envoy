@@ -111,7 +111,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::listBegin(Buffer::Instan
 // ListValue -> ListEnd
 DecoderStateMachine::DecoderStatus DecoderStateMachine::listValue(Buffer::Instance& buffer) {
   ASSERT(!stack_.empty());
-  uint32_t index = stack_.size() - 1;
+  const uint32_t index = stack_.size() - 1;
   if (stack_[index].remaining_ == 0) {
     return {popReturnState(), FilterStatus::Continue};
   }
@@ -162,7 +162,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::mapKey(Buffer::Instance&
 // MapValue -> MapKey
 DecoderStateMachine::DecoderStatus DecoderStateMachine::mapValue(Buffer::Instance& buffer) {
   ASSERT(!stack_.empty());
-  uint32_t index = stack_.size() - 1;
+  const uint32_t index = stack_.size() - 1;
   ASSERT(stack_[index].remaining_ != 0);
   DecoderStatus status = handleValue(buffer, stack_[index].value_type_, ProtocolState::MapKey);
   if (status.next_state_ != ProtocolState::WaitForData) {
@@ -199,7 +199,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::setBegin(Buffer::Instanc
 // SetValue -> SetEnd
 DecoderStateMachine::DecoderStatus DecoderStateMachine::setValue(Buffer::Instance& buffer) {
   ASSERT(!stack_.empty());
-  uint32_t index = stack_.size() - 1;
+  const uint32_t index = stack_.size() - 1;
   if (stack_[index].remaining_ == 0) {
     return {popReturnState(), FilterStatus::Continue};
   }
