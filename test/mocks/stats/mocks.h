@@ -110,12 +110,25 @@ public:
 
   void setTags(const TagVector& tags) {
     tag_pool_.clear();
+    tag_names_and_values_.clear();
     tags_ = tags;
     for (const Tag& tag : tags) {
       tag_names_and_values_.push_back(tag_pool_.add(tag.name_));
       tag_names_and_values_.push_back(tag_pool_.add(tag.value_));
     }
   }
+
+  void setTags(const Stats::StatNameTagVector& tags) {
+    tag_pool_.clear();
+    tag_names_and_values_.clear();
+    tags_.clear();
+    for (const StatNameTag& tag : tags) {
+      tag_names_and_values_.push_back(tag.first);
+      tag_names_and_values_.push_back(tag.second);
+      tags_.push_back(Tag{symbol_table_->toString(tag.first), symbol_table_->toString(tag.second)});
+    }
+  }
+
   void addTag(const Tag& tag) {
     tags_.emplace_back(tag);
     tag_names_and_values_.push_back(tag_pool_.add(tag.name_));
@@ -124,7 +137,7 @@ public:
 
 private:
   TagVector tags_;
-  std::vector<StatName> tag_names_and_values_;
+  StatNameVec tag_names_and_values_;
   std::string tag_extracted_name_;
   StatNamePool tag_pool_;
   std::unique_ptr<StatNameManagedStorage> tag_extracted_stat_name_;

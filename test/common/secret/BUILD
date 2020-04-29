@@ -14,6 +14,7 @@ envoy_cc_test(
     data = [
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/secret:sds_api_lib",
         "//source/common/secret:secret_manager_impl_lib",
