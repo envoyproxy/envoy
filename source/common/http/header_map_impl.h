@@ -46,6 +46,8 @@ public:                                                                         
 
 #define DEFINE_INLINE_HEADER_STRUCT(name) HeaderEntryImpl* name##_;
 
+class HeaderListView;
+
 /**
  * Implementation of Http::HeaderMap. This is heavily optimized for performance. Roughly, when
  * headers are added to the map, we do a hash lookup to see if it's one of the O(1) headers.
@@ -207,19 +209,6 @@ protected:
     std::list<HeaderEntryImpl>::iterator pseudo_headers_end_;
   };
 
-public:
-  class HeaderListViewImpl : public HeaderListView {
-  public:
-    static std::unique_ptr<HeaderListView> create(const HeaderMapImpl&);
-    std::vector<std::reference_wrapper<const HeaderString>> keys() const;
-    std::vector<std::reference_wrapper<const HeaderString>> values() const;
-    explicit HeaderListViewImpl(const HeaderList* headers) : headers_(headers) {}
-
-  private:
-    const HeaderList* headers_;
-  };
-
-protected:
   void insertByKey(HeaderString&& key, HeaderString&& value);
   static uint64_t appendToHeader(HeaderString& header, absl::string_view data,
                                  absl::string_view delimiter = ",");
@@ -244,7 +233,7 @@ protected:
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
 
-  friend HeaderListViewImpl;
+  friend HeaderListView;
 };
 
 /**
@@ -337,6 +326,16 @@ protected:
   AllInlineHeaders inline_headers_;
 
   friend class HeaderMapImpl;
+};
+
+class HeaderListView {
+public:
+  HeaderListView(const HeaderMapImpl& header_map) : headers_(&(header_map.headers_)) {}
+  std::vector<std::reference_wrapper<const HeaderString>> keys() const;
+  std::vector<std::reference_wrapper<const HeaderString>> values() const;
+
+private:
+  const HeaderMapImpl::HeaderList* headers_;
 };
 
 template <class T>

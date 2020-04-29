@@ -183,13 +183,7 @@ void HeaderMapImpl::HeaderEntryImpl::value(const HeaderEntry& header) {
   value(header.value().getStringView());
 }
 
-std::unique_ptr<HeaderListView>
-HeaderMapImpl::HeaderListViewImpl::create(const HeaderMapImpl& header_map) {
-  return std::make_unique<HeaderMapImpl::HeaderListViewImpl>(&(header_map.headers_));
-}
-
-std::vector<std::reference_wrapper<const HeaderString>>
-HeaderMapImpl::HeaderListViewImpl::keys() const {
+std::vector<std::reference_wrapper<const HeaderString>> HeaderListView::keys() const {
   std::vector<std::reference_wrapper<const HeaderString>> header_keys;
   for (const auto& header : *headers_) {
     header_keys.emplace_back(header.key());
@@ -197,8 +191,7 @@ HeaderMapImpl::HeaderListViewImpl::keys() const {
   return header_keys;
 }
 
-std::vector<std::reference_wrapper<const HeaderString>>
-HeaderMapImpl::HeaderListViewImpl::values() const {
+std::vector<std::reference_wrapper<const HeaderString>> HeaderListView::values() const {
   std::vector<std::reference_wrapper<const HeaderString>> header_values;
   for (const auto& header : *headers_) {
     header_values.emplace_back(header.value());
