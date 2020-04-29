@@ -35,5 +35,5 @@ level. Currently the only filters that support graceful draining are
 :ref:`Mongo <config_network_filters_mongo_proxy>`.
 
 Listeners can also be stopped via :ref:`drain_listeners <operations_admin_interface_drain>`. In this case,
-they are directly stopped (with out going through the actual draining process) on worker threads,
+they are directly stopped (without going through the actual draining process) on worker threads,
 so that they will not accept any new requests.
