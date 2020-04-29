@@ -505,7 +505,6 @@ TEST_P(LdsHttpIntegrationTest, test1) {
       nullptr);
   auto codec_client_0 = makeHttpConnection(std::move(ssl_conn_0));
 
- 
 
   ConfigHelper new_config_helper(version_, *api_,
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
@@ -538,6 +537,64 @@ TEST_P(LdsHttpIntegrationTest, test1) {
   EXPECT_TRUE(response_0->complete());
   EXPECT_EQ("200", response_0->headers().Status()->value().getStringView());
 
+  EXPECT_EQ(nullptr, response_0->headers().Connection());
+  codec_client_0->close();
+}
+
+
+TEST_P(LdsHttpIntegrationTest, ReloadConfigAddingFilterChain) {
+    autonomous_upstream_ = true;
+
+  setUpstreamCount(2);
+  initialize();
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/client1"}, {":authority", "default.com"}};
+ 
+  Network::Address::InstanceConstSharedPtr address =
+      Ssl::getSslAddress(version_, lookupPort("http"));
+
+  auto ssl_conn_0 = dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"alpn0"})),
+      nullptr);
+  auto codec_client_0 = makeHttpConnection(std::move(ssl_conn_0));
+
+  ConfigHelper new_config_helper(version_, *api_,
+                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(1));
+        *listener->mutable_filter_chains(2)
+             ->mutable_filter_chain_match()
+             ->mutable_application_protocols(0) = "alpn2";
+      });
+  new_config_helper.setLds("1");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+   auto ssl_conn_2 = dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"alpn2"})),
+      nullptr);
+  auto codec_client_2 = makeHttpConnection(std::move(ssl_conn_2));
+
+  IntegrationStreamDecoderPtr response_2 = codec_client_2->makeHeaderOnlyRequest(request_headers);
+
+  response_2->waitForEndStream();
+  EXPECT_TRUE(response_2->complete());
+  EXPECT_EQ("200", response_2->headers().Status()->value().getStringView());
+  EXPECT_EQ(nullptr, response_2->headers().Connection());
+  codec_client_2->close();
+
+  IntegrationStreamDecoderPtr response_0 = codec_client_0->makeHeaderOnlyRequest(request_headers);
+
+  response_0->waitForEndStream();
+
+  EXPECT_TRUE(response_0->complete());
+  EXPECT_EQ("200", response_0->headers().Status()->value().getStringView());
   EXPECT_EQ(nullptr, response_0->headers().Connection());
   codec_client_0->close();
 }
