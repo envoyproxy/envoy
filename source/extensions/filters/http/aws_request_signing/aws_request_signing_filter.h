@@ -34,7 +34,7 @@ struct FilterStats {
  */
 class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 public:
-  virtual ~FilterConfig() = default;
+  ~FilterConfig() override = default;
 
   /**
    * @return the config's signer.
