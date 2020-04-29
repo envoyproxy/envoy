@@ -436,7 +436,7 @@ void ConnectionImpl::completeLastHeader() {
   auto& headers_or_trailers = headersOrTrailers();
   if (!current_header_field_.empty()) {
     current_header_field_.inlineTransform([](char c) { return absl::ascii_tolower(c); });
-    // Strip trailing whitespace if the current header value if any. Leading whitespace was trimmed
+    // Strip trailing whitespace of the current header value if any. Leading whitespace was trimmed
     // in ConnectionImpl::onHeaderValue. http_parser does not strip leading or trailing whitespace
     // as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4
     current_header_value_.rtrim();
