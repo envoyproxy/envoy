@@ -36,6 +36,7 @@ public:
   MOCK_METHOD(void, sendMessageRaw_, (Buffer::InstancePtr & request, bool end_stream));
   MOCK_METHOD(void, closeStream, ());
   MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const));
 };
 
 template <class ResponseType>

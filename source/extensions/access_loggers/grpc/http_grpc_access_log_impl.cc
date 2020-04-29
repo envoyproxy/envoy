@@ -22,8 +22,9 @@ HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
 HttpGrpcAccessLog::HttpGrpcAccessLog(
     AccessLog::FilterPtr&& filter,
     envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
-    ThreadLocal::SlotAllocator& tls, GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache)
-    : Common::ImplBase(std::move(filter)), config_(std::move(config)),
+    ThreadLocal::SlotAllocator& tls, GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+    Stats::Scope& scope)
+    : Common::ImplBase(std::move(filter)), scope_(scope), config_(std::move(config)),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
   for (const auto& header : config_.additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
@@ -39,7 +40,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
 
   tls_slot_->set([this](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config_.common_config(), GrpcCommon::GrpcAccessLoggerType::HTTP));
+        config_.common_config(), GrpcCommon::GrpcAccessLoggerType::HTTP, scope_));
   });
 }
 

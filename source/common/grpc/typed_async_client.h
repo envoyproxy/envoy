@@ -38,6 +38,9 @@ public:
   }
   void closeStream() { stream_->closeStream(); }
   void resetStream() { stream_->resetStream(); }
+  bool isAboveWriteBufferHighWatermark() const {
+    return stream_->isAboveWriteBufferHighWatermark();
+  }
   AsyncStream* operator->() { return this; }
   AsyncStream<Request> operator=(RawAsyncStream* stream) {
     stream_ = stream;

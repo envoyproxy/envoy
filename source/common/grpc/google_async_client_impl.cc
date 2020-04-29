@@ -109,7 +109,7 @@ AsyncRequest* GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name
   std::unique_ptr<GoogleAsyncStreamImpl> grpc_stream{async_request};
 
   grpc_stream->initialize(true);
-  if (grpc_stream->call_failed()) {
+  if (grpc_stream->callFailed()) {
     return nullptr;
   }
 
@@ -125,7 +125,7 @@ RawAsyncStream* GoogleAsyncClientImpl::startRaw(absl::string_view service_full_n
                                                              callbacks, options);
 
   grpc_stream->initialize(false);
-  if (grpc_stream->call_failed()) {
+  if (grpc_stream->callFailed()) {
     return nullptr;
   }
 
@@ -412,16 +412,16 @@ GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
 
 void GoogleAsyncRequestImpl::initialize(bool buffer_body_for_retry) {
   GoogleAsyncStreamImpl::initialize(buffer_body_for_retry);
-  if (this->call_failed()) {
+  if (callFailed()) {
     return;
   }
-  this->sendMessageRaw(std::move(request_), true);
+  sendMessageRaw(std::move(request_), true);
 }
 
 void GoogleAsyncRequestImpl::cancel() {
   current_span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
   current_span_->finishSpan();
-  this->resetStream();
+  resetStream();
 }
 
 void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {

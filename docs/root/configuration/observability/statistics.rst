@@ -32,20 +32,3 @@ Server related statistics are rooted at *server.* with following statistics:
   static_unknown_fields, Counter, Number of messages in static configuration with unknown fields
   dynamic_unknown_fields, Counter, Number of messages in dynamic configuration with unknown fields
 
-.. _filesystem_stats:
-
-File system
------------
-
-Statistics related to file system are emitted in the *filesystem.* namespace.
-
-.. csv-table::
-  :header: Name, Type, Description
-  :widths: 1, 1, 2
-
-  write_buffered, Counter, Total number of times file data is moved to Envoy's internal flush buffer
-  write_completed, Counter, Total number of times a file was successfully written
-  write_failed, Counter, Total number of times an error occurred during a file write operation
-  flushed_by_timer, Counter, Total number of times internal flush buffers are written to a file due to flush timeout
-  reopen_failed, Counter, Total number of times a file was failed to be opened
-  write_total_buffered, Gauge, Current total size of internal flush buffer in bytes
