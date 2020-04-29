@@ -35,7 +35,11 @@ public:
    * @return a snapshot of all histograms.
    */
   virtual const std::vector<std::reference_wrapper<const ParentHistogram>>& histograms() PURE;
-  // TODO(efimki): Add support of text readouts stats.
+
+  /**
+   * @return a snapshot of all text readouts.
+   */
+  virtual const std::vector<std::reference_wrapper<const TextReadout>>& textReadouts() PURE;
 };
 
 /**

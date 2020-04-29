@@ -381,6 +381,9 @@ public:
   const std::vector<std::reference_wrapper<const Stats::ParentHistogram>>& histograms() override {
     return histograms_;
   }
+  const std::vector<std::reference_wrapper<const Stats::TextReadout>>& textReadouts() override {
+    return text_readouts_;
+  }
 
 private:
   std::vector<Stats::CounterSharedPtr> snapped_counters_;
@@ -389,6 +392,8 @@ private:
   std::vector<std::reference_wrapper<const Stats::Gauge>> gauges_;
   std::vector<Stats::ParentHistogramSharedPtr> snapped_histograms_;
   std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
+  std::vector<Stats::TextReadoutSharedPtr> snapped_text_readouts_;
+  std::vector<std::reference_wrapper<const Stats::TextReadout>> text_readouts_;
 };
 
 } // namespace Server

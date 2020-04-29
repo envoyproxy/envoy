@@ -102,6 +102,7 @@ public:
   Histogram& histogram(const std::string& name, Histogram::Unit unit) {
     return histogramFromString(name, unit);
   }
+  TextReadout& textReadout(const std::string& name) { return textReadoutFromString(name); }
 
   // Override the Stats::Store methods for name-based lookup of stats, to use
   // and update the string-maps in this class. Note that IsolatedStoreImpl
