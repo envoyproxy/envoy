@@ -38,7 +38,7 @@ message UpstreamHttpProtocolOptions {
   bool auto_san_validation = 2;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 6]
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HttpProtocolOptions";
