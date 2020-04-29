@@ -42,8 +42,8 @@ public:
                                   ? absl::nullopt
                                   : absl::optional<std::string>(override_server_name)),
         override_verify_san_list_{std::move(override_verify_san_list)},
-        override_alpn_list_{std::move(override_alpn)},
-        alpn_fallback_list_{std::move(fallback_alpn)} {}
+        override_alpn_list_{std::move(override_alpn)}, alpn_fallback_list_{
+                                                           std::move(fallback_alpn)} {}
 
   // Network::TransportSocketOptions
   const absl::optional<std::string>& serverNameOverride() const override {
