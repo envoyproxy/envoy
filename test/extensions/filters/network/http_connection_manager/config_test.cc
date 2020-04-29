@@ -1000,7 +1000,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
   stat_prefix: ingress_http
   route_config:
     name: local_route
-  remove_port: true
+  strip_host_port: true
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
@@ -1017,7 +1017,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
   stat_prefix: ingress_http
   route_config:
     name: local_route
-  remove_port: false
+  strip_host_port: false
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
