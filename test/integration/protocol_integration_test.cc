@@ -241,6 +241,39 @@ TEST_P(ProtocolIntegrationTest, DrainClose) {
   test_server_->drainManager().draining_ = false;
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/10270
+TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
+  // Header with at least 20kb of spaces surrounded by non-whitespace characters to ensure that
+  // dispatching is split across 2 dispatch calls. This threshold comes from Envoy preferring 16KB
+  // reads, which the buffer rounds up to about 20KB when allocating slices in
+  // Buffer::OwnedImpl::reserve().
+  const std::string long_header_value_with_inner_lws = "v" + std::string(32 * 1024, ' ') + "v";
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestHeaderMapImpl{{":method", "GET"},
+                              {":path", "/test/long/url"},
+                              {":scheme", "http"},
+                              {":authority", "host"},
+                              {"longrequestvalue", long_header_value_with_inner_lws}});
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(long_header_value_with_inner_lws, upstream_request_->headers()
+                                                  .get(Http::LowerCaseString("longrequestvalue"))
+                                                  ->value()
+                                                  .getStringView());
+  upstream_request_->encodeHeaders(
+      Http::TestHeaderMapImpl{{":status", "200"},
+                              {"longresponsevalue", long_header_value_with_inner_lws}},
+      true);
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(
+      long_header_value_with_inner_lws,
+      response->headers().get(Http::LowerCaseString("longresponsevalue"))->value().getStringView());
+}
+
 TEST_P(ProtocolIntegrationTest, Retry) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

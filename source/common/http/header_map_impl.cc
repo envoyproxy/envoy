@@ -150,6 +150,46 @@ void HeaderString::append(const char* data, uint32_t size) {
   string_length_ += size;
 }
 
+void HeaderString::rtrim() {
+  switch (type_) {
+  case Type::Reference: {
+    absl::string_view original = getStringView();
+    absl::string_view rtrimmed = StringUtil::rtrim(original);
+    const uint64_t new_size = rtrimmed.size();
+    // rtrim does nothing.
+    if (new_size == string_length_) {
+      break;
+    }
+    if (new_size > sizeof(inline_buffer_)) {
+      type_ = Type::Dynamic;
+      char* buf = static_cast<char*>(malloc(dynamic_capacity_));
+      RELEASE_ASSERT(buf != nullptr, "");
+      memcpy(buf, buffer_.ref_, new_size);
+      buffer_.dynamic_ = buf;
+      dynamic_capacity_ = new_size;
+      string_length_ = new_size;
+    } else {
+      type_ = Type::Inline;
+      memcpy(inline_buffer_, buffer_.ref_, new_size);
+      string_length_ = new_size;
+    }
+    break;
+  }
+  case Type::Dynamic: {
+    // rtrim only manipulate length_. Share the same code with Inline.
+    FALLTHRU;
+  }
+  case Type::Inline: {
+    absl::string_view original = getStringView();
+    absl::string_view rtrimmed = StringUtil::rtrim(original);
+    if (original.size() != rtrimmed.size()) {
+      string_length_ = rtrimmed.size();
+    }
+    break;
+  }
+  }
+}
+
 void HeaderString::clear() {
   switch (type_) {
   case Type::Reference: {
