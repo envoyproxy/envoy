@@ -991,7 +991,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortDefault) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
-  EXPECT_FALSE(config.shouldRemovePort());
+  EXPECT_FALSE(config.shouldStripPort());
 }
 
 // Validated that when configured, we remove port.
@@ -1008,7 +1008,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
-  EXPECT_TRUE(config.shouldRemovePort());
+  EXPECT_TRUE(config.shouldStripPort());
 }
 
 // Validated that when explicitly set false, we don't remove port.
@@ -1025,7 +1025,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
-  EXPECT_FALSE(config.shouldRemovePort());
+  EXPECT_FALSE(config.shouldStripPort());
 }
 
 // Validated that by default we allow requests with header names containing underscores.

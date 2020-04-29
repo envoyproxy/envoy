@@ -136,7 +136,7 @@ public:
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
   MOCK_METHOD(bool, shouldNormalizePath, (), (const));
   MOCK_METHOD(bool, shouldMergeSlashes, (), (const));
-  MOCK_METHOD(bool, shouldRemovePort, (), (const));
+  MOCK_METHOD(bool, shouldStripPort, (), (const));
   MOCK_METHOD(envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction,
               headersWithUnderscoresAction, (), (const));
 
@@ -1500,12 +1500,12 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
 
 // maybeNormalizeHost() removes port part from host header.
 TEST_F(ConnectionManagerUtilityTest, RemovePort) {
-  ON_CALL(config_, shouldRemovePort()).WillByDefault(Return(true));
+  ON_CALL(config_, shouldStripPort()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setHost("host:443");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  ConnectionManagerUtility::maybeNormalizeHost(header_map, config_);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map, config_, 443);
   EXPECT_EQ(header_map.Host()->value().getStringView(), "host");
 }
 

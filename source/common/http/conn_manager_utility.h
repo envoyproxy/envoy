@@ -70,7 +70,7 @@ public:
                                  const ConnectionManagerConfig& config);
 
   static void maybeNormalizeHost(RequestHeaderMap& request_headers,
-                                 const ConnectionManagerConfig& config);
+                                 const ConnectionManagerConfig& config, uint32_t port);
 
   /**
    * Mutate request headers if request needs to be traced.

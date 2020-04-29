@@ -9,6 +9,7 @@
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -421,15 +422,15 @@ bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_head
 }
 
 void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
-                                                  const ConnectionManagerConfig& config) {
-  //
+                                                  const ConnectionManagerConfig& config,
+                                                  uint32_t port) {
   if (!request_headers.Host()) {
     // request w/o Host header. such requests are allowed in http 1.0
     return;
   }
 
-  if (config.shouldRemovePort()) {
-    PathUtil::removePortsFromHost(request_headers);
+  if (config.shouldStripPort()) {
+    HeaderUtility::stripPortFromHost(request_headers, port);
   }
 }
 

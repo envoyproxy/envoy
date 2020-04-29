@@ -68,26 +68,6 @@ TEST_F(PathUtilityTest, NormalizeValidPaths) {
   }
 }
 
-// Port's part from host header get removed
-TEST_F(PathUtilityTest, RemovePortsFromHost) {
-  const std::vector<std::pair<std::string, std::string>> host_headers{
-      {"localhost", "localhost"},         // w/o port part
-      {"localhost:443", "localhost"},     // name w/ port
-      {"", ""},                           // empty
-      {":443", ""},                       // just port
-      {"192.168.1.1", "192.168.1.1"},     // ipv4
-      {"192.168.1.1:443", "192.168.1.1"}, // ipv4 w/ port
-      {"[fc00::1]:443", "[fc00::1]"},     // ipv6 w/ port
-      {"[fc00::1]", "[fc00::1]"}          // ipv6
-  };
-
-  for (const auto& host_pair : host_headers) {
-    auto& host_header = hostHeaderEntry(host_pair.first);
-    PathUtil::removePortsFromHost(headers_);
-    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
-  }
-}
-
 // Paths that are valid get normalized.
 TEST_F(PathUtilityTest, NormalizeCasePath) {
   const std::vector<std::pair<std::string, std::string>> non_normal_pairs{

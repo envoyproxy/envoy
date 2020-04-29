@@ -427,7 +427,7 @@ public:
   /**
    * @return if the HttpConnectionManager should remove ports from Host/authority header
    */
-  virtual bool shouldRemovePort() const PURE;
+  virtual bool shouldStripPort() const PURE;
 
   /**
    * @return the action HttpConnectionManager should take when receiving client request

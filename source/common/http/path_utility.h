@@ -19,8 +19,6 @@ public:
   // Merges two or more adjacent slashes in path part of URI into one.
   // Requires the Path header be present.
   static void mergeSlashes(RequestHeaderMap& headers);
-  // Remove port part from Host/authority header
-  static void removePortsFromHost(RequestHeaderMap& headers);
   // Removes the query and/or fragment string (if present) from the input path.
   // For example, this function returns "/data" for the input path "/data#fragment?param=value".
   static absl::string_view removeQueryAndFragment(const absl::string_view path);

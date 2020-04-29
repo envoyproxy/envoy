@@ -126,7 +126,7 @@ public:
     ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_));
     ON_CALL(Const(filter_callbacks_.connection_), ssl()).WillByDefault(Return(ssl_connection_));
     filter_callbacks_.connection_.local_address_ =
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 443);
     filter_callbacks_.connection_.remote_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
     conn_manager_ = std::make_unique<ConnectionManagerImpl>(
@@ -348,7 +348,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
-  bool shouldRemovePort() const override { return remove_port_; }
+  bool shouldStripPort() const override { return strip_port_; }
   RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
@@ -410,7 +410,7 @@ public:
   Http::Http1Settings http1_settings_;
   bool normalize_path_ = false;
   bool merge_slashes_ = false;
-  bool remove_port_ = false;
+  bool strip_port_ = false;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
@@ -903,7 +903,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
 TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
   setup(false, "");
   // Enable port removal
-  remove_port_ = true;
+  strip_port_ = true;
   const std::string original_host = "host:443";
   const std::string normalized_host = "host";
 
@@ -939,7 +939,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
 TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   setup(false, "");
   // Enable port removal
-  remove_port_ = true;
+  strip_port_ = true;
   const std::string original_host = "host:443";
   const std::string normalized_host = "host";
 

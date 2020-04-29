@@ -673,6 +673,9 @@ private:
     void onStreamMaxDurationReached();
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
 
+    // return local port of the connection
+    uint32_t localPort();
+
     friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
       s.dumpState(os);
       return os;
