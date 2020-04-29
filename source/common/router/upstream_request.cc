@@ -554,7 +554,6 @@ void TcpUpstream::encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) 
                        .value()
                        .proxy_protocol_config()
                        .version();
-    // FIXME versions.
     if (version == envoy::config::core::v3::ProxyProtocolConfig::V1) {
       auto connection = upstream_request_->parent().callbacks()->connection();
       Extensions::Common::ProxyProtocol::generateV1Header(
