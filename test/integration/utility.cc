@@ -138,8 +138,9 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
 
 RawConnectionDriver::~RawConnectionDriver() = default;
 
-void RawConnectionDriver::waitForConnected() {
-  while (!callbacks_->connected()) {
+void RawConnectionDriver::waitForConnection() {
+  while (!callbacks_->connected() && !callbacks_->closed()) {
+    Event::GlobalTimeSystem().timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   }
 }

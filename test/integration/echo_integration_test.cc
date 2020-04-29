@@ -132,12 +132,7 @@ filter_chains:
         new_listener_port, buffer,
         [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_,
         *dispatcher_);
-    while (connection2.connecting()) {
-      // Don't busy loop, but macOS often needs a moment to decide this connection isn't happening.
-      timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
-
-      connection2.run(Event::Dispatcher::RunType::NonBlock);
-    }
+    connection2.waitForConnection();
     if (connection2.connection().state() == Network::Connection::State::Closed) {
       connect_fail = true;
       break;
