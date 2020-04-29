@@ -36,7 +36,7 @@ TEST_P(HystrixIntegrationTest, NoChunkEncoding) {
             client.close(Network::ConnectionCloseType::NoFlush);
           }
         },
-        version_);
+        version_, *dispatcher_);
     connection.run();
     EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
     // Make sure that the response is not actually chunk encoded, but it does have the hystrix flush

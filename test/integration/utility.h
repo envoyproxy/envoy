@@ -64,7 +64,8 @@ public:
   using ReadCallback = std::function<void(Network::ClientConnection&, const Buffer::Instance&)>;
 
   RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
-                      Network::Address::IpVersion version);
+                      Network::Address::IpVersion version, Event::Dispatcher& dispatcher,
+                      Network::TransportSocketPtr transport_socket = nullptr);
   ~RawConnectionDriver();
   const Network::Connection& connection() { return *client_; }
   bool connecting() { return callbacks_->connecting_; }
@@ -73,6 +74,7 @@ public:
   Network::ConnectionEvent last_connection_event() const {
     return callbacks_->last_connection_event_;
   }
+  void waitForConnected();
 
 private:
   struct ForwardingFilter : public Network::ReadFilterBaseImpl {
@@ -91,20 +93,32 @@ private:
   };
 
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
+
+    bool connected() const { return connected_; }
+    bool closed() const { return closed_; }
+
+    // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
       last_connection_event_ = event;
       connecting_ = false;
+      closed_ |= (event == Network::ConnectionEvent::RemoteClose ||
+                  event == Network::ConnectionEvent::LocalClose);
+      connected_ |= (event == Network::ConnectionEvent::Connected);
     }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
     bool connecting_{true};
     Network::ConnectionEvent last_connection_event_;
+
+  private:
+    bool connected_{false};
+    bool closed_{false};
   };
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  Event::DispatcherPtr dispatcher_;
+  Event::Dispatcher& dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;
 };

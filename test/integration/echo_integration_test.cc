@@ -55,7 +55,7 @@ TEST_P(EchoIntegrationTest, Hello) {
         response.append(data.toString());
         connection.close();
       },
-      version_);
+      version_, *dispatcher_);
 
   connection.run();
   EXPECT_EQ("hello", response);
@@ -105,7 +105,7 @@ filter_chains:
         response.append(data.toString());
         connection.close();
       },
-      version_);
+      version_, *dispatcher_);
   connection.run();
   EXPECT_EQ("hello", response);
 
@@ -130,7 +130,8 @@ filter_chains:
   for (int i = 0; i < 10; ++i) {
     RawConnectionDriver connection2(
         new_listener_port, buffer,
-        [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
+        [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_,
+        *dispatcher_);
     while (connection2.connecting()) {
       // Don't busy loop, but macOS often needs a moment to decide this connection isn't happening.
       timeSystem().advanceTimeWait(std::chrono::milliseconds(10));

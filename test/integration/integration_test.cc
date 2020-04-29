@@ -596,7 +596,7 @@ TEST_P(IntegrationTest, Pipeline) {
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
       },
-      version_);
+      version_, *dispatcher_);
   // First response should be success.
   while (response.find("200") == std::string::npos) {
     connection.run(Event::Dispatcher::RunType::NonBlock);
@@ -646,7 +646,7 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
       },
-      version_);
+      version_, *dispatcher_);
 
   // First response should be success.
   size_t pos;
@@ -679,7 +679,7 @@ TEST_P(IntegrationTest, PipelineInline) {
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
       },
-      version_);
+      version_, *dispatcher_);
 
   while (response.find("400") == std::string::npos) {
     connection.run(Event::Dispatcher::RunType::NonBlock);

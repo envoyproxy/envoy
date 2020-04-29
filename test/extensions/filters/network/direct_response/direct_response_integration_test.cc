@@ -51,7 +51,7 @@ TEST_P(DirectResponseIntegrationTest, Hello) {
         response.append(data.toString());
         connection.close();
       },
-      version_);
+      version_, *dispatcher_);
 
   connection.run();
   EXPECT_EQ("hello, world!\n", response);

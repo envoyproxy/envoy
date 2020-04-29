@@ -527,7 +527,7 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
           client.close(Network::ConnectionCloseType::NoFlush);
         }
       },
-      version_);
+      version_, *dispatcher_);
 
   connection.run();
 }
