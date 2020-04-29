@@ -219,6 +219,11 @@ is to set ```--copt=-fno-limit-debug-info``` on the CLI or in your .bazelrc file
 
 If you don't want your debug or release binaries to contain debug info
 to reduce binary size, pass `--define=no_debug_info=1` when building.
+This is primarily useful when building envoy as a static library. When
+building a linked envoy binary you can build the implicit `.stripped`
+target from [`cc_binary`](https://docs.bazel.build/versions/master/be/c-cpp.html#cc_binary)
+or pass [`--strip=always`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--strip)
+instead.
 
 # Testing Envoy with Bazel
 
