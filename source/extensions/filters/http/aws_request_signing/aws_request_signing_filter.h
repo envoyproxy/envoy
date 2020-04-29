@@ -32,19 +32,19 @@ struct FilterStats {
 /**
  * Abstract filter configuration.
  */
-class FilterConfig {
+class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 public:
   virtual ~FilterConfig() = default;
 
   /**
    * @return the config's signer.
    */
-  virtual Extensions::Common::Aws::Signer& signer() PURE;
+  virtual Extensions::Common::Aws::Signer& signer() const PURE;
 
   /**
    * @return the filter stats.
    */
-  virtual FilterStats& stats() PURE;
+  virtual FilterStats& stats() const PURE;
 
   /**
    * @return the host rewrite value.
@@ -62,13 +62,14 @@ public:
   FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
                    Stats::Scope& scope, const std::string& host_rewrite);
 
-  Extensions::Common::Aws::Signer& signer() override;
-  FilterStats& stats() override;
+  Extensions::Common::Aws::Signer& signer() const override;
+  FilterStats& stats() const override;
   const std::string& hostRewrite() const override;
 
 private:
-  Extensions::Common::Aws::SignerPtr signer_;
-  FilterStats stats_;
+  // TODO(rgs1): Signer::sign() should be const.
+  mutable Extensions::Common::Aws::SignerPtr signer_;
+  mutable FilterStats stats_;
   std::string host_rewrite_;
 };
 
@@ -85,7 +86,10 @@ public:
                                           bool end_stream) override;
 
 private:
+  const FilterConfig* getConfig() const;
+
   std::shared_ptr<FilterConfig> config_;
+  mutable const FilterConfig* effective_config_{nullptr};
 };
 
 } // namespace AwsRequestSigningFilter

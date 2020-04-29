@@ -17,13 +17,13 @@ class MockFilterConfig : public FilterConfig {
 public:
   MockFilterConfig() { signer_ = std::make_shared<Common::Aws::MockSigner>(); }
 
-  Common::Aws::Signer& signer() override { return *signer_; }
-  FilterStats& stats() override { return stats_; }
+  Common::Aws::Signer& signer() const override { return *signer_; }
+  FilterStats& stats() const override { return stats_; }
   const std::string& hostRewrite() const override { return host_rewrite_; }
 
-  std::shared_ptr<Common::Aws::MockSigner> signer_;
+  mutable std::shared_ptr<Common::Aws::MockSigner> signer_;
   Stats::IsolatedStoreImpl stats_store_;
-  FilterStats stats_{Filter::generateStats("test", stats_store_)};
+  mutable FilterStats stats_{Filter::generateStats("test", stats_store_)};
   std::string host_rewrite_;
 };
 
@@ -32,10 +32,12 @@ public:
   void setup() {
     filter_config_ = std::make_shared<MockFilterConfig>();
     filter_ = std::make_unique<Filter>(filter_config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
   std::shared_ptr<MockFilterConfig> filter_config_;
   std::unique_ptr<Filter> filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 };
 
 // Verify filter functionality when signing works.

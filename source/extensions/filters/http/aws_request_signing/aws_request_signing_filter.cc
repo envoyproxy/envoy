@@ -1,6 +1,9 @@
 #include "extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 
+#include "common/http/utility.h"
+
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,9 +18,9 @@ FilterConfigImpl::FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer,
 
 Filter::Filter(const std::shared_ptr<FilterConfig>& config) : config_(config) {}
 
-Extensions::Common::Aws::Signer& FilterConfigImpl::signer() { return *signer_; }
+Extensions::Common::Aws::Signer& FilterConfigImpl::signer() const { return *signer_; }
 
-FilterStats& FilterConfigImpl::stats() { return stats_; }
+FilterStats& FilterConfigImpl::stats() const { return stats_; }
 
 const std::string& FilterConfigImpl::hostRewrite() const { return host_rewrite_; }
 
@@ -44,7 +47,21 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::Continue;
 }
 
+const FilterConfig* Filter::getConfig() const {
+  // Cached config pointer.
+  if (effective_config_) {
+    return effective_config_;
+  }
 
+  effective_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(
+      HttpFilterNames::get().AwsRequestSigning, decoder_callbacks_->route());
+  if (effective_config_) {
+    return effective_config_;
+  }
+
+  effective_config_ = config_.get();
+  return effective_config_;
+}
 
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters

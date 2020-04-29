@@ -18,6 +18,8 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
     const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
+  // TODO(rgs1): we should allow this to be globally disabled.
+
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
           context.api(), Extensions::Common::Aws::Utility::metadataFetcher);
@@ -31,6 +33,22 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
     auto filter = std::make_shared<Filter>(filter_config);
     callbacks.addStreamDecoderFilter(filter);
   };
+}
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config,
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  auto credentials_provider =
+      std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
+          context.api(), Extensions::Common::Aws::Utility::metadataFetcher);
+  auto signer = std::make_unique<Extensions::Common::Aws::SignerImpl>(
+      config.service_name(), config.region(), credentials_provider,
+      context.dispatcher().timeSource());
+
+  // TODO(rgs1): we should support setting stat_prefix via config.
+  return std::make_shared<FilterConfigImpl>(std::move(signer), "", context.scope(),
+                                            config.host_rewrite());
 }
 
 /**
