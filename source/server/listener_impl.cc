@@ -305,7 +305,9 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
       filter_chain_manager_(address_, origin.listener_factory_context_->parentFactoryContext(),
                             initManager(), origin.filter_chain_manager_),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this] { parent_.inPlaceFilterChainUpdate(*this); }) {
+                          [this] { 
+                            ASSERT(workers_started_);
+                            parent_.inPlaceFilterChainUpdate(*this); }) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);

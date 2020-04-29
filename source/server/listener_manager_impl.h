@@ -112,6 +112,7 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   COUNTER(listener_added)                                                                          \
   COUNTER(listener_create_failure)                                                                 \
   COUNTER(listener_create_success)                                                                 \
+  COUNTER(listener_in_place_updated)                                                               \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
   COUNTER(listener_stopped)                                                                        \
