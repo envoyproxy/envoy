@@ -16,7 +16,7 @@ namespace {
 TEST(DynamoFilterConfigTest, DynamoFilter) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DynamoFilterConfig factory;
-  const auto proto_config = factory.createEmptyConfigProto().get();
+  const auto proto_config = factory.createEmptyConfigProto();
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));

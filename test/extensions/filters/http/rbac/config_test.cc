@@ -32,16 +32,19 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  auto* config = dynamic_cast<envoy::config::filter::http::rbac::v2::RBAC*>(
-      factory.createEmptyConfigProto().get());
-  EXPECT_NE(nullptr, config);
+  auto config =
+
+      factory.createEmptyConfigProto();
+
+  EXPECT_NE(nullptr, dynamic_cast<envoy::config::filter::http::rbac::v2::RBAC*>(config.get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  auto* config = dynamic_cast<envoy::config::filter::http::rbac::v2::RBACPerRoute*>(
-      factory.createEmptyRouteConfigProto().get());
-  EXPECT_NE(nullptr, config);
+  auto config = factory.createEmptyRouteConfigProto();
+
+  EXPECT_NE(nullptr,
+            dynamic_cast<envoy::config::filter::http::rbac::v2::RBACPerRoute*>(config.get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, RouteSpecificConfig) {
