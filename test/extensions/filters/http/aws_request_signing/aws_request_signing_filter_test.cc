@@ -17,7 +17,7 @@ class MockFilterConfig : public FilterConfig {
 public:
   MockFilterConfig() { signer_ = std::make_shared<Common::Aws::MockSigner>(); }
 
-  Common::Aws::Signer& signer() const override { return *signer_; }
+  Common::Aws::Signer* signer() const override { return signer_.get(); }
   FilterStats& stats() const override { return stats_; }
   const std::string& hostRewrite() const override { return host_rewrite_; }
 

@@ -19,7 +19,7 @@ FilterConfigImpl::FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer,
 
 Filter::Filter(const std::shared_ptr<FilterConfig>& config) : config_(config) {}
 
-Extensions::Common::Aws::Signer& FilterConfigImpl::signer() const { return *signer_; }
+Extensions::Common::Aws::Signer* FilterConfigImpl::signer() const { return signer_.get(); }
 
 FilterStats& FilterConfigImpl::stats() const { return stats_; }
 
@@ -38,7 +38,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   try {
-    config->signer().sign(headers);
+    config->signer()->sign(headers);
     config->stats().signing_added_.inc();
   } catch (const EnvoyException& e) {
     ENVOY_LOG(debug, "signing failed: {}", e.what());
@@ -49,19 +49,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 const FilterConfig* Filter::getConfig() const {
-  // Cached config pointer.
-  if (effective_config_) {
-    return effective_config_;
-  }
-
-  effective_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(
+  const auto* config = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(
       HttpFilterNames::get().AwsRequestSigning, decoder_callbacks_->route());
-  if (effective_config_) {
-    return effective_config_;
+  if (config) {
+    return config;
   }
 
-  effective_config_ = config_.get();
-  return effective_config_;
+  return config_.get();
 }
 
 } // namespace AwsRequestSigningFilter
