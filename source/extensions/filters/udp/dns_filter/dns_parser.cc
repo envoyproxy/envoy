@@ -80,16 +80,13 @@ DnsQueryContextPtr DnsMessageParser::createQueryContext(Network::UdpRecvData& cl
 
 bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
                                       const Buffer::InstancePtr& buffer) {
-  auto available_bytes = buffer->length();
-
-  memset(&header_, 0x00, sizeof(struct DnsHeader));
-
   static constexpr uint64_t field_size = sizeof(uint16_t);
+  size_t available_bytes = buffer->length();
   uint64_t offset = 0;
   uint16_t data;
-
   DnsQueryParseState state{DnsQueryParseState::Init};
 
+  header_ = {};
   while (state != DnsQueryParseState::Finish) {
     // Ensure that we have enough data remaining in the buffer to parse the query
     if (available_bytes < field_size) {

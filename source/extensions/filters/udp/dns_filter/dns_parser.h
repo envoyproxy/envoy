@@ -77,7 +77,6 @@ public:
   DnsQueryContext(Network::Address::InstanceConstSharedPtr local,
                   Network::Address::InstanceConstSharedPtr peer)
       : local_(std::move(local)), peer_(std::move(peer)), parse_status_(false), id_() {}
-  ~DnsQueryContext() = default;
 
   const Network::Address::InstanceConstSharedPtr local_;
   const Network::Address::InstanceConstSharedPtr peer_;
@@ -95,7 +94,11 @@ using DnsQueryContextPtr = std::unique_ptr<DnsQueryContext>;
  */
 class DnsMessageParser : public Logger::Loggable<Logger::Id::filter> {
 public:
-  enum DnsResponseCode { NoError, FormatError, ServerFailure, NameError, NotImplemented };
+  static constexpr uint16_t NO_ERROR{0};
+  static constexpr uint16_t FORMAT_ERROR{1};
+  static constexpr uint16_t SERVER_FAILURE{2};
+  static constexpr uint16_t NAME_ERROR{3};
+  static constexpr uint16_t NOT_IMPLEMENTED{4};
 
   enum class DnsQueryParseState {
     Init = 0,
@@ -135,8 +138,6 @@ public:
     uint16_t additional_rrs;
   });
 
-  DnsMessageParser() = default;
-
   /**
    * @brief parse a single query record from a client request
    *
@@ -171,7 +172,7 @@ private:
   const std::string parseDnsNameRecord(const Buffer::InstancePtr& buffer, uint64_t* available_bytes,
                                        uint64_t* name_offset);
 
-  struct DnsHeader header_;
+  DnsHeader header_;
 };
 
 using DnsMessageParserPtr = std::unique_ptr<DnsMessageParser>;

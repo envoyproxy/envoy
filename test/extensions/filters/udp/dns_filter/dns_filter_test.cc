@@ -31,9 +31,7 @@ class DnsFilterTest : public testing::Test {
 public:
   DnsFilterTest()
       : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")) {
-    // TODO: Consume the log setting from the command line
-    // Logger::Registry::setLogLevel(TestEnvironment::getOptions().logLevel());
-    Logger::Registry::setLogLevel(spdlog::level::trace);
+    Logger::Registry::setLogLevel(TestEnvironment::getOptions().logLevel());
 
     response_parser_ = std::make_unique<DnsMessageParser>();
 

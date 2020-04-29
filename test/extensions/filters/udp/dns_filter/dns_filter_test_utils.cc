@@ -11,7 +11,6 @@ namespace DnsFilter {
 namespace Utils {
 
 std::string buildQueryForDomain(const std::string& name, uint16_t rec_type, uint16_t rec_class) {
-
   Runtime::RandomGeneratorImpl random_;
   struct DnsMessageParser::DnsHeader query {};
   uint16_t id = random_.random() & 0xFFFF;
@@ -57,9 +56,7 @@ std::string buildQueryForDomain(const std::string& name, uint16_t rec_type, uint
   buffer_.writeBEInt<uint16_t>(query.additional_rrs);
 
   DnsQueryRecord query_rec(name, rec_type, rec_class);
-
   query_rec.serialize(buffer_);
-
   return buffer_.toString();
 }
 
