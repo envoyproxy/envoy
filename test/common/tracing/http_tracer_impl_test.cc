@@ -158,6 +158,7 @@ TEST_F(HttpConnManFinalizerImplTest, OriginalAndLongPath) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-request-id", "id"},
                                                  {"x-envoy-original-path", path},
                                                  {":method", "GET"},
+                                                 {":path", ""},
                                                  {"x-forwarded-proto", "http"}};
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -189,8 +190,10 @@ TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
   const auto remote_address =
       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(expected_ip, 0)};
 
-  Http::TestRequestHeaderMapImpl request_headers{
-      {"x-envoy-original-path", path}, {":method", "GET"}, {"x-forwarded-proto", "http"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":path", ""},
+                                                 {"x-envoy-original-path", path},
+                                                 {":method", "GET"},
+                                                 {"x-forwarded-proto", "http"}};
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
 
@@ -206,6 +209,38 @@ TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq(path_prefix + expected_path)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("GET")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
+
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+                                            &response_trailers, stream_info, config);
+}
+
+TEST_F(HttpConnManFinalizerImplTest, Connect) {
+  const std::string path(300, 'a');
+  const std::string path_prefix = "http://";
+  const std::string expected_path(256, 'a');
+  const std::string expected_ip = "10.0.0.100";
+  const auto remote_address =
+      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(expected_ip, 0)};
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "CONNECT"},
+                                                 {"x-forwarded-proto", "http"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
+  EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  absl::optional<uint32_t> response_code;
+  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
+  EXPECT_CALL(stream_info, downstreamDirectRemoteAddress())
+      .WillRepeatedly(ReturnPointee(&remote_address));
+
+  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq("")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("CONNECT")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 

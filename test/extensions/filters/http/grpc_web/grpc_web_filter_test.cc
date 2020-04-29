@@ -114,6 +114,7 @@ public:
   Http::TestRequestTrailerMapImpl request_trailers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
+  Http::TestRequestHeaderMapImpl request_headers_{{":path", "/"}};
 };
 
 TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
@@ -123,7 +124,7 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
       Http::Headers::get().ContentTypeValues.GrpcWebText,
       Http::Headers::get().ContentTypeValues.GrpcWebTextProto};
   for (auto& content_type : supported_content_types) {
-    Http::TestRequestHeaderMapImpl request_headers;
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
     request_headers.addCopy(Http::Headers::get().ContentType, content_type);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
     Http::MetadataMap metadata_map{{"metadata", "metadata"}};
@@ -135,9 +136,8 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
 
 TEST_F(GrpcWebFilterTest, UnsupportedContentType) {
   Buffer::OwnedImpl data;
-  Http::TestRequestHeaderMapImpl request_headers;
-  request_headers.addCopy(Http::Headers::get().ContentType, "unsupported");
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  request_headers_.addCopy(Http::Headers::get().ContentType, "unsupported");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
@@ -148,7 +148,18 @@ TEST_F(GrpcWebFilterTest, UnsupportedContentType) {
 
 TEST_F(GrpcWebFilterTest, NoContentType) {
   Buffer::OwnedImpl data;
-  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
+}
+
+TEST_F(GrpcWebFilterTest, NoPath) {
+  Http::TestRequestHeaderMapImpl request_headers{};
+  Buffer::OwnedImpl data;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
@@ -159,12 +170,11 @@ TEST_F(GrpcWebFilterTest, NoContentType) {
 }
 
 TEST_F(GrpcWebFilterTest, InvalidBase64) {
-  Http::TestRequestHeaderMapImpl request_headers;
-  request_headers.addCopy(Http::Headers::get().ContentType,
-                          Http::Headers::get().ContentTypeValues.GrpcWebText);
+  request_headers_.addCopy(Http::Headers::get().ContentType,
+                           Http::Headers::get().ContentTypeValues.GrpcWebText);
   expectErrorResponse(Http::Code::BadRequest, "Bad gRPC-web request, invalid base64 data.");
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  expectRequiredGrpcUpstreamHeaders(request_headers);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+  expectRequiredGrpcUpstreamHeaders(request_headers_);
 
   Buffer::OwnedImpl request_buffer;
   Buffer::OwnedImpl decoded_buffer;
@@ -175,12 +185,11 @@ TEST_F(GrpcWebFilterTest, InvalidBase64) {
 }
 
 TEST_F(GrpcWebFilterTest, Base64NoPadding) {
-  Http::TestRequestHeaderMapImpl request_headers;
-  request_headers.addCopy(Http::Headers::get().ContentType,
-                          Http::Headers::get().ContentTypeValues.GrpcWebText);
+  request_headers_.addCopy(Http::Headers::get().ContentType,
+                           Http::Headers::get().ContentTypeValues.GrpcWebText);
   expectErrorResponse(Http::Code::BadRequest, "Bad gRPC-web request, invalid base64 data.");
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  expectRequiredGrpcUpstreamHeaders(request_headers);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+  expectRequiredGrpcUpstreamHeaders(request_headers_);
 
   Buffer::OwnedImpl request_buffer;
   Buffer::OwnedImpl decoded_buffer;
@@ -254,13 +263,12 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
 
 TEST_P(GrpcWebFilterTest, Unary) {
   // Tests request headers.
-  Http::TestRequestHeaderMapImpl request_headers;
-  request_headers.addCopy(Http::Headers::get().ContentType, request_content_type());
-  request_headers.addCopy(Http::Headers::get().Accept, request_accept());
-  request_headers.addCopy(Http::Headers::get().ContentLength, uint64_t(8));
+  request_headers_.addCopy(Http::Headers::get().ContentType, request_content_type());
+  request_headers_.addCopy(Http::Headers::get().Accept, request_accept());
+  request_headers_.addCopy(Http::Headers::get().ContentLength, uint64_t(8));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  expectRequiredGrpcUpstreamHeaders(request_headers);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+  expectRequiredGrpcUpstreamHeaders(request_headers_);
 
   // Tests request data.
   if (isBinaryRequest()) {

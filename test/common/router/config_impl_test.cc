@@ -87,6 +87,14 @@ public:
   const envoy::config::route::v3::RouteConfiguration config_;
 };
 
+Http::TestRequestHeaderMapImpl genPathlessHeaders(const std::string& host,
+                                                  const std::string& method) {
+  return Http::TestRequestHeaderMapImpl{{":authority", host},         {":method", method},
+                                        {"x-safe", "safe"},           {"x-global-nope", "global"},
+                                        {"x-vhost-nope", "vhost"},    {"x-route-nope", "route"},
+                                        {"x-forwarded-proto", "http"}};
+}
+
 Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
                                           const std::string& method) {
   return Http::TestRequestHeaderMapImpl{{":authority", host},        {":path", path},
@@ -368,6 +376,7 @@ virtual_hosts:
             config.route(genHeaders("bat2.com", "/foo", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("regex_default",
             config.route(genHeaders("bat2.com", " ", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_TRUE(config.route(genPathlessHeaders("bat2.com", "GET"), 0) == nullptr);
 
   // Regular Expression matching with query string params
   EXPECT_EQ(
@@ -429,6 +438,88 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/something/else", "GET");
     EXPECT_EQ("other", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
+  }
+}
+
+TEST_F(RouteMatcherTest, TestConnectRoutes) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: connect
+  domains:
+  - bat3.com
+  routes:
+  - match:
+      safe_regex:
+        google_re2: {}
+        regex: "foobar"
+    route:
+      cluster: connect_break
+  - match:
+        connect_matcher:
+          {}
+    route:
+      cluster: connect_match
+      prefix_rewrite: "/rewrote"
+  - match:
+      safe_regex:
+        google_re2: {}
+        regex: ".*"
+    route:
+      cluster: connect_fallthrough
+- name: connect2
+  domains:
+  - bat4.com
+  routes:
+  - match:
+        connect_matcher:
+          {}
+    redirect: { path_redirect: /new_path }
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: instant-server
+      timeout: 30s
+  virtual_clusters:
+  - headers:
+    - name: ":path"
+      safe_regex_match:
+        google_re2: {}
+        regex: "^/users/\\d+/location$"
+    - name: ":method"
+      exact_match: POST
+    name: ulu
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  // Connect matching
+  EXPECT_EQ("connect_match",
+            config.route(genHeaders("bat3.com", " ", "CONNECT"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ(
+      "connect_match",
+      config.route(genPathlessHeaders("bat3.com", "CONNECT"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("connect_fallthrough",
+            config.route(genHeaders("bat3.com", " ", "GET"), 0)->routeEntry()->clusterName());
+
+  // Prefix rewrite for CONNECT with path (for HTTP/2)
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("bat3.com", "/api/locations?works=true", "CONNECT");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("/rewrote?works=true", headers.get_(Http::Headers::get().Path));
+  }
+  // Prefix rewrite for CONNECT without path (for non-crashing)
+  {
+    Http::TestRequestHeaderMapImpl headers = genPathlessHeaders("bat4.com", "CONNECT");
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    ASSERT(redirect != nullptr);
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://bat4.com/new_path", redirect->newPath(headers));
   }
 }
 
@@ -687,7 +778,6 @@ virtual_hosts:
       exact_match: POST
     name: ulu
   )EOF";
-
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
@@ -6696,6 +6786,30 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException, "Duplicate upgrade WebSocket");
+}
+
+TEST_F(RouteConfigurationV2, BadConnectConfig) {
+  const std::string yaml = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: Websocket
+              connect_config: {}
+              enabled: false
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Non-CONNECT upgrade type Websocket has ConnectConfig");
 }
 
 // Verifies that we're creating a new instance of the retry plugins on each call instead of always

@@ -548,6 +548,10 @@ message Cluster {
   // *TransportSocketMatch* in this field. Other client Envoys receive CDS without
   // *transport_socket_match* set, and still send plain text traffic to the same cluster.
   //
+  // This field can be used to specify custom transport socket configurations for health
+  // checks by adding matching key/value pairs in a health check's
+  // :ref:`transport socket match criteria <envoy_api_field_config.core.v4alpha.HealthCheck.transport_socket_match_criteria>` field.
+  //
   // [#comment:TODO(incfly): add a detailed architecture doc on intended usage.]
   repeated TransportSocketMatch transport_socket_matches = 43;
 

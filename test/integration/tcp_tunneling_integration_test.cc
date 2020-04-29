@@ -22,12 +22,20 @@ public:
   }
 
   void initialize() override {
-    auto host = config_helper_.createVirtualHost("host", "/");
-    //    host.mutable_proxying_config();
-    config_helper_.addVirtualHost(host);
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
+                hcm) {
+          auto* route_config = hcm.mutable_route_config();
+          ASSERT_EQ(1, route_config->virtual_hosts_size());
+          auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
+          auto* match = route->mutable_match();
+          match->Clear();
+          match->mutable_connect_matcher();
+
+          auto* upgrade = route->mutable_route()->add_upgrade_configs();
+          upgrade->set_upgrade_type("CONNECT");
+          upgrade->mutable_connect_config();
+
           hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
           hcm.mutable_http2_protocol_options()->set_allow_connect(true);
 
@@ -66,7 +74,7 @@ public:
                                                   {":path", "/"},
                                                   {":protocol", "bytestream"},
                                                   {":scheme", "https"},
-                                                  {":authority", "host"}};
+                                                  {":authority", "host:80"}};
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
   bool enable_timeout_{};
@@ -74,7 +82,7 @@ public:
 
 // TODO(alyssawilk) make sure that if data is sent with the connect it does not go upstream
 // until the 200 headers are sent before unhiding ANY config.
-TEST_P(ConnectTerminationIntegrationTest, DISABLED_Basic) {
+TEST_P(ConnectTerminationIntegrationTest, Basic) {
   initialize();
 
   setUpConnection();
@@ -92,7 +100,7 @@ TEST_P(ConnectTerminationIntegrationTest, DISABLED_Basic) {
   ASSERT_FALSE(response_->reset());
 }
 
-TEST_P(ConnectTerminationIntegrationTest, DISABLED_DownstreamClose) {
+TEST_P(ConnectTerminationIntegrationTest, DownstreamClose) {
   initialize();
 
   setUpConnection();
@@ -103,7 +111,7 @@ TEST_P(ConnectTerminationIntegrationTest, DISABLED_DownstreamClose) {
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
 }
 
-TEST_P(ConnectTerminationIntegrationTest, DISABLED_DownstreamReset) {
+TEST_P(ConnectTerminationIntegrationTest, DownstreamReset) {
   initialize();
 
   setUpConnection();
@@ -114,7 +122,7 @@ TEST_P(ConnectTerminationIntegrationTest, DISABLED_DownstreamReset) {
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
 }
 
-TEST_P(ConnectTerminationIntegrationTest, DISABLED_UpstreamClose) {
+TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
   initialize();
 
   setUpConnection();
@@ -125,7 +133,7 @@ TEST_P(ConnectTerminationIntegrationTest, DISABLED_UpstreamClose) {
   response_->waitForReset();
 }
 
-TEST_P(ConnectTerminationIntegrationTest, DISABLED_TestTimeout) {
+TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
   enable_timeout_ = true;
   initialize();
 
@@ -136,7 +144,7 @@ TEST_P(ConnectTerminationIntegrationTest, DISABLED_TestTimeout) {
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
 }
 
-TEST_P(ConnectTerminationIntegrationTest, DISABLED_BuggyHeaders) {
+TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
   initialize();
   // It's possible that the FIN is received before we set half close on the
   // upstream connection, so allow unexpected disconnects.
@@ -150,7 +158,7 @@ TEST_P(ConnectTerminationIntegrationTest, DISABLED_BuggyHeaders) {
                                      {":path", "/"},
                                      {":protocol", "bytestream"},
                                      {":scheme", "https"},
-                                     {":authority", "host"}});
+                                     {":authority", "host:80"}});
   // If the connection is established (created, set to half close, and then the
   // FIN arrives), make sure the FIN arrives, and send a FIN from upstream.
   if (fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_) &&

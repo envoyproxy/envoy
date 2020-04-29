@@ -98,6 +98,12 @@ UpstreamRequest::~UpstreamRequest() {
     upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
                       upstream_trailers_.get(), stream_info_);
   }
+
+  while (downstream_data_disabled_ != 0) {
+    parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
+    parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
+    --downstream_data_disabled_;
+  }
 }
 
 void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
@@ -289,17 +295,21 @@ void UpstreamRequest::onPerTryTimeout() {
   }
 }
 
-void UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) {
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
   switch (reason) {
-  case Http::ConnectionPool::PoolFailureReason::Overflow:
+  case ConnectionPool::PoolFailureReason::Overflow:
     reset_reason = Http::StreamResetReason::Overflow;
     break;
-  case Http::ConnectionPool::PoolFailureReason::ConnectionFailure:
+  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    FALLTHRU;
+  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
+  case ConnectionPool::PoolFailureReason::Timeout:
+    reset_reason = Http::StreamResetReason::LocalReset;
   }
 
   // Mimic an upstream reset.
@@ -417,7 +427,6 @@ void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermar
   // can disable reads from upstream.
   ASSERT(!parent_.parent_.finalUpstreamRequest() ||
          &parent_ == parent_.parent_.finalUpstreamRequest());
-
   // The downstream connection is overrun. Pause reads from upstream.
   // If there are multiple calls to readDisable either the codec (H2) or the underlying
   // Network::Connection (H1) will handle reference counting.
@@ -447,6 +456,7 @@ void UpstreamRequest::disableDataFromDownstreamForFlowControl() {
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
   parent_.cluster()->stats().upstream_flow_control_backed_up_total_.inc();
   parent_.callbacks()->onDecoderFilterAboveWriteBufferHighWatermark();
+  ++downstream_data_disabled_;
 }
 
 void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
@@ -462,6 +472,10 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
   parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
   parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
+  ASSERT(downstream_data_disabled_ != 0);
+  if (downstream_data_disabled_ > 0) {
+    --downstream_data_disabled_;
+  }
 }
 
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
@@ -476,6 +490,16 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   }
 }
 
+void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+                              Upstream::HostDescriptionConstSharedPtr host) {
+  upstream_handle_ = nullptr;
+  Network::Connection& latched_conn = conn_data->connection();
+  auto upstream =
+      std::make_unique<TcpUpstream>(callbacks_->upstreamRequest(), std::move(conn_data));
+  callbacks_->onPoolReady(std::move(upstream), host, latched_conn.localAddress(),
+                          latched_conn.streamInfo());
+}
+
 bool HttpConnPool::cancelAnyPendingRequest() {
   if (conn_pool_stream_handle_) {
     conn_pool_stream_handle_->cancel();
@@ -487,7 +511,7 @@ bool HttpConnPool::cancelAnyPendingRequest() {
 
 absl::optional<Http::Protocol> HttpConnPool::protocol() const { return conn_pool_.protocol(); }
 
-void HttpConnPool::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                  absl::string_view transport_failure_reason,
                                  Upstream::HostDescriptionConstSharedPtr host) {
   callbacks_->onPoolFailure(reason, transport_failure_reason, host);
@@ -500,6 +524,69 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   auto upstream = std::make_unique<HttpUpstream>(*callbacks_->upstreamRequest(), &request_encoder);
   callbacks_->onPoolReady(std::move(upstream), host,
                           request_encoder.getStream().connectionLocalAddress(), info);
+}
+
+TcpUpstream::TcpUpstream(UpstreamRequest* upstream_request,
+                         Tcp::ConnectionPool::ConnectionDataPtr&& upstream)
+    : upstream_request_(upstream_request), upstream_conn_data_(std::move(upstream)) {
+  upstream_conn_data_->connection().enableHalfClose(true);
+  upstream_conn_data_->addUpstreamCallbacks(*this);
+}
+
+void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
+  upstream_conn_data_->connection().write(data, end_stream);
+}
+
+void TcpUpstream::encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) {
+  if (end_stream) {
+    Buffer::OwnedImpl data;
+    upstream_conn_data_->connection().write(data, true);
+  }
+}
+
+void TcpUpstream::encodeTrailers(const Http::RequestTrailerMap&) {
+  Buffer::OwnedImpl data;
+  upstream_conn_data_->connection().write(data, true);
+}
+
+void TcpUpstream::readDisable(bool disable) {
+  if (upstream_conn_data_->connection().state() != Network::Connection::State::Open) {
+    return;
+  }
+  upstream_conn_data_->connection().readDisable(disable);
+}
+
+void TcpUpstream::resetStream() {
+  upstream_request_ = nullptr;
+  upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+  if (!sent_headers_) {
+    Http::ResponseHeaderMapPtr headers{
+        Http::createHeaderMap<Http::ResponseHeaderMapImpl>({{Http::Headers::get().Status, "200"}})};
+    upstream_request_->decodeHeaders(std::move(headers), false);
+    sent_headers_ = true;
+  }
+  upstream_request_->decodeData(data, end_stream);
+}
+
+void TcpUpstream::onEvent(Network::ConnectionEvent event) {
+  if (event != Network::ConnectionEvent::Connected && upstream_request_) {
+    upstream_request_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
+  }
+}
+
+void TcpUpstream::onAboveWriteBufferHighWatermark() {
+  if (upstream_request_) {
+    upstream_request_->disableDataFromDownstreamForFlowControl();
+  }
+}
+
+void TcpUpstream::onBelowWriteBufferLowWatermark() {
+  if (upstream_request_) {
+    upstream_request_->enableDataFromDownstreamForFlowControl();
+  }
 }
 
 } // namespace Router
