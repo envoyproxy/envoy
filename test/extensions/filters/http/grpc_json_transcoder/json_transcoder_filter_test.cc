@@ -884,6 +884,17 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamWithHttpBodyAsOutput) {
   EXPECT_EQ(nullptr, response_headers.ContentLength());
   EXPECT_EQ(response.data(), response_data->toString());
 
+  // "Send" 3rd multiframe message ("msgmsgmsg")
+  Buffer::OwnedImpl multiframe_data;
+  response.set_data("msg");
+  for (size_t i = 0; i < 3; i++) {
+    auto frame = Grpc::Common::serializeToGrpcFrame(response);
+    multiframe_data.add(*frame);
+  }
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(multiframe_data, false));
+  // 3 grpc frames joined
+  EXPECT_EQ("msgmsgmsg", multiframe_data.toString());
+
   Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
 }

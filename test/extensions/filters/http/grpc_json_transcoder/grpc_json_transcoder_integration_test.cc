@@ -341,6 +341,52 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBody) {
       R"(Hello!)");
 }
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyMultipleFramesInData) {
+  HttpIntegrationTest::initialize();
+
+  // testTranscoding() does not provide grpc multiframe support.
+  // Since this is one-off it does not make sense to even more
+  // complicate this function.
+  //
+  // Make request to gRPC upstream
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/indexStream"},
+      {":authority", "host"},
+  });
+  waitForNextUpstreamRequest();
+
+  // Send multi-framed gRPC response
+  // Headers
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/grpc");
+  upstream_request_->encodeHeaders(response_headers, false);
+  // Payload
+  google::api::HttpBody grpcMsg;
+  EXPECT_TRUE(TextFormat::ParseFromString(R"(content_type: "text/plain" data: "Hello")", &grpcMsg));
+  Buffer::OwnedImpl response_buffer;
+  for (size_t i = 0; i < 3; i++) {
+    auto frame = Grpc::Common::serializeToGrpcFrame(grpcMsg);
+    response_buffer.add(*frame);
+  }
+  upstream_request_->encodeData(response_buffer, false);
+  // Trailers
+  Http::TestResponseTrailerMapImpl response_trailers;
+  auto grpc_status = Status();
+  response_trailers.setGrpcStatus(static_cast<uint64_t>(grpc_status.error_code()));
+  response_trailers.setGrpcMessage(
+      absl::string_view(grpc_status.error_message().data(), grpc_status.error_message().size()));
+  upstream_request_->encodeTrailers(response_trailers);
+  EXPECT_TRUE(upstream_request_->complete());
+
+  // Wait for complete / check body to have 3 frames joined
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->body(), "HelloHelloHello");
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryEchoHttpBody) {
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::EchoBodyRequest, google::api::HttpBody>(
