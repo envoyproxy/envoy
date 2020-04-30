@@ -117,8 +117,6 @@ public:
           cluster: cluster_1
 )EOF") {}
 
-  ~LdsInplaceUpdateTcpProxyIntegrationTest() override = default;
-
   void initialize() override {
     config_helper_.renameListener("tcp");
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
@@ -181,6 +179,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
         listener->mutable_filter_chains()->RemoveLast();
       });
   new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
 
   while (!client_1->connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -224,7 +223,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
              ->mutable_application_protocols(0) = "alpn2";
       });
   new_config_helper.setLds("1");
-
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
 
   auto client_2 = connect("alpn2");
@@ -371,9 +370,10 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
       });
 
   new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
-  expectResponseHeaderConnectionClose(*codec_client_1, true);
 
+  expectResponseHeaderConnectionClose(*codec_client_1, true);
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 0);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
 }
@@ -396,7 +396,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
              ->mutable_application_protocols(0) = "alpn2";
       });
   new_config_helper.setLds("1");
-
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
 
   auto codec_client_2 = createHttpCodec("alpn2");
@@ -447,6 +447,7 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
 
   // Create an LDS response with the new config, and reload config.
   new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
 
   // HTTP 1.0 should now be enabled.

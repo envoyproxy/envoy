@@ -292,7 +292,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
-      // Never used during in place update because we expect server started.
+      // listener_init_target_ is not used during in place update because we expect server started.
       listener_init_target_("", nullptr),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
@@ -643,12 +643,15 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
     return false;
   }
 
-  // Guard the filter_chains[0] access.
+  // Full listener update currently rejects tcp listener having 0 filter chain.
+  // In place filter chain update could survive under zero filter chain but we should keep the same
+  // behavior for now. This also guards the below filter chain access.
   if (config.filter_chains_size() == 0) {
     return false;
   }
 
-  // See buildProxyProtocolListenerFilter().
+  // See buildProxyProtocolListenerFilter(). Full listener update guarantees at least 1 filter chain
+  // at tcp listener.
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_.filter_chains()[0], use_proxy_proto, false) ^
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)) {
     return false;

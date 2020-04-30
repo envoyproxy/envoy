@@ -104,7 +104,6 @@ public:
     filter_chains: {}
   )EOF",
                                           &listener_proto);
-    // listener.set_name(name);
     return listener_proto;
   }
 
@@ -117,6 +116,7 @@ public:
     EXPECT_EQ(1UL, manager_->listeners().size());
     checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
   }
+
   void expectUpdateToThenDrain(const envoy::config::listener::v3::Listener& new_listener_proto,
                                ListenerHandle* old_listener_handle) {
     EXPECT_CALL(*worker_, addListener(_, _, _));
