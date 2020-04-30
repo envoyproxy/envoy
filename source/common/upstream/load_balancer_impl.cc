@@ -1,6 +1,7 @@
 #include "common/upstream/load_balancer_impl.h"
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -807,7 +808,7 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector&,
                                                                 const HostsSource& source) {
   HostSharedPtr candidate_host = nullptr;
-  uint64_t candidate_active_rq = 0;
+  uint64_t candidate_active_rq = std::numeric_limits<uint64_t>::max();
   auto& hosts_to_use = unweighted_hosts_[source];
   uint32_t size = hosts_to_use.size();
   const uint32_t choice_count = std::min(choice_count_, size);
@@ -817,16 +818,9 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
     HostSharedPtr sampled_host = hosts_to_use[rand_idx];
     std::swap(hosts_to_use[rand_idx], hosts_to_use[--size]);
 
-    if (candidate_host == nullptr) {
-      // Make a first choice to start the comparisons.
-      candidate_host = sampled_host;
-      candidate_active_rq = candidate_host->stats().rq_active_.value();
-      continue;
-    }
-
     const auto sampled_active_rq = sampled_host->stats().rq_active_.value();
     if (sampled_active_rq < candidate_active_rq) {
-      candidate_host = sampled_host;
+      candidate_host = std::move(sampled_host);
       candidate_active_rq = sampled_active_rq;
     }
   }
