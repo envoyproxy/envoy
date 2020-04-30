@@ -35,6 +35,7 @@
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -538,9 +539,19 @@ void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void TcpUpstream::encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) {
-  if (end_stream) {
-    Buffer::OwnedImpl data;
-    upstream_conn_data_->connection().write(data, true);
+  // Headers should only happen once, so use this opportunity to add the proxy
+  // proto header, if configured.
+  ASSERT(upstream_request_->parent().routeEntry()->connectConfig().has_value());
+  Buffer::OwnedImpl data;
+  auto& connect_config = upstream_request_->parent().routeEntry()->connectConfig().value();
+  if (connect_config.has_proxy_protocol_config()) {
+    const Network::Connection& connection = *upstream_request_->parent().callbacks()->connection();
+    Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
+        connect_config.proxy_protocol_config(), connection, data);
+  }
+
+  if (data.length() != 0 || end_stream) {
+    upstream_conn_data_->connection().write(data, end_stream);
   }
 }
 
