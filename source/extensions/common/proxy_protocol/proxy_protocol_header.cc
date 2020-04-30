@@ -107,6 +107,17 @@ void generateV2Header(const Network::Address::Ip& source_address,
                    source_address.port(), dest_address.port(), source_address.version(), out);
 }
 
+void generateProxyProtoHeader(const envoy::config::core::v3::ProxyProtocolConfig& config,
+                              const Network::Connection& connection, Buffer::Instance& out) {
+  const Network::Address::Ip& dest_address = *connection.localAddress()->ip();
+  const Network::Address::Ip& source_address = *connection.remoteAddress()->ip();
+  if (config.version() == envoy::config::core::v3::ProxyProtocolConfig::V1) {
+    generateV1Header(source_address, dest_address, out);
+  } else if (config.version() == envoy::config::core::v3::ProxyProtocolConfig::V2) {
+    generateV2Header(source_address, dest_address, out);
+  }
+}
+
 void generateV2LocalHeader(Buffer::Instance& out) {
   out.add(PROXY_PROTO_V2_SIGNATURE, PROXY_PROTO_V2_SIGNATURE_LEN);
   const uint8_t addr_fam_protocol_and_length[4]{PROXY_PROTO_V2_VERSION << 4, 0, 0, 0};

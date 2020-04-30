@@ -206,46 +206,46 @@ TEST_F(TcpUpstreamTest, Basic) {
 }
 
 TEST_F(TcpUpstreamTest, V1Header) {
-  mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config()->set_version(
-      envoy::config::core::v3::ProxyProtocolConfig::V1);
+  envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
+      mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
+  proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V1);
   mock_router_filter_.client_connection_.remote_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5);
   mock_router_filter_.client_connection_.local_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8);
 
   Buffer::OwnedImpl expected_data;
-  Extensions::Common::ProxyProtocol::generateV1Header(
-      *mock_router_filter_.client_connection_.local_address_->ip(),
-      *mock_router_filter_.client_connection_.remote_address_->ip(), expected_data);
+  Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
+      *proxy_config, mock_router_filter_.client_connection_, expected_data);
 
   // encodeHeaders now results in the proxy proto header being sent.
   EXPECT_CALL(connection_, write(BufferEqual(&expected_data), false));
   tcp_upstream_->encodeHeaders(request_, false);
 
-  // Data is proxied as usuak.
+  // Data is proxied as usual.
   EXPECT_CALL(connection_, write(BufferStringEqual("foo"), false));
   Buffer::OwnedImpl buffer("foo");
   tcp_upstream_->encodeData(buffer, false);
 }
 
 TEST_F(TcpUpstreamTest, V2Header) {
-  mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config()->set_version(
-      envoy::config::core::v3::ProxyProtocolConfig::V2);
+  envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
+      mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
+  proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
   mock_router_filter_.client_connection_.remote_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5);
   mock_router_filter_.client_connection_.local_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8);
 
   Buffer::OwnedImpl expected_data;
-  Extensions::Common::ProxyProtocol::generateV2Header(
-      *mock_router_filter_.client_connection_.local_address_->ip(),
-      *mock_router_filter_.client_connection_.remote_address_->ip(), expected_data);
+  Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
+      *proxy_config, mock_router_filter_.client_connection_, expected_data);
 
   // encodeHeaders now results in the proxy proto header being sent.
   EXPECT_CALL(connection_, write(BufferEqual(&expected_data), false));
   tcp_upstream_->encodeHeaders(request_, false);
 
-  // Data is proxied as usuak.
+  // Data is proxied as usual.
   EXPECT_CALL(connection_, write(BufferStringEqual("foo"), false));
   Buffer::OwnedImpl buffer("foo");
   tcp_upstream_->encodeData(buffer, false);

@@ -543,32 +543,11 @@ void TcpUpstream::encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) 
   // proto header, if configured.
   ASSERT(upstream_request_->parent().routeEntry()->connectConfig().has_value());
   Buffer::OwnedImpl data;
-  if (upstream_request_->parent()
-          .routeEntry()
-          ->connectConfig()
-          .value()
-          .has_proxy_protocol_config()) {
-    auto version = upstream_request_->parent()
-                       .routeEntry()
-                       ->connectConfig()
-                       .value()
-                       .proxy_protocol_config()
-                       .version();
-    if (version == envoy::config::core::v3::ProxyProtocolConfig::V1) {
-      auto connection = upstream_request_->parent().callbacks()->connection();
-      Extensions::Common::ProxyProtocol::generateV1Header(
-          connection->localAddress()->ip()->addressAsString(),
-          connection->remoteAddress()->ip()->addressAsString(),
-          connection->localAddress()->ip()->port(), connection->remoteAddress()->ip()->port(),
-          connection->localAddress()->ip()->version(), data);
-    } else if (version == envoy::config::core::v3::ProxyProtocolConfig::V2) {
-      auto connection = upstream_request_->parent().callbacks()->connection();
-      Extensions::Common::ProxyProtocol::generateV2Header(
-          connection->localAddress()->ip()->addressAsString(),
-          connection->remoteAddress()->ip()->addressAsString(),
-          connection->localAddress()->ip()->port(), connection->remoteAddress()->ip()->port(),
-          connection->localAddress()->ip()->version(), data);
-    }
+  auto& connect_config = upstream_request_->parent().routeEntry()->connectConfig().value();
+  if (connect_config.has_proxy_protocol_config()) {
+    const Network::Connection& connection = *upstream_request_->parent().callbacks()->connection();
+    Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
+        connect_config.proxy_protocol_config(), connection, data);
   }
 
   if (data.length() != 0 || end_stream) {
