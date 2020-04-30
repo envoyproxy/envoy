@@ -240,9 +240,10 @@ public:
   }
 
   // Stats::TextReadout
-  void set(std::string&& value) override {
+  void set(absl::string_view value) override {
+    std::string value_copy(value);
     absl::MutexLock lock(&mutex_);
-    value_ = std::move(value);
+    value_ = std::move(value_copy);
   }
   std::string value() const override {
     absl::MutexLock lock(&mutex_);

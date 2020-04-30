@@ -23,7 +23,7 @@ public:
     MetricImpl::clear(symbol_table_);
   }
 
-  void set(std::string&&) override {}
+  void set(absl::string_view) override {}
   std::string value() const override { return std::string(); }
 
   // Metric

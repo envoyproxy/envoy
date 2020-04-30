@@ -263,7 +263,7 @@ public:
   MockTextReadout();
   ~MockTextReadout() override;
 
-  MOCK_METHOD1(set, void(std::string&& value));
+  MOCK_METHOD1(set, void(absl::string_view value));
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, std::string());
 
