@@ -638,7 +638,7 @@ SotW TTL
 ^^^^^^^^
 
 The SotW :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse.resources>` field contains the 
-current resources as a list of `google.protobuf.Any`. For clients that support the 
+current resources as a list of 'google.protobuf.Any'. For clients that support the 
 'envoy.config.ttl' client feature, a management server may wrap any number of resources in a 
 :ref:`Resource <envoy_api_msg_Resource>` in order to enable TTL.
 
