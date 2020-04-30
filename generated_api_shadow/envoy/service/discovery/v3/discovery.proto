@@ -64,7 +64,7 @@ message DiscoveryRequest {
   google.rpc.Status error_detail = 6;
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message DiscoveryResponse {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DiscoveryResponse";
 
@@ -107,16 +107,6 @@ message DiscoveryResponse {
   // [#not-implemented-hide:]
   // The control plane instance that sent the response.
   config.core.v3.ControlPlane control_plane = 6;
-
-  // [#not-implemented-hide:]
-  // The TTL feature is meant to support configurations that should be removed in the event of a management server
-  // failure. For example, the feature may be used for fault injection testing where the fault injection should be
-  // terminated in the event that Envoy loses contact with the management server.
-  //
-  // When a response is received with TTL set, a timer is started. Each subsequent response containing a TTL
-  // resets this timer to a new value. If a response is received with no TTL set, the timer is removed. Upon
-  // expiration of the timer, the configurations for all resources in the response are removed.
-  google.protobuf.Duration ttl = 7;
 }
 
 // DeltaDiscoveryRequest and DeltaDiscoveryResponse are used in a new gRPC
