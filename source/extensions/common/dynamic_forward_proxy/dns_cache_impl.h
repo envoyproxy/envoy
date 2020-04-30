@@ -39,7 +39,7 @@ struct DnsCacheStats {
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-               Runtime::RandomGenerator& random, Stats::Scope& root_scope,
+               Runtime::RandomGenerator& random, Runtime::Loader& loader, Stats::Scope& root_scope,
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   ~DnsCacheImpl() override;
 
@@ -48,6 +48,7 @@ public:
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
+  DnsCacheResourceManager& dnsCacheResourceManager() override { return resource_manager_; }
 
 private:
   using TlsHostMap = absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>;
@@ -138,6 +139,7 @@ private:
   DnsCacheStats stats_;
   std::list<AddUpdateCallbacksHandleImpl*> update_callbacks_;
   absl::flat_hash_map<std::string, PrimaryHostInfoPtr> primary_hosts_;
+  DnsCacheResourceManager resource_manager_;
   const std::chrono::milliseconds refresh_interval_;
   const BackOffStrategyPtr failure_backoff_strategy_;
   const std::chrono::milliseconds host_ttl_;

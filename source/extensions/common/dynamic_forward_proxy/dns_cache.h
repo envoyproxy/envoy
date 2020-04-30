@@ -5,6 +5,8 @@
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -148,6 +150,11 @@ public:
    * @return all hosts currently stored in the cache.
    */
   virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
+
+  /**
+   * @return resource manager for dns cache.
+   */
+  virtual DnsCacheResourceManager& dnsCacheResourceManager() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;
@@ -176,7 +183,7 @@ using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;
 DnsCacheManagerSharedPtr getCacheManager(Singleton::Manager& manager,
                                          Event::Dispatcher& main_thread_dispatcher,
                                          ThreadLocal::SlotAllocator& tls,
-                                         Runtime::RandomGenerator& random,
+                                         Runtime::RandomGenerator& random, Runtime::Loader& loader,
                                          Stats::Scope& root_scope);
 
 /**

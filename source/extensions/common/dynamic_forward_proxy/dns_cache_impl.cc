@@ -16,13 +16,14 @@ namespace DynamicForwardProxy {
 
 DnsCacheImpl::DnsCacheImpl(
     Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-    Runtime::RandomGenerator& random, Stats::Scope& root_scope,
+    Runtime::RandomGenerator& random, Runtime::Loader& loader, Stats::Scope& root_scope,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(main_thread_dispatcher.createDnsResolver({}, false)), tls_slot_(tls.allocateSlot()),
       scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_{ALL_DNS_CACHE_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))},
+      resource_manager_(loader, "dns_cache", 1000), // TODO(shikugawa): fix runtime_key
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       failure_backoff_strategy_(
           Config::Utility::prepareDnsRefreshStrategy<

@@ -53,8 +53,8 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   cluster_info_ = cluster->info();
 
-  auto& resource = cluster_info_->resourceManager(route_entry->priority()).pendingRequests();
-  if (!resource.canCreate()) {
+  auto& pending_requests = config_->cache().dnsCacheResourceManager().pendingRequests();
+  if (!pending_requests.canCreate()) {
     ENVOY_STREAM_LOG(debug, "pending request overflow", *decoder_callbacks_);
     cluster_info_->stats().upstream_rq_pending_overflow_.inc();
     decoder_callbacks_->sendLocalReply(
@@ -62,7 +62,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
         absl::nullopt, ResponseStrings::get().PendingRequestOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
-  circuit_breaker_ = std::make_unique<Upstream::ResourceAutoIncDec>(resource);
+  circuit_breaker_ = std::make_unique<Upstream::ResourceAutoIncDec>(pending_requests);
 
   uint16_t default_port = 80;
   if (cluster_info_->transportSocketMatcher()
