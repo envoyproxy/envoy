@@ -72,6 +72,8 @@ marked with 123.
         port_value: 8888
     listener_filters:
       - name: envoy.filters.listener.proxy_protocol
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
       - name: envoy.filters.listener.original_src
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.listener.original_src.v3.OriginalSrc

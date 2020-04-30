@@ -27,7 +27,7 @@ Example Configuration
 .. code-block:: yaml
 
   listener_filters:
-    name: "envoy.filters.udp.dns_filter"
+    name: envoy.filters.udp.dns_filter
     typed_config:
       "@type": "type.googleapis.com/envoy.extensions.filter.udp.dns_filter.v3alpha.DnsFilterConfig"
       stat_prefix: "dns_filter_prefix"

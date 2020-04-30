@@ -81,6 +81,8 @@ host when forwarding. See the example below within the configured routes.
                   name: dynamic_forward_proxy_cache_config
                   dns_lookup_family: V4_ONLY
             - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     clusters:
     - name: dynamic_forward_proxy_cluster
       connect_timeout: 1s
