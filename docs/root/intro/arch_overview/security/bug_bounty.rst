@@ -29,7 +29,8 @@ to be eligible for the program:
    while triage and potential security releases occur.
 
 3. Vulnerabilities must not be previously known in a public forum, e.g. GitHub issues trackers,
-   CVE databases, etc.
+   CVE databases (when previously associated with Envoy), etc. Existing CVEs that have not been
+   previously associated with an Envoy vulnerability are fair game.
 
 Rewards are at the discretion of the Envoy OSS security team and will be conditioned on the above
 criteria. If multiple instances of the same vulnerability are reported at the same time by
