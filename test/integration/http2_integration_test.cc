@@ -1140,10 +1140,10 @@ TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
   // Envoy server), it's possible the delayed close timer could fire and close the server socket
   // prior to the data callback above firing. Therefore, we may either still be connected, or have
   // received a remote close.
-  if (connection.last_connection_event() == Network::ConnectionEvent::Connected) {
+  if (connection.lastConnectionEvent() == Network::ConnectionEvent::Connected) {
     connection.run();
   }
-  EXPECT_EQ(connection.last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(connection.lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
 }
@@ -1169,10 +1169,10 @@ TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
   // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
   // Envoy server), it's possible for the 'connection' to receive the data and exit the dispatcher
   // prior to the FIN being received from the server.
-  if (connection.last_connection_event() == Network::ConnectionEvent::Connected) {
+  if (connection.lastConnectionEvent() == Network::ConnectionEvent::Connected) {
     connection.run();
   }
-  EXPECT_EQ(connection.last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(connection.lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             0);
 }

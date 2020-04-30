@@ -112,6 +112,7 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   COUNTER(listener_added)                                                                          \
   COUNTER(listener_create_failure)                                                                 \
   COUNTER(listener_create_success)                                                                 \
+  COUNTER(listener_in_place_updated)                                                               \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
   COUNTER(listener_stopped)                                                                        \
@@ -152,6 +153,12 @@ public:
     drain_timer_->enableTimer(drain_time);
   }
 
+  void addFilterChainToDrain(const Network::FilterChain& filter_chain) {
+    draining_filter_chains_.push_back(&filter_chain);
+  }
+
+  uint32_t numDrainingFilterChains() const { return draining_filter_chains_.size(); }
+
 private:
   ListenerImplPtr draining_listener_;
   std::list<const Network::FilterChain*> draining_filter_chains_;
@@ -170,6 +177,7 @@ public:
                       WorkerFactory& worker_factory, bool enable_dispatcher_stats);
 
   void onListenerWarmed(ListenerImpl& listener);
+  void inPlaceFilterChainUpdate(ListenerImpl& listener);
 
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
@@ -188,27 +196,6 @@ public:
   void endListenerUpdate(FailureStates&& failure_state) override;
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
-
-  // TODO(lambdai): Remove follow 2 test helper once intelligent listener warm up is added.
-  // Delegate to private addListenerToWorker.
-  void addListenerToWorkerForTest(Worker& worker, absl::optional<uint64_t> overridden_listener,
-                                  ListenerImpl& listener,
-                                  std::function<void()> completion_callback) {
-    addListenerToWorker(worker, overridden_listener, listener, completion_callback);
-  }
-  // Erase the the listener draining filter chain from active listeners and then start the drain
-  // sequence.
-  void drainFilterChainsForTest(ListenerImpl* listener_raw_ptr) {
-    auto iter = std::find_if(active_listeners_.begin(), active_listeners_.end(),
-                             [listener_raw_ptr](const ListenerImplPtr& ptr) {
-                               return ptr != nullptr && ptr.get() == listener_raw_ptr;
-                             });
-    ASSERT(iter != active_listeners_.end());
-
-    ListenerImplPtr listener_impl_ptr = std::move(*iter);
-    active_listeners_.erase(iter);
-    drainFilterChains(std::move(listener_impl_ptr));
-  }
 
   Instance& server_;
   ListenerComponentFactory& factory_;
@@ -264,11 +251,14 @@ private:
   void drainListener(ListenerImplPtr&& listener);
 
   /**
-   * Mark filter chains which owned by listener for draining. The new listener should have taken
-   * over the listener socket and partial of the filter chains from listener.
-   * @param listener supplies the listener to drain.
+   * Start to draining filter chains that are owned by draining listener but not owned by
+   * new_listener. The new listener should have taken over the listener socket and partial of the
+   * filter chains from listener. This method is used by in place filter chain update.
+   * @param draining_listener supplies the listener to be replaced.
+   * @param new_listener supplies the new listener config which is going to replace the draining
+   * listener.
    */
-  void drainFilterChains(ListenerImplPtr&& listener);
+  void drainFilterChains(ListenerImplPtr&& draining_listener, ListenerImpl& new_listener);
 
   /**
    * Stop a listener. The listener will stop accepting new connections and its socket will be

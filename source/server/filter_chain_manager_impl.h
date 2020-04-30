@@ -193,6 +193,10 @@ public:
       FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
   static bool isWildcardServerName(const std::string& name);
 
+  // Return the current view of filter chains, keyed by filter chain message. Used by the owning
+  // listener to calculate the intersection of filter chains with another listener.
+  const FcContextMap& filterChainsByMessage() const { return fc_contexts_; }
+
 private:
   void convertIPsToTries();
   using SourcePortsMap = absl::flat_hash_map<uint16_t, Network::FilterChainSharedPtr>;

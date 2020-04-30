@@ -70,7 +70,7 @@ public:
   bool connecting() { return callbacks_->connecting_; }
   void run(Event::Dispatcher::RunType run_type = Event::Dispatcher::RunType::Block);
   void close();
-  Network::ConnectionEvent last_connection_event() const {
+  Network::ConnectionEvent lastConnectionEvent() const {
     return callbacks_->last_connection_event_;
   }
 

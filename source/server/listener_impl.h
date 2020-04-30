@@ -24,6 +24,15 @@
 namespace Envoy {
 namespace Server {
 
+class ListenerMessageUtil {
+public:
+  /**
+   * @return true if listener message lhs and rhs are the same if ignoring filter_chains field.
+   */
+  static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
+                                    const envoy::config::listener::v3::Listener& rhs);
+};
+
 class ListenerManagerImpl;
 
 class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
@@ -218,6 +227,28 @@ public:
                bool workers_started, uint64_t hash, uint32_t concurrency);
   ~ListenerImpl() override;
 
+  // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
+  // update.
+  /**
+   * Execute in place filter chain update. The filter chain update is less expensive than full
+   * listener update because connections may not need to be drained.
+   */
+  std::unique_ptr<ListenerImpl>
+  newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
+                             bool workers_started, uint64_t hash);
+  /**
+   * Determine if in place filter chain update could be executed at this moment.
+   */
+  bool supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
+                                bool worker_started);
+
+  /**
+   * Run the callback on each filter chain that exists in this listener but not in the passed
+   * listener config.
+   */
+  void diffFilterChain(const ListenerImpl& another_listener,
+                       std::function<void(Network::DrainableFilterChain&)> callback);
+
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
    */
@@ -296,6 +327,26 @@ public:
   SystemTime last_updated_;
 
 private:
+  /**
+   * Create a new listener from an existing listener and the new config message if the in place
+   * filter chain update is decided. Should be called only by newListenerWithFilterChain().
+   */
+  ListenerImpl(const ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
+               const std::string& version_info, ListenerManagerImpl& parent,
+               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
+               uint32_t concurrency);
+  // Helpers for constructor.
+  void buildAccessLog();
+  void buildUdpListenerFactory(Network::Address::SocketType socket_type, uint32_t concurrency);
+  void buildListenSocketOptions(Network::Address::SocketType socket_type);
+  void createListenerFilterFactories(Network::Address::SocketType socket_type);
+  void validateFilterChains(Network::Address::SocketType socket_type);
+  void buildFilterChains();
+  void buildSocketOptions();
+  void buildOriginalDstListenerFilter();
+  void buildProxyProtocolListenerFilter();
+  void buildTlsInspectorListenerFilter();
+
   void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
     ensureSocketOptions();
     listen_socket_options_->emplace_back(std::move(option));

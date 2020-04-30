@@ -15,6 +15,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
@@ -133,6 +134,33 @@ protected:
     return raw_listener;
   }
 
+  ListenerHandle* expectListenerOverridden(bool need_init, ListenerHandle* origin = nullptr) {
+    auto raw_listener = new ListenerHandle(false);
+    // Simulate ListenerImpl: drain manager is copied from origin.
+    if (origin != nullptr) {
+      raw_listener->drain_manager_ = origin->drain_manager_;
+    }
+    // Overridden listener is always added by api.
+    EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
+    EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
+
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillOnce(Invoke(
+            [raw_listener, need_init](
+                const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
+                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                -> std::vector<Network::FilterFactoryCb> {
+              std::shared_ptr<ListenerHandle> notifier(raw_listener);
+              raw_listener->context_ = &filter_chain_factory_context;
+              if (need_init) {
+                filter_chain_factory_context.initManager().add(notifier->target_);
+              }
+              return {[notifier](Network::FilterManager&) -> void {}};
+            }));
+
+    return raw_listener;
+  }
+
   const Network::FilterChain*
   findFilterChain(uint16_t destination_port, const std::string& destination_address,
                   const std::string& server_name, const std::string& transport_protocol,
@@ -199,8 +227,11 @@ protected:
             }));
   }
 
-  void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t warming,
-                  uint64_t active, uint64_t draining) {
+  void checkStats(int line_num, uint64_t added, uint64_t modified, uint64_t removed,
+                  uint64_t warming, uint64_t active, uint64_t draining,
+                  uint64_t draining_filter_chains) {
+    SCOPED_TRACE(line_num);
+
     EXPECT_EQ(added, server_.stats_store_.counter("listener_manager.listener_added").value());
     EXPECT_EQ(modified, server_.stats_store_.counter("listener_manager.listener_modified").value());
     EXPECT_EQ(removed, server_.stats_store_.counter("listener_manager.listener_removed").value());
@@ -216,6 +247,10 @@ protected:
                             .gauge("listener_manager.total_listeners_draining",
                                    Stats::Gauge::ImportMode::NeverImport)
                             .value());
+    EXPECT_EQ(draining_filter_chains, server_.stats_store_
+                                          .gauge("listener_manager.total_filter_chains_draining",
+                                                 Stats::Gauge::ImportMode::NeverImport)
+                                          .value());
   }
 
   void checkConfigDump(const std::string& expected_dump_yaml) {
@@ -226,6 +261,14 @@ protected:
     envoy::admin::v3::ListenersConfigDump expected_listeners_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
+  }
+
+  ABSL_MUST_USE_RESULT
+  auto disableInplaceUpdateForThisTest() {
+    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.listener_in_place_filterchain_update", "false"}});
+    return scoped_runtime;
   }
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;

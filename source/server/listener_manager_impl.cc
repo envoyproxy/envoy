@@ -403,9 +403,23 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     return false;
   }
 
-  ListenerImplPtr new_listener(new ListenerImpl(config, version_info, *this, name, added_via_api,
-                                                workers_started_, hash,
-                                                server_.options().concurrency()));
+  ListenerImplPtr new_listener = nullptr;
+
+  // In place filter chain update depends on the active listener at worker.
+  if (existing_active_listener != active_listeners_.end() &&
+      (*existing_active_listener)->supportUpdateFilterChain(config, workers_started_)) {
+    ENVOY_LOG(debug, "use in place update filter chain update path for listener name={} hash={}",
+              name, hash);
+    new_listener =
+        (*existing_active_listener)->newListenerWithFilterChain(config, workers_started_, hash);
+    stats_.listener_in_place_updated_.inc();
+  } else {
+    ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, hash);
+    new_listener =
+        std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
+                                       workers_started_, hash, server_.options().concurrency());
+  }
+
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This
@@ -694,20 +708,47 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   updateWarmingActiveGauges();
 }
 
-void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener) {
+void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
+  auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
+  auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
+  ASSERT(existing_warming_listener != warming_listeners_.end());
+  ASSERT(*existing_warming_listener != nullptr);
+
+  (*existing_warming_listener)->debugLog("execute in place filter chain update");
+
+  // Now that in place filter chain update was decided, the replaced listener must be in active
+  // list. It requires stop/remove listener procedure cancelling the in placed update if any.
+  ASSERT(existing_active_listener != active_listeners_.end());
+  ASSERT(*existing_active_listener != nullptr);
+
+  for (const auto& worker : workers_) {
+    // Explicitly override the existing listener with a new listener config.
+    addListenerToWorker(*worker, listener.listenerTag(), listener, nullptr);
+  }
+
+  auto previous_listener = std::move(*existing_active_listener);
+  *existing_active_listener = std::move(*existing_warming_listener);
+  // Finish active_listeners_ transformation before calling `drainFilterChains` as it depends on
+  // their state.
+  drainFilterChains(std::move(previous_listener), **existing_active_listener);
+
+  warming_listeners_.erase(existing_warming_listener);
+  updateWarmingActiveGauges();
+}
+
+void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
+                                            ListenerImpl& new_listener) {
   // First add the listener to the draining list.
   std::list<DrainingFilterChainsManager>::iterator draining_group =
       draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(),
-                                              std::move(listener), workers_.size());
-  int filter_chain_size = draining_group->getDrainingFilterChains().size();
-
-  // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
-  // restart. Same below inside the lambda.
-  // TODO(lambdai): Currently the number of DrainFilterChains objects are tracked:
-  // len(filter_chains). What we really need is accumulate(filter_chains, filter_chains:
-  // len(filter_chains))
-  stats_.total_filter_chains_draining_.set(draining_filter_chains_manager_.size());
-
+                                              std::move(draining_listener), workers_.size());
+  draining_group->getDrainingListener().diffFilterChain(
+      new_listener, [&draining_group](Network::DrainableFilterChain& filter_chain) mutable {
+        filter_chain.startDraining();
+        draining_group->addFilterChainToDrain(filter_chain);
+      });
+  auto filter_chain_size = draining_group->numDrainingFilterChains();
+  stats_.total_filter_chains_draining_.add(filter_chain_size);
   draining_group->getDrainingListener().debugLog(
       absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
                    draining_group->getDrainingListener().name()));
@@ -733,15 +774,14 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener) {
                     draining_group->getDrainingListener().debugLog(
                         absl::StrCat("draining filter chains from listener ",
                                      draining_group->getDrainingListener().name(), " complete"));
+                    stats_.total_filter_chains_draining_.sub(
+                        draining_group->numDrainingFilterChains());
                     draining_filter_chains_manager_.erase(draining_group);
-                    stats_.total_filter_chains_draining_.set(
-                        draining_filter_chains_manager_.size());
                   }
                 });
               });
         }
       });
-
   updateWarmingActiveGauges();
 }
 
