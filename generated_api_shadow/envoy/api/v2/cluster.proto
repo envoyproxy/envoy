@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
-import "envoy/api/v2/auth/cert.proto";
+import "envoy/api/v2/auth/tls.proto";
 import "envoy/api/v2/cluster/circuit_breaker.proto";
 import "envoy/api/v2/cluster/filter.proto";
 import "envoy/api/v2/cluster/outlier_detection.proto";

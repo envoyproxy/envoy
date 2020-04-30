@@ -196,6 +196,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),
+      always_set_request_id_in_response_(config.always_set_request_id_in_response()),
       date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
@@ -547,11 +548,15 @@ const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
  * "envoy.filters.network.http_connection_manager" filter instance.
  */
 const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPerFilterTracerConfig(
-    const envoy::extensions::filters::network::http_connection_manager::v3::
-        HttpConnectionManager&) {
-  // At the moment, it is not yet possible to define tracing provider as part of
-  // "envoy.filters.network.http_connection_manager" config.
-  // Therefore, we always fallback to using the default server-wide tracing provider.
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        config) {
+  // Give precedence to tracing provider configuration defined as part of
+  // "envoy.filters.network.http_connection_manager" filter config.
+  if (config.tracing().has_provider()) {
+    return &config.tracing().provider();
+  }
+  // Otherwise, for the sake of backwards compatibility, fallback to using tracing provider
+  // configuration defined in the bootstrap config.
   if (context_.httpContext().defaultTracingConfig().has_http()) {
     return &context_.httpContext().defaultTracingConfig().http();
   }

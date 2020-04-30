@@ -252,7 +252,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
                                          const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
-      dispatcher_(api_->allocateDispatcher(Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
+      dispatcher_(api_->allocateDispatcher("test_thread",
+                                           Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       version_(version), upstream_address_fn_(upstream_address_fn),
       config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
@@ -262,7 +263,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // notification and clear the pool connection if necessary. A real fix would require adding fairly
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
-  timeSystem().sleep(std::chrono::milliseconds(10));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, create_(_, _))
       .WillByDefault(Invoke([](std::function<void()> below_low,
                                std::function<void()> above_high) -> Buffer::Instance* {
@@ -479,7 +480,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
                        absl::StrCat("Lds update failed. Details\n",
                                     getListenerDetails(test_server_->server())));
       }
-      time_system_.sleep(std::chrono::milliseconds(10));
+      time_system_.advanceTimeWait(std::chrono::milliseconds(10));
     }
 
     registerTestServerPorts(port_names);

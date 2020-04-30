@@ -1,13 +1,10 @@
-#include <arpa/inet.h>
-#include <arpa/nameser.h>
-#include <arpa/nameser_compat.h>
-
 #include <list>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/address.h"
@@ -33,6 +30,13 @@
 #include "ares.h"
 #include "ares_dns.h"
 #include "gtest/gtest.h"
+
+#if !defined(WIN32)
+#include <arpa/nameser.h>
+#include <arpa/nameser_compat.h>
+#else
+#include "nameser.h"
+#endif
 
 using testing::_;
 using testing::Contains;
@@ -337,7 +341,8 @@ private:
 
 class DnsImplConstructor : public testing::Test {
 protected:
-  DnsImplConstructor() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+  DnsImplConstructor()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -417,7 +422,8 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
-  DnsImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+  DnsImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void SetUp() override {
     resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups());

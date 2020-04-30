@@ -1,5 +1,6 @@
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
+#include "envoy/config/trace/v3/opencensus.pb.h"
+#include "envoy/config/trace/v3/opencensus.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/tracers/opencensus/config.h"
@@ -295,12 +296,6 @@ TEST(OpenCensusTracerConfigTest, ShouldRejectSubsequentCreateAttemptsWithDiffere
   // Verify that OpenCensus is only configured once in a lifetime.
   EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message_two, context)), EnvoyException,
                             "Opencensus has already been configured with a different config.");
-}
-
-TEST(OpenCensusTracerConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<OpenCensusTracerFactory, Server::Configuration::TracerFactory>()),
-      EnvoyException, "Double registration for name: 'envoy.tracers.opencensus'");
 }
 
 } // namespace OpenCensus

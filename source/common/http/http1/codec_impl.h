@@ -61,8 +61,8 @@ public:
   void disableChunkEncoding() override { disable_chunk_encoding_ = true; }
 
   // Http::Stream
-  void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
-  void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
+  void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
+  void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
   // After this is called, for the HTTP/1 codec, the connection should be closed, i.e. no further
   // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
@@ -71,7 +71,8 @@ public:
   absl::string_view responseDetails() override { return details_; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
 
-  void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
+  void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
+  void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
 
 protected:
@@ -88,6 +89,7 @@ protected:
   bool chunk_encoding_ : 1;
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
+  bool is_response_to_connect_request_ : 1;
   bool is_content_length_allowed_ : 1;
 
 private:
@@ -145,13 +147,17 @@ public:
   RequestEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
       : StreamEncoderImpl(connection, header_key_formatter) {}
   bool headRequest() { return head_request_; }
+  bool connectRequest() { return connect_request_; }
 
   // Http::RequestEncoder
   void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const RequestTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
+  bool upgrade_request_{};
+
 private:
   bool head_request_{};
+  bool connect_request_{};
 };
 
 /**
@@ -315,6 +321,11 @@ private:
   virtual int onHeadersComplete() PURE;
 
   /**
+   * Called to see if upgrade transition is allowed.
+   */
+  virtual bool upgradeAllowed() const PURE;
+
+  /**
    * Called with body data is available for processing when either:
    * - There is an accumulated partial body after the parser is done processing bytes read from the
    * socket
@@ -420,6 +431,8 @@ private:
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete() override;
+  // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
+  bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
@@ -502,6 +515,7 @@ private:
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete() override;
+  bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
