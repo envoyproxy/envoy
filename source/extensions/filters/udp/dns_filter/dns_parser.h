@@ -68,6 +68,12 @@ public:
 using DnsAnswerRecordPtr = std::unique_ptr<DnsAnswerRecord>;
 using DnsAnswerMap = std::unordered_multimap<std::string, DnsAnswerRecordPtr>;
 
+static constexpr uint16_t NO_ERROR{0};
+static constexpr uint16_t FORMAT_ERROR{1};
+static constexpr uint16_t SERVER_FAILURE{2};
+static constexpr uint16_t NAME_ERROR{3};
+static constexpr uint16_t NOT_IMPLEMENTED{4};
+
 /**
  * DnsQueryContext contains all the data associated with a query. The filter uses this object to
  * generate a response and determine where it should be transmitted.
@@ -94,11 +100,6 @@ using DnsQueryContextPtr = std::unique_ptr<DnsQueryContext>;
  */
 class DnsMessageParser : public Logger::Loggable<Logger::Id::filter> {
 public:
-  static constexpr uint16_t NO_ERROR{0};
-  static constexpr uint16_t FORMAT_ERROR{1};
-  static constexpr uint16_t SERVER_FAILURE{2};
-  static constexpr uint16_t NAME_ERROR{3};
-  static constexpr uint16_t NOT_IMPLEMENTED{4};
 
   enum class DnsQueryParseState {
     Init = 0,
