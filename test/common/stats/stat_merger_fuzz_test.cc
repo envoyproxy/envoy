@@ -15,7 +15,7 @@ namespace Fuzz {
 void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
   StatNameDynamicPool dynamic_pool(symbol_table);
   StatNamePool symbolic_pool(symbol_table);
-  std::vector<StatName> stat_names;
+  StatNameVec stat_names;
 
   // This local string is write-only; it's used to help when debugging
   // a crash. If a crash is found, you can print the unit_test_encoding

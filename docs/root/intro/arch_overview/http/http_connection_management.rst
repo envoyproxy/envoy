@@ -73,7 +73,7 @@ can be used to modify this behavior, and they fall into two categories:
 
   Envoy supports the following built-in priority predicates
 
-  * *envoy.retry_priority.previous_priorities*: This will keep track of previously attempted priorities,
+  * *envoy.retry_priorities.previous_priorities*: This will keep track of previously attempted priorities,
     and adjust the priority load such that other priorities will be targeted in subsequent retry attempts.
 
 Host selection will continue until either the configured predicates accept the host or a configurable
@@ -117,7 +117,7 @@ To reject a host based on its metadata, ``envoy.retry_host_predicates.omit_host_
 This will reject any host with matching (key, value) in its metadata.
 
 To configure retries to attempt other priorities during retries, the built-in
-``envoy.retry_priority.previous_priorities`` can be used.
+``envoy.retry_priorities.previous_priorities`` can be used.
 
 .. code-block:: yaml
 

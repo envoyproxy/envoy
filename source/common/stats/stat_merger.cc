@@ -20,7 +20,7 @@ StatName StatMerger::DynamicContext::makeDynamicStatName(const std::string& name
 
   // Name has embedded dynamic segments; we'll need to join together the
   // static/dynamic StatName segments.
-  std::vector<StatName> segments;
+  StatNameVec segments;
   uint32_t segment_index = 0;
   std::vector<absl::string_view> dynamic_segments;
 
