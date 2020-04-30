@@ -350,7 +350,6 @@ envoy_cc_test(
         "//source/common/common:version_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/buffer:config",
-        "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
         "//source/extensions/filters/http/ratelimit:config",
