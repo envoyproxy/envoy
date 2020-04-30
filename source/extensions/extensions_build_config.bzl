@@ -17,6 +17,12 @@ EXTENSIONS = {
     "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
 
     #
+    # Compression
+    #
+
+    "envoy.compression.gzip.decompressor":              "//source/extensions/compression/gzip/decompressor:config",
+
+    #
     # gRPC Credentials Plugins
     #
 
