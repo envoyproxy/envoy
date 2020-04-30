@@ -8,7 +8,6 @@ if [[ -z "${TEST_RANDOM_SEED}" ]]; then
 else
     BASE_ID="${TEST_RANDOM_SEED}"
 fi
-let BASE_ID=BASE_ID*10
 
 function expect_fail_with_error() {
   log="${TEST_TMPDIR}/envoy.log"
@@ -16,7 +15,7 @@ function expect_fail_with_error() {
   expected_error="$1"
   shift
   echo ${ENVOY_BIN} --base-id "${BASE_ID}" "$@" ">&" "$log"
-  ${ENVOY_BIN} "$@" >& "$log"
+  ${ENVOY_BIN} --base-id "${BASE_ID}" "$@" >& "$log"
   EXIT_CODE=$?
   cat "$log"
   check [ $EXIT_CODE -eq 1 ]
