@@ -323,18 +323,8 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   bool redispatch;
   do {
     redispatch = false;
-    Status status;
 
-    try {
-      status = codec_->dispatch(data);
-      // TODO(#10878): Remove this when exception removal is complete. It is currently in migration.
-      // Soon we won't need to catch these exceptions, as they'll be propagated through the error
-      // statuses callbacks and returned from dispatch.
-    } catch (const FrameFloodException& e) {
-      status = bufferFloodError(e.what());
-    } catch (const CodecProtocolException& e) {
-      status = codecProtocolError(e.what());
-    }
+    Status status = codec_->dispatch(data);
 
     ASSERT(!isPrematureResponseError(status));
     if (isBufferFloodError(status)) {

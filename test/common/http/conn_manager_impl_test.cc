@@ -2761,7 +2761,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
 
   // Fake a protocol error that races with the drain timeout. This will cause a local close.
   // Also fake the local close not closing immediately.
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Throw(CodecProtocolException("protocol error")));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(codecProtocolError("protocol error")));
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay))
@@ -2971,8 +2971,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     conn_manager_->newStream(response_encoder_);
-    throw CodecProtocolException("protocol error");
-    return Http::okStatus();
+    return codecProtocolError("protocol error");
   }));
 
   EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
@@ -3006,8 +3005,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAccessLog) {
   NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder = &conn_manager_->newStream(encoder);
-    throw CodecProtocolException("protocol error");
-    return Http::okStatus();
+    return codecProtocolError("protocol error");
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -3043,8 +3041,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAfterHeadersAcc
         new TestRequestHeaderMapImpl{{":method", "GET"}, {":authority", "host"}, {":path", "/"}}};
     decoder->decodeHeaders(std::move(headers), true);
 
-    throw CodecProtocolException("protocol error");
-    return Http::okStatus();
+    return codecProtocolError("protocol error");
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -3058,8 +3055,7 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     conn_manager_->newStream(response_encoder_);
-    throw FrameFloodException("too many outbound frames.");
-    return Http::okStatus();
+    return bufferFloodError("too many outbound frames.");
   }));
 
   EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));

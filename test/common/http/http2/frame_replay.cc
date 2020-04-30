@@ -94,7 +94,7 @@ void CodecFrameInjector::write(const Frame& frame, Http::Connection& connection)
   buffer.add(frame.data(), frame.size());
   ENVOY_LOG_MISC(trace, "{} write: {}", injector_name_, Hex::encode(frame.data(), frame.size()));
   auto status = Http::okStatus();
-  while (buffer.length() > 0) {
+  while (buffer.length() > 0 && status.ok()) {
     status = connection.dispatch(buffer);
   }
   ENVOY_LOG_MISC(trace, "Status: {}", status.message());

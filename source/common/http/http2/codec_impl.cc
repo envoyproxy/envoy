@@ -468,9 +468,19 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
 Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
+  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
+  // throw an exception or return an error status. The utility wrapper catches exceptions and
+  // converts them to error statuses.
+  return Http::Utility::exceptionToStatus(
+      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
+}
+
+Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
   // ConnectionImpl::dispatch throws an exception.
+  // TODO(#10878): Replace by manually setting to false at the end of the dispatch when exception
+  // removal is complete and dispatch will no longer throw.
   Cleanup cleanup([this]() { dispatching_ = false; });
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     dispatching_ = true;
@@ -1344,6 +1354,14 @@ void ServerConnectionImpl::checkOutboundQueueLimits() {
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
+  // throw an exception or return an error status. The utility wrapper catches exceptions and
+  // converts them to error statuses.
+  return Http::Utility::exceptionToStatus(
+      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
+}
+
+Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ASSERT(!dispatching_downstream_data_);
   dispatching_downstream_data_ = true;
 
@@ -1354,7 +1372,7 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   checkOutboundQueueLimits();
 
-  return ConnectionImpl::dispatch(data);
+  return ConnectionImpl::innerDispatch(data);
 }
 
 absl::optional<int>

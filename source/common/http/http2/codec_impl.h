@@ -139,6 +139,16 @@ public:
     }
   }
 
+  /**
+   * An inner dispatch call that executes the dispatching logic. While exception removal is in
+   * migration (#10878), this function may either throw an exception or return an error status.
+   * Exceptions are caught and translated to their corresponding statuses in the outer level
+   * dispatch.
+   * This needs to be virtual so that ServerConnectionImpl can override.
+   * TODO(#10878): Remove this when exception removal is complete.
+   */
+  virtual Http::Status innerDispatch(Buffer::Instance& data);
+
 protected:
   friend class ProdNghttp2SessionFactory;
 
@@ -222,6 +232,7 @@ protected:
     // This code assumes that details is a static string, so that we
     // can avoid copying it.
     void setDetails(absl::string_view details) {
+      ENVOY_LOG_MISC(info, "CALLING SET DETAILS");
       // It is probably a mistake to call setDetails() twice, so
       // assert that details_ is empty.
       ASSERT(details_.empty());
@@ -567,6 +578,7 @@ private:
   // ServerConnectionImpl objects is called only when processing data from the downstream client in
   // the ConnectionManagerImpl::onData method.
   Http::Status dispatch(Buffer::Instance& data) override;
+  Http::Status innerDispatch(Buffer::Instance& data) override;
 
   ServerConnectionCallbacks& callbacks_;
 

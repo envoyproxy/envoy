@@ -122,17 +122,7 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
 
 void CodecClient::onData(Buffer::Instance& data) {
   bool protocol_error = false;
-  Status status;
-  try {
-    status = codec_->dispatch(data);
-    // TODO(#10878): Remove this when exception removal is complete. It is currently in migration.
-    // Soon we won't need to catch these exceptions, as they'll be propagated through the error
-    // statuses callbacks and returned from dispatch.
-  } catch (CodecProtocolException& e) {
-    status = codecProtocolError(e.what());
-  } catch (PrematureResponseException& e) {
-    status = prematureResponseError(e.what(), e.responseCode());
-  }
+  Status status = codec_->dispatch(data);
 
   if (isCodecProtocolError(status)) {
     ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, status.message());

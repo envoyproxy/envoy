@@ -446,15 +446,8 @@ private:
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      Http::Status status;
-      try {
-        status = parent_.codec_->dispatch(data);
-        // TODO(#10878): Remove this when exception removal is complete. It is currently in
-        // migration. Soon we won't need to catch these exceptions, as they'll be propagated through
-        // the error statuses callbacks and returned from dispatch.
-      } catch (const Http::CodecProtocolException& e) {
-        status = Http::codecProtocolError(e.what());
-      }
+      Http::Status status = parent_.codec_->dispatch(data);
+
       if (Http::isCodecProtocolError(status)) {
         ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", status.message());
         // We don't do a full stream shutdown like HCM, but just shutdown the

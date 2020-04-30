@@ -47,12 +47,12 @@ class Http2CodecImplTestFixture {
 public:
   struct ConnectionWrapper {
     void dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
+      Http::Status status;
       buffer_.add(data);
       if (!dispatching_) {
         while (buffer_.length() > 0) {
           dispatching_ = true;
-          auto status = connection.dispatch(buffer_);
-          EXPECT_TRUE(status.ok());
+          status = connection.innerDispatch(buffer_);
           dispatching_ = false;
         }
       }
@@ -1781,7 +1781,7 @@ TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
       .Times(
           CommonUtility::OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD +
           1);
-  EXPECT_NO_THROW(server_wrapper_.dispatch(data, *server_));
+  server_wrapper_.dispatch(data, *server_);
 }
 
 // CONNECT without upgrade type gets tagged with "bytestream"
