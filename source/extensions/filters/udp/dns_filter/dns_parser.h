@@ -100,7 +100,6 @@ using DnsQueryContextPtr = std::unique_ptr<DnsQueryContext>;
  */
 class DnsMessageParser : public Logger::Loggable<Logger::Id::filter> {
 public:
-
   enum class DnsQueryParseState {
     Init = 0,
     Flags,      // 2 bytes
