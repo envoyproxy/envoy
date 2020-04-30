@@ -6,7 +6,7 @@ def clang_tools_cc_binary(name, copts = [], tags = [], deps = [], **kwargs):
             "-fno-rtti",
         ],
         tags = tags + ["manual"],
-        deps = deps + ["@envoy//bazel/foreign_cc:zlib"],
+        deps = deps + ["@net_zlib//:zlib"],
         **kwargs
     )
 

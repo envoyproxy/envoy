@@ -132,8 +132,8 @@ envoy_cmake_external(
     deps = [
         ":ares",
         ":nghttp2",
-        "//external:zlib",
         "//external:ssl",
+        "//external:zlib",
     ],
 )
 
@@ -206,4 +206,3 @@ envoy_cmake_external(
         "//conditions:default": ["libyaml-cpp.a"],
     }),
 )
-
