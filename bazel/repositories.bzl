@@ -2,7 +2,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":dev_binding.bzl", "envoy_dev_binding")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
-load(":repository_locations.bzl", "DEPENDENCY_REPOSITORIES", "USE_CATEGORIES")
+load(":repository_locations.bzl", "DEPENDENCY_ANNOTATIONS", "DEPENDENCY_REPOSITORIES", "USE_CATEGORIES")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
@@ -39,7 +39,8 @@ REPOSITORY_LOCATIONS = _repository_locations()
 # See repository_locations.bzl for the list of annotation attributes.
 def _get_location(dependency):
     stripped = dict(REPOSITORY_LOCATIONS[dependency])
-    stripped.pop("use_category", None)
+    for attribute in DEPENDENCY_ANNOTATIONS:
+        stripped.pop(attribute, None)
     return stripped
 
 def _repository_impl(name, **kwargs):

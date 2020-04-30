@@ -1,8 +1,20 @@
+# Validation of content in this file is done on the bazel/repositories.bzl file to make it free of bazel
+# constructs. This is to allow this file to be loaded into Python based build and maintenance tools.
+
 # Envoy dependencies may be annotated with the following attributes:
-#
-# use_category - list of the categories describing how the dependency is being used. This attribute is used
-#                for automatic tracking of security posture of Envoy's dependencies.
-#                Possible values are documented in the USE_CATEGORIES list.
+DEPENDENCY_ANNOTATIONS = [
+    # List of the categories describing how the dependency is being used. This attribute is used
+    # for automatic tracking of security posture of Envoy's dependencies.
+    # Possible values are documented in the USE_CATEGORIES list below.
+    # This attribute is mandatory for each dependecy.
+    "use_category",
+
+    # Optional attribute specifying CPE (Common Platform Enumeration, see https://nvd.nist.gov/products/cpe) ID
+    # of the dependency. The ID may be in v2.3 or v2.2 format, although v2.3 is prefferred. See
+    # https://nvd.nist.gov/products/cpe for CPE format. Use single wildcard '*' for version and vector elements
+    # i.e. 'cpe:2.3:a:nghttp2:nghttp2:*'.
+    "cpe",
+]
 
 # NOTE: If a dependency use case is either dataplane or controlplane, the other uses are not needed
 # to be declared.
@@ -86,6 +98,7 @@ DEPENDENCY_REPOSITORIES = dict(
         strip_prefix = "thrift-0.11.0",
         urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-0.11.0.tar.gz"],
         use_category = ["dataplane"],
+        cpe = "cpe:2.3:a:apache:thrift:*",
     ),
     com_github_c_ares_c_ares = dict(
         sha256 = "bbaab13d6ad399a278d476f533e4d88a7ec7d729507348bb9c2e3b207ba4c606",
@@ -96,6 +109,7 @@ DEPENDENCY_REPOSITORIES = dict(
         # TODO(crazyxy): Update to release-1.16.0 when it is released.
         urls = ["https://github.com/c-ares/c-ares/archive/d7e070e7283f822b1d2787903cce3615536c5610.tar.gz"],
         use_category = ["dataplane"],
+        cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
     ),
     com_github_circonus_labs_libcircllhist = dict(
         sha256 = "8165aa25e529d7d4b9ae849d3bf30371255a99d6db0421516abcff23214cdc2c",
@@ -158,6 +172,7 @@ DEPENDENCY_REPOSITORIES = dict(
         strip_prefix = "grpc-d8f4928fa779f6005a7fe55a176bdb373b0f910f",
         urls = ["https://github.com/grpc/grpc/archive/d8f4928fa779f6005a7fe55a176bdb373b0f910f.tar.gz"],
         use_category = ["dataplane", "controlplane"],
+        cpe = "cpe:2.3:a:grpc:grpc:*",
     ),
     com_github_luajit_luajit = dict(
         sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
@@ -176,6 +191,7 @@ DEPENDENCY_REPOSITORIES = dict(
         strip_prefix = "nghttp2-1.40.0",
         urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.40.0/nghttp2-1.40.0.tar.gz"],
         use_category = ["dataplane"],
+        cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
     ),
     io_opentracing_cpp = dict(
         sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
@@ -214,6 +230,7 @@ DEPENDENCY_REPOSITORIES = dict(
         # 2019-07-02
         urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
         use_category = ["dataplane"],
+        cpe = "cpe:2.3:a:libevent_project:libevent:*",
     ),
     net_zlib = dict(
         # Use the dev branch of zlib to resolve fuzz bugs and out of bound
@@ -224,6 +241,7 @@ DEPENDENCY_REPOSITORIES = dict(
         # 2019-04-14 development branch
         urls = ["https://github.com/madler/zlib/archive/79baebe50e4d6b73ae1f8b603f0ef41300110aa3.tar.gz"],
         use_category = ["dataplane"],
+        cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
     com_github_jbeder_yaml_cpp = dict(
         sha256 = "77ea1b90b3718aa0c324207cb29418f5bced2354c2e483a9523d98c3460af1ed",
@@ -268,6 +286,7 @@ DEPENDENCY_REPOSITORIES = dict(
         # Changes through 2019-12-02
         urls = ["https://github.com/Tencent/rapidjson/archive/dfbe1db9da455552f7a9ad5d2aea17dd9d832ac1.tar.gz"],
         use_category = ["dataplane"],
+        cpe = "cpe:2.3:a:tencent:rapidjson:*",
     ),
     com_github_twitter_common_lang = dict(
         sha256 = "56d1d266fd4767941d11c27061a57bc1266a3342e551bde3780f9e9eb5ad0ed1",
@@ -400,6 +419,7 @@ DEPENDENCY_REPOSITORIES = dict(
         strip_prefix = "kafka-2.4.0/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/2.4.0.zip"],
         use_category = ["dataplane"],
+        cpe = "cpe:2.3:a:apache:kafka:*",
     ),
     kafka_server_binary = dict(
         sha256 = "b9582bab0c3e8d131953b1afa72d6885ca1caae0061c2623071e7f396f2ccfee",
