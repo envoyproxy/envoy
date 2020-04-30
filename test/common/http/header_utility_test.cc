@@ -22,8 +22,11 @@ envoy::config::route::v3::HeaderMatcher parseHeaderMatcherFromYaml(const std::st
 
 class HeaderUtilityTest : public testing::Test {
 public:
-  const HeaderEntry& hostHeaderEntry(const std::string& host_value) {
+  const HeaderEntry& hostHeaderEntry(const std::string& host_value, bool set_connect = false) {
     headers_.setHost(host_value);
+    if (set_connect) {
+      headers_.setMethod(Http::Headers::get().MethodValues.Connect);
+    }
     return *headers_.Host();
   }
   RequestHeaderMapImpl headers_;
@@ -50,6 +53,18 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
 
   for (const auto& host_pair : host_headers) {
     auto& host_header = hostHeaderEntry(host_pair.first);
+    HeaderUtility::stripPortFromHost(headers_, 443);
+    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
+  }
+}
+
+// Port's part from host header won't be removed if method is "connect"
+TEST_F(HeaderUtilityTest, RemovePortsFromHostConnect) {
+  const std::vector<std::pair<std::string, std::string>> host_headers{
+      {"localhost:443", "localhost:443"},
+  };
+  for (const auto& host_pair : host_headers) {
+    auto& host_header = hostHeaderEntry(host_pair.first, true);
     HeaderUtility::stripPortFromHost(headers_, 443);
     EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
   }

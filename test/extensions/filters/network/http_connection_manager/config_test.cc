@@ -991,7 +991,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortDefault) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
-  EXPECT_FALSE(config.shouldStripPort());
+  EXPECT_FALSE(config.shouldStripMatchingPort());
 }
 
 // Validated that when configured, we remove port.
@@ -1000,7 +1000,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
   stat_prefix: ingress_http
   route_config:
     name: local_route
-  strip_host_port: true
+  strip_matching_host_port: true
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
@@ -1008,7 +1008,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
-  EXPECT_TRUE(config.shouldStripPort());
+  EXPECT_TRUE(config.shouldStripMatchingPort());
 }
 
 // Validated that when explicitly set false, we don't remove port.
@@ -1017,7 +1017,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
   stat_prefix: ingress_http
   route_config:
     name: local_route
-  strip_host_port: false
+  strip_matching_host_port: false
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
@@ -1025,7 +1025,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
-  EXPECT_FALSE(config.shouldStripPort());
+  EXPECT_FALSE(config.shouldStripMatchingPort());
 }
 
 // Validated that by default we allow requests with header names containing underscores.

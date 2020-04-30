@@ -749,9 +749,7 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 
 uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
   auto conn = connection();
-  if (conn == nullptr) {
-    return 0;
-  }
+  ASSERT(conn != nullptr);
   auto ip = conn->localAddress()->ip();
   if (ip == nullptr) {
     return 0;

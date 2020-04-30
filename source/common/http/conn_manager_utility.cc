@@ -424,12 +424,7 @@ bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_head
 void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config,
                                                   uint32_t port) {
-  if (!request_headers.Host()) {
-    // request w/o Host header. such requests are allowed in http 1.0
-    return;
-  }
-
-  if (config.shouldStripPort()) {
+  if (config.shouldStripMatchingPort()) {
     HeaderUtility::stripPortFromHost(request_headers, port);
   }
 }
