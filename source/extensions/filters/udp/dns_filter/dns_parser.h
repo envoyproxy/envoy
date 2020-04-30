@@ -87,7 +87,6 @@ public:
 
   const Network::Address::InstanceConstSharedPtr local_;
   const Network::Address::InstanceConstSharedPtr peer_;
-
   bool parse_status_;
   uint16_t id_;
   DnsQueryPtrVec queries_;

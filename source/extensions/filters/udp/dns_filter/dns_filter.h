@@ -65,7 +65,6 @@ private:
   }
 
   Stats::Scope& root_scope_;
-
   mutable DnsFilterStats stats_;
   DnsVirtualDomainConfig virtual_domains_;
   std::vector<Matchers::StringMatcherPtr> known_suffixes_;
@@ -87,8 +86,7 @@ enum class DnsLookupResponseCode { Success, Failure, External };
 class DnsFilter : public Network::UdpListenerReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   DnsFilter(Network::UdpReadFilterCallbacks& callbacks, const DnsFilterEnvoyConfigSharedPtr& config)
-      : UdpListenerReadFilter(callbacks), config_(config), listener_(callbacks.udpListener()),
-        message_parser_() {}
+      : UdpListenerReadFilter(callbacks), config_(config), listener_(callbacks.udpListener()) {}
 
   // Network::UdpListenerReadFilter callbacks
   void onData(Network::UdpRecvData& client_request) override;

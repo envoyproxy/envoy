@@ -90,7 +90,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   while (state != DnsQueryParseState::Finish) {
     // Ensure that we have enough data remaining in the buffer to parse the query
     if (available_bytes < field_size) {
-      ENVOY_LOG(error,
+      ENVOY_LOG(debug,
                 "Exhausted available bytes in the buffer. Insufficient data to parse query field.");
       return false;
     }

@@ -31,8 +31,6 @@ class DnsFilterTest : public testing::Test {
 public:
   DnsFilterTest()
       : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")) {
-    Logger::Registry::setLogLevel(TestEnvironment::getOptions().logLevel());
-
     response_parser_ = std::make_unique<DnsMessageParser>();
 
     client_request_.addresses_.local_ = listener_address_;
