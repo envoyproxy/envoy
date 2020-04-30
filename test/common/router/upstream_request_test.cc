@@ -3,6 +3,8 @@
 #include "common/router/router.h"
 #include "common/router/upstream_request.h"
 
+#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
+
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
@@ -55,6 +57,9 @@ public:
     ON_CALL(*this, cluster()).WillByDefault(Return(cluster_info_));
     ON_CALL(*this, upstreamRequests()).WillByDefault(ReturnRef(requests_));
     EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
+    ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_));
+    ON_CALL(callbacks_, connection()).WillByDefault(Return(&client_connection_));
+    route_entry_.connect_config_.emplace(RouteEntry::ConnectConfig());
   }
 
   MOCK_METHOD(void, onUpstream100ContinueHeaders,
@@ -89,6 +94,8 @@ public:
   MOCK_METHOD(TimeSource&, timeSource, ());
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
+  NiceMock<MockRouteEntry> route_entry_;
+  NiceMock<Network::MockConnection> client_connection_;
 
   envoy::extensions::filters::http::router::v3::Router router_proto;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -173,6 +180,7 @@ protected:
 
 TEST_F(TcpUpstreamTest, Basic) {
   // Swallow the headers.
+  EXPECT_CALL(connection_, write(_, false)).Times(0);
   tcp_upstream_->encodeHeaders(request_, false);
 
   // Proxy the data.
@@ -195,6 +203,52 @@ TEST_F(TcpUpstreamTest, Basic) {
   EXPECT_CALL(mock_router_filter_, onUpstreamHeaders(_, _, _, _)).Times(0);
   EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferStringEqual("eep"), _, false));
   tcp_upstream_->onUpstreamData(response2, false);
+}
+
+TEST_F(TcpUpstreamTest, V1Header) {
+  envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
+      mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
+  proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V1);
+  mock_router_filter_.client_connection_.remote_address_ =
+      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5);
+  mock_router_filter_.client_connection_.local_address_ =
+      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8);
+
+  Buffer::OwnedImpl expected_data;
+  Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
+      *proxy_config, mock_router_filter_.client_connection_, expected_data);
+
+  // encodeHeaders now results in the proxy proto header being sent.
+  EXPECT_CALL(connection_, write(BufferEqual(&expected_data), false));
+  tcp_upstream_->encodeHeaders(request_, false);
+
+  // Data is proxied as usual.
+  EXPECT_CALL(connection_, write(BufferStringEqual("foo"), false));
+  Buffer::OwnedImpl buffer("foo");
+  tcp_upstream_->encodeData(buffer, false);
+}
+
+TEST_F(TcpUpstreamTest, V2Header) {
+  envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
+      mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
+  proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
+  mock_router_filter_.client_connection_.remote_address_ =
+      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5);
+  mock_router_filter_.client_connection_.local_address_ =
+      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8);
+
+  Buffer::OwnedImpl expected_data;
+  Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
+      *proxy_config, mock_router_filter_.client_connection_, expected_data);
+
+  // encodeHeaders now results in the proxy proto header being sent.
+  EXPECT_CALL(connection_, write(BufferEqual(&expected_data), false));
+  tcp_upstream_->encodeHeaders(request_, false);
+
+  // Data is proxied as usual.
+  EXPECT_CALL(connection_, write(BufferStringEqual("foo"), false));
+  Buffer::OwnedImpl buffer("foo");
+  tcp_upstream_->encodeData(buffer, false);
 }
 
 TEST_F(TcpUpstreamTest, TrailersEndStream) {

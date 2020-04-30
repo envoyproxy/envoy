@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.route.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
+import "envoy/config/core/v4alpha/proxy_protocol.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
@@ -727,10 +728,11 @@ message RouteAction {
     // Configuration for sending data upstream as a raw data payload. This is used for
     // CONNECT requests, when forwarding CONNECT payload as raw TCP.
     message ConnectConfig {
-      // TODO(alyssawilk) add proxy proto configuration here.
-
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.route.v3.RouteAction.UpgradeConfig.ConnectConfig";
+
+      // If present, the proxy protocol header will be prepended to the CONNECT payload sent upstream.
+      core.v4alpha.ProxyProtocolConfig proxy_protocol_config = 1;
     }
 
     // The case-insensitive name of this upgrade, e.g. "websocket".

@@ -4,6 +4,7 @@
 
 #include "extensions/common/proxy_protocol/proxy_protocol_header.h"
 
+#include "test/mocks/network/connection.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -28,6 +29,16 @@ TEST(ProxyProtocolHeaderTest, GeneratesV1IPv4Header) {
   generateV1Header(src_addr, dst_addr, src_port, dst_port, version, buff);
 
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
+
+  // Make sure the wrapper utility generates the same output.
+  testing::NiceMock<Network::MockClientConnection> connection;
+  connection.remote_address_ = Network::Utility::resolveUrl("tcp://174.2.2.222:50000");
+  connection.local_address_ = Network::Utility::resolveUrl("tcp://172.0.0.1:80");
+  Buffer::OwnedImpl util_buf;
+  envoy::config::core::v3::ProxyProtocolConfig config;
+  config.set_version(envoy::config::core::v3::ProxyProtocolConfig::V1);
+  generateProxyProtoHeader(config, connection, util_buf);
+  EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, util_buf));
 }
 
 TEST(ProxyProtocolHeaderTest, GeneratesV1IPv6Header) {
@@ -79,6 +90,16 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2IPv6Header) {
   generateV2Header(src_addr, dst_addr, src_port, dst_port, version, buff);
 
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
+
+  // Make sure the wrapper utility generates the same output.
+  testing::NiceMock<Network::MockConnection> connection;
+  connection.remote_address_ = Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+  connection.local_address_ = Network::Utility::resolveUrl("tcp://[1:100:200:3::]:2");
+  Buffer::OwnedImpl util_buf;
+  envoy::config::core::v3::ProxyProtocolConfig config;
+  config.set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
+  generateProxyProtoHeader(config, connection, util_buf);
+  EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, util_buf));
 }
 
 TEST(ProxyProtocolHeaderTest, GeneratesV2LocalHeader) {
