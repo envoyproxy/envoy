@@ -217,11 +217,14 @@ public:
   enum class StreamState { PendingHeaders, PendingDataOrTrailers, Closed };
 
   FuzzStream(ConnectionManagerImpl& conn_manager, FuzzConfig& config,
-             const HeaderMap& request_headers, bool end_stream)
+             const HeaderMap& request_headers,
+             test::common::http::HeaderStatus decode_header_status, bool end_stream)
       : conn_manager_(conn_manager), config_(config) {
     config_.newStream();
     request_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
     response_state_ = StreamState::PendingHeaders;
+    decoder_filter_ = config.decoder_filter_;
+    encoder_filter_ = config.encoder_filter_;
     EXPECT_CALL(*config_.codec_, dispatch(_))
         .WillOnce(InvokeWithoutArgs([this, &request_headers, end_stream] {
           decoder_ = &conn_manager_.newStream(encoder_);
@@ -245,9 +248,13 @@ public:
           decoder_->decodeHeaders(std::move(headers), end_stream);
           return Http::okStatus();
         }));
+    ON_CALL(*decoder_filter_, decodeHeaders(_, _))
+        .WillByDefault(
+            InvokeWithoutArgs([this, decode_header_status]() -> Http::FilterHeadersStatus {
+              header_status_ = fromHeaderStatus(decode_header_status);
+              return *header_status_;
+            }));
     fakeOnData();
-    decoder_filter_ = config.decoder_filter_;
-    encoder_filter_ = config.encoder_filter_;
     FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
   }
 
@@ -262,6 +269,12 @@ public:
       return Http::FilterHeadersStatus::Continue;
     case test::common::http::HeaderStatus::HEADER_STOP_ITERATION:
       return Http::FilterHeadersStatus::StopIteration;
+    case test::common::http::HeaderStatus::HEADER_CONTINUE_AND_END_STREAM:
+      return Http::FilterHeadersStatus::ContinueAndEndStream;
+    case test::common::http::HeaderStatus::HEADER_STOP_ALL_ITERATION_AND_BUFFER:
+      return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+    case test::common::http::HeaderStatus::HEADER_STOP_ALL_ITERATION_AND_WATERMARK:
+      return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
     default:
       return Http::FilterHeadersStatus::Continue;
     }
@@ -321,7 +334,8 @@ public:
               if (data_action.has_decoder_filter_callback_action()) {
                 decoderFilterCallbackAction(data_action.decoder_filter_callback_action());
               }
-              return fromDataStatus(data_action.status());
+              data_status_ = fromDataStatus(data_action.status());
+              return *data_status_;
             }));
         EXPECT_CALL(*config_.codec_, dispatch(_)).WillOnce(InvokeWithoutArgs([this, &data_action] {
           Buffer::OwnedImpl buf(std::string(data_action.size() % (1024 * 1024), 'a'));
@@ -358,7 +372,14 @@ public:
       break;
     }
     case test::common::http::RequestAction::kContinueDecoding: {
-      decoder_filter_->callbacks_->continueDecoding();
+      if (header_status_ == FilterHeadersStatus::StopAllIterationAndBuffer ||
+          header_status_ == FilterHeadersStatus::StopAllIterationAndWatermark ||
+          (header_status_ == FilterHeadersStatus::StopIteration &&
+           (data_status_ == FilterDataStatus::StopIterationAndBuffer ||
+            data_status_ == FilterDataStatus::StopIterationAndWatermark ||
+            data_status_ == FilterDataStatus::StopIterationNoBuffer))) {
+        decoder_filter_->callbacks_->continueDecoding();
+      }
       break;
     }
     case test::common::http::RequestAction::kThrowDecoderException: {
@@ -452,6 +473,8 @@ public:
   MockStreamEncoderFilter* encoder_filter_{};
   StreamState request_state_;
   StreamState response_state_;
+  absl::optional<Http::FilterHeadersStatus> header_status_;
+  absl::optional<Http::FilterDataStatus> data_status_;
 };
 
 using FuzzStreamPtr = std::unique_ptr<FuzzStream>;
@@ -503,7 +526,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
       streams.emplace_back(new FuzzStream(
           conn_manager, config,
           Fuzz::fromHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
-          action.new_stream().end_stream()));
+          action.new_stream().status(), action.new_stream().end_stream()));
       break;
     }
     case test::common::http::Action::kStreamAction: {

@@ -115,6 +115,16 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
 
 constexpr uint64_t TimeoutPrecisionFactor = 100;
 
+Http::ConnectionPool::Instance*
+httpPool(absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*> pool) {
+  return absl::get<Http::ConnectionPool::Instance*>(pool);
+}
+
+Tcp::ConnectionPool::Instance*
+tcpPool(absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*> pool) {
+  return absl::get<Tcp::ConnectionPool::Instance*>(pool);
+}
+
 const absl::string_view getPath(const Http::RequestHeaderMap& headers) {
   return headers.Path() ? headers.Path()->value().getStringView() : "";
 }
@@ -549,12 +559,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  Http::ConnectionPool::Instance* http_pool = getHttpConnPool();
   Upstream::HostDescriptionConstSharedPtr host;
+  Filter::HttpOrTcpPool conn_pool = createConnPool(host);
 
-  if (http_pool) {
-    host = http_pool->host();
-  } else {
+  if (!host) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -644,8 +652,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
-  UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::make_unique<HttpConnPool>(*http_pool));
+  UpstreamRequestPtr upstream_request = createUpstreamRequest(conn_pool);
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
@@ -653,6 +660,38 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   return Http::FilterHeadersStatus::StopIteration;
+}
+
+Filter::HttpOrTcpPool Filter::createConnPool(Upstream::HostDescriptionConstSharedPtr& host) {
+  Filter::HttpOrTcpPool conn_pool;
+  bool should_tcp_proxy = route_entry_->connectConfig().has_value() &&
+                          downstream_headers_->Method()->value().getStringView() ==
+                              Http::Headers::get().MethodValues.Connect;
+
+  if (!should_tcp_proxy) {
+    conn_pool = getHttpConnPool();
+    if (httpPool(conn_pool)) {
+      host = httpPool(conn_pool)->host();
+    }
+  } else {
+    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+        *callbacks_->streamInfo().filterState());
+    conn_pool = config_.cm_.tcpConnPoolForCluster(route_entry_->clusterName(),
+                                                  Upstream::ResourcePriority::Default, this);
+    if (tcpPool(conn_pool)) {
+      host = tcpPool(conn_pool)->host();
+    }
+  }
+  return conn_pool;
+}
+
+UpstreamRequestPtr Filter::createUpstreamRequest(Filter::HttpOrTcpPool conn_pool) {
+  if (absl::holds_alternative<Http::ConnectionPool::Instance*>(conn_pool)) {
+    return std::make_unique<UpstreamRequest>(*this,
+                                             std::make_unique<HttpConnPool>(*httpPool(conn_pool)));
+  }
+  return std::make_unique<UpstreamRequest>(*this,
+                                           std::make_unique<TcpConnPool>(tcpPool(conn_pool)));
 }
 
 Http::ConnectionPool::Instance* Filter::getHttpConnPool() {
@@ -1454,19 +1493,15 @@ void Filter::doRetry() {
   attempt_count_++;
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
-  UpstreamRequestPtr upstream_request;
 
-  Http::ConnectionPool::Instance* conn_pool = getHttpConnPool();
-  if (conn_pool) {
-    upstream_request =
-        std::make_unique<UpstreamRequest>(*this, std::make_unique<HttpConnPool>(*conn_pool));
-  }
-
-  if (!upstream_request) {
+  Upstream::HostDescriptionConstSharedPtr host;
+  Filter::HttpOrTcpPool conn_pool = createConnPool(host);
+  if (!host) {
     sendNoHealthyUpstreamResponse();
     cleanup();
     return;
   }
+  UpstreamRequestPtr upstream_request = createUpstreamRequest(conn_pool);
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);

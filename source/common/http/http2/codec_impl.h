@@ -232,7 +232,6 @@ protected:
     // This code assumes that details is a static string, so that we
     // can avoid copying it.
     void setDetails(absl::string_view details) {
-      ENVOY_LOG_MISC(info, "CALLING SET DETAILS");
       // It is probably a mistake to call setDetails() twice, so
       // assert that details_ is empty.
       ASSERT(details_.empty());

@@ -382,6 +382,7 @@ public:
   MOCK_METHOD(void, sendData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, sendTrailers, (RequestTrailerMap & trailers));
   MOCK_METHOD(void, reset, ());
+  MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const));
 };
 
 class MockFilterChainFactoryCallbacks : public Http::FilterChainFactoryCallbacks {

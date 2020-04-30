@@ -89,7 +89,7 @@ ServerCodecFrameInjector::ServerCodecFrameInjector() : CodecFrameInjector("clien
       }));
 }
 
-void CodecFrameInjector::write(const Frame& frame, Http::Connection& connection) {
+Http::Status CodecFrameInjector::write(const Frame& frame, Http::Connection& connection) {
   Buffer::OwnedImpl buffer;
   buffer.add(frame.data(), frame.size());
   ENVOY_LOG_MISC(trace, "{} write: {}", injector_name_, Hex::encode(frame.data(), frame.size()));
@@ -98,6 +98,7 @@ void CodecFrameInjector::write(const Frame& frame, Http::Connection& connection)
     status = connection.dispatch(buffer);
   }
   ENVOY_LOG_MISC(trace, "Status: {}", status.message());
+  return status;
 }
 
 } // namespace Http2
