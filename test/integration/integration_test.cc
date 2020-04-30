@@ -493,6 +493,18 @@ TEST_P(IntegrationTest, Http09Enabled) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("HTTP/1.0"));
 }
 
+TEST_P(IntegrationTest, Http09WithKeepalive) {
+  useAccessLog();
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\nConnection: keep-alive\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("connection: keep-alive\r\n"));
+}
+
 // Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
 TEST_P(IntegrationTest, Http10Enabled) {
   autonomous_upstream_ = true;
