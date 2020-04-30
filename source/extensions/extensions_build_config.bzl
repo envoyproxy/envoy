@@ -174,6 +174,6 @@ EXTENSIONS = {
 
     # Internal redirect predicates
     #
-    "envoy.internal_redirect_predicates.allowlisted_routes": "//source/extensions/internal_redirect/allowlisted_routes:config",
+    "envoy.internal_redirect_predicates.allow_listed_routes": "//source/extensions/internal_redirect/allow_listed_routes:config",
     "envoy.internal_redirect_predicates.previous_routes":    "//source/extensions/internal_redirect/previous_routes:config",
 }

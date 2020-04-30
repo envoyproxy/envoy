@@ -23,7 +23,7 @@ public:
   PreviousRoutesPredicateState(const PreviousRoutesPredicateState&) = delete;
   PreviousRoutesPredicateState& operator=(const PreviousRoutesPredicateState&) = delete;
 
-  bool insertRouteIfUnexist(absl::string_view route) {
+  bool insertRouteIfNotPresent(absl::string_view route) {
     return previous_routes_.insert(std::string(route)).second;
   }
 
@@ -44,7 +44,7 @@ bool PreviousRoutesPredicate::acceptTargetRoute(StreamInfo::FilterState& filter_
   }
   auto& predicate_state =
       filter_state.getDataMutable<PreviousRoutesPredicateState>(filter_state_name);
-  return predicate_state.insertRouteIfUnexist(route_name);
+  return predicate_state.insertRouteIfNotPresent(route_name);
 }
 
 } // namespace InternalRedirect

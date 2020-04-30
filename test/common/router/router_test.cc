@@ -291,7 +291,8 @@ public:
   void enableRedirects(uint32_t max_internal_redirects = 1) {
     ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, enabled())
         .WillByDefault(Return(true));
-    ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, shouldRedirectForCode(_))
+    ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
+            shouldRedirectForResponseCode(_))
         .WillByDefault(Return(true));
     ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, maxInternalRedirects())
         .WillByDefault(Return(max_internal_redirects));
@@ -4425,7 +4426,7 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
 
   sendRequest();
 
-  redirect_headers_->setLocation("http://www.foo.com");
+  redirect_headers_->setLocation("http://www.foo.com/some/path");
 
   auto mock_predicate = std::make_shared<MockInternalRedirectPredicate>();
 
@@ -4440,6 +4441,12 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+
+  // Make sure the original host/path is preserved.
+  EXPECT_EQ("host", default_request_headers_.Host()->value().getStringView());
+  EXPECT_EQ("/", default_request_headers_.Path()->value().getStringView());
+  // Make sure x-envoy-original-url is not set for unsuccessful redirect.
+  EXPECT_EQ(nullptr, default_request_headers_.EnvoyOriginalUrl());
 }
 
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {

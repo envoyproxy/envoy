@@ -21,7 +21,7 @@ public:
    *
    * @return whether the route specified by target_route_name is allowed to be followed. Any
    *         predicate returning false will prevent the redirect from being followed, causing the
-   *         response to be proxied to the downstream.
+   *         response to be proxied downstream.
    */
   virtual bool acceptTargetRoute(StreamInfo::FilterState& filter_state,
                                  absl::string_view target_route_name) PURE;

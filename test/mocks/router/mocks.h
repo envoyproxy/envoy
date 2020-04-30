@@ -135,7 +135,7 @@ class MockInternalRedirectPolicy : public InternalRedirectPolicy {
 public:
   MockInternalRedirectPolicy();
   MOCK_METHOD(bool, enabled, (), (const));
-  MOCK_METHOD(bool, shouldRedirectForCode, (const Http::Code& response_code), (const));
+  MOCK_METHOD(bool, shouldRedirectForResponseCode, (const Http::Code& response_code), (const));
   MOCK_METHOD(std::vector<InternalRedirectPredicateSharedPtr>, predicates, (), (const));
   MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));
   MOCK_METHOD(bool, isCrossSchemeRedirectAllowed, (), (const));

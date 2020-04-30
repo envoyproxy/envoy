@@ -1,6 +1,6 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/extensions/internal_redirect/allowlisted_routes/v3/allowlisted_routes_config.pb.h"
+#include "envoy/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.pb.h"
 #include "envoy/extensions/internal_redirect/previous_routes/v3/previous_routes_config.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
@@ -232,8 +232,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
   internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
   envoy::extensions::internal_redirect::previous_routes::v3::PreviousRoutesConfig
       previous_routes_config;
-  internal_redirect_policy->add_predicates()->mutable_typed_config()->PackFrom(
-      previous_routes_config);
+  internal_redirect_policy->add_predicates()->PackFrom(previous_routes_config);
   config_helper_.addVirtualHost(handle_prevent_repeated_target);
 
   // Validate that header sanitization is only called once.
@@ -273,22 +272,22 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
                    ->value());
 }
 
-TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowlistedRoutesPredicate) {
-  auto handle_allowlisted_redirect_route =
-      config_helper_.createVirtualHost("handle.internal.redirect.only.allowlisted.target");
-  auto* internal_redirect_policy = handle_allowlisted_redirect_route.mutable_routes(0)
+TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPredicate) {
+  auto handle_allow_listed_redirect_route =
+      config_helper_.createVirtualHost("handle.internal.redirect.only.allow.listed.target");
+  auto* internal_redirect_policy = handle_allow_listed_redirect_route.mutable_routes(0)
                                        ->mutable_route()
                                        ->mutable_internal_redirect_policy();
 
-  auto* allowlisted_routes_predicate = internal_redirect_policy->add_predicates();
-  envoy::extensions::internal_redirect::allowlisted_routes::v3::AllowlistedRoutesConfig
-      allowlisted_routes_config;
-  *allowlisted_routes_config.add_allowed_route_names() = "max_three_hop";
-  allowlisted_routes_predicate->mutable_typed_config()->PackFrom(allowlisted_routes_config);
+  auto* allow_listed_routes_predicate = internal_redirect_policy->add_predicates();
+  envoy::extensions::internal_redirect::allow_listed_routes::v3::AllowListedRoutesConfig
+      allow_listed_routes_config;
+  *allow_listed_routes_config.add_allowed_route_names() = "max_three_hop";
+  allow_listed_routes_predicate->PackFrom(allow_listed_routes_config);
 
   internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
 
-  config_helper_.addVirtualHost(handle_allowlisted_redirect_route);
+  config_helper_.addVirtualHost(handle_allow_listed_redirect_route);
 
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(
@@ -299,7 +298,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowlistedRoutesPred
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  default_request_headers_.setHost("handle.internal.redirect.only.allowlisted.target");
+  default_request_headers_.setHost("handle.internal.redirect.only.allow.listed.target");
   IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
@@ -311,11 +310,11 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowlistedRoutesPred
   auto second_request = waitForNextStream();
   // Redirect back to the original route.
   redirect_response_.setLocation(
-      "http://handle.internal.redirect.only.allowlisted.target/another/path");
+      "http://handle.internal.redirect.only.allow.listed.target/another/path");
   second_request->encodeHeaders(redirect_response_, true);
 
   auto third_request = waitForNextStream();
-  // Redirect to the non-allowlisted route. This should fail.
+  // Redirect to the non-allow-listed route. This should fail.
   redirect_response_.setLocation("http://handle.internal.redirect/yet/another/path");
   third_request->encodeHeaders(redirect_response_, true);
 

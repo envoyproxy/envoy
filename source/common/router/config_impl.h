@@ -387,14 +387,17 @@ private:
  */
 class InternalRedirectPolicyImpl : public InternalRedirectPolicy {
 public:
+  // Constructor that enables internal redirect with policy_config controlling the configurable
+  // behaviors.
   explicit InternalRedirectPolicyImpl(
       const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
       ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name);
+  // Default constructor that disables internal redirect.
   InternalRedirectPolicyImpl() = default;
 
   bool enabled() const override { return enabled_; }
 
-  bool shouldRedirectForCode(const Http::Code& response_code) const override {
+  bool shouldRedirectForResponseCode(const Http::Code& response_code) const override {
     return redirect_response_codes_.contains(response_code);
   }
 
@@ -408,10 +411,10 @@ private:
   absl::flat_hash_set<Http::Code> buildRedirectResponseCodes(
       const envoy::config::route::v3::InternalRedirectPolicy& policy_config) const;
 
-  const bool enabled_{false};
   const std::string current_route_name_;
   const absl::flat_hash_set<Http::Code> redirect_response_codes_;
   const uint32_t max_internal_redirects_{1};
+  const bool enabled_{false};
   const bool allow_cross_scheme_redirect_{false};
 
   std::vector<std::pair<InternalRedirectPredicateFactory*, ProtobufTypes::MessagePtr>>

@@ -147,19 +147,18 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
 InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
     const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
     ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name)
-    : enabled_(true), current_route_name_(current_route_name),
+    : current_route_name_(current_route_name),
       redirect_response_codes_(buildRedirectResponseCodes(policy_config)),
       max_internal_redirects_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(policy_config, max_internal_redirects, 1)),
-      allow_cross_scheme_redirect_(policy_config.allow_cross_scheme_redirect()) {
+      enabled_(true), allow_cross_scheme_redirect_(policy_config.allow_cross_scheme_redirect()) {
   for (const auto& predicate : policy_config.predicates()) {
-    const std::string type{
-        TypeUtil::typeUrlToDescriptorFullName(predicate.typed_config().type_url())};
+    const std::string type{TypeUtil::typeUrlToDescriptorFullName(predicate.type_url())};
     auto* factory =
         Registry::FactoryRegistry<InternalRedirectPredicateFactory>::getFactoryByType(type);
 
     auto config = factory->createEmptyConfigProto();
-    Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), {}, validator, *config);
+    Envoy::Config::Utility::translateOpaqueConfig(predicate, {}, validator, *config);
     predicate_factories_.emplace_back(factory, std::move(config));
   }
 }
@@ -181,7 +180,11 @@ absl::flat_hash_set<Http::Code> InternalRedirectPolicyImpl::buildRedirectRespons
   absl::flat_hash_set<Http::Code> ret;
   std::for_each(policy_config.redirect_response_codes().begin(),
                 policy_config.redirect_response_codes().end(), [&ret](uint32_t response_code) {
-                  ret.insert(static_cast<Http::Code>(response_code));
+                  const absl::flat_hash_set<uint32_t> valid_redirect_response_code = {301, 302, 303,
+                                                                                      307, 308};
+                  if (valid_redirect_response_code.contains(response_code)) {
+                    ret.insert(static_cast<Http::Code>(response_code));
+                  }
                 });
   return ret;
 }
@@ -744,7 +747,7 @@ InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
   case envoy::config::route::v3::RouteAction::HANDLE_INTERNAL_REDIRECT:
     break;
   case envoy::config::route::v3::RouteAction::PASS_THROUGH_INTERNAL_REDIRECT:
-    return InternalRedirectPolicyImpl();
+    FALLTHRU;
   default:
     return InternalRedirectPolicyImpl();
   }

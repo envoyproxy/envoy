@@ -6796,7 +6796,7 @@ virtual_hosts:
   const auto& internal_redirect_policy =
       config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
   EXPECT_TRUE(internal_redirect_policy.enabled());
-  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForCode(static_cast<Http::Code>(302)));
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(302)));
   EXPECT_FALSE(internal_redirect_policy.shouldRedirectForCode(static_cast<Http::Code>(200)));
   EXPECT_EQ(1, internal_redirect_policy.maxInternalRedirects());
   EXPECT_TRUE(internal_redirect_policy.predicates().empty());

@@ -251,7 +251,7 @@ public:
   /**
    * @return whether the given response_code should trigger an internal redirect on this route.
    */
-  virtual bool shouldRedirectForCode(const Http::Code& response_code) const PURE;
+  virtual bool shouldRedirectForResponseCode(const Http::Code& response_code) const PURE;
 
   /**
    * Creates the target route predicates. This should really be called only once for each upstream

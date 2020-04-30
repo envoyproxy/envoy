@@ -15,6 +15,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/common/cleanup.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
@@ -98,14 +99,18 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
   if (num_internal_redirect.value() >= policy.maxInternalRedirects()) {
     return false;
   }
-  num_internal_redirect.increment();
-
-  // Preserve the original request URL for the second pass.
-  downstream_headers.setEnvoyOriginalUrl(
-      absl::StrCat(scheme_is_http ? Http::Headers::get().SchemeValues.Http
-                                  : Http::Headers::get().SchemeValues.Https,
-                   "://", downstream_headers.Host()->value().getStringView(),
-                   downstream_headers.Path()->value().getStringView()));
+  std::string original_host(downstream_headers.Host()->value().getStringView());
+  std::string original_path(downstream_headers.Path()->value().getStringView());
+  bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
+  Cleanup restore_original_headers(
+      [&downstream_headers, original_host, original_path, scheme_is_set, scheme_is_http]() {
+        downstream_headers.setHost(original_host);
+        downstream_headers.setPath(original_path);
+        if (scheme_is_set) {
+          downstream_headers.setScheme(scheme_is_http ? Http::Headers::get().SchemeValues.Http
+                                                      : Http::Headers::get().SchemeValues.Https);
+        }
+      });
 
   // Replace the original host, scheme and path.
   downstream_headers.setScheme(absolute_url.scheme());
@@ -125,6 +130,14 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
       return false;
     }
   }
+
+  num_internal_redirect.increment();
+  restore_original_headers.cancel();
+  // Preserve the original request URL for the second pass.
+  downstream_headers.setEnvoyOriginalUrl(absl::StrCat(scheme_is_http
+                                                          ? Http::Headers::get().SchemeValues.Http
+                                                          : Http::Headers::get().SchemeValues.Https,
+                                                      "://", original_host, original_path));
   return true;
 }
 
@@ -1258,7 +1271,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   }
 
   if (route_entry_->internalRedirectPolicy().enabled() &&
-      route_entry_->internalRedirectPolicy().shouldRedirectForCode(
+      route_entry_->internalRedirectPolicy().shouldRedirectForResponseCode(
           static_cast<Http::Code>(response_code)) &&
       setupRedirect(*headers, upstream_request)) {
     return;

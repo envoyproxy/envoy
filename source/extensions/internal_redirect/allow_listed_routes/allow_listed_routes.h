@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/internal_redirect/allowlisted_routes/v3/allowlisted_routes_config.pb.h"
+#include "envoy/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.pb.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/stream_info/filter_state.h"
 
@@ -11,11 +11,11 @@ namespace Envoy {
 namespace Extensions {
 namespace InternalRedirect {
 
-class AllowlistedRoutesPredicate : public Router::InternalRedirectPredicate {
+class AllowListedRoutesPredicate : public Router::InternalRedirectPredicate {
 public:
-  AllowlistedRoutesPredicate(
+  AllowListedRoutesPredicate(
       absl::string_view,
-      const envoy::extensions::internal_redirect::allowlisted_routes::v3::AllowlistedRoutesConfig&
+      const envoy::extensions::internal_redirect::allow_listed_routes::v3::AllowListedRoutesConfig&
           config)
       : allowed_routes_(config.allowed_route_names().begin(), config.allowed_route_names().end()) {}
 

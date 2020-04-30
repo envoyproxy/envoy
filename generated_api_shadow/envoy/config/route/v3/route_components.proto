@@ -1592,10 +1592,6 @@ message QueryParameterMatcher {
 
 // HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
 message InternalRedirectPolicy {
-  message Predicate {
-    google.protobuf.Any typed_config = 1;
-  }
-
   // An internal redirect is not handled, unless the number of previous internal redirects that a
   // downstream request has encountered is lower than this value.
   // In the case where a downstream request is bounced among multiple routes by internal redirect,
@@ -1608,14 +1604,13 @@ message InternalRedirectPolicy {
 
   // Defines what upstream response codes are allowed to trigger internal redirect. If unspecified,
   // only 302 will be treated as internal redirect.
-  // Only 301, 302, 303, 307 and 308 are valid values.
-  repeated uint32 redirect_response_codes = 2
-      [(validate.rules).repeated = {items {uint32 {lte: 308 gte: 301}}}];
+  // Only 301, 302, 303, 307 and 308 are valid values. Any other codes will be ignored.
+  repeated uint32 redirect_response_codes = 2 [(validate.rules).repeated = {max_items: 5}];
 
   // Specifies a list of predicates that are queried when an upstream response is deemed
   // to trigger an internal redirect by all other criteria. Any predicate in the list can reject
   // the redirect, causing the response to be proxied to downstream.
-  repeated Predicate predicates = 3;
+  repeated google.protobuf.Any predicates = 3;
 
   // Allow internal redirect to follow a target URI with a different scheme than the value of
   // x-forwarded-proto. Default behavior is to not follow such redirects.
