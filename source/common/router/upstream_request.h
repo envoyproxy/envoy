@@ -141,6 +141,13 @@ public:
   }
 
 private:
+  bool shouldSendEndStream() {
+    // Only encode end stream if the full request has been received, the body
+    // has been sent, and any trailers or metadata have also been sent.
+    return encode_complete_ && !buffered_request_body_ && !encode_trailers_ &&
+           downstream_metadata_map_vector_.empty();
+  }
+
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
   bool grpc_rq_success_deferred_;

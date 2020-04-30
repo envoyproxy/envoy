@@ -374,10 +374,6 @@ void UpstreamRequest::onPoolReady(
 
   upstream_timing_.onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
 
-  const bool end_stream = !buffered_request_body_ && encode_complete_ && !encode_trailers_;
-  // If end_stream is set in headers, and there are metadata to send, delays end_stream. The case
-  // only happens when decoding headers filters return ContinueAndEndStream.
-  const bool delay_headers_end_stream = end_stream && !downstream_metadata_map_vector_.empty();
   // Make sure that when we are forwarding CONNECT payload we do not do so until
   // the upstream has accepted the CONNECT request.
   if (conn_pool_->protocol().has_value() && headers->Method() &&
@@ -385,7 +381,7 @@ void UpstreamRequest::onPoolReady(
     paused_for_connect_ = true;
   }
 
-  upstream_->encodeHeaders(*parent_.downstreamHeaders(), end_stream && !delay_headers_end_stream);
+  upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());
   calling_encode_headers_ = false;
 
   if (!paused_for_connect_) {
@@ -394,9 +390,6 @@ void UpstreamRequest::onPoolReady(
 }
 
 void UpstreamRequest::encodeBodyAndTrailers() {
-  const bool end_stream = !buffered_request_body_ && encode_complete_ && !encode_trailers_;
-  const bool delay_headers_end_stream = end_stream && !downstream_metadata_map_vector_.empty();
-
   // It is possible to get reset in the middle of an encodeHeaders() call. This happens for
   // example in the HTTP/2 codec if the frame cannot be encoded for some reason. This should never
   // happen but it's unclear if we have covered all cases so protect against it and test for it.
@@ -411,7 +404,7 @@ void UpstreamRequest::encodeBodyAndTrailers() {
                        downstream_metadata_map_vector_);
       upstream_->encodeMetadata(downstream_metadata_map_vector_);
       downstream_metadata_map_vector_.clear();
-      if (delay_headers_end_stream) {
+      if (shouldSendEndStream()) {
         Buffer::OwnedImpl empty_data("");
         upstream_->encodeData(empty_data, true);
       }
