@@ -263,7 +263,7 @@ TEST_F(EdsTest, OnConfigUpdateEmpty) {
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   eds_callbacks_->onConfigUpdate(resources, removed_resources, "");
   EXPECT_EQ(2UL, stats_.counter("cluster.name.update_empty").value());
-  // EXPECT_TRUE(initialized_);
+  EXPECT_TRUE(initialized_);
 }
 
 // Validate that onConfigUpdate() with unexpected cluster vector size rejects config.

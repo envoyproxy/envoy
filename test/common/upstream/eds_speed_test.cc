@@ -111,7 +111,7 @@ public:
 
   // Set up an EDS config with multiple priorities, localities, weights and make sure
   // they are loaded and reloaded as expected.
-  void PriorityAndLocalityWeightedHelper(bool ignore_unknown_dynamic_fields, int num_hosts) {
+  void priorityAndLocalityWeightedHelper(bool ignore_unknown_dynamic_fields, int num_hosts) {
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("fare");
     resetCluster(R"EOF(
@@ -182,7 +182,7 @@ public:
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ThreadLocal::MockInstance> tls_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_ = ProtobufMessage::getStrictValidationVisitor();;
+  ProtobufMessage::MockValidationVisitor validation_visitor_;
   Api::ApiPtr api_;
 };
 
@@ -195,7 +195,7 @@ static void BM_PriorityAndLocalityWeighted(benchmark::State& state) {
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test;
-    speed_test.PriorityAndLocalityWeightedHelper(state.range(0), state.range(1));
+    speed_test.priorityAndLocalityWeightedHelper(state.range(0), state.range(1));
   }
 }
 

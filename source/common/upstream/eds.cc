@@ -117,15 +117,9 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
   if (!validateUpdateSize(resources.size())) {
     return;
   }
-  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
-  if (validation_visitor_.skipValidation()) {
-    cluster_load_assignment =
-        MessageUtil::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resources[0]);
-  } else {
-    cluster_load_assignment =
+  auto cluster_load_assignment =
         MessageUtil::anyConvertAndValidate<envoy::config::endpoint::v3::ClusterLoadAssignment>(
             resources[0], validation_visitor_);
-  }
   if (cluster_load_assignment.cluster_name() != cluster_name_) {
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));

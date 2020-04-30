@@ -293,7 +293,6 @@ modify different aspects of the server:
         "service_zone": "",
         "mode": "Serve",
         "disable_hot_restart": false,
-	"disable_eds_validation": false,
         "enable_mutex_tracing": false,
         "restart_epoch": 0,
         "file_flush_interval": "10s",
