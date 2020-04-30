@@ -325,7 +325,7 @@ def _com_github_libevent_libevent():
 def _net_zlib():
     _repository_impl(
         "net_zlib",
-        build_file = "@com_google_protobuf//third_party:zlib.BUILD",
+        build_file = "@envoy//bazel/external:zlib.BUILD",
     )
 
     native.bind(
