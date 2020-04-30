@@ -51,10 +51,10 @@ class StreamEncoderImpl : public virtual StreamEncoder,
                           public StreamCallbackHelper,
                           public Http1StreamEncoderOptions {
 public:
-  ~StreamEncoderImpl() {
+  ~StreamEncoderImpl() override {
     // When the stream goes away, undo any read blocks to resume reading.
     while (read_disable_calls_ != 0) {
-      readDisable(false);
+      StreamEncoderImpl::readDisable(false);
     }
   }
   // Http::StreamEncoder
@@ -427,7 +427,7 @@ protected:
     ResponseEncoderImpl response_encoder_;
     bool remote_complete_{};
   };
-  absl::optional<ActiveRequest>& active_request() { return active_request_; }
+  absl::optional<ActiveRequest>& activeRequest() { return active_request_; }
 
 private:
   /**

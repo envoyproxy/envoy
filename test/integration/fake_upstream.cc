@@ -228,9 +228,9 @@ class TestHttp1ServerConnectionImpl : public Http::Http1::ServerConnectionImpl {
 public:
   using Http::Http1::ServerConnectionImpl::ServerConnectionImpl;
 
-  virtual ~TestHttp1ServerConnectionImpl() {
-    if (active_request().has_value()) {
-      active_request().value().response_encoder_.clearReadDisableCallsForTests();
+  ~TestHttp1ServerConnectionImpl() override {
+    if (activeRequest().has_value()) {
+      activeRequest().value().response_encoder_.clearReadDisableCallsForTests();
     }
   }
 };
