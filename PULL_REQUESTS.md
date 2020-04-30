@@ -12,13 +12,21 @@ explaining the overall change. Both the component and the explanation must be lo
 * router:add x-envoy-overloaded header
 * tls: add support for specifying TLS session ticket keys
 
-### <a name="desc"></a>Description
+### <a name="desc"></a>Commit Message
 
-The description field should include a more verbose explanation of what this PR
-does. If this PR causes a change in behavior it should document the behavior
-before and after   If fixing a bug, please describe what the original issue is and
-how the change resolves it. If it is configuration controlled, it should note
-how the feature is enabled etc...
+The commit message field should include an explanation of what this PR
+does. This will be used as the final commit message that maintainers will use to
+populate the commit message when merging. If this PR causes a change in behavior
+it should document the behavior before and after. If fixing a bug, please
+describe what the original issue is and how the change resolves it. If it is
+configuration controlled, it should note how the feature is enabled etc...
+
+
+### <a name="desc"></a>Additional Description
+
+The additional description field should include information of what this PR does
+that may be out of scope for a commit message. This could include additional
+information or context useful to reviewers.
 
 ### <a name="risk"></a>Risk
 
@@ -54,7 +62,7 @@ N/A if there were no documentation changes.
 ### <a name="relnotes"></a>Release notes
 
 If this change is user impacting OR extension developer impacting (filter API, etc.) you **must**
-add a release note to the [version history](docs/root/version_history/current.rst) for the 
+add a release note to the [version history](docs/root/version_history/current.rst) for the
 current version. Please include any relevant links. Each release note should be prefixed with the
 relevant subsystem in **alphabetical order** (see existing examples as a guide) and include links
 to relevant parts of the documentation. Thank you! Please write in N/A if there are no release notes.
@@ -73,11 +81,10 @@ you may instead just tag the PR with the issue:
 
 ### <a name="deprecated"></a>Deprecated
 
-If this PR deprecates existing Envoy APIs or code, it should include
-an update to the [deprecated file](docs/root/intro/deprecated.rst) and a one line note in the PR
-description.
+If this PR deprecates existing Envoy APIs or code, it should include an update to the deprecated
+section of the [version history](docs/root/version_history/current.rst) and a one line note in the
+PR description.
 
 If you mark existing APIs or code as deprecated, when the next release is cut, the
 deprecation script will create and assign an issue to you for
 cleaning up the deprecated code path.
-

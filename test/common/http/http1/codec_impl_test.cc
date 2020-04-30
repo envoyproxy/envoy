@@ -44,11 +44,13 @@ std::string createHeaderFragment(int num_headers) {
   return headers;
 }
 
-Buffer::OwnedImpl createBufferWithOneByteSlices(absl::string_view input) {
+Buffer::OwnedImpl createBufferWithNByteSlices(absl::string_view input, size_t max_slice_size) {
   Buffer::OwnedImpl buffer;
-  for (const char& c : input) {
-    buffer.appendSliceForTest(&c, 1);
+  for (size_t offset = 0; offset < input.size(); offset += max_slice_size) {
+    buffer.appendSliceForTest(input.substr(offset, max_slice_size));
   }
+  // Verify that the buffer contains the right number of slices.
+  ASSERT(buffer.getRawSlices().size() == (input.size() + max_slice_size - 1) / max_slice_size);
   return buffer;
 }
 } // namespace
@@ -80,6 +82,12 @@ public:
   // Then send a response just to clean up.
   void sendAndValidateRequestAndSendResponse(absl::string_view raw_request,
                                              const TestHeaderMapImpl& expected_request_headers) {
+    Buffer::OwnedImpl buffer(raw_request);
+    sendAndValidateRequestAndSendResponse(buffer, expected_request_headers);
+  }
+
+  void sendAndValidateRequestAndSendResponse(Buffer::Instance& buffer,
+                                             const TestHeaderMapImpl& expected_request_headers) {
     NiceMock<MockRequestDecoder> decoder;
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
@@ -88,7 +96,6 @@ public:
           return decoder;
         }));
     EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_request_headers), true));
-    Buffer::OwnedImpl buffer(raw_request);
     codec_->dispatch(buffer);
     EXPECT_EQ(0U, buffer.length());
     response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "200"}}, true);
@@ -401,10 +408,11 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodyFragmentedBuffer) {
   EXPECT_CALL(decoder, decodeData(_, true));
 
   Buffer::OwnedImpl buffer =
-      createBufferWithOneByteSlices("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
-                                    "6\r\nHello \r\n"
-                                    "5\r\nWorld\r\n"
-                                    "0\r\n\r\n");
+      createBufferWithNByteSlices("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                                  "6\r\nHello \r\n"
+                                  "5\r\nWorld\r\n"
+                                  "0\r\n\r\n",
+                                  1);
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
 }
@@ -488,6 +496,42 @@ TEST_F(Http1ServerConnectionImplTest, HostWithLWS) {
   // Regression test mixed spaces and tabs before and after the host header value.
   sendAndValidateRequestAndSendResponse(
       "GET / HTTP/1.1\r\nHost: 	 	  host		  	 \r\n\r\n", expected_headers);
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/10270. Linear whitespace at the
+// beginning and end of a header value should be stripped. Whitespace in the middle should be
+// preserved.
+TEST_F(Http1ServerConnectionImplTest, InnerLWSIsPreserved) {
+  initialize();
+
+  // Header with many spaces surrounded by non-whitespace characters to ensure that dispatching is
+  // split across multiple dispatch calls. The threshold used here comes from Envoy preferring 16KB
+  // reads, but the important part is that the header value is split such that the pieces have
+  // leading and trailing whitespace characters.
+  const std::string header_value_with_inner_lws = "v" + std::string(32 * 1024, ' ') + "v";
+  TestHeaderMapImpl expected_headers{{":authority", "host"},
+                                     {":path", "/"},
+                                     {":method", "GET"},
+                                     {"header_field", header_value_with_inner_lws}};
+
+  {
+    // Regression test spaces in the middle are preserved
+    Buffer::OwnedImpl header_buffer = createBufferWithNByteSlices(
+        "GET / HTTP/1.1\r\nHost: host\r\nheader_field: " + header_value_with_inner_lws + "\r\n\r\n",
+        16 * 1024);
+    EXPECT_EQ(3, header_buffer.getRawSlices().size());
+    sendAndValidateRequestAndSendResponse(header_buffer, expected_headers);
+  }
+
+  {
+    // Regression test spaces before and after are removed
+    Buffer::OwnedImpl header_buffer = createBufferWithNByteSlices(
+        "GET / HTTP/1.1\r\nHost: host\r\nheader_field:  " + header_value_with_inner_lws +
+            "  \r\n\r\n",
+        16 * 1024);
+    EXPECT_EQ(3, header_buffer.getRawSlices().size());
+    sendAndValidateRequestAndSendResponse(header_buffer, expected_headers);
+  }
 }
 
 TEST_F(Http1ServerConnectionImplTest, Http10) {
@@ -907,7 +951,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAllowed) {
       {":method", "GET"},
       {"foo_bar", "bar"},
   };
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
   codec_->dispatch(buffer);
@@ -929,7 +973,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAreDropped) {
       {":path", "/"},
       {":method", "GET"},
   };
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
   codec_->dispatch(buffer);
@@ -1104,7 +1148,7 @@ TEST_F(Http1ServerConnectionImplTest, PostWithContentLengthFragmentedBuffer) {
   EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), true));
 
   Buffer::OwnedImpl buffer =
-      createBufferWithOneByteSlices("POST / HTTP/1.1\r\ncontent-length: 5\r\n\r\n12345");
+      createBufferWithNByteSlices("POST / HTTP/1.1\r\ncontent-length: 5\r\n\r\n12345", 1);
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
 }
@@ -1537,6 +1581,89 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithNoBody) {
   codec_->dispatch(buffer);
 }
 
+TEST_F(Http1ServerConnectionImplTest, ConnectRequestNoContentLength) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "host:80"},
+      {":method", "CONNECT"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\n\r\n");
+  codec_->dispatch(buffer);
+
+  Buffer::OwnedImpl expected_data("abcd");
+  Buffer::OwnedImpl connect_payload("abcd");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+  codec_->dispatch(connect_payload);
+}
+
+// We use the absolute URL parsing code for CONNECT requests, but it does not
+// actually allow absolute URLs.
+TEST_F(Http1ServerConnectionImplTest, ConnectRequestAbsoluteURLNotallowed) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer("CONNECT http://host:80 HTTP/1.1\r\n\r\n");
+  EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
+}
+
+TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithEarlyData) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl expected_data("abcd");
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+  Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\n\r\nabcd");
+  codec_->dispatch(buffer);
+}
+
+TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithTEChunked) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  // Connect with body is technically illegal, but Envoy does not inspect the
+  // body to see if there is a non-zero byte chunk. It will instead pass it
+  // through.
+  // TODO(alyssawilk) track connect payload and block if this happens.
+  Buffer::OwnedImpl expected_data("12345abcd");
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+  Buffer::OwnedImpl buffer(
+      "CONNECT host:80 HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n12345abcd");
+  codec_->dispatch(buffer);
+}
+
+TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithContentLength) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  // Make sure we avoid the deferred_end_stream_headers_ optimization for
+  // requests-with-no-body.
+  Buffer::OwnedImpl expected_data("abcd");
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+  Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\ncontent-length: 0\r\n\r\nabcd");
+  codec_->dispatch(buffer);
+}
+
 TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
   EXPECT_CALL(connection_, bufferLimit()).WillOnce(Return(10));
   initialize();
@@ -1879,6 +2006,71 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: "
                              "upgrade\r\nUpgrade: websocket\r\n\r\n12345abcd");
+  codec_->dispatch(response);
+}
+
+TEST_F(Http1ClientConnectionImplTest, ConnectResponse) {
+  initialize();
+
+  InSequence s;
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  // Send response headers
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n");
+  codec_->dispatch(response);
+
+  // Send body payload
+  Buffer::OwnedImpl expected_data1("12345");
+  Buffer::OwnedImpl body("12345");
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data1), false));
+  codec_->dispatch(body);
+
+  // Send connect payload
+  Buffer::OwnedImpl expected_data2("abcd");
+  Buffer::OwnedImpl connect_payload("abcd");
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data2), false));
+  codec_->dispatch(connect_payload);
+}
+
+// Same data as above, but make sure directDispatch immediately hands off any
+// outstanding data.
+TEST_F(Http1ClientConnectionImplTest, ConnectResponseWithEarlyData) {
+  initialize();
+
+  InSequence s;
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  // Send response headers and payload
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  Buffer::OwnedImpl expected_data("12345abcd");
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\n12345abcd");
+  codec_->dispatch(response);
+}
+
+TEST_F(Http1ClientConnectionImplTest, ConnectRejected) {
+  initialize();
+
+  InSequence s;
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  Buffer::OwnedImpl expected_data("12345abcd");
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
+  Buffer::OwnedImpl response("HTTP/1.1 400 OK\r\n\r\n12345abcd");
   codec_->dispatch(response);
 }
 

@@ -78,7 +78,7 @@ public:
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    test_client.client_dispatcher_ = api_->allocateDispatcher();
+    test_client.client_dispatcher_ = api_->allocateDispatcher("test_thread");
 
     return test_client;
   }
@@ -118,7 +118,7 @@ public:
 
   // Resets the connection belonging to the provided index, asserting that the
   // provided request receives onPoolFailure.
-  void expectClientReset(size_t index, ActiveTestRequest& r);
+  void expectClientReset(size_t index, ActiveTestRequest& r, bool local_failure);
   // Asserts that the provided requests receives onPoolFailure.
   void expectStreamReset(ActiveTestRequest& r);
 
@@ -183,10 +183,17 @@ void Http2ConnPoolImplTest::expectStreamConnect(size_t index, ActiveTestRequest&
   EXPECT_CALL(r.callbacks_.pool_ready_, ready());
 }
 
-void Http2ConnPoolImplTest::expectClientReset(size_t index, ActiveTestRequest& r) {
+void Http2ConnPoolImplTest::expectClientReset(size_t index, ActiveTestRequest& r,
+                                              bool local_failure) {
   expectStreamReset(r);
   EXPECT_CALL(*test_clients_[0].connect_timer_, disableTimer());
-  test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  if (local_failure) {
+    test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
+    EXPECT_EQ(r.callbacks_.reason_, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+  } else {
+    test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+    EXPECT_EQ(r.callbacks_.reason_, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  }
 }
 
 void Http2ConnPoolImplTest::expectStreamReset(ActiveTestRequest& r) {
@@ -573,7 +580,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsFailure) {
   // Note that these occur in reverse order due to the order we purge pending requests in.
   expectStreamReset(r3);
   expectStreamReset(r2);
-  expectClientReset(0, r1);
+  expectClientReset(0, r1, false);
 
   expectClientCreate();
   // Since we have no active connection, subsequence requests will queue until
@@ -588,6 +595,26 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsFailure) {
 
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_destroy_.value());
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_destroy_remote_.value());
+}
+
+// Verifies resets due to local connection closes are tracked correctly.
+TEST_F(Http2ConnPoolImplTest, LocalFailure) {
+  InSequence s;
+  cluster_->max_requests_per_connection_ = 10;
+
+  // Create three requests. These should be queued up.
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  ActiveTestRequest r2(*this, 0, false);
+  ActiveTestRequest r3(*this, 0, false);
+
+  // The connection now becomes ready. This should cause all the queued requests to be sent.
+  // Note that these occur in reverse order due to the order we purge pending requests in.
+  expectStreamReset(r3);
+  expectStreamReset(r2);
+  expectClientReset(0, r1, true);
+
+  EXPECT_CALL(*this, onClientDestroy());
 }
 
 // Verifies that requests are queued up in the conn pool and respect max request circuit breaking
@@ -936,6 +963,7 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   ActiveTestRequest r1(*this, 0, false);
   EXPECT_CALL(r1.callbacks_.pool_failure_, ready());
   test_clients_[0].connect_timer_->invokeCallback();
+  EXPECT_EQ(r1.callbacks_.reason_, ConnectionPool::PoolFailureReason::Timeout);
 
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();

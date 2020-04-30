@@ -36,18 +36,67 @@ The fault filter has the capability to allow fault configuration to be specified
 This is useful in certain scenarios in which it is desired to allow the client to specify its own
 fault configuration. The currently supported header controls are:
 
-* Request abort configuration via the *x-envoy-fault-abort-request* header. The header value
-  should be an integer that specifies the HTTP status code to return in response to a request
-  and must be in the range [200, 600). In order for the header to work, :ref:`header_abort
+x-envoy-fault-abort-request
+  HTTP status code to abort a request with. The header value should be an integer that specifies
+  the HTTP status code to return in response to a request and must be in the range [200, 600). 
+  In order for the header to work, :ref:`header_abort
   <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set.
-* Request delay configuration via the *x-envoy-fault-delay-request* header. The header value
-  should be an integer that specifies the number of milliseconds to throttle the latency for.
-  In order for the header to work, :ref:`header_delay
+
+x-envoy-fault-abort-grpc-request
+  gRPC status code to abort a request with. The header value should be a non-negative integer that specifies
+  the gRPC status code to return in response to a request. Its value range is [0, UInt32.Max] instead of [0, 16]
+  to allow testing even not well-defined gRPC status codes. When this header is set, the HTTP response status code
+  will be set to 200. In order for the header to work, :ref:`header_abort
+  <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set. If both 
+  *x-envoy-fault-abort-request* and *x-envoy-fault-abort-grpc-request* headers are set then 
+  *x-envoy-fault-abort-grpc-request* header will be **ignored** and fault response http status code will be
+  set to *x-envoy-fault-abort-request* header value.
+
+x-envoy-fault-abort-request-percentage
+  The percentage of requests that should be failed with a status code that's defined
+  by the value of *x-envoy-fault-abort-request* or *x-envoy-fault-abort-grpc-request* HTTP headers.
+  The header value should be an integer that specifies the numerator of the percentage of request to apply aborts
+  to and must be greater or equal to 0 and its maximum value is capped by the value of the numerator of
+  :ref:`percentage <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>` field.
+  Percentage's denominator is equal to default percentage's denominator
+  :ref:`percentage <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>` field.
+  In order for the header to work, :ref:`header_abort
+  <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set and
+  either *x-envoy-fault-abort-request* or *x-envoy-fault-abort-grpc-request* HTTP header needs to be a part of the request.
+
+x-envoy-fault-delay-request
+  The duration to delay a request by. The header value should be an integer that specifies the number
+  of milliseconds to throttle the latency for. In order for the header to work, :ref:`header_delay
   <envoy_api_field_config.filter.fault.v2.FaultDelay.header_delay>` needs to be set.
-* Response rate limit configuration via the *x-envoy-fault-throughput-response* header. The
-  header value should be an integer that specifies the limit in KiB/s and must be > 0. In order
-  for the header to work, :ref:`header_limit
+
+x-envoy-fault-delay-request-percentage
+  The percentage of requests that should be delayed by a duration that's defined by the value of
+  *x-envoy-fault-delay-request* HTTP header. The header value should be an integer that
+  specifies the percentage of request to apply delays to and must be greater
+  or equal to 0 and its maximum value is capped by the value of the numerator of
+  :ref:`percentage <envoy_api_field_config.filter.fault.v2.FaultDelay.percentage>` field.
+  Percentage's denominator is equal to default percentage's denominator
+  :ref:`percentage <envoy_api_field_config.filter.fault.v2.FaultDelay.percentage>` field.
+  In order for the header to work, :ref:`header_delay
+  <envoy_api_field_config.filter.fault.v2.FaultDelay.header_delay>` needs to be set and
+  *x-envoy-fault-delay-request* HTTP header needs to be a part of a request.
+
+x-envoy-fault-throughput-response
+  The rate limit to use when a response to a caller is sent. The header value should be an integer
+  that specifies the limit in KiB/s and must be > 0. In order for the header to work, :ref:`header_limit
   <envoy_api_field_config.filter.fault.v2.FaultRateLimit.header_limit>` needs to be set.
+
+x-envoy-fault-throughput-response-percentage
+  The percentage of requests whose response rate should be limited to the value of
+  *x-envoy-fault-throughput-response* HTTP header. The header value should be an integer that
+  specifies the percentage of request to apply delays to and must be greater
+  or equal to 0 and its maximum value is capped by the value of the numerator of
+  :ref:`percentage <envoy_api_field_config.filter.fault.v2.FaultRateLimit.percentage>` field.
+  Percentage's denominator is equal to default percentage's denominator
+  :ref:`percentage <envoy_api_field_config.filter.fault.v2.FaultRateLimit.percentage>` field.
+  In order for the header to work, :ref:`header_limit
+  <envoy_api_field_config.filter.fault.v2.FaultRateLimit.header_limit>` needs to be set and
+  *x-envoy-fault-delay-request* HTTP header needs to be a part of a request.
 
 .. attention::
 
@@ -98,12 +147,19 @@ fault.http.abort.abort_percent
   <envoy_api_field_config.filter.http.fault.v2.HTTPFault.abort>`.
 
 fault.http.abort.http_status
-  HTTP status code that will be used as the  of requests that will be
+  HTTP status code that will be used as the response status code of requests that will be
   aborted if the headers match. Defaults to the HTTP status code specified
   in the config. If the config does not contain an *abort* block, then
   *http_status* defaults to 0. For historic reasons, this runtime key is
   available regardless of whether the filter is :ref:`configured for abort
   <envoy_api_field_config.filter.http.fault.v2.HTTPFault.abort>`.
+
+fault.http.abort.grpc_status
+  gRPC status code that will be used as the response status code of requests that will be
+  aborted if the headers match. Defaults to the gRPC status code specified in the config.
+  If this field is missing from both the runtime and the config, gRPC status code in the response
+  will be derived from *fault.http.abort.http_status* field. This runtime key is only available when
+  the filter is :ref:`configured for abort <envoy_api_field_config.filter.http.fault.v2.HTTPFault.abort>`.
 
 fault.http.delay.fixed_delay_percent
   % of requests that will be delayed if the headers match. Defaults to the

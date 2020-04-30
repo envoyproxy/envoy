@@ -6,7 +6,7 @@
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"
@@ -157,6 +157,10 @@ bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
                                  header_value.size()) != 0;
 }
 
+bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
+  return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
+}
+
 void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
   headers_to_add.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
@@ -182,11 +186,6 @@ HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
       headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
     return SharedResponseCodeDetails::get().InvalidAuthority;
-  }
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_method_validation") &&
-      headers.Method() &&
-      Http::Headers::get().MethodValues.Connect == headers.Method()->value().getStringView()) {
-    return SharedResponseCodeDetails::get().ConnectUnsupported;
   }
   return absl::nullopt;
 }

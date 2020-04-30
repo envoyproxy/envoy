@@ -1316,7 +1316,13 @@ TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       static_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
+  filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
   filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
+  EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
+  filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(stream->isAboveWriteBufferHighWatermark());
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 

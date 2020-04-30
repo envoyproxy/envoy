@@ -70,4 +70,9 @@ message NextVersion {
   // Deprecations.
   reserved 14;
   NextEnum enum_field_with_deprecated_value = 15;
+  message NewMessageInThisVerion {
+  }
+
+  // New message present in this version but not PreviousVersion.
+  NewMessageInThisVerion new_message_in_this_version = 16;
 }

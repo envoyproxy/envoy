@@ -43,6 +43,12 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
                        "./test/test_common/utility.cc", "./test/test_common/utility.h",
                        "./test/integration/integration.h")
 
+# Tests in these paths may make use of the Registry::RegisterFactory constructor or the
+# REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
+# perform temporary registrations.
+REGISTER_FACTORY_TEST_WHITELIST = ("./test/common/config/registry_test.cc",
+                                   "./test/integration/clusters/", "./test/integration/filters/")
+
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = (
     "./source/common/config/version_converter.cc",
@@ -65,17 +71,17 @@ HISTOGRAM_WITH_SI_SUFFIX_WHITELIST = ("downstream_cx_length_ms", "downstream_cx_
                                       "upstream_cx_length_ms")
 
 # Files in these paths can use std::regex
-STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/common/regex.h",
-                       "./source/common/common/regex.cc",
-                       "./source/common/stats/tag_extractor_impl.h",
-                       "./source/common/stats/tag_extractor_impl.cc",
-                       "./source/common/access_log/access_log_formatter.cc",
-                       "./source/extensions/filters/http/squash/squash_filter.h",
-                       "./source/extensions/filters/http/squash/squash_filter.cc",
-                       "./source/server/http/admin.h", "./source/server/http/admin.cc",
-                       "./tools/clang_tools/api_booster/main.cc",
-                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc",
-                       "./source/common/common/version.cc")
+STD_REGEX_WHITELIST = (
+    "./source/common/common/utility.cc", "./source/common/common/regex.h",
+    "./source/common/common/regex.cc", "./source/common/stats/tag_extractor_impl.h",
+    "./source/common/stats/tag_extractor_impl.cc",
+    "./source/common/access_log/access_log_formatter.cc",
+    "./source/extensions/filters/http/squash/squash_filter.h",
+    "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/http/utils.h",
+    "./source/server/http/utils.cc", "./source/server/http/stats_handler.h",
+    "./source/server/http/stats_handler.cc", "./source/server/http/prometheus_stats.h",
+    "./source/server/http/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
+    "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/common/version.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -310,6 +316,13 @@ def whitelistedForRealTime(file_path):
   if file_path.endswith(".md"):
     return True
   return file_path in REAL_TIME_WHITELIST
+
+
+def whitelistedForRegisterFactory(file_path):
+  if not file_path.startswith("./test/"):
+    return True
+
+  return any(file_path.startswith(prefix) for prefix in REGISTER_FACTORY_TEST_WHITELIST)
 
 
 def whitelistedForSerializeAsString(file_path):
@@ -588,6 +601,10 @@ def checkSourceLine(line, file_path, reportError):
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  if not whitelistedForRegisterFactory(file_path):
+    if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
+      reportError("Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
+                  "use Registry::InjectFactory instead.")
   if not whitelistedForUnpackTo(file_path):
     if "UnpackTo" in line:
       reportError("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
@@ -647,8 +664,9 @@ def checkSourceLine(line, file_path, reportError):
 
   if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
      ('.counterFromString(' in line or '.gaugeFromString(' in line or \
-      '.histogramFromString(' in line or '->counterFromString(' in line or \
-      '->gaugeFromString(' in line or '->histogramFromString(' in line):
+      '.histogramFromString(' in line or '.textReadoutFromString(' in line or \
+      '->counterFromString(' in line or '->gaugeFromString(' in line or \
+      '->histogramFromString(' in line or '->textReadoutFromString(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
   if re.search("envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}", line):
