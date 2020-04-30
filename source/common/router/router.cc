@@ -664,9 +664,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Filter::HttpOrTcpPool Filter::createConnPool(Upstream::HostDescriptionConstSharedPtr& host) {
   Filter::HttpOrTcpPool conn_pool;
-  bool should_tcp_proxy = route_entry_->connectConfig().has_value() &&
-                          downstream_headers_->Method()->value().getStringView() ==
-                              Http::Headers::get().MethodValues.Connect;
+  const bool should_tcp_proxy = route_entry_->connectConfig().has_value() &&
+                                downstream_headers_->Method()->value().getStringView() ==
+                                    Http::Headers::get().MethodValues.Connect;
 
   if (!should_tcp_proxy) {
     conn_pool = getHttpConnPool();

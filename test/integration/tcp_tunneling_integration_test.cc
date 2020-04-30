@@ -80,8 +80,6 @@ public:
   bool enable_timeout_{};
 };
 
-// TODO(alyssawilk) make sure that if data is sent with the connect it does not go upstream
-// until the 200 headers are sent before unhiding ANY config.
 TEST_P(ConnectTerminationIntegrationTest, Basic) {
   initialize();
 

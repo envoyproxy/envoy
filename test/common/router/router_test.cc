@@ -5667,6 +5667,71 @@ TEST_F(RouterTest, ApplicationProtocols) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
+// Verify that CONNECT payload is not sent upstream until :200 response headers
+// are received.
+TEST_F(RouterTest, ConnectPauseAndResume) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+  expectResponseTimerCreate();
+
+  EXPECT_CALL(encoder, encodeHeaders(_, false));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("CONNECT");
+  router_.decodeHeaders(headers, false);
+
+  // Make sure any early data does not go upstream.
+  EXPECT_CALL(encoder, encodeData(_, _)).Times(0);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  // Now send the response headers, and ensure the deferred payload is proxied.
+  EXPECT_CALL(encoder, encodeData(_, _));
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+// Verify that CONNECT payload is not sent upstream if non-200 response headers are received.
+TEST_F(RouterTest, ConnectPauseNoResume) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+  expectResponseTimerCreate();
+
+  EXPECT_CALL(encoder, encodeHeaders(_, false));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("CONNECT");
+  router_.decodeHeaders(headers, false);
+
+  // Make sure any early data does not go upstream.
+  EXPECT_CALL(encoder, encodeData(_, _)).Times(0);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  // Now send the response headers, and ensure the deferred payload is not proxied.
+  EXPECT_CALL(encoder, encodeData(_, _)).Times(0);
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "400"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
 class WatermarkTest : public RouterTest {
 public:
   void sendRequest(bool header_only_request = true, bool pool_ready = true) {
