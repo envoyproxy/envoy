@@ -71,7 +71,7 @@ DnsQueryContextPtr DnsMessageParser::createQueryContext(Network::UdpRecvData& cl
 
   query_context->parse_status_ = parseDnsObject(query_context, client_request.buffer_);
   if (!query_context->parse_status_) {
-    ENVOY_LOG(error, "Unable to parse query buffer from '{}' into a DNS object.",
+    ENVOY_LOG(debug, "Unable to parse query buffer from '{}' into a DNS object.",
               client_request.addresses_.peer_->ip()->addressAsString());
   }
 
@@ -101,7 +101,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     available_bytes -= field_size;
 
     if (offset > buffer->length()) {
-      ENVOY_LOG(error, "Buffer read offset [{}] is beyond buffer length [{}].", offset,
+      ENVOY_LOG(debug, "Buffer read offset [{}] is beyond buffer length [{}].", offset,
                 buffer->length());
       return false;
     }
@@ -145,7 +145,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   // TODO(abaptiste):  Verify that queries do not contain answer records
   // Verify that we still have available data in the buffer to read answer and query records
   if (offset > buffer->length()) {
-    ENVOY_LOG(error, "Buffer read offset[{}] is larget than buffer length [{}].", offset,
+    ENVOY_LOG(debug, "Buffer read offset[{}] is larget than buffer length [{}].", offset,
               buffer->length());
     return false;
   }
@@ -158,7 +158,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     ENVOY_LOG(trace, "Parsing [{}/{}] questions", index, header_.questions);
     auto rec = parseDnsQueryRecord(buffer, &offset);
     if (rec == nullptr) {
-      ENVOY_LOG(error, "Couldn't parse query record from buffer");
+      ENVOY_LOG(debug, "Couldn't parse query record from buffer");
       return false;
     }
     context->queries_.push_back(std::move(rec));
@@ -196,12 +196,12 @@ DnsQueryRecordPtr DnsMessageParser::parseDnsQueryRecord(const Buffer::InstancePt
 
   const std::string record_name = parseDnsNameRecord(buffer, &available_bytes, &name_offset);
   if (record_name.empty()) {
-    ENVOY_LOG(error, "Unable to parse name record from buffer");
+    ENVOY_LOG(debug, "Unable to parse name record from buffer");
     return nullptr;
   }
 
   if (available_bytes < 2 * sizeof(uint16_t)) {
-    ENVOY_LOG(error, "Insufficient data in buffer to read query record type and class. ");
+    ENVOY_LOG(debug, "Insufficient data in buffer to read query record type and class. ");
     return nullptr;
   }
 
