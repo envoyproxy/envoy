@@ -366,7 +366,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ActiveQuicListenerEmptyFlagConfigTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Quic listener should be enabled by default, if not enabled expicitely in config.
+// Quic listener should be enabled by default, if not enabled explicitly in config.
 TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
