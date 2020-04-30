@@ -21,7 +21,7 @@ public:
   FilterStats& stats() const override { return stats_; }
   const std::string& hostRewrite() const override { return host_rewrite_; }
 
-  mutable std::shared_ptr<Common::Aws::MockSigner> signer_;
+  std::shared_ptr<Common::Aws::MockSigner> signer_;
   Stats::IsolatedStoreImpl stats_store_;
   mutable FilterStats stats_{Filter::generateStats("test", stats_store_)};
   std::string host_rewrite_;
