@@ -72,6 +72,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filesystem_subscription_impl_test",
     srcs = ["filesystem_subscription_impl_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         ":filesystem_subscription_test_harness",
         "//test/mocks/event:event_mocks",
@@ -271,6 +272,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "subscription_impl_test",
     srcs = ["subscription_impl_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         ":delta_subscription_test_harness",
         ":filesystem_subscription_test_harness",

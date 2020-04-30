@@ -76,6 +76,7 @@ envoy_extension_cc_test(
     external_deps = [
         "grpc_alts_fake_handshaker_server",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",
