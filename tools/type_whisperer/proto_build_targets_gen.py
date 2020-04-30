@@ -15,8 +15,8 @@ V2_REGEXES = list(
     map(re.compile, [
         r'envoy[\w\.]*\.(v1alpha\d?|v1)',
         r'envoy[\w\.]*\.(v2alpha\d?|v2)',
-        r'envoy\.type\.matcher',
-        r'envoy\.type',
+        r'envoy\.type\.matcher$',
+        r'envoy\.type$',
         r'envoy\.config\.cluster\.redis',
         r'envoy\.config\.retry\.previous_priorities',
     ]))
