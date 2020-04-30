@@ -15,6 +15,13 @@ namespace DnsFilter {
 constexpr uint16_t DNS_RECORD_CLASS_IN = 1;
 constexpr uint16_t DNS_RECORD_TYPE_A = 1;
 constexpr uint16_t DNS_RECORD_TYPE_AAAA = 28;
+
+constexpr uint16_t DNS_RESPONSE_CODE_NO_ERROR = 0;
+constexpr uint16_t DNS_RESPONSE_CODE_FORMAT_ERROR = 1;
+constexpr uint16_t DNS_RESPONSE_CODE_SERVER_FAILURE = 2;
+constexpr uint16_t DNS_RESPONSE_CODE_NAME_ERROR = 3;
+constexpr uint16_t DNS_RESPONSE_CODE_NOT_IMPLEMENTED = 4;
+
 /**
  * BaseDnsRecord contains the fields and functions common to both query and answer records.
  */
@@ -67,12 +74,6 @@ public:
 
 using DnsAnswerRecordPtr = std::unique_ptr<DnsAnswerRecord>;
 using DnsAnswerMap = std::unordered_multimap<std::string, DnsAnswerRecordPtr>;
-
-constexpr uint16_t NO_ERROR = 0;
-constexpr uint16_t FORMAT_ERROR = 1;
-constexpr uint16_t SERVER_FAILURE = 2;
-constexpr uint16_t NAME_ERROR = 3;
-constexpr uint16_t NOT_IMPLEMENTED = 4;
 
 /**
  * DnsQueryContext contains all the data associated with a query. The filter uses this object to
