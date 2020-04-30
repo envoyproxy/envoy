@@ -626,29 +626,21 @@ resources after a specified period of time if contact with the management server
 be used, for example, to terminate a fault injection test when the management server can no longer
 be reached.
 
+For clients that support the 'envoy.config.ttl' client feature, A TTL field may be specified on 
+each :ref:`Resource <envoy_api_msg_Resource>`. A timer is started for each 
+:ref:`Resource <envoy_api_msg_Resource>` that has a TTL specified. When the timer expires, the 
+specific resource is removed.
+
+To update the TTL associated with a Resource, the management server resends the resource with a 
+new TTL. To remove the TTL, the management server resends the resource with the TTL field unset.
+
 SotW TTL
 ^^^^^^^^
 
-A TTL field in the :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` specifies the TTL for
-all resources contained in the response. A timer is started when the response is received. When the
-timer expires, all resources retrieved from the management server will be removed.
-
-The TTL timer can be updated by sending a specially formed 
-:ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` with the same version as the previously
-applied response. The list of resources included in the response is empty and the TTL field is
-optional. This serves as a signal to Envoy to update the TTL to the value specified or remove the
-TTL if none is specified.
-
-Incremental TTL
-^^^^^^^^^^^^^^^
-
-A TTL field is specified on each link:Resource. A timer is started for each link:Resource with a
-TTL specified. When the timer expires, the specific resource is removed.
-
-To update the TTL associated with a Resource, the management server sends a response for the
-Resource with the same version as was previously sent for the Resource. The body of the resource is
-empty and the TTL field is optional. This serves as a signal to Envoy to update the TTL to the
-value specified or remove the TTL if none is specified.
+The SotW :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse.resources>` field contains the 
+current resources as a list of `google.protobuf.Any`. For clients that support the 
+'envoy.config.ttl' client feature, a management server may wrap any number of resources in a 
+:ref:`Resource <envoy_api_msg_Resource>` in order to enable TTL.
 
 .. _xds_protocol_ads:
 
