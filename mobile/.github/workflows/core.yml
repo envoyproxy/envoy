@@ -16,7 +16,7 @@ jobs:
         with:
           submodules: true
       - name: 'Install dependencies'
-        run: ./envoy/ci/mac_ci_setup.sh
+        run: ./ci/mac_ci_setup.sh
       - name: 'Run tests'
         run: bazel test --test_output=all //test/...
   tsan:
