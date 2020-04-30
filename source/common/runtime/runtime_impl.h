@@ -57,7 +57,7 @@ public:
   COUNTER(override_dir_exists)                                                                     \
   COUNTER(override_dir_not_exists)                                                                 \
   GAUGE(admin_overrides_active, NeverImport)                                                       \
-  GAUGE(deprecated_feature_active, NeverImport)                                                    \
+  GAUGE(deprecated_feature_seen_since_process_start, NeverImport)                                  \
   GAUGE(num_keys, NeverImport)                                                                     \
   GAUGE(num_layers, NeverImport)
 

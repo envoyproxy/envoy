@@ -170,7 +170,7 @@ bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_
   stats_.deprecated_feature_use_.inc();
 
   // Similar to the above, but a gauge that isn't imported during a hot restart.
-  stats_.deprecated_feature_active_.inc();
+  stats_.deprecated_feature_seen_since_process_start_.inc();
 
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
   return false;
