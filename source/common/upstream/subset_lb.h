@@ -188,6 +188,7 @@ private:
 
     bool initialized() const { return priority_subset_ != nullptr; }
     bool active() const { return initialized() && !priority_subset_->empty(); }
+    bool hasChildren() const { return !children_.empty(); }
 
     LbSubsetMap children_;
 
@@ -222,6 +223,7 @@ private:
   LbSubsetEntryPtr findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadata& kvs,
                                       uint32_t idx);
   void forEachSubset(LbSubsetMap& subsets, std::function<void(LbSubsetEntryPtr)> cb);
+  void purgeEmptySubsets(LbSubsetMap& subsets) const;
 
   std::vector<SubsetMetadata> extractSubsetMetadata(const std::set<std::string>& subset_keys,
                                                     const Host& host);

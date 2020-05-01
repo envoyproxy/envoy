@@ -83,6 +83,9 @@ SubsetLoadBalancer::SubsetLoadBalancer(
           // This is a regular update with deltas.
           update(priority, hosts_added, hosts_removed);
         }
+
+        // Drop subsets that became empty.
+        purgeEmptySubsets(subsets_);
       });
 }
 
@@ -590,6 +593,37 @@ void SubsetLoadBalancer::forEachSubset(LbSubsetMap& subsets,
       cb(entry);
       forEachSubset(entry->children_, cb);
     }
+  }
+}
+
+// Purge empty subsets.
+void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) const {
+  std::vector<std::string> purge_subsets;
+
+  for (auto& vsm : subsets) {
+    std::vector<HashedValue> purge_vsm;
+
+    for (auto& em : vsm.second) {
+      LbSubsetEntryPtr entry = em.second;
+
+      purgeEmptySubsets(entry->children_);
+
+      if (!entry->active() && !entry->hasChildren()) {
+        purge_vsm.emplace_back(em.first);
+      }
+    }
+
+    for (auto&& key : purge_vsm) {
+      vsm.second.erase(key);
+    }
+
+    if (vsm.second.empty()) {
+      purge_subsets.emplace_back(vsm.first);
+    }
+  }
+
+  for (auto&& key : purge_subsets) {
+    subsets.erase(key);
   }
 }
 
