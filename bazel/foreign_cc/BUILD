@@ -212,6 +212,8 @@ envoy_cmake_external(
     cache_entries = {
         "BUILD_SHARED_LIBS": "off",
         "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_C_COMPILER_FORCED": "on",
+        "SKIP_BUILD_EXAMPLES": "on",
     },
     lib_source = "@net_zlib//:all",
     static_libraries = select({
