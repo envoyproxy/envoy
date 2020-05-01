@@ -471,6 +471,19 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeStopIterationAndBuffer) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, result);
 }
 
+TEST_F(AwsLambdaFilterTest, EncodeDataAddsLastChunk) {
+  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/});
+  filter_->resolveSettings();
+  Http::TestResponseHeaderMapImpl headers;
+  headers.setStatus(200);
+  filter_->encodeHeaders(headers, false /*end_stream*/);
+
+  Buffer::OwnedImpl buf(std::string("foobar"));
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false));
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(&buf));
+  filter_->encodeData(buf, true /*end_stream*/);
+}
+
 /**
  * encodeData() data in JSON mode without a 'body' key should translate the 'headers' key to HTTP
  * headers while ignoring any HTTP/2 pseudo-headers.

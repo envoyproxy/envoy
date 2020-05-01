@@ -108,6 +108,11 @@ config_setting(
 )
 
 config_setting(
+    name = "no_debug_info",
+    values = {"define": "no_debug_info=1"},
+)
+
+config_setting(
     name = "asan_build",
     values = {"define": "ENVOY_CONFIG_ASAN=1"},
 )
