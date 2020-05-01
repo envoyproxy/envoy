@@ -182,20 +182,15 @@ TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
 
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
+  setUpConnection();
+  sendBidirectionalData();
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
   } else {
-    response->waitForReset();
+    response_->waitForReset();
     codec_client_->close();
   }
 }
