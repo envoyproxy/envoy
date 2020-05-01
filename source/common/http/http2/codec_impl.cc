@@ -478,9 +478,8 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
-  // ConnectionImpl::dispatch throws an exception.
-  // TODO(#10878): Replace by manually setting to false at the end of the dispatch when exception
-  // removal is complete and dispatch will no longer throw.
+  // ConnectionImpl::dispatch returns early or throws an exception (consider removing if there is a
+  // single return after exception removal (#10878)).
   Cleanup cleanup([this]() { dispatching_ = false; });
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     dispatching_ = true;
