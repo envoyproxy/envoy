@@ -158,11 +158,20 @@ public:
     RELEASE_ASSERT(result, result.message());
   }
 
-  void
-  mergeLoadStats(envoy::service::load_stats::v3::LoadStatsRequest& loadstats_request,
-                 const envoy::service::load_stats::v3::LoadStatsRequest& local_loadstats_request) {
-    ASSERT(loadstats_request.cluster_stats_size() <= 1);
-    ASSERT(local_loadstats_request.cluster_stats_size() <= 1);
+  void mergeLoadStats(envoy::service::load_stats::v3::LoadStatsRequest& loadstats_request,
+                      envoy::service::load_stats::v3::LoadStatsRequest& local_loadstats_request) {
+    // Strip out "load_report" cluster, so that it doesn't interfere with the test.
+    for (auto it = local_loadstats_request.mutable_cluster_stats()->begin();
+         it != local_loadstats_request.mutable_cluster_stats()->end(); ++it) {
+      if (it->cluster_name() == "load_report") {
+        local_loadstats_request.mutable_cluster_stats()->erase(it);
+        break;
+      }
+    }
+
+    ASSERT_LE(loadstats_request.cluster_stats_size(), 1) << loadstats_request.DebugString();
+    ASSERT_LE(local_loadstats_request.cluster_stats_size(), 1)
+        << local_loadstats_request.DebugString();
 
     if (local_loadstats_request.cluster_stats_size() == 0) {
       return;
@@ -254,6 +263,11 @@ public:
       AssertionResult result =
           loadstats_stream_->waitForGrpcMessage(*dispatcher_, local_loadstats_request);
       RELEASE_ASSERT(result, result.message());
+      // Check that "envoy.lrs.supports_send_all_clusters" client feature is set.
+      if (local_loadstats_request.has_node()) {
+        EXPECT_THAT(local_loadstats_request.node().client_features(),
+                    ::testing::ElementsAre("envoy.lrs.supports_send_all_clusters"));
+      }
       // Sanity check and clear the measured load report interval.
       for (auto& cluster_stats : *local_loadstats_request.mutable_cluster_stats()) {
         const uint32_t actual_load_report_interval_ms =
@@ -299,12 +313,16 @@ public:
     EXPECT_EQ(response_size_, response_->body().size());
   }
 
-  void requestLoadStatsResponse(const std::vector<std::string>& clusters) {
+  void requestLoadStatsResponse(const std::vector<std::string>& clusters,
+                                bool send_all_clusters = false) {
     envoy::service::load_stats::v3::LoadStatsResponse loadstats_response;
     loadstats_response.mutable_load_reporting_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(load_report_interval_ms_));
     for (const auto& cluster : clusters) {
       loadstats_response.add_clusters(cluster);
+    }
+    if (send_all_clusters) {
+      loadstats_response.set_send_all_clusters(true);
     }
     loadstats_stream_->sendGrpcMessage(loadstats_response);
     // Wait until the request has been received by Envoy.
@@ -394,7 +412,8 @@ TEST_P(LoadStatsIntegrationTest, Success) {
 
   // 33%/67% split between dragon/winter primary localities.
   updateClusterLoadAssignment({{0}}, {{1, 2}}, {}, {{4}});
-  requestLoadStatsResponse({"cluster_0"});
+  // Verify that send_all_clusters works.
+  requestLoadStatsResponse({}, true);
 
   for (uint32_t i = 0; i < 6; ++i) {
     sendAndReceiveUpstream((4 + i) % 3);
