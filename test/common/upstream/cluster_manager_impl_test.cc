@@ -52,7 +52,8 @@ public:
       type: STATIC
       lb_policy: ROUND_ROBIN
       load_assignment:
-      endpoints:
+        cluster_name: cluster_1
+        endpoints:
         - lb_endpoints:
           - endpoint:
               address:
@@ -63,8 +64,7 @@ public:
               address:
                 socket_address:
                   address: 127.0.0.1
-                  port_value: 11002  
-      
+                  port_value: 11002        
   )EOF";
     const std::string merge_window_enabled = R"EOF(
       common_lb_config:
@@ -198,7 +198,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   checkConfigDump(R"EOF(
 static_clusters:
   - cluster:
-      "@type": type.googleapis.com/envoy.api.v3.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
       name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
@@ -337,13 +337,14 @@ static_resources:
     type: static
     lb_policy: round_robin
     load_assignment:
+      cluster_name: foo
       endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
   )EOF";
 
   create(parseBootstrapFromV3Yaml(yaml));
@@ -382,13 +383,14 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
     type: static
     lb_policy: cluster_provided
     load_assignment:
+      cluster_name: cluster_1
       endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
@@ -433,24 +435,26 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
+    {}
     lb_policy: "{}"
     lb_subset_config:
       fallback_policy: ANY_ENDPOINT
       subset_selectors:
         - keys: [ "x" ]
     load_assignment:
+      cluster_name: cluster_1
       endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 8000
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 8001
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8000
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8001
   )EOF";
 
   const std::string& policy_name = envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam());
@@ -544,6 +548,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerLocalityAware) {
         - keys: [ "x" ]
       locality_weight_aware: true
     load_assignment:
+      cluster_name: cluster_1
       endpoints:
         - lb_endpoints:
           - endpoint:
@@ -574,18 +579,19 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
     connect_timeout: 0.250s
     type: STATIC
     load_assignment:
+      cluster_name: redis_cluster
       endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 8000
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 8001
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8000
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8001
   )EOF";
   create(parseBootstrapFromV3Yaml(yaml));
 }
@@ -598,18 +604,19 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
       connect_timeout: 0.250s
       lb_policy: RING_HASH
       load_assignment:
+        cluster_name: redis_cluster
         endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: 127.0.0.1
-                    port_value: 8000
-            - endpoint:
-                address:
-                  socket_address:
-                    address: 127.0.0.1
-                    port_value: 8001
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8000
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8001
       dns_lookup_family: V4_ONLY
       ring_hash_lb_config:
         minimum_ring_size: 125
@@ -709,13 +716,14 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
     type: STATIC
     lb_policy: ROUND_ROBIN
     load_assignment:
+      cluster_name: cluster_1
       endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
     health_checks:
     - timeout: 1s
       interval: 1s
@@ -746,13 +754,14 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
     type: STATIC
     lb_policy: ROUND_ROBIN
     load_assignment:
+      cluster_name: cluster_1
       endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
     health_checks:
     - timeout: 1s
       interval: 1s
@@ -807,13 +816,14 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
     lb_policy: round_robin
     per_connection_buffer_limit_bytes: 8192
     load_assignment:
+      cluster_name: cluster_1
       endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
   )EOF";
 
   create(parseBootstrapFromV3Yaml(yaml));
@@ -940,12 +950,13 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
  version_info: version3
  static_clusters:
   - cluster:
-      "@type": type.googleapis.com/envoy.api.v3.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
       name: "cds_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
       load_assignment:
-      endpoints:
+        cluster_name: cds_cluster
+        endpoints:
         - lb_endpoints:
           - endpoint:
               address:
@@ -956,12 +967,13 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       seconds: 1234567891
       nanos: 234000000
   - cluster:
-      "@type": type.googleapis.com/envoy.api.v3.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
       name: "fake_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
       load_assignment:
-      endpoints:
+        cluster_name: fake_cluster
+        endpoints:
         - lb_endpoints:
           - endpoint:
               address:
@@ -972,12 +984,13 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       seconds: 1234567891
       nanos: 234000000
   - cluster:
-      "@type": type.googleapis.com/envoy.api.v3.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
       name: "fake_cluster2"
       type: "STATIC"
       connect_timeout: 0.25s
       load_assignment:
-      endpoints:
+        cluster_name: fake_cluster2
+        endpoints:
         - lb_endpoints:
           - endpoint:
               address:
@@ -990,12 +1003,13 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
  dynamic_active_clusters:
   - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.api.v3.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
       name: "cluster3"
       type: "STATIC"
       connect_timeout: 0.25s
       load_assignment:
-      endpoints:
+        cluster_name: cluster3
+        endpoints:
         - lb_endpoints:
           - endpoint:
               address:
@@ -1007,12 +1021,13 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       nanos: 234000000
   - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.api.v3.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
       name: "cluster4"
       type: "STATIC"
       connect_timeout: 0.25s
       load_assignment:
-      endpoints:
+        cluster_name: cluster4
+        endpoints:
         - lb_endpoints:
           - endpoint:
               address:
@@ -1024,12 +1039,13 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       nanos: 234000000
   - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.api.v3.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
       name: "cluster5"
       type: "STATIC"
       connect_timeout: 0.25s
       load_assignment:
-      endpoints:
+        cluster_name: cluster5
+        endpoints:
         - lb_endpoints:
           - endpoint:
               address:
@@ -1142,12 +1158,13 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
 dynamic_warming_clusters:
   - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.api.v3.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
       name: "fake_cluster"
       type: STATIC
       connect_timeout: 0.25s
       load_assignment:
-      endpoints:
+        cluster_name: fake_cluster
+        endpoints:
         - lb_endpoints:
           - endpoint:
               address:
@@ -1189,18 +1206,19 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version3"
      cluster:
-       "@type": type.googleapis.com/envoy.api.v3.Cluster
+       "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
        load_assignment:
-      endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+         cluster_name: fake_cluster
+         endpoints:
+         - lb_endpoints:
+           - endpoint:
+               address:
+                 socket_address:
+                   address: 127.0.0.1
+                   port_value: 11001
      last_updated:
        seconds: 1234567891
        nanos: 234000000
@@ -1226,18 +1244,19 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version3"
      cluster:
-       "@type": type.googleapis.com/envoy.api.v3.Cluster
+       "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
        load_assignment:
-      endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11002
+         cluster_name: fake_cluster
+         endpoints:
+         - lb_endpoints:
+           - endpoint:
+               address:
+                 socket_address:
+                   address: 127.0.0.1
+                   port_value: 11002
      last_updated:
        seconds: 1234567891
        nanos: 234000000
@@ -1713,6 +1732,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
             address: 1.2.3.4
             port_value: 80
       load_assignment:
+        cluster_name: cluster_1
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -1856,6 +1876,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
           port_value: 80
       lb_policy: ROUND_ROBIN
       load_assignment:
+        cluster_name: cluster_1
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -2184,6 +2205,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
           port_value: 80
       lb_policy: ROUND_ROBIN
       load_assignment:
+        cluster_name: cluster_1
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -2264,6 +2286,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
           port_value: 80
       lb_policy: ROUND_ROBIN
       load_assignment:
+        cluster_name: cluster_1
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -2626,6 +2649,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   type: STATIC
   lb_policy: ROUND_ROBIN
   load_assignment:
+    cluster_name: new_cluster
     endpoints:
       - lb_endpoints:
         - endpoint:
@@ -2636,7 +2660,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   common_lb_config:
     update_merge_window: 3s
   )EOF";
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(yaml), "version1"));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml), "version1"));
 
   Cluster& cluster = cluster_manager_->activeClusters().find("new_cluster")->second;
   HostVectorSharedPtr hosts(
@@ -2684,6 +2708,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   type: STATIC
   lb_policy: ROUND_ROBIN
   load_assignment:
+    cluster_name: new_cluster
     endpoints:
       - lb_endpoints:
         - endpoint:
@@ -2704,7 +2729,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
                    .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
   EXPECT_TRUE(
-      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(yaml_updated), "version2"));
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml_updated), "version2"));
   EXPECT_EQ(2, factory_.stats_
                    .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
@@ -2833,7 +2858,8 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-      endpoints:
+        cluster_name: cluster_1
+        endpoints:
         - lb_endpoints:
           - endpoint:
               address:
@@ -3114,6 +3140,7 @@ TEST_F(SockoptsTest, SockoptsUnset) {
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
+        cluster_name: SockoptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -3135,6 +3162,7 @@ TEST_F(SockoptsTest, FreebindClusterOnly) {
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
+        cluster_name: SockoptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -3158,6 +3186,7 @@ TEST_F(SockoptsTest, FreebindClusterManagerOnly) {
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
+        cluster_name: SockoptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -3182,6 +3211,7 @@ TEST_F(SockoptsTest, FreebindClusterOverride) {
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
+        cluster_name: SockoptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -3208,6 +3238,7 @@ TEST_F(SockoptsTest, SockoptsClusterOnly) {
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
+        cluster_name: SockoptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -3236,6 +3267,7 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
+        cluster_name: SockoptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -3264,6 +3296,7 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
+        cluster_name: SockoptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -3393,6 +3426,7 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveUnset) {
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
+        cluster_name: TcpKeepaliveCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -3414,6 +3448,7 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveCluster) {
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
+        cluster_name: TcpKeepaliveCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -3437,6 +3472,7 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterProbes) {
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
+        cluster_name: TcpKeepaliveCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -3461,6 +3497,7 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
+        cluster_name: TcpKeepaliveCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
