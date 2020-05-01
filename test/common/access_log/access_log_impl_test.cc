@@ -1318,7 +1318,7 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo&, const Http::RequestHeaderMap&,
-                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) override {
+                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) const override {
     if (current_++ == 0) {
       return true;
     }
@@ -1329,7 +1329,7 @@ public:
   }
 
 private:
-  uint32_t current_ = 0;
+  mutable uint32_t current_ = 0;
   uint32_t sample_rate_;
 };
 

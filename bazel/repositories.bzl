@@ -347,12 +347,11 @@ def _com_github_libevent_libevent():
     )
 
 def _net_zlib():
-    location = _get_location("net_zlib")
-
-    http_archive(
+    _repository_impl(
         name = "net_zlib",
         build_file_content = BUILD_ALL_CONTENT,
-        **location
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
     )
 
     native.bind(

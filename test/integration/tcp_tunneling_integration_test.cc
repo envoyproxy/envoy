@@ -80,8 +80,6 @@ public:
   bool enable_timeout_{};
 };
 
-// TODO(alyssawilk) make sure that if data is sent with the connect it does not go upstream
-// until the 200 headers are sent before unhiding ANY config.
 TEST_P(ConnectTerminationIntegrationTest, Basic) {
   initialize();
 
@@ -190,7 +188,7 @@ TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
 
