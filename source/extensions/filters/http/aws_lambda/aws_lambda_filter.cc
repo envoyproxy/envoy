@@ -251,9 +251,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
   }
 
   ENVOY_LOG(trace, "Tranforming JSON payload to HTTP response.");
-  if (!encoder_callbacks_->encodingBuffer()) {
-    encoder_callbacks_->addEncodedData(data, false);
-  }
+  encoder_callbacks_->addEncodedData(data, false);
   const Buffer::Instance& encoding_buffer = *encoder_callbacks_->encodingBuffer();
   encoder_callbacks_->modifyEncodingBuffer([this](Buffer::Instance& enc_buf) {
     Buffer::OwnedImpl body;

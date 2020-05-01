@@ -111,13 +111,16 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::listBegin(Buffer::Instan
 // ListValue -> ListEnd
 DecoderStateMachine::DecoderStatus DecoderStateMachine::listValue(Buffer::Instance& buffer) {
   ASSERT(!stack_.empty());
-  Frame& frame = stack_.back();
-  if (frame.remaining_ == 0) {
+  const uint32_t index = stack_.size() - 1;
+  if (stack_[index].remaining_ == 0) {
     return {popReturnState(), FilterStatus::Continue};
   }
-  frame.remaining_--;
+  DecoderStatus status = handleValue(buffer, stack_[index].elem_type_, ProtocolState::ListValue);
+  if (status.next_state_ != ProtocolState::WaitForData) {
+    stack_[index].remaining_--;
+  }
 
-  return handleValue(buffer, frame.elem_type_, ProtocolState::ListValue);
+  return status;
 }
 
 // ListEnd -> stack's return state
@@ -159,11 +162,14 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::mapKey(Buffer::Instance&
 // MapValue -> MapKey
 DecoderStateMachine::DecoderStatus DecoderStateMachine::mapValue(Buffer::Instance& buffer) {
   ASSERT(!stack_.empty());
-  Frame& frame = stack_.back();
-  ASSERT(frame.remaining_ != 0);
-  frame.remaining_--;
+  const uint32_t index = stack_.size() - 1;
+  ASSERT(stack_[index].remaining_ != 0);
+  DecoderStatus status = handleValue(buffer, stack_[index].value_type_, ProtocolState::MapKey);
+  if (status.next_state_ != ProtocolState::WaitForData) {
+    stack_[index].remaining_--;
+  }
 
-  return handleValue(buffer, frame.value_type_, ProtocolState::MapKey);
+  return status;
 }
 
 // MapEnd -> stack's return state
@@ -193,13 +199,16 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::setBegin(Buffer::Instanc
 // SetValue -> SetEnd
 DecoderStateMachine::DecoderStatus DecoderStateMachine::setValue(Buffer::Instance& buffer) {
   ASSERT(!stack_.empty());
-  Frame& frame = stack_.back();
-  if (frame.remaining_ == 0) {
+  const uint32_t index = stack_.size() - 1;
+  if (stack_[index].remaining_ == 0) {
     return {popReturnState(), FilterStatus::Continue};
   }
-  frame.remaining_--;
+  DecoderStatus status = handleValue(buffer, stack_[index].elem_type_, ProtocolState::SetValue);
+  if (status.next_state_ != ProtocolState::WaitForData) {
+    stack_[index].remaining_--;
+  }
 
-  return handleValue(buffer, frame.elem_type_, ProtocolState::SetValue);
+  return status;
 }
 
 // SetEnd -> stack's return state

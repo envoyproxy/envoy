@@ -219,9 +219,11 @@ public:
   void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) override;
   void closeStream() override;
   void resetStream() override;
+  // The GoogleAsyncClientImpl doesn't do Envoy watermark based flow control.
+  bool isAboveWriteBufferHighWatermark() const override { return false; }
 
 protected:
-  bool call_failed() const { return call_failed_; }
+  bool callFailed() const { return call_failed_; }
 
 private:
   // Process queued events in completed_ops_ with handleOpCompletion() on

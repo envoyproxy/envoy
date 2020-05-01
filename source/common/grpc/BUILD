@@ -115,6 +115,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:hash_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 
