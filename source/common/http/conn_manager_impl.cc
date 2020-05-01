@@ -324,7 +324,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   do {
     redispatch = false;
 
-    Status status = codec_->dispatch(data);
+    const Status status = codec_->dispatch(data);
 
     ASSERT(!isPrematureResponseError(status));
     if (isBufferFloodError(status)) {
