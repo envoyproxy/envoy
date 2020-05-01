@@ -142,11 +142,13 @@ TEST_F(FaultTest, SingleCommandFaultWithNoDefaultValueOrRuntimeValue) {
 
 TEST_F(FaultTest, MultipleFaults) {
   // This creates 2 faults, but the map will have 3 entries, as each command points to
-  // command specific faults AND the general fault.
+  // command specific faults AND the general fault. The second fault has no runtime key,
+  // forcing the runtime key check to be false in application code and falling back to the
+  // default value.
   RedisProxy redis_config;
   auto* faults = redis_config.mutable_faults();
   createCommandFault(faults->Add(), "get", 0, 25, FractionalPercent::HUNDRED, RUNTIME_KEY);
-  createAllKeyFault(faults->Add(), 2, 25, FractionalPercent::HUNDRED, RUNTIME_KEY);
+  createAllKeyFault(faults->Add(), 2, 25, FractionalPercent::HUNDRED, absl::nullopt);
 
   TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);

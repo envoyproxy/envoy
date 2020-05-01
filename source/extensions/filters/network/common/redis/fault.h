@@ -24,7 +24,7 @@ public:
    * @param command supplies the Redis command string.
    */
   virtual absl::optional<std::pair<FaultType, std::chrono::milliseconds>>
-  getFaultForCommand(std::string command) PURE;
+  getFaultForCommand(std::string command) const PURE;
 };
 
 using FaultManagerPtr = std::shared_ptr<FaultManager>;

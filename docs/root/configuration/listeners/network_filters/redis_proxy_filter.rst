@@ -81,7 +81,13 @@ Fault Injection
 The Redis filter can perform fault injection. Currently, Delay and Error faults are supported.
 Delay faults delay a request, and Error faults respond with an error. Moreover, errors can be delayed.
 
-Note that if a delay is injected, the delay is additive- if the request took 400ms and a delay of 100ms
-is injected, then the total request latency is 500ms. Also, due to implementation of the redis proxy,
+If multiple faults are specified, the fault injection percentage should not exceed 100% for a given 
+fault and Redis command combination. For example, if you have two faults; one applying to GET at 60
+%, and one applying to all commands at 50%, that is a bad configuration as GET now has 110% chance of
+applying a fault. The Redis filter does not check for correctness in your configuration- it is user's
+responsibility to make sure both the default and runtime percentages are correct!
+
+If a delay is injected, the delay is additive- if the request took 400ms and a delay of 100ms
+is injected, then the total request latency is 500ms. Also, due to implementation of the redis protocol,
 a delayed request will delay everything that comes in after it, due to the proxy's need to respect the 
 order of commands it receives.

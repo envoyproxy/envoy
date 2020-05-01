@@ -22,20 +22,25 @@ class Fault {
 public:
   Fault(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault);
 
+  FaultType faultType() const { return fault_type_; };
+  std::chrono::milliseconds delayMs() const { return delay_ms_; };
+  const std::vector<std::string> commands() const { return commands_; };
+  uint64_t defaultValue() const { return default_value_; };
+  absl::optional<std::string> runtimeKey() const { return runtime_key_; };
+
 private:
-  static std::vector<std::string> getCommands(
+  static std::vector<std::string> buildCommands(
       envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault);
 
-public:
   FaultType fault_type_;
   std::chrono::milliseconds delay_ms_;
   const std::vector<std::string> commands_;
-  bool has_fault_enabled_;
-  absl::optional<int> default_value_;
+  uint64_t default_value_;
   absl::optional<std::string> runtime_key_;
 };
 
 using FaultPtr = std::shared_ptr<Fault>;
+using FaultMap = std::unordered_map<std::string, std::vector<FaultPtr>>;
 
 /**
  * Fault management- creation, storage and retrieval. Faults are queried for by command,
@@ -43,8 +48,6 @@ using FaultPtr = std::shared_ptr<Fault>;
  * all commands, we use a special ALL_KEYS entry in the map.
  */
 class FaultManagerImpl : public FaultManager {
-  typedef std::unordered_map<std::string, std::vector<FaultPtr>> FaultMap;
-
 public:
   FaultManagerImpl(Runtime::RandomGenerator& random, Runtime::Loader& runtime)
       : random_(random), runtime_(runtime){}; // For testing
@@ -55,17 +58,23 @@ public:
           base_faults);
 
   absl::optional<std::pair<FaultType, std::chrono::milliseconds>>
-  getFaultForCommand(std::string command) override;
+  getFaultForCommand(std::string command) const override;
 
   // Allow the unit test to have access to private members.
   friend class FaultTest;
 
 private:
-  absl::optional<std::pair<FaultType, std::chrono::milliseconds>>
-  getFaultForCommandInternal(std::string command);
+  static FaultMap
+  buildFaultMap(const Protobuf::RepeatedPtrField<
+                ::envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault>
+                    faults);
 
-  const std::string ALL_KEY = "ALL_KEY";
-  FaultMap fault_map_;
+  absl::optional<std::pair<FaultType, std::chrono::milliseconds>>
+  getFaultForCommandInternal(std::string command) const;
+  const FaultMap fault_map_;
+
+public:
+  static const std::string ALL_KEY;
 
 protected:
   Runtime::RandomGenerator& random_;
