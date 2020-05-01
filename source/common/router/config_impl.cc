@@ -151,7 +151,8 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
       redirect_response_codes_(buildRedirectResponseCodes(policy_config)),
       max_internal_redirects_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(policy_config, max_internal_redirects, 1)),
-      enabled_(true), allow_cross_scheme_redirect_(policy_config.allow_cross_scheme_redirect()) {
+      enabled_(true),
+      disallow_cross_scheme_redirect_(policy_config.disallow_cross_scheme_redirect()) {
   for (const auto& predicate : policy_config.predicates()) {
     const std::string type{TypeUtil::typeUrlToDescriptorFullName(predicate.type_url())};
     auto* factory =

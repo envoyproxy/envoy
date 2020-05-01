@@ -405,7 +405,7 @@ public:
 
   uint32_t maxInternalRedirects() const override { return max_internal_redirects_; }
 
-  bool isCrossSchemeRedirectAllowed() const override { return allow_cross_scheme_redirect_; }
+  bool isCrossSchemeRedirectAllowed() const override { return !disallow_cross_scheme_redirect_; }
 
 private:
   absl::flat_hash_set<Http::Code> buildRedirectResponseCodes(
@@ -415,7 +415,7 @@ private:
   const absl::flat_hash_set<Http::Code> redirect_response_codes_;
   const uint32_t max_internal_redirects_{1};
   const bool enabled_{false};
-  const bool allow_cross_scheme_redirect_{false};
+  const bool disallow_cross_scheme_redirect_{false};
 
   std::vector<std::pair<InternalRedirectPredicateFactory*, ProtobufTypes::MessagePtr>>
       predicate_factories_;

@@ -6800,7 +6800,7 @@ virtual_hosts:
   EXPECT_FALSE(internal_redirect_policy.shouldRedirectForCode(static_cast<Http::Code>(200)));
   EXPECT_EQ(1, internal_redirect_policy.maxInternalRedirects());
   EXPECT_TRUE(internal_redirect_policy.predicates().empty());
-  EXPECT_FALSE(internal_redirect_policy.isCrossSchemeRedirectAllowed());
+  EXPECT_TRUE(internal_redirect_policy.isCrossSchemeRedirectAllowed());
 }
 
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {

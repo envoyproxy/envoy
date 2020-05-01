@@ -298,7 +298,7 @@ public:
         .WillByDefault(Return(max_internal_redirects));
     ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
             isCrossSchemeRedirectAllowed())
-        .WillByDefault(Return(false));
+        .WillByDefault(Return(true));
     ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
   }
 
@@ -4380,22 +4380,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
                     .value());
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedByCrossSchemeRedirect) {
-  enableRedirects();
-
-  sendRequest();
-
-  redirect_headers_->setLocation("https://www.foo.com");
-
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
-
-  response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_internal_redirect_failed_total")
-                    .value());
-}
-
-TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
+TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
   enableRedirects();
 
   sendRequest();
@@ -4405,20 +4390,13 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
               isCrossSchemeRedirectAllowed())
-      .WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
-  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
-  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_internal_redirect_succeeded_total")
-                    .value());
+      .WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
 
-  // In production, the HCM recreateStream would have called this.
-  router_.onDestroy();
-  EXPECT_EQ(1, callbacks_.streamInfo()
-                   .filterState()
-                   ->getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
-                   .value());
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
@@ -4456,6 +4434,9 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   sendRequest();
 
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
+              isCrossSchemeRedirectAllowed())
+      .WillOnce(Return(false));
   EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
   EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -4479,6 +4460,26 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   sendRequest();
 
   redirect_headers_->setLocation("https://www.foo.com");
+  EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(ssl_connection));
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
+  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_.onDestroy();
+}
+
+TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
+  auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
+  enableRedirects();
+
+  sendRequest();
+
+  redirect_headers_->setLocation("http://www.foo.com");
   EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(ssl_connection));
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);

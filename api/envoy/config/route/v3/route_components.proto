@@ -1594,7 +1594,7 @@ message InternalRedirectPolicy {
   // the redirect, causing the response to be proxied to downstream.
   repeated google.protobuf.Any predicates = 3;
 
-  // Allow internal redirect to follow a target URI with a different scheme than the value of
-  // x-forwarded-proto. Default behavior is to not follow such redirects.
-  bool allow_cross_scheme_redirect = 4;
+  // Disallow internal redirect to follow a target URI with a different scheme than the value of
+  // x-forwarded-proto. Default behavior is to follow such redirects.
+  bool disallow_cross_scheme_redirect = 4;
 }
