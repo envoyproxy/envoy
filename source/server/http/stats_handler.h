@@ -11,42 +11,39 @@
 
 #include "common/stats/histogram_impl.h"
 
+#include "server/http/handler_ctx.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Server {
 
-class StatsHandler {
+class StatsHandler : public HandlerContextBase {
 
 public:
-  static Http::Code handlerResetCounters(absl::string_view path_and_query,
-                                         Http::ResponseHeaderMap& response_headers,
-                                         Buffer::Instance& response, AdminStream&,
-                                         Server::Instance& server);
-  static Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
+  StatsHandler(Server::Instance& server);
+
+  Http::Code handlerResetCounters(absl::string_view path_and_query,
+                                  Http::ResponseHeaderMap& response_headers,
+                                  Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
+                                       Http::ResponseHeaderMap& response_headers,
+                                       Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookupsClear(absl::string_view path_and_query,
+                                            Http::ResponseHeaderMap& response_headers,
+                                            Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookupsDisable(absl::string_view path_and_query,
                                               Http::ResponseHeaderMap& response_headers,
-                                              Buffer::Instance& response, AdminStream&,
-                                              Server::Instance& server);
-  static Http::Code handlerStatsRecentLookupsClear(absl::string_view path_and_query,
-                                                   Http::ResponseHeaderMap& response_headers,
-                                                   Buffer::Instance& response, AdminStream&,
-                                                   Server::Instance& server);
-  static Http::Code handlerStatsRecentLookupsDisable(absl::string_view path_and_query,
-                                                     Http::ResponseHeaderMap& response_headers,
-                                                     Buffer::Instance& response, AdminStream&,
-                                                     Server::Instance& server);
-  static Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
-                                                    Http::ResponseHeaderMap& response_headers,
-                                                    Buffer::Instance& response, AdminStream&,
-                                                    Server::Instance& server);
-  static Http::Code handlerStats(absl::string_view path_and_query,
-                                 Http::ResponseHeaderMap& response_headers,
-                                 Buffer::Instance& response, AdminStream&,
-                                 Server::Instance& server);
-  static Http::Code handlerPrometheusStats(absl::string_view path_and_query,
-                                           Http::ResponseHeaderMap& response_headers,
-                                           Buffer::Instance& response, AdminStream&,
-                                           Server::Instance& server);
+                                              Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
+                                             Http::ResponseHeaderMap& response_headers,
+                                             Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStats(absl::string_view path_and_query,
+                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                          AdminStream&);
+  Http::Code handlerPrometheusStats(absl::string_view path_and_query,
+                                    Http::ResponseHeaderMap& response_headers,
+                                    Buffer::Instance& response, AdminStream&);
 
 private:
   template <class StatType>

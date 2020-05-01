@@ -39,6 +39,7 @@
 
 #include "server/http/admin_filter.h"
 #include "server/http/config_tracker_impl.h"
+#include "server/http/stats_handler.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 
@@ -179,33 +180,16 @@ public:
     };
   }
 
-  using HandlerWithServerCb = std::function<Http::Code(
-      absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
-      Buffer::Instance& response, AdminStream& admin_stream, Server::Instance& server)>;
-
 private:
   /**
    * Individual admin handler including prefix, help text, and callback.
    */
   struct UrlHandler {
-    UrlHandler(std::string prefix, std::string help_text, HandlerCb handler, bool removable,
-               bool mutates_server_state)
-        : prefix_(prefix), help_text_(help_text), handler_(handler), removable_(removable),
-          mutates_server_state_(mutates_server_state), requires_server_(false) {}
-
-    UrlHandler(std::string prefix, std::string help_text, HandlerWithServerCb handler_with_server,
-               bool removable, bool mutates_server_state)
-        : prefix_(prefix), help_text_(help_text), handler_with_server_(handler_with_server),
-          removable_(removable), mutates_server_state_(mutates_server_state),
-          requires_server_(true) {}
-
     const std::string prefix_;
     const std::string help_text_;
     const HandlerCb handler_;
-    const HandlerWithServerCb handler_with_server_;
     const bool removable_;
     const bool mutates_server_state_;
-    const bool requires_server_;
   };
 
   /**
@@ -458,6 +442,7 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;
+  Server::StatsHandler stats_handler_;
   std::list<UrlHandler> handlers_;
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   const uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
