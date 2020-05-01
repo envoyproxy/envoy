@@ -20,7 +20,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
+envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(yaml, bootstrap, true);
   return bootstrap;
@@ -53,13 +53,20 @@ public:
       connect_timeout: 0.250s
       type: STATIC
       lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11002
+      load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002  
+      
   )EOF";
     const std::string merge_window_enabled = R"EOF(
       common_lb_config:
@@ -72,7 +79,7 @@ public:
 
     yaml += enable_merge_window ? merge_window_enabled : merge_window_disabled;
 
-    const auto& bootstrap = parseBootstrapFromV2Yaml(yaml);
+    const auto& bootstrap = parseBootstrapFromV3Yaml(yaml);
 
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
@@ -136,7 +143,7 @@ static_resources:
   clusters: []
   )EOF";
 
-  return parseBootstrapFromV2Yaml(yaml);
+  return parseBootstrapFromV3Yaml(yaml);
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
@@ -150,7 +157,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
       http_protocol_options: {}
   )EOF";
   EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
       "cluster: Both HTTP1 and HTTP2 options may only be configured with non-default "
       "'protocol_selection' values");
 }
@@ -172,7 +179,7 @@ TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
           path: "/"
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "Multiple health checks not supported");
 }
 
@@ -189,11 +196,11 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
       http_protocol_options: {}
       protocol_selection: USE_DOWNSTREAM_PROTOCOL
   )EOF";
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   checkConfigDump(R"EOF(
 static_clusters:
   - cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.api.v3.Cluster
       name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
@@ -235,7 +242,7 @@ static_resources:
     type: eds
     lb_policy: round_robin
   )EOF";
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "cannot create an EDS cluster without an EDS config");
 }
 
@@ -341,7 +348,7 @@ static_resources:
                   port_value: 11001
   )EOF";
 
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   cluster_manager_->clusters()
       .find("cluster:name")
       ->second.get()
@@ -411,7 +418,7 @@ static_resources:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
       "cluster: LB policy ROUND_ROBIN is not valid for Cluster type ORIGINAL_DST. Only "
       "'CLUSTER_PROVIDED' or 'ORIGINAL_DST_LB' is allowed with cluster type 'ORIGINAL_DST'");
 }
@@ -423,7 +430,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
   - name: cluster_1
     connect_timeout: 0.250s
     type: static
-    lb_policy: original_dst_lb
+    lb_policy: cluster_provided
     load_assignment:
       endpoints:
         - lb_endpoints:
@@ -434,7 +441,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
                   port_value: 11001
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "cluster: LB policy hidden_envoy_deprecated_ORIGINAL_DST_LB is not "
                             "valid for Cluster type STATIC. "
                             "'ORIGINAL_DST_LB' is allowed only with cluster type 'ORIGINAL_DST'");
@@ -476,7 +483,6 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
-    {}
     lb_policy: "{}"
     lb_subset_config:
       fallback_policy: ANY_ENDPOINT
@@ -511,12 +517,12 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
   if (GetParam() == envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB ||
       GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     EXPECT_THROW_WITH_MESSAGE(
-        create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+        create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
         fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam())));
 
   } else {
-    create(parseBootstrapFromV2Yaml(yaml));
+    create(parseBootstrapFromV3Yaml(yaml));
     checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
     Upstream::ThreadLocalCluster* tlc = cluster_manager_->get("cluster_1");
@@ -543,14 +549,14 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerOriginalDstRestriction) {
   - name: cluster_1
     connect_timeout: 0.250s
     type: original_dst
-    lb_policy: original_dst_lb
+    lb_policy: cluster_provided
     lb_subset_config:
       fallback_policy: ANY_ENDPOINT
       subset_selectors:
         - keys: [ "x" ]
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "cluster: LB policy hidden_envoy_deprecated_ORIGINAL_DST_LB cannot be "
                             "combined with lb_subset_config");
 }
@@ -570,7 +576,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerClusterProvidedLbRestriction) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
       "cluster: LB policy CLUSTER_PROVIDED cannot be combined with lb_subset_config");
 }
 
@@ -602,7 +608,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerLocalityAware) {
                   port_value: 8001
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "Locality weight aware subset LB requires that a "
                             "locality_weighted_lb_config be set in cluster_1");
 }
@@ -631,7 +637,7 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
                   address: 127.0.0.1
                   port_value: 8001
   )EOF";
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
 }
 
 TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
@@ -658,7 +664,7 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
       ring_hash_lb_config:
         minimum_ring_size: 125
   )EOF";
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
 }
 
 // Verify EDS clusters have EDS config.
@@ -670,7 +676,7 @@ TEST_F(ClusterManagerImplTest, EdsClustersRequireEdsConfig) {
       type: EDS
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "cannot create an EDS cluster without an EDS config");
 }
 
@@ -777,7 +783,7 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
               createClientConnection_(
                   PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
@@ -811,7 +817,7 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
               createClientConnection_(
                   PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
@@ -860,7 +866,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
                   port_value: 11001
   )EOF";
 
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
@@ -902,7 +908,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
     "dynamic_resources": {
       "cds_config": {
         "api_config_source": {
-          "api_type": "UNSUPPORTED_REST_LEGACY",
+          "api_type": "DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE",
           "refresh_delay": "30s",
           "cluster_names": ["cds_cluster"]
         }
@@ -984,78 +990,102 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
  version_info: version3
  static_clusters:
   - cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.api.v3.Cluster
       name: "cds_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
   - cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.api.v3.Cluster
       name: "fake_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
   - cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.api.v3.Cluster
       name: "fake_cluster2"
       type: "STATIC"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
  dynamic_active_clusters:
-  - version_info: "version1"
+  - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.api.v3.Cluster
       name: "cluster3"
       type: "STATIC"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
-    last_updated:
-      seconds: 1234567891
-      nanos: 234000000
-  - version_info: "version2"
-    cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
-      name: "cluster4"
-      type: "STATIC"
-      connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
   - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.api.v3.Cluster
+      name: "cluster4"
+      type: "STATIC"
+      connect_timeout: 0.25s
+      load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+  - version_info: "version3"
+    cluster:
+      "@type": type.googleapis.com/envoy.api.v3.Cluster
       name: "cluster5"
       type: "STATIC"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -1155,21 +1185,25 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
   EXPECT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version1"));
+      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version3"));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   checkConfigDump(R"EOF(
 dynamic_warming_clusters:
-  - version_info: "version1"
+  - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.api.v3.Cluster
       name: "fake_cluster"
       type: STATIC
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -1198,21 +1232,25 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
   EXPECT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version1"));
+      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version3"));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   checkConfigDump(R"EOF(
  dynamic_warming_clusters:
-   - version_info: "version1"
+   - version_info: "version3"
      cluster:
-       "@type": type.googleapis.com/envoy.api.v2.Cluster
+       "@type": type.googleapis.com/envoy.api.v3.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
-       hosts:
-       - socket_address:
-           address: "127.0.0.1"
-           port_value: 11001
+       load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
      last_updated:
        seconds: 1234567891
        nanos: 234000000
@@ -1232,20 +1270,24 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
   "address": "127.0.0.1",
   "port_value": 11002
 })EOF")),
-      "version2"));
+      "version3"));
   checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   checkConfigDump(R"EOF(
  dynamic_warming_clusters:
-   - version_info: "version2"
+   - version_info: "version3"
      cluster:
-       "@type": type.googleapis.com/envoy.api.v2.Cluster
+       "@type": type.googleapis.com/envoy.api.v3.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
-       hosts:
-       - socket_address:
-           address: "127.0.0.1"
-           port_value: 11002
+       load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
      last_updated:
        seconds: 1234567891
        nanos: 234000000
@@ -1619,7 +1661,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
           // Test inline init.
           initialize_callback();
         }));
-    create(parseBootstrapFromV2Yaml(yaml));
+    create(parseBootstrapFromV3Yaml(yaml));
 
     EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(connection1));
@@ -1692,7 +1734,7 @@ TEST_F(ClusterManagerImplTest, DoNotCloseTcpConnectionsOnHealthFailure) {
         // Test inline init.
         initialize_callback();
       }));
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
 
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(Return(connection1));
@@ -1738,7 +1780,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
@@ -1881,7 +1923,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   NiceMock<MockLoadBalancerContext> example_com_context;
@@ -2116,7 +2158,7 @@ TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
@@ -2143,7 +2185,7 @@ TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
@@ -2171,7 +2213,7 @@ TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolver) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
@@ -2209,7 +2251,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
@@ -2289,7 +2331,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
@@ -2331,7 +2373,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
           "name": "cluster_1",
           "connect_timeout": "0.250s",
           "type": "original_dst",
-          "lb_policy": "original_dst_lb"
+          "lb_policy": "cluster_provided"
         }
       ]
     }
@@ -2341,7 +2383,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   ReadyWatcher initialized;
   EXPECT_CALL(initialized, ready());
 
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
 
   // Set up for an initialize callback.
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -2644,7 +2686,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   common_lb_config:
     update_merge_window: 3s
   )EOF";
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml), "version1"));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(yaml), "version1"));
 
   Cluster& cluster = cluster_manager_->activeClusters().find("new_cluster")->second;
   HostVectorSharedPtr hosts(
@@ -2712,7 +2754,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
                    .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
   EXPECT_TRUE(
-      cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml_updated), "version2"));
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(yaml_updated), "version2"));
   EXPECT_EQ(2, factory_.stats_
                    .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
@@ -2840,15 +2882,19 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
       filters:
       - name: envoy.test.filter
   )EOF";
 
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, addReadFilter(_)).Times(0);
   EXPECT_CALL(*connection, addWriteFilter(_)).Times(1);
@@ -3069,7 +3115,7 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
 // socket_option_impl_test.cc.
 class SockoptsTest : public ClusterManagerImplTest {
 public:
-  void initialize(const std::string& yaml) { create(parseBootstrapFromV2Yaml(yaml)); }
+  void initialize(const std::string& yaml) { create(parseBootstrapFromV3Yaml(yaml)); }
 
   void TearDown() override { factory_.tls_.shutdownThread(); }
 
@@ -3327,7 +3373,7 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
 // tcp_keepalive_option_impl_test.cc.
 class TcpKeepaliveTest : public ClusterManagerImplTest {
 public:
-  void initialize(const std::string& yaml) { create(parseBootstrapFromV2Yaml(yaml)); }
+  void initialize(const std::string& yaml) { create(parseBootstrapFromV3Yaml(yaml)); }
 
   void TearDown() override { factory_.tls_.shutdownThread(); }
 
@@ -3528,7 +3574,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   ReadyWatcher initialized;
   EXPECT_CALL(initialized, ready());
 
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
 
   // Set up for an initialize callback.
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -3646,7 +3692,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
 
   ReadyWatcher initialized;
   EXPECT_CALL(initialized, ready());
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
 
   // Set up for an initialize callback.
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -3719,7 +3765,7 @@ cluster_manager:
   local_cluster_name: new_cluster
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "Unexpected non-zero priority for local cluster 'new_cluster'.");
 }
 
@@ -3744,7 +3790,7 @@ cluster_manager:
   local_cluster_name: new_cluster
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "Unexpected non-zero priority for local cluster 'new_cluster'.");
 }
 
@@ -3771,7 +3817,7 @@ cluster_manager:
 
   // The priority for LOGICAL_DNS endpoints are written, so we just verify that there is only a
   // single priority even if the endpoint was configured to be priority 10.
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   const auto cluster = cluster_manager_->get("new_cluster");
   EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority().size());
 }
