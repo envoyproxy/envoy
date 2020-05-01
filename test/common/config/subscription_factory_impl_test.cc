@@ -19,6 +19,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -35,14 +36,14 @@ namespace {
 class SubscriptionFactoryTest : public testing::Test {
 public:
   SubscriptionFactoryTest()
-      : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)) {}
+      : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)),
+        subscription_factory_(local_info_, dispatcher_, cm_, random_, validation_visitor_, *api_,
+                              runtime_) {}
 
   std::unique_ptr<Subscription>
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
-    return SubscriptionFactoryImpl(local_info_, dispatcher_, cm_, random_, validation_visitor_,
-                                   *api_, runtime_)
-        .subscriptionFromConfigSource(config, Config::TypeUrl::get().ClusterLoadAssignment,
-                                      stats_store_, callbacks_);
+    return subscription_factory_.subscriptionFromConfigSource(
+        config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_);
   }
 
   Upstream::MockClusterManager cm_;
@@ -55,6 +56,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   NiceMock<Runtime::MockLoader> runtime_;
+  SubscriptionFactoryImpl subscription_factory_;
 };
 
 class SubscriptionFactoryTestApiConfigSource
@@ -314,6 +316,28 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
   subscriptionFromConfigSource(config)->start({"static_cluster"});
+}
+
+TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedApi) {
+  envoy::config::core::v3::ConfigSource config;
+
+  config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::V2);
+  NiceMock<Runtime::MockSnapshot> snapshot;
+  EXPECT_CALL(runtime_, snapshot()).WillOnce(ReturnRef(snapshot));
+  EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(true));
+
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
+  cluster_map.emplace("static_cluster", cluster);
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+
+  EXPECT_LOG_CONTAINS(
+      "warn", "xDS of version v2 has been deprecated", try {
+        subscription_factory_.subscriptionFromConfigSource(
+            config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_);
+      } catch (EnvoyException&){/* expected, we pass an empty configuration  */});
 }
 
 INSTANTIATE_TEST_SUITE_P(SubscriptionFactoryTestApiConfigSource,
