@@ -28,11 +28,14 @@ static_resources:
         port_value: 10000
     per_connection_buffer_limit_bytes: 32768 # 32 KiB
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-          - certificate_chain: { filename: "certs/servercert.pem" }
-            private_key: { filename: "certs/serverkey.pem" }
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain: { filename: "certs/servercert.pem" }
+              private_key: { filename: "certs/serverkey.pem" }
       # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
       # use_proxy_proto: true
       filters:
