@@ -118,6 +118,14 @@ v4 might occur at some point in 2021 or beyond.
 The implication of this API lifecycle and clock is that any deprecated feature in the Envoy API will
 retain implementation support for at least 1-2 years.
 
+We are currently working on a strategy to introduce minor versions
+(https://github.com/envoyproxy/envoy/issues/8416). This will bump the xDS API minor version on every
+deprecation and field introduction/modification. This will provide an opportunity for the control
+plane to condition on client and major/minor API version support. Currently under discussion, but
+not finalized will be the sunsetting of Envoy client support for deprecated features after a year
+of support within a major version. Please post to https://github.com/envoyproxy/envoy/issues/8416
+any thoughts around this.
+
 # New API features
 
 The Envoy APIs can be [safely extended](https://cloud.google.com/apis/design/compatibility) with new
@@ -176,7 +184,7 @@ Not all clients will support all fields and features in a given major API versio
 preferable to use Protobuf semantics to support this, for example:
 * Ignoring a field's contents is sufficient to indicate that the support is missing in a client.
 * Setting both deprecated and the new method for expressing a field if support for a range of
-  clients is desired.
+  clients is desired (where this does not involve huge overhead or gymnastics).
 
 This approach does not always work, for example:
 * A route matcher conjunct condition should not be ignored just because the client is missing the
@@ -185,10 +193,7 @@ This approach does not always work, for example:
   a JSON encoded `Struct`-in-`Any` representation of opaque extension configuration.
 
 For this purpose, we have [client
-features](https://www.envoyproxy.io/docs/envoy/latest/api/client_features). Client features are
-encouraged as an alternative to relying on major versions for turning down technical debt. The
-number of client features applicable to a given major version will be an influence in determining
-the amount of technical debt, guiding when the cut of the next major version is made.
+features](https://www.envoyproxy.io/docs/envoy/latest/api/client_features).
 
 # One Definition Rule (ODR)
 
