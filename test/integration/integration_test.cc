@@ -590,25 +590,23 @@ TEST_P(IntegrationTest, Pipeline) {
   initialize();
   std::string response;
 
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHost: host\r\n\r\nGET / HTTP/1.1\r\n\r\n");
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
+  auto connection = createConnectionDriver(
+      lookupPort("http"), "GET / HTTP/1.1\r\nHost: host\r\n\r\nGET / HTTP/1.1\r\n\r\n",
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-      },
-      version_, *dispatcher_);
+      });
   // First response should be success.
   while (response.find("200") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
 
   // Second response should be 400 (no host)
   while (response.find("400") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
-  connection.close();
+  connection->close();
 }
 
 // Checks to ensure that we reject the third request that is pipelined in the
@@ -639,30 +637,27 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
                           "trailer2:t3\r\n"
                           "\r\n");
 
-  Buffer::OwnedImpl buffer(absl::StrCat(good_request, good_request, bad_request));
-
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      lookupPort("http"), absl::StrCat(good_request, good_request, bad_request),
+      [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-      },
-      version_, *dispatcher_);
+      });
 
   // First response should be success.
   size_t pos;
   while ((pos = response.find("200")) == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
   while (response.find("200", pos + 1) == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   while (response.find("400") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
-  connection.close();
+  connection->close();
 }
 
 // Add a pipeline test where complete request headers in the first request merit
@@ -673,24 +668,22 @@ TEST_P(IntegrationTest, PipelineInline) {
   initialize();
   std::string response;
 
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\nGET / HTTP/1.0\r\n\r\n");
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      lookupPort("http"), "GET / HTTP/1.1\r\n\r\nGET / HTTP/1.0\r\n\r\n",
+      [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-      },
-      version_, *dispatcher_);
+      });
 
   while (response.find("400") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 
   while (response.find("426") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 426 Upgrade Required\r\n"));
-  connection.close();
+  connection->close();
 }
 
 TEST_P(IntegrationTest, NoHost) {

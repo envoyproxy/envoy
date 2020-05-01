@@ -76,24 +76,6 @@ TEST_P(XdsIntegrationTestTypedStruct, RouterRequestAndResponseWithBodyNoBuffer) 
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
-class SslClient {
-public:
-  SslClient(Network::ClientConnectionPtr ssl_conn, Event::Dispatcher& dispatcher)
-      : ssl_conn_(std::move(ssl_conn)),
-        payload_reader_(std::make_shared<WaitForPayloadReader>(dispatcher)) {
-    ssl_conn_->addConnectionCallbacks(connect_callbacks_);
-    ssl_conn_->addReadFilter(payload_reader_);
-    ssl_conn_->connect();
-    while (!connect_callbacks_.connected()) {
-      dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-    }
-  }
-  Network::ClientConnectionPtr ssl_conn_;
-  MockWatermarkBuffer* client_write_buffer;
-  std::shared_ptr<WaitForPayloadReader> payload_reader_;
-  ConnectionStatusCallbacks connect_callbacks_;
-};
-
 class LdsInplaceUpdateTcpProxyIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public BaseIntegrationTest {
@@ -143,17 +125,6 @@ public:
     context_manager_ =
         std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
-  }
-
-  std::unique_ptr<SslClient> connect(const std::string& alpn) {
-    Network::Address::InstanceConstSharedPtr address =
-        Ssl::getSslAddress(version_, lookupPort("tcp"));
-    auto ssl_conn = dispatcher_->createClientConnection(
-        address, Network::Address::InstanceConstSharedPtr(),
-        context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-            absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})),
-        nullptr);
-    return std::make_unique<SslClient>(std::move(ssl_conn), *dispatcher_);
   }
 
   std::unique_ptr<RawConnectionDriver> createConnectionAndWrite(const std::string& alpn,
