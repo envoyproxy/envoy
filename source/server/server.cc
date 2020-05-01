@@ -8,6 +8,9 @@
 #include <unordered_set>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
@@ -25,6 +28,7 @@
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/http/codes.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
@@ -158,6 +162,12 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   for (const auto& histogram : snapped_histograms_) {
     histograms_.push_back(*histogram);
   }
+
+  snapped_text_readouts_ = store.textReadouts();
+  text_readouts_.reserve(snapped_text_readouts_.size());
+  for (const auto& text_readout : snapped_text_readouts_) {
+    text_readouts_.push_back(*text_readout);
+  }
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
@@ -219,6 +229,26 @@ void InstanceImpl::flushStatsInternal() {
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
+namespace {
+// Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
+void loadBootsrap(absl::optional<uint32_t> bootstrap_version,
+                  envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                  std::function<void(Protobuf::Message&, bool)> load_function) {
+
+  if (!bootstrap_version.has_value()) {
+    load_function(bootstrap, true);
+  } else if (*bootstrap_version == 3) {
+    load_function(bootstrap, false);
+  } else if (*bootstrap_version == 2) {
+    envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
+    load_function(bootstrap_v2, false);
+    Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
+  } else {
+    throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
+  }
+}
+} // namespace
+
 void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                        const Options& options,
                                        ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -234,11 +264,19 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
+    loadBootsrap(
+        options.bootstrapVersion(), bootstrap,
+        [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
+          MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
+        });
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
+    loadBootsrap(options.bootstrapVersion(), bootstrap_override,
+                 [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
+                   MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
+                 });
+    // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSize() != 0) {
@@ -378,21 +416,6 @@ void InstanceImpl::initialize(const Options& options,
     dispatcher_->initializeStats(stats_store_, "server.");
   }
 
-  // The broad order of initialization from this point on is the following:
-  // 1. Statically provisioned configuration (bootstrap) are loaded.
-  // 2. Cluster manager is created and all primary clusters (i.e. with endpoint assignments
-  //    provisioned statically in bootstrap, discovered through DNS or file based CDS) are
-  //    initialized.
-  // 3. Various services are initialized and configured using the bootstrap config.
-  // 4. RTDS is initialized using primary clusters. This  allows runtime overrides to be fully
-  //    configured before the rest of xDS configuration is provisioned.
-  // 5. Secondary clusters (with endpoint assignments provisioned by xDS servers) are initialized.
-  // 6. The rest of the dynamic configuration is provisioned.
-  //
-  // Please note: this order requires that RTDS is provisioned using a primary cluster. If RTDS is
-  // provisioned through ADS then ADS must use primary cluster as well. This invariant is enforced
-  // during RTDS initialization and invalid configuration will be rejected.
-
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
@@ -427,27 +450,6 @@ void InstanceImpl::initialize(const Options& options,
   // instantiated (which in turn relies on runtime...).
   Runtime::LoaderSingleton::get().initialize(clusterManager());
 
-  // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
-  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
-
-  for (Stats::SinkPtr& sink : config_.statsSinks()) {
-    stats_store_.addSink(*sink);
-  }
-
-  // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
-  // Just setup the timer.
-  stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
-  stat_flush_timer_->enableTimer(config_.statsFlushInterval());
-
-  // GuardDog (deadlock detection) object and thread setup before workers are
-  // started and before our own run() loop runs.
-  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
-}
-
-void InstanceImpl::onRuntimeReady() {
-  // Begin initializing secondary clusters after RTDS configuration has been applied.
-  clusterManager().initializeSecondaryClusters(bootstrap_);
-
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
@@ -462,6 +464,19 @@ void InstanceImpl::onRuntimeReady() {
         *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
         messageValidationContext().dynamicValidationVisitor(), *api_);
   }
+
+  for (Stats::SinkPtr& sink : config_.statsSinks()) {
+    stats_store_.addSink(*sink);
+  }
+
+  // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
+  // Just setup the timer.
+  stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
+  stat_flush_timer_->enableTimer(config_.statsFlushInterval());
+
+  // GuardDog (deadlock detection) object and thread setup before workers are
+  // started and before our own run() loop runs.
+  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
 }
 
 void InstanceImpl::startWorkers() {
@@ -481,8 +496,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
   return std::make_unique<Runtime::LoaderImpl>(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
-      server.stats(), server.random(), server.messageValidationContext().dynamicValidationVisitor(),
-      server.api());
+      server.initManager(), server.stats(), server.random(),
+      server.messageValidationContext().dynamicValidationVisitor(), server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {

@@ -419,6 +419,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     if (!success) {
       throw EnvoyException(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
     }
+    if (upgrade_config.upgrade_type() == Http::Headers::get().MethodValues.Connect) {
+      connect_config_ = upgrade_config.connect_config();
+    } else if (upgrade_config.has_connect_config()) {
+      throw EnvoyException(absl::StrCat("Non-CONNECT upgrade type ", upgrade_config.upgrade_type(),
+                                        " has ConnectConfig"));
+    }
   }
 
   if (route.route().has_regex_rewrite()) {
@@ -972,6 +978,27 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
   return nullptr;
 }
 
+ConnectRouteEntryImpl::ConnectRouteEntryImpl(
+    const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator)
+    : RouteEntryImplBase(vhost, route, factory_context, validator) {}
+
+void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
+                                              bool insert_envoy_original_path) const {
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(getPath(headers));
+  finalizePathHeader(headers, path, insert_envoy_original_path);
+}
+
+RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                                   const StreamInfo::StreamInfo&,
+                                                   uint64_t random_value) const {
+  if (Http::HeaderUtility::isConnect(headers)) {
+    return clusterEntry(headers, random_value);
+  }
+  return nullptr;
+}
+
 VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                                  const ConfigImpl& global_route_config,
                                  Server::Configuration::ServerFactoryContext& factory_context,
@@ -1029,6 +1056,10 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex:
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex: {
       routes_.emplace_back(new RegexRouteEntryImpl(*this, route, factory_context, validator));
+      break;
+    }
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher: {
+      routes_.emplace_back(new ConnectRouteEntryImpl(*this, route, factory_context, validator));
       break;
     }
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
@@ -1173,9 +1204,8 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::RequestHead
 
   // Check for a route that matches the request.
   for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
-    if (!headers.Path()) {
-      // TODO(alyssawilk) allow specifically for kConnectMatcher routes.
-      return nullptr;
+    if (!headers.Path() && !route->supportsPathlessHeaders()) {
+      continue;
     }
     RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
     if (nullptr != route_entry) {

@@ -175,10 +175,12 @@ MB
 MD
 MERCHANTABILITY
 MGET
+MQ
 MSET
 MSVC
 MTLS
 MTU
+MULTIFRAME
 NACK
 NACKed
 NACKs
@@ -759,6 +761,7 @@ mutexes
 mux
 muxed
 mysql
+nameserver
 namespace
 namespaces
 namespacing
@@ -915,6 +918,7 @@ reimplements
 rele
 releasor
 reloadable
+remoting
 reparse
 repeatability
 reperform
@@ -936,6 +940,7 @@ resync
 retriable
 retriggers
 rmdir
+rocketmq
 rollout
 roundtrip
 rpcs
