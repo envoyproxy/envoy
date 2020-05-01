@@ -50,10 +50,12 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "dns_cache_resource_manager",
+    srcs = ["dns_cache_resource_manager.cc"],
     hdrs = ["dns_cache_resource_manager.h"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/upstream:resource_manager_lib",
+        "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )

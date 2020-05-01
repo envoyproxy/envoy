@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.common.dynamic_forward_proxy.v3;
 
+import "envoy/config/cluster/v3/circuit_breaker.proto";
 import "envoy/config/cluster/v3/cluster.proto";
 
 import "google/protobuf/duration.proto";
@@ -20,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the dynamic forward proxy DNS cache. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DnsCacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig";
@@ -83,4 +84,6 @@ message DnsCacheConfig {
   // this is used as the cache's DNS refresh rate when DNS requests are failing. If this setting is
   // not specified, the failure refresh rate defaults to the dns_refresh_rate.
   config.cluster.v3.Cluster.RefreshRate dns_failure_refresh_rate = 6;
+
+  config.cluster.v3.DnsCacheCircuitBreaker dns_cache_circuit_breaker = 7;
 }

@@ -1,8 +1,10 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
 #include <string>
 
+#include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -39,14 +41,13 @@ private:
 
 class DnsCacheResourceManager {
 public:
-  DnsCacheResourceManager(Runtime::Loader& runtime, const std::string& runtime_key,
-                          uint64_t max_pending_requests)
-      : pending_requests_(max_pending_requests, runtime, runtime_key) {}
-
-  DnsResource& pendingRequests() { return pending_requests_; }
+  DnsCacheResourceManager(
+      Runtime::Loader& loader,
+      const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
+  DnsResource& pendingRequests() { return *pending_requests_; }
 
 private:
-  DnsResource pending_requests_;
+  std::unique_ptr<DnsResource> pending_requests_;
 };
 
 } // namespace DynamicForwardProxy

@@ -103,3 +103,19 @@ message CircuitBreakers {
   // are used.
   repeated Thresholds thresholds = 1;
 }
+
+message DnsCacheCircuitBreaker {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.cluster.v3.DnsCacheCircuitBreaker";
+
+  message DnsCacheThreshold {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.cluster.v3.DnsCacheCircuitBreaker.DnsCacheThreshold";
+
+    // The maximum number of pending requests that Envoy will allow to the
+    // resolver. If not specified, the default is 1024.
+    google.protobuf.UInt32Value max_pending_requests = 1;
+  }
+
+  DnsCacheThreshold threshold = 1;
+}
