@@ -39,7 +39,7 @@ TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisDeprecated)) {
   EXPECT_NE(
       nullptr,
       dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
               .get()));
 }
 
@@ -64,7 +64,7 @@ TEST(HealthCheckerFactoryTest, CreateRedis) {
   EXPECT_NE(
       nullptr,
       dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
               .get()));
 }
 
@@ -87,7 +87,7 @@ TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisWithoutKeyDepr
   EXPECT_NE(
       nullptr,
       dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
               .get()));
 }
 
@@ -111,7 +111,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisWithoutKey) {
   EXPECT_NE(
       nullptr,
       dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
               .get()));
 }
 
@@ -136,7 +136,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisWithLogHCFailure) {
   EXPECT_NE(
       nullptr,
       dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
               .get()));
 }
 
@@ -165,7 +165,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
   EXPECT_NE(nullptr,
             dynamic_cast<CustomRedisHealthChecker*>(
                 Upstream::HealthCheckerFactory::create(
-                    Upstream::parseHealthCheckFromV2Yaml(yaml), cluster, runtime, random,
+                    Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, runtime, random,
                     dispatcher, log_manager, ProtobufMessage::getStrictValidationVisitor(), api)
                     .get()));
 }

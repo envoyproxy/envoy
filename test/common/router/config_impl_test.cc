@@ -137,7 +137,9 @@ Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::st
 envoy::config::route::v3::RouteConfiguration
 parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   envoy::config::route::v3::RouteConfiguration route_config;
-  TestUtility::loadFromYaml(yaml, route_config);
+  bool preserve_original_type = false; 
+  bool Avoid_boosting = false;
+  TestUtility::loadFromYaml(yaml, route_config, preserve_original_type, Avoid_boosting);
   TestUtility::validate(route_config);
   return route_config;
 }
