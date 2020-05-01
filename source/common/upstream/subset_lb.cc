@@ -94,7 +94,7 @@ SubsetLoadBalancer::~SubsetLoadBalancer() {
 
   // Ensure gauges reflect correct values.
   forEachSubset(subsets_, [&](LbSubsetEntryPtr entry) {
-    if (entry->initialized() && entry->active()) {
+    if (entry->active()) {
       stats_.lb_subsets_removed_.inc();
       stats_.lb_subsets_active_.dec();
     }
@@ -366,7 +366,7 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
 void SubsetLoadBalancer::processSubsets(
     const HostVector& hosts_added, const HostVector& hosts_removed,
     std::function<void(LbSubsetEntryPtr)> update_cb,
-    std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&, bool)> new_cb) {
+    std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&)> new_cb) {
   std::unordered_set<LbSubsetEntryPtr> subsets_modified;
 
   std::pair<const HostVector&, bool> steps[] = {{hosts_added, true}, {hosts_removed, false}};
@@ -395,7 +395,9 @@ void SubsetLoadBalancer::processSubsets(
               HostPredicate predicate = [this, kvs](const Host& host) -> bool {
                 return hostMatches(kvs, host);
               };
-              new_cb(entry, predicate, kvs, adding_hosts);
+              if (adding_hosts) {
+                new_cb(entry, predicate, kvs);
+              }
             }
           }
         }
@@ -424,31 +426,18 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
   processSubsets(
       hosts_added, hosts_removed,
       [&](LbSubsetEntryPtr entry) {
-        const bool active_before = entry->active();
         entry->priority_subset_->update(priority, hosts_added, hosts_removed);
-
-        if (active_before && !entry->active()) {
-          stats_.lb_subsets_active_.dec();
-          stats_.lb_subsets_removed_.inc();
-        } else if (!active_before && entry->active()) {
-          stats_.lb_subsets_active_.inc();
-          stats_.lb_subsets_created_.inc();
-        }
       },
-      [&](LbSubsetEntryPtr entry, HostPredicate predicate, const SubsetMetadata& kvs,
-          bool adding_host) {
-        UNREFERENCED_PARAMETER(kvs);
-        if (adding_host) {
-          ENVOY_LOG(debug, "subset lb: creating load balancer for {}", describeMetadata(kvs));
+      [&](LbSubsetEntryPtr entry, HostPredicate predicate, const SubsetMetadata& kvs) {
+        ENVOY_LOG(debug, "subset lb: creating load balancer for {}", describeMetadata(kvs));
 
-          // Initialize new entry with hosts and update stats. (An uninitialized entry
-          // with only removed hosts is a degenerate case and we leave the entry
-          // uninitialized.)
-          entry->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
-              *this, predicate, locality_weight_aware_, scale_locality_weight_);
-          stats_.lb_subsets_active_.inc();
-          stats_.lb_subsets_created_.inc();
-        }
+        // Initialize new entry with hosts and update stats. (An uninitialized entry
+        // with only removed hosts is a degenerate case and we leave the entry
+        // uninitialized.)
+        entry->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
+            *this, predicate, locality_weight_aware_, scale_locality_weight_);
+        stats_.lb_subsets_active_.inc();
+        stats_.lb_subsets_created_.inc();
       });
 }
 
@@ -597,7 +586,7 @@ void SubsetLoadBalancer::forEachSubset(LbSubsetMap& subsets,
 }
 
 // Purge empty subsets.
-void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) const {
+void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) {
   std::vector<std::string> purge_subsets;
 
   for (auto& vsm : subsets) {
@@ -609,6 +598,12 @@ void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) const {
       purgeEmptySubsets(entry->children_);
 
       if (!entry->active() && !entry->hasChildren()) {
+        // Ignore subsets that weren't even initialized.
+        if (entry->initialized()) {
+          stats_.lb_subsets_active_.dec();
+          stats_.lb_subsets_removed_.inc();
+        }
+
         purge_vsm.emplace_back(em.first);
       }
     }
