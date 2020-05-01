@@ -1,15 +1,16 @@
 syntax = "proto3";
 
-package envoy.extensions.filter.udp.dns_filter.v3alpha;
+package envoy.extensions.filters.udp.dns_filter.v3alpha;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/data/dns/v3/dns_table.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filter.udp.dns_filter.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.udp.dns_filter.v3alpha";
 option java_outer_classname = "DnsFilterProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).work_in_progress = true;
@@ -21,16 +22,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the DNS filter.
 message DnsFilterConfig {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig";
-
-  // This message contains the configuration for the Dns Filter operating
+  // This message contains the configuration for the DNS Filter operating
   // in a server context. This message will contain the virtual hosts and
   // associated addresses with which Envoy will respond to queries
   message ServerContextConfig {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig.ServerContextConfig";
-
     oneof config_source {
       option (validate.required) = true;
 
@@ -44,9 +39,32 @@ message DnsFilterConfig {
     }
   }
 
+  // This message contains the configuration for the DNS Filter operating
+  // in a client context. This message will contain the timeouts, retry,
+  // and forwarding configuration for Envoy to make DNS requests to other
+  // resolvers
+  message ClientContextConfig {
+    // Sets the maximum time we will wait for the upstream query to complete
+    // We allow 5s for the upstream resolution to complete, so the minimum
+    // value here is 5
+    google.protobuf.Duration resolver_timeout = 1 [(validate.rules).duration = {gte {seconds: 5}}];
+
+    // A list of DNS servers to which we can forward queries
+    repeated string upstream_resolvers = 2 [(validate.rules).repeated = {
+      min_items: 1
+      items {string {min_len: 3}}
+    }];
+  }
+
   // The stat prefix used when emitting DNS filter statistics
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Server context configuration
+  // Server context configuration contains the data that the filter uses to respond
+  // to DNS requests.
   ServerContextConfig server_config = 2;
+
+  // Client context configuration controls Envoy's behavior when it must use external
+  // resolvers to answer a query. This object is optional and if omitted instructs
+  // the filter to resolve queries from the data in the server_config
+  ClientContextConfig client_config = 3;
 }

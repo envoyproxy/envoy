@@ -6,8 +6,9 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     deps = [
-        "//envoy/api/v2/core:pkg",
-        "//envoy/data/dns/v2alpha:pkg",
+        "//envoy/config/core/v4alpha:pkg",
+        "//envoy/data/dns/v4alpha:pkg",
+        "//envoy/extensions/filters/udp/dns_filter/v3alpha:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )
