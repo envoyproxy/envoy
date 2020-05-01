@@ -42,7 +42,10 @@ template <class T> T fromSanitizedHeaders(const test::fuzz::Headers& headers) {
   return Fuzz::fromHeaders<T>(headers, {"transfer-encoding"});
 }
 
-// Template specialization for TestRequestHeaderMapImpl to include a Host header.
+// Template specialization for TestRequestHeaderMapImpl to include a Host header. This guards
+// against missing host headers in CONNECT requests that would have failed parsing on ingress.
+// TODO(#10878): When proper error handling is introduced for non-dispatching codec calls, remove
+// this and fail gracefully.
 template <>
 TestRequestHeaderMapImpl
 fromSanitizedHeaders<TestRequestHeaderMapImpl>(const test::fuzz::Headers& headers) {
