@@ -66,7 +66,7 @@ JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
 # Enable this test to work with --runs_per_test
 if [[ -z "${TEST_RANDOM_SEED}" ]]; then
-  BASE_ID=1
+  BASE_ID=$$
 else
   BASE_ID="${TEST_RANDOM_SEED}"
 fi
