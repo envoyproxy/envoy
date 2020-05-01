@@ -22,6 +22,8 @@ envoy_py_test_binary(
 filegroup(
     name = "configs",
     srcs = [
+        "bugbounty/envoy-edge.yaml",
+        "bugbounty/envoy-origin.yaml",
         "original-dst-cluster/proxy_config.yaml",
     ] + select({
         "//bazel:apple": [],

@@ -57,8 +57,8 @@ In the future we will relax these restrictions as we increase the sophistication
 program's execution environment.
 
 We also explicitly exclude any local attacks (e.g. via local processes, shells, etc.) against
-the Envoy process. All attacks must occur via the network data plane on ports 10000 and
-10001. Similarly, kernel and Docker vulnerabilities are outside the threat model.
+the Envoy process. All attacks must occur via the network data plane on port 10000. Similarly,
+kernel and Docker vulnerabilities are outside the threat model.
 
 .. _arch_overview_bug_bounty_ee:
 
@@ -78,26 +78,21 @@ We supply Docker images that act as the reference environment for this program:
 
 Two Envoy processes are available when these images are launched via `docker run`:
 
-* The *edge* Envoy is listening on ports 10000 (plain HTTP) and 10001 (HTTPS). It has a :repo:`static
-  configuration </configs/bugbounty/envoy-edge.yaml>` that is configured according to Envoy's
-  :ref:`edge hardening principles <faq_edge>`. It has sinkhole, direct response and request forwarding
-  routing rules:
+* The *edge* Envoy is listening on ports 10000 (HTTPS). It has a :repo:`static configuration
+  </configs/bugbounty/envoy-edge.yaml>` that is configured according to Envoy's :ref:`edge hardening
+  principles <faq_edge>`. It has sinkhole, direct response and request forwarding routing rules (in
+  order):
 
-  * On port 10000 (in order):
+  1. `/content/*`: route to the origin Envoy server.
+  2. `/*`: return 403 (denied).
 
-    1. `/content/*`: route to the origin Envoy server.
-    2. `/*`: return 403 (denied).
-
-  * On port 10001:
-
-    1. `/*`: return 200 `normal - direct response TLS`.
 
 * The *origin* Envoy is an upstream of the edge Envoy. It has a :repo:`static configuration
   </configs/bugbounty/envoy-origin.yaml>` that features only direct responses, effectively acting
   as an HTTP origin server. There are two route rules (in order):
 
   1. `/blockedz`: return 200 `hidden treasure`. It should never be possible to have
-     traffic on the Envoy edge server's 10000/10001 ports receive this response unless a
+     traffic on the Envoy edge server's 10000 port receive this response unless a
      qualifying vulnerability is present.
   2. `/*`: return 200 `normal`.
 
@@ -118,7 +113,7 @@ When running the Docker images, the following command line options should be sup
 Objectives
 ----------
 
-Vulnerabilities will be evidenced by requests on 10000/10001 that trigger a failure mode
+Vulnerabilities will be evidenced by requests on 10000 that trigger a failure mode
 that falls into one of these categories:
 
 * Query-of-death: requests that cause the Envoy process to segfault or abort
@@ -135,11 +130,11 @@ Working with the Docker images
 ------------------------------
 
 A basic invocation of the execution environment that will bring up the edge Envoy on local
-port 10001/10001 looks like:
+port 10000 looks like:
 
 .. code-block:: bash
 
-   docker run -m 3g -p 10000:10000 -p 10001:10001 --name envoy-bugbounty \
+   docker run -m 3g -p 10000:10000 --name envoy-bugbounty \
      -e ENVOY_EDGE_EXTRA_ARGS="" \
      -e ENVOY_ORIGIN_EXTRA_ARGS="" \
      envoyproxy/envoy-bugbounty-dev:latest
@@ -149,7 +144,7 @@ use of `wireshark` and `gdb`:
 
 .. code-block:: bash
 
-   docker run -m 3g -p 10000:10000 -p 10001:10001 --name envoy-bugbounty \
+   docker run -m 3g -p 10000:10000 --name envoy-bugbounty \
      -e ENVOY_EDGE_EXTRA_ARGS="-l trace" \
      -e ENVOY_ORIGIN_EXTRA_ARGS="-l trace" \
      --cap-add SYS_PTRACE --cap-add NET_RAW --cap-add NET_ADMIN \
@@ -163,3 +158,19 @@ You can obtain a shell in the Docker container with:
 
 The Docker images include `gdb`, `strace`, `tshark` (feel free to contribute other
 suggestions via PRs updating the :repo:`Docker build file </ci/Dockerfile-envoy-bugbounty>`).
+
+Rebuilding the Docker image
+---------------------------
+
+It's helpful to be able to regenerate your own Docker base image for research purposes.
+To do this without relying on CI, following the instructions at the top of
+:repo:`ci/docker_rebuild_bugbounty.sh`. An example of this flow looks like:
+
+.. code-block:: bash
+
+   bazel build //source/exe:envoy-static
+   ./ci/docker_rebuild_bugbounty.sh bazel-bin/source/exe/envoy-static
+   docker run -m 3g -p 10000:10000 --name envoy-bugbounty \
+     -e ENVOY_EDGE_EXTRA_ARGS="" \
+     -e ENVOY_ORIGIN_EXTRA_ARGS="" \
+     envoy-bugbounty:local
