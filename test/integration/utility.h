@@ -76,6 +76,8 @@ public:
   // Wait until connected or closed().
   void waitForConnection();
 
+  bool closed() { return callbacks_->closed(); }
+
 private:
   struct ForwardingFilter : public Network::ReadFilterBaseImpl {
     ForwardingFilter(RawConnectionDriver& parent, ReadCallback cb)
