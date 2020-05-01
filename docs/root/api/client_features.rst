@@ -18,3 +18,9 @@ Currently Defined Client Features
   :ref:`overprovisioning_factor<envoy_api_field_ClusterLoadAssignment.Policy.overprovisioning_factor>`
   field. If graceful failover functionality is required, it must be supplied by the management
   server.
+- **envoy.config.supports-resource-in-sotw-response**: This feature indicates that xDS client
+  can accept both :ref:`Resource <envoy_api_msg_Resource>` and *google.protobuf.Any* in the 
+  :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse.resources>` field for SotW responses.
+- **envoy.config.supports-resource-ttl**: This feature indicates that xDS client supports 
+  per-resource :ref:`TTL <xds_protocol_TTL>`. *envoy.config.supports-resource-in-sotw-response* 
+  is also required if using :ref:`TTL <xds_protocol_TTL>` with SotW.

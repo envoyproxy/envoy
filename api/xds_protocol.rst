@@ -626,8 +626,8 @@ resources after a specified period of time if contact with the management server
 be used, for example, to terminate a fault injection test when the management server can no longer
 be reached.
 
-For clients that support the 'envoy.config.ttl' client feature, A TTL field may be specified on 
-each :ref:`Resource <envoy_api_msg_Resource>`. A timer is started for each 
+For clients that support the 'envoy.config.supports-resource-ttl' client feature, A TTL field may 
+be specified on each :ref:`Resource <envoy_api_msg_Resource>`. A timer is started for each 
 :ref:`Resource <envoy_api_msg_Resource>` that has a TTL specified. When the timer expires, the 
 specific resource is removed.
 
@@ -639,8 +639,8 @@ SotW TTL
 
 The SotW :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse.resources>` field contains the 
 current resources as a list of 'google.protobuf.Any'. For clients that support the 
-'envoy.config.ttl' client feature, a management server may wrap any number of resources in a 
-:ref:`Resource <envoy_api_msg_Resource>` in order to enable TTL.
+*envoy.config.supports-resource-in-sotw-response* client feature, a management server may wrap any 
+number of resources in a :ref:`Resource <envoy_api_msg_Resource>` in order to enable TTL.
 
 .. _xds_protocol_ads:
 
