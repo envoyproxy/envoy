@@ -135,7 +135,8 @@ public:
 
   CreateConnectionData
   createHealthCheckConnection(Event::Dispatcher& dispatcher,
-                              Network::TransportSocketOptionsSharedPtr) const override {
+                              Network::TransportSocketOptionsSharedPtr,
+                              const envoy::config::core::v3::Metadata*) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, nullptr);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }

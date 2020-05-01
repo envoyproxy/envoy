@@ -32,6 +32,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_name = "envoy.filters.http.dynamic_forward_proxy",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",

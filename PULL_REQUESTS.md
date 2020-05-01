@@ -67,6 +67,16 @@ current version. Please include any relevant links. Each release note should be 
 relevant subsystem in **alphabetical order** (see existing examples as a guide) and include links
 to relevant parts of the documentation. Thank you! Please write in N/A if there are no release notes.
 
+### <a name="runtime_guard"></a>Runtime guard
+
+If this PR has a user-visible behavioral change, or otherwise falls under the
+guidelines for runtime guarding in the [contributing doc](CONTRIBUTING.md.md)
+it should have a runtime guard, which should be documented both in the release
+notes and here in the PR description.
+
+For new feature additions guarded by configs, no-op refactors, docs changes etc.
+this field can be disregarded and/or removed.
+
 ### <a name="issues"></a>Issues
 
 If this PR fixes an outstanding issue, please add a line of the form:

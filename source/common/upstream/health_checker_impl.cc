@@ -250,7 +250,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
-        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions());
+        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
+                                           parent_.transportSocketMatchMetadata().get());
     client_.reset(parent_.createCodecClient(conn));
     client_->addConnectionCallbacks(connection_callback_impl_);
     expect_reset_ = false;
@@ -505,7 +506,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     client_ =
-        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions())
+        host_
+            ->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
+                                          parent_.transportSocketMatchMetadata().get())
             .connection_;
     session_callbacks_ = std::make_shared<TcpSessionCallbacks>(*this);
     client_->addConnectionCallbacks(*session_callbacks_);
@@ -659,7 +662,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onEvent(Network::Conne
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
-        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions());
+        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
+                                           parent_.transportSocketMatchMetadata().get());
     client_ = parent_.createCodecClient(conn);
     client_->addConnectionCallbacks(connection_callback_impl_);
     client_->setCodecConnectionCallbacks(http_connection_callback_impl_);

@@ -64,10 +64,11 @@ void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
   if (path.find("//") == absl::string_view::npos) {
     return;
   }
-  const absl::string_view prefix = absl::StartsWith(path, "/") ? "/" : absl::string_view();
-  const absl::string_view suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
-  headers.setPath(absl::StrCat(
-      prefix, absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"), query, suffix));
+  const absl::string_view path_prefix = absl::StartsWith(path, "/") ? "/" : absl::string_view();
+  const absl::string_view path_suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
+  headers.setPath(absl::StrCat(path_prefix,
+                               absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"),
+                               path_suffix, query));
 }
 
 absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path) {
