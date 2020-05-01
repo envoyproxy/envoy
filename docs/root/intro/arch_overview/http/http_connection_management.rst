@@ -170,9 +170,9 @@ For a redirect to be handled successfully it must pass the following checks:
 2. Have a *location* header with a valid, fully qualified URL.
 3. The request must have been fully processed by Envoy.
 4. The request must not have a body.
-5. The scheme of the downstream request and the *location* header are the same or
-   :ref:`allow_cross_scheme_redirect
-   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.allow_cross_scheme_redirect>` is true.
+5. :ref:`disallow_cross_scheme_redirect
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.disallow_cross_scheme_redirect>` is false (default),
+   or the scheme of the downstream request and the *location* header are the same.
 6. The number of previously handled internal redirect within a given downstream request does not
    exceed :ref:`max internal redirects
    <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>`
@@ -195,9 +195,9 @@ will cause the redirect to be passed downstream.
 
 Two predicates can be used to create a DAG that defines the redirect chain, the :ref:`previous routes
 <envoy_v3_api_msg_extensions.internal_redirect.previous_routes.v3.PreviousRoutesConfig>` predicate, and
-the :ref:`allowlisted_routes
-<envoy_v3_api_msg_extensions.internal_redirect.allowlisted_routes.v3.AllowlistedRoutesConfig>`.
-Specifically, the *allowlisted routes* predicate defines edges of individual node in the DAG
+the :ref:`allow_listed_routes
+<envoy_v3_api_msg_extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig>`.
+Specifically, the *allow listed routes* predicate defines edges of individual node in the DAG
 and the *previous routes* predicate defines "visited" state of the edges, so that loop can be avoided
 if so desired.
 
