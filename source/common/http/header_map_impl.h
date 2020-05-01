@@ -46,8 +46,6 @@ public:                                                                         
 
 #define DEFINE_INLINE_HEADER_STRUCT(name) HeaderEntryImpl* name##_;
 
-class HeaderListView;
-
 /**
  * Implementation of Http::HeaderMap. This is heavily optimized for performance. Roughly, when
  * headers are added to the map, we do a hash lookup to see if it's one of the O(1) headers.
@@ -232,8 +230,6 @@ protected:
   HeaderList headers_;
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
-
-  friend HeaderListView;
 };
 
 /**
@@ -330,12 +326,15 @@ protected:
 
 class HeaderListView {
 public:
-  HeaderListView(const HeaderMapImpl& header_map) : headers_(&(header_map.headers_)) {}
+  using HeaderKeyValuePairWrapper =
+      std::vector<std::pair<std::reference_wrapper<const HeaderString>,
+                            std::reference_wrapper<const HeaderString>>>;
+  HeaderListView(const HeaderMapImpl& header_map);
   std::vector<std::reference_wrapper<const HeaderString>> keys() const;
   std::vector<std::reference_wrapper<const HeaderString>> values() const;
 
 private:
-  const HeaderMapImpl::HeaderList* headers_;
+  HeaderKeyValuePairWrapper map_;
 };
 
 template <class T>
