@@ -597,15 +597,17 @@ void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) {
 
       purgeEmptySubsets(entry->children_);
 
-      if (!entry->active() && !entry->hasChildren()) {
-        // Ignore subsets that weren't even initialized.
-        if (entry->initialized()) {
-          stats_.lb_subsets_active_.dec();
-          stats_.lb_subsets_removed_.inc();
-        }
-
-        purge_vsm.emplace_back(em.first);
+      if (entry->active() || entry->hasChildren()) {
+        continue;
       }
+
+      // If it wasn't initialized, it wasn't accounted for.
+      if (entry->initialized()) {
+        stats_.lb_subsets_active_.dec();
+        stats_.lb_subsets_removed_.inc();
+      }
+
+      purge_vsm.emplace_back(em.first);
     }
 
     for (auto&& key : purge_vsm) {
