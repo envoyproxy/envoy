@@ -993,7 +993,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
   // Issue a local close and check that the client did not pick up a remote close which can happen
   // when delayed close semantics are disabled.
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::LocalClose);
 }
 
 // Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
@@ -1030,7 +1030,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
   // Therefore, avoid checking response code/payload here and instead simply look for the remote
   // close.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
 }
 
 // Test that delay closed connections are eventually force closed when the timeout triggers.
@@ -1064,7 +1064,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   response->waitForEndStream();
   // The delayed close timeout should trigger since client is not closing the connection.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(2000)));
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
 }
@@ -1336,8 +1336,10 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
       });
   initialize();
 
+  // Send the payload early so we can regression test that body data does not
+  // get proxied until after the response headers are sent.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\nHost: host\r\n\r\n", false);
+  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\nHost: host\r\n\r\npayload", false);
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -1347,6 +1349,8 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   // No transfer-encoding: chunked or connection: close
   EXPECT_FALSE(absl::StrContains(data, "hunked")) << data;
   EXPECT_FALSE(absl::StrContains(data, "onnection")) << data;
+  // The payload should not be present as the response headers have not been sent.
+  EXPECT_FALSE(absl::StrContains(data, "payload")) << data;
 
   ASSERT_TRUE(fake_upstream_connection->write(
       "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n"));
@@ -1356,8 +1360,7 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   EXPECT_TRUE(absl::StrContains(tcp_client->data(), "\r\n\r\nb\r\nHello World\r\n0\r\n\r\n"))
       << tcp_client->data();
 
-  // Make sure the following payload is proxied without chunks or any other modifications.
-  tcp_client->write("payload");
+  // Make sure the early payload is proxied without chunks or any other modifications.
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\npayload")));
 
