@@ -52,6 +52,9 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
                "//conditions:default": [],
            }) + select({
+               repository + "//bazel:no_debug_info": ["-g0"],
+               "//conditions:default": [],
+           }) + select({
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                "//conditions:default": ["-DTCMALLOC"],
            }) + select({

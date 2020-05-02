@@ -847,7 +847,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
-      scoped_route_config_provider_(server.timeSource()),
+      scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -876,25 +876,26 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            false, false},
           {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
            true},
-          {"/reset_counters", "reset all counters to zero", StatsHandler::handlerResetCounters,
-           false, true},
+          {"/reset_counters", "reset all counters to zero",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true},
           {"/drain_listeners", "drain listeners", ListenersHandler::handlerDrainListeners, false,
            true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
            MAKE_ADMIN_HANDLER(handlerReady), false, false},
-          {"/stats", "print server stats", StatsHandler::handlerStats, false, false},
+          {"/stats", "print server stats", MAKE_ADMIN_HANDLER(stats_handler_.handlerStats), false,
+           false},
           {"/stats/prometheus", "print server stats in prometheus format",
-           StatsHandler::handlerPrometheusStats, false, false},
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false},
           {"/stats/recentlookups", "Show recent stat-name lookups",
-           StatsHandler::handlerStatsRecentLookups, false, false},
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false},
           {"/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
-           StatsHandler::handlerStatsRecentLookupsClear, false, true},
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsClear), false, true},
           {"/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
-           StatsHandler::handlerStatsRecentLookupsDisable, false, true},
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable), false, true},
           {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
-           StatsHandler::handlerStatsRecentLookupsEnable, false, true},
+          MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true},
           {"/listeners", "print listener info", ListenersHandler::handlerListenerInfo, false,
            false},
           {"/runtime", "print runtime values", RuntimeHandler::handlerRuntime, false, false},
@@ -956,12 +957,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
           break;
         }
       }
-      if (handler.requires_server_) {
-        code = handler.handler_with_server_(path_and_query, response_headers, response,
-                                            admin_stream, server_);
-      } else {
-        code = handler.handler_(path_and_query, response_headers, response, admin_stream);
-      }
+      code = handler.handler_(path_and_query, response_headers, response, admin_stream);
       Memory::Utils::tryShrinkHeap();
       break;
     }

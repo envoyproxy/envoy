@@ -1,7 +1,6 @@
 #include "extensions/filters/network/kafka/request_codec.h"
 
 #include "test/extensions/filters/network/kafka/buffer_based_test.h"
-#include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
