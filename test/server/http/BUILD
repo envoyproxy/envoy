@@ -74,18 +74,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-<<<<<<< HEAD
     name = "runtime_handler_test",
     srcs = ["runtime_handler_test.cc"],
     deps = [":admin_instance_lib"],
-=======
+)
+
+envoy_cc_test(
     name = "prometheus_stats_test",
     srcs = ["prometheus_stats_test.cc"],
     deps = [
         "//source/server/http:prometheus_stats_lib",
         "//test/test_common:utility_lib",
     ],
->>>>>>> master
 )
 
 envoy_cc_test(
