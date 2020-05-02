@@ -36,6 +36,7 @@ namespace TcpProxy {
  * All tcp proxy stats. @see stats_macros.h
  */
 #define ALL_TCP_PROXY_STATS(COUNTER, GAUGE)                                                        \
+  COUNTER(downstream_buffer_overflow_total)                                                        \
   COUNTER(downstream_cx_no_route)                                                                  \
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
   COUNTER(downstream_cx_total)                                                                     \
@@ -43,6 +44,7 @@ namespace TcpProxy {
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
   COUNTER(idle_timeout)                                                                            \
+  COUNTER(upstream_buffer_overflow_total)                                                          \
   COUNTER(upstream_flush_total)                                                                    \
   GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
   GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \

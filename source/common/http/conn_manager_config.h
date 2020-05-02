@@ -20,6 +20,7 @@ namespace Http {
  * All stats for the connection manager. @see stats_macros.h
  */
 #define ALL_HTTP_CONN_MAN_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
+  COUNTER(dec_buffer_overflow_total)                                                               \
   COUNTER(downstream_cx_delayed_close_timeout)                                                     \
   COUNTER(downstream_cx_destroy)                                                                   \
   COUNTER(downstream_cx_destroy_active_rq)                                                         \
@@ -47,6 +48,7 @@ namespace Http {
   COUNTER(downstream_rq_3xx)                                                                       \
   COUNTER(downstream_rq_4xx)                                                                       \
   COUNTER(downstream_rq_5xx)                                                                       \
+  COUNTER(downstream_rq_buffer_overflow_total)                                                     \
   COUNTER(downstream_rq_completed)                                                                 \
   COUNTER(downstream_rq_http1_total)                                                               \
   COUNTER(downstream_rq_http2_total)                                                               \
@@ -62,11 +64,9 @@ namespace Http {
   COUNTER(downstream_rq_tx_reset)                                                                  \
   COUNTER(downstream_rq_max_duration_reached)                                                      \
   COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
+  COUNTER(enc_buffer_overflow_total)                                                               \
+  COUNTER(rs_buffer_overflow_total)                                                                \
   COUNTER(rs_too_large)                                                                            \
-  COUNTER(downstream_buffer_overflow_total)                                                        \
-  COUNTER(upstream_buffer_overflow_total)                                                          \
-  COUNTER(filter_buffer_overflow_total)                                                            \
-  COUNTER(response_buffer_overflow_total)                                                          \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
   GAUGE(downstream_cx_http1_active, Accumulate)                                                    \
   GAUGE(downstream_cx_http2_active, Accumulate)                                                    \

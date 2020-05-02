@@ -540,8 +540,7 @@ public:
   COUNTER(update_failure)                                                                          \
   COUNTER(update_no_rebuild)                                                                       \
   COUNTER(update_success)                                                                          \
-  COUNTER(upstream_buffer_overflow_multiple_downstreams_total)                                     \
-  COUNTER(upstream_buffer_overflow_single_downstream_total)                                        \
+  COUNTER(upstream_buffered_request_body_buffer_overflow_total)                                    \
   COUNTER(upstream_cx_close_notify)                                                                \
   COUNTER(upstream_cx_connect_attempts_exceeded)                                                   \
   COUNTER(upstream_cx_connect_fail)                                                                \
@@ -564,6 +563,7 @@ public:
   COUNTER(upstream_cx_total)                                                                       \
   COUNTER(upstream_cx_tx_bytes_total)                                                              \
   COUNTER(upstream_flow_control_backed_up_total)                                                   \
+  COUNTER(upstream_flow_control_downstream_buffer_overflow_total)                                  \
   COUNTER(upstream_flow_control_drained_total)                                                     \
   COUNTER(upstream_flow_control_paused_reading_total)                                              \
   COUNTER(upstream_flow_control_resumed_reading_total)                                             \
@@ -584,8 +584,6 @@ public:
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \
-  COUNTER(upstream_tcp_downstream_buffer_overflow_total)                                           \
-  COUNTER(upstream_tcp_upstream_buffer_overflow_total)                                             \
   GAUGE(lb_subsets_active, Accumulate)                                                             \
   GAUGE(max_host_weight, NeverImport)                                                              \
   GAUGE(membership_degraded, NeverImport)                                                          \
