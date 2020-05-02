@@ -6,25 +6,27 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
+#include "server/http/handler_ctx.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Server {
 
-class RuntimeHandler {
+class RuntimeHandler : public HandlerContextBase {
 
 public:
-  static Http::Code handlerRuntime(absl::string_view path_and_query,
-                                   Http::ResponseHeaderMap& response_headers,
-                                   Buffer::Instance& response, AdminStream&,
-                                   Server::Instance& server);
-  static Http::Code handlerRuntimeModify(absl::string_view path_and_query,
-                                         Http::ResponseHeaderMap& response_headers,
-                                         Buffer::Instance& response, AdminStream&,
-                                         Server::Instance& server);
+  RuntimeHandler(Server::Instance& server);
+
+  Http::Code handlerRuntime(absl::string_view path_and_query,
+                            Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                            AdminStream&);
+  Http::Code handlerRuntimeModify(absl::string_view path_and_query,
+                                  Http::ResponseHeaderMap& response_headers,
+                                  Buffer::Instance& response, AdminStream&);
 
 private:
-  static bool isFormUrlEncoded(const Http::HeaderEntry* content_type);
+  bool isFormUrlEncoded(const Http::HeaderEntry* content_type);
 };
 
 } // namespace Server

@@ -129,6 +129,7 @@ envoy_cc_library(
     srcs = ["listeners_handler.cc"],
     hdrs = ["listeners_handler.h"],
     deps = [
+        ":handler_ctx_lib",
         ":utils_lib",
         "//include/envoy/http:codes_interface",
         "//include/envoy/server:admin_interface",
@@ -145,6 +146,7 @@ envoy_cc_library(
     srcs = ["runtime_handler.cc"],
     hdrs = ["runtime_handler.h"],
     deps = [
+        ":handler_ctx_lib",
         ":utils_lib",
         "//include/envoy/http:codes_interface",
         "//include/envoy/server:admin_interface",

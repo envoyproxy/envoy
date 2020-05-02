@@ -6,30 +6,32 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
+#include "server/http/handler_ctx.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Server {
 
-class ListenersHandler {
+class ListenersHandler : public HandlerContextBase {
 
 public:
-  static Http::Code handlerDrainListeners(absl::string_view path_and_query,
-                                          Http::ResponseHeaderMap& response_headers,
-                                          Buffer::Instance& response, AdminStream&,
-                                          Server::Instance& server);
+  ListenersHandler(Server::Instance& server);
 
-  static Http::Code handlerListenerInfo(absl::string_view path_and_query,
-                                        Http::ResponseHeaderMap& response_headers,
-                                        Buffer::Instance& response, AdminStream&,
-                                        Server::Instance& server);
+  Http::Code handlerDrainListeners(absl::string_view path_and_query,
+                                   Http::ResponseHeaderMap& response_headers,
+                                   Buffer::Instance& response, AdminStream&);
+
+  Http::Code handlerListenerInfo(absl::string_view path_and_query,
+                                 Http::ResponseHeaderMap& response_headers,
+                                 Buffer::Instance& response, AdminStream&);
 
 private:
   /**
    * Helper methods for the /listeners url handler.
    */
-  static void writeListenersAsJson(Buffer::Instance& response, Server::Instance& server);
-  static void writeListenersAsText(Buffer::Instance& response, Server::Instance& server);
+  void writeListenersAsJson(Buffer::Instance& response);
+  void writeListenersAsText(Buffer::Instance& response);
 };
 
 } // namespace Server

@@ -13,15 +13,16 @@
 namespace Envoy {
 namespace Server {
 
+RuntimeHandler::RuntimeHandler(Server::Instance& server) : HandlerContextBase(server) {}
+
 Http::Code RuntimeHandler::handlerRuntime(absl::string_view url,
                                           Http::ResponseHeaderMap& response_headers,
-                                          Buffer::Instance& response, AdminStream&,
-                                          Server::Instance& server) {
+                                          Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
   // TODO(jsedgwick): Use proto to structure this output instead of arbitrary JSON.
-  const auto& layers = server.runtime().snapshot().getLayers();
+  const auto& layers = server_.runtime().snapshot().getLayers();
 
   std::vector<ProtobufWkt::Value> layer_names;
   layer_names.reserve(layers.size());
@@ -78,8 +79,7 @@ Http::Code RuntimeHandler::handlerRuntime(absl::string_view url,
 
 Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response,
-                                                AdminStream& admin_stream,
-                                                Server::Instance& server) {
+                                                AdminStream& admin_stream) {
   Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   if (params.empty()) {
     // Check if the params are in the request's body.
@@ -98,7 +98,7 @@ Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::Res
   std::unordered_map<std::string, std::string> overrides;
   overrides.insert(params.begin(), params.end());
   try {
-    server.runtime().mergeValues(overrides);
+    server_.runtime().mergeValues(overrides);
   } catch (const EnvoyException& e) {
     response.add(e.what());
     return Http::Code::ServiceUnavailable;

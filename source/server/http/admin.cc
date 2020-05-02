@@ -47,9 +47,6 @@
 #include "common/router/config_impl.h"
 #include "common/upstream/host_utility.h"
 
-#include "server/http/listeners_handler.h"
-#include "server/http/runtime_handler.h"
-#include "server/http/stats_handler.h"
 #include "server/http/utils.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
@@ -848,6 +845,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
+      runtime_handler_(server), listeners_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -878,8 +876,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            true},
           {"/reset_counters", "reset all counters to zero",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true},
-          {"/drain_listeners", "drain listeners", ListenersHandler::handlerDrainListeners, false,
-           true},
+          {"/drain_listeners", "drain listeners",
+           MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
@@ -895,12 +893,13 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable), false, true},
           {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
-          MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true},
-          {"/listeners", "print listener info", ListenersHandler::handlerListenerInfo, false,
-           false},
-          {"/runtime", "print runtime values", RuntimeHandler::handlerRuntime, false, false},
-          {"/runtime_modify", "modify runtime values", RuntimeHandler::handlerRuntimeModify, false,
-           true},
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true},
+          {"/listeners", "print listener info",
+           MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo), false, false},
+          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime),
+           false, false},
+          {"/runtime_modify", "modify runtime values",
+           MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true},
           {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false,
            true},
       },
