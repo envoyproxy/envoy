@@ -51,3 +51,6 @@ Deprecated
 * Tracing provider configuration as part of :ref:`bootstrap config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.tracing>`
   has been deprecated in favor of configuration as part of :ref:`HTTP connection manager
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
+* The * :ref:`GoogleRE2.max_program_size<envoy_v3_api_field_type.matcher.v3.RegexMatcher.GoogleRE2.max_program_size>`
+  field is now deprecated. Management servers are expected to validate regexp program sizes
+  instead of expecting the client to do it.
