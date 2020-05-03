@@ -35,6 +35,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 
+#include "absl/synchronization/notification.h"
 #include "absl/time/time.h"
 #include "gtest/gtest.h"
 
@@ -232,7 +233,13 @@ TEST_P(ProtocolIntegrationTest, DrainClose) {
   config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
-  test_server_->drainManager().draining_ = true;
+  absl::Notification drain_sequence_started;
+  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
+    test_server_->drainManager().startDrainSequence(nullptr);
+    drain_sequence_started.Notify();
+  });
+  drain_sequence_started.WaitForNotification();
+
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   response->waitForEndStream();
@@ -243,8 +250,6 @@ TEST_P(ProtocolIntegrationTest, DrainClose) {
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
-
-  test_server_->drainManager().draining_ = false;
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/9873
