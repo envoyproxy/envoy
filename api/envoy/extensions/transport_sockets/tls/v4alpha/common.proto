@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.transport_sockets.tls.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
-import "envoy/type/matcher/v3/string.proto";
+import "envoy/type/matcher/v4alpha/string.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -298,7 +298,7 @@ message CertificateValidationContext {
   // Subject Alternative Name of the presented certificate matches one of the specified matches.
   //
   // When a certificate has wildcard DNS SAN entries, to match a specific client, it should be
-  // configured with exact match type in the :ref:`string matcher <envoy_api_msg_type.matcher.v3.StringMatcher>`.
+  // configured with exact match type in the :ref:`string matcher <envoy_api_msg_type.matcher.v4alpha.StringMatcher>`.
   // For example if the certificate has "\*.example.com" as DNS SAN entry, to allow only "api.example.com",
   // it should be configured as shown below.
   //
@@ -312,7 +312,7 @@ message CertificateValidationContext {
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
   //   therefore this option must be used together with :ref:`trusted_ca
   //   <envoy_api_field_extensions.transport_sockets.tls.v4alpha.CertificateValidationContext.trusted_ca>`.
-  repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9;
+  repeated type.matcher.v4alpha.StringMatcher match_subject_alt_names = 9;
 
   // [#not-implemented-hide:] Must present a signed time-stamped OCSP response.
   google.protobuf.BoolValue require_ocsp_staple = 5;
