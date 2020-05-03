@@ -43,7 +43,8 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 class TestComponentFactory : public ComponentFactory {
 public:
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    return Server::DrainManagerPtr{new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY)};
+    return Server::DrainManagerPtr{
+        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY)};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
@@ -261,13 +262,15 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
                               public IntegrationTestServerStats,
                               public Server::ComponentFactory {
 public:
-  static IntegrationTestServerPtr create(
-      const std::string& config_path, const Network::Address::IpVersion version,
-      std::function<void(IntegrationTestServer&)> on_server_ready_function,
-      std::function<void()> on_server_init_function, bool deterministic,
-      Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
-      ProcessObjectOptRef process_object = absl::nullopt, bool allow_unknown_static_fields = false,
-      bool reject_unknown_dynamic_fields = false, uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1));
+  static IntegrationTestServerPtr
+  create(const std::string& config_path, const Network::Address::IpVersion version,
+         std::function<void(IntegrationTestServer&)> on_server_ready_function,
+         std::function<void()> on_server_init_function, bool deterministic,
+         Event::TestTimeSystem& time_system, Api::Api& api,
+         bool defer_listener_finalization = false,
+         ProcessObjectOptRef process_object = absl::nullopt,
+         bool allow_unknown_static_fields = false, bool reject_unknown_dynamic_fields = false,
+         uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1));
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -330,7 +333,8 @@ public:
 
   // Server::ComponentFactory
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    drain_manager_ = new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
+    drain_manager_ =
+        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
     return Server::DrainManagerPtr{drain_manager_};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,

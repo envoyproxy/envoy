@@ -168,12 +168,11 @@ void IntegrationTestServer::serverReady() {
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic, ProcessObjectOptRef process_object,
                                           bool allow_unknown_static_fields,
-                                          bool reject_unknown_dynamic_fields,
-                                          uint32_t concurrency,
+                                          bool reject_unknown_dynamic_fields, uint32_t concurrency,
                                           std::chrono::seconds drain_time) {
-  OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version,
-                                                    allow_unknown_static_fields,
-                                                    reject_unknown_dynamic_fields, concurrency, drain_time));
+  OptionsImpl options(
+      Server::createTestOptionsImpl(config_path_, "", version, allow_unknown_static_fields,
+                                    reject_unknown_dynamic_fields, concurrency, drain_time));
   Thread::MutexBasicLockable lock;
 
   Runtime::RandomGeneratorPtr random_generator;
