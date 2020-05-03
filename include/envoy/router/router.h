@@ -970,12 +970,12 @@ enum class RouteMatchStatus {
 };
 
 /**
- * RouteCallback, is passed this enum to indicate if more routes are available for evaluation.
+ * RouteCallback is passed this enum to indicate if more routes are available for evaluation.
  */
 enum class RouteEvalStatus {
-  // Has more routes that can be evaluated for match
+  // Has more routes that can be evaluated for match.
   HasMoreRoutes,
-  // All routes have been evaluated for match
+  // All routes have been evaluated for match.
   NoMoreRoutes
 };
 
@@ -1020,7 +1020,7 @@ public:
    *
    * Invokes callback with matched route, callback can choose to accept the route by returning
    * RouteStatus::Stop or continue route match from last matched route by returning
-   * RouteMatchStatus::Continue, when more routes available.
+   * RouteMatchStatus::Continue, when more routes are available.
    *
    * @param cb supplies callback to be invoked upon route match.
    * @param headers supplies the request headers.

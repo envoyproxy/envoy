@@ -984,7 +984,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
             }
 
             if (ctr == 3) {
-              ctr++;
+              ++ctr;
               EXPECT_EQ(default_route, route);
               EXPECT_EQ(route_eval_status, Router::RouteEvalStatus::NoMoreRoutes);
               return Router::RouteMatchStatus::Accept;
