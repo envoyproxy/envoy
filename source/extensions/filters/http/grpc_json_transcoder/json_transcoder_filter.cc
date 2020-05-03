@@ -688,12 +688,12 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
         // Non streaming case: single message with content type / length
         response_headers.setContentType(http_body.content_type());
         response_headers.setContentLength(body.size());
+        return;
       } else if (!http_body_response_headers_set_) {
         // Streaming case: set content type only once from first HttpBody message
         response_headers.setContentType(http_body.content_type());
         http_body_response_headers_set_ = true;
       }
-      return;
     }
   }
 }
