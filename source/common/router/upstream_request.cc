@@ -516,8 +516,7 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
 
 void UpstreamRequest::overflowDataFromDownstream() {
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
-  ENVOY_STREAM_LOG(warn, "Upstream buffered request body buffer overflow",
-                   *parent_.callbacks());
+  ENVOY_STREAM_LOG(warn, "Upstream buffered request body buffer overflow", *parent_.callbacks());
   parent_.cluster()->stats().upstream_buffered_request_body_buffer_overflow_total_.inc();
   parent_.callbacks()->onDecoderFilterAboveWriteBufferOverflowWatermark();
 }

@@ -21,7 +21,8 @@ public:
                   std::function<void()> above_overflow_watermark)
       : below_low_watermark_(below_low_watermark), above_high_watermark_(above_high_watermark),
         above_overflow_watermark_(above_overflow_watermark),
-        overflow_watermark_multiplier_(Runtime::getInteger("envoy.buffer.overflow_multiplier", 2)) {}
+        overflow_watermark_multiplier_(Runtime::getInteger("envoy.buffer.overflow_multiplier", 2)) {
+  }
 
   // Override all functions from Instance which can result in changing the size
   // of the underlying buffer.

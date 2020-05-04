@@ -70,8 +70,10 @@ Api::IoCallUint64Result WatermarkBuffer::write(Network::IoHandle& io_handle) {
 
 void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
   ASSERT(low_watermark < high_watermark || (high_watermark == 0 && low_watermark == 0));
-  if (overflow_watermark_multiplier_ > 0 && (overflow_watermark_multiplier_ * high_watermark) < high_watermark) {
-    ENVOY_LOG_MISC(error, "Error setting overflow threshold: overflow_waterflow_multiplier * high_watermark is overflowing. Disabling overflow watermark.");
+  if (overflow_watermark_multiplier_ > 0 &&
+      (overflow_watermark_multiplier_ * high_watermark) < high_watermark) {
+    ENVOY_LOG_MISC(error, "Error setting overflow threshold: overflow_waterflow_multiplier * "
+                          "high_watermark is overflowing. Disabling overflow watermark.");
     overflow_watermark_multiplier_ = 0;
   }
   low_watermark_ = low_watermark;
@@ -92,8 +94,7 @@ void WatermarkBuffer::checkLowWatermark() {
 }
 
 void WatermarkBuffer::checkHighAndOverflowWatermarks() {
-  if (high_watermark_ == 0 ||
-      OwnedImpl::length() <= high_watermark_) {
+  if (high_watermark_ == 0 || OwnedImpl::length() <= high_watermark_) {
     return;
   }
 

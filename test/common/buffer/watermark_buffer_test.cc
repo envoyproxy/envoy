@@ -346,8 +346,7 @@ TEST_F(WatermarkBufferTest, MoveBackWithWatermarks) {
 
 TEST_F(WatermarkBufferTest, OverflowWatermark) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.buffer.overflow_multiplier", "2"}});
+  Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "2"}});
 
   int high_watermark_buffer1 = 0;
   int low_watermark_buffer1 = 0;
@@ -390,8 +389,7 @@ TEST_F(WatermarkBufferTest, OverflowWatermark) {
 
 TEST_F(WatermarkBufferTest, OverflowWatermarkDisabled) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.buffer.overflow_multiplier", "0"}});
+  Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "0"}});
 
   int high_watermark_buffer1 = 0;
   int low_watermark_buffer1 = 0;
@@ -415,8 +413,7 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabled) {
 
 TEST_F(WatermarkBufferTest, OverflowWatermarkEqualHighWatermark) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.buffer.overflow_multiplier", "1"}});
+  Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "1"}});
 
   int high_watermark_buffer1 = 0;
   int low_watermark_buffer1 = 0;
@@ -443,7 +440,6 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkEqualHighWatermark) {
   EXPECT_EQ(2, high_watermark_buffer1);
   EXPECT_EQ(1, overflow_watermark_buffer1);
 }
-
 
 TEST_F(WatermarkBufferTest, MoveWatermarksOverflow) {
   buffer_.setWatermarks(5, 10);

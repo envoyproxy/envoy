@@ -814,7 +814,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_CALL(callbacks, onAboveWriteBufferOverflowWatermark());
   Buffer::OwnedImpl more_long_data2(std::string(initial_stream_window, 'a'));
   request_encoder_->encodeData(more_long_data2, false);
-  EXPECT_EQ(2*initial_stream_window + 1, client_->getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(2 * initial_stream_window + 1, client_->getStream(1)->pending_send_data_.length());
   EXPECT_EQ(1, stats_store_.counter("http2.send_buffer_overflow").value());
 
   // Now create a second stream on the connection.

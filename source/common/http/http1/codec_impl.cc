@@ -940,7 +940,8 @@ void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
 
 void ServerConnectionImpl::onAboveOverflowWatermark() {
   if (active_request_.has_value()) {
-    ENVOY_CONN_LOG(warn, "Server connection output buffer or underlying connection overflow detected",
+    ENVOY_CONN_LOG(warn,
+                   "Server connection output buffer or underlying connection overflow detected",
                    connection_);
     stats_.server_cx_buffer_overflow_.inc();
     active_request_.value().response_encoder_.runOverflowWatermarkCallbacks();
