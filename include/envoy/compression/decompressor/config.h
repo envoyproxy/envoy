@@ -8,8 +8,6 @@ namespace Envoy {
 namespace Compression {
 namespace Decompressor {
 
-using DecompressorFactoryPtr = std::unique_ptr<DecompressorFactory>;
-
 class NamedDecompressorLibraryConfigFactory : public Config::TypedFactory {
 public:
   ~NamedDecompressorLibraryConfigFactory() override = default;
