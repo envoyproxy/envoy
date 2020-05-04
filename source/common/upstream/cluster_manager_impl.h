@@ -111,7 +111,7 @@ public:
 
   enum class State {
     // Initial state. During this state all static clusters are loaded. Any primary clusters
-    // are immediately begin initialization.
+    // immediately begin initialization.
     Loading,
     // In this state cluster manager waits for all primary clusters to finish initialization.
     // This state may immediately transition to the next state iff all clusters are STATIC and
