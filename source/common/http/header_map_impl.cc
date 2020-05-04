@@ -183,34 +183,6 @@ void HeaderMapImpl::HeaderEntryImpl::value(const HeaderEntry& header) {
   value(header.value().getStringView());
 }
 
-HeaderListView::HeaderListView(const HeaderMapImpl& header_map) {
-  header_map.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        auto* context_ptr = static_cast<HeaderListView::HeaderKeyValuePairWrapper*>(context);
-        auto key = std::reference_wrapper<const HeaderString>(header.key());
-        auto value = std::reference_wrapper<const HeaderString>(header.value());
-        context_ptr->emplace_back(std::make_pair(key, value));
-        return HeaderMap::Iterate::Continue;
-      },
-      &map_);
-}
-
-std::vector<std::reference_wrapper<const HeaderString>> HeaderListView::keys() const {
-  std::vector<std::reference_wrapper<const HeaderString>> header_keys;
-  for (const auto& pair : map_) {
-    header_keys.emplace_back(pair.first);
-  }
-  return header_keys;
-}
-
-std::vector<std::reference_wrapper<const HeaderString>> HeaderListView::values() const {
-  std::vector<std::reference_wrapper<const HeaderString>> header_values;
-  for (const auto& pair : map_) {
-    header_values.emplace_back(pair.second);
-  }
-  return header_values;
-}
-
 #define INLINE_HEADER_STATIC_MAP_ENTRY(name)                                                       \
   add(Headers::get().name.get().c_str(), [](HeaderMapType& h) -> StaticLookupResponse {            \
     return {&h.inline_headers_.name##_, &Headers::get().name};                                     \

@@ -20,6 +20,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/thread.h"
 #include "common/config/version_converter.h"
+#include "common/http/header_list_view.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"

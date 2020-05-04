@@ -324,19 +324,6 @@ protected:
   friend class HeaderMapImpl;
 };
 
-class HeaderListView {
-public:
-  using HeaderKeyValuePairWrapper =
-      std::vector<std::pair<std::reference_wrapper<const HeaderString>,
-                            std::reference_wrapper<const HeaderString>>>;
-  HeaderListView(const HeaderMapImpl& header_map);
-  std::vector<std::reference_wrapper<const HeaderString>> keys() const;
-  std::vector<std::reference_wrapper<const HeaderString>> values() const;
-
-private:
-  HeaderKeyValuePairWrapper map_;
-};
-
 template <class T>
 std::unique_ptr<T>
 createHeaderMap(const std::initializer_list<std::pair<LowerCaseString, std::string>>& values) {
