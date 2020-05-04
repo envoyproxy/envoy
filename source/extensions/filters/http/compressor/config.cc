@@ -14,6 +14,11 @@ namespace Compressor {
 Http::FilterFactoryCb CompressorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+  // TODO(rojkov): instead of throwing an exception make the Compressor.compressor_library field
+  // required when the Gzip HTTP-filter is fully deprecated and removed.
+  if (!proto_config.has_compressor_library()) {
+    throw EnvoyException("Compressor filter doesn't have compressor_library defined");
+  }
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(
       proto_config.compressor_library().typed_config().type_url())};
   Compression::Compressor::NamedCompressorLibraryConfigFactory* const config_factory =

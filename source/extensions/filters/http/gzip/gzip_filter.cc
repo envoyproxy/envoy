@@ -79,18 +79,10 @@ uint64_t GzipFilterConfig::windowBitsUint(Protobuf::uint32 window_bits) {
 
 const envoy::extensions::filters::http::compressor::v3::Compressor
 GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip) {
-  envoy::extensions::filters::http::compressor::v3::Compressor compressor = {};
-
-  // The deprecated gzip filter is using a locally defined Compressor field to avoid setting the
-  // compressor_library field which is mandatory in v3. Here we convert gzip's Compressor to
-  // what is accepted by the generic compressor.
   if (gzip.has_compressor()) {
-    ProtobufWkt::Struct tmp;
-    MessageUtil::jsonConvert(gzip.compressor(), tmp);
-    MessageUtil::jsonConvert(tmp, ProtobufMessage::getStrictValidationVisitor(), compressor);
-    return compressor;
+    return gzip.compressor();
   }
-
+  envoy::extensions::filters::http::compressor::v3::Compressor compressor = {};
   if (gzip.has_hidden_envoy_deprecated_content_length()) {
     compressor.set_allocated_content_length(
         // According to
