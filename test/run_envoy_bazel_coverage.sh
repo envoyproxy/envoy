@@ -20,9 +20,13 @@ if [[ $# -gt 0 ]]; then
 elif [[ -n "${COVERAGE_TARGET}" ]]; then
   COVERAGE_TARGETS=${COVERAGE_TARGET}
 else
-  # For fuzz builds, this overrides to just fuzz targets.
-  COVERAGE_TARGETS=//test/... && [[ ${FUZZ_COVERAGE} == "true" ]] &&
-    COVERAGE_TARGETS="$(bazel query 'attr("tags", "fuzz_target", //test/...)')"
+  COVERAGE_TARGETS=//test/...
+fi
+
+# For fuzz builds, filter out fuzz targets.
+if [ "$FUZZ_COVERAGE" == "true" ]
+then
+  COVERAGE_TARGETS="$(bazel query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS})")"
 fi
 
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
@@ -71,15 +75,14 @@ do
     "${TEST_ARGS[@]}" --test_env=HEAPCHECK=  ${TARGET}
 done
 
-COVERAGE_DIR="${SRCDIR}"/generated/coverage
+COVERAGE_DIR="${SRCDIR}"/generated/coverage && [[ ${FUZZ_COVERAGE} == "true" ]] && COVERAGE_DIR="${SRCDIR}"/generated/fuzz_coverage
 mkdir -p "${COVERAGE_DIR}"
 
 COVERAGE_IGNORE_REGEX="(/external/|pb\.(validate\.)?(h|cc)|/chromium_url/|/test/|/tmp|/tools/|/third_party/|/source/extensions/quic_listeners/quiche/)"
-COVERAGE_BINARY="bazel-bin/test/coverage/coverage_tests"
+BAZEL_OUT=test/coverage/coverage_tests/ && [[ ${FUZZ_COVERAGE} == "true" ]] && BAZEL_OUT=test/
 COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
 
 echo "Merging coverage data..."
-BAZEL_OUT=test/coverage/coverage_tests/ && [[ ${FUZZ_COVERAGE} ]] && BAZEL_OUT=test/
 llvm-profdata merge -sparse -o ${COVERAGE_DATA} $(find -L bazel-out/k8-fastbuild/testlogs/${BAZEL_OUT} -name coverage.dat)
 
 echo "Generating report..."
@@ -88,14 +91,19 @@ llvm-cov show -instr-profile="${COVERAGE_DATA}" ${OBJECTS} -Xdemangler=c++filt \
 sed -i -e 's|>proc/self/cwd/|>|g' "${COVERAGE_DIR}/index.html"
 sed -i -e 's|>bazel-out/[^/]*/bin/\([^/]*\)/[^<]*/_virtual_includes/[^/]*|>\1|g' "${COVERAGE_DIR}/index.html"
 
-[[ -z "${ENVOY_COVERAGE_DIR}" ]] || rsync -av "${COVERAGE_DIR}"/ "${ENVOY_COVERAGE_DIR}"
+if [ "$FUZZ_COVERAGE" == "true" ]
+then
+  [[ -z "${ENVOY_FUZZ_COVERAGE_DIR}" ]] || rsync -av "${COVERAGE_DIR}"/ "${ENVOY_FUZZ_COVERAGE_DIR}"
+else
+  [[ -z "${ENVOY_COVERAGE_DIR}" ]] || rsync -av "${COVERAGE_DIR}"/ "${ENVOY_COVERAGE_DIR}"
+fi
 
 if [ "$VALIDATE_COVERAGE" == "true" ]
 then
-  COVERAGE_VALUE=$(llvm-cov export "${OBJECTS}" -instr-profile="${COVERAGE_DATA}" \
+  COVERAGE_VALUE=$(llvm-cov export ${OBJECTS} -instr-profile="${COVERAGE_DATA}" \
     -ignore-filename-regex="${COVERAGE_IGNORE_REGEX}" -summary-only | \
     python3 -c "import sys, json; print(json.load(sys.stdin)['data'][0]['totals']['lines']['percent'])")
-  COVERAGE_THRESHOLD=97.0
+  COVERAGE_THRESHOLD=97.0 && [[ ${FUZZ_COVERAGE} == "true" ]] && COVERAGE_THRESHOLD=27.0
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if test ${COVERAGE_FAILED} -eq 1; then
       echo Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}

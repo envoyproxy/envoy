@@ -10,9 +10,10 @@ fi
 
 [[ -z "${ENVOY_BUILD_DIR}" ]] && ENVOY_BUILD_DIR=/build
 COVERAGE_FILE="${ENVOY_BUILD_DIR}/envoy/generated/coverage/index.html"
+FUZZ_COVERAGE_FILE="${ENVOY_BUILD_DIR}/envoy/generated/fuzz_coverage/index.html"
 
-if [ ! -f "${COVERAGE_FILE}" ]; then
-  echo "ERROR: Coverage file not found."
+if [ ! -f "${COVERAGE_FILE}" || ! -f "${FUZZ_COVERAGE_FILE}" ]; then
+  echo "ERROR: Coverage file(s) not found."
   exit 1
 fi
 
@@ -23,11 +24,15 @@ then
 
   BRANCH_NAME="${CIRCLE_BRANCH}"
   COVERAGE_DIR="$(dirname "${COVERAGE_FILE}")"
+  FUZZ_COVERAGE_DIR="$(dirname "${FUZZ_COVERAGE_FILE}")"
   GCS_LOCATION="envoy-coverage/report-${BRANCH_NAME}"
+  GCS_FUZZ_LOCATION="envoy-fuzz-coverage/report-${BRANCH_NAME}"
 
   echo ${GCP_SERVICE_ACCOUNT_KEY} | base64 --decode | gcloud auth activate-service-account --key-file=-
   gsutil -m rsync -dr ${COVERAGE_DIR} gs://${GCS_LOCATION}
+  gsutil -m rsync -dr ${FUZZ_COVERAGE_DIR} gs://${GCS_FUZZ_LOCATION}
   echo "Coverage report for branch '${BRANCH_NAME}': https://storage.googleapis.com/${GCS_LOCATION}/index.html"
+  echo "Fuzz coverage report for branch '${BRANCH_NAME}': https://storage.googleapis.com/${GCS_FUZZ_LOCATION}/index.html"
 else
   echo "Coverage report will not be uploaded for this build."
 fi

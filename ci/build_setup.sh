@@ -106,6 +106,10 @@ mkdir -p "${ENVOY_DELIVERY_DIR}"
 export ENVOY_COVERAGE_DIR="${ENVOY_BUILD_DIR}"/generated/coverage
 mkdir -p "${ENVOY_COVERAGE_DIR}"
 
+# This is where we copy the coverage report to.
+export ENVOY_FUZZ_COVERAGE_DIR="${ENVOY_BUILD_DIR}"/generated/fuzz_coverage
+mkdir -p "${ENVOY_FUZZ_COVERAGE_DIR}"
+
 # This is where we dump failed test logs for CI collection.
 export ENVOY_FAILED_TEST_LOGS="${ENVOY_BUILD_DIR}"/generated/failed-testlogs
 mkdir -p "${ENVOY_FAILED_TEST_LOGS}"

@@ -34,7 +34,7 @@ do
   # Copy entries in original corpus into temp.
   cp -r "$(pwd)${ORIGINAL_CORPUS:1}" "${CORPUS_DIR}"
   # Run fuzzing process.
-  bazel-bin/"${TARGET_BINARY:2}"_with_libfuzzer -max_total_time=60 "${CORPUS_DIR}" &
+  bazel-bin/"${TARGET_BINARY:2}"_with_libfuzzer -max_total_time=60 -artifact_prefix=${TMPDIR} "${CORPUS_DIR}" &
   # Add pid to pids list
   PIDS="${PIDS} $!"
 done

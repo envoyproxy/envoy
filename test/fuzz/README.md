@@ -158,7 +158,15 @@ to provide fuzzers some interesting starting points for invalid inputs.
 ## Coverage reports
 
 Coverage reports, where individual lines are annotated with fuzzing hit counts, are a useful way to
-understand the scope and efficacy of the Envoy fuzzers. You can generate such reports from the
+understand the scope and efficacy of the Envoy fuzzers. You can generate fuzz coverage reports both locally, and using the OSS-Fuzz infrastructure.
+
+To generate fuzz coverage reports locally (see [Coverage builds](bazel/README.md), run
+```
+FUZZ_COVERAGE=true test/run_envoy_bazel_coverage.sh
+```
+This generates a coverage report after running the fuzz targets for one minute against the fuzzing engine libfuzzer and using the checked-in corpus as an initial seed.
+
+Otherwise, you can generate reports from the
 ClusterFuzz corpus following the general ClusterFuzz [instructions for profiling
 setup](https://github.com/google/oss-fuzz/blob/master/docs/code_coverage.md).
 

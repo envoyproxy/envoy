@@ -62,6 +62,23 @@ jobs:
            path: /build/envoy/generated
            destination: /
 
+   fuzz_coverage:
+     executor: ubuntu-build
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run:
+           command:
+             ci/do_circle_ci.sh bazel.fuzz_coverage
+           no_output_timeout: 60m
+       - persist_to_workspace:
+           root: /build/envoy/generated
+           paths:
+             - coverage
+       - store_artifacts:
+           path: /build/envoy/generated
+           destination: /
+
    coverage_publish:
      docker:
        - image: google/cloud-sdk
