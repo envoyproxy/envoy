@@ -6909,6 +6909,75 @@ virtual_hosts:
   EXPECT_TRUE(internal_redirect_policy.isCrossSchemeRedirectAllowed());
 }
 
+TEST_F(RouteConfigurationV2, InternalRedirctPolicyDropsInvalidRedirectCode) {
+  const std::string InternalRedirectEnabled = R"EOF(
+name: InternalRedirectEnabled
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy:
+            redirect_response_codes: [301, 302, 303, 304]
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(InternalRedirectEnabled),
+                        factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_TRUE(internal_redirect_policy.enabled());
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(301)));
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(302)));
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(303)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(304)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(305)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(306)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(307)));
+}
+
+TEST_F(RouteConfigurationV2, InternalRedirctPolicyDropsInvalidRedirectCodeCauseEmptySet) {
+  const std::string InternalRedirectEnabled = R"EOF(
+name: InternalRedirectEnabled
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy:
+            redirect_response_codes: [200, 304]
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(InternalRedirectEnabled),
+                        factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_TRUE(internal_redirect_policy.enabled());
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(302)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(304)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(200)));
+}
+
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {
 public:
   PerFilterConfigsTest()

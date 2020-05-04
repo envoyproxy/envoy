@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/router:internal_redirect_interface",
         "//include/envoy/stream_info:filter_state_interface",
+        "//source/extensions/internal_redirect:well_known_names",
     ],
 )
 

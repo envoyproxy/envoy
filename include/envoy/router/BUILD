@@ -116,5 +116,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:minimal_logger_lib",
     ],
 )

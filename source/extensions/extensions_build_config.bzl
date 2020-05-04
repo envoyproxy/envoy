@@ -173,6 +173,7 @@ EXTENSIONS = {
 
     "envoy.filters.http.cache.simple_http_cache":       "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
 
+    #
     # Internal redirect predicates
     #
     "envoy.internal_redirect_predicates.allow_listed_routes": "//source/extensions/internal_redirect/allow_listed_routes:config",
