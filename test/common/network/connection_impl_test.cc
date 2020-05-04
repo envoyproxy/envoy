@@ -90,7 +90,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
                      Network::Test::createRawBufferSocket(), stream_info, false),
-      ".*assert failure: SOCKET_VALID\\(ioHandle\\(\\)\\.fd\\(\\)\\).*");
+      ".*assert failure: SOCKET_VALID\\(ConnectionImpl::ioHandle\\(\\)\\.fd\\(\\)\\).*");
 }
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -188,7 +188,7 @@ protected:
     Event::FileReadyCb* file_ready_cb_;
   };
 
-  ConnectionMocks createConnectionMocks() {
+  ConnectionMocks createConnectionMocks(bool create_timer = true) {
     auto dispatcher = std::make_unique<NiceMock<Event::MockDispatcher>>();
     EXPECT_CALL(dispatcher->buffer_factory_, create_(_, _))
         .WillRepeatedly(Invoke([](std::function<void()> below_low,
@@ -198,9 +198,12 @@ protected:
           return new Buffer::WatermarkBuffer(below_low, above_high);
         }));
 
-    // This timer will be returned (transferring ownership) to the ConnectionImpl when createTimer()
-    // is called to allocate the delayed close timer.
-    Event::MockTimer* timer = new Event::MockTimer(dispatcher.get());
+    Event::MockTimer* timer = nullptr;
+    if (create_timer) {
+      // This timer will be returned (transferring ownership) to the ConnectionImpl when
+      // createTimer() is called to allocate the delayed close timer.
+      timer = new Event::MockTimer(dispatcher.get());
+    }
 
     NiceMock<Event::MockFileEvent>* file_event = new NiceMock<Event::MockFileEvent>;
     EXPECT_CALL(*dispatcher, createFileEvent_(0, _, _, _))
@@ -482,24 +485,41 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
 // Ensure the new counter logic in ReadDisable avoids tripping asserts in ReadDisable guarding
 // against actual enabling twice in a row.
 TEST_P(ConnectionImplTest, ReadDisable) {
-  setUpBasicConnection();
+  ConnectionMocks mocks = createConnectionMocks(false);
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  auto connection = std::make_unique<Network::ConnectionImpl>(
+      *mocks.dispatcher_,
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      std::move(mocks.transport_socket_), stream_info_, true);
 
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(false);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_));
+  connection->readDisable(true);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_));
+  connection->readDisable(false);
 
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(false);
-  client_connection_->readDisable(false);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_));
+  connection->readDisable(true);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
+  connection->readDisable(true);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
+  connection->readDisable(false);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_));
+  connection->readDisable(false);
 
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(false);
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(false);
-  client_connection_->readDisable(false);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_));
+  connection->readDisable(true);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
+  connection->readDisable(true);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
+  connection->readDisable(false);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
+  connection->readDisable(true);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
+  connection->readDisable(false);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_));
+  connection->readDisable(false);
 
-  disconnect(false);
+  connection->close(ConnectionCloseType::NoFlush);
 }
 
 // The HTTP/1 codec handles pipelined connections by relying on readDisable(false) resulting in the
