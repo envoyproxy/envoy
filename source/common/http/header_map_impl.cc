@@ -87,6 +87,15 @@ void HeaderString::append(const char* data, uint32_t data_size) {
   get_in_vec(buffer_).insert(get_in_vec(buffer_).end(), data, data + data_size);
 }
 
+void HeaderString::rtrim() {
+  ASSERT(type() == Type::Inline);
+  absl::string_view original = getStringView();
+  absl::string_view rtrimmed = StringUtil::rtrim(original);
+  if (original.size() != rtrimmed.size()) {
+    get_in_vec(buffer_).resize(rtrimmed.size());
+  }
+}
+
 absl::string_view HeaderString::getStringView() const {
   if (type() == Type::Reference) {
     return get_str_view(buffer_);
