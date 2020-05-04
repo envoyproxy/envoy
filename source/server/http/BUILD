@@ -86,10 +86,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "handler_ctx_lib",
+    hdrs = ["handler_ctx.h"],
+    deps = [
+        "//include/envoy/server:instance_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "stats_handler_lib",
     srcs = ["stats_handler.cc"],
     hdrs = ["stats_handler.h"],
     deps = [
+        ":handler_ctx_lib",
         ":prometheus_stats_lib",
         ":utils_lib",
         "//include/envoy/http:codes_interface",

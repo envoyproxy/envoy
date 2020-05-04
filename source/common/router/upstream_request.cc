@@ -35,6 +35,7 @@
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -48,7 +49,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
-      create_per_try_timeout_on_request_complete_(false),
+      create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()) {
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
@@ -127,6 +128,12 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   }
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   stream_info_.response_code_ = static_cast<uint32_t>(response_code);
+
+  if (paused_for_connect_ && response_code == 200) {
+    encodeBodyAndTrailers();
+    paused_for_connect_ = false;
+  }
+
   parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
 }
 
@@ -177,7 +184,7 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!encode_complete_);
   encode_complete_ = end_stream;
 
-  if (!upstream_) {
+  if (!upstream_ || paused_for_connect_) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks(), data.length());
     if (!buffered_request_body_) {
       buffered_request_body_ = std::make_unique<Buffer::WatermarkBuffer>(
@@ -357,6 +364,7 @@ void UpstreamRequest::onPoolReady(
   parent_.callbacks()->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
 
   calling_encode_headers_ = true;
+  auto* headers = parent_.downstreamHeaders();
   if (parent_.routeEntry()->autoHostRewrite() && !host->hostname().empty()) {
     parent_.downstreamHeaders()->setHost(host->hostname());
   }
@@ -367,13 +375,22 @@ void UpstreamRequest::onPoolReady(
 
   upstream_timing_.onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
 
-  const bool end_stream = !buffered_request_body_ && encode_complete_ && !encode_trailers_;
-  // If end_stream is set in headers, and there are metadata to send, delays end_stream. The case
-  // only happens when decoding headers filters return ContinueAndEndStream.
-  const bool delay_headers_end_stream = end_stream && !downstream_metadata_map_vector_.empty();
-  upstream_->encodeHeaders(*parent_.downstreamHeaders(), end_stream && !delay_headers_end_stream);
+  // Make sure that when we are forwarding CONNECT payload we do not do so until
+  // the upstream has accepted the CONNECT request.
+  if (conn_pool_->protocol().has_value() && headers->Method() &&
+      headers->Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect) {
+    paused_for_connect_ = true;
+  }
+
+  upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());
   calling_encode_headers_ = false;
 
+  if (!paused_for_connect_) {
+    encodeBodyAndTrailers();
+  }
+}
+
+void UpstreamRequest::encodeBodyAndTrailers() {
   // It is possible to get reset in the middle of an encodeHeaders() call. This happens for
   // example in the HTTP/2 codec if the frame cannot be encoded for some reason. This should never
   // happen but it's unclear if we have covered all cases so protect against it and test for it.
@@ -388,7 +405,7 @@ void UpstreamRequest::onPoolReady(
                        downstream_metadata_map_vector_);
       upstream_->encodeMetadata(downstream_metadata_map_vector_);
       downstream_metadata_map_vector_.clear();
-      if (delay_headers_end_stream) {
+      if (shouldSendEndStream()) {
         Buffer::OwnedImpl empty_data("");
         upstream_->encodeData(empty_data, true);
       }
@@ -538,9 +555,19 @@ void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void TcpUpstream::encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) {
-  if (end_stream) {
-    Buffer::OwnedImpl data;
-    upstream_conn_data_->connection().write(data, true);
+  // Headers should only happen once, so use this opportunity to add the proxy
+  // proto header, if configured.
+  ASSERT(upstream_request_->parent().routeEntry()->connectConfig().has_value());
+  Buffer::OwnedImpl data;
+  auto& connect_config = upstream_request_->parent().routeEntry()->connectConfig().value();
+  if (connect_config.has_proxy_protocol_config()) {
+    const Network::Connection& connection = *upstream_request_->parent().callbacks()->connection();
+    Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
+        connect_config.proxy_protocol_config(), connection, data);
+  }
+
+  if (data.length() != 0 || end_stream) {
+    upstream_conn_data_->connection().write(data, end_stream);
   }
 }
 
