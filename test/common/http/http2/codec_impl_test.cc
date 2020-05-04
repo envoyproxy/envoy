@@ -809,7 +809,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   request_encoder_->encodeData(last_byte, false);
   EXPECT_EQ(initial_stream_window + 1, client_->getStream(1)->pending_send_data_.length());
 
-  // If we go over 2x the limit, the overflow callback should fire, and stas updated.
+  // If we go over 2x the limit, the overflow callback should fire, and stats updated.
   EXPECT_EQ(0, stats_store_.counter("http2.send_buffer_overflow").value());
   EXPECT_CALL(callbacks, onAboveWriteBufferOverflowWatermark());
   Buffer::OwnedImpl more_long_data2(std::string(initial_stream_window, 'a'));
@@ -950,7 +950,7 @@ TEST_P(Http2CodecImplFlowControlTest, FlowControlPendingRecvData) {
   Buffer::OwnedImpl data(std::string(40, 'a'));
   request_encoder_->encodeData(data, false);
 
-  // If we go over 2x the limit, the overflow callback should fire, and stas updated.
+  // If we go over 2x the limit, the overflow callback should fire, and stats updated.
   EXPECT_EQ(0, stats_store_.counter("http2.recv_buffer_overflow").value());
   EXPECT_CALL(request_decoder_, decodeData(_, false));
   Buffer::OwnedImpl more_data(std::string(41, 'a'));
