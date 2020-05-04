@@ -69,8 +69,8 @@ following are the command line options that Envoy supports.
 .. option:: --concurrency <integer>
 
   *(optional)* The number of :ref:`worker threads <arch_overview_threading>` to run. If not
-  specified defaults to the number of hardware threads on the machine. Specifically, the actual 
-  number of worker thread is 1 when you set the value 0.
+  specified defaults to the number of hardware threads on the machine. If set to zero, Envoy will 
+  still run one worker thread.
 
 .. option:: -l <string>, --log-level <string>
 
