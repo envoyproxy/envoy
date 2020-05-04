@@ -110,8 +110,11 @@ workflows:
       - go_control_plane_mirror
       - filter_example_mirror
       - coverage
+      - fuzz_coverage
       - coverage_publish:
-          requires: [coverage]
+          requires:
+            - coverage
+            - fuzz_coverage
       - docs:
           filters:
             tags:
