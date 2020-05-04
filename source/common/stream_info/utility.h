@@ -40,6 +40,7 @@ private:
   const static std::string STREAM_IDLE_TIMEOUT;
   const static std::string INVALID_ENVOY_REQUEST_HEADERS;
   const static std::string DOWNSTREAM_PROTOCOL_ERROR;
+  const static std::string UPSTREAM_MAX_STREAM_DURATION_REACHED;
 };
 
 /**
