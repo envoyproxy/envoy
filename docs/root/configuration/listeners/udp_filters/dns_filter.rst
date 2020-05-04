@@ -13,14 +13,15 @@ DNS Filter
 Overview
 --------
 
-The DNS filter allows Envoy to resolve forward DNS queries as an authoritative server for all
+The DNS filter allows Envoy to resolve forward DNS queries as an authoritative server for any
 configured domains. The filter's configuration specifies the names and addresses for which Envoy
 will answer as well as the configuration needed to send queries externally for unknown domains.
 
 The filter supports local and external DNS resolution. If a lookup for a name does not match a
 statically configured domain, or a provisioned cluster name, Envoy can refer the query to an
 external resolver for an answer. Users have the option of specifying the DNS servers that Envoy
-will use for external resolution.
+will use for external resolution. Users can disable external DNS resolution by omitting the
+client configuration object.
 
 The filter supports :ref:`per-filter configuration
 <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`.
@@ -74,15 +75,9 @@ matching records for the query type, each configured address is returned. This i
 AAAA records. Only A and AAAA records are supported. If the filter parses other queries for other
 record types, the filter immediately responds indicating that the query is not supported.
 
-To disable external resolution, one can omit the `client_config` section of the config. Envoy interprets
-this configuration to mean that name resolution should be done only from the data appearing in the
-`server_config` section. A query for a name not appearing in the DNS table will receive a "No Answer"
-DNS response.
-
-The filter can also consume its configuration from an external dns table. The same configuration
-that appears in the static configuration can be stored in a Proto3-conformant JSON file and
-referenced in the configuration using the :ref:`external_dns_table DataSource <envoy_api_msg_core.DataSource>`
-directive:
+The filter can also consume its domain configuration from an external dns table. The same entities
+appearing in the static configuration can be stored as JSON or YAML in a separate file and referenced
+using the :ref:`external_dns_table DataSource <envoy_api_msg_core.DataSource>` directive:
 
 Example External DnsTable Configuration
 ---------------------------------------
@@ -103,30 +98,32 @@ In the file, the table can be defined as follows:
 DnsTable JSON Configuration
 ---------------------------
 
-.. code-block:: text
+.. code-block:: json
 
-  known_suffixes: [
-    { suffix: "suffix1.com" },
-    { suffix: "suffix2.com" }
-  ],
-  virtual_domains: [
-    {
-      name: "www.suffix1.com",
-      endpoint: {
-        address_list: {
-          address: [ "10.0.0.1", "10.0.0.2" ]
+  {
+    "known_suffixes": [
+      { "suffix": "suffix1.com" },
+      { "suffix": "suffix2.com" }
+    ],
+    "virtual_domains": [
+      {
+        "name": "www.suffix1.com",
+        "endpoint": {
+          "address_list": {
+            "address": [ "10.0.0.1", "10.0.0.2" ]
+          }
+        }
+      },
+      {
+        "name": "www.suffix2.com",
+        "endpoint": {
+          "address_list": {
+            "address": [ "2001:8a:c1::2800:7" ]
+          }
         }
       }
-    },
-    {
-      name: "www.suffix2.com",
-      endpoint: {
-        address_list: {
-          address: [ "2001:8a:c1::2800:7" ]
-        }
-      }
-    }
-  ]
+    ]
+  }
 
 
 By utilizing this configuration, the DNS responses can be configured separately from the Envoy

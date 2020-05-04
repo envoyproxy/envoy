@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_package",
 )
 load(
@@ -34,5 +35,17 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "@envoy_api//envoy/extensions/filters/udp/dns_filter/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "dns_filter_fuzz_test",
+    srcs = ["dns_filter_fuzz_test.cc"],
+    corpus = "dns_filter_corpus",
+    deps = [
+        "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
+        "//test/fuzz:utility_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
     ],
 )
