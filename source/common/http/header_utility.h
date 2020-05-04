@@ -137,7 +137,7 @@ public:
   requestHeadersValid(const RequestHeaderMap& headers);
 
   /**
-   * @brief Remove port part from Host/authority header if it is equal to provided port
+   * @brief Remove the port part from host/authority header if it is equal to provided port
    */
   static void stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port);
 };

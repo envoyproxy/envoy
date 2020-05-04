@@ -425,7 +425,7 @@ public:
   virtual bool shouldMergeSlashes() const PURE;
 
   /**
-   * @return if the HttpConnectionManager should remove ports from Host/authority header
+   * @return if the HttpConnectionManager should remove the port from host/authority header
    */
   virtual bool shouldStripMatchingPort() const PURE;
 
