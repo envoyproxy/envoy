@@ -4565,7 +4565,7 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
 
   redirect_headers_->setLocation("http://www.foo.com/some/path");
 
-  auto mock_predicate = std::make_shared<MockInternalRedirectPredicate>();
+  auto mock_predicate = std::make_shared<NiceMock<MockInternalRedirectPredicate>>();
 
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
