@@ -4,6 +4,7 @@ package envoy.config.bootstrap.v3;
 
 import "envoy/config/cluster/v3/cluster.proto";
 import "envoy/config/core/v3/address.proto";
+import "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/event_service_config.proto";
@@ -13,12 +14,10 @@ import "envoy/config/metrics/v3/stats.proto";
 import "envoy/config/overload/v3/overload.proto";
 import "envoy/config/trace/v3/http_tracer.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
-
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
-
-import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -145,14 +144,40 @@ message Bootstrap {
   Admin admin = 12;
 
   // Optional overload manager configuration.
-  overload.v3.OverloadManager overload_manager = 15;
+  overload.v3.OverloadManager overload_manager = 15
+      [(udpa.annotations.security) = {
+        configure_for_untrusted_downstream: true
+        configure_for_untrusted_upstream: true
+        example_configs {
+          example:
+            "  refresh_interval: 0.25s\n"
+            "  resource_monitors:\n"
+            "  - name: envoy.resource_monitors.fixed_heap\n"
+            "    typed_config:\n"
+            "      '@type': type.googleapis.com/envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig\n"
+            "      # TODO: Tune for your system.\n"
+            "      max_heap_size_bytes: 2147483648 # 2 GiB\n"
+            "  actions:\n"
+            "  - name: envoy.overload_actions.shrink_heap\n"
+            "    triggers:\n"
+            "    - name: envoy.resource_monitors.fixed_heap\n"
+            "      threshold:\n"
+            "        value: 0.95\n"
+            "  - name: envoy.overload_actions.stop_accepting_requests\n"
+            "    triggers:\n"
+            "    - name: envoy.resource_monitors.fixed_heap\n"
+            "      threshold:\n"
+            "        value: 0.98\n"
+        }
+      }];
 
-  // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
-  // Note that this records a value for each iteration of the event loop on every thread. This
-  // should normally be minimal overhead, but when using
-  // :ref:`statsd <envoy_api_msg_config.metrics.v3.StatsdSink>`, it will send each observed value
-  // over the wire individually because the statsd protocol doesn't have any way to represent a
-  // histogram summary. Be aware that this can be a very large volume of data.
+  // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults
+  // to false. Note that this records a value for each iteration of the event
+  // loop on every thread. This should normally be minimal overhead, but when
+  // using :ref:`statsd <envoy_api_msg_config.metrics.v3.StatsdSink>`, it will
+  // send each observed value over the wire individually because the statsd
+  // protocol doesn't have any way to represent a histogram summary. Be aware
+  // that this can be a very large volume of data.
   bool enable_dispatcher_stats = 16;
 
   // Optional string which will be used in lieu of x-envoy in prefixing headers.

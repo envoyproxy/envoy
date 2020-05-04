@@ -11,10 +11,15 @@ import pathlib
 import re
 import string
 
+import yaml
+
+from google.protobuf import json_format
+
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
 
+from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2
 from validate import validate_pb2
 
@@ -52,29 +57,28 @@ This extension may be referenced by the qualified name *$extension*
 # envoy_cc_extension build macro) to human readable text for extension docs.
 EXTENSION_SECURITY_POSTURES = {
     'robust_to_untrusted_downstream':
-        'This extension is intended to be robust against untrusted downstream traffic. It '
-        'assumes that the upstream is trusted.',
+        'This extension is intended to be robust against untrusted downstream '
+        'traffic. It assumes that the upstream is trusted.',
     'robust_to_untrusted_downstream_and_upstream':
-        'This extension is intended to be robust against both untrusted downstream and '
-        'upstream traffic.',
+        'This extension is intended to be robust against both untrusted '
+        'downstream and upstream traffic.',
     'requires_trusted_downstream_and_upstream':
         'This extension is not hardened and should only be used in deployments'
         ' where both the downstream and upstream are trusted.',
-    'unknown':
-        'This extension has an unknown security posture and should only be '
-        'used in deployments where both the downstream and upstream are '
-        'trusted.',
-    'data_plane_agnostic':
-        'This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.',
+    'unknown': 'This extension has an unknown security posture and should only be '
+               'used in deployments where both the downstream and upstream are '
+               'trusted.',
+    'data_plane_agnostic': 'This extension does not operate on the data plane and hence is '
+                           'intended to be robust against untrusted traffic.',
 }
 
 # A map from the extension status value to a human readable text for extension
 # docs.
 EXTENSION_STATUS_VALUES = {
-    'alpha':
-        'This extension is functional but has not had substantial production burn time, use only with this caveat.',
-    'wip':
-        'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
+    'alpha': 'This extension is functional but has not had substantial production '
+             'burn time, use only with this caveat.',
+    'wip': 'This extension is work-in-progress. Functionality is incomplete and '
+           'it is not intended for production use.',
 }
 
 
@@ -388,6 +392,36 @@ def FormatAnchor(label):
   return '.. _%s:\n\n' % label
 
 
+def FormatSecurityOption(security_option, field, type_context):
+  sections = []
+
+  if security_option.configure_for_untrusted_downstream:
+    sections.append(
+        Indent(4, 'This field should be configured in the presence of untrusted *downstreams*'))
+  if security_option.configure_for_untrusted_upstream:
+    sections.append(
+        Indent(4, 'This field should be configured in the presence of untrusted *upstreams*'))
+
+  formatted_examples = []
+  for example_config in security_option.example_configs:
+    # Verify example parses
+    target_msg = type_context.message_factory[field.type_name[1:]]()
+    example_yaml = example_config.example
+    example_json = json.dumps(yaml.load(example_yaml, Loader=yaml.CLoader))
+    try:
+      json_format.Parse(example_json, target_msg, descriptor_pool=type_context.descriptor_pool)
+    except json_format.ParseError as e:
+      raise ProtodocError(
+          'Unable to parse example config for %s: %s for %s (available message types: %s)' %
+          (type_context.name, e, example_json, type_context.message_factory.keys()))
+
+    sections.append(
+        Indent(4, 'Example configuration for untrusted environments:\n\n') +
+        Indent(4, '.. code-block:: yaml\n\n') +
+        '\n'.join(IndentLines(6, example_config.example.split('\n'))))
+  return '.. note::\n' + '\n\n'.join(sections)
+
+
 def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
   """Format a FieldDescriptorProto as RST definition list item.
 
@@ -441,10 +475,17 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
   else:
     formatted_oneof_comment = ''
 
+  # If there is a udpa.annotations.security option, include it after the comment.
+  if field.options.HasExtension(security_pb2.security):
+    formatted_security_option = FormatSecurityOption(
+        field.options.Extensions[security_pb2.security], field, type_context)
+  else:
+    formatted_security_option = ''
+
   comment = '(%s) ' % ', '.join([FormatFieldType(type_context, field)] +
                                 field_annotations) + formatted_leading_comment
-  return anchor + field.name + '\n' + MapLines(functools.partial(Indent, 2),
-                                               comment + formatted_oneof_comment)
+  return anchor + field.name + '\n' + MapLines(functools.partial(
+      Indent, 2), comment + formatted_oneof_comment) + formatted_security_option
 
 
 def FormatMessageAsDefinitionList(type_context, msg):
@@ -524,6 +565,9 @@ class RstFormatVisitor(visitor.Visitor):
 
   See visitor.Visitor for visitor method docs comments.
   """
+
+  def VisitDescriptorDatabase(self, descriptor_database):
+    self._descriptor_database = descriptor_database
 
   def VisitEnum(self, enum_proto, type_context):
     normal_enum_type = NormalizeTypeContextName(type_context.name)

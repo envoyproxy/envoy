@@ -62,18 +62,21 @@ def TraverseMessage(type_context, msg_proto, visitor):
   return visitor.VisitMessage(msg_proto, type_context, nested_msgs, nested_enums)
 
 
-def TraverseFile(file_proto, visitor):
+def TraverseFile(file_proto, visitor, descriptor_pool=None, message_factory=None):
   """Traverse a proto file definition.
 
   Args:
     file_proto: FileDescriptorProto for file.
     visitor: visitor.Visitor defining the business logic of the plugin.
+    descriptor_pool: google.protobuf.descriptor_pool.DescriptorPool
+    message_factory: google.protobuf.message_factory.MessageFactory
 
   Returns:
     Plugin specific output.
   """
   source_code_info = type_context.SourceCodeInfo(file_proto.name, file_proto.source_code_info)
-  package_type_context = type_context.TypeContext(source_code_info, file_proto.package)
+  package_type_context = type_context.TypeContext(source_code_info, descriptor_pool,
+                                                  message_factory, file_proto.package)
   services = [
       TraverseService(package_type_context.ExtendService(index, service.name), service, visitor)
       for index, service in enumerate(file_proto.service)

@@ -10,6 +10,7 @@ api_proto_package(
         "//envoy/config/bootstrap/v2:pkg",
         "//envoy/config/cluster/v3:pkg",
         "//envoy/config/core/v3:pkg",
+        "//envoy/config/resource_monitor/fixed_heap/v2alpha:pkg",
         "//envoy/config/listener/v3:pkg",
         "//envoy/config/metrics/v3:pkg",
         "//envoy/config/overload/v3:pkg",

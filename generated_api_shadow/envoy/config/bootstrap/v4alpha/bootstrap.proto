@@ -19,6 +19,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -43,16 +44,16 @@ message Bootstrap {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v3.Bootstrap.StaticResources";
 
-    // Static :ref:`Listeners <envoy_api_msg_config.listener.v4alpha.Listener>`. These listeners are
-    // available regardless of LDS configuration.
+    // Static :ref:`Listeners <envoy_api_msg_config.listener.v4alpha.Listener>`.
+    // These listeners are available regardless of LDS configuration.
     repeated listener.v4alpha.Listener listeners = 1;
 
     // If a network based configuration source is specified for :ref:`cds_config
-    // <envoy_api_field_config.bootstrap.v4alpha.Bootstrap.DynamicResources.cds_config>`, it's necessary
-    // to have some initial cluster definitions available to allow Envoy to know
-    // how to speak to the management server. These cluster definitions may not
-    // use :ref:`EDS <arch_overview_dynamic_config_eds>` (i.e. they should be static
-    // IP or DNS-based).
+    // <envoy_api_field_config.bootstrap.v4alpha.Bootstrap.DynamicResources.cds_config>`,
+    // it's necessary to have some initial cluster definitions available to
+    // allow Envoy to know how to speak to the management server. These cluster
+    // definitions may not use :ref:`EDS <arch_overview_dynamic_config_eds>`
+    // (i.e. they should be static IP or DNS-based).
     repeated cluster.v4alpha.Cluster clusters = 2;
 
     // These static secrets can be used by :ref:`SdsSecretConfig
@@ -66,22 +67,24 @@ message Bootstrap {
 
     reserved 4;
 
-    // All :ref:`Listeners <envoy_api_msg_config.listener.v4alpha.Listener>` are provided by a single
-    // :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
+    // All :ref:`Listeners <envoy_api_msg_config.listener.v4alpha.Listener>` are
+    // provided by a single :ref:`LDS <arch_overview_dynamic_config_lds>`
+    // configuration source.
     core.v4alpha.ConfigSource lds_config = 1;
 
-    // All post-bootstrap :ref:`Cluster <envoy_api_msg_config.cluster.v4alpha.Cluster>` definitions are
-    // provided by a single :ref:`CDS <arch_overview_dynamic_config_cds>`
-    // configuration source.
+    // All post-bootstrap :ref:`Cluster
+    // <envoy_api_msg_config.cluster.v4alpha.Cluster>` definitions are provided by a
+    // single :ref:`CDS <arch_overview_dynamic_config_cds>` configuration
+    // source.
     core.v4alpha.ConfigSource cds_config = 2;
 
     // A single :ref:`ADS <config_overview_ads>` source may be optionally
     // specified. This must have :ref:`api_type
     // <envoy_api_field_config.core.v4alpha.ApiConfigSource.api_type>` :ref:`GRPC
     // <envoy_api_enum_value_config.core.v4alpha.ApiConfigSource.ApiType.GRPC>`. Only
-    // :ref:`ConfigSources <envoy_api_msg_config.core.v4alpha.ConfigSource>` that have
-    // the :ref:`ads <envoy_api_field_config.core.v4alpha.ConfigSource.ads>` field set will be
-    // streamed on the ADS channel.
+    // :ref:`ConfigSources <envoy_api_msg_config.core.v4alpha.ConfigSource>` that
+    // have the :ref:`ads <envoy_api_field_config.core.v4alpha.ConfigSource.ads>`
+    // field set will be streamed on the ADS channel.
     core.v4alpha.ApiConfigSource ads_config = 3;
   }
 
@@ -104,7 +107,8 @@ message Bootstrap {
   ClusterManager cluster_manager = 4;
 
   // Health discovery service config option.
-  // (:ref:`core.ApiConfigSource <envoy_api_msg_config.core.v4alpha.ApiConfigSource>`)
+  // (:ref:`core.ApiConfigSource
+  // <envoy_api_msg_config.core.v4alpha.ApiConfigSource>`)
   core.v4alpha.ApiConfigSource hds_config = 14;
 
   // Optional file system path to search for startup flag files.
@@ -132,7 +136,8 @@ message Bootstrap {
   // Configuration for an external tracing provider.
   //
   // .. attention::
-  //  This field has been deprecated in favor of :ref:`HttpConnectionManager.Tracing.provider
+  //  This field has been deprecated in favor of
+  //  :ref:`HttpConnectionManager.Tracing.provider
   //  <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.Tracing.provider>`.
   trace.v4alpha.Tracing hidden_envoy_deprecated_tracing = 9 [deprecated = true];
 
@@ -147,34 +152,39 @@ message Bootstrap {
   // Optional overload manager configuration.
   overload.v3.OverloadManager overload_manager = 15;
 
-  // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
-  // Note that this records a value for each iteration of the event loop on every thread. This
-  // should normally be minimal overhead, but when using
-  // :ref:`statsd <envoy_api_msg_config.metrics.v4alpha.StatsdSink>`, it will send each observed value
-  // over the wire individually because the statsd protocol doesn't have any way to represent a
-  // histogram summary. Be aware that this can be a very large volume of data.
+  // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults
+  // to false. Note that this records a value for each iteration of the event
+  // loop on every thread. This should normally be minimal overhead, but when
+  // using :ref:`statsd <envoy_api_msg_config.metrics.v4alpha.StatsdSink>`, it will
+  // send each observed value over the wire individually because the statsd
+  // protocol doesn't have any way to represent a histogram summary. Be aware
+  // that this can be a very large volume of data.
   bool enable_dispatcher_stats = 16;
 
   // Optional string which will be used in lieu of x-envoy in prefixing headers.
   //
-  // For example, if this string is present and set to X-Foo, then x-envoy-retry-on will be
-  // transformed into x-foo-retry-on etc.
+  // For example, if this string is present and set to X-Foo, then
+  // x-envoy-retry-on will be transformed into x-foo-retry-on etc.
   //
-  // Note this applies to the headers Envoy will generate, the headers Envoy will sanitize, and the
-  // headers Envoy will trust for core code and core extensions only. Be VERY careful making
-  // changes to this string, especially in multi-layer Envoy deployments or deployments using
-  // extensions which are not upstream.
+  // Note this applies to the headers Envoy will generate, the headers Envoy
+  // will sanitize, and the headers Envoy will trust for core code and core
+  // extensions only. Be VERY careful making changes to this string, especially
+  // in multi-layer Envoy deployments or deployments using extensions which are
+  // not upstream.
   string header_prefix = 18;
 
-  // Optional proxy version which will be used to set the value of :ref:`server.version statistic
-  // <server_statistics>` if specified. Envoy will not process this value, it will be sent as is to
-  // :ref:`stats sinks <envoy_api_msg_config.metrics.v4alpha.StatsSink>`.
+  // Optional proxy version which will be used to set the value of
+  // :ref:`server.version statistic <server_statistics>` if specified. Envoy
+  // will not process this value, it will be sent as is to :ref:`stats sinks
+  // <envoy_api_msg_config.metrics.v4alpha.StatsSink>`.
   google.protobuf.UInt64Value stats_server_version_override = 19;
 
   // Always use TCP queries instead of UDP queries for DNS lookups.
   // This may be overridden on a per-cluster basis in cds_config,
-  // when :ref:`dns_resolvers <envoy_api_field_config.cluster.v4alpha.Cluster.dns_resolvers>` and
-  // :ref:`use_tcp_for_dns_lookups <envoy_api_field_config.cluster.v4alpha.Cluster.use_tcp_for_dns_lookups>` are
+  // when :ref:`dns_resolvers
+  // <envoy_api_field_config.cluster.v4alpha.Cluster.dns_resolvers>` and
+  // :ref:`use_tcp_for_dns_lookups
+  // <envoy_api_field_config.cluster.v4alpha.Cluster.use_tcp_for_dns_lookups>` are
   // specified.
   bool use_tcp_for_dns_lookups = 20;
 }
@@ -224,18 +234,20 @@ message ClusterManager {
   // this configuration). In order to enable :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
   // If *local_cluster_name* is defined then :ref:`clusters
-  // <envoy_api_msg_config.cluster.v4alpha.Cluster>` must be defined in the :ref:`Bootstrap
-  // static cluster resources
-  // <envoy_api_field_config.bootstrap.v4alpha.Bootstrap.StaticResources.clusters>`. This is unrelated to
-  // the :option:`--service-cluster` option which does not `affect zone aware
-  // routing <https://github.com/envoyproxy/envoy/issues/774>`_.
+  // <envoy_api_msg_config.cluster.v4alpha.Cluster>` must be defined in the
+  // :ref:`Bootstrap static cluster resources
+  // <envoy_api_field_config.bootstrap.v4alpha.Bootstrap.StaticResources.clusters>`.
+  // This is unrelated to the :option:`--service-cluster` option which does not
+  // `affect zone aware routing
+  // <https://github.com/envoyproxy/envoy/issues/774>`_.
   string local_cluster_name = 1;
 
   // Optional global configuration for outlier detection.
   OutlierDetection outlier_detection = 2;
 
   // Optional configuration used to bind newly established upstream connections.
-  // This may be overridden on a per-cluster basis by upstream_bind_config in the cds_config.
+  // This may be overridden on a per-cluster basis by upstream_bind_config in
+  // the cds_config.
   core.v4alpha.BindConfig upstream_bind_config = 3;
 
   // A management server endpoint to stream load stats to via
@@ -247,7 +259,8 @@ message ClusterManager {
 
 // Envoy process watchdog configuration. When configured, this monitors for
 // nonresponsive threads and kills the process after the configured thresholds.
-// See the :ref:`watchdog documentation <operations_performance_watchdog>` for more information.
+// See the :ref:`watchdog documentation <operations_performance_watchdog>` for
+// more information.
 message Watchdog {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v3.Watchdog";
 

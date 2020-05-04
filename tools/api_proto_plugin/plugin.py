@@ -9,6 +9,8 @@ import sys
 
 from tools.api_proto_plugin import traverse
 
+from google.protobuf.descriptor_pool import DescriptorPool
+from google.protobuf.message_factory import GetMessages
 from google.protobuf.compiler import plugin_pb2
 
 OutputDescriptor = namedtuple(
@@ -52,6 +54,11 @@ def Plugin(output_descriptors):
   response = plugin_pb2.CodeGeneratorResponse()
   cprofile_enabled = os.getenv('CPROFILE_ENABLED')
 
+  descriptor_pool = DescriptorPool()
+  for pf in request.proto_file:
+    descriptor_pool.Add(pf)
+  message_factory = GetMessages(request.proto_file)
+
   # We use request.file_to_generate rather than request.file_proto here since we
   # are invoked inside a Bazel aspect, each node in the DAG will be visited once
   # by the aspect and we only want to generate docs for the current node.
@@ -67,14 +74,17 @@ def Plugin(output_descriptors):
       # Don't run API proto plugins on things like WKT types etc.
       if not file_proto.package.startswith('envoy.'):
         continue
-      if request.HasField("parameter") and od.want_params:
+      if request.HasField('parameter') and od.want_params:
         params = dict(param.split('=') for param in request.parameter.split(','))
         xformed_proto = od.xform(file_proto, params)
         visitor_factory = od.visitor_factory(params)
       else:
         xformed_proto = od.xform(file_proto)
         visitor_factory = od.visitor_factory()
-      f.content = traverse.TraverseFile(xformed_proto, visitor_factory) if xformed_proto else ''
+      f.content = traverse.TraverseFile(xformed_proto,
+                                        visitor_factory,
+                                        descriptor_pool=descriptor_pool,
+                                        message_factory=message_factory) if xformed_proto else ''
     if cprofile_enabled:
       pr.disable()
       stats_stream = io.StringIO()
@@ -87,6 +97,6 @@ def Plugin(output_descriptors):
     # Also include the original FileDescriptorProto as text proto, this is
     # useful when debugging.
     descriptor_file = response.file.add()
-    descriptor_file.name = file_proto.name + ".descriptor.proto"
+    descriptor_file.name = file_proto.name + '.descriptor.proto'
     descriptor_file.content = str(file_proto)
   sys.stdout.buffer.write(response.SerializeToString())

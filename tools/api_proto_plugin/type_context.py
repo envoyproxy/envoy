@@ -131,7 +131,7 @@ class TypeContext(object):
   nested messages/enums.
   """
 
-  def __init__(self, source_code_info, name):
+  def __init__(self, source_code_info, descriptor_pool, message_factory, name):
     # SourceCodeInfo as per
     # https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto.
     self.source_code_info = source_code_info
@@ -153,13 +153,16 @@ class TypeContext(object):
     self.oneof_required = {}
     self.type_name = 'file'
     self.deprecated = False
+    self.descriptor_pool = descriptor_pool
+    self.message_factory = message_factory
 
   def _Extend(self, path, type_name, name, deprecated=False):
     if not self.name:
       extended_name = name
     else:
       extended_name = '%s.%s' % (self.name, name)
-    extended = TypeContext(self.source_code_info, extended_name)
+    extended = TypeContext(self.source_code_info, self.descriptor_pool, self.message_factory,
+                           extended_name)
     extended.path = self.path + path
     extended.type_name = type_name
     extended.map_typenames = self.map_typenames.copy()
