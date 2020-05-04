@@ -4,7 +4,7 @@ Health check
 ============
 
 * Health check filter :ref:`architecture overview <arch_overview_health_checking_filter>`
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.health_check.v2.HealthCheck>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.health_check.v3.HealthCheck>`
 * This filter should be configured with the name *envoy.filters.http.health_check*.
 
 .. note::

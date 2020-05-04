@@ -4,7 +4,7 @@ Client TLS authentication
 =========================
 
 * Client TLS authentication filter :ref:`architecture overview <arch_overview_ssl_auth_filter>`
-* :ref:`v2 API reference <envoy_api_msg_config.filter.network.client_ssl_auth.v2.ClientSslAuth>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth>`
 * This filter should be configured with the name *envoy.filters.network.client_ssl_auth*.
 
 .. _config_network_filters_client_ssl_auth_stats:

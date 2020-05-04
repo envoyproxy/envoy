@@ -60,7 +60,7 @@ API.
 Configuration
 -------------
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.lua.v2.Lua>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`
 * This filter should be configured with the name *envoy.filters.http.lua*.
 
 Script examples
@@ -289,7 +289,7 @@ metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
 under the filter name i.e. *envoy.filters.http.lua*. Below is an example of a *metadata* in a
-:ref:`route entry <envoy_api_msg_route.Route>`.
+:ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
 
 .. code-block:: yaml
 

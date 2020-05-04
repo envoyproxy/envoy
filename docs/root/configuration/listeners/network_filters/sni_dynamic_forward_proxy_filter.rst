@@ -48,14 +48,14 @@ SNI dynamic forward proxy.
         - filters:
             - name: envoy.filters.network.sni_dynamic_forward_proxy
               typed_config:
-                "@type": type.googleapis.com/envoy.config.filter.network.sni_dynamic_forward_proxy.v2alpha.FilterConfig
+                "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha.FilterConfig
                 port_value: 443
                 dns_cache_config:
                   name: dynamic_forward_proxy_cache_config
                   dns_lookup_family: V4_ONLY
             - name: envoy.tcp_proxy
               typed_config:
-                "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+                "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
                 stat_prefix: tcp
                 cluster: dynamic_forward_proxy_cluster
     clusters:
@@ -65,7 +65,7 @@ SNI dynamic forward proxy.
       cluster_type:
         name: envoy.clusters.dynamic_forward_proxy
         typed_config:
-          "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+          "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
           dns_cache_config:
             name: dynamic_forward_proxy_cache_config
             dns_lookup_family: V4_ONLY

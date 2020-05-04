@@ -4,7 +4,7 @@ Overload manager
 ================
 
 The :ref:`overload manager <arch_overview_overload_manager>` is configured in the Bootstrap
-:ref:`overload_manager <envoy_api_field_config.bootstrap.v2.Bootstrap.overload_manager>`
+:ref:`overload_manager <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.overload_manager>`
 field.
 
 An example configuration of the overload manager is shown below. It shows a configuration to

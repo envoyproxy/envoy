@@ -11,4 +11,4 @@ with the name *envoy.filters.network.sni_cluster*.
 This filter has no configuration. It must be installed before the
 :ref:`tcp_proxy <config_network_filters_tcp_proxy>` filter.
 
-* :ref:`v2 API reference <envoy_api_field_listener.Filter.name>`
+* :ref:`v3 API reference <envoy_v3_api_field_config.listener.v3.Filter.name>`

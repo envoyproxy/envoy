@@ -8,7 +8,7 @@ This section gets you started with a very simple configuration and provides some
 The fastest way to get started using Envoy is :ref:`installing pre-built binaries <install_binaries>`.
 You can also :ref:`build it <building>` from source.
 
-These examples use the :ref:`v2 Envoy API <envoy_api_reference>`, but use only the static configuration
+These examples use the :ref:`v3 Envoy API <envoy_api_reference>`, but use only the static configuration
 feature of the API, which is most useful for simple requirements. For more complex requirements
 :ref:`Dynamic Configuration <arch_overview_dynamic_config>` is supported.
 
@@ -38,9 +38,9 @@ Simple Configuration
 
 Envoy can be configured using a single YAML file passed in as an argument on the command line.
 
-The :ref:`admin message <envoy_api_msg_config.bootstrap.v2.Admin>` is required to configure
+The :ref:`admin message <envoy_v3_api_msg_config.bootstrap.v3.Admin>` is required to configure
 the administration server. The `address` key specifies the
-listening :ref:`address <envoy_api_file_envoy/api/v2/core/address.proto>`
+listening :ref:`address <envoy_v3_api_file_envoy/config/core/v3/address.proto>`
 which in this case is simply `0.0.0.0:9901`.
 
 .. code-block:: yaml
@@ -50,7 +50,7 @@ which in this case is simply `0.0.0.0:9901`.
     address:
       socket_address: { address: 0.0.0.0, port_value: 9901 }
 
-The :ref:`static_resources <envoy_api_field_config.bootstrap.v2.Bootstrap.static_resources>` contains everything that is configured statically when Envoy starts,
+The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contains everything that is configured statically when Envoy starts,
 as opposed to the means of configuring resources dynamically when Envoy is running.
 The :ref:`v2 API Overview <config_overview>` describes this.
 
@@ -58,7 +58,7 @@ The :ref:`v2 API Overview <config_overview>` describes this.
 
     static_resources:
 
-The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/listener.proto>`.
+The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`.
 
 .. code-block:: yaml
 
@@ -70,7 +70,7 @@ The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/l
         - filters:
           - name: envoy.filters.network.http_connection_manager
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
               stat_prefix: ingress_http
               codec_type: AUTO
               route_config:
@@ -84,7 +84,7 @@ The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/l
               http_filters:
               - name: envoy.filters.http.router
 
-The specification of the :ref:`clusters <envoy_api_file_envoy/api/v2/cds.proto>`.
+The specification of the :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`.
 
 .. code-block:: yaml
 
@@ -107,7 +107,7 @@ The specification of the :ref:`clusters <envoy_api_file_envoy/api/v2/cds.proto>`
         transport_socket:
           name: envoy.transport_sockets.tls
           typed_config:
-            "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
             sni: www.google.com
 
 

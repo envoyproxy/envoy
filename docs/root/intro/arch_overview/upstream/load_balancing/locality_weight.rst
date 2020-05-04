@@ -5,7 +5,7 @@ Locality weighted load balancing
 
 One approach to determining how to weight assignments across different zones
 and geographical locations is by using explicit weights supplied via EDS in the
-:ref:`LocalityLbEndpoints <envoy_api_msg_endpoint.LocalityLbEndpoints>` message.
+:ref:`LocalityLbEndpoints <envoy_v3_api_msg_config.endpoint.v3.LocalityLbEndpoints>` message.
 This approach is mutually exclusive with 
 :ref:`zone aware routing <arch_overview_load_balancing_zone_aware_routing>`, since
 in the case of locality aware LB, we rely on the management server to provide the
@@ -59,10 +59,10 @@ picked. The load balancer follows these steps:
 
 Locality weighted load balancing is configured by setting
 :ref:`locality_weighted_lb_config
-<envoy_api_field_Cluster.CommonLbConfig.locality_weighted_lb_config>` in the
+<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.locality_weighted_lb_config>` in the
 cluster configuration and providing weights in :ref:`LocalityLbEndpoints
-<envoy_api_msg_endpoint.LocalityLbEndpoints>` via :ref:`load_balancing_weight
-<envoy_api_field_endpoint.LocalityLbEndpoints.load_balancing_weight>`.
+<envoy_v3_api_msg_config.endpoint.v3.LocalityLbEndpoints>` via :ref:`load_balancing_weight
+<envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.load_balancing_weight>`.
 
 This feature is not compatible with :ref:`load balancer subsetting
 <arch_overview_load_balancer_subsets>`, since it is not straightforward to

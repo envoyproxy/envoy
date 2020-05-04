@@ -13,14 +13,14 @@ overview of the options currently available.
 
 * Top level configuration :ref:`reference <config>`.
 * :ref:`Reference configurations <install_ref_configs>`.
-* Envoy :ref:`v2 API overview <config_overview>`.
+* Envoy :ref:`v3 API overview <config_overview>`.
 * :ref:`xDS API endpoints <config_overview_management_server>`.
 
 Fully static
 ------------
 
 In a fully static configuration, the implementor provides a set of :ref:`listeners
-<config_listeners>` (and :ref:`filter chains <envoy_api_msg_listener.Filter>`), :ref:`clusters
+<config_listeners>` (and :ref:`filter chains <envoy_v3_api_msg_config.listener.v3.Filter>`), :ref:`clusters
 <config_cluster_manager>`, etc. Dynamic host discovery is only possible via DNS based
 :ref:`service discovery <arch_overview_service_discovery>`. Configuration reloads must take place
 via the built in :ref:`hot restart <arch_overview_hot_restart>` mechanism.
@@ -50,7 +50,7 @@ and remove clusters as specified by the API. This API allows implementors to bui
 which Envoy does not need to be aware of all upstream clusters at initial configuration time.
 Typically, when doing HTTP routing along with CDS (but without route discovery service),
 implementors will make use of the router's ability to forward requests to a cluster specified in an
-:ref:`HTTP request header <envoy_api_field_route.RouteAction.cluster_header>`.
+:ref:`HTTP request header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>`.
 
 Although it is possible to use CDS without EDS by specifying fully static clusters, we recommend
 still using the EDS API for clusters specified via CDS. Internally, when a cluster definition is

@@ -2,7 +2,7 @@
 
 Envoy Header-To-Metadata Filter
 ===============================
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.header_to_metadata.v2.Config>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.header_to_metadata.v3.Config>`
 * This filter should be configured with the name *envoy.filters.http.header_to_metadata*.
 
 This filter is configured with rules that will be matched against requests and responses.
@@ -25,7 +25,7 @@ absence of a version header could be:
   http_filters:
     - name: envoy.filters.http.header_to_metadata
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.http.header_to_metadata.v2.Config
+        "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
         request_rules:
           - header: x-version
             on_header_present:
@@ -72,8 +72,9 @@ Note that this filter also supports per route configuration:
       routes:
       - match: { prefix: "/version-to-metadata" }
         route: { cluster: service }
-        per_filter_config:
+        typed_per_filter_config:
           envoy.filters.http.header_to_metadata:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
             request_rules:
               - header: x-version
                 on_header_present:

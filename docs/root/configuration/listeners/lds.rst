@@ -9,7 +9,7 @@ depending on what is required.
 
 The semantics of listener updates are as follows:
 
-* Every listener must have a unique :ref:`name <envoy_api_field_Listener.name>`. If a name is not
+* Every listener must have a unique :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>`. If a name is not
   provided, Envoy will create a UUID. Listeners that are to be dynamically updated should have a
   unique name supplied by the management server.
 * When a listener is added, it will be "warmed" before taking traffic. For example, if the listener
@@ -31,7 +31,7 @@ The semantics of listener updates are as follows:
 Configuration
 -------------
 
-* :ref:`v2 LDS API <v2_grpc_streaming_endpoints>`
+* :ref:`v3 LDS API <v2_grpc_streaming_endpoints>`
 
 Statistics
 ----------

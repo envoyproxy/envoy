@@ -3,7 +3,7 @@
 Tap
 ===
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.tap.v2alpha.Tap>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.tap.v3.Tap>`
 * This filter should be configured with the name *envoy.filters.http.tap*.
 
 .. attention::
@@ -15,9 +15,9 @@ Tap
 The HTTP tap filter is used to interpose on and record HTTP traffic. At a high level, the
 configuration is composed of two pieces:
 
-1. :ref:`Match configuration <envoy_api_msg_service.tap.v2alpha.MatchPredicate>`: a list of
+1. :ref:`Match configuration <envoy_v3_api_msg_config.tap.v3.MatchPredicate>`: a list of
    conditions under which the filter will match an HTTP request and begin a tap session.
-2. :ref:`Output configuration <envoy_api_msg_service.tap.v2alpha.OutputConfig>`: a list of output
+2. :ref:`Output configuration <envoy_v3_api_msg_config.tap.v3.OutputConfig>`: a list of output
    sinks that the filter will write the matched and tapped data to.
 
 Each of these concepts will be covered incrementally over the course of several example
@@ -32,7 +32,7 @@ Example filter configuration:
 
   name: envoy.filters.http.tap
   typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
+    "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
     common_config:
       admin_config:
         config_id: test_config_id
@@ -46,15 +46,15 @@ Admin handler
 -------------
 
 When the HTTP filter specifies an :ref:`admin_config
-<envoy_api_msg_config.common.tap.v2alpha.AdminConfig>`, it is configured for admin control and
+<envoy_v3_api_msg_extensions.common.tap.v3.AdminConfig>`, it is configured for admin control and
 the :http:post:`/tap` admin handler will be installed. The admin handler can be used for live
 tapping and debugging of HTTP traffic. It works as follows:
 
 1. A POST request is used to provide a valid tap configuration. The POST request body can be either
    the JSON or YAML representation of the :ref:`TapConfig
-   <envoy_api_msg_service.tap.v2alpha.TapConfig>` message.
+   <envoy_v3_api_msg_config.tap.v3.TapConfig>` message.
 2. If the POST request is accepted, Envoy will stream :ref:`HttpBufferedTrace
-   <envoy_api_msg_data.tap.v2alpha.HttpBufferedTrace>` messages (serialized to JSON) until the admin
+   <envoy_v3_api_msg_data.tap.v3.HttpBufferedTrace>` messages (serialized to JSON) until the admin
    request is terminated.
 
 An example POST body:
@@ -126,16 +126,16 @@ Output format
 -------------
 
 Each output sink has an associated :ref:`format
-<envoy_api_enum_service.tap.v2alpha.OutputSink.Format>`. The default format is
+<envoy_v3_api_enum_config.tap.v3.OutputSink.Format>`. The default format is
 :ref:`JSON_BODY_AS_BYTES
-<envoy_api_enum_value_service.tap.v2alpha.OutputSink.Format.JSON_BODY_AS_BYTES>`. This format is
+<envoy_v3_api_enum_value_config.tap.v3.OutputSink.Format.JSON_BODY_AS_BYTES>`. This format is
 easy to read JSON, but has the downside that body data is base64 encoded. In the case that the tap
 is known to be on human readable data, the :ref:`JSON_BODY_AS_STRING
-<envoy_api_enum_value_service.tap.v2alpha.OutputSink.Format.JSON_BODY_AS_STRING>` format may be
+<envoy_v3_api_enum_value_config.tap.v3.OutputSink.Format.JSON_BODY_AS_STRING>` format may be
 more user friendly. See the reference documentation for more information on other available formats.
 
 An example of a streaming admin tap configuration that uses the :ref:`JSON_BODY_AS_STRING
-<envoy_api_enum_value_service.tap.v2alpha.OutputSink.Format.JSON_BODY_AS_STRING>` format:
+<envoy_v3_api_enum_value_config.tap.v3.OutputSink.Format.JSON_BODY_AS_STRING>` format:
 
 .. code-block:: yaml
 
@@ -154,9 +154,9 @@ Buffered body limits
 For buffered taps, Envoy will limit the amount of body data that is tapped to avoid OOM situations.
 The default limit is 1KiB for both received (request) and transmitted (response) data. This is
 configurable via the :ref:`max_buffered_rx_bytes
-<envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_rx_bytes>` and
+<envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_rx_bytes>` and
 :ref:`max_buffered_tx_bytes
-<envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_tx_bytes>` settings.
+<envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_tx_bytes>` settings.
 
 .. _config_http_filters_tap_streaming:
 
@@ -169,18 +169,18 @@ first the request headers will be matched, then the request body if present, the
 trailers if present, then the response headers if present, etc.
 
 The filter additionally supports optional streamed output which is governed by the :ref:`streaming
-<envoy_api_field_service.tap.v2alpha.OutputConfig.streaming>` setting. If this setting is false
+<envoy_v3_api_field_config.tap.v3.OutputConfig.streaming>` setting. If this setting is false
 (the default), Envoy will emit :ref:`fully buffered traces
-<envoy_api_msg_data.tap.v2alpha.HttpBufferedTrace>`. Users are likely to find this format easier
+<envoy_v3_api_msg_data.tap.v3.HttpBufferedTrace>`. Users are likely to find this format easier
 to interact with for simple cases.
 
 In cases where fully buffered traces are not practical (e.g., very large request and responses,
 long lived streaming APIs, etc.), the streaming setting can be set to true, and Envoy will emit
-multiple :ref:`streamed trace segments <envoy_api_msg_data.tap.v2alpha.HttpStreamedTraceSegment>` for
+multiple :ref:`streamed trace segments <envoy_v3_api_msg_data.tap.v3.HttpStreamedTraceSegment>` for
 each tap. In this case, it is required that post-processing is performed to stitch all of the trace
 segments back together into a usable form. Also note that binary protobuf is not a self-delimiting
 format. If binary protobuf output is desired, the :ref:`PROTO_BINARY_LENGTH_DELIMITED
-<envoy_api_enum_value_service.tap.v2alpha.OutputSink.Format.PROTO_BINARY_LENGTH_DELIMITED>` output
+<envoy_v3_api_enum_value_config.tap.v3.OutputSink.Format.PROTO_BINARY_LENGTH_DELIMITED>` output
 format should be used.
 
 An static filter configuration to enable streaming output looks like:
@@ -189,7 +189,7 @@ An static filter configuration to enable streaming output looks like:
 
   name: envoy.filters.http.tap
   typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
+    "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
     common_config:
       static_config:
         match_config:
@@ -232,7 +232,7 @@ Statistics
 ----------
 
 The tap filter outputs statistics in the *http.<stat_prefix>.tap.* namespace. The :ref:`stat prefix
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stat_prefix>`
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
 comes from the owning HTTP connection manager.
 
 .. csv-table::

@@ -9,10 +9,10 @@ result in addition, removal, or modification. Ultimately, whether the request is
 or external is governed by the :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`
 header (please read the linked section carefully as how Envoy populates the header is complex and depends on the
 :ref:`use_remote_address
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>`
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
 setting). In addition, the
 :ref:`internal_address_config
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.internal_address_config>`
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
 setting can be used to configure the internal/external determination.
 
 Envoy will potentially sanitize the following headers:

@@ -4,7 +4,7 @@ External Authorization
 ======================
 
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
-* :ref:`Network filter v2 API reference <envoy_api_msg_config.filter.network.ext_authz.v2.ExtAuthz>`
+* :ref:`Network filter v3 API reference <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`
 * This filter should be configured with the name *envoy.filters.network.ext_authz*.
 
 The external authorization network filter calls an external authorization service to check if the
@@ -16,12 +16,12 @@ then the connection will be closed.
   authorized prior to rest of the filters processing the request.
 
 The content of the request that are passed to an authorization service is specified by
-:ref:`CheckRequest <envoy_api_msg_service.auth.v2.CheckRequest>`.
+:ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
 
 .. _config_network_filters_ext_authz_network_configuration:
 
 The network filter, gRPC service, can be configured as follows. You can see all the configuration
-options at :ref:`Network filter <envoy_api_msg_config.filter.network.ext_authz.v2.ExtAuthz>`.
+options at :ref:`Network filter <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`.
 
 Example
 -------
@@ -33,7 +33,7 @@ A sample filter configuration could be:
   filters:
     - name: envoy.filters.network.ext_authz
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz
+        "@type": type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz
         stat_prefix: ext_authz
         grpc_service:
           envoy_grpc:

@@ -4,7 +4,7 @@ Mongo proxy
 ===========
 
 * MongoDB :ref:`architecture overview <arch_overview_mongo>`
-* :ref:`v2 API reference <envoy_api_msg_config.filter.network.mongo_proxy.v2.MongoProxy>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.mongo_proxy.v3.MongoProxy>`
 * This filter should be configured with the name *envoy.filters.network.mongo_proxy*.
 
 .. _config_network_filters_mongo_proxy_fault_injection:
@@ -12,7 +12,7 @@ Mongo proxy
 Fault injection
 ---------------
 
-The Mongo proxy filter supports fault injection. See the v2 API reference for how to
+The Mongo proxy filter supports fault injection. See the v3 API reference for how to
 configure.
 
 .. _config_network_filters_mongo_proxy_stats:
@@ -181,7 +181,7 @@ Dynamic Metadata
 ----------------
 
 The Mongo filter emits the following dynamic metadata when enabled via the
-:ref:`configuration <envoy_api_field_config.filter.network.mongo_proxy.v2.MongoProxy.emit_dynamic_metadata>`.
+:ref:`configuration <envoy_v3_api_field_extensions.filters.network.mongo_proxy.v3.MongoProxy.emit_dynamic_metadata>`.
 This dynamic metadata is available as key-value pairs where the key
 represents the database and the collection being accessed, and the value is
 a list of operations performed on the collection.

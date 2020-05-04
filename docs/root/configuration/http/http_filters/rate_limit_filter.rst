@@ -4,19 +4,19 @@ Rate limit
 ==========
 
 * Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit>`
 * This filter should be configured with the name *envoy.filters.http.ratelimit*.
 
 The HTTP rate limit filter will call the rate limit service when the request's route or virtual host
-has one or more :ref:`rate limit configurations<envoy_api_field_route.VirtualHost.rate_limits>`
-that match the filter stage setting. The :ref:`route<envoy_api_field_route.RouteAction.include_vh_rate_limits>`
+has one or more :ref:`rate limit configurations<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`
+that match the filter stage setting. The :ref:`route<envoy_v3_api_field_config.route.v3.RouteAction.include_vh_rate_limits>`
 can optionally include the virtual host rate limit configurations. More than one configuration can
 apply to a request. Each configuration results in a descriptor being sent to the rate limit service.
 
 If the rate limit service is called, and the response for any of the descriptors is over limit, a
 429 response is returned. The rate limit filter also sets the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header.
 
-If there is an error in calling rate limit service or rate limit service returns an error and :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` is 
+If there is an error in calling rate limit service or rate limit service returns an error and :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` is 
 set to true, a 500 response is returned.
 
 .. _config_http_filters_rate_limit_composing_actions:
@@ -24,7 +24,7 @@ set to true, a 500 response is returned.
 Composing Actions
 -----------------
 
-Each :ref:`rate limit action <envoy_api_msg_route.RateLimit>` on the route or
+Each :ref:`rate limit action <envoy_v3_api_msg_config.route.v3.RateLimit>` on the route or
 virtual host populates a descriptor entry. A vector of descriptor entries compose a descriptor. To
 create more complex rate limit descriptors, actions can be composed in any order. The descriptor
 will be populated in the order the actions are specified in the configuration.
@@ -90,7 +90,7 @@ The rate limit filter outputs statistics in the *cluster.<route target cluster>.
   error, Counter, Total errors contacting the rate limit service
   over_limit, Counter, total over limit responses from the rate limit service
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
-  of :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` set to false."
+  of :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` set to false."
 
 Runtime
 -------
@@ -106,4 +106,4 @@ ratelimit.http_filter_enforcing
 
 ratelimit.<route_key>.http_filter_enabled
   % of requests that will call the rate limit service for a given *route_key* specified in the
-  :ref:`rate limit configuration <envoy_api_msg_route.RateLimit>`. Defaults to 100.
+  :ref:`rate limit configuration <envoy_v3_api_msg_config.route.v3.RateLimit>`. Defaults to 100.

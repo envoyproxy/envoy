@@ -14,12 +14,12 @@ the :option:`-c` flag, i.e.:
 
 where the extension reflects the underlying config representation.
 
-The :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` message is the root of the
-configuration. A key concept in the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
+The :ref:`Bootstrap <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` message is the root of the
+configuration. A key concept in the :ref:`Bootstrap <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>`
 message is the distinction between static and dynamic resources. Resources such
-as a :ref:`Listener <envoy_api_msg_Listener>` or :ref:`Cluster
-<envoy_api_msg_Cluster>` may be supplied either statically in
-:ref:`static_resources <envoy_api_field_config.bootstrap.v2.Bootstrap.static_resources>` or have
+as a :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` or :ref:`Cluster
+<envoy_v3_api_msg_config.cluster.v3.Cluster>` may be supplied either statically in
+:ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` or have
 an xDS service such as :ref:`LDS
 <config_listeners_lds>` or :ref:`CDS <config_cluster_manager_cds>` configured in
-:ref:`dynamic_resources <envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>`.
+:ref:`dynamic_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>`.

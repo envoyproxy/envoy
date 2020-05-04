@@ -26,7 +26,7 @@ section describes this scenario in more detail.
 Traffic shifting between two upstreams
 --------------------------------------
 
-The :ref:`runtime <envoy_api_field_route.RouteMatch.runtime_fraction>` object
+The :ref:`runtime <envoy_v3_api_field_config.route.v3.RouteMatch.runtime_fraction>` object
 in the route configuration determines the probability of selecting a
 particular route (and hence its cluster). By using the *runtime_fraction*
 configuration, traffic to a particular route in a virtual host can be
@@ -59,7 +59,7 @@ envoy configuration file.
 
 Envoy matches routes with a :ref:`first match <config_http_conn_man_route_table_route_matching>` policy.
 If the route has a runtime_fraction object, the request will be additionally matched based on the runtime_fraction
-:ref:`value <envoy_api_field_route.RouteMatch.runtime_fraction>`
+:ref:`value <envoy_v3_api_field_config.route.v3.RouteMatch.runtime_fraction>`
 (or the default, if no value is specified). Thus, by placing routes
 back-to-back in the above example and specifying a runtime_fraction object in the
 first route, traffic shifting can be accomplished by changing the runtime_fraction
@@ -93,8 +93,8 @@ v3) instead of two. To split traffic evenly across the three versions
 specify the weight for each upstream cluster.
 
 Unlike the previous example, a **single** :ref:`route
-<envoy_api_msg_route.Route>` entry is sufficient. The
-:ref:`weighted_clusters <envoy_api_field_route.RouteAction.weighted_clusters>`
+<envoy_v3_api_msg_config.route.v3.Route>` entry is sufficient. The
+:ref:`weighted_clusters <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>`
 configuration block in a route can be used to specify multiple upstream clusters
 along with weights that indicate the **percentage** of traffic to be sent
 to each upstream cluster.
@@ -120,7 +120,7 @@ to each upstream cluster.
 
 
 By default, the weights must sum to exactly 100. In the V2 API, the
-:ref:`total weight <envoy_api_field_route.WeightedCluster.total_weight>` defaults to 100, but can
+:ref:`total weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` defaults to 100, but can
 be modified to allow finer granularity.
 
 The weights assigned to each cluster can be dynamically adjusted using the

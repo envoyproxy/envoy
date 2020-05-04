@@ -34,11 +34,11 @@ in the configuration snippet below:
   - filters:
     - name: envoy.filters.network.mysql_proxy
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.network.mysql_proxy.v1alpha1.MySQLProxy
+        "@type": type.googleapis.com/envoy.extensions.filters.network.mysql_proxy.v3.MySQLProxy
         stat_prefix: mysql
     - name: envoy.filters.network.tcp_proxy
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+        "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
         stat_prefix: tcp
         cluster: ...
 
@@ -96,11 +96,11 @@ _catalog_ table in the _productdb_ database.
   - filters:
     - name: envoy.filters.network.mysql_proxy
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.network.mysql_proxy.v1alpha1.MySQLProxy
+        "@type": type.googleapis.com/envoy.extensions.filters.network.mysql_proxy.v3.MySQLProxy
         stat_prefix: mysql
     - name: envoy.filters.network.rbac
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
+        "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
         stat_prefix: rbac
         rules:
           action: DENY
@@ -120,6 +120,6 @@ _catalog_ table in the _productdb_ database.
               - any: true
     - name: envoy.filters.network.tcp_proxy
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+        "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
         stat_prefix: tcp
         cluster: mysql

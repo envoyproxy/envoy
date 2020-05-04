@@ -7,7 +7,7 @@ UDP proxy
 
   UDP proxy support should be considered alpha and not production ready.
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig>`
+* :ref:`v3 API reference <envoy_v3_api_msg_config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig>`
 * This filter should be configured with the name *envoy.filters.udp_listener.udp_proxy*
 
 Overview
@@ -22,7 +22,7 @@ Because UDP is not a connection oriented protocol, Envoy must keep track of a cl
 such that the response datagrams from an upstream server can be routed back to the correct client.
 Each session is index by the 4-tuple consisting of source IP/port and local IP/port that the
 datagram is received on. Sessions last until the :ref:`idle timeout
-<envoy_api_field_config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig.idle_timeout>` is reached.
+<envoy_v3_api_field_config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig.idle_timeout>` is reached.
 
 Load balancing and unhealthy host handling
 ------------------------------------------
