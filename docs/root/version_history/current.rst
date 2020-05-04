@@ -28,6 +28,10 @@ Changes
   Can be disabled by setting runtime feature `envoy.reloadable_features.listener_in_place_filterchain_update` to false.
   Also added additional draining filter chain stat for :ref:`listener manager <config_listener_manager_stats>` to track the number of draining filter chains and the number of in place update attempts.
 * logger: added :ref:`--log-format-prefix-with-location <operations_cli>` command line option to prefix '%v' with file path and line number.
+* lrs: added new *envoy_api_field_service.load_stats.v2.LoadStatsResponse.send_all_clusters* field
+  in LRS response, which allows management servers to avoid explicitly listing all clusters it is
+  interested in; behavior is allowed based on new "envoy.lrs.supports_send_all_clusters" capability
+  in :ref:`client_features<envoy_v3_api_field_config.core.v3.Node.client_features>` field.
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
 * network filters: added a :ref:`rocketmq proxy filter <config_network_filters_rocketmq_proxy>`.
 * prometheus stats: fix the sort order of output lines to comply with the standard.
@@ -47,3 +51,6 @@ Deprecated
 * Tracing provider configuration as part of :ref:`bootstrap config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.tracing>`
   has been deprecated in favor of configuration as part of :ref:`HTTP connection manager
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
+* The * :ref:`GoogleRE2.max_program_size<envoy_v3_api_field_type.matcher.v3.RegexMatcher.GoogleRE2.max_program_size>`
+  field is now deprecated. Management servers are expected to validate regexp program sizes
+  instead of expecting the client to do it.
