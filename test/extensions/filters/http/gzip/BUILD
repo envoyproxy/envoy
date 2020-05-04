@@ -36,6 +36,7 @@ envoy_extension_cc_test(
         "gzip_filter_integration_test.cc",
     ],
     extension_name = "envoy.filters.http.gzip",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/decompressor:decompressor_lib",
         "//source/extensions/filters/http/gzip:config",
