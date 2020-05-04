@@ -112,7 +112,7 @@ To reject a host based on its metadata, ``envoy.retry_host_predicates.omit_host_
         metadata_match:
           filter_metadata:
             envoy.lb:
-            key: value
+              key: value
 
 This will reject any host with matching (key, value) in its metadata.
 

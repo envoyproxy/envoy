@@ -719,8 +719,8 @@ public:
 
   /**
    * @return const InternalRedirectPolicy& the internal redirect policy for the route. All routes
-   *         have a internal redirect policy even if it is not enabled, which means redirects from
-   *         the upstream are not followed.
+   *         have a internal redirect policy even if it is not enabled, which means redirects are
+   *         simply proxied as normal responses.
    */
   virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
 
