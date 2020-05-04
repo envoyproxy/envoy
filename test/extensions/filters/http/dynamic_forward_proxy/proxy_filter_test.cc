@@ -73,6 +73,7 @@ TEST_F(ProxyFilterTest, HttpDefaultPort) {
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(*(dns_cache_manager_->dns_cache_), dnsCacheResourceManager());
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
@@ -91,6 +92,7 @@ TEST_F(ProxyFilterTest, HttpsDefaultPort) {
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(*(dns_cache_manager_->dns_cache_), dnsCacheResourceManager());
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
@@ -109,6 +111,7 @@ TEST_F(ProxyFilterTest, CacheOverflow) {
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(*(dns_cache_manager_->dns_cache_), dnsCacheResourceManager());
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
       .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr}));
@@ -128,6 +131,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(*(dns_cache_manager_->dns_cache_), dnsCacheResourceManager());
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
@@ -141,6 +145,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
   filter2->setDecoderFilterCallbacks(callbacks_);
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(*(dns_cache_manager_->dns_cache_), dnsCacheResourceManager());
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable,
                                          Eq("Dynamic forward proxy pending request overflow"), _, _,
                                          Eq("Dynamic forward proxy pending request overflow")));
@@ -182,6 +187,7 @@ TEST_F(ProxyFilterTest, HostRewrite) {
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(*(dns_cache_manager_->dns_cache_), dnsCacheResourceManager());
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
@@ -206,6 +212,7 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(*(dns_cache_manager_->dns_cache_), dnsCacheResourceManager());
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();

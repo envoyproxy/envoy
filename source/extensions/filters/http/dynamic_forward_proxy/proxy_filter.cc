@@ -54,9 +54,12 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   cluster_info_ = cluster->info();
 
   Upstream::ResourceManager& resource_manager_ =
-      config_->cache().dnsCacheResourceManager()
-          ? *(config_->cache().dnsCacheResourceManager())
-          : cluster_info_->resourceManager(route_entry->priority());
+      cluster_info_->resourceManager(route_entry->priority());
+  auto* cache_resource_manager = config_->cache().dnsCacheResourceManager();
+
+  if (cache_resource_manager != nullptr) {
+    resource_manager_ = *cache_resource_manager;
+  }
   auto& pending_requests = resource_manager_.pendingRequests();
 
   if (!pending_requests.canCreate()) {

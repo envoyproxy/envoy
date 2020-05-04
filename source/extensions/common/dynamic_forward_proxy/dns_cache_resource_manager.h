@@ -83,8 +83,6 @@ private:
   std::unique_ptr<DnsResource> pending_requests_;
 };
 
-using DnsCacheResourceManagerPtr = std::unique_ptr<DnsCacheResourceManager>;
-
 } // namespace DynamicForwardProxy
 } // namespace Common
 } // namespace Extensions
