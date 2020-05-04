@@ -6,17 +6,14 @@ namespace Common {
 namespace DynamicForwardProxy {
 
 DnsCacheResourceManager::DnsCacheResourceManager(
-    Runtime::Loader& loader,
-    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
-  uint32_t max_requests = 1024;
+    DnsCacheCircuitBreakersStats cb_stats, Runtime::Loader& loader, const std::string& config_name,
+    const envoy::config::cluster::v3::DnsCacheCircuitBreaker& cb_config) {
+  const auto& max_requests = cb_config.threshold().max_pending_requests().value();
+  const auto runtime_key = fmt::format("circuit_breaker.dns_cache.{}", config_name);
 
-  if (config.has_dns_failure_refresh_rate()) {
-    const auto& threshold = config.dns_cache_circuit_breaker().threshold();
-    max_requests = threshold.max_pending_requests().value();
-  }
-  const auto runtime_key = fmt::format("circuit_breaker.dns_cache.{}", config.name());
-
-  pending_requests_ = std::make_unique<DnsResource>(max_requests, loader, runtime_key);
+  pending_requests_ =
+      std::make_unique<DnsResource>(max_requests, loader, runtime_key, cb_stats.rq_pending_opening_,
+                                    cb_stats.rq_pending_remaining_);
 }
 } // namespace DynamicForwardProxy
 } // namespace Common

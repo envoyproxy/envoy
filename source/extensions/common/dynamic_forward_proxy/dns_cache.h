@@ -152,9 +152,9 @@ public:
   virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
 
   /**
-   * @return resource manager for dns cache.
+   * @return A pointer to resource manager for dns cache.
    */
-  virtual DnsCacheResourceManager& dnsCacheResourceManager() PURE;
+  virtual DnsCacheResourceManagerPtr& dnsCacheResourceManager() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;

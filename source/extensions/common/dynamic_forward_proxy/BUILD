@@ -53,9 +53,11 @@ envoy_cc_library(
     srcs = ["dns_cache_resource_manager.cc"],
     hdrs = ["dns_cache_resource_manager.h"],
     deps = [
+        "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/upstream:resource_manager_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )

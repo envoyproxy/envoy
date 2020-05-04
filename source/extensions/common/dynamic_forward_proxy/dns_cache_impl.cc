@@ -23,7 +23,6 @@ DnsCacheImpl::DnsCacheImpl(
       resolver_(main_thread_dispatcher.createDnsResolver({}, false)), tls_slot_(tls.allocateSlot()),
       scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_{ALL_DNS_CACHE_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))},
-      resource_manager_(loader, config),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       failure_backoff_strategy_(
           Config::Utility::prepareDnsRefreshStrategy<
@@ -33,6 +32,12 @@ DnsCacheImpl::DnsCacheImpl(
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(); });
   updateTlsHostsMap();
+
+  if (config.has_dns_cache_circuit_breaker()) {
+    auto cb_stats = generateDnsCacheCircuitBreakersStats(*scope_);
+    resource_manager_ = std::make_unique<DnsCacheResourceManager>(
+        cb_stats, loader, config.name(), config.dns_cache_circuit_breaker());
+  }
 }
 
 DnsCacheImpl::~DnsCacheImpl() {
@@ -45,6 +50,13 @@ DnsCacheImpl::~DnsCacheImpl() {
   for (auto update_callbacks : update_callbacks_) {
     update_callbacks->cancel();
   }
+}
+
+DnsCacheCircuitBreakersStats
+DnsCacheImpl::generateDnsCacheCircuitBreakersStats(Stats::Scope& scope) {
+  std::string stat_prefix = "circuit_breaker";
+  return {ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, stat_prefix),
+                                               POOL_GAUGE_PREFIX(scope, stat_prefix))};
 }
 
 DnsCacheImpl::LoadDnsCacheEntryResult

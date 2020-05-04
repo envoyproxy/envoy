@@ -53,7 +53,12 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   cluster_info_ = cluster->info();
 
-  auto& pending_requests = config_->cache().dnsCacheResourceManager().pendingRequests();
+  Upstream::ResourceManager& resource_manager_ =
+      config_->cache().dnsCacheResourceManager()
+          ? *(config_->cache().dnsCacheResourceManager())
+          : cluster_info_->resourceManager(route_entry->priority());
+  auto& pending_requests = resource_manager_.pendingRequests();
+
   if (!pending_requests.canCreate()) {
     ENVOY_STREAM_LOG(debug, "pending request overflow", *decoder_callbacks_);
     cluster_info_->stats().upstream_rq_pending_overflow_.inc();
