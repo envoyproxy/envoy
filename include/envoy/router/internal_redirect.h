@@ -43,7 +43,7 @@ public:
 protected:
   /**
    * Called by acceptTargetRoute. Predicate implementations should override this to provide the
-   * actual funcitonality.
+   * actual functionality.
    *
    * @return whether the route specified by target_route_name is allowed to be followed. Any
    *         predicate returning false will prevent the redirect from being followed, causing the
