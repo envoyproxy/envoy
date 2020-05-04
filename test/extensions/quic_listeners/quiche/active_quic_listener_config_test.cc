@@ -75,7 +75,10 @@ TEST(ActiveQuicListenerConfigTest, QuicListenerFlagNotConfigured) {
   envoy::config::core::v3::RuntimeFeatureFlag& runtime_enabled =
       ActiveQuicListenerFactoryPeer::runtimeEnabled(
           dynamic_cast<ActiveQuicListenerFactory&>(*listener_factory));
+  auto& quic_config =
+      dynamic_cast<const envoy::config::listener::v3::QuicProtocolOptions&>(*config);
   EXPECT_FALSE(runtime_enabled.has_default_value());
+  EXPECT_FALSE(quic_config.has_enabled());
   EXPECT_EQ("", runtime_enabled.runtime_key());
 }
 

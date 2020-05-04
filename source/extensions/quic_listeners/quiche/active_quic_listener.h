@@ -54,8 +54,6 @@ public:
   void resumeListening() override;
   void shutdownListener() override;
 
-  bool enabled() { return enabled_.enabled(); }
-
 private:
   friend class ActiveQuicListenerPeer;
 

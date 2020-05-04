@@ -35,7 +35,6 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   ASSERT(file_event_);
-
   if (!Network::Socket::applyOptions(socket_->options(), *socket_,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",

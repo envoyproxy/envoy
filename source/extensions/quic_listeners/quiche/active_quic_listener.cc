@@ -46,7 +46,6 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
     }
     listen_socket_.addOptions(options);
   }
-
   udp_listener_ = dispatcher_.createUdpListener(std::move(listen_socket), *this);
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
@@ -95,7 +94,7 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
 }
 
 void ActiveQuicListener::onReadReady() {
-  if (!enabled()) {
+  if (!enabled_.enabled()) {
     ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_->name());
     return;
   }
@@ -197,6 +196,7 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
 #endif
   }
 #endif
+
   return std::make_unique<ActiveQuicListener>(disptacher, parent, config, quic_config_,
                                               std::move(options), enabled_);
 }
