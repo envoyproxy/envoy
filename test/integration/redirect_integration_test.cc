@@ -179,6 +179,9 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
   EXPECT_EQ(
       1,
       test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")->value());
+  EXPECT_EQ(
+      1, test_server_->counter("http.config_test.passthrough_internal_redirect_too_many_redirects")
+             ->value());
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
@@ -270,6 +273,9 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
             response->headers().Location()->value().getStringView());
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
+  EXPECT_EQ(
+      1,
+      test_server_->counter("http.config_test.passthrough_internal_redirect_predicate")->value());
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPredicate) {
@@ -325,6 +331,9 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPred
             response->headers().Location()->value().getStringView());
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
+  EXPECT_EQ(
+      1,
+      test_server_->counter("http.config_test.passthrough_internal_redirect_predicate")->value());
 }
 
 TEST_P(RedirectIntegrationTest, InvalidRedirect) {

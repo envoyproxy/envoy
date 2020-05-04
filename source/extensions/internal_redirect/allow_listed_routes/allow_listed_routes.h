@@ -21,7 +21,7 @@ public:
           config)
       : allowed_routes_(config.allowed_route_names().begin(), config.allowed_route_names().end()) {}
 
-  bool acceptTargetRoutel(StreamInfo::FilterState&, absl::string_view route_name) override {
+  bool acceptTargetRoute(StreamInfo::FilterState&, absl::string_view route_name) override {
     return allowed_routes_.contains(route_name);
   }
 
