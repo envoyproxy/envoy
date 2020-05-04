@@ -592,7 +592,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
       codec_error = true;
     }
   }
-  if (http2) {
+  if (!codec_error && http2) {
     dynamic_cast<Http2::TestClientConnectionImpl&>(*client).goAway();
     dynamic_cast<Http2::TestServerConnectionImpl&>(*server).goAway();
   }
