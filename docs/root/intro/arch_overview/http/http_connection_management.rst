@@ -52,29 +52,29 @@ Normally during retries, host selection follows the same process as the original
 can be used to modify this behavior, and they fall into two categories:
 
 * :ref:`Host Predicates <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_host_predicate>`:
-These predicates can be used to "reject" a host, which will cause host selection to be reattempted.
-Any number of these predicates can be specified, and the host will be rejected if any of the predicates reject the host.
+  These predicates can be used to "reject" a host, which will cause host selection to be reattempted.
+  Any number of these predicates can be specified, and the host will be rejected if any of the predicates reject the host.
 
-Envoy supports the following built-in host predicates
+  Envoy supports the following built-in host predicates
 
-* *envoy.retry_host_predicates.previous_hosts*: This will keep track of previously attempted hosts, and rejects
-hosts that have already been attempted.
+  * *envoy.retry_host_predicates.previous_hosts*: This will keep track of previously attempted hosts, and rejects
+    hosts that have already been attempted.
 
-* *envoy.retry_host_predicates.omit_canary_hosts*: This will reject any host that is a marked as canary host.
-Hosts are marked by setting ``canary: true`` for the ``envoy.lb`` filter in the endpoint's filter metadata.
-See :ref:`LbEndpoint <envoy_v3_api_msg_config.endpoint.v3.LbEndpoint>` for more details.
+  * *envoy.retry_host_predicates.omit_canary_hosts*: This will reject any host that is a marked as canary host.
+    Hosts are marked by setting ``canary: true`` for the ``envoy.lb`` filter in the endpoint's filter metadata.
+    See :ref:`LbEndpoint <envoy_v3_api_msg_config.endpoint.v3.LbEndpoint>` for more details.
 
-* *envoy.retry_host_predicates.omit_host_metadata*: This will reject any host based on predefined metadata match criteria. 
-See the configuration example below for more details.
+  * *envoy.retry_host_predicates.omit_host_metadata*: This will reject any host based on predefined metadata match criteria. 
+    See the configuration example below for more details.
 
 * :ref:`Priority Predicates<envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>`: These predicates can
-be used to adjust the priority load used when selecting a priority for a retry attempt. Only one such
-predicate may be specified.
+  be used to adjust the priority load used when selecting a priority for a retry attempt. Only one such
+  predicate may be specified.
 
-Envoy supports the following built-in priority predicates
+  Envoy supports the following built-in priority predicates
 
-* *envoy.retry_priorities.previous_priorities*: This will keep track of previously attempted priorities,
-and adjust the priority load such that other priorities will be targeted in subsequent retry attempts.
+  * *envoy.retry_priorities.previous_priorities*: This will keep track of previously attempted priorities,
+    and adjust the priority load such that other priorities will be targeted in subsequent retry attempts.
 
 Host selection will continue until either the configured predicates accept the host or a configurable
 :ref:`max attempts <envoy_v3_api_field_config.route.v3.RetryPolicy.host_selection_retry_max_attempts>` has been reached.
@@ -90,10 +90,10 @@ For example, to configure retries to prefer hosts that haven't been attempted al
 
 .. code-block:: yaml
 
-retry_policy:
-retry_host_predicate:
-- name: envoy.retry_host_predicates.previous_hosts
-host_selection_retry_max_attempts: 3
+  retry_policy:
+    retry_host_predicate:
+    - name: envoy.retry_host_predicates.previous_hosts
+    host_selection_retry_max_attempts: 3
 
 This will reject hosts previously attempted, retrying host selection a maximum of 3 times. The bound
 on attempts is necessary in order to deal with scenarios in which finding an acceptable host is either
@@ -104,15 +104,15 @@ To reject a host based on its metadata, ``envoy.retry_host_predicates.omit_host_
 
 .. code-block:: yaml
 
-retry_policy:
-retry_host_predicate:
-- name: envoy.retry_host_predicates.omit_host_metadata
-typed_config:
-"@type": type.googleapis.com/envoy.extensions.retry.host.omit_host_metadata.v3.OmitHostMetadataConfig
-metadata_match:
-  filter_metadata:
-    envoy.lb:
-      key: value
+  retry_policy:
+    retry_host_predicate:
+    - name: envoy.retry_host_predicates.omit_host_metadata
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.retry.host.omit_host_metadata.v3.OmitHostMetadataConfig
+        metadata_match:
+          filter_metadata:
+            envoy.lb:
+            key: value
 
 This will reject any host with matching (key, value) in its metadata.
 
@@ -121,12 +121,12 @@ To configure retries to attempt other priorities during retries, the built-in
 
 .. code-block:: yaml
 
-retry_policy:
-retry_priority:
-name: envoy.retry_priorities.previous_priorities
-typed_config:
-"@type": type.googleapis.com/envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig
-update_frequency: 2
+  retry_policy:
+    retry_priority:
+      name: envoy.retry_priorities.previous_priorities
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig
+        update_frequency: 2
 
 This will target priorities in subsequent retry attempts that haven't been already used. The ``update_frequency`` parameter decides how
 often the priority load should be recalculated.
@@ -136,15 +136,15 @@ previously attempted priorities.
 
 .. code-block:: yaml
 
-retry_policy:
-retry_host_predicate:
-- name: envoy.retry_host_predicates.previous_hosts
-host_selection_retry_max_attempts: 3
-retry_priority:
-name: envoy.retry_priorities.previous_priorities
-typed_config:
-"@type": type.googleapis.com/envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig
-update_frequency: 2
+  retry_policy:
+    retry_host_predicate:
+    - name: envoy.retry_host_predicates.previous_hosts
+    host_selection_retry_max_attempts: 3
+    retry_priority:
+      name: envoy.retry_priorities.previous_priorities
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig
+        update_frequency: 2
 
 .. _arch_overview_internal_redirects:
 
