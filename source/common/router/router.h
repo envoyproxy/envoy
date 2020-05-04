@@ -41,6 +41,13 @@ namespace Router {
  */
 // clang-format off
 #define ALL_ROUTER_STATS(COUNTER)                                                                  \
+  COUNTER(passthrough_internal_redirect_no_location)                                               \
+  COUNTER(passthrough_internal_redirect_no_path)                                                   \
+  COUNTER(passthrough_internal_redirect_bad_location)                                              \
+  COUNTER(passthrough_internal_redirect_unsafe_scheme)                                             \
+  COUNTER(passthrough_internal_redirect_too_many_redirects)                                        \
+  COUNTER(passthrough_internal_redirect_no_route)                                                  \
+  COUNTER(passthrough_internal_redirect_predicate)                                                 \
   COUNTER(no_route)                                                                                \
   COUNTER(no_cluster)                                                                              \
   COUNTER(rq_redirect)                                                                             \
@@ -500,6 +507,8 @@ private:
   void resetOtherUpstreams(UpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
   bool setupRedirect(const Http::ResponseHeaderMap& headers, UpstreamRequest& upstream_request);
+  bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
+                                                const Http::HeaderEntry& internal_redirect);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
   void doRetry();

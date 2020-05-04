@@ -4448,6 +4448,8 @@ TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxInternalRedirect) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  EXPECT_EQ(1UL,
+            stats_store_.counter("test.passthrough_internal_redirect_too_many_redirects").value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
@@ -4465,6 +4467,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_no_location").value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
@@ -4482,6 +4485,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_bad_location").value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
@@ -4551,6 +4555,7 @@ TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_unsafe_scheme").value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
@@ -4567,12 +4572,14 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, predicates())
       .WillOnce(Return(std::vector<InternalRedirectPredicateSharedPtr>({mock_predicate})));
   EXPECT_CALL(*mock_predicate, acceptTargetRoute(_, _)).WillOnce(Return(false));
+  ON_CALL(*mock_predicate, name()).WillByDefault(Return("mock_predicate"));
   EXPECT_CALL(callbacks_, recreateStream()).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_predicate").value());
 
   // Make sure the original host/path is preserved.
   EXPECT_EQ("host", default_request_headers_.Host()->value().getStringView());

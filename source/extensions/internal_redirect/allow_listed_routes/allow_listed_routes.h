@@ -21,13 +21,12 @@ public:
           config)
       : allowed_routes_(config.allowed_route_names().begin(), config.allowed_route_names().end()) {}
 
-  absl::string_view name() const override {
-    return InternalRedirectPredicateValues::get().AllowListedRoutesPredicate;
+  bool acceptTargetRoutel(StreamInfo::FilterState&, absl::string_view route_name) override {
+    return allowed_routes_.contains(route_name);
   }
 
-private:
-  bool acceptTargetRouteImpl(StreamInfo::FilterState&, absl::string_view route_name) override {
-    return allowed_routes_.contains(route_name);
+  absl::string_view name() const override {
+    return InternalRedirectPredicateValues::get().AllowListedRoutesPredicate;
   }
 
   const absl::flat_hash_set<std::string> allowed_routes_;

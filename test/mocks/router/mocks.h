@@ -144,6 +144,7 @@ public:
 class MockInternalRedirectPredicate : public InternalRedirectPredicate {
 public:
   MOCK_METHOD(bool, acceptTargetRoute, (StreamInfo::FilterState&, absl::string_view));
+  MOCK_METHOD(absl::string_view, name, (), (const));
 };
 
 class MockRetryState : public RetryState {
