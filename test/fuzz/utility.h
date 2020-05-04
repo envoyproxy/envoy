@@ -12,6 +12,8 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
+#include "nghttp2/nghttp2.h"
+
 // Strong assertion that applies across all compilation modes and doesn't rely
 // on gtest, which only provides soft fails that don't trip oss-fuzz failures.
 #define FUZZ_ASSERT(x) RELEASE_ASSERT(x, "")
@@ -49,13 +51,11 @@ inline std::string replaceInvalidCharacters(absl::string_view string) {
 inline std::string replaceInvalidHostCharacters(absl::string_view string) {
   std::string filtered;
   filtered.reserve(string.length());
-  for (const char& c : string) {
-    switch (c) {
-    case ' ':
+  for (const uint8_t* c = reinterpret_cast<const uint8_t*>(string.data()); *c; ++c) {
+    if (nghttp2_check_authority(c, 1)) {
+      filtered.push_back(*c);
+    } else {
       filtered.push_back('0');
-      break;
-    default:
-      filtered.push_back(c);
     }
   }
   return filtered;
@@ -83,12 +83,18 @@ replaceInvalidStringValues(const envoy::config::core::v3::Metadata& upstream_met
 template <class T>
 inline T fromHeaders(
     const test::fuzz::Headers& headers,
-    const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>()) {
+    const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>(),
+    std::unordered_set<std::string> include_headers = std::unordered_set<std::string>()) {
   T header_map;
   for (const auto& header : headers.headers()) {
     if (ignore_headers.find(absl::AsciiStrToLower(header.key())) == ignore_headers.end()) {
       header_map.addCopy(header.key(), header.value());
     }
+    include_headers.erase(absl::AsciiStrToLower(header.key()));
+  }
+  // Add dummy headers for non-present headers that must be included.
+  for (const auto& header : include_headers) {
+    header_map.addCopy(header, "dummy");
   }
   return header_map;
 }

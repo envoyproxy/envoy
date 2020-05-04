@@ -362,6 +362,9 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   bool is_connect = HeaderUtility::isConnect(headers);
 
   if (!method || (!path && !is_connect)) {
+    // TODO(#10878): This exception does not occur during dispatch and would not be triggered under
+    // normal circumstances since inputs would fail parsing at ingress. Replace with proper error
+    // handling when exceptions are removed. Include missing host header for CONNECT.
     throw CodecClientException(":method and :path must be specified");
   }
   if (method->value() == Headers::get().MethodValues.Head) {

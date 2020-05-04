@@ -85,8 +85,7 @@ public:
 class RequestEncoder : public virtual StreamEncoder {
 public:
   /**
-   * Encode headers, optionally indicating end of stream. Response headers must
-   * have a valid :status set.
+   * Encode headers, optionally indicating end of stream.
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only request.
    */
