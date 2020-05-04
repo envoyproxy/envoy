@@ -82,7 +82,7 @@ public:
   void init(CompressionLevel level, CompressionStrategy strategy, int64_t window_bits,
             uint64_t memory_level);
 
-  // Compressor
+  // Compression::Compressor::Compressor
   void compress(Buffer::Instance& buffer, Envoy::Compression::Compressor::State state) override;
 
 private:
