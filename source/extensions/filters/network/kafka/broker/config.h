@@ -17,7 +17,8 @@ using KafkaBrokerProtoConfig = envoy::extensions::filters::network::kafka_broker
 /**
  * Config registration for the Kafka filter.
  */
-class KafkaConfigFactory : public Common::FactoryBase<KafkaBrokerProtoConfig> {
+class KafkaConfigFactory : public Common::FactoryBase<KafkaBrokerProtoConfig>,
+                           private Logger::Loggable<Logger::Id::kafka> {
 public:
   KafkaConfigFactory() : FactoryBase(NetworkFilterNames::get().KafkaBroker) {}
 

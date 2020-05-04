@@ -454,6 +454,13 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:apache:kafka:*",
     ),
+    edenhill_librdkafka = dict(
+        sha256 = "3b99a36c082a67ef6295eabd4fb3e32ab0bff7c6b0d397d6352697335f4e57eb",
+        strip_prefix = "librdkafka-1.4.2",
+        urls = ["https://github.com/edenhill/librdkafka/archive/v1.4.2.tar.gz"],
+        use_category = ["dataplane"],
+        cpe = "N/A",
+    ),
     kafka_server_binary = dict(
         sha256 = "b9582bab0c3e8d131953b1afa72d6885ca1caae0061c2623071e7f396f2ccfee",
         strip_prefix = "kafka_2.12-2.4.0",
