@@ -12,7 +12,7 @@ DEPENDENCY_ANNOTATIONS = [
     # Attribute specifying CPE (Common Platform Enumeration, see https://nvd.nist.gov/products/cpe) ID
     # of the dependency. The ID may be in v2.3 or v2.2 format, although v2.3 is prefferred. See
     # https://nvd.nist.gov/products/cpe for CPE format. Use single wildcard '*' for version and vector elements
-    # i.e. 'cpe:2.3:a:nghttp2:nghttp2:*'.
+    # i.e. 'cpe:2.3:a:nghttp2:nghttp2:*'. Use "N/A" for dependencies without CPE assigned.
     # This attribute is optional for components with use categories listed in the
     # USE_CATEGORIES_WITH_CPE_OPTIONAL
     "cpe",
