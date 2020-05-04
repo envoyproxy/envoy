@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <fstream>
 #include <string>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -12,14 +11,12 @@
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/listeners.pb.h"
 #include "envoy/admin/v3/memory.pb.h"
 #include "envoy/admin/v3/metrics.pb.h"
 #include "envoy/admin/v3/mutex_stats.pb.h"
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/filesystem/filesystem.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -487,24 +484,6 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
   }
 }
 
-void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
-  envoy::admin::v3::Listeners listeners;
-  for (const auto& listener : server_.listenerManager().listeners()) {
-    envoy::admin::v3::ListenerStatus& listener_status = *listeners.add_listener_statuses();
-    listener_status.set_name(listener.get().name());
-    Network::Utility::addressToProtobufAddress(*listener.get().listenSocketFactory().localAddress(),
-                                               *listener_status.mutable_local_address());
-  }
-  response.add(MessageUtil::getJsonStringFromMessage(listeners, true)); // pretty-print
-}
-
-void AdminImpl::writeListenersAsText(Buffer::Instance& response) {
-  for (const auto& listener : server_.listenerManager().listeners()) {
-    response.add(fmt::format("{}::{}\n", listener.get().name(),
-                             listener.get().listenSocketFactory().localAddress()->asString()));
-  }
-}
-
 Http::Code AdminImpl::handlerClusters(absl::string_view url,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&) {
@@ -756,17 +735,6 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::ResponseHeaderMap& 
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::ResponseHeaderMap&,
-                                            Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  ListenerManager::StopListenersType stop_listeners_type =
-      params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
-                                                 : ListenerManager::StopListenersType::All;
-  server_.listenerManager().stopListeners(stop_listeners_type);
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::ResponseHeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   const std::time_t current_time =
@@ -811,21 +779,6 @@ Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::ResponseHeade
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerListenerInfo(absl::string_view url,
-                                          Http::ResponseHeaderMap& response_headers,
-                                          Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  const auto format_value = Utility::formatParam(query_params);
-
-  if (format_value.has_value() && format_value.value() == "json") {
-    writeListenersAsJson(response);
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  } else {
-    writeListenersAsText(response);
-  }
-  return Http::Code::OK;
-}
-
 Http::Code AdminImpl::handlerCerts(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                    Buffer::Instance& response, AdminStream&) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
@@ -844,106 +797,6 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::ResponseHeaderMap& r
     }
   });
   response.add(MessageUtil::getJsonStringFromMessage(certificates, true, true));
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerRuntime(absl::string_view url,
-                                     Http::ResponseHeaderMap& response_headers,
-                                     Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-
-  // TODO(jsedgwick): Use proto to structure this output instead of arbitrary JSON.
-  const auto& layers = server_.runtime().snapshot().getLayers();
-
-  std::vector<ProtobufWkt::Value> layer_names;
-  layer_names.reserve(layers.size());
-  std::map<std::string, std::vector<std::string>> entries;
-  for (const auto& layer : layers) {
-    layer_names.push_back(ValueUtil::stringValue(layer->name()));
-    for (const auto& value : layer->values()) {
-      const auto found = entries.find(value.first);
-      if (found == entries.end()) {
-        entries.emplace(value.first, std::vector<std::string>{});
-      }
-    }
-  }
-
-  for (const auto& layer : layers) {
-    for (auto& entry : entries) {
-      const auto found = layer->values().find(entry.first);
-      const auto& entry_value =
-          found == layer->values().end() ? EMPTY_STRING : found->second.raw_string_value_;
-      entry.second.push_back(entry_value);
-    }
-  }
-
-  ProtobufWkt::Struct layer_entries;
-  auto* layer_entry_fields = layer_entries.mutable_fields();
-  for (const auto& entry : entries) {
-    std::vector<ProtobufWkt::Value> layer_entry_values;
-    layer_entry_values.reserve(entry.second.size());
-    std::string final_value;
-    for (const auto& value : entry.second) {
-      if (!value.empty()) {
-        final_value = value;
-      }
-      layer_entry_values.push_back(ValueUtil::stringValue(value));
-    }
-
-    ProtobufWkt::Struct layer_entry_value;
-    auto* layer_entry_value_fields = layer_entry_value.mutable_fields();
-
-    (*layer_entry_value_fields)["final_value"] = ValueUtil::stringValue(final_value);
-    (*layer_entry_value_fields)["layer_values"] = ValueUtil::listValue(layer_entry_values);
-    (*layer_entry_fields)[entry.first] = ValueUtil::structValue(layer_entry_value);
-  }
-
-  ProtobufWkt::Struct runtime;
-  auto* fields = runtime.mutable_fields();
-
-  (*fields)["layers"] = ValueUtil::listValue(layer_names);
-  (*fields)["entries"] = ValueUtil::structValue(layer_entries);
-
-  response.add(MessageUtil::getJsonStringFromMessage(runtime, true, true));
-  return Http::Code::OK;
-}
-
-bool AdminImpl::isFormUrlEncoded(const Http::HeaderEntry* content_type) const {
-  if (content_type == nullptr) {
-    return false;
-  }
-
-  return content_type->value().getStringView() ==
-         Http::Headers::get().ContentTypeValues.FormUrlEncoded;
-}
-
-Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::ResponseHeaderMap&,
-                                           Buffer::Instance& response, AdminStream& admin_stream) {
-  Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  if (params.empty()) {
-    // Check if the params are in the request's body.
-    if (admin_stream.getRequestBody() != nullptr &&
-        isFormUrlEncoded(admin_stream.getRequestHeaders().ContentType())) {
-      params = Http::Utility::parseFromBody(admin_stream.getRequestBody()->toString());
-    }
-
-    if (params.empty()) {
-      response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
-      response.add("       or send the parameters as form values\n");
-      response.add("use an empty value to remove a previously added override");
-      return Http::Code::BadRequest;
-    }
-  }
-  std::unordered_map<std::string, std::string> overrides;
-  overrides.insert(params.begin(), params.end());
-  try {
-    server_.runtime().mergeValues(overrides);
-  } catch (const EnvoyException& e) {
-    response.add(e.what());
-    return Http::Code::ServiceUnavailable;
-  }
-  response.add("OK\n");
   return Http::Code::OK;
 }
 
@@ -992,6 +845,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
+      runtime_handler_(server), listeners_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -1022,8 +876,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            true},
           {"/reset_counters", "reset all counters to zero",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true},
-          {"/drain_listeners", "drain listeners", MAKE_ADMIN_HANDLER(handlerDrainListeners), false,
-           true},
+          {"/drain_listeners", "drain listeners",
+           MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
@@ -1040,11 +894,12 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable), false, true},
           {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true},
-          {"/listeners", "print listener info", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
-           false},
-          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
-          {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
-           false, true},
+          {"/listeners", "print listener info",
+           MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo), false, false},
+          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime),
+           false, false},
+          {"/runtime_modify", "modify runtime values",
+           MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true},
           {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false,
            true},
       },
