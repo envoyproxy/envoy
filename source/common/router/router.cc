@@ -664,9 +664,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Filter::HttpOrTcpPool Filter::createConnPool(Upstream::HostDescriptionConstSharedPtr& host) {
   Filter::HttpOrTcpPool conn_pool;
-  bool should_tcp_proxy = route_entry_->connectConfig().has_value() &&
-                          downstream_headers_->Method()->value().getStringView() ==
-                              Http::Headers::get().MethodValues.Connect;
+  const bool should_tcp_proxy = route_entry_->connectConfig().has_value() &&
+                                downstream_headers_->Method()->value().getStringView() ==
+                                    Http::Headers::get().MethodValues.Connect;
 
   if (!should_tcp_proxy) {
     conn_pool = getHttpConnPool();
@@ -982,6 +982,29 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
   upstream_request.removeFromList(upstream_requests_);
   onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout,
                          StreamInfo::ResponseCodeDetails::get().UpstreamPerTryTimeout);
+}
+
+void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
+  upstream_request.resetStream();
+
+  if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request)) {
+    return;
+  }
+
+  upstream_request.removeFromList(upstream_requests_);
+  cleanup();
+
+  if (downstream_response_started_) {
+    callbacks_->streamInfo().setResponseCodeDetails(
+        StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
+    callbacks_->resetStream();
+  } else {
+    callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached);
+    callbacks_->sendLocalReply(
+        Http::Code::RequestTimeout, "upstream max stream duration reached", modify_headers_,
+        absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
+  }
 }
 
 void Filter::updateOutlierDetection(Upstream::Outlier::Result result,

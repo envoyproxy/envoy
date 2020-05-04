@@ -523,7 +523,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
     case test::common::http::Action::kNewStream: {
       streams.emplace_back(new FuzzStream(
           conn_manager, config,
-          Fuzz::fromHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
+          Fuzz::fromHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers(),
+                                                      /* ignore_headers =*/{}, {":authority"}),
           action.new_stream().status(), action.new_stream().end_stream()));
       break;
     }
