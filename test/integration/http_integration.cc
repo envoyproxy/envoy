@@ -361,7 +361,7 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
     int upstream_index = 0;
     Event::TestTimeSystem& time_system = timeSystem();
     auto end_time = time_system.monotonicTime() + connection_wait_timeout;
-    // Loop over the upstreams until timeout or get a upstream request.
+    // Loop over the upstreams until the call times out or an upstream request is received.
     while (!result) {
       upstream_index = upstream_index % upstream_indices.size();
       result = fake_upstreams_[upstream_indices[upstream_index]]->waitForHttpConnection(
