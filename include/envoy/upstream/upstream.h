@@ -571,6 +571,7 @@ public:
   COUNTER(upstream_rq_cancelled)                                                                   \
   COUNTER(upstream_rq_completed)                                                                   \
   COUNTER(upstream_rq_maintenance_mode)                                                            \
+  COUNTER(upstream_rq_max_duration_reached)                                                        \
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
@@ -727,6 +728,12 @@ public:
    *         @see envoy::config::core::v3::Http2ProtocolOptions.
    */
   virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::HttpProtocolOptions for all of HTTP versions.
+   */
+  virtual const envoy::config::core::v3::HttpProtocolOptions&
+  commonHttpProtocolOptions() const PURE;
 
   /**
    * @param name std::string containing the well-known name of the extension for which protocol

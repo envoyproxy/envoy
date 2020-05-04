@@ -77,6 +77,7 @@ public:
                UpstreamRequest& upstream_request));
   MOCK_METHOD(void, onUpstreamHostSelected, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(void, onPerTryTimeout, (UpstreamRequest & upstream_request));
+  MOCK_METHOD(void, onStreamMaxDurationReached, (UpstreamRequest & upstream_request));
 
   MOCK_METHOD(Http::StreamDecoderFilterCallbacks*, callbacks, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, cluster, ());
