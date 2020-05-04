@@ -308,8 +308,8 @@ public:
   MOCK_METHOD(bool, addOrUpdateCluster,
               (const envoy::config::cluster::v3::Cluster& cluster,
                const std::string& version_info));
-  MOCK_METHOD(void, setPrimaryClustersInitializedCb, (std::function<void()>));
-  MOCK_METHOD(void, setInitializedCb, (std::function<void()>));
+  MOCK_METHOD(void, setPrimaryClustersInitializedCb, (PrimaryClustersReadyCallback));
+  MOCK_METHOD(void, setInitializedCb, (InitializationCompleteCallback));
   MOCK_METHOD(void, initializeSecondaryClusters,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(ClusterInfoMap, clusters, ());

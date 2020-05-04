@@ -209,7 +209,8 @@ void ClusterManagerInitHelper::setCds(CdsApi* cds) {
   }
 }
 
-void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) {
+void ClusterManagerInitHelper::setInitializedCb(
+    ClusterManager::InitializationCompleteCallback callback) {
   if (state_ == State::AllClustersInitialized) {
     callback();
   } else {
@@ -217,7 +218,11 @@ void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) 
   }
 }
 
-void ClusterManagerInitHelper::setPrimaryClustersInitializedCb(std::function<void()> callback) {
+void ClusterManagerInitHelper::setPrimaryClustersInitializedCb(
+    ClusterManager::PrimaryClustersReadyCallback callback) {
+  // The callback must be set before or at the `WaitingToStartSecondaryInitialization` state.
+  ASSERT(state_ == State::WaitingToStartSecondaryInitialization ||
+         state_ == State::WaitingForPrimaryInitializationToComplete || state_ == State::Loading);
   if (state_ == State::WaitingToStartSecondaryInitialization) {
     // This is the case where all clusters are STATIC and without health checking.
     callback();
@@ -371,7 +376,6 @@ ClusterManagerImpl::ClusterManagerImpl(
   init_helper_.onStaticLoadComplete();
 
   ads_mux_->start();
-  ENVOY_LOG(info, "Done with the first phase");
 }
 
 void ClusterManagerImpl::initializeSecondaryClusters(

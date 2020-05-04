@@ -86,6 +86,9 @@ class ClusterManagerFactory;
  */
 class ClusterManager {
 public:
+  using PrimaryClustersReadyCallback = std::function<void()>;
+  using InitializationCompleteCallback = std::function<void()>;
+
   virtual ~ClusterManager() = default;
 
   /**
@@ -104,12 +107,12 @@ public:
   /**
    * Set a callback that will be invoked when all primary clusters have been initialized.
    */
-  virtual void setPrimaryClustersInitializedCb(std::function<void()> callback) PURE;
+  virtual void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) PURE;
 
   /**
    * Set a callback that will be invoked when all owned clusters have been initialized.
    */
-  virtual void setInitializedCb(std::function<void()> callback) PURE;
+  virtual void setInitializedCb(InitializationCompleteCallback callback) PURE;
 
   /**
    * Start initialization of secondary clusters and then dynamically configured clusters.
