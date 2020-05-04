@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.common.dynamic_forward_proxy.v3;
 
-import "envoy/config/cluster/v3/circuit_breaker.proto";
 import "envoy/config/cluster/v3/cluster.proto";
 
 import "google/protobuf/duration.proto";
@@ -18,6 +17,18 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Dynamic forward proxy common configuration]
+
+// Configuration of circuit breakers for resolver.
+message DnsCacheCircuitBreakers {
+  message DnsCacheThreshold {
+    // The maximum number of pending requests that Envoy will allow to the
+    // resolver. If not specified, the default is 1024.
+    google.protobuf.UInt32Value max_pending_requests = 1;
+  }
+
+  // The circuit breaking threshold for resolver.
+  DnsCacheThreshold threshold = 1;
+}
 
 // Configuration for the dynamic forward proxy DNS cache. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
@@ -85,5 +96,6 @@ message DnsCacheConfig {
   // not specified, the failure refresh rate defaults to the dns_refresh_rate.
   config.cluster.v3.Cluster.RefreshRate dns_failure_refresh_rate = 6;
 
-  config.cluster.v3.DnsCacheCircuitBreaker dns_cache_circuit_breaker = 7;
+  // The config of circuit breakers for resolver. It provides a configurable threshold.
+  DnsCacheCircuitBreakers dns_cache_circuit_breaker = 7;
 }

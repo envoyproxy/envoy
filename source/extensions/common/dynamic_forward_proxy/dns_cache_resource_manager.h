@@ -4,7 +4,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/cluster/v3/circuit_breaker.pb.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -67,9 +66,11 @@ private:
 
 class DnsCacheResourceManager : public Envoy::Upstream::ResourceManager {
 public:
-  DnsCacheResourceManager(DnsCacheCircuitBreakersStats cb_stats, Runtime::Loader& loader,
-                          const std::string& config_name,
-                          const envoy::config::cluster::v3::DnsCacheCircuitBreaker& cb_config);
+  DnsCacheResourceManager(
+      DnsCacheCircuitBreakersStats cb_stats, Runtime::Loader& loader,
+      const std::string& config_name,
+      const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers&
+          cb_config);
 
   // Envoy::Upstream::ResourceManager
   DnsResource& pendingRequests() override { return *pending_requests_; }

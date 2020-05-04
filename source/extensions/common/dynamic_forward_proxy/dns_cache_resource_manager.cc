@@ -7,7 +7,8 @@ namespace DynamicForwardProxy {
 
 DnsCacheResourceManager::DnsCacheResourceManager(
     DnsCacheCircuitBreakersStats cb_stats, Runtime::Loader& loader, const std::string& config_name,
-    const envoy::config::cluster::v3::DnsCacheCircuitBreaker& cb_config) {
+    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers&
+        cb_config) {
   const auto& max_requests = cb_config.threshold().max_pending_requests().value();
   const auto runtime_key = fmt::format("circuit_breaker.dns_cache.{}", config_name);
 

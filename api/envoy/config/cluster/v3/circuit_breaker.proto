@@ -103,13 +103,3 @@ message CircuitBreakers {
   // are used.
   repeated Thresholds thresholds = 1;
 }
-
-message DnsCacheCircuitBreaker {
-  message DnsCacheThreshold {
-    // The maximum number of pending requests that Envoy will allow to the
-    // resolver. If not specified, the default is 1024.
-    google.protobuf.UInt32Value max_pending_requests = 1;
-  }
-
-  DnsCacheThreshold threshold = 1;
-}
