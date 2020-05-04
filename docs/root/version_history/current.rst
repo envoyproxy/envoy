@@ -43,6 +43,7 @@ Changes
 * router: internal redirect configs are moved to the :ref`internal_redirect_policy
   <envoy_api_field_router.RouterAction.internal_redirect_policy>` field, which defines more fine
   grained control of the internal redirect behavior.
+* runtime: add new gauge :ref:`deprecated_feature_seen_since_process_start <runtime_stats>` that gets reset across hot restarts.
 * stats: added the option to :ref:`report counters as deltas <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.report_counters_as_deltas>` to the metrics service stats sink.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
   can now have a separate :ref:`tracing provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
