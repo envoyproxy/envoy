@@ -1648,12 +1648,14 @@ TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
   TestResponseHeaderMapImpl headers{{"Content-Location", std::string(30, 'a')}, {":status", "200"}};
   response_encoder->encodeHeaders(headers, false);
 
+  EXPECT_EQ(0, store_.counter("http1.server_cx_buffer_overflow").value());
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferOverflowWatermark());
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
   TestResponseHeaderMapImpl headers_overflow{{"Content-Location", std::string(180, 'a')},
                                              {":status", "200"}};
   response_encoder->encodeHeaders(headers_overflow, false);
+  EXPECT_EQ(1, store_.counter("http1.server_cx_buffer_overflow").value());
 
   // Fake out the underlying Network::Connection buffer being drained.
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
@@ -2060,12 +2062,14 @@ TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   request_encoder.encodeHeaders(headers, true);
 
+  EXPECT_EQ(0, store_.counter("http1.client_cx_buffer_overflow").value());
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferOverflowWatermark());
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
   TestRequestHeaderMapImpl headers_overflow{
       {":method", "GET"}, {":path", std::string(50, 'a')}, {":authority", "host"}};
   request_encoder.encodeHeaders(headers_overflow, true);
+  EXPECT_EQ(1, store_.counter("http1.client_cx_buffer_overflow").value());
 
   // Fake out the underlying Network::Connection buffer being drained.
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());

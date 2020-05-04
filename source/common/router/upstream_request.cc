@@ -422,7 +422,6 @@ void UpstreamRequest::clearRequestEncoder() {
 void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferOverflowWatermark() {
   ASSERT(parent_.upstream_);
 
-  // TODO(adip): Test counters
   // Similar to onAboveWriteBufferHighWatermark:
   // There are two states we should get this callback in: 1) the watermark was
   // hit due to writes from a different filter instance over a shared
@@ -500,7 +499,6 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
 
 void UpstreamRequest::overflowDataFromDownstream() {
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
-  // TODO(adip): Test counters
   ENVOY_STREAM_LOG(warn, "Upstream buffered request body buffer overflow",
                    *parent_.callbacks());
   parent_.cluster()->stats().upstream_buffered_request_body_buffer_overflow_total_.inc();

@@ -931,7 +931,6 @@ void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
 
 void ServerConnectionImpl::onAboveOverflowWatermark() {
   if (active_request_.has_value()) {
-    // TODO(adip): Test counters
     ENVOY_CONN_LOG(warn, "Server connection output buffer or underlying connection overflow detected",
                    connection_);
     stats_.server_cx_buffer_overflow_.inc();
@@ -1127,7 +1126,6 @@ void ClientConnectionImpl::sendProtocolError(absl::string_view details) {
 
 void ClientConnectionImpl::onAboveOverflowWatermark() {
   // This should never happen without an active stream/request.
-  // TODO(adip): Test counters
   ENVOY_CONN_LOG(warn, "Client connection output buffer or underlying connection overflow detected",
                  connection_);
   stats_.client_cx_buffer_overflow_.inc();

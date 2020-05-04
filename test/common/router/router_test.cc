@@ -5722,6 +5722,10 @@ TEST_F(WatermarkTest, DownstreamWatermarks) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_drained_total")
                     .value());
+  stream_callbacks_->onAboveWriteBufferOverflowWatermark();
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_buffered_request_body_buffer_overflow_total")
+                    .value());
 
   sendResponse();
 }
@@ -5749,6 +5753,11 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
                     .counter("upstream_flow_control_resumed_reading_total")
                     .value());
 
+  watermark_callbacks->onAboveWriteBufferOverflowWatermark();
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_downstream_buffer_overflow_total")
+                    .value());
+
   Buffer::OwnedImpl data;
   EXPECT_CALL(encoder_, getStream()).Times(2).WillRepeatedly(ReturnRef(stream_));
   response_decoder_->decodeData(data, true);
@@ -5770,9 +5779,16 @@ TEST_F(WatermarkTest, FilterWatermarks) {
   // Send one extra byte. This should cause the buffer to go over the limit and pause downstream
   // data.
   Buffer::OwnedImpl last_byte("!");
-  router_.decodeData(last_byte, true);
+  router_.decodeData(last_byte, false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_backed_up_total")
+                    .value());
+
+  // Add 10 more bytes to go over the 2x overflow threshold.
+  Buffer::OwnedImpl more_data("1234567890");
+  router_.decodeData(more_data, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_buffered_request_body_buffer_overflow_total")
                     .value());
 
   // Now set up the downstream connection. The encoder will be given the buffered request body,

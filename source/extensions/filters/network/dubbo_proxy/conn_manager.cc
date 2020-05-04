@@ -69,7 +69,6 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 void ConnectionManager::onAboveWriteBufferOverflowWatermark() {
-  // TODO(adip): Test counters
   stats_.cx_buffer_overflow_total_.inc();
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferOverflowWatermark", read_callbacks_->connection());
 }

@@ -153,6 +153,10 @@ public:
     // NOP currently.
     conn_manager_->onAboveWriteBufferHighWatermark();
     conn_manager_->onBelowWriteBufferLowWatermark();
+
+    EXPECT_EQ(0U, stats_.cx_buffer_overflow_total_.value());
+    conn_manager_->onAboveWriteBufferOverflowWatermark();
+    EXPECT_EQ(1U, stats_.cx_buffer_overflow_total_.value());
   }
 
   void writeHessianErrorResponseMessage(Buffer::Instance& buffer, bool is_event,

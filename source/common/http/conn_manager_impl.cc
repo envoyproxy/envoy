@@ -2347,7 +2347,6 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
     onDecoderFilterAboveWriteBufferOverflowWatermark() {
-  // TODO(adip): Test counters
   ENVOY_STREAM_LOG(warn, "Decoder streaming filter buffer overflow detected.", parent_);
   parent_.connection_manager_.stats_.named_.dec_buffer_overflow_total_.inc();
 }
@@ -2360,7 +2359,6 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataOverflow() {
-  // TODO(adip): Test counters
   ENVOY_STREAM_LOG(debug, "request data buffer overflow watermark exceeded", parent_);
   parent_.connection_manager_.stats_.named_.downstream_rq_buffer_overflow_total_.inc();
 }
@@ -2494,7 +2492,6 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedMetadata(
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::
     onEncoderFilterAboveWriteBufferOverflowWatermark() {
-  // TODO(adip): Test counters
   ENVOY_STREAM_LOG(warn, "Encoder streaming filter buffer overflow detected.", parent_);
   parent_.connection_manager_.stats_.named_.enc_buffer_overflow_total_.inc();
   parent_.callOverflowWatermarkCallbacks();
@@ -2515,7 +2512,6 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataOverflow() {
-  // TODO(adip): Test counters
   parent_.connection_manager_.stats_.named_.rs_buffer_overflow_total_.inc();
   ENVOY_STREAM_LOG(warn, "Response data buffer overflow watermark exceeded", *this);
   onEncoderFilterAboveWriteBufferOverflowWatermark();

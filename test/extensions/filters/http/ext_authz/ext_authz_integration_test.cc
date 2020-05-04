@@ -309,14 +309,6 @@ TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithLargeBody) {
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
-// HTTP/1.1 and the size of the request body is larger than max_request_bytes.
-/*
-TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithVeryLargeBody) {
-  expectCheckRequestWithBody(Http::CodecClient::Type::HTTP1, 1048576); //1048577);
-}
-*/
-
-// Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithBody) {
   expectCheckRequestWithBody(Http::CodecClient::Type::HTTP2, 4);
@@ -327,14 +319,6 @@ TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithBody) {
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
   expectCheckRequestWithBody(Http::CodecClient::Type::HTTP2, 2048);
 }
-
-// Verifies that the request body is included in the CheckRequest when the downstream protocol is
-// HTTP/2 and the size of the request body is larger than max_request_bytes.
-/*
-TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithVeryLargeBody) {
-  expectCheckRequestWithBody(Http::CodecClient::Type::HTTP2, 1048576);
-}
-*/
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

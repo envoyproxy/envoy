@@ -248,7 +248,6 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
 }
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferOverflowWatermark() {
-  // TODO(adip): test counters
   parent_.stats_.recv_buffer_overflow_.inc();
   ENVOY_CONN_LOG(warn, "recv buffer overflowing ", parent_.connection_);
 }
@@ -306,9 +305,9 @@ void ConnectionImpl::StreamImpl::pendingSendBufferLowWatermark() {
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferOverflowWatermark() {
-  // TODO(adip): test counters
   parent_.stats_.send_buffer_overflow_.inc();
   ENVOY_CONN_LOG(warn, "send buffer overflowing ", parent_.connection_);
+  runOverflowWatermarkCallbacks();
 }
 
 void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& value) {
