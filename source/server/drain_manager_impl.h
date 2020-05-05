@@ -22,9 +22,11 @@ class DrainManagerImpl : Logger::Loggable<Logger::Id::main>, public DrainManager
 public:
   DrainManagerImpl(Instance& server, envoy::config::listener::v3::Listener::DrainType drain_type);
 
-  // Server::DrainManager
+  // Network::DrainDecision
   bool drainClose() const override;
-  void startDrainSequence(std::function<void()> completion) override;
+
+  // Server::DrainManager
+  void startDrainSequence(std::function<void()> drain_complete_cb) override;
   void startParentShutdownSequence() override;
 
 private:
@@ -36,7 +38,7 @@ private:
   std::atomic<bool> draining_{false};
   std::atomic<uint32_t> drain_time_completed_{};
   Event::TimerPtr parent_shutdown_timer_;
-  std::function<void()> drain_sequence_completion_;
+  std::function<void()> drain_complete_cb_;
 };
 
 } // namespace Server

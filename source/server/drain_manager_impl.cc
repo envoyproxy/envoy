@@ -47,13 +47,13 @@ void DrainManagerImpl::drainSequenceTick() {
 
   if (drain_time_completed_.load() < server_.options().drainTime().count()) {
     drain_tick_timer_->enableTimer(std::chrono::milliseconds(1000));
-  } else if (drain_sequence_completion_) {
-    drain_sequence_completion_();
+  } else if (drain_complete_cb_) {
+    drain_complete_cb_();
   }
 }
 
-void DrainManagerImpl::startDrainSequence(std::function<void()> completion) {
-  drain_sequence_completion_ = completion;
+void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
+  drain_complete_cb_ = drain_complete_cb;
   ASSERT(!draining_);
   ASSERT(!drain_tick_timer_);
   draining_ = true;
