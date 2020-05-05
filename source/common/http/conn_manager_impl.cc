@@ -695,6 +695,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
     StreamDecoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
+  // Note: configured decoder filters are appended to decoder_filters_.
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
+  //   http_filters:
+  //     - A
+  //     - B
+  //     - C
+  // The decoder filter chain will iterate through filters A, B, C.
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
@@ -702,6 +710,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
+  // Note: configured encoder filters are prepended to encoder_filters_.
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
+  //   http_filters:
+  //     - A
+  //     - B
+  //     - C
+  // The encoder filter chain will iterate through filters C, B, A.
   wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
 }
 

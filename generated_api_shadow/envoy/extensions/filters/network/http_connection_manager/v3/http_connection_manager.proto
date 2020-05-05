@@ -261,8 +261,8 @@ message HttpConnectionManager {
   Tracing tracing = 7;
 
   // A list of individual HTTP filters that make up the filter chain for
-  // requests made to the connection manager. Order matters as the filters are
-  // processed sequentially as request events happen.
+  // requests made to the connection manager. :ref:`Order matters <arch_overview_http_filters_ordering>`
+  // as the filters are processed sequentially as request events happen.
   config.core.v3.HttpProtocolOptions common_http_protocol_options = 35;
 
   // Whether the connection manager manipulates the :ref:`config_http_conn_man_headers_user-agent`
