@@ -4467,7 +4467,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
-  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_no_location").value());
+  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_bad_location").value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
