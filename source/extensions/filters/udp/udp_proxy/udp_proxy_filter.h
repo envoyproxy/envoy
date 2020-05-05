@@ -6,6 +6,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/network/socket_impl.h"
 #include "common/network/utility.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -221,7 +222,8 @@ private:
 
   virtual Network::IoHandlePtr createIoHandle(const Upstream::HostConstSharedPtr& host) {
     // Virtual so this can be overridden in unit tests.
-    return host->address()->socket(Network::Address::SocketType::Datagram);
+    return Network::SocketInterface::createSocket(Network::Address::SocketType::Datagram,
+                                                  host->address());
   }
 
   // Upstream::ClusterUpdateCallbacks

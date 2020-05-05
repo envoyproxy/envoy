@@ -91,6 +91,11 @@ public:
    * @return the version of IP address.
    */
   virtual IpVersion version() const PURE;
+
+  /**
+   * @return true if address is Ipv6 and Ipv4 compatibility is disabled, false otherwise
+   */
+  virtual bool v6only() const PURE;
 };
 
 enum class Type { Ip, Pipe };
@@ -133,35 +138,9 @@ public:
   virtual const std::string& logicalName() const PURE;
 
   /**
-   * Bind a socket to this address. The socket should have been created with a call to socket() on
-   * an Instance of the same address family.
-   * @param fd supplies the platform socket handle.
-   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
-   *   is successful, errno_ shouldn't be used.
-   */
-  virtual Api::SysCallIntResult bind(os_fd_t fd) const PURE;
-
-  /**
-   * Connect a socket to this address. The socket should have been created with a call to socket()
-   * on this object.
-   * @param fd supplies the platform socket handle.
-   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
-   *   is successful, errno_ shouldn't be used.
-   */
-  virtual Api::SysCallIntResult connect(os_fd_t fd) const PURE;
-
-  /**
    * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.
    */
   virtual const Ip* ip() const PURE;
-
-  /**
-   * Create a socket for this address.
-   * @param type supplies the socket type to create.
-   * @return the IoHandlePtr naming the socket. In case of a failure, the program would be
-   *   aborted.
-   */
-  virtual IoHandlePtr socket(SocketType type) const PURE;
 
   /**
    * @return the type of address.

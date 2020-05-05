@@ -8,17 +8,10 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/network/address.h"
-#include "envoy/network/io_handle.h"
 
 namespace Envoy {
 namespace Network {
 namespace Address {
-
-/**
- * Returns true if the given family is supported on this machine.
- * @param domain the IP family.
- */
-bool ipFamilySupported(int domain);
 
 /**
  * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
@@ -31,21 +24,6 @@ bool ipFamilySupported(int domain);
  */
 InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
                                            bool v6only = true);
-
-/**
- * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
- * @param fd socket file descriptor
- * @return InstanceConstSharedPtr for bound address.
- */
-InstanceConstSharedPtr addressFromFd(os_fd_t fd);
-
-/**
- * Obtain the address of the peer of the socket with the specified file descriptor.
- * Raises an EnvoyException on failure.
- * @param fd socket file descriptor
- * @return InstanceConstSharedPtr for peer address.
- */
-InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd);
 
 /**
  * Base class for all address types.
@@ -64,7 +42,6 @@ public:
 
 protected:
   InstanceBase(Type type) : type_(type) {}
-  IoHandlePtr socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
 
@@ -100,10 +77,7 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(os_fd_t fd) const override;
-  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return &ip_; }
-  IoHandlePtr socket(SocketType type) const override;
 
   // Network::Address::InstanceBase
   const sockaddr* sockAddr() const override {
@@ -138,6 +112,7 @@ private:
     const Ipv6* ipv6() const override { return nullptr; }
     uint32_t port() const override { return ntohs(ipv4_.address_.sin_port); }
     IpVersion version() const override { return IpVersion::v4; }
+    bool v6only() const override { return false; }
 
     Ipv4Helper ipv4_;
     std::string friendly_address_;
@@ -174,10 +149,7 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(os_fd_t fd) const override;
-  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return &ip_; }
-  IoHandlePtr socket(SocketType type) const override;
 
   // Network::Address::InstanceBase
   const sockaddr* sockAddr() const override {
@@ -208,6 +180,7 @@ private:
     const Ipv6* ipv6() const override { return &ipv6_; }
     uint32_t port() const override { return ipv6_.port(); }
     IpVersion version() const override { return IpVersion::v6; }
+    bool v6only() const override { return v6only_; }
 
     Ipv6Helper ipv6_;
     std::string friendly_address_;
@@ -237,10 +210,7 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(os_fd_t fd) const override;
-  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return nullptr; }
-  IoHandlePtr socket(SocketType type) const override;
 
   // Network::Address::InstanceBase
   const sockaddr* sockAddr() const override { return reinterpret_cast<const sockaddr*>(&address_); }
@@ -251,12 +221,15 @@ public:
     return sizeof(address_);
   }
 
+  bool abstractNamespace() const { return abstract_namespace_; }
+  mode_t getMode() const { return mode_; }
+
 private:
   sockaddr_un address_;
   // For abstract namespaces.
   bool abstract_namespace_{false};
   uint32_t address_length_{0};
-  mode_t mode{0};
+  mode_t mode_{0};
 };
 
 } // namespace Address

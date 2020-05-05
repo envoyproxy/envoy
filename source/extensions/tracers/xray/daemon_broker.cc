@@ -29,7 +29,8 @@ std::string createHeader(const std::string& format, uint32_t version) {
 
 DaemonBrokerImpl::DaemonBrokerImpl(const std::string& daemon_endpoint)
     : address_(Network::Utility::parseInternetAddressAndPort(daemon_endpoint, false /*v6only*/)),
-      io_handle_(address_->socket(Network::Address::SocketType::Datagram)) {}
+      io_handle_(Network::SocketInterface::createSocket(Network::Address::SocketType::Datagram,
+                                                        address_)) {}
 
 void DaemonBrokerImpl::send(const std::string& data) const {
   auto& logger = Logger::Registry::getLog(Logger::Id::tracing);
