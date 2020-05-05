@@ -387,6 +387,53 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyMultipleFramesInData)
   EXPECT_EQ(response->body(), "HelloHelloHello");
 }
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyFragmented) {
+  HttpIntegrationTest::initialize();
+
+  // Make request to gRPC upstream
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/indexStream"},
+      {":authority", "host"},
+  });
+  waitForNextUpstreamRequest();
+
+  // Send fragmented gRPC response
+  // Headers
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/grpc");
+  upstream_request_->encodeHeaders(response_headers, false);
+  // Fragmented payload
+  google::api::HttpBody http_body;
+  http_body.set_content_type("text/plain");
+  http_body.set_data(std::string(1024, 'a'));
+  // Fragment gRPC frame into 2 buffers equally divided
+  Buffer::OwnedImpl fragment1;
+  auto fragment2 = Grpc::Common::serializeToGrpcFrame(http_body);
+  fragment1.move(*fragment2, fragment2->length() / 2);
+  upstream_request_->encodeData(fragment1, false);
+  upstream_request_->encodeData(*fragment2, false);
+  // Trailers
+  Http::TestResponseTrailerMapImpl response_trailers;
+  auto grpc_status = Status();
+  response_trailers.setGrpcStatus(static_cast<uint64_t>(grpc_status.error_code()));
+  response_trailers.setGrpcMessage(
+      absl::string_view(grpc_status.error_message().data(), grpc_status.error_message().size()));
+  upstream_request_->encodeTrailers(response_trailers);
+  EXPECT_TRUE(upstream_request_->complete());
+
+  // Wait for complete
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  // Ensure that body was actually replaced
+  EXPECT_EQ(response->body(), http_body.data());
+  // As well as content-type header
+  auto content_type = response->headers().get(Http::LowerCaseString("content-type"));
+  EXPECT_EQ("text/plain", content_type->value().getStringView());
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryEchoHttpBody) {
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::EchoBodyRequest, google::api::HttpBody>(

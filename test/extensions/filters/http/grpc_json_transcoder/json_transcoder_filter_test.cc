@@ -899,6 +899,41 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamWithHttpBodyAsOutput) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamWithFragmentedHttpBody) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/indexStream"}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/indexStream", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("/bookstore.Bookstore/GetIndexStream", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                                   {":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+
+  // "Send" one fragmented gRPC frame
+  google::api::HttpBody http_body;
+  http_body.set_content_type("text/html");
+  http_body.set_data("<h1>Fragmented Message!</h1>");
+  auto fragment2 = Grpc::Common::serializeToGrpcFrame(http_body);
+  Buffer::OwnedImpl fragment1;
+  fragment1.move(*fragment2, fragment2->length() / 2);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(fragment1, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(*fragment2, false));
+
+  // Ensure that content-type is correct (taken from httpBody)
+  EXPECT_EQ("text/html", response_headers.get_("content-type"));
+
+  // Fragment1 is buffered by transcoder
+  EXPECT_EQ(0, fragment1.length());
+  // Second fragment contains entire body
+  EXPECT_EQ(http_body.data(), fragment2->toString());
+}
+
 class GrpcJsonTranscoderFilterGrpcStatusTest : public GrpcJsonTranscoderFilterTest {
 public:
   GrpcJsonTranscoderFilterGrpcStatusTest(

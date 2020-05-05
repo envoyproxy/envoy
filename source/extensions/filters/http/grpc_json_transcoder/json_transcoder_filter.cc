@@ -519,8 +519,11 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   has_body_ = true;
 
   if (method_->response_type_is_http_body_) {
-    buildResponseFromHttpBodyOutput(*response_headers_, data);
+    bool frame_processed = buildResponseFromHttpBodyOutput(*response_headers_, data);
     if (!method_->descriptor_->server_streaming()) {
+      return Http::FilterDataStatus::StopIterationAndBuffer;
+    }
+    if (!http_body_response_headers_set_ && !frame_processed) {
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
     return Http::FilterDataStatus::Continue;
@@ -667,12 +670,12 @@ void JsonTranscoderFilter::maybeSendHttpBodyRequestMessage() {
   first_request_sent_ = true;
 }
 
-void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
+bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
     Http::ResponseHeaderMap& response_headers, Buffer::Instance& data) {
   std::vector<Grpc::Frame> frames;
   decoder_.decode(data, frames);
   if (frames.empty()) {
-    return;
+    return false;
   }
 
   google::api::HttpBody http_body;
@@ -688,7 +691,7 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
         // Non streaming case: single message with content type / length
         response_headers.setContentType(http_body.content_type());
         response_headers.setContentLength(body.size());
-        return;
+        return true;
       } else if (!http_body_response_headers_set_) {
         // Streaming case: set content type only once from first HttpBody message
         response_headers.setContentType(http_body.content_type());
@@ -696,6 +699,8 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
       }
     }
   }
+
+  return true;
 }
 
 bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status,

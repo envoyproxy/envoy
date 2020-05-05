@@ -162,7 +162,11 @@ private:
   bool checkIfTranscoderFailed(const std::string& details);
   bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
   void maybeSendHttpBodyRequestMessage();
-  void buildResponseFromHttpBodyOutput(Http::ResponseHeaderMap& response_headers,
+  /**
+   * Builds response from HttpBody protobuf.
+   * Returns true if at least one gRPC frame has processed.
+   */
+  bool buildResponseFromHttpBodyOutput(Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& data);
   bool maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status,
                               Http::ResponseHeaderOrTrailerMap& trailers);
