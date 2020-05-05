@@ -19,7 +19,14 @@ Http::Code ListenersHandler::handlerDrainListeners(absl::string_view url, Http::
   ListenerManager::StopListenersType stop_listeners_type =
       params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
                                                  : ListenerManager::StopListenersType::All;
-  server_.listenerManager().stopListeners(stop_listeners_type);
+  if (params.find("graceful") != params.end()) {
+    server_.drainManager().startDrainSequence([this, stop_listeners_type]() {
+      server_.listenerManager().stopListeners(stop_listeners_type);
+    });
+  } else {
+    // If no graceful drain period is specified, close listeners immediately.
+    server_.listenerManager().stopListeners(stop_listeners_type);
+  }
   response.add("OK\n");
   return Http::Code::OK;
 }

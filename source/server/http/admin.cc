@@ -735,24 +735,6 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::ResponseHeaderMap& 
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::ResponseHeaderMap&,
-                                            Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  ListenerManager::StopListenersType stop_listeners_type =
-      params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
-                                                 : ListenerManager::StopListenersType::All;
-  if (params.find("graceful") != params.end()) {
-    server_.drainManager().startDrainSequence([this, stop_listeners_type]() {
-      server_.listenerManager().stopListeners(stop_listeners_type);
-    });
-  } else {
-    // If no graceful drain period is specified, close listeners immediately.
-    server_.listenerManager().stopListeners(stop_listeners_type);
-  }
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::ResponseHeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   const std::time_t current_time =
