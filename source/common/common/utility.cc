@@ -34,6 +34,7 @@ public:
 };
 
 using SpecifierConstants = ConstSingleton<SpecifierConstantValues>;
+using UnsignedMilliseconds = std::chrono::duration<uint64_t, std::milli>;
 
 } // namespace
 
@@ -215,6 +216,11 @@ bool DateUtil::timePointValid(MonotonicTime time_point) {
              .count() != 0;
 }
 
+uint64_t DateUtil::nowToMilliseconds(TimeSource& time_source) {
+  const SystemTime& now = time_source.systemTime();
+  return std::chrono::time_point_cast<UnsignedMilliseconds>(now).time_since_epoch().count();
+}
+
 const char StringUtil::WhitespaceChars[] = " \t\f\v\n\r";
 
 const char* StringUtil::strtoull(const char* str, uint64_t& out, int base) {
@@ -322,18 +328,29 @@ absl::string_view StringUtil::cropLeft(absl::string_view source, absl::string_vi
 
 std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
                                                       absl::string_view delimiters,
-                                                      bool keep_empty_string) {
+                                                      bool keep_empty_string,
+                                                      bool trim_whitespace) {
+  std::vector<absl::string_view> result;
   if (keep_empty_string) {
-    return absl::StrSplit(source, absl::ByAnyChar(delimiters));
+    result = absl::StrSplit(source, absl::ByAnyChar(delimiters));
+  } else {
+    if (trim_whitespace) {
+      result = absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipWhitespace());
+    } else {
+      result = absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
+    }
   }
-  return absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
+
+  if (trim_whitespace) {
+    for_each(result.begin(), result.end(), [](auto& v) { v = trim(v); });
+  }
+  return result;
 }
 
 std::string StringUtil::removeTokens(absl::string_view source, absl::string_view delimiters,
                                      const CaseUnorderedSet& tokens_to_remove,
                                      absl::string_view joiner) {
-  auto values = Envoy::StringUtil::splitToken(source, delimiters);
-  std::for_each(values.begin(), values.end(), [](auto& v) { v = StringUtil::trim(v); });
+  auto values = Envoy::StringUtil::splitToken(source, delimiters, false, true);
   auto end = std::remove_if(values.begin(), values.end(),
                             [&](absl::string_view t) { return tokens_to_remove.count(t) != 0; });
   return absl::StrJoin(values.begin(), end, joiner);
@@ -399,9 +416,11 @@ std::string StringUtil::escape(const std::string& source) {
   return ret;
 }
 
-std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) {
-  static const std::string DefaultDateFormat = "%Y-%m-%dT%H:%M:%E3SZ";
+const std::string& getDefaultDateFormat() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "%Y-%m-%dT%H:%M:%E3SZ");
+}
 
+std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) {
   struct CachedTime {
     std::chrono::seconds epoch_time_seconds;
     std::string formatted_time;
@@ -415,8 +434,8 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) 
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
 
   if (cached_time.formatted_time.empty() || cached_time.epoch_time_seconds != epoch_time_seconds) {
-    cached_time.formatted_time =
-        absl::FormatTime(DefaultDateFormat, absl::FromChrono(system_time), absl::UTCTimeZone());
+    cached_time.formatted_time = absl::FormatTime(
+        getDefaultDateFormat(), absl::FromChrono(system_time), absl::UTCTimeZone());
     cached_time.epoch_time_seconds = epoch_time_seconds;
   } else {
     // Overwrite the digits in the ".000Z" at the end of the string with the

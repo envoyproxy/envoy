@@ -25,6 +25,7 @@ namespace Extensions {
 namespace Common {
 namespace Redis {
 
+// TODO: rewrite the tests to fix the flaky test
 class ClusterRefreshManagerTest : public testing::Test {
 public:
   ClusterRefreshManagerTest()
@@ -131,17 +132,15 @@ TEST_F(ClusterRefreshManagerTest, Basic) {
     // as wait for 2 would only ensure onRedirection was started
     waitForTime(MonotonicTime(std::chrono::seconds(3)));
     refresh_manager_->onRedirection(cluster_name_);
-    waitForTime(MonotonicTime(std::chrono::seconds(4)));
   });
   Thread::ThreadPtr thread_2 = platform_.threadFactory().createThread([&]() {
     // wait for 3 ensures that thread_1's first onRedirection is completed,
     // as wait for 2 would only ensure onRedirection was started
     waitForTime(MonotonicTime(std::chrono::seconds(3)));
     refresh_manager_->onRedirection(cluster_name_);
-    waitForTime(MonotonicTime(std::chrono::seconds(4)));
   });
 
-  advanceTime(MonotonicTime(std::chrono::seconds(4)), 2);
+  advanceTime(MonotonicTime(std::chrono::seconds(3)), 2);
   thread_1->join();
   thread_2->join();
 
@@ -177,17 +176,15 @@ TEST_F(ClusterRefreshManagerTest, BasicFailureEvents) {
     // as wait for 2 would only ensure onRedirection was started
     waitForTime(MonotonicTime(std::chrono::seconds(3)));
     refresh_manager_->onFailure(cluster_name_);
-    waitForTime(MonotonicTime(std::chrono::seconds(4)));
   });
   Thread::ThreadPtr thread_2 = platform_.threadFactory().createThread([&]() {
     // wait for 3 ensures that thread_1's first onRedirection is completed,
     // as wait for 2 would only ensure onRedirection was started
     waitForTime(MonotonicTime(std::chrono::seconds(3)));
     refresh_manager_->onFailure(cluster_name_);
-    waitForTime(MonotonicTime(std::chrono::seconds(4)));
   });
 
-  advanceTime(MonotonicTime(std::chrono::seconds(4)), 2);
+  advanceTime(MonotonicTime(std::chrono::seconds(3)), 2);
   thread_1->join();
   thread_2->join();
 
@@ -223,17 +220,15 @@ TEST_F(ClusterRefreshManagerTest, BasicDegradedEvents) {
     // as wait for 2 would only ensure onRedirection was started
     waitForTime(MonotonicTime(std::chrono::seconds(3)));
     refresh_manager_->onHostDegraded(cluster_name_);
-    waitForTime(MonotonicTime(std::chrono::seconds(4)));
   });
   Thread::ThreadPtr thread_2 = platform_.threadFactory().createThread([&]() {
     // wait for 3 ensures that thread_1's first onRedirection is completed,
     // as wait for 2 would only ensure onRedirection was started
     waitForTime(MonotonicTime(std::chrono::seconds(3)));
     refresh_manager_->onHostDegraded(cluster_name_);
-    waitForTime(MonotonicTime(std::chrono::seconds(4)));
   });
 
-  advanceTime(MonotonicTime(std::chrono::seconds(4)), 2);
+  advanceTime(MonotonicTime(std::chrono::seconds(3)), 2);
   thread_1->join();
   thread_2->join();
 

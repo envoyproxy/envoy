@@ -12,6 +12,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "backtrace_lib",
+    srcs = ["backtrace.cc"],
     hdrs = ["backtrace.h"],
     external_deps = [
         "abseil_stacktrace",
@@ -48,8 +49,6 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/tracing:http_tracer_config_lib",
-        "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
@@ -75,8 +74,10 @@ envoy_cc_library(
         "//include/envoy/stats:timespan_interface",
         "//source/common/common:linked_object",
         "//source/common/common:non_copyable",
+        "//source/common/event:deferred_task",
         "//source/common/network:connection_lib",
         "//source/common/stats:timespan_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//source/extensions/transport_sockets:well_known_names",
     ],
 )
@@ -261,7 +262,7 @@ envoy_cc_library(
         "//include/envoy/server:listener_manager_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/config:resources_lib",
+        "//source/common/config:subscription_base_interface",
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
@@ -269,6 +270,7 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -317,10 +319,12 @@ envoy_cc_library(
         ":listener_manager_impl",
         ":transport_socket_config_lib",
         ":well_known_names_lib",
+        "//include/envoy/access_log:access_log_interface",
         "//include/envoy/server:active_udp_listener_config_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
+        "//source/common/access_log:access_log_lib",
         "//source/common/config:utility_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
@@ -365,6 +369,7 @@ envoy_cc_library(
         "//source/common/config:version_converter_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/init:manager_lib",
+        "//source/common/network:filter_matcher_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
@@ -480,6 +485,7 @@ envoy_cc_library(
         "//source/server:overload_manager_lib",
         "//source/server/http:admin_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

@@ -25,6 +25,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
   ON_CALL(*this, configProto()).WillByDefault(ReturnRef(config_proto_));
   ON_CALL(*this, configYaml()).WillByDefault(ReturnRef(config_yaml_));
+  ON_CALL(*this, bootstrapVersion()).WillByDefault(ReturnRef(bootstrap_version_));
   ON_CALL(*this, allowUnknownStaticFields()).WillByDefault(Invoke([this] {
     return allow_unknown_static_fields_;
   }));
@@ -118,9 +119,11 @@ MockWorkerFactory::MockWorkerFactory() = default;
 MockWorkerFactory::~MockWorkerFactory() = default;
 
 MockWorker::MockWorker() {
-  ON_CALL(*this, addListener(_, _))
+  ON_CALL(*this, addListener(_, _, _))
       .WillByDefault(
-          Invoke([this](Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
+          Invoke([this](absl::optional<uint64_t> overridden_listener,
+                        Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
+            UNREFERENCED_PARAMETER(overridden_listener);
             config.listenSocketFactory().getListenSocket();
             EXPECT_EQ(nullptr, add_listener_completion_);
             add_listener_completion_ = completion;
@@ -138,6 +141,13 @@ MockWorker::MockWorker() {
         if (completion != nullptr) {
           completion();
         }
+      }));
+
+  ON_CALL(*this, removeFilterChains(_, _, _))
+      .WillByDefault(Invoke([this](uint64_t, const std::list<const Network::FilterChain*>&,
+                                   std::function<void()> completion) -> void {
+        EXPECT_EQ(nullptr, remove_filter_chains_completion_);
+        remove_filter_chains_completion_ = completion;
       }));
 }
 MockWorker::~MockWorker() = default;
@@ -213,12 +223,14 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
+  ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 
 MockFactoryContext::MockFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(scope_.symbolTable()), http_context_(scope_.symbolTable()) {
+  ON_CALL(*this, getServerFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
@@ -273,6 +285,13 @@ MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 
 MockFilterChainFactoryContext::MockFilterChainFactoryContext() = default;
 MockFilterChainFactoryContext::~MockFilterChainFactoryContext() = default;
+
+MockTracerFactory::MockTracerFactory(const std::string& name) : name_(name) {
+  ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Invoke([] {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }));
+}
+MockTracerFactory::~MockTracerFactory() = default;
 
 MockTracerFactoryContext::MockTracerFactoryContext() {
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));

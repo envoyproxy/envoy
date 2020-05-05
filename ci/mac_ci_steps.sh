@@ -26,10 +26,10 @@ BAZEL_BUILD_OPTIONS="--curses=no --show_task_finish --verbose_failures \
 if [[ $# -gt 0 ]]; then
   TEST_TARGETS=$*
 else
-  TEST_TARGETS=//test/...
+  TEST_TARGETS=//test/integration/...
 fi
 
-if [[ "$TEST_TARGETS" == "//test/..." ]]; then
+if [[ "$TEST_TARGETS" == "//test/..." || "$TEST_TARGETS" == "//test/integration/..." ]]; then
   bazel build ${BAZEL_BUILD_OPTIONS} //source/exe:envoy-static
 fi
 bazel test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}

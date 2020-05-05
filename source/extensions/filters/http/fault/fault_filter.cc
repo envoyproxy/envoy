@@ -19,6 +19,7 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
 
@@ -43,15 +44,16 @@ FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::
                                                              RuntimeKeys::get().DelayDurationKey)),
       abort_http_status_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(
           fault, abort_http_status_runtime, RuntimeKeys::get().AbortHttpStatusKey)),
+      abort_grpc_status_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(
+          fault, abort_grpc_status_runtime, RuntimeKeys::get().AbortGrpcStatusKey)),
       max_active_faults_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(
           fault, max_active_faults_runtime, RuntimeKeys::get().MaxActiveFaultsKey)),
       response_rate_limit_percent_runtime_(
           PROTOBUF_GET_STRING_OR_DEFAULT(fault, response_rate_limit_percent_runtime,
                                          RuntimeKeys::get().ResponseRateLimitPercentKey)) {
   if (fault.has_abort()) {
-    const auto& abort = fault.abort();
-    abort_percentage_ = abort.percentage();
-    http_status_ = abort.http_status();
+    request_abort_config_ =
+        std::make_unique<Filters::Common::Fault::FaultAbortConfig>(fault.abort());
   }
 
   if (fault.has_delay()) {
@@ -86,9 +88,8 @@ FaultFilterConfig::FaultFilterConfig(
       stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))) {}
 
 void FaultFilterConfig::incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name) {
-  Stats::SymbolTable::StoragePtr storage =
-      scope_.symbolTable().join({stats_prefix_, downstream_cluster, stat_name});
-  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+  Stats::Utility::counterFromStatNames(scope_, {stats_prefix_, downstream_cluster, stat_name})
+      .inc();
 }
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
@@ -150,14 +151,16 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
         fmt::format("fault.http.{}.delay.fixed_duration_ms", downstream_cluster_);
     downstream_cluster_abort_http_status_key_ =
         fmt::format("fault.http.{}.abort.http_status", downstream_cluster_);
+    downstream_cluster_abort_grpc_status_key_ =
+        fmt::format("fault.http.{}.abort.grpc_status", downstream_cluster_);
   }
 
   maybeSetupResponseRateLimit(headers);
 
   absl::optional<std::chrono::milliseconds> duration = delayDuration(headers);
   if (duration.has_value()) {
-    delay_timer_ =
-        decoder_callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
+    delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
+        [this, &headers]() -> void { postDelayInjection(headers); });
     ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
     delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
     recordDelaysInjectedStats();
@@ -165,8 +168,12 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  if (isAbortEnabled()) {
-    abortWithHTTPStatus();
+  absl::optional<Http::Code> http_status;
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+  std::tie(http_status, grpc_status) = abortStatus(headers);
+
+  if (http_status.has_value()) {
+    abortWithStatus(http_status.value(), grpc_status);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -174,20 +181,13 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
 }
 
 void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers) {
-  if (fault_settings_->responseRateLimit() == nullptr) {
+  if (!isResponseRateLimitEnabled(request_headers)) {
     return;
   }
 
-  absl::optional<uint64_t> rate_kbps = fault_settings_->responseRateLimit()->rateKbps(
-      request_headers.get(Filters::Common::Fault::HeaderNames::get().ThroughputResponse));
+  absl::optional<uint64_t> rate_kbps =
+      fault_settings_->responseRateLimit()->rateKbps(&request_headers);
   if (!rate_kbps.has_value()) {
-    return;
-  }
-
-  // TODO(mattklein123): Allow runtime override via downstream cluster similar to the other keys.
-  if (!config_->runtime().snapshot().featureEnabled(
-          fault_settings_->responseRateLimitPercentRuntime(),
-          fault_settings_->responseRateLimit()->percentage())) {
     return;
   }
 
@@ -221,40 +221,56 @@ bool FaultFilter::faultOverflow() {
   return false;
 }
 
-bool FaultFilter::isDelayEnabled() {
-  if (fault_settings_->requestDelay() == nullptr) {
+bool FaultFilter::isDelayEnabled(const Http::RequestHeaderMap& request_headers) {
+  const auto request_delay = fault_settings_->requestDelay();
+  if (request_delay == nullptr) {
     return false;
   }
 
   if (!downstream_cluster_delay_percent_key_.empty()) {
     return config_->runtime().snapshot().featureEnabled(
-        downstream_cluster_delay_percent_key_, fault_settings_->requestDelay()->percentage());
+        downstream_cluster_delay_percent_key_, request_delay->percentage(&request_headers));
   }
-  return config_->runtime().snapshot().featureEnabled(
-      fault_settings_->delayPercentRuntime(), fault_settings_->requestDelay()->percentage());
+  return config_->runtime().snapshot().featureEnabled(fault_settings_->delayPercentRuntime(),
+                                                      request_delay->percentage(&request_headers));
 }
 
-bool FaultFilter::isAbortEnabled() {
+bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) {
+  const auto request_abort = fault_settings_->requestAbort();
+  if (request_abort == nullptr) {
+    return false;
+  }
+
   if (!downstream_cluster_abort_percent_key_.empty()) {
-    return config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
-                                                        fault_settings_->abortPercentage());
+    return config_->runtime().snapshot().featureEnabled(
+        downstream_cluster_abort_percent_key_, request_abort->percentage(&request_headers));
   }
   return config_->runtime().snapshot().featureEnabled(fault_settings_->abortPercentRuntime(),
-                                                      fault_settings_->abortPercentage());
+                                                      request_abort->percentage(&request_headers));
+}
+
+bool FaultFilter::isResponseRateLimitEnabled(const Http::RequestHeaderMap& request_headers) {
+  if (fault_settings_->responseRateLimit() == nullptr) {
+    return false;
+  }
+
+  // TODO(mattklein123): Allow runtime override via downstream cluster similar to the other keys.
+  return config_->runtime().snapshot().featureEnabled(
+      fault_settings_->responseRateLimitPercentRuntime(),
+      fault_settings_->responseRateLimit()->percentage(&request_headers));
 }
 
 absl::optional<std::chrono::milliseconds>
 FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
   absl::optional<std::chrono::milliseconds> ret;
 
-  if (!isDelayEnabled()) {
+  if (!isDelayEnabled(request_headers)) {
     return ret;
   }
 
   // See if the configured delay provider has a default delay, if not there is no delay (e.g.,
   // header configuration and no/invalid header).
-  auto config_duration = fault_settings_->requestDelay()->duration(
-      request_headers.get(Filters::Common::Fault::HeaderNames::get().DelayRequest));
+  auto config_duration = fault_settings_->requestDelay()->duration(&request_headers);
   if (!config_duration.has_value()) {
     return ret;
   }
@@ -275,17 +291,64 @@ FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
   return ret;
 }
 
-uint64_t FaultFilter::abortHttpStatus() {
-  // TODO(mattklein123): check http status codes obtained from runtime.
-  uint64_t http_status = config_->runtime().snapshot().getInteger(
-      fault_settings_->abortHttpStatusRuntime(), fault_settings_->abortCode());
-
-  if (!downstream_cluster_abort_http_status_key_.empty()) {
-    http_status = config_->runtime().snapshot().getInteger(
-        downstream_cluster_abort_http_status_key_, http_status);
+AbortHttpAndGrpcStatus FaultFilter::abortStatus(const Http::RequestHeaderMap& request_headers) {
+  if (!isAbortEnabled(request_headers)) {
+    return AbortHttpAndGrpcStatus{absl::nullopt, absl::nullopt};
   }
 
-  return http_status;
+  auto http_status = abortHttpStatus(request_headers);
+  // If http status code is set, then gRPC status won't be used.
+  if (http_status.has_value()) {
+    return AbortHttpAndGrpcStatus{http_status, absl::nullopt};
+  }
+
+  auto grpc_status = abortGrpcStatus(request_headers);
+  // If gRPC status code is set, then http status will be set to Http::Code::OK (200)
+  if (grpc_status.has_value()) {
+    return AbortHttpAndGrpcStatus{Http::Code::OK, grpc_status};
+  }
+
+  return AbortHttpAndGrpcStatus{absl::nullopt, absl::nullopt};
+}
+
+absl::optional<Http::Code>
+FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
+  // See if the configured abort provider has a default status code, if not there is no abort status
+  // code (e.g., header configuration and no/invalid header).
+  auto http_status = fault_settings_->requestAbort()->httpStatusCode(&request_headers);
+  if (!http_status.has_value()) {
+    return absl::nullopt;
+  }
+
+  auto default_http_status_code = static_cast<uint64_t>(http_status.value());
+  auto runtime_http_status_code = config_->runtime().snapshot().getInteger(
+      fault_settings_->abortHttpStatusRuntime(), default_http_status_code);
+
+  if (!downstream_cluster_abort_http_status_key_.empty()) {
+    runtime_http_status_code = config_->runtime().snapshot().getInteger(
+        downstream_cluster_abort_http_status_key_, default_http_status_code);
+  }
+
+  return static_cast<Http::Code>(runtime_http_status_code);
+}
+
+absl::optional<Grpc::Status::GrpcStatus>
+FaultFilter::abortGrpcStatus(const Http::RequestHeaderMap& request_headers) {
+  auto grpc_status = fault_settings_->requestAbort()->grpcStatusCode(&request_headers);
+  if (!grpc_status.has_value()) {
+    return absl::nullopt;
+  }
+
+  auto default_grpc_status_code = static_cast<uint64_t>(grpc_status.value());
+  auto runtime_grpc_status_code = config_->runtime().snapshot().getInteger(
+      fault_settings_->abortGrpcStatusRuntime(), default_grpc_status_code);
+
+  if (!downstream_cluster_abort_grpc_status_key_.empty()) {
+    runtime_grpc_status_code = config_->runtime().snapshot().getInteger(
+        downstream_cluster_abort_grpc_status_key_, default_grpc_status_code);
+  }
+
+  return static_cast<Grpc::Status::GrpcStatus>(runtime_grpc_status_code);
 }
 
 void FaultFilter::recordDelaysInjectedStats() {
@@ -350,22 +413,26 @@ void FaultFilter::onDestroy() {
   }
 }
 
-void FaultFilter::postDelayInjection() {
+void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_headers) {
   resetTimerState();
 
   // Delays can be followed by aborts
-  if (isAbortEnabled()) {
-    abortWithHTTPStatus();
+  absl::optional<Http::Code> http_status;
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+  std::tie(http_status, grpc_status) = abortStatus(request_headers);
+
+  if (http_status.has_value()) {
+    abortWithStatus(http_status.value(), grpc_status);
   } else {
     // Continue request processing.
     decoder_callbacks_->continueDecoding();
   }
 }
 
-void FaultFilter::abortWithHTTPStatus() {
+void FaultFilter::abortWithStatus(Http::Code http_status_code,
+                                  absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
-  decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(abortHttpStatus()),
-                                     "fault filter abort", nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(http_status_code, "fault filter abort", nullptr, grpc_status,
                                      RcDetails::get().FaultAbort);
   recordAbortsInjectedStats();
 }

@@ -1,13 +1,10 @@
-#include <arpa/inet.h>
-#include <arpa/nameser.h>
-#include <arpa/nameser_compat.h>
-
 #include <list>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/address.h"
@@ -21,6 +18,7 @@
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
@@ -32,6 +30,13 @@
 #include "ares.h"
 #include "ares_dns.h"
 #include "gtest/gtest.h"
+
+#if !defined(WIN32)
+#include <arpa/nameser.h>
+#include <arpa/nameser_compat.h>
+#else
+#include "nameser.h"
+#endif
 
 using testing::_;
 using testing::Contains;
@@ -265,11 +270,12 @@ private:
 
 class TestDnsServer : public ListenerCallbacks {
 public:
-  TestDnsServer(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher), record_ttl_(0) {}
+  TestDnsServer(Event::Dispatcher& dispatcher)
+      : dispatcher_(dispatcher), record_ttl_(0), stream_info_(dispatcher.timeSource()) {}
 
   void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
-        std::move(socket), Network::Test::createRawBufferSocket());
+        std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
     TestDnsServerQuery* query = new TestDnsServerQuery(std::move(new_connection), hosts_a_,
                                                        hosts_aaaa_, cnames_, record_ttl_, refused_);
     queries_.emplace_back(query);
@@ -301,6 +307,7 @@ private:
   // All queries are tracked so we can do resource reclamation when the test is
   // over.
   std::vector<std::unique_ptr<TestDnsServerQuery>> queries_;
+  StreamInfo::StreamInfoImpl stream_info_;
 };
 
 } // namespace
@@ -334,7 +341,8 @@ private:
 
 class DnsImplConstructor : public testing::Test {
 protected:
-  DnsImplConstructor() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+  DnsImplConstructor()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -414,7 +422,8 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
-  DnsImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+  DnsImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void SetUp() override {
     resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups());
@@ -479,13 +488,13 @@ public:
             EXPECT_EQ(expected_results, address_as_string_list);
           }
 
-          for (auto expected_absent_result : expected_absent_results) {
+          for (const auto& expected_absent_result : expected_absent_results) {
             EXPECT_THAT(address_as_string_list, Not(Contains(expected_absent_result)));
           }
 
           if (expected_ttl) {
             std::list<Address::InstanceConstSharedPtr> address_list = getAddressList(results);
-            for (auto address : results) {
+            for (const auto& address : results) {
               EXPECT_EQ(address.ttl_, expected_ttl.value());
             }
           }

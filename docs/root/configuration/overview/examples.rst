@@ -25,7 +25,7 @@ A minimal fully static bootstrap config is provided below:
       - filters:
         - name: envoy.filters.network.http_connection_manager
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
             stat_prefix: ingress_http
             codec_type: AUTO
             route_config:
@@ -58,7 +58,7 @@ Mostly static with dynamic EDS
 
 A bootstrap config that continues from the above example with :ref:`dynamic endpoint
 discovery <arch_overview_dynamic_config_eds>` via an
-:ref:`EDS<envoy_api_file_envoy/api/v2/eds.proto>` gRPC management server listening
+:ref:`EDS<envoy_v3_api_file_envoy/service/endpoint/v3/eds.proto>` gRPC management server listening
 on 127.0.0.1:5678 is provided below:
 
 .. code-block:: yaml
@@ -77,7 +77,7 @@ on 127.0.0.1:5678 is provided below:
       - filters:
         - name: envoy.filters.network.http_connection_manager
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
             stat_prefix: ingress_http
             codec_type: AUTO
             route_config:
@@ -125,18 +125,18 @@ Notice above that *xds_cluster* is defined to point Envoy at the management serv
 an otherwise completely dynamic configurations, some static resources need to
 be defined to point Envoy at its xDS management server(s).
 
-It's important to set appropriate :ref:`TCP Keep-Alive options <envoy_api_msg_core.TcpKeepalive>`
+It's important to set appropriate :ref:`TCP Keep-Alive options <envoy_v3_api_msg_config.core.v3.TcpKeepalive>`
 in the `tcp_keepalive` block. This will help detect TCP half open connections to the xDS management
 server and re-establish a full connection.
 
 In the above example, the EDS management server could then return a proto encoding of a
-:ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`:
+:ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`:
 
 .. code-block:: yaml
 
   version_info: "0"
   resources:
-  - "@type": type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
+  - "@type": type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment
     cluster_name: some_service
     endpoints:
     - lb_endpoints:
@@ -207,7 +207,7 @@ The management server could respond to LDS requests with:
 
   version_info: "0"
   resources:
-  - "@type": type.googleapis.com/envoy.api.v2.Listener
+  - "@type": type.googleapis.com/envoy.config.listener.v3.Listener
     name: listener_0
     address:
       socket_address:
@@ -217,7 +217,7 @@ The management server could respond to LDS requests with:
     - filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
           codec_type: AUTO
           rds:
@@ -237,7 +237,7 @@ The management server could respond to RDS requests with:
 
   version_info: "0"
   resources:
-  - "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
+  - "@type": type.googleapis.com/envoy.config.route.v3.RouteConfiguration
     name: local_route
     virtual_hosts:
     - name: local_service
@@ -252,7 +252,7 @@ The management server could respond to CDS requests with:
 
   version_info: "0"
   resources:
-  - "@type": type.googleapis.com/envoy.api.v2.Cluster
+  - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
     name: some_service
     connect_timeout: 0.25s
     lb_policy: ROUND_ROBIN
@@ -271,7 +271,7 @@ The management server could respond to EDS requests with:
 
   version_info: "0"
   resources:
-  - "@type": type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
+  - "@type": type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment
     cluster_name: some_service
     endpoints:
     - lb_endpoints:

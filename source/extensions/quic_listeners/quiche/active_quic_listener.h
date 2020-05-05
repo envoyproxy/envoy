@@ -34,7 +34,6 @@ public:
 
   ~ActiveQuicListener() override;
 
-  // TODO(#7465): Make this a callback.
   void onListenerShutdown();
 
   // Network::UdpListenerCallbacks
@@ -47,7 +46,9 @@ public:
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
-  void destroy() override { udp_listener_.reset(); }
+  void pauseListening() override;
+  void resumeListening() override;
+  void shutdownListener() override;
 
 private:
   friend class ActiveQuicListenerPeer;

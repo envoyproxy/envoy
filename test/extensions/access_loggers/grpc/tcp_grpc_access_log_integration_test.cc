@@ -28,7 +28,7 @@ class TcpGrpcAccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamT
                                         public BaseIntegrationTest {
 public:
   TcpGrpcAccessLogIntegrationTest()
-      : BaseIntegrationTest(ipVersion(), ConfigHelper::TCP_PROXY_CONFIG) {
+      : BaseIntegrationTest(ipVersion(), ConfigHelper::tcpProxyConfig()) {
     enable_half_close_ = true;
   }
 
@@ -54,12 +54,7 @@ public:
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      auto* filter_chain = listener->mutable_filter_chains(0);
-      auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
-      auto tcp_proxy_config =
-          MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
-              *config_blob);
-      auto* access_log = tcp_proxy_config.add_access_log();
+      auto* access_log = listener->add_access_log();
       access_log->set_name("grpc_accesslog");
       envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig access_log_config;
       auto* common_config = access_log_config.mutable_common_config();
@@ -67,7 +62,6 @@ public:
       setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                      fake_upstreams_.back()->localAddress());
       access_log->mutable_typed_config()->PackFrom(access_log_config);
-      config_blob->PackFrom(tcp_proxy_config);
     });
     BaseIntegrationTest::initialize();
   }
@@ -98,6 +92,7 @@ public:
     // Clear fields which are not deterministic.
     auto* log_entry = request_msg.mutable_tcp_logs()->mutable_log_entry(0);
     clearPort(*log_entry->mutable_common_properties()->mutable_downstream_remote_address());
+    clearPort(*log_entry->mutable_common_properties()->mutable_downstream_direct_remote_address());
     clearPort(*log_entry->mutable_common_properties()->mutable_downstream_local_address());
     clearPort(*log_entry->mutable_common_properties()->mutable_upstream_remote_address());
     clearPort(*log_entry->mutable_common_properties()->mutable_upstream_local_address());
@@ -181,11 +176,15 @@ tcp_logs:
         socket_address:
           address: {}
       upstream_cluster: cluster_0
+      downstream_direct_remote_address:
+        socket_address:
+          address: {}
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
 )EOF",
                   VersionInfo::version(), Network::Test::getLoopbackAddressString(ipVersion()),
+                  Network::Test::getLoopbackAddressString(ipVersion()),
                   Network::Test::getLoopbackAddressString(ipVersion()),
                   Network::Test::getLoopbackAddressString(ipVersion()),
                   Network::Test::getLoopbackAddressString(ipVersion()))));

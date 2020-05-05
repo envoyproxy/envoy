@@ -80,11 +80,10 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
-  return {
+  return ConnectionManagerStats(
       {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix),
                                POOL_HISTOGRAM_PREFIX(scope, prefix))},
-      prefix,
-      scope};
+      prefix, scope);
 }
 
 ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const std::string& prefix,
@@ -108,8 +107,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
-      drain_close_(drain_close), random_generator_(random_generator), http_context_(http_context),
-      runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
+      drain_close_(drain_close), user_agent_(http_context.userAgentContext()),
+      random_generator_(random_generator), http_context_(http_context), runtime_(runtime),
+      local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
       overload_stop_accepting_requests_ref_(
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
@@ -230,6 +230,10 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
+  if (stream.max_stream_duration_timer_) {
+    stream.max_stream_duration_timer_->disableTimer();
+    stream.max_stream_duration_timer_ = nullptr;
+  }
   if (stream.stream_idle_timer_ != nullptr) {
     stream.stream_idle_timer_->disableTimer();
     stream.stream_idle_timer_ = nullptr;
@@ -268,7 +272,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->buffer_limit_ = new_stream->response_encoder_->getStream().bufferLimit();
   // If the network connection is backed up, the stream should be made aware of it on creation.
-  // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacks_.
+  // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
          new_stream->high_watermark_count_ > 0);
   new_stream->moveIntoList(std::move(new_stream), streams_);
@@ -277,6 +281,10 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 
 void ConnectionManagerImpl::handleCodecException(const char* error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
+  read_callbacks_->connection().streamInfo().setResponseCodeDetails(
+      absl::StrCat("codec error: ", error));
+  read_callbacks_->connection().streamInfo().setResponseFlag(
+      StreamInfo::ResponseFlag::DownstreamProtocolError);
 
   // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
   // GOAWAY.
@@ -318,19 +326,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     try {
       codec_->dispatch(data);
     } catch (const FrameFloodException& e) {
-      // TODO(mattklein123): This is an emergency substitute for the lack of connection level
-      // logging in the HCM. In a public follow up change we will add full support for connection
-      // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
-      // indicators to be stored in the connection level stream info, and then matched, sampled,
-      // etc. when logged.
-      const envoy::type::v3::FractionalPercent default_value; // 0
-      if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
-                                             default_value)) {
-        ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}",
-                       read_callbacks_->connection(),
-                       read_callbacks_->connection().remoteAddress()->asString(), e.what());
-      }
-
       handleCodecException(e.what());
       return Network::FilterStatus::StopIteration;
     } catch (const CodecProtocolException& e) {
@@ -357,6 +352,10 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       }
     }
   } while (redispatch);
+
+  if (!read_callbacks_->connection().streamInfo().protocol()) {
+    read_callbacks_->connection().streamInfo().protocol(codec_->protocol());
+  }
 
   return Network::FilterStatus::StopIteration;
 }
@@ -553,6 +552,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                connection_manager.config_.scopedRouteConfigProvider() == nullptr)),
          "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
          "ConnectionManagerImpl.");
+
+  stream_info_.setRequestIDExtension(connection_manager.config_.requestIDExtension());
+
   if (connection_manager_.config_.isRoutable() &&
       connection_manager.config_.routeConfigProvider() != nullptr) {
     route_config_update_requester_ =
@@ -578,7 +580,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   stream_info_.setDownstreamLocalAddress(
       connection_manager_.read_callbacks_->connection().localAddress());
   stream_info_.setDownstreamDirectRemoteAddress(
-      connection_manager_.read_callbacks_->connection().remoteAddress());
+      connection_manager_.read_callbacks_->connection().directRemoteAddress());
   // Initially, the downstream remote address is the source address of the
   // downstream connection. That can change later in the request's lifecycle,
   // based on XFF processing, but setting the downstream remote address here
@@ -600,6 +602,15 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     request_timer_ = connection_manager.read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onRequestTimeout(); });
     request_timer_->enableTimer(request_timeout_ms_, this);
+  }
+
+  const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
+  if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
+    max_stream_duration_timer_ =
+        connection_manager.read_callbacks_->connection().dispatcher().createTimer(
+            [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_->enableTimer(connection_manager_.config_.maxStreamDuration().value(),
+                                            this);
   }
 
   stream_info_.setRequestedServerName(
@@ -660,7 +671,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   } else {
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
     sendLocalReply(request_headers_ != nullptr &&
-                       Grpc::Common::hasGrpcContentType(*request_headers_),
+                       Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                    Http::Code::RequestTimeout, "stream timeout", nullptr, state_.is_head_request_,
                    absl::nullopt, StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
   }
@@ -668,9 +679,16 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
-  sendLocalReply(request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_),
+  sendLocalReply(request_headers_ != nullptr &&
+                     Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                  Http::Code::RequestTimeout, "request timeout", nullptr, state_.is_head_request_,
                  absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
+}
+
+void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
+  ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
+  connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
+  connection_manager_.doEndStream(*this);
 }
 
 void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
@@ -743,6 +761,13 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
 
+  // TODO(alyssawilk) remove this synthetic path in a follow-up PR, including
+  // auditing of empty path headers. We check for path because HTTP/2 connect requests may have a
+  // path.
+  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) {
+    request_headers_->setPath("/");
+  }
+
   // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
   if (connection_manager_.config_.isRoutable()) {
     if (connection_manager_.config_.routeConfigProvider() != nullptr) {
@@ -775,7 +800,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // overload it is more important to avoid unnecessary allocation than to create the filters.
     state_.created_filter_chain_ = true;
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
+    sendLocalReply(Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                    Http::Code::ServiceUnavailable, "envoy overloaded", nullptr,
                    state_.is_head_request_, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().Overload);
@@ -792,8 +817,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     request_headers_->removeExpect();
   }
 
-  connection_manager_.user_agent_.initializeFromHeaders(
-      *request_headers_, connection_manager_.stats_.prefix_, connection_manager_.stats_.scope_);
+  connection_manager_.user_agent_.initializeFromHeaders(*request_headers_,
+                                                        connection_manager_.stats_.prefixStatName(),
+                                                        connection_manager_.stats_.scope_);
 
   // Make sure we are getting a codec version we support.
   Protocol protocol = connection_manager_.codec_->protocol();
@@ -884,8 +910,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // Modify the downstream remote address depending on configuration and headers.
     stream_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
         *request_headers_, connection_manager_.read_callbacks_->connection(),
-        connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
-        connection_manager_.local_info_));
+        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_));
   }
   ASSERT(stream_info_.downstreamRemoteAddress() != nullptr);
 
@@ -904,9 +929,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
-  if (protocol == Protocol::Http11 && hasCachedRoute()) {
+  if (hasCachedRoute()) {
+    // Do not allow upgrades if the route does not support it.
     if (upgrade_rejected) {
-      // Do not allow upgrades if the route does not support it.
+      // While downstream servers should not send upgrade payload without the upgrade being
+      // accepted, err on the side of caution and refuse to process any further requests on this
+      // connection, to avoid a class of HTTP/1.1 smuggling bugs where Upgrade or CONNECT payload
+      // contains a smuggled HTTP request.
+      state_.saw_connection_close_ = true;
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
                      nullptr, state_.is_head_request_, absl::nullopt,
@@ -1405,6 +1435,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
 
+  stream_info_.setUpstreamClusterInfo(cached_cluster_info_.value());
   refreshCachedTracingCustomTags();
 }
 
@@ -1509,7 +1540,8 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
-  ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(), EMPTY_STRING);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
+                                                  connection_manager_.config_, EMPTY_STRING);
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(headers);
@@ -1592,6 +1624,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
     headers.setReferenceServer(connection_manager_.config_.serverName());
   }
   ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
+                                                  connection_manager_.config_,
                                                   connection_manager_.config_.via());
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
@@ -1982,7 +2015,12 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
     return false;
   }
   bool upgrade_rejected = false;
-  auto upgrade = request_headers_ ? request_headers_->Upgrade() : nullptr;
+  const Envoy::Http::HeaderEntry* upgrade =
+      request_headers_ ? request_headers_->Upgrade() : nullptr;
+  // Treat CONNECT requests as a special upgrade case.
+  if (!upgrade && request_headers_ && HeaderUtility::isConnect(*request_headers_)) {
+    upgrade = request_headers_->Method();
+  }
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = nullptr;
@@ -2029,7 +2067,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
   allowIteration();
 
   // Only resume with do100ContinueHeaders() if we've actually seen a 100-Continue.
-  if (parent_.state_.has_continue_headers_ && !continue_headers_continued_) {
+  if (has100Continueheaders()) {
     continue_headers_continued_ = true;
     do100ContinueHeaders();
     // If the response headers have not yet come in, don't continue on with
@@ -2366,7 +2404,7 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   // store any objects with a LifeSpan at or above DownstreamRequest. This is to avoid unnecessary
   // heap allocation.
   if (parent_.stream_info_.filter_state_->hasDataAtOrAboveLifeSpan(
-          StreamInfo::FilterState::LifeSpan::DownstreamRequest)) {
+          StreamInfo::FilterState::LifeSpan::Request)) {
     (*parent_.connection_manager_.streams_.begin())->stream_info_.filter_state_ =
         std::make_shared<StreamInfo::FilterStateImpl>(
             parent_.stream_info_.filter_state_->parent(),

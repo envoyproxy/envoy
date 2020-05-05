@@ -11,6 +11,7 @@
 
 #include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
@@ -175,6 +176,12 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     absl::string_view sni_name = "stubserver.org";
     stream_info.setRequestedServerName(sni_name);
     EXPECT_EQ(std::string(sni_name), stream_info.requestedServerName());
+
+    EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
+    Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
+    stream_info.setUpstreamClusterInfo(cluster_info);
+    EXPECT_NE(absl::nullopt, stream_info.upstreamClusterInfo());
+    EXPECT_EQ("fake_cluster", stream_info.upstreamClusterInfo().value()->name());
   }
 }
 
@@ -228,6 +235,24 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
   Http::RequestHeaderMapImpl headers;
   stream_info.setRequestHeaders(headers);
   EXPECT_EQ(&headers, stream_info.getRequestHeaders());
+}
+
+TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
+  StreamInfoImpl stream_info(test_time_.timeSystem());
+  EXPECT_TRUE(stream_info.getRequestIDExtension());
+
+  auto rid_extension = stream_info.getRequestIDExtension();
+
+  Http::RequestHeaderMapImpl request_headers;
+  Http::ResponseHeaderMapImpl response_headers;
+  rid_extension->set(request_headers, false);
+  rid_extension->set(request_headers, true);
+  rid_extension->setInResponse(response_headers, request_headers);
+  uint64_t out = 123;
+  EXPECT_FALSE(rid_extension->modBy(request_headers, out, 10000));
+  EXPECT_EQ(out, 123);
+  rid_extension->setTraceStatus(request_headers, Http::TraceStatus::Forced);
+  EXPECT_EQ(rid_extension->getTraceStatus(request_headers), Http::TraceStatus::NoTrace);
 }
 
 } // namespace

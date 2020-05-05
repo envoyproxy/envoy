@@ -9,9 +9,12 @@ Common messages
   ../config/core/v3/address.proto
   ../config/core/v3/backoff.proto
   ../config/core/v3/protocol.proto
+  ../config/core/v3/proxy_protocol.proto
   ../service/discovery/v3/discovery.proto
   ../config/core/v3/config_source.proto
   ../config/core/v3/grpc_service.proto
+  ../config/core/v3/grpc_method_list.proto
   ../config/core/v3/http_uri.proto
+  ../config/core/v3/socket_option.proto
   ../extensions/common/ratelimit/v3/ratelimit.proto
   ../extensions/filters/common/fault/v3/fault.proto

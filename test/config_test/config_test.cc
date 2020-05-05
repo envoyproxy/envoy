@@ -170,12 +170,10 @@ uint32_t run(const std::string& directory) {
         Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
     ConfigTest test1(options);
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
-    if (Server::InstanceUtil::loadBootstrapConfig(
-            bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api) ==
-        Server::InstanceUtil::BootstrapVersion::V2) {
-      ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
-      ConfigTest test2(asConfigYaml(options, *api));
-    }
+    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options,
+                                              ProtobufMessage::getStrictValidationVisitor(), *api);
+    ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
+    ConfigTest test2(asConfigYaml(options, *api));
     num_tested++;
   }
   return num_tested;

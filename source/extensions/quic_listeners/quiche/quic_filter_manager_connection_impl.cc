@@ -106,6 +106,13 @@ QuicFilterManagerConnectionImpl::remoteAddress() const {
 }
 
 const Network::Address::InstanceConstSharedPtr&
+QuicFilterManagerConnectionImpl::directRemoteAddress() const {
+  ASSERT(quic_connection_->connectionSocket() != nullptr,
+         "directRemoteAddress() should only be called after OnPacketHeader");
+  return quic_connection_->connectionSocket()->directRemoteAddress();
+}
+
+const Network::Address::InstanceConstSharedPtr&
 QuicFilterManagerConnectionImpl::localAddress() const {
   ASSERT(quic_connection_->connectionSocket() != nullptr,
          "localAddress() should only be called after OnPacketHeader");

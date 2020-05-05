@@ -11,7 +11,7 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/common/logger.h"
 
-#include "luajit-2.1/lua.hpp"
+#include "lua.hpp"
 
 namespace Envoy {
 namespace Extensions {

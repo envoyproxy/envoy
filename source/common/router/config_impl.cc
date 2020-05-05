@@ -59,6 +59,10 @@ convertInternalRedirectAction(const envoy::config::route::v3::RouteAction& route
 
 const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
+const absl::string_view getPath(const Http::RequestHeaderMap& headers) {
+  return headers.Path() ? headers.Path()->value().getStringView() : "";
+}
+
 } // namespace
 
 std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
@@ -189,6 +193,7 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
     runtime_key_ = config.hidden_envoy_deprecated_runtime_key();
     default_value_.set_numerator(0);
   }
+  trace_sampled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, trace_sampled, true);
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
@@ -381,6 +386,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     if (!success) {
       throw EnvoyException(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
     }
+    if (upgrade_config.upgrade_type() == Http::Headers::get().MethodValues.Connect) {
+      connect_config_ = upgrade_config.connect_config();
+    } else if (upgrade_config.has_connect_config()) {
+      throw EnvoyException(absl::StrCat("Non-CONNECT upgrade type ", upgrade_config.upgrade_type(),
+                                        " has ConnectConfig"));
+    }
   }
 
   if (route.route().has_regex_rewrite()) {
@@ -429,12 +440,6 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
                                     uint64_t random_value) const {
   bool matches = true;
 
-  // TODO(mattklein123): Currently all match types require a path header. When we support CONNECT
-  // we will need to figure out how to safely relax this.
-  if (headers.Path() == nullptr) {
-    return false;
-  }
-
   matches &= evaluateRuntimeMatch(random_value);
   if (!matches) {
     // No need to waste further cycles calculating a route match.
@@ -442,13 +447,12 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
   }
 
   if (match_grpc_) {
-    matches &= Grpc::Common::hasGrpcContentType(headers);
+    matches &= Grpc::Common::isGrpcRequestHeaders(headers);
   }
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
   if (!config_query_parameters_.empty()) {
-    Http::Utility::QueryParams query_parameters =
-        Http::Utility::parseQueryString(headers.Path()->value().getStringView());
+    Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(getPath(headers));
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
   }
 
@@ -539,7 +543,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
     return;
   }
 
-  std::string path(headers.Path()->value().getStringView());
+  std::string path(getPath(headers));
   if (insert_envoy_original_path) {
     headers.setEnvoyOriginalPath(path);
   }
@@ -632,8 +636,7 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   if (!path_redirect_.empty()) {
     final_path = path_redirect_.c_str();
   } else {
-    ASSERT(headers.Path());
-    final_path = headers.Path()->value().getStringView();
+    final_path = getPath(headers);
     if (strip_query_) {
       size_t path_end = final_path.find("?");
       if (path_end != absl::string_view::npos) {
@@ -851,7 +854,7 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& 
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(headers.Path()->value().getStringView())) {
+      path_matcher_->match(getPath(headers))) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -873,7 +876,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& he
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(headers.Path()->value().getStringView())) {
+      path_matcher_->match(getPath(headers))) {
     return clusterEntry(headers, random_value);
   }
 
@@ -901,8 +904,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                             bool insert_envoy_original_path) const {
-  const absl::string_view path =
-      Http::PathUtil::removeQueryAndFragment(headers.Path()->value().getStringView());
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(getPath(headers));
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
   // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
   ASSERT(regex_->match(path));
@@ -913,8 +915,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    const absl::string_view path =
-        Http::PathUtil::removeQueryAndFragment(headers.Path()->value().getStringView());
+    const absl::string_view path = Http::PathUtil::removeQueryAndFragment(getPath(headers));
     if (regex_->match(path)) {
       return clusterEntry(headers, random_value);
     }
@@ -922,13 +923,35 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
   return nullptr;
 }
 
+ConnectRouteEntryImpl::ConnectRouteEntryImpl(
+    const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator)
+    : RouteEntryImplBase(vhost, route, factory_context, validator) {}
+
+void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
+                                              bool insert_envoy_original_path) const {
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(getPath(headers));
+  finalizePathHeader(headers, path, insert_envoy_original_path);
+}
+
+RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                                   const StreamInfo::StreamInfo&,
+                                                   uint64_t random_value) const {
+  if (Http::HeaderUtility::isConnect(headers)) {
+    return clusterEntry(headers, random_value);
+  }
+  return nullptr;
+}
+
 VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                                  const ConfigImpl& global_route_config,
                                  Server::Configuration::ServerFactoryContext& factory_context,
-                                 ProtobufMessage::ValidationVisitor& validator,
+                                 Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
                                  bool validate_clusters)
     : stat_name_pool_(factory_context.scope().symbolTable()),
       stat_name_(stat_name_pool_.add(virtual_host.name())),
+      vcluster_scope_(scope.createScope(virtual_host.name() + ".vcluster")),
       rate_limit_policy_(virtual_host.rate_limits()), global_route_config_(global_route_config),
       request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
                                                       virtual_host.request_headers_to_remove())),
@@ -939,8 +962,9 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
                           validator),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
-      include_attempt_count_(virtual_host.include_request_attempt_count()),
-      virtual_cluster_catch_all_(stat_name_pool_) {
+      include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
+      include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
+      virtual_cluster_catch_all_(stat_name_pool_, *vcluster_scope_) {
 
   switch (virtual_host.require_tls()) {
   case envoy::config::route::v3::VirtualHost::NONE:
@@ -979,6 +1003,10 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
       routes_.emplace_back(new RegexRouteEntryImpl(*this, route, factory_context, validator));
       break;
     }
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher: {
+      routes_.emplace_back(new ConnectRouteEntryImpl(*this, route, factory_context, validator));
+      break;
+    }
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -996,7 +1024,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
   }
 
   for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
-    virtual_clusters_.push_back(VirtualClusterEntry(virtual_cluster, stat_name_pool_));
+    virtual_clusters_.push_back(
+        VirtualClusterEntry(virtual_cluster, stat_name_pool_, *vcluster_scope_));
   }
 
   if (virtual_host.has_cors()) {
@@ -1005,8 +1034,10 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
 }
 
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
-    const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::StatNamePool& pool)
-    : stat_name_(pool.add(virtual_cluster.name())) {
+    const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::StatNamePool& pool,
+    Stats::Scope& scope)
+    : VirtualClusterBase(pool.add(virtual_cluster.name()),
+                         scope.createScope(virtual_cluster.name())) {
   if (virtual_cluster.hidden_envoy_deprecated_pattern().empty() ==
       virtual_cluster.headers().empty()) {
     throw EnvoyException("virtual clusters must define either 'pattern' or 'headers'");
@@ -1064,10 +1095,12 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
 RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& route_config,
                            const ConfigImpl& global_route_config,
                            Server::Configuration::ServerFactoryContext& factory_context,
-                           ProtobufMessage::ValidationVisitor& validator, bool validate_clusters) {
+                           ProtobufMessage::ValidationVisitor& validator, bool validate_clusters)
+    : vhost_scope_(factory_context.scope().createScope("vhost")) {
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
-    VirtualHostSharedPtr virtual_host(new VirtualHostImpl(
-        virtual_host_config, global_route_config, factory_context, validator, validate_clusters));
+    VirtualHostSharedPtr virtual_host(new VirtualHostImpl(virtual_host_config, global_route_config,
+                                                          factory_context, *vhost_scope_, validator,
+                                                          validate_clusters));
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const std::string domain = Http::LowerCaseString(domain_name).get();
       bool duplicate_found = false;
@@ -1116,6 +1149,9 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::RequestHead
 
   // Check for a route that matches the request.
   for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
+    if (!headers.Path() && !route->supportsPathlessHeaders()) {
+      continue;
+    }
     RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
     if (nullptr != route_entry) {
       return route_entry;

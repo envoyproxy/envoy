@@ -7,13 +7,13 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener.pb.validate.h"
+#include "envoy/config/route/v3/route.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/config/api_version.h"
-#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -26,11 +26,14 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
-    : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
+    : Envoy::Config::SubscriptionBase<envoy::config::listener::v3::Listener>(
+          lds_config.resource_api_version()),
+      listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }),
       validation_visitor_(validation_visitor) {
+  const auto resource_name = getResourceName();
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-      lds_config, loadTypeUrl(lds_config.resource_api_version()), *scope_, *this);
+      lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this);
   init_manager.add(init_target_);
 }
 
@@ -40,9 +43,11 @@ void LdsApiImpl::onConfigUpdate(
     const std::string& system_version_info) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
-    cm_.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
-    maybe_eds_resume = std::make_unique<Cleanup>(
-        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration); });
+    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+        envoy::config::core::v3::ApiVersion::V2);
+    cm_.adsMux()->pause(type_url);
+    maybe_eds_resume =
+        std::make_unique<Cleanup>([this, type_url] { cm_.adsMux()->resume(type_url); });
   }
 
   bool any_applied = false;
@@ -133,19 +138,5 @@ void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason r
   init_target_.ready();
 }
 
-std::string LdsApiImpl::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3::ApiVersion::AUTO:
-  case envoy::config::core::v3::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::Listener().GetDescriptor()->full_name()));
-  case envoy::config::core::v3::ApiVersion::V3:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::config::listener::v3::Listener().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-}
 } // namespace Server
 } // namespace Envoy

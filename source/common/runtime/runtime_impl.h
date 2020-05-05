@@ -23,6 +23,7 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+#include "common/config/subscription_base.h"
 #include "common/init/target_impl.h"
 #include "common/singleton/threadsafe_singleton.h"
 
@@ -30,9 +31,6 @@
 
 namespace Envoy {
 namespace Runtime {
-
-bool runtimeFeatureEnabled(absl::string_view feature);
-uint64_t getInteger(absl::string_view feature, uint64_t default_value);
 
 using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 
@@ -59,6 +57,7 @@ public:
   COUNTER(override_dir_exists)                                                                     \
   COUNTER(override_dir_not_exists)                                                                 \
   GAUGE(admin_overrides_active, NeverImport)                                                       \
+  GAUGE(deprecated_feature_seen_since_process_start, NeverImport)                                  \
   GAUGE(num_keys, NeverImport)                                                                     \
   GAUGE(num_layers, NeverImport)
 
@@ -199,7 +198,8 @@ private:
 
 class LoaderImpl;
 
-struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger::Id::runtime> {
+struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>,
+                          Logger::Loggable<Logger::Id::runtime> {
   RtdsSubscription(LoaderImpl& parent,
                    const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
                    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
@@ -220,7 +220,6 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
-  static std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
 
   LoaderImpl& parent_;
   const envoy::config::core::v3::ConfigSource config_source_;

@@ -49,6 +49,12 @@ public:
    * request.
    */
   virtual const Http::RequestHeaderMap& getRequestHeaders() const PURE;
+
+  /**
+   * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
+   * absl::nullopt.
+   */
+  virtual Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 };
 
 /**

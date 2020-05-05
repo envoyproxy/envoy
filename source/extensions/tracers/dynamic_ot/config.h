@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/dynamic_ot.pb.h"
+#include "envoy/config/trace/v3/dynamic_ot.pb.validate.h"
 
 #include "extensions/tracers/common/factory_base.h"
 
@@ -20,7 +20,7 @@ public:
 
 private:
   // FactoryBase
-  Tracing::HttpTracerPtr
+  Tracing::HttpTracerSharedPtr
   createHttpTracerTyped(const envoy::config::trace::v3::DynamicOtConfig& configuration,
                         Server::Configuration::TracerFactoryContext& context) override;
 };

@@ -23,8 +23,8 @@ using QuantileLatencyMap = std::unordered_map<double, double>;
 static const std::vector<double> hystrix_quantiles = {0,    0.25, 0.5,   0.75, 0.90,
                                                       0.95, 0.99, 0.995, 1};
 
-struct {
-  const std::string AllowHeadersHystrix{"Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
+static const struct {
+  absl::string_view AllowHeadersHystrix{"Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
 } AccessControlAllowHeadersValue;
 
 struct ClusterStatsCache {
@@ -158,6 +158,8 @@ private:
   std::unordered_map<std::string, ClusterStatsCachePtr> cluster_stats_cache_map_;
 
   // Saved StatNames for fast comparisons in loop.
+  // TODO(mattklein123): Many/all of these stats should just be pulled directly from the cluster
+  // stats directly. This needs some cleanup.
   Stats::StatNamePool stat_name_pool_;
   const Stats::StatName cluster_name_;
   const Stats::StatName cluster_upstream_rq_time_;

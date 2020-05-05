@@ -27,7 +27,8 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         "//source/extensions/filters/network/kafka:kafka_broker_filter_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stats:stats_mocks",
     ],
 )
 
@@ -36,8 +37,8 @@ envoy_extension_cc_test(
     srcs = ["filter_protocol_test.cc"],
     extension_name = "envoy.filters.network.kafka_broker",
     deps = [
-        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/network/kafka:kafka_broker_filter_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/filters/network/kafka:buffer_based_test_lib",
         "//test/extensions/filters/network/kafka:message_utilities",
         "//test/test_common:test_time_lib",

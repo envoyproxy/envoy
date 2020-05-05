@@ -133,7 +133,6 @@ public:
   const LowerCaseString KeepAlive{"keep-alive"};
   const LowerCaseString Location{"location"};
   const LowerCaseString Method{":method"};
-  const LowerCaseString NoChunks{":no-chunks"}; // Illegal pseudo-header used internally.
   const LowerCaseString Origin{"origin"};
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
@@ -239,6 +238,11 @@ public:
     const std::string Put{"PUT"};
     const std::string Trace{"TRACE"};
   } MethodValues;
+
+  struct {
+    // per https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
+    const std::string Bytestream{"bytestream"};
+  } ProtocolValues;
 
   struct {
     const std::string Http{"http"};

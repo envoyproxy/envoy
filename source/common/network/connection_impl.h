@@ -46,7 +46,8 @@ public:
 class ConnectionImpl : public ConnectionImplBase, public TransportSocketCallbacks {
 public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                 TransportSocketPtr&& transport_socket, bool connected);
+                 TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
+                 bool connected);
 
   ~ConnectionImpl() override;
 
@@ -68,6 +69,9 @@ public:
   const Address::InstanceConstSharedPtr& remoteAddress() const override {
     return socket_->remoteAddress();
   }
+  const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return socket_->directRemoteAddress();
+  }
   const Address::InstanceConstSharedPtr& localAddress() const override {
     return socket_->localAddress();
   }
@@ -78,7 +82,7 @@ public:
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
   bool localAddressRestored() const override { return socket_->localAddressRestored(); }
-  bool aboveHighWatermark() const override { return above_high_watermark_; }
+  bool aboveHighWatermark() const override { return write_buffer_above_high_watermark_; }
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
     return socket_->options();
   }
@@ -123,12 +127,12 @@ protected:
 
   void closeSocket(ConnectionEvent close_type);
 
-  void onLowWatermark();
-  void onHighWatermark();
+  void onWriteBufferLowWatermark();
+  void onWriteBufferHighWatermark();
 
   TransportSocketPtr transport_socket_;
   ConnectionSocketPtr socket_;
-  StreamInfo::StreamInfoImpl stream_info_;
+  StreamInfo::StreamInfo& stream_info_;
   FilterManagerImpl filter_manager_;
 
   Buffer::OwnedImpl read_buffer_;
@@ -170,8 +174,7 @@ private:
   uint64_t last_write_buffer_size_{};
   Buffer::Instance* current_write_buffer_{};
   uint32_t read_disable_count_{0};
-  bool read_enabled_ : 1;
-  bool above_high_watermark_ : 1;
+  bool write_buffer_above_high_watermark_ : 1;
   bool detect_early_close_ : 1;
   bool enable_half_close_ : 1;
   bool read_end_stream_raised_ : 1;
@@ -194,6 +197,9 @@ public:
 
   // Network::ClientConnection
   void connect() override;
+
+private:
+  StreamInfo::StreamInfoImpl stream_info_;
 };
 
 } // namespace Network

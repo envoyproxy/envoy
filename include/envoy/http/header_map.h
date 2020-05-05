@@ -149,6 +149,12 @@ public:
   }
 
   /**
+   * Trim trailing whitespaces from the HeaderString. Only supported by the "Inline" HeaderString
+   * representation.
+   */
+  void rtrim();
+
+  /**
    * Get an absl::string_view. It will NOT be NUL terminated!
    *
    * @return an absl::string_view.
@@ -274,7 +280,6 @@ private:
   HEADER_FUNC(AccessControlRequestMethod)                                                          \
   HEADER_FUNC(Authorization)                                                                       \
   HEADER_FUNC(ClientTraceId)                                                                       \
-  HEADER_FUNC(EnvoyAttemptCount)                                                                   \
   HEADER_FUNC(EnvoyDownstreamServiceCluster)                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceNode)                                                          \
   HEADER_FUNC(EnvoyExpectedRequestTimeoutMs)                                                       \
@@ -326,7 +331,6 @@ private:
   HEADER_FUNC(Etag)                                                                                \
   HEADER_FUNC(EnvoyDegraded)                                                                       \
   HEADER_FUNC(EnvoyImmediateHealthCheckFail)                                                       \
-  HEADER_FUNC(EnvoyOverloaded)                                                                     \
   HEADER_FUNC(EnvoyRateLimited)                                                                    \
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
   HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
@@ -344,9 +348,9 @@ private:
   HEADER_FUNC(Connection)                                                                          \
   HEADER_FUNC(ContentLength)                                                                       \
   HEADER_FUNC(ContentType)                                                                         \
+  HEADER_FUNC(EnvoyAttemptCount)                                                                   \
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(KeepAlive)                                                                           \
-  HEADER_FUNC(NoChunks)                                                                            \
   HEADER_FUNC(ProxyConnection)                                                                     \
   HEADER_FUNC(RequestId)                                                                           \
   HEADER_FUNC(TransferEncoding)                                                                    \

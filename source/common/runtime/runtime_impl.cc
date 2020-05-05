@@ -32,36 +32,6 @@
 
 namespace Envoy {
 namespace Runtime {
-namespace {
-
-bool isRuntimeFeature(absl::string_view feature) {
-  return RuntimeFeaturesDefaults::get().enabledByDefault(feature) ||
-         RuntimeFeaturesDefaults::get().existsButDisabled(feature);
-}
-
-} // namespace
-
-bool runtimeFeatureEnabled(absl::string_view feature) {
-  ASSERT(isRuntimeFeature(feature));
-  if (Runtime::LoaderSingleton::getExisting()) {
-    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
-        feature);
-  }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
-                      "Unable to use runtime singleton for feature {}", feature);
-  return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
-}
-
-uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
-  ASSERT(absl::StartsWith(feature, "envoy."));
-  if (Runtime::LoaderSingleton::getExisting()) {
-    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
-        std::string(feature), default_value);
-  }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
-                      "Unable to use runtime singleton for feature {}", feature);
-  return default_value;
-}
 
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
@@ -198,6 +168,10 @@ bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_
   // The feature is allowed. It is assumed this check is called when the feature
   // is about to be used, so increment the feature use stat.
   stats_.deprecated_feature_use_.inc();
+
+  // Similar to the above, but a gauge that isn't imported during a hot restart.
+  stats_.deprecated_feature_seen_since_process_start_.inc();
+
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
   return false;
 #endif
@@ -542,7 +516,9 @@ void LoaderImpl::initialize(Upstream::ClusterManager& cm) { cm_ = &cm; }
 RtdsSubscription::RtdsSubscription(
     LoaderImpl& parent, const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
     Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
+    : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(
+          rtds_layer.rtds_config().resource_api_version()),
+      parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }),
       validation_visitor_(validation_visitor) {}
@@ -583,8 +559,9 @@ void RtdsSubscription::start() {
   // We have to delay the subscription creation until init-time, since the
   // cluster manager resources are not available in the constructor when
   // instantiated in the server instance.
+  const auto resource_name = getResourceName();
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, loadTypeUrl(config_source_.resource_api_version()), store_, *this);
+      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this);
   subscription_->start({resource_name_});
 }
 
@@ -593,22 +570,6 @@ void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
     init_target_.ready();
     throw EnvoyException(fmt::format("Unexpected RTDS resource length: {}", num_resources));
     // (would be a return false here)
-  }
-}
-
-std::string
-RtdsSubscription::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3::ApiVersion::AUTO:
-  case envoy::config::core::v3::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()));
-  case envoy::config::core::v3::ApiVersion::V3:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::service::runtime::v3::Runtime().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

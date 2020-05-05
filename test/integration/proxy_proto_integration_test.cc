@@ -26,7 +26,7 @@ TEST_P(ProxyProtoIntegrationTest, V1RouterRequestAndResponseWithBodyNoBuffer) {
     return conn;
   };
 
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 TEST_P(ProxyProtoIntegrationTest, V2RouterRequestAndResponseWithBodyNoBuffer) {
@@ -40,7 +40,7 @@ TEST_P(ProxyProtoIntegrationTest, V2RouterRequestAndResponseWithBodyNoBuffer) {
     return conn;
   };
 
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 TEST_P(ProxyProtoIntegrationTest, V1RouterRequestAndResponseWithBodyNoBufferV6) {
@@ -51,7 +51,7 @@ TEST_P(ProxyProtoIntegrationTest, V1RouterRequestAndResponseWithBodyNoBufferV6) 
     return conn;
   };
 
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 TEST_P(ProxyProtoIntegrationTest, V2RouterRequestAndResponseWithBodyNoBufferV6) {
@@ -67,7 +67,7 @@ TEST_P(ProxyProtoIntegrationTest, V2RouterRequestAndResponseWithBodyNoBufferV6) 
     return conn;
   };
 
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 TEST_P(ProxyProtoIntegrationTest, RouterProxyUnknownRequestAndResponseWithBodyNoBuffer) {
@@ -78,7 +78,7 @@ TEST_P(ProxyProtoIntegrationTest, RouterProxyUnknownRequestAndResponseWithBodyNo
     return conn;
   };
 
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 TEST_P(ProxyProtoIntegrationTest, RouterProxyUnknownLongRequestAndResponseWithBodyNoBuffer) {
@@ -89,7 +89,34 @@ TEST_P(ProxyProtoIntegrationTest, RouterProxyUnknownLongRequestAndResponseWithBo
     return conn;
   };
 
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+}
+
+// Test that %DOWNSTREAM_DIRECT_REMOTE_ADDRESS%/%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
+// returns the direct address, and %DOWSTREAM_REMOTE_ADDRESS% returns the proxy-protocol-provided
+// address.
+TEST_P(ProxyProtoIntegrationTest, AccessLog) {
+  useAccessLog("%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT% %DOWNSTREAM_REMOTE_ADDRESS%");
+
+  // Tell HCM to ignore x-forwarded-for so that the proxy-proto address is used.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_use_remote_address()->set_value(true); });
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));
+    Buffer::OwnedImpl buf("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234\r\n");
+    conn->write(buf, false);
+    return conn;
+  };
+
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  const std::string log_line = waitForAccessLog(access_log_name_);
+  const std::vector<absl::string_view> tokens = StringUtil::splitToken(log_line, " ");
+
+  ASSERT_EQ(2, tokens.size());
+  EXPECT_EQ(tokens[0], Network::Test::getLoopbackAddressString(GetParam()));
+  EXPECT_EQ(tokens[1], "1.2.3.4:12345");
 }
 
 TEST_P(ProxyProtoIntegrationTest, DEPRECATED_FEATURE_TEST(OriginalDst)) {
@@ -120,7 +147,7 @@ TEST_P(ProxyProtoIntegrationTest, DEPRECATED_FEATURE_TEST(OriginalDst)) {
     return conn;
   };
 
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 TEST_P(ProxyProtoIntegrationTest, ClusterProvided) {
@@ -150,7 +177,7 @@ TEST_P(ProxyProtoIntegrationTest, ClusterProvided) {
     return conn;
   };
 
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 } // namespace Envoy

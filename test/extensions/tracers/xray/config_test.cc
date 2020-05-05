@@ -1,4 +1,4 @@
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/config/trace/v3/xray.pb.h"
 #include "envoy/config/trace/v3/xray.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -41,7 +41,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithTypedConfig) {
   XRayTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr xray_tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr xray_tracer = factory.createHttpTracer(*message, context);
   ASSERT_NE(nullptr, xray_tracer);
 }
 
@@ -76,7 +76,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
-  Tracing::HttpTracerPtr xray_tracer = factory.createHttpTracer(*message, context);
+  Tracing::HttpTracerSharedPtr xray_tracer = factory.createHttpTracer(*message, context);
   ASSERT_NE(nullptr, xray_tracer);
 }
 

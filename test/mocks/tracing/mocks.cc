@@ -4,7 +4,6 @@
 #include "gtest/gtest.h"
 
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Tracing {
@@ -25,6 +24,9 @@ MockHttpTracer::~MockHttpTracer() = default;
 
 MockDriver::MockDriver() = default;
 MockDriver::~MockDriver() = default;
+
+MockHttpTracerManager::MockHttpTracerManager() = default;
+MockHttpTracerManager::~MockHttpTracerManager() = default;
 
 } // namespace Tracing
 } // namespace Envoy

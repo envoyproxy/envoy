@@ -94,6 +94,7 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/grpc:status_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
@@ -107,12 +108,14 @@ envoy_cc_library(
     hdrs = ["context_impl.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":common_lib",
         ":stat_names_lib",
         "//include/envoy/grpc:context_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:hash_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 

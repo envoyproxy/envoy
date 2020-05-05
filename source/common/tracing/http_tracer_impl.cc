@@ -18,7 +18,6 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/uuid_util.h"
 #include "common/stream_info/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -37,6 +36,9 @@ static std::string valueOrDefault(const Http::HeaderEntry* header, const char* d
 
 static std::string buildUrl(const Http::RequestHeaderMap& request_headers,
                             const uint32_t max_path_length) {
+  if (!request_headers.Path()) {
+    return "";
+  }
   std::string path(request_headers.EnvoyOriginalPath()
                        ? request_headers.EnvoyOriginalPath()->value().getStringView()
                        : request_headers.Path()->value().getStringView());
@@ -70,21 +72,17 @@ Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
     return {Reason::HealthCheck, false};
   }
 
-  if (!request_headers.RequestId()) {
-    return {Reason::NotTraceableRequestId, false};
-  }
-
-  UuidTraceStatus trace_status =
-      UuidUtils::isTraceableUuid(request_headers.RequestId()->value().getStringView());
+  Http::TraceStatus trace_status =
+      stream_info.getRequestIDExtension()->getTraceStatus(request_headers);
 
   switch (trace_status) {
-  case UuidTraceStatus::Client:
+  case Http::TraceStatus::Client:
     return {Reason::ClientForced, true};
-  case UuidTraceStatus::Forced:
+  case Http::TraceStatus::Forced:
     return {Reason::ServiceForced, true};
-  case UuidTraceStatus::Sampled:
+  case Http::TraceStatus::Sampled:
     return {Reason::Sampling, true};
-  case UuidTraceStatus::NoTrace:
+  case Http::TraceStatus::NoTrace:
     return {Reason::NotTraceableRequestId, false};
   }
 
@@ -189,7 +187,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
                   std::string(request_headers->ClientTraceId()->value().getStringView()));
     }
 
-    if (Grpc::Common::hasGrpcContentType(*request_headers)) {
+    if (Grpc::Common::isGrpcRequestHeaders(*request_headers)) {
       addGrpcRequestTags(span, *request_headers);
     }
   }

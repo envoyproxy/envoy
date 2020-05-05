@@ -11,6 +11,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -361,9 +362,32 @@ public:
    *         present.
    */
   virtual const envoy::type::v3::FractionalPercent& defaultValue() const PURE;
+
+  /**
+   * @return true if the trace span should be sampled.
+   */
+  virtual bool traceSampled() const PURE;
 };
 
 using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
+
+/**
+ * All virtual cluster stats. @see stats_macro.h
+ */
+#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER)                                                         \
+  COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
+  COUNTER(upstream_rq_retry_overflow)                                                              \
+  COUNTER(upstream_rq_retry_success)                                                               \
+  COUNTER(upstream_rq_timeout)                                                                     \
+  COUNTER(upstream_rq_total)
+
+/**
+ * Struct definition for all virtual cluster stats. @see stats_macro.h
+ */
+struct VirtualClusterStats {
+  ALL_VIRTUAL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -377,6 +401,15 @@ public:
    * @return the stat-name of the virtual cluster.
    */
   virtual Stats::StatName statName() const PURE;
+
+  /**
+   * @return VirtualClusterStats& strongly named stats for this virtual cluster.
+   */
+  virtual VirtualClusterStats& stats() const PURE;
+
+  static VirtualClusterStats generateStats(Stats::Scope& scope) {
+    return {ALL_VIRTUAL_CLUSTER_STATS(POOL_COUNTER(scope))};
+  }
 };
 
 class RateLimitPolicy;
@@ -438,7 +471,12 @@ public:
   /**
    * @return bool whether to include the request count header in upstream requests.
    */
-  virtual bool includeAttemptCount() const PURE;
+  virtual bool includeAttemptCountInRequest() const PURE;
+
+  /**
+   * @return bool whether to include the request count header in the downstream response.
+   */
+  virtual bool includeAttemptCountInResponse() const PURE;
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
@@ -773,13 +811,26 @@ public:
    * count header.
    * @return bool whether x-envoy-attempt-count should be included on the upstream request.
    */
-  virtual bool includeAttemptCount() const PURE;
+  virtual bool includeAttemptCountInRequest() const PURE;
+
+  /**
+   * True if the virtual host this RouteEntry belongs to is configured to include the attempt
+   * count header.
+   * @return bool whether x-envoy-attempt-count should be included on the downstream response.
+   */
+  virtual bool includeAttemptCountInResponse() const PURE;
 
   using UpgradeMap = std::map<std::string, bool>;
   /**
    * @return a map of route-specific upgrades to their enabled/disabled status.
    */
   virtual const UpgradeMap& upgradeMap() const PURE;
+
+  using ConnectConfig = envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig;
+  /**
+   * If present, informs how to handle proxying CONNECT requests on this route.
+   */
+  virtual const absl::optional<ConnectConfig>& connectConfig() const PURE;
 
   /**
    * @returns the internal redirect action which should be taken on this route.

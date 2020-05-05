@@ -13,6 +13,7 @@
 #include "common/config/version_converter.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/visitor.h"
 #include "common/protobuf/well_known.h"
 
 #include "absl/strings/match.h"
@@ -102,7 +103,7 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
 
 void jsonConvertInternal(const Protobuf::Message& source,
                          ProtobufMessage::ValidationVisitor& validation_visitor,
-                         Protobuf::Message& dest) {
+                         Protobuf::Message& dest, bool do_boosting = true) {
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
   std::string json;
@@ -111,7 +112,7 @@ void jsonConvertInternal(const Protobuf::Message& source,
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
                                      status.ToString(), source.DebugString()));
   }
-  MessageUtil::loadFromJson(json, dest, validation_visitor);
+  MessageUtil::loadFromJson(json, dest, validation_visitor, do_boosting);
 }
 
 enum class MessageVersion {
@@ -143,6 +144,7 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
     f(message, MessageVersion::LATEST_VERSION);
     return;
   }
+
   Protobuf::DynamicMessageFactory dmf;
   auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
   ASSERT(earlier_message != nullptr);
@@ -269,43 +271,49 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
 }
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor) {
-  tryWithApiBoosting(
-      [&json, &validation_visitor](Protobuf::Message& message, MessageVersion message_version) {
-        Protobuf::util::JsonParseOptions options;
-        options.case_insensitive_enum_parsing = true;
-        // Let's first try and get a clean parse when checking for unknown fields;
-        // this should be the common case.
-        options.ignore_unknown_fields = false;
-        const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
-        if (strict_status.ok()) {
-          // Success, no need to do any extra work.
-          return;
-        }
-        // If we fail, we see if we get a clean parse when allowing unknown fields.
-        // This is essentially a workaround
-        // for https://github.com/protocolbuffers/protobuf/issues/5967.
-        // TODO(htuch): clean this up when protobuf supports JSON/YAML unknown field
-        // detection directly.
-        options.ignore_unknown_fields = true;
-        const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
-        // If we still fail with relaxed unknown field checking, the error has nothing
-        // to do with unknown fields.
-        if (!relaxed_status.ok()) {
-          throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
-                               "): " + json);
-        }
-        // We know it's an unknown field at this point. If we're at the latest
-        // version, then it's definitely an unknown field, otherwise we try to
-        // load again at a later version.
-        if (message_version == MessageVersion::LATEST_VERSION) {
-          validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                            strict_status.ToString());
-        } else {
-          throw ApiBoostRetryException("Unknown field, possibly a rename, try again.");
-        }
-      },
-      message);
+                               ProtobufMessage::ValidationVisitor& validation_visitor,
+                               bool do_boosting) {
+  auto load_json = [&json, &validation_visitor](Protobuf::Message& message,
+                                                MessageVersion message_version) {
+    Protobuf::util::JsonParseOptions options;
+    options.case_insensitive_enum_parsing = true;
+    // Let's first try and get a clean parse when checking for unknown fields;
+    // this should be the common case.
+    options.ignore_unknown_fields = false;
+    const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
+    if (strict_status.ok()) {
+      // Success, no need to do any extra work.
+      return;
+    }
+    // If we fail, we see if we get a clean parse when allowing unknown fields.
+    // This is essentially a workaround
+    // for https://github.com/protocolbuffers/protobuf/issues/5967.
+    // TODO(htuch): clean this up when protobuf supports JSON/YAML unknown field
+    // detection directly.
+    options.ignore_unknown_fields = true;
+    const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
+    // If we still fail with relaxed unknown field checking, the error has nothing
+    // to do with unknown fields.
+    if (!relaxed_status.ok()) {
+      throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
+                           "): " + json);
+    }
+    // We know it's an unknown field at this point. If we're at the latest
+    // version, then it's definitely an unknown field, otherwise we try to
+    // load again at a later version.
+    if (message_version == MessageVersion::LATEST_VERSION) {
+      validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
+                                        strict_status.ToString());
+    } else {
+      throw ApiBoostRetryException("Unknown field, possibly a rename, try again.");
+    }
+  };
+
+  if (do_boosting) {
+    tryWithApiBoosting(load_json, message);
+  } else {
+    load_json(message, MessageVersion::LATEST_VERSION);
+  }
 }
 
 void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
@@ -315,11 +323,12 @@ void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& mes
 }
 
 void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor) {
+                               ProtobufMessage::ValidationVisitor& validation_visitor,
+                               bool do_boosting) {
   ProtobufWkt::Value value = ValueUtil::loadFromYaml(yaml);
   if (value.kind_case() == ProtobufWkt::Value::kStructValue ||
       value.kind_case() == ProtobufWkt::Value::kListValue) {
-    jsonConvertInternal(value, validation_visitor, message);
+    jsonConvertInternal(value, validation_visitor, message, do_boosting);
     return;
   }
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
@@ -333,7 +342,7 @@ void MessageUtil::loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& mes
 
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Api::Api& api) {
+                               Api::Api& api, bool do_boosting) {
   const std::string contents = api.fileSystem().fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
@@ -347,26 +356,31 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
-    tryWithApiBoosting(
-        [&contents, &path](Protobuf::Message& message, MessageVersion message_version) {
-          if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
-            return;
-          }
-          if (message_version == MessageVersion::LATEST_VERSION) {
-            throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
-                                 message.GetTypeName() + ")");
-          } else {
-            throw ApiBoostRetryException(
-                "Failed to parse at earlier version, trying again at later version.");
-          }
-        },
-        message);
+    auto read_proto_text = [&contents, &path](Protobuf::Message& message,
+                                              MessageVersion message_version) {
+      if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
+        return;
+      }
+      if (message_version == MessageVersion::LATEST_VERSION) {
+        throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
+                             message.GetTypeName() + ")");
+      } else {
+        throw ApiBoostRetryException(
+            "Failed to parse at earlier version, trying again at later version.");
+      }
+    };
+
+    if (do_boosting) {
+      tryWithApiBoosting(read_proto_text, message);
+    } else {
+      read_proto_text(message, MessageVersion::LATEST_VERSION);
+    }
     return;
   }
   if (absl::EndsWith(path, FileExtensions::get().Yaml)) {
-    loadFromYaml(contents, message, validation_visitor);
+    loadFromYaml(contents, message, validation_visitor, do_boosting);
   } else {
-    loadFromJson(contents, message, validation_visitor);
+    loadFromJson(contents, message, validation_visitor, do_boosting);
   }
 }
 
@@ -403,80 +417,77 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
       message);
 }
 
-void checkForUnexpectedFields(const Protobuf::Message& message,
-                              ProtobufMessage::ValidationVisitor& validation_visitor,
-                              Runtime::Loader* runtime) {
-  // Reject unknown fields.
-  const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
-  if (!unknown_fields.empty()) {
-    std::string error_msg;
-    for (int n = 0; n < unknown_fields.field_count(); ++n) {
-      if (unknown_fields.field(n).number() == ProtobufWellKnown::OriginalTypeFieldNumber) {
-        continue;
-      }
-      error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
-    }
-    // We use the validation visitor but have hard coded behavior below for deprecated fields.
-    // TODO(htuch): Unify the deprecated and unknown visitor handling behind the validation
-    // visitor pattern. https://github.com/envoyproxy/envoy/issues/8092.
-    if (!error_msg.empty()) {
-      validation_visitor.onUnknownField("type " + message.GetTypeName() +
-                                        " with unknown field set {" + error_msg + "}");
-    }
-  }
+class UnexpectedFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
+public:
+  UnexpectedFieldProtoVisitor(ProtobufMessage::ValidationVisitor& validation_visitor,
+                              Runtime::Loader* runtime)
+      : validation_visitor_(validation_visitor), runtime_(runtime) {}
 
-  const Protobuf::Descriptor* descriptor = message.GetDescriptor();
-  const Protobuf::Reflection* reflection = message.GetReflection();
-  for (int i = 0; i < descriptor->field_count(); ++i) {
-    const Protobuf::FieldDescriptor* field = descriptor->field(i);
-    absl::string_view filename = filenameFromPath(field->file()->name());
+  const void* onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
+                      const void*) override {
+    const Protobuf::Reflection* reflection = message.GetReflection();
+    absl::string_view filename = filenameFromPath(field.file()->name());
 
     // Before we check to see if the field is in use, see if there's a
     // deprecated default enum value.
-    checkForDeprecatedNonRepeatedEnumValue(message, filename, field, reflection, runtime);
+    checkForDeprecatedNonRepeatedEnumValue(message, filename, &field, reflection, runtime_);
 
     // If this field is not in use, continue.
-    if ((field->is_repeated() && reflection->FieldSize(message, field) == 0) ||
-        (!field->is_repeated() && !reflection->HasField(message, field))) {
-      continue;
+    if ((field.is_repeated() && reflection->FieldSize(message, &field) == 0) ||
+        (!field.is_repeated() && !reflection->HasField(message, &field))) {
+      return nullptr;
     }
 
     // If this field is deprecated, warn or throw an error.
-    if (field->options().deprecated()) {
+    if (field.options().deprecated()) {
       const std::string warning = absl::StrCat(
-          "Using {}deprecated option '", field->full_name(), "' from file ", filename,
+          "Using {}deprecated option '", field.full_name(), "' from file ", filename,
           ". This configuration will be removed from "
           "Envoy soon. Please see https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated "
           "for details.");
 
-      deprecatedFieldHelper(
-          runtime, true /*deprecated*/,
-          field->options().GetExtension(envoy::annotations::disallowed_by_default),
-          absl::StrCat("envoy.deprecated_features:", field->full_name()), warning, message);
+      deprecatedFieldHelper(runtime_, true /*deprecated*/,
+                            field.options().GetExtension(envoy::annotations::disallowed_by_default),
+                            absl::StrCat("envoy.deprecated_features:", field.full_name()), warning,
+                            message);
     }
+    return nullptr;
+  }
 
-    // If this is a message, recurse to check for deprecated fields in the sub-message.
-    if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
-      if (field->is_repeated()) {
-        const int size = reflection->FieldSize(message, field);
-        for (int j = 0; j < size; ++j) {
-          checkForUnexpectedFields(reflection->GetRepeatedMessage(message, field, j),
-                                   validation_visitor, runtime);
+  void onMessage(const Protobuf::Message& message, const void*) override {
+    // Reject unknown fields.
+    const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
+    if (!unknown_fields.empty()) {
+      std::string error_msg;
+      for (int n = 0; n < unknown_fields.field_count(); ++n) {
+        if (unknown_fields.field(n).number() == ProtobufWellKnown::OriginalTypeFieldNumber) {
+          continue;
         }
-      } else {
-        checkForUnexpectedFields(reflection->GetMessage(message, field), validation_visitor,
-                                 runtime);
+        error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
+      }
+      // We use the validation visitor but have hard coded behavior below for deprecated fields.
+      // TODO(htuch): Unify the deprecated and unknown visitor handling behind the validation
+      // visitor pattern. https://github.com/envoyproxy/envoy/issues/8092.
+      if (!error_msg.empty()) {
+        validation_visitor_.onUnknownField("type " + message.GetTypeName() +
+                                           " with unknown field set {" + error_msg + "}");
       }
     }
   }
-}
+
+private:
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Runtime::Loader* runtime_;
+};
 
 } // namespace
 
 void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
                                            ProtobufMessage::ValidationVisitor& validation_visitor,
                                            Runtime::Loader* runtime) {
-  ::Envoy::checkForUnexpectedFields(API_RECOVER_ORIGINAL(message), validation_visitor, runtime);
+  UnexpectedFieldProtoVisitor unexpected_field_visitor(validation_visitor, runtime);
+  ProtobufMessage::traverseMessage(unexpected_field_visitor, API_RECOVER_ORIGINAL(message),
+                                   nullptr);
 }
 
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,

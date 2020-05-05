@@ -12,6 +12,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/locality.h"
 
+#include "common/config/subscription_base.h"
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -23,7 +24,9 @@ namespace Upstream {
 /**
  * Cluster implementation that reads host information from the Endpoint Discovery Service.
  */
-class EdsClusterImpl : public BaseDynamicClusterImpl, Config::SubscriptionCallbacks {
+class EdsClusterImpl
+    : public BaseDynamicClusterImpl,
+      Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment> {
 public:
   EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
@@ -44,7 +47,6 @@ private:
     return MessageUtil::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
         .cluster_name();
   }
-  static std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
   using LocalityWeightsMap = std::unordered_map<envoy::config::core::v3::Locality, uint32_t,
                                                 LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,

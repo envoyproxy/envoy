@@ -84,6 +84,7 @@ ENOTSUP
 ENV
 EOF
 EOS
+EOY
 EPOLLRDHUP
 EQ
 ERANGE
@@ -117,6 +118,7 @@ GETting
 GLB
 GOAWAY
 GRPC
+GSS
 GTEST
 GURL
 Grabbit
@@ -172,10 +174,12 @@ MB
 MD
 MERCHANTABILITY
 MGET
+MQ
 MSET
 MSVC
 MTLS
 MTU
+MULTIFRAME
 NACK
 NACKed
 NACKs
@@ -221,7 +225,10 @@ PostCBs
 PREBIND
 PRNG
 PROT
+Postgre
+Postgres
 Prereq
+QDCOUNT
 QUIC
 QoS
 RAII
@@ -321,6 +328,7 @@ VH
 VHDS
 VLOG
 VM
+WAITFORONE
 WASM
 WAVM
 WIP
@@ -353,6 +361,7 @@ alignof
 alloc
 alloca
 allocator
+allowlist
 alls
 alphanumerics
 amongst
@@ -385,6 +394,8 @@ backgrounded
 backoff
 backpressure
 backticks
+backtraces
+backtracing
 balancer
 balancers
 barbaz
@@ -525,6 +536,7 @@ dirname
 djb
 downcasted
 downstreams
+drainable
 dtor
 dubbo
 dup
@@ -622,6 +634,7 @@ hermeticity
 highp
 hoc
 hostname
+hostnames
 hostset
 hrefs
 huffman
@@ -634,6 +647,7 @@ ified
 impl
 implementors
 impls
+indices
 inflater
 inflight
 -ing
@@ -728,6 +742,8 @@ misconfigured
 mixin
 mkdir
 mmap
+mmsg
+mmsghdr
 mongo
 moveable
 msec
@@ -744,11 +760,13 @@ mutexes
 mux
 muxed
 mysql
+nameserver
 namespace
 namespaces
 namespacing
 nan
 natively
+ndk
 netblock
 netblocks
 netfilter
@@ -817,6 +835,8 @@ pos
 posix
 postfix
 postfixes
+postgres
+postgresql
 pre
 preallocate
 preallocating
@@ -897,6 +917,7 @@ reimplements
 rele
 releasor
 reloadable
+remoting
 reparse
 repeatability
 reperform
@@ -918,6 +939,7 @@ resync
 retriable
 retriggers
 rmdir
+rocketmq
 rollout
 roundtrip
 rpcs
@@ -939,6 +961,7 @@ sched
 schemas
 scopekey
 sendmsg
+sendmmsg
 sendto
 serializable
 serializer

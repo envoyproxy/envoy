@@ -9,12 +9,14 @@ import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "ConfigSourceProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Configuration sources]
 
@@ -55,10 +57,6 @@ message ApiConfigSource {
     // Using the delta xDS gRPC service, i.e. DeltaDiscovery{Request,Response}
     // rather than Discovery{Request,Response}. Rather than sending Envoy the entire state
     // with every update, the xDS server only sends what has changed since the last update.
-    //
-    // DELTA_GRPC is not yet entirely implemented! Initially, only CDS is available.
-    // Do not use for other xDSes.
-    // [#comment:TODO(fredlas) update/remove this warning when appropriate.]
     DELTA_GRPC = 3;
   }
 
@@ -133,6 +131,8 @@ message ConfigSource {
     option (validate.required) = true;
 
     // Path on the filesystem to source and watch for configuration updates.
+    // When sourcing configuration for :ref:`secret <envoy_api_msg_auth.Secret>`,
+    // the certificate and key files are also watched for updates.
     //
     // .. note::
     //
