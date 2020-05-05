@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.tls.v3;
 
-import "envoy/config/core/v3/config_source.proto";
 import "envoy/extensions/transport_sockets/tls/v3/common.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
@@ -108,17 +107,8 @@ message CommonTlsContext {
     // plugin name
     string name = 1;
 
-    // opaque name to identify a secret when workload needs more than one secret
-    string secret_name = 2;
-
     // plugin specific config based on the plugin name
     google.protobuf.Any typed_config = 3;
-  }
-
-  // the typed_config for a plugin with the name “GoogleManagedCA”
-  message GoogleCAPluginConfig {
-    // Api config source (endpoint + creds) for GoogleManagedCA
-    config.core.v3.ApiConfigSource config_source = 1;
   }
 
   message CombinedCertificateValidationContext {
@@ -135,8 +125,9 @@ message CommonTlsContext {
       (udpa.annotations.field_migrate).oneof_promotion = "dynamic_validation_context"
     ];
 
-    // Config for fetching validation context via CA Manager plugin
-    CAClientPluginConfig validation_context_ca_manager_plugin = 3
+    // Config for fetching validation context via CA client plugin
+    // [#not-implemented-hide:]
+    CAClientPluginConfig validation_context_ca_client_plugin = 3
         [(udpa.annotations.field_migrate).oneof_promotion = "dynamic_validation_context"];
   }
 
@@ -187,8 +178,10 @@ message CommonTlsContext {
   repeated string alpn_protocols = 4;
 
   // Config for fetching TLS certificates via CA client plugin.
+  // [#not-implemented-hide:]
   CAClientPluginConfig tls_certificate_ca_client_plugin = 9;
 
   // Config for fetching validation context via CA client plugin.
+  // [#not-implemented-hide:]
   CAClientPluginConfig validation_context_ca_client_plugin = 10;
 }

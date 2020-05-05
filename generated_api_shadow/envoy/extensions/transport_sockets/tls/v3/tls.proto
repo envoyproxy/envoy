@@ -5,9 +5,11 @@ package envoy.extensions.transport_sockets.tls.v3;
 import "envoy/extensions/transport_sockets/tls/v3/common.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -67,12 +69,15 @@ message DownstreamTlsContext {
   // [#not-implemented-hide:]
   google.protobuf.BoolValue require_sni = 3;
 
-  oneof session_ticket_keys_type {
-    // TLS session ticket key settings.
-    TlsSessionTicketKeys session_ticket_keys = 4;
+  // TLS session ticket key settings.
+  google.protobuf.Duration session_timeout = 6 [(validate.rules).duration = {
+    lt {seconds: 4294967296}
+    gte {}
+  }];
 
+  oneof session_ticket_keys_type {
     // Config for fetching TLS session ticket keys via SDS API.
-    SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
+    TlsSessionTicketKeys session_ticket_keys = 4;
 
     // Config for controlling stateless TLS session resumption: setting this to true will cause the TLS
     // server to not issue TLS session tickets for the purposes of stateless TLS session resumption.
@@ -82,23 +87,29 @@ message DownstreamTlsContext {
     // If this config is set to false and no keys are explicitly configured, the TLS server will issue
     // TLS session tickets and encrypt/decrypt them using an internally-generated and managed key, with the
     // implication that sessions cannot be resumed across hot restarts or on different hosts.
+    SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
+
+    // If specified, session_timeout will change maximum lifetime (in seconds) of TLS session
+    // Currently this value is used as a hint to `TLS session ticket lifetime (for TLSv1.2)
+    // <https://tools.ietf.org/html/rfc5077#section-5.6>`
+    // only seconds could be specified (fractional seconds are going to be ignored).
     bool disable_stateless_session_resumption = 7;
   }
-
-  // If specified, session_timeout will change maximum lifetime (in seconds) of TLS session
-  // Currently this value is used as a hint to `TLS session ticket lifetime (for TLSv1.2)
-  // <https://tools.ietf.org/html/rfc5077#section-5.6>`
-  // only seconds could be specified (fractional seconds are going to be ignored).
-  google.protobuf.Duration session_timeout = 6 [(validate.rules).duration = {
-    lt {seconds: 4294967296}
-    gte {}
-  }];
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 9]
+// [#next-free-field: 11]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
+
+  // Config for CA client plugin to get secrets
+  message CAClientPluginConfig {
+    // plugin name
+    string name = 1;
+
+    // plugin specific config based on the plugin name
+    google.protobuf.Any typed_config = 3;
+  }
 
   message CombinedCertificateValidationContext {
     option (udpa.annotations.versioning).previous_message_type =
@@ -109,8 +120,15 @@ message CommonTlsContext {
         [(validate.rules).message = {required: true}];
 
     // Config for fetching validation context via SDS API.
-    SdsSecretConfig validation_context_sds_secret_config = 2
-        [(validate.rules).message = {required: true}];
+    SdsSecretConfig validation_context_sds_secret_config = 2 [
+      (validate.rules).message = {required: true},
+      (udpa.annotations.field_migrate).oneof_promotion = "dynamic_validation_context"
+    ];
+
+    // Config for fetching validation context via CA client plugin
+    // [#not-implemented-hide:]
+    CAClientPluginConfig validation_context_ca_client_plugin = 3
+        [(udpa.annotations.field_migrate).oneof_promotion = "dynamic_validation_context"];
   }
 
   reserved 5;
@@ -130,32 +148,40 @@ message CommonTlsContext {
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
       [(validate.rules).repeated = {max_items: 1}];
 
+  // How to validate peer certificates.
+  repeated string alpn_protocols = 4;
+
+  // Config for fetching validation context via SDS API.
+  CAClientPluginConfig tls_certificate_ca_client_plugin = 9;
+
+  // Combined certificate validation context holds a default CertificateValidationContext
+  // and SDS config. When SDS server returns dynamic CertificateValidationContext, both dynamic
+  // and default CertificateValidationContext are merged into a new CertificateValidationContext
+  // for validation. This merge is done by Message::MergeFrom(), so dynamic
+  // CertificateValidationContext overwrites singular fields in default
+  // CertificateValidationContext, and concatenates repeated fields to default
+  // CertificateValidationContext, and logical OR is applied to boolean fields.
+  CAClientPluginConfig validation_context_ca_client_plugin = 10;
+
   oneof validation_context_type {
-    // How to validate peer certificates.
+    // Supplies the list of ALPN protocols that the listener should expose. In
+    // practice this is likely to be set to one of two values (see the
+    // :ref:`codec_type
+    // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.codec_type>`
+    // parameter in the HTTP connection manager for more information):
+    //
+    // * "h2,http/1.1" If the listener is going to support both HTTP/2 and HTTP/1.1.
+    // * "http/1.1" If the listener is only going to support HTTP/1.1.
+    //
+    // There is no default for this parameter. If empty, Envoy will not expose ALPN.
     CertificateValidationContext validation_context = 3;
 
-    // Config for fetching validation context via SDS API.
+    // Config for fetching TLS certificates via CA client plugin.
+    // [#not-implemented-hide:]
     SdsSecretConfig validation_context_sds_secret_config = 7;
 
-    // Combined certificate validation context holds a default CertificateValidationContext
-    // and SDS config. When SDS server returns dynamic CertificateValidationContext, both dynamic
-    // and default CertificateValidationContext are merged into a new CertificateValidationContext
-    // for validation. This merge is done by Message::MergeFrom(), so dynamic
-    // CertificateValidationContext overwrites singular fields in default
-    // CertificateValidationContext, and concatenates repeated fields to default
-    // CertificateValidationContext, and logical OR is applied to boolean fields.
+    // Config for fetching validation context via CA client plugin.
+    // [#not-implemented-hide:]
     CombinedCertificateValidationContext combined_validation_context = 8;
   }
-
-  // Supplies the list of ALPN protocols that the listener should expose. In
-  // practice this is likely to be set to one of two values (see the
-  // :ref:`codec_type
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.codec_type>`
-  // parameter in the HTTP connection manager for more information):
-  //
-  // * "h2,http/1.1" If the listener is going to support both HTTP/2 and HTTP/1.1.
-  // * "http/1.1" If the listener is only going to support HTTP/1.1.
-  //
-  // There is no default for this parameter. If empty, Envoy will not expose ALPN.
-  repeated string alpn_protocols = 4;
 }
