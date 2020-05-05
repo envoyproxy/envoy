@@ -111,7 +111,7 @@ message CommonTlsContext {
     string name = 1;
 
     // plugin specific config based on the plugin name
-    google.protobuf.Any typed_config = 3;
+    google.protobuf.Any typed_config = 2;
   }
 
   message CombinedCertificateValidationContext {
