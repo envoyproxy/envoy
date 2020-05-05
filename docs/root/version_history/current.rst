@@ -24,10 +24,10 @@ Changes
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
 * http: remove legacy connection pool code and their runtime features: `envoy.reloadable_features.new_http1_connection_pool_behavior` and
   `envoy.reloadable_features.new_http2_connection_pool_behavior`.
-* load balancing: :ref:`least requests load balancing <arch_overview_load_balancing_types_least_request>` was improved to check each host at most one time per pick attempt.
 * listener: added in place filter chain update flow for tcp listener update which doesn't close connections if the corresponding network filter chain is equivalent during the listener update.
   Can be disabled by setting runtime feature `envoy.reloadable_features.listener_in_place_filterchain_update` to false.
   Also added additional draining filter chain stat for :ref:`listener manager <config_listener_manager_stats>` to track the number of draining filter chains and the number of in place update attempts.
+* load balancing: :ref:`least requests load balancing <arch_overview_load_balancing_types_least_request>` was improved to check each host at most one time per pick attempt.
 * logger: added :ref:`--log-format-prefix-with-location <operations_cli>` command line option to prefix '%v' with file path and line number.
 * lrs: added new *envoy_api_field_service.load_stats.v2.LoadStatsResponse.send_all_clusters* field
   in LRS response, which allows management servers to avoid explicitly listing all clusters it is
