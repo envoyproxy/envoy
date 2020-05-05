@@ -272,7 +272,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/04/02  10624    43356       44000   Use 100 clusters rather than 1000 to avoid timeouts
   // 2020/04/07  10661    43349       44000   fix clang tidy on master
   // 2020/04/23  10531    44169       44600   http: max stream duration upstream support.
-  // 2020/05/05  10908    44263       44600   router: add InternalRedirectPolicy and predicate
+  // 2020/05/05  10908    44233       44600   router: add InternalRedirectPolicy and predicate
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -286,7 +286,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 44263);
+  EXPECT_MEMORY_EQ(m_per_cluster, 44233);
   EXPECT_MEMORY_LE(m_per_cluster, 44600);
 }
 
@@ -332,7 +332,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/04/02  10624    35564       36000   Use 100 clusters rather than 1000 to avoid timeouts
   // 2020/04/07  10661    35557       36000   fix clang tidy on master
   // 2020/04/23  10531    36281       36800   http: max stream duration upstream support.
-  // 2020/05/05  10908    36376       36800   router: add InternalRedirectPolicy and predicate
+  // 2020/05/05  10908    36345       36800   router: add InternalRedirectPolicy and predicate
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -346,7 +346,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 36376);
+  EXPECT_MEMORY_EQ(m_per_cluster, 36345);
   EXPECT_MEMORY_LE(m_per_cluster, 36800);
 }
 
@@ -379,7 +379,6 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // 2020/02/13  10042    1363         1655   Metadata object are shared across different clusters
   //                                          and hosts.
   // 2020/04/02  10624    1380         1655   Use 100 clusters rather than 1000 to avoid timeouts
-  // 2020/05/05  10908    1412         1655   router: add InternalRedirectPolicy and predicate
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -389,7 +388,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_host, 1412);
+  EXPECT_MEMORY_EQ(m_per_host, 1380);
   EXPECT_MEMORY_LE(m_per_host, 1655);
 }
 
