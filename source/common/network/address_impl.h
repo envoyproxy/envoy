@@ -8,7 +8,6 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/network/address.h"
-#include "envoy/network/io_handle.h"
 
 namespace Envoy {
 namespace Network {
@@ -78,8 +77,6 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(os_fd_t fd) const override;
-  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return &ip_; }
 
   // Network::Address::InstanceBase
@@ -151,8 +148,6 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(os_fd_t fd) const override;
-  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return &ip_; }
 
   // Network::Address::InstanceBase
@@ -214,8 +209,6 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Api::SysCallIntResult bind(os_fd_t fd) const override;
-  Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return nullptr; }
 
   // Network::Address::InstanceBase
@@ -227,12 +220,22 @@ public:
     return sizeof(address_);
   }
 
+  /**
+   * Accessor for abstract_namespace
+   */
+  bool abstractNamespace() const { return abstract_namespace_; }
+
+  /**
+   * Accessor for mode
+   */
+  mode_t getMode() const { return mode_; }
+
 private:
   sockaddr_un address_;
   // For abstract namespaces.
   bool abstract_namespace_{false};
   uint32_t address_length_{0};
-  mode_t mode{0};
+  mode_t mode_{0};
 };
 
 } // namespace Address

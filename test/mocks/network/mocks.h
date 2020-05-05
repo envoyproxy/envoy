@@ -225,6 +225,13 @@ public:
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD(void, addOptions_, (const Socket::OptionsSharedPtr& options));
   MOCK_METHOD(const OptionsSharedPtr&, options, (), (const));
+  MOCK_METHOD(IoHandlePtr, socket, (Address::SocketType, Address::Type, Address::IpVersion),
+              (const));
+  MOCK_METHOD(IoHandlePtr, socketForAddrPtr,
+              (Address::SocketType, const Address::InstanceConstSharedPtr), (const));
+  MOCK_METHOD(Api::SysCallIntResult, bind, (const Address::InstanceConstSharedPtr));
+  MOCK_METHOD(Api::SysCallIntResult, connect, (const Address::InstanceConstSharedPtr));
+  MOCK_METHOD(Api::SysCallIntResult, listen, (int));
 
   IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
@@ -273,6 +280,13 @@ public:
   MOCK_METHOD(Address::SocketType, socketType, (), (const));
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
+  MOCK_METHOD(IoHandlePtr, socket, (Address::SocketType, Address::Type, Address::IpVersion),
+              (const));
+  MOCK_METHOD(IoHandlePtr, socketForAddrPtr,
+              (Address::SocketType, const Address::InstanceConstSharedPtr), (const));
+  MOCK_METHOD(Api::SysCallIntResult, bind, (const Address::InstanceConstSharedPtr));
+  MOCK_METHOD(Api::SysCallIntResult, connect, (const Address::InstanceConstSharedPtr));
+  MOCK_METHOD(Api::SysCallIntResult, listen, (int));
 
   IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
@@ -380,6 +394,7 @@ public:
   MOCK_METHOD(Address::Ipv6*, ipv6, (), (const));
   MOCK_METHOD(uint32_t, port, (), (const));
   MOCK_METHOD(Address::IpVersion, version, (), (const));
+  MOCK_METHOD(bool, v6only, (), (const));
 };
 
 class MockResolvedAddress : public Address::Instance {
