@@ -1455,16 +1455,16 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
 
 bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
                                                       const Http::HeaderEntry& internal_redirect) {
-  // Make sure the redirect response contains a URL to redirect to.
-  if (internal_redirect.value().getStringView().length() == 0) {
-    config_.stats_.passthrough_internal_redirect_no_location_.inc();
-    return false;
-  }
   if (!downstream_headers.Path()) {
-    config_.stats_.passthrough_internal_redirect_no_path_.inc();
+    ENVOY_STREAM_LOG(trace, "no path in downstream_headers", *callbacks_);
     return false;
   }
 
+  // Make sure the redirect response contains a URL to redirect to.
+  if (internal_redirect.value().getStringView().length() == 0) {
+    config_.stats_.passthrough_internal_redirect_bad_location_.inc();
+    return false;
+  }
   Http::Utility::Url absolute_url;
   if (!absolute_url.initialize(internal_redirect.value().getStringView(), false)) {
     config_.stats_.passthrough_internal_redirect_bad_location_.inc();

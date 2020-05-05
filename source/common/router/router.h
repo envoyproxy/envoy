@@ -41,8 +41,6 @@ namespace Router {
  */
 // clang-format off
 #define ALL_ROUTER_STATS(COUNTER)                                                                  \
-  COUNTER(passthrough_internal_redirect_no_location)                                               \
-  COUNTER(passthrough_internal_redirect_no_path)                                                   \
   COUNTER(passthrough_internal_redirect_bad_location)                                              \
   COUNTER(passthrough_internal_redirect_unsafe_scheme)                                             \
   COUNTER(passthrough_internal_redirect_too_many_redirects)                                        \
