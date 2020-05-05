@@ -166,6 +166,10 @@ message CommonTlsContext {
     // CertificateValidationContext, and concatenates repeated fields to default
     // CertificateValidationContext, and logical OR is applied to boolean fields.
     CombinedCertificateValidationContext combined_validation_context = 8;
+
+    // Config for fetching validation context via CA client plugin.
+    // [#not-implemented-hide:]
+    CAClientPluginConfig validation_context_ca_client_plugin = 10;
   }
 
   // Supplies the list of ALPN protocols that the listener should expose. In
@@ -183,8 +187,4 @@ message CommonTlsContext {
   // Config for fetching TLS certificates via CA client plugin.
   // [#not-implemented-hide:]
   CAClientPluginConfig tls_certificate_ca_client_plugin = 9;
-
-  // Config for fetching validation context via CA client plugin.
-  // [#not-implemented-hide:]
-  CAClientPluginConfig validation_context_ca_client_plugin = 10;
 }
