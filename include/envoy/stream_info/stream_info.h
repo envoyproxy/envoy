@@ -72,8 +72,10 @@ enum ResponseFlag {
   InvalidEnvoyRequestHeaders = 0x20000,
   // Downstream request had an HTTP protocol error
   DownstreamProtocolError = 0x40000,
+  // Upstream request reached to user defined max stream duration.
+  UpstreamMaxStreamDurationReached = 0x80000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DownstreamProtocolError
+  LastFlag = UpstreamMaxStreamDurationReached
 };
 
 /**
@@ -139,6 +141,8 @@ struct ResponseCodeDetailValues {
   const std::string UpstreamTimeout = "upstream_response_timeout";
   // The final upstream try timed out
   const std::string UpstreamPerTryTimeout = "upstream_per_try_timeout";
+  // The request was destroyed because of user defined max stream duration.
+  const std::string UpstreamMaxStreamDurationReached = "upstream_max_stream_duration_reached";
   // The upstream connection was reset before a response was started. This
   // will generally be accompanied by details about why the reset occurred.
   const std::string EarlyUpstreamReset = "upstream_reset_before_response_started";
