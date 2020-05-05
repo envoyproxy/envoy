@@ -262,53 +262,6 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
 
 } // namespace
 
-bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
-  if (params.size() != 1) {
-    return false;
-  }
-
-  std::string name = params.begin()->first;
-  std::string level = params.begin()->second;
-
-  // First see if the level is valid.
-  size_t level_to_use = std::numeric_limits<size_t>::max();
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    if (level == spdlog::level::level_string_views[i]) {
-      level_to_use = i;
-      break;
-    }
-  }
-
-  if (level_to_use == std::numeric_limits<size_t>::max()) {
-    return false;
-  }
-
-  // Now either change all levels or a single level.
-  if (name == "level") {
-    ENVOY_LOG(debug, "change all log levels: level='{}'", level);
-    for (Logger::Logger& logger : Logger::Registry::loggers()) {
-      logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
-    }
-  } else {
-    ENVOY_LOG(debug, "change log level: name='{}' level='{}'", name, level);
-    Logger::Logger* logger_to_change = nullptr;
-    for (Logger::Logger& logger : Logger::Registry::loggers()) {
-      if (logger.name() == name) {
-        logger_to_change = &logger;
-        break;
-      }
-    }
-
-    if (!logger_to_change) {
-      return false;
-    }
-
-    logger_to_change->setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
-  }
-
-  return true;
-}
-
 void AdminImpl::addOutlierInfo(const std::string& cluster_name,
                                const Upstream::Outlier::Detector* outlier_detector,
                                Buffer::Instance& response) {
@@ -715,32 +668,6 @@ Http::Code AdminImpl::handlerHotRestartVersion(absl::string_view, Http::Response
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::ResponseHeaderMap&,
-                                     Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-
-  Http::Code rc = Http::Code::OK;
-  if (!query_params.empty() && !changeLogLevel(query_params)) {
-    response.add("usage: /logging?<name>=<level> (change single level)\n");
-    response.add("usage: /logging?level=<level> (change all levels)\n");
-    response.add("levels: ");
-    for (auto level_string_view : spdlog::level::level_string_views) {
-      response.add(fmt::format("{} ", level_string_view));
-    }
-
-    response.add("\n");
-    rc = Http::Code::NotFound;
-  }
-
-  response.add("active loggers:\n");
-  for (const Logger::Logger& logger : Logger::Registry::loggers()) {
-    response.add(fmt::format("  {}: {}\n", logger.name(), logger.levelString()));
-  }
-
-  response.add("\n");
-  return rc;
-}
-
 // TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
 Http::Code AdminImpl::handlerMemory(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&) {
@@ -947,13 +874,6 @@ Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::Response
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerReopenLogs(absl::string_view, Http::ResponseHeaderMap&,
-                                        Buffer::Instance& response, AdminStream&) {
-  server_.accessLogManager().reopen();
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
@@ -992,6 +912,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
+      logs_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -1014,8 +935,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            false},
           {"/hot_restart_version", "print the hot restart compatibility version",
            MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false, false},
-          {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false,
-           true},
+          {"/logging", "query/change logging levels",
+           MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true},
           {"/memory", "print current allocation/heap usage", MAKE_ADMIN_HANDLER(handlerMemory),
            false, false},
           {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
@@ -1045,8 +966,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
-          {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false,
-           true},
+          {"/reopen_logs", "reopen access logs",
+           MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true},
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
