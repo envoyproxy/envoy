@@ -327,7 +327,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetHttpBody) {
       R"(<h1>Hello!</h1>)");
 }
 
-TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpLargeBody) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBody) {
   HttpIntegrationTest::initialize();
 
   testTranscoding<Empty, google::api::HttpBody>(
