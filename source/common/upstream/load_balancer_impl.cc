@@ -804,18 +804,27 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
   }
 }
 
-HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector&,
+HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector& hosts_to_use,
                                                                 const HostsSource& source) {
+  // Choose random choice_count_ hosts and pick one of them with the lowest number of active
+  // requests. At each iteration a random host is picked among ones which were not considered yet.
   HostSharedPtr candidate_host = nullptr;
   uint64_t candidate_active_rq = 0;
-  auto& hosts_to_use = unweighted_hosts_[source];
-  uint32_t size = hosts_to_use.size();
+  auto& host_indexes_to_use = unweighted_host_indexes_[source];
+  ASSERT(hosts_to_use.size() == host_indexes_to_use.size());
+  uint32_t size = host_indexes_to_use.size();
+  // As each host is considered at most once - number of iterations should not surpass number of
+  // hosts.
   const uint32_t choice_count = std::min(choice_count_, size);
 
   for (uint32_t choice_idx = 0; choice_idx < choice_count; ++choice_idx) {
+    ASSERT(size >= 1);
     const int rand_idx = random_.random() % size;
-    HostSharedPtr sampled_host = hosts_to_use[rand_idx];
-    std::swap(hosts_to_use[rand_idx], hosts_to_use[--size]);
+    HostSharedPtr sampled_host = hosts_to_use[host_indexes_to_use[rand_idx]];
+    // Move the host to the end of the list and shrink the list by one by decrementing the size.
+    // It makes this host inaccessible for next iterations, which guarantees no host duplicates
+    // across iterations.
+    std::swap(host_indexes_to_use[rand_idx], host_indexes_to_use[--size]);
 
     const auto sampled_active_rq = sampled_host->stats().rq_active_.value();
     if (candidate_host == nullptr || sampled_active_rq < candidate_active_rq) {

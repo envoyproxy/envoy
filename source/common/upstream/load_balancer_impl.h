@@ -456,11 +456,15 @@ public:
 
 private:
   void refreshHostSource(const HostsSource& source, const HostVector& hosts) override {
-    // Initialize per-source list of hosts by a copy of given shared pointers.
+    // Initialize per-source list of host indexes.
     // This list is used later on to guarantee that pick call considers each host at most once.
     // Note that host sources will never be removed, but given how uncommon this
     // is it probably doesn't matter.
-    unweighted_hosts_[source] = hosts;
+    auto& host_indexes = unweighted_host_indexes_[source];
+    host_indexes.resize(hosts.size(), 0);
+    for (uint32_t i = 0; i < host_indexes.size(); ++i) {
+      host_indexes[i] = i;
+    }
   }
   double hostWeight(const Host& host) override {
     // Here we scale host weight by the number of active requests at the time we do the pick. We
@@ -477,8 +481,8 @@ private:
                                         const HostsSource& source) override;
   const uint32_t choice_count_;
 
-  // List of hosts per HostsSource for fair random sampling.
-  std::unordered_map<HostsSource, HostVector, HostsSourceHash> unweighted_hosts_;
+  // List of host indexes per HostsSource for fair random sampling.
+  std::unordered_map<HostsSource, std::vector<uint32_t>, HostsSourceHash> unweighted_host_indexes_;
 };
 
 /**
