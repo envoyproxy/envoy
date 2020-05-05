@@ -11,7 +11,7 @@ ENVOY_BUILD_SHA="3cbc11e373dc4e3a523b9273ed010c5e0f197874"
 # images').
 [[ -z "${IMAGE_ID}" ]] && IMAGE_ID="${ENVOY_BUILD_SHA}"
 
-ENVOY_SOURCE_DIR=$(echo "${PWD}" | sed "s#/c/#C:/#")
+ENVOY_SOURCE_DIR=$(echo "${PWD}" | sed -E "s#/([a-zA-Z])/#\1:/#")
 
 [[ -f .git ]] && [[ ! -d .git ]] && GIT_VOLUME_OPTION="-v $(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)"
 
