@@ -25,6 +25,7 @@ namespace Extensions {
 namespace Common {
 namespace Redis {
 
+// TODO: rewrite the tests to fix the flaky test
 class ClusterRefreshManagerTest : public testing::Test {
 public:
   ClusterRefreshManagerTest()
