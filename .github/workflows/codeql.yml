@@ -1,0 +1,47 @@
+on:
+  push:
+  schedule:
+    - cron: '0 9 * * 4'
+
+jobs:
+  CodeQL-Build:
+
+    strategy:
+      fail-fast: false
+
+    # CodeQL runs on ubuntu-latest and windows-latest
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    # Initializes the CodeQL tools for scanning.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v1
+      # Override language selection by uncommenting this and choosing your languages
+      with:
+         languages: cpp
+
+    - name: Install deps
+      shell: bash
+      run: |
+       wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+       chmod +x /usr/local/bin/bazel
+       apt-get install libtool cmake automake autoconf make ninja-build curl unzip virtualenv
+       mkdir clang9
+       cd clang9
+       wget https://releases.llvm.org/9.0.0/clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+       tar -xf clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
+       cd ..
+       export CLANG_TOOLCHAIN=clang9
+       export CC=$CLANG_TOOLCHAIN/bin/clang
+       export CXX=$CLANG_TOOLCHAIN/bin/clang++
+
+    - name: Build
+      shell: bash
+      run: |
+       /usr/local/bin/bazel build //source/exe:envoy-static
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v1
