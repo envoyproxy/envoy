@@ -265,7 +265,7 @@ void AsyncRequestImpl::initialize() {
 }
 
 void AsyncRequestImpl::onComplete() {
-  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &response_->headers(),
+  Tracing::HttpTracerUtility::finalizeDownstreamSpan(*child_span_, &request_->headers(), &response_->headers(),
                                                    response_->trailers(), streamInfo(),
                                                    Tracing::EgressConfig::get());
 
@@ -298,8 +298,8 @@ void AsyncRequestImpl::onReset() {
   }
 
   // Finalize the span based on whether we received a response or not
-  Tracing::HttpTracerUtility::finalizeUpstreamSpan(
-      *child_span_, remoteClosed() ? &response_->headers() : nullptr,
+  Tracing::HttpTracerUtility::finalizeDownstreamSpan(
+      *child_span_, &request_->headers(), remoteClosed() ? &response_->headers() : nullptr,
       remoteClosed() ? response_->trailers() : nullptr, streamInfo(), Tracing::EgressConfig::get());
 
   if (!cancelled_) {
