@@ -53,6 +53,29 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
     ENVOY_LOG_MISC(trace, "Sending priority frame");
     h2_frame = Http2Frame::makePriorityFrame(stream_idx, dependent_idx);
   } break;
+  case test::integration::H2TestFrame::kPushPromise: {
+    const Http2Frame::HeadersFlags headers_flags =
+        static_cast<Http2Frame::HeadersFlags>(proto_frame.push_promise().flags());
+    uint32_t stream_idx = proto_frame.push_promise().stream_index();
+    uint32_t promised_stream_idx = proto_frame.push_promise().promised_stream_index();
+    ENVOY_LOG_MISC(trace, "Sending push promise frame");
+    h2_frame = Http2Frame::makeEmptyPushPromiseFrame(stream_idx, promised_stream_idx,
+                                                     headers_flags);
+  } break;
+  case test::integration::H2TestFrame::kResetStream: {
+    uint32_t stream_idx = proto_frame.reset_stream().stream_index();
+    const Http2Frame::ErrorCode error_code =
+        static_cast<Http2Frame::ErrorCode>(proto_frame.reset_stream().error_code());
+    ENVOY_LOG_MISC(trace, "Sending reset stream frame");
+    h2_frame = Http2Frame::makeResetStreamFrame(stream_idx, error_code);
+  } break;
+  case test::integration::H2TestFrame::kGoAway: {
+    uint32_t last_stream_idx = proto_frame.go_away().last_stream_index();
+    const Http2Frame::ErrorCode error_code =
+        static_cast<Http2Frame::ErrorCode>(proto_frame.go_away().error_code());
+    ENVOY_LOG_MISC(trace, "Sending go-away frame");
+    h2_frame = Http2Frame::makeEmptyGoAwayFrame(last_stream_idx, error_code);
+  } break;
   case test::integration::H2TestFrame::kWindowUpdate: {
     uint32_t stream_idx = proto_frame.window_update().stream_index();
     uint32_t increment = proto_frame.window_update().increment();
