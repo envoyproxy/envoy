@@ -44,7 +44,6 @@
 #include "common/memory/utils.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
-#include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -577,77 +576,6 @@ Http::Code AdminImpl::handlerContention(absl::string_view,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::ResponseHeaderMap&,
-                                         Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
-      (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
-    response.add("?enable=<y|n>\n");
-    return Http::Code::BadRequest;
-  }
-
-  bool enable = query_params.begin()->second == "y";
-  if (enable && !Profiler::Cpu::profilerEnabled()) {
-    if (!Profiler::Cpu::startProfiler(profile_path_)) {
-      response.add("failure to start the profiler");
-      return Http::Code::InternalServerError;
-    }
-
-  } else if (!enable && Profiler::Cpu::profilerEnabled()) {
-    Profiler::Cpu::stopProfiler();
-  }
-
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::ResponseHeaderMap&,
-                                          Buffer::Instance& response, AdminStream&) {
-  if (!Profiler::Heap::profilerEnabled()) {
-    response.add("The current build does not support heap profiler");
-    return Http::Code::NotImplemented;
-  }
-
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
-      (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
-    response.add("?enable=<y|n>\n");
-    return Http::Code::BadRequest;
-  }
-
-  Http::Code res = Http::Code::OK;
-  bool enable = query_params.begin()->second == "y";
-  if (enable) {
-    if (Profiler::Heap::isProfilerStarted()) {
-      response.add("Fail to start heap profiler: already started");
-      res = Http::Code::BadRequest;
-    } else if (!Profiler::Heap::startProfiler(profile_path_)) {
-      // GCOVR_EXCL_START
-      // TODO(silentdai) remove the GCOVR when startProfiler is better implemented
-      response.add("Fail to start the heap profiler");
-      res = Http::Code::InternalServerError;
-      // GCOVR_EXCL_STOP
-    } else {
-      response.add("Starting heap profiler");
-      res = Http::Code::OK;
-    }
-  } else {
-    // !enable
-    if (!Profiler::Heap::isProfilerStarted()) {
-      response.add("Fail to stop heap profiler: not started");
-      res = Http::Code::BadRequest;
-    } else {
-      Profiler::Heap::stopProfiler();
-      response.add(
-          fmt::format("Heap profiler stopped and data written to {}. See "
-                      "http://goog-perftools.sourceforge.net/doc/heap_profiler.html for details.",
-                      profile_path_));
-      res = Http::Code::OK;
-    }
-  }
-  return res;
-}
-
 Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::ResponseHeaderMap&,
                                              Buffer::Instance& response, AdminStream&) {
   server_.failHealthcheck(true);
@@ -912,7 +840,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
-      logs_handler_(server),
+      logs_handler_(server), profiling_handler_(profile_path),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -924,9 +852,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/contention", "dump current Envoy mutex contention stats (if enabled)",
            MAKE_ADMIN_HANDLER(handlerContention), false, false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
-           MAKE_ADMIN_HANDLER(handlerCpuProfiler), false, true},
+           MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true},
           {"/heapprofiler", "enable/disable the heap profiler",
-           MAKE_ADMIN_HANDLER(handlerHeapProfiler), false, true},
+           MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",
            MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false, true},
           {"/healthcheck/ok", "cause the server to pass health checks",

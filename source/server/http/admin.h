@@ -40,6 +40,7 @@
 #include "server/http/admin_filter.h"
 #include "server/http/config_tracker_impl.h"
 #include "server/http/logs_handler.h"
+#include "server/http/profiling_handler.h"
 #include "server/http/stats_handler.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
@@ -432,6 +433,7 @@ private:
   NullScopedRouteConfigProvider scoped_route_config_provider_;
   Server::StatsHandler stats_handler_;
   Server::LogsHandler logs_handler_;
+  Server::ProfilingHandler profiling_handler_;
   std::list<UrlHandler> handlers_;
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   const uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
