@@ -407,7 +407,7 @@ def FormatSecurityOption(security_option, field, type_context):
     # Verify example parses
     target_msg = type_context.message_factory[field.type_name[1:]]()
     example_yaml = example_config.example
-    example_json = json.dumps(yaml.load(example_yaml, Loader=yaml.CLoader))
+    example_json = json.dumps(yaml.load(example_yaml))
     try:
       json_format.Parse(example_json, target_msg, descriptor_pool=type_context.descriptor_pool)
     except json_format.ParseError as e:
