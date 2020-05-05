@@ -2,9 +2,11 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.tls.v4alpha;
 
+import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/extensions/transport_sockets/tls/v4alpha/common.proto";
 import "envoy/extensions/transport_sockets/tls/v4alpha/secret.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -96,10 +98,34 @@ message DownstreamTlsContext {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 9]
+// [#next-free-field: 11]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.transport_sockets.tls.v3.CommonTlsContext";
+
+  // Config for CA client plugin to get secrets
+  message CAClientPluginConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.CAClientPluginConfig";
+
+    // plugin name
+    string name = 1;
+
+    // opaque name to identify a secret when workload needs more than one secret
+    string secret_name = 2;
+
+    // plugin specific config based on the plugin name
+    google.protobuf.Any typed_config = 3;
+  }
+
+  // the typed_config for a plugin with the name “GoogleManagedCA”
+  message GoogleCAPluginConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.GoogleCAPluginConfig";
+
+    // Api config source (endpoint + creds) for GoogleManagedCA
+    config.core.v4alpha.ApiConfigSource config_source = 1;
+  }
 
   message CombinedCertificateValidationContext {
     option (udpa.annotations.versioning).previous_message_type =
@@ -110,9 +136,14 @@ message CommonTlsContext {
     CertificateValidationContext default_validation_context = 1
         [(validate.rules).message = {required: true}];
 
-    // Config for fetching validation context via SDS API.
-    SdsSecretConfig validation_context_sds_secret_config = 2
-        [(validate.rules).message = {required: true}];
+    oneof dynamic_validation_context {
+      // Config for fetching validation context via SDS API.
+      SdsSecretConfig validation_context_sds_secret_config = 2
+          [(validate.rules).message = {required: true}];
+
+      // Config for fetching validation context via CA Manager plugin
+      CAClientPluginConfig validation_context_ca_manager_plugin = 3;
+    }
   }
 
   reserved 5;
@@ -160,4 +191,10 @@ message CommonTlsContext {
   //
   // There is no default for this parameter. If empty, Envoy will not expose ALPN.
   repeated string alpn_protocols = 4;
+
+  // Config for fetching TLS certificates via CA client plugin.
+  CAClientPluginConfig tls_certificate_ca_client_plugin = 9;
+
+  // Config for fetching validation context via CA client plugin.
+  CAClientPluginConfig validation_context_ca_client_plugin = 10;
 }
