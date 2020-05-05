@@ -265,9 +265,9 @@ void AsyncRequestImpl::initialize() {
 }
 
 void AsyncRequestImpl::onComplete() {
-  Tracing::HttpTracerUtility::finalizeDownstreamSpan(*child_span_, &request_->headers(), &response_->headers(),
-                                                   response_->trailers(), streamInfo(),
-                                                   Tracing::EgressConfig::get());
+  Tracing::HttpTracerUtility::finalizeDownstreamSpan(*child_span_, &request_->headers(),
+                                                     &response_->headers(), response_->trailers(),
+                                                     streamInfo(), Tracing::EgressConfig::get());
 
   callbacks_.onSuccess(*this, std::move(response_));
 }
