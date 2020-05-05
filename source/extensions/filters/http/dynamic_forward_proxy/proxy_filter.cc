@@ -53,18 +53,24 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   cluster_info_ = cluster->info();
 
-  Upstream::ResourceManager& resource_manager_ =
-      cluster_info_->resourceManager(route_entry->priority());
+  Upstream::ResourceManager* resource_manager_ =
+      &cluster_info_->resourceManager(route_entry->priority());
   auto* cache_resource_manager = config_->cache().dnsCacheResourceManager();
 
   if (cache_resource_manager != nullptr) {
-    resource_manager_ = *cache_resource_manager;
+    resource_manager_ = cache_resource_manager;
   }
-  auto& pending_requests = resource_manager_.pendingRequests();
+  auto& pending_requests = resource_manager_->pendingRequests();
 
   if (!pending_requests.canCreate()) {
+    // When we use DNS Cache manager circuit breakers, we don't have to take care of upstream
+    // pending counter. Because DNSCacheCircuitBreakersStats will do that by counting
+    // rq_pending_remaining_.
+    if (cache_resource_manager == nullptr) {
+      cluster_info_->stats().upstream_rq_pending_overflow_.inc();
+    }
+
     ENVOY_STREAM_LOG(debug, "pending request overflow", *decoder_callbacks_);
-    cluster_info_->stats().upstream_rq_pending_overflow_.inc();
     decoder_callbacks_->sendLocalReply(
         Http::Code::ServiceUnavailable, ResponseStrings::get().PendingRequestOverflow, nullptr,
         absl::nullopt, ResponseStrings::get().PendingRequestOverflow);

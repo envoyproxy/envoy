@@ -67,13 +67,13 @@ private:
 class DnsCacheResourceManager : public Envoy::Upstream::ResourceManager {
 public:
   DnsCacheResourceManager(
-      DnsCacheCircuitBreakersStats cb_stats, Runtime::Loader& loader,
+      DnsCacheCircuitBreakersStats& cb_stats, Runtime::Loader& loader,
       const std::string& config_name,
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers&
           cb_config);
 
   // Envoy::Upstream::ResourceManager
-  DnsResource& pendingRequests() override { return *pending_requests_; }
+  Envoy::Upstream::Resource& pendingRequests() override { return *pending_requests_; }
   Envoy::Upstream::Resource& connections() override { NOT_REACHED_GCOVR_EXCL_LINE; }
   Envoy::Upstream::Resource& requests() override { NOT_REACHED_GCOVR_EXCL_LINE; }
   Envoy::Upstream::Resource& retries() override { NOT_REACHED_GCOVR_EXCL_LINE; }
