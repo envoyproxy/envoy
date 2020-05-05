@@ -218,32 +218,28 @@ void* OwnedImpl::linearize(uint32_t size) {
   if (slices_.empty()) {
     return nullptr;
   }
-  uint64_t linearized_size = 0;
-  uint64_t num_slices_to_linearize = 0;
-  for (const auto& slice : slices_) {
-    num_slices_to_linearize++;
-    linearized_size += slice->dataSize();
-    if (linearized_size >= size) {
-      break;
-    }
-  }
-  if (num_slices_to_linearize > 1) {
-    auto new_slice = OwnedSlice::create(linearized_size);
+  if (slices_[0]->dataSize() < size) {
+    auto new_slice = OwnedSlice::create(size);
     uint64_t bytes_copied = 0;
-    Slice::Reservation reservation = new_slice->reserve(linearized_size);
+    Slice::Reservation reservation = new_slice->reserve(size);
     ASSERT(reservation.mem_ != nullptr);
-    ASSERT(reservation.len_ == linearized_size);
+    ASSERT(reservation.len_ == size);
     auto dest = static_cast<uint8_t*>(reservation.mem_);
     do {
       uint64_t data_size = slices_.front()->dataSize();
-      if (data_size > 0) {
-        memcpy(dest, slices_.front()->data(), data_size);
-        bytes_copied += data_size;
-        dest += data_size;
+      uint64_t copy_size = std::min(data_size, size - bytes_copied);
+      if (copy_size > 0) {
+        memcpy(dest, slices_.front()->data(), copy_size);
+        bytes_copied += copy_size;
+        dest += copy_size;
       }
-      slices_.pop_front();
-    } while (bytes_copied < linearized_size);
-    ASSERT(dest == static_cast<const uint8_t*>(reservation.mem_) + linearized_size);
+
+      slices_.front()->drain(copy_size);
+      if (slices_.front()->dataSize() == 0) {
+        slices_.pop_front();
+      }
+    } while (bytes_copied < size);
+    ASSERT(dest == static_cast<const uint8_t*>(reservation.mem_) + size);
     new_slice->commit(reservation);
     slices_.emplace_front(std::move(new_slice));
   }
