@@ -16,11 +16,23 @@ envoy_cc_library(
     hdrs = ["main_interface.h"],
     repository = "@envoy",
     deps = [
+        ":envoy_mobile_main_common_lib",
         "//library/common/buffer:utility_lib",
         "//library/common/http:dispatcher_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
         "@envoy//include/envoy/server:lifecycle_notifier_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_mobile_main_common_lib",
+    srcs = ["envoy_mobile_main_common.cc"],
+    hdrs = ["envoy_mobile_main_common.h"],
+    repository = "@envoy",
+    deps = [
+        "@envoy//source/common/runtime:runtime_lib",
+        "@envoy//source/exe:envoy_common_lib",
         "@envoy//source/exe:envoy_main_common_lib",
     ],
 )

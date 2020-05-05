@@ -4,8 +4,6 @@
 
 #include "common/upstream/logical_dns_cluster.h"
 
-#include "exe/main_common.h"
-
 #include "extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "extensions/filters/http/dynamic_forward_proxy/config.h"
 #include "extensions/filters/http/router/config.h"
@@ -14,6 +12,7 @@
 #include "extensions/transport_sockets/tls/config.h"
 
 #include "absl/base/call_once.h"
+#include "library/common/envoy_mobile_main_common.h"
 #include "library/common/http/dispatcher.h"
 #include "library/common/types/c_types.h"
 
@@ -57,7 +56,7 @@ private:
   Thread::CondVar cv_;
   std::thread main_thread_;
   std::unique_ptr<Http::Dispatcher> http_dispatcher_;
-  std::unique_ptr<MainCommon> main_common_ GUARDED_BY(mutex_);
+  std::unique_ptr<MobileMainCommon> main_common_ GUARDED_BY(mutex_);
   Server::Instance* server_{};
   Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;
   Event::Dispatcher* event_dispatcher_;

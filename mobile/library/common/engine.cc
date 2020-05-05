@@ -44,7 +44,7 @@ envoy_status_t Engine::run(std::string config, std::string log_level) {
       char* envoy_argv[] = {strdup("envoy"), strdup("--config-yaml"),   strdup(config.c_str()),
                             strdup("-l"),    strdup(log_level.c_str()), nullptr};
 
-      main_common_ = std::make_unique<Envoy::MainCommon>(5, envoy_argv);
+      main_common_ = std::make_unique<MobileMainCommon>(5, envoy_argv);
       event_dispatcher_ = &main_common_->server()->dispatcher();
       cv_.notifyOne();
     } catch (const Envoy::NoServingException& e) {
