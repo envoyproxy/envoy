@@ -15,10 +15,12 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
+#include "common/common/statusor.h"
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/header_formatter.h"
+#include "common/http/status.h"
 
 namespace Envoy {
 namespace Http {
@@ -205,7 +207,7 @@ public:
   bool enableTrailers() const { return enable_trailers_; }
 
   // Http::Connection
-  void dispatch(Buffer::Instance& data) override;
+  Http::Status dispatch(Buffer::Instance& data) override;
   void goAway() override {} // Called during connection manager drain flow
   Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow
@@ -263,6 +265,15 @@ private:
   virtual bool shouldDropHeaderWithUnderscoresInNames(absl::string_view /* header_name */) const {
     return false;
   }
+
+  /**
+   * An inner dispatch call that executes the dispatching logic. While exception removal is in
+   * migration (#10878), this function may either throw an exception or return an error status.
+   * Exceptions are caught and translated to their corresponding statuses in the outer level
+   * dispatch.
+   * TODO(#10878): Remove this when exception removal is complete.
+   */
+  Http::Status innerDispatch(Buffer::Instance& data);
 
   /**
    * Dispatch a memory span.

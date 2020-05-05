@@ -22,7 +22,7 @@ public:
       : quic_session_(quic_session) {}
 
   // Http::Connection
-  void dispatch(Buffer::Instance& /*data*/) override {
+  Http::Status dispatch(Buffer::Instance& /*data*/) override {
     // Bypassed. QUIC connection already hands all data to streams.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

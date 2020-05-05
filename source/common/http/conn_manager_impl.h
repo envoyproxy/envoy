@@ -758,7 +758,7 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
   Tracing::HttpTracer& tracer() { return *config_.tracer(); }
-  void handleCodecException(const char* error);
+  void handleCodecError(absl::string_view error);
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
                          absl::optional<StreamInfo::ResponseFlag> response_flag);
 
