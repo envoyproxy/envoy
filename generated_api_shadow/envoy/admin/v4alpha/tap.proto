@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.admin.v4alpha;
 
-import "envoy/config/tap/v3/common.proto";
+import "envoy/config/tap/v4alpha/common.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -24,5 +24,5 @@ message TapRequest {
   string config_id = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The tap configuration to load.
-  config.tap.v3.TapConfig tap_config = 2 [(validate.rules).message = {required: true}];
+  config.tap.v4alpha.TapConfig tap_config = 2 [(validate.rules).message = {required: true}];
 }
