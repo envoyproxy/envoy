@@ -190,7 +190,6 @@ def envoy_dependencies(skip_targets = []):
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
-    _fuzzit_linux()
 
     _python_deps()
     _cc_deps()
@@ -703,12 +702,6 @@ def _org_llvm_releases_compiler_rt():
     _repository_impl(
         name = "org_llvm_releases_compiler_rt",
         build_file = "@envoy//bazel/external:compiler_rt.BUILD",
-    )
-
-def _fuzzit_linux():
-    _repository_impl(
-        name = "fuzzit_linux",
-        build_file_content = "exports_files([\"fuzzit\"])",
     )
 
 def _com_github_grpc_grpc():
