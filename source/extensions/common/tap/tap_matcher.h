@@ -2,6 +2,8 @@
 
 #include "envoy/config/tap/v3/common.pb.h"
 
+#include "common/buffer/buffer_impl.h"
+#include "common/common/matchers.h"
 #include "common/http/header_utility.h"
 
 namespace Envoy {
@@ -103,6 +105,8 @@ public:
   virtual void onHttpResponseTrailers(const Http::ResponseTrailerMap& response_trailers,
                                       MatchStatusVector& statuses) const PURE;
 
+  virtual void onBody(const Buffer::Instance& data, MatchStatusVector& statuses) const PURE;
+
   /**
    * @return whether given currently available information, the matcher matches.
    * @param statuses supplies the per-stream-request match status vector which must be the same
@@ -158,6 +162,10 @@ public:
       m.onHttpResponseTrailers(response_trailers, statuses);
     });
   }
+  void onBody(const Buffer::Instance& data, MatchStatusVector& statuses) const override {
+    updateLocalStatus(
+        statuses, [&data](Matcher& m, MatchStatusVector& statuses) { m.onBody(data, statuses); });
+  }
 
 protected:
   using UpdateFunctor = std::function<void(Matcher&, MatchStatusVector&)>;
@@ -212,6 +220,7 @@ public:
   void onHttpRequestTrailers(const Http::RequestTrailerMap&, MatchStatusVector&) const override {}
   void onHttpResponseHeaders(const Http::ResponseHeaderMap&, MatchStatusVector&) const override {}
   void onHttpResponseTrailers(const Http::ResponseTrailerMap&, MatchStatusVector&) const override {}
+  void onBody(const Buffer::Instance&, MatchStatusVector&) const override {}
 };
 
 /**
@@ -296,6 +305,26 @@ public:
                               MatchStatusVector& statuses) const override {
     matchHeaders(response_trailers, statuses);
   }
+};
+
+/**
+ * Base class for body matchers.
+ */
+class HttpBodyMatcherBase : public SimpleMatcher {
+public:
+  HttpBodyMatcherBase(const std::vector<MatcherPtr>& matchers) : SimpleMatcher(matchers) {}
+};
+
+class HttpGenericBodyMatcher : public HttpBodyMatcherBase {
+public:
+  HttpGenericBodyMatcher(const envoy::config::tap::v3::HttpGenericBodyMatch& config,
+                         const std::vector<MatcherPtr>& matchers);
+
+  void onBody(const Buffer::Instance&, MatchStatusVector&) const override;
+
+private:
+  // Vector of strings which body must contain to get match.
+  std::vector<std::string> patterns_;
 };
 
 } // namespace Tap

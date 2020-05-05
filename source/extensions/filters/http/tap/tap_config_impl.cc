@@ -179,6 +179,7 @@ void HttpPerRequestTapperImpl::onBody(
     uint32_t max_buffered_bytes, MutableBodyChunk mutable_body_chunk,
     MutableMessage mutable_message) {
   // TODO(mattklein123): Body matching.
+  config_->rootMatcher().onBody(data, statuses_);
   if (config_->streaming()) {
     const auto match_status = config_->rootMatcher().matchStatus(statuses_);
     // Without body matching, we must have already started tracing or have not yet matched.

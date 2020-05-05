@@ -47,7 +47,7 @@ message TapConfig {
 
 // Tap match configuration. This is a recursive structure which allows complex nested match
 // configurations to be built using various logical operators.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message MatchPredicate {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.tap.v2alpha.MatchPredicate";
@@ -89,6 +89,8 @@ message MatchPredicate {
 
     // HTTP response trailers match configuration.
     HttpHeadersMatch http_response_trailers_match = 8;
+
+    HttpGenericBodyMatch http_generic_body_match = 9;
   }
 }
 
@@ -99,6 +101,22 @@ message HttpHeadersMatch {
 
   // HTTP headers to match.
   repeated route.v3.HeaderMatcher headers = 1;
+}
+
+message HttpGenericBodyMatch {
+  message GenericTextMatch {
+    oneof rule {
+      option (validate.required) = true;
+
+      // text string
+      string contains_text = 1;
+
+      // text with hex digits
+      string contains_hex = 2;
+    }
+  }
+
+  repeated GenericTextMatch patterns = 1 [(validate.rules).repeated = {min_items: 1}];
 }
 
 // Tap output configuration.

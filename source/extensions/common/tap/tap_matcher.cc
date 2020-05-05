@@ -3,6 +3,7 @@
 #include "envoy/config/tap/v3/common.pb.h"
 
 #include "common/common/assert.h"
+#include "common/common/hex.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,6 +51,10 @@ void buildMatcher(const envoy::config::tap::v3::MatchPredicate& match_config,
     new_matcher = std::make_unique<HttpResponseTrailersMatcher>(
         match_config.http_response_trailers_match(), matchers);
     break;
+  case envoy::config::tap::v3::MatchPredicate::RuleCase::kHttpGenericBodyMatch:
+    new_matcher =
+        std::make_unique<HttpGenericBodyMatcher>(match_config.http_generic_body_match(), matchers);
+    break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -62,6 +67,7 @@ SetLogicMatcher::SetLogicMatcher(const envoy::config::tap::v3::MatchPredicate::M
                                  std::vector<MatcherPtr>& matchers, Type type)
     : LogicMatcherBase(matchers), matchers_(matchers), type_(type) {
   for (const auto& config : configs.rules()) {
+    printf("SETTING LOGIC MATCHER: %d\n", static_cast<int>(matchers_.size()));
     indexes_.push_back(matchers_.size());
     buildMatcher(config, matchers_);
   }
@@ -118,6 +124,42 @@ void HttpHeaderMatcherBase::matchHeaders(const Http::HeaderMap& headers,
                                          MatchStatusVector& statuses) const {
   ASSERT(statuses[my_index_].might_change_status_);
   statuses[my_index_].matches_ = Http::HeaderUtility::matchHeaders(headers, headers_to_match_);
+  statuses[my_index_].might_change_status_ = false;
+}
+
+HttpGenericBodyMatcher::HttpGenericBodyMatcher(
+    const envoy::config::tap::v3::HttpGenericBodyMatch& config,
+    const std::vector<MatcherPtr>& matchers)
+    : HttpBodyMatcherBase(matchers) {
+  for (auto i : config.patterns()) {
+    switch (i.rule_case()) {
+    case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kContainsHex: {
+      // convert the hex string to real hex values
+      // string containing "01" will be converted to 1 byte: 0x01
+      const std::vector<unsigned char> hex = Hex::decode(i.contains_hex());
+      if (hex.empty()) {
+        throw EnvoyException(fmt::format("invalid hex string '{}'", i.contains_hex()));
+      }
+      std::string hex_string;
+      hex_string.assign(reinterpret_cast<const char*>(hex.data()), hex.size());
+      patterns_.push_back(hex_string);
+    } break;
+    case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kContainsText:
+      patterns_.push_back(i.contains_text());
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+}
+
+void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data,
+                                    MatchStatusVector& statuses) const {
+  bool found = std::all_of(patterns_.begin(), patterns_.end(), [&data](std::string pattern) {
+    return (-1 != data.search(static_cast<const void*>(pattern.c_str()), pattern.length(), 0));
+  });
+
+  statuses[my_index_].matches_ |= found;
   statuses[my_index_].might_change_status_ = false;
 }
 
