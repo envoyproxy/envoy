@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
     s.name = 'EnvoyMobile'
-    s.version = '0.3.0.04292020'
+    s.version = '0.3.0.05052020'
     s.author = 'Lyft, Inc.'
     s.summary = 'Client networking libraries based on the Envoy project'
     s.homepage = 'https://envoy-mobile.github.io'
