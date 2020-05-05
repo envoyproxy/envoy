@@ -280,7 +280,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   return **streams_.begin();
 }
 
-void ConnectionManagerImpl::handleCodecException(absl::string_view error) {
+void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
   read_callbacks_->connection().streamInfo().setResponseCodeDetails(
       absl::StrCat("codec error: ", error));
@@ -328,11 +328,11 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 
     ASSERT(!isPrematureResponseError(status));
     if (isBufferFloodError(status)) {
-      handleCodecException(status.message());
+      handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
     } else if (isCodecProtocolError(status)) {
       stats_.named_.downstream_cx_protocol_error_.inc();
-      handleCodecException(status.message());
+      handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
     }
 
