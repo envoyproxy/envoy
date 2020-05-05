@@ -172,8 +172,7 @@ Http2Frame Http2Frame::makeEmptyPushPromiseFrame(uint32_t stream_index,
 Http2Frame Http2Frame::makeResetStreamFrame(uint32_t stream_index, ErrorCode error_code) {
   static constexpr size_t kResetStreamPayloadSize = 4;
   Http2Frame frame;
-  frame.buildHeader(Type::RstStream, kResetStreamPayloadSize, 0,
-                    makeRequestStreamId(stream_index));
+  frame.buildHeader(Type::RstStream, kResetStreamPayloadSize, 0, makeRequestStreamId(stream_index));
   uint32_t error = static_cast<uint32_t>(error_code);
   memcpy(&frame.data_[HeaderSize], reinterpret_cast<void*>(&error), sizeof(uint32_t));
   return frame;
@@ -182,8 +181,7 @@ Http2Frame Http2Frame::makeResetStreamFrame(uint32_t stream_index, ErrorCode err
 Http2Frame Http2Frame::makeEmptyGoAwayFrame(uint32_t last_stream_index, ErrorCode error_code) {
   static constexpr size_t kEmptyGoAwayPayloadSize = 8;
   Http2Frame frame;
-  frame.buildHeader(Type::GoAway, kEmptyGoAwayPayloadSize, 0,
-                    makeRequestStreamId(0));
+  frame.buildHeader(Type::GoAway, kEmptyGoAwayPayloadSize, 0, makeRequestStreamId(0));
   uint32_t last_stream_id = makeRequestStreamId(last_stream_index);
   memcpy(&frame.data_[HeaderSize], reinterpret_cast<void*>(&last_stream_id), sizeof(uint32_t));
   uint32_t error = static_cast<uint32_t>(error_code);

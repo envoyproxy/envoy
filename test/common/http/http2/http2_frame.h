@@ -95,8 +95,7 @@ public:
   static Http2Frame makeEmptyDataFrame(uint32_t stream_index, DataFlags flags = DataFlags::None);
   static Http2Frame makePriorityFrame(uint32_t stream_index, uint32_t dependent_index);
 
-  static Http2Frame makeEmptyPushPromiseFrame(uint32_t stream_index,
-                                              uint32_t promised_stream_index,
+  static Http2Frame makeEmptyPushPromiseFrame(uint32_t stream_index, uint32_t promised_stream_index,
                                               HeadersFlags flags = HeadersFlags::None);
   static Http2Frame makeResetStreamFrame(uint32_t stream_index, ErrorCode errorCode);
   static Http2Frame makeEmptyGoAwayFrame(uint32_t last_stream_index, ErrorCode errorCode);

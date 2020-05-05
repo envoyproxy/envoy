@@ -59,8 +59,8 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
     uint32_t stream_idx = proto_frame.push_promise().stream_index();
     uint32_t promised_stream_idx = proto_frame.push_promise().promised_stream_index();
     ENVOY_LOG_MISC(trace, "Sending push promise frame");
-    h2_frame = Http2Frame::makeEmptyPushPromiseFrame(stream_idx, promised_stream_idx,
-                                                     headers_flags);
+    h2_frame =
+        Http2Frame::makeEmptyPushPromiseFrame(stream_idx, promised_stream_idx, headers_flags);
   } break;
   case test::integration::H2TestFrame::kResetStream: {
     uint32_t stream_idx = proto_frame.reset_stream().stream_index();
