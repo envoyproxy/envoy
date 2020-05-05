@@ -48,8 +48,7 @@ Per command statistics
 ----------------------
 
 The Redis filter will gather statistics for commands in the
-*redis.<stat_prefix>.command.<command>.* namespace. By default latency stats are in milliseconds and can be
-changed to microseconds by setting the configuration parameter :ref:`latency_in_micros <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.latency_in_micros>` to true.
+*redis.<stat_prefix>.command.<command>.* namespace. The latency stats are in microseconds.
 
 .. csv-table::
   :header: Name, Type, Description
