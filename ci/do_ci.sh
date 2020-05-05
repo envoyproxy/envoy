@@ -300,14 +300,6 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
   exit 0
-elif [[ "$CI_TARGET" == "bazel.fuzzit" ]]; then
-  setup_clang_toolchain
-  FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
-  echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
-  echo "Building fuzzers and run under Fuzzit"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} \
-    --test_env=FUZZIT_API_KEY --test_env=ENVOY_BUILD_IMAGE --test_timeout=1200 --run_under=//bazel:fuzzit_wrapper
-  exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain

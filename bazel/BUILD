@@ -43,12 +43,6 @@ genrule(
     stamp = 1,
 )
 
-sh_binary(
-    name = "fuzzit_wrapper",
-    srcs = ["fuzzit_wrapper.sh"],
-    data = ["@fuzzit_linux//:fuzzit"],
-)
-
 # A target to optionally link C++ standard library dynamically in sanitizer runs.
 # TSAN doesn't support libc/libstdc++ static linking per doc:
 #   http://releases.llvm.org/8.0.1/tools/clang/docs/ThreadSanitizer.html
