@@ -68,6 +68,9 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
   if (internal_redirect.value().getStringView().length() == 0) {
     return false;
   }
+  if (!downstream_headers.Path()) {
+    return false;
+  }
 
   Http::Utility::Url absolute_url;
   if (!absolute_url.initialize(internal_redirect.value().getStringView(), false)) {
@@ -111,6 +114,20 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
 }
 
 constexpr uint64_t TimeoutPrecisionFactor = 100;
+
+Http::ConnectionPool::Instance*
+httpPool(absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*> pool) {
+  return absl::get<Http::ConnectionPool::Instance*>(pool);
+}
+
+Tcp::ConnectionPool::Instance*
+tcpPool(absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*> pool) {
+  return absl::get<Tcp::ConnectionPool::Instance*>(pool);
+}
+
+const absl::string_view getPath(const Http::RequestHeaderMap& headers) {
+  return headers.Path() ? headers.Path()->value().getStringView() : "";
+}
 
 } // namespace
 
@@ -379,7 +396,6 @@ void Filter::chargeUpstreamCode(Http::Code code,
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
   // These get stripped by HTTP/1 codec where applicable.
-  ASSERT(headers.Path());
   ASSERT(headers.Method());
   ASSERT(headers.Host());
 
@@ -395,7 +411,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           : nullptr;
 
   // TODO: Maybe add a filter API for this.
-  grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+  grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
   // that get handled by earlier filters.
@@ -410,8 +426,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   route_ = callbacks_->route();
   if (!route_) {
     config_.stats_.no_route_.inc();
-    ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_,
-                     headers.Path()->value().getStringView());
+    ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_, getPath(headers));
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     callbacks_->sendLocalReply(Http::Code::NotFound, "", modify_headers, absl::nullopt,
@@ -428,7 +443,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         direct_response->responseCode(), direct_response->responseBody(),
         [this, direct_response,
          &request_headers = headers](Http::ResponseHeaderMap& response_headers) -> void {
-          const auto new_path = direct_response->newPath(request_headers);
+          std::string new_path;
+          if (request_headers.Path()) {
+            new_path = direct_response->newPath(request_headers);
+          }
           // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
           const auto add_location =
               direct_response->responseCode() == Http::Code::Created ||
@@ -473,7 +491,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
-                   route_entry_->clusterName(), headers.Path()->value().getStringView());
+                   route_entry_->clusterName(), getPath(headers));
 
   if (config_.strict_check_headers_ != nullptr) {
     for (const auto& header : *config_.strict_check_headers_) {
@@ -508,7 +526,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         Http::Code::ServiceUnavailable, "maintenance mode",
         [modify_headers, this](Http::ResponseHeaderMap& headers) {
           if (!config_.suppress_envoy_headers_) {
-            headers.setReferenceEnvoyOverloaded(Http::Headers::get().EnvoyOverloadedValues.True);
+            headers.addReference(Http::Headers::get().EnvoyOverloaded,
+                                 Http::Headers::get().EnvoyOverloadedValues.True);
           }
           // Note: append_cluster_info does not respect suppress_envoy_headers.
           modify_headers(headers);
@@ -540,12 +559,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  Http::ConnectionPool::Instance* http_pool = getHttpConnPool();
   Upstream::HostDescriptionConstSharedPtr host;
+  Filter::HttpOrTcpPool conn_pool = createConnPool(host);
 
-  if (http_pool) {
-    host = http_pool->host();
-  } else {
+  if (!host) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -635,8 +652,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
-  UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::make_unique<HttpConnPool>(*http_pool));
+  UpstreamRequestPtr upstream_request = createUpstreamRequest(conn_pool);
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
@@ -644,6 +660,38 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   return Http::FilterHeadersStatus::StopIteration;
+}
+
+Filter::HttpOrTcpPool Filter::createConnPool(Upstream::HostDescriptionConstSharedPtr& host) {
+  Filter::HttpOrTcpPool conn_pool;
+  const bool should_tcp_proxy = route_entry_->connectConfig().has_value() &&
+                                downstream_headers_->Method()->value().getStringView() ==
+                                    Http::Headers::get().MethodValues.Connect;
+
+  if (!should_tcp_proxy) {
+    conn_pool = getHttpConnPool();
+    if (httpPool(conn_pool)) {
+      host = httpPool(conn_pool)->host();
+    }
+  } else {
+    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+        *callbacks_->streamInfo().filterState());
+    conn_pool = config_.cm_.tcpConnPoolForCluster(route_entry_->clusterName(),
+                                                  Upstream::ResourcePriority::Default, this);
+    if (tcpPool(conn_pool)) {
+      host = tcpPool(conn_pool)->host();
+    }
+  }
+  return conn_pool;
+}
+
+UpstreamRequestPtr Filter::createUpstreamRequest(Filter::HttpOrTcpPool conn_pool) {
+  if (absl::holds_alternative<Http::ConnectionPool::Instance*>(conn_pool)) {
+    return std::make_unique<UpstreamRequest>(*this,
+                                             std::make_unique<HttpConnPool>(*httpPool(conn_pool)));
+  }
+  return std::make_unique<UpstreamRequest>(*this,
+                                           std::make_unique<TcpConnPool>(tcpPool(conn_pool)));
 }
 
 Http::ConnectionPool::Instance* Filter::getHttpConnPool() {
@@ -936,6 +984,29 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
                          StreamInfo::ResponseCodeDetails::get().UpstreamPerTryTimeout);
 }
 
+void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
+  upstream_request.resetStream();
+
+  if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request)) {
+    return;
+  }
+
+  upstream_request.removeFromList(upstream_requests_);
+  cleanup();
+
+  if (downstream_response_started_) {
+    callbacks_->streamInfo().setResponseCodeDetails(
+        StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
+    callbacks_->resetStream();
+  } else {
+    callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached);
+    callbacks_->sendLocalReply(
+        Http::Code::RequestTimeout, "upstream max stream duration reached", modify_headers_,
+        absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
+  }
+}
+
 void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
                                     UpstreamRequest& upstream_request,
                                     absl::optional<uint64_t> code) {
@@ -999,7 +1070,8 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
         code, body,
         [dropped, this](Http::ResponseHeaderMap& headers) {
           if (dropped && !config_.suppress_envoy_headers_) {
-            headers.setReferenceEnvoyOverloaded(Http::Headers::get().EnvoyOverloadedValues.True);
+            headers.addReference(Http::Headers::get().EnvoyOverloaded,
+                                 Http::Headers::get().EnvoyOverloadedValues.True);
           }
           modify_headers_(headers);
         },
@@ -1444,19 +1516,15 @@ void Filter::doRetry() {
   attempt_count_++;
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
-  UpstreamRequestPtr upstream_request;
 
-  Http::ConnectionPool::Instance* conn_pool = getHttpConnPool();
-  if (conn_pool) {
-    upstream_request =
-        std::make_unique<UpstreamRequest>(*this, std::make_unique<HttpConnPool>(*conn_pool));
-  }
-
-  if (!upstream_request) {
+  Upstream::HostDescriptionConstSharedPtr host;
+  Filter::HttpOrTcpPool conn_pool = createConnPool(host);
+  if (!host) {
     sendNoHealthyUpstreamResponse();
     cleanup();
     return;
   }
+  UpstreamRequestPtr upstream_request = createUpstreamRequest(conn_pool);
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);

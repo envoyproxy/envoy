@@ -272,7 +272,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->buffer_limit_ = new_stream->response_encoder_->getStream().bufferLimit();
   // If the network connection is backed up, the stream should be made aware of it on creation.
-  // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacks_.
+  // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
          new_stream->high_watermark_count_ > 0);
   new_stream->moveIntoList(std::move(new_stream), streams_);
@@ -671,7 +671,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   } else {
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
     sendLocalReply(request_headers_ != nullptr &&
-                       Grpc::Common::hasGrpcContentType(*request_headers_),
+                       Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                    Http::Code::RequestTimeout, "stream timeout", nullptr, state_.is_head_request_,
                    absl::nullopt, StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
   }
@@ -679,7 +679,8 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
-  sendLocalReply(request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_),
+  sendLocalReply(request_headers_ != nullptr &&
+                     Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                  Http::Code::RequestTimeout, "request timeout", nullptr, state_.is_head_request_,
                  absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
@@ -694,6 +695,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
     StreamDecoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
+  // Note: configured decoder filters are appended to decoder_filters_.
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
+  //   http_filters:
+  //     - A
+  //     - B
+  //     - C
+  // The decoder filter chain will iterate through filters A, B, C.
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
@@ -701,6 +710,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
+  // Note: configured encoder filters are prepended to encoder_filters_.
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
+  //   http_filters:
+  //     - A
+  //     - B
+  //     - C
+  // The encoder filter chain will iterate through filters C, B, A.
   wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
 }
 
@@ -799,7 +816,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // overload it is more important to avoid unnecessary allocation than to create the filters.
     state_.created_filter_chain_ = true;
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
+    sendLocalReply(Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                    Http::Code::ServiceUnavailable, "envoy overloaded", nullptr,
                    state_.is_head_request_, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().Overload);
@@ -1540,8 +1557,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
   ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
-                                                  connection_manager_.config_.requestIDExtension(),
-                                                  EMPTY_STRING);
+                                                  connection_manager_.config_, EMPTY_STRING);
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(headers);
@@ -1624,7 +1640,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
     headers.setReferenceServer(connection_manager_.config_.serverName());
   }
   ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
-                                                  connection_manager_.config_.requestIDExtension(),
+                                                  connection_manager_.config_,
                                                   connection_manager_.config_.via());
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
@@ -2067,7 +2083,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
   allowIteration();
 
   // Only resume with do100ContinueHeaders() if we've actually seen a 100-Continue.
-  if (parent_.state_.has_continue_headers_ && !continue_headers_continued_) {
+  if (has100Continueheaders()) {
     continue_headers_continued_ = true;
     do100ContinueHeaders();
     // If the response headers have not yet come in, don't continue on with

@@ -17,7 +17,6 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
@@ -39,6 +38,9 @@
 
 #include "server/http/admin_filter.h"
 #include "server/http/config_tracker_impl.h"
+#include "server/http/listeners_handler.h"
+#include "server/http/runtime_handler.h"
+#include "server/http/stats_handler.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 
@@ -115,6 +117,7 @@ public:
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() const override { return false; }
   bool preserveExternalRequestId() const override { return false; }
+  bool alwaysSetRequestIdInResponse() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return false; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
@@ -178,33 +181,16 @@ public:
     };
   }
 
-  using HandlerWithServerCb = std::function<Http::Code(
-      absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
-      Buffer::Instance& response, AdminStream& admin_stream, Server::Instance& server)>;
-
 private:
   /**
    * Individual admin handler including prefix, help text, and callback.
    */
   struct UrlHandler {
-    UrlHandler(std::string prefix, std::string help_text, HandlerCb handler, bool removable,
-               bool mutates_server_state)
-        : prefix_(prefix), help_text_(help_text), handler_(handler), removable_(removable),
-          mutates_server_state_(mutates_server_state), requires_server_(false) {}
-
-    UrlHandler(std::string prefix, std::string help_text, HandlerWithServerCb handler_with_server,
-               bool removable, bool mutates_server_state)
-        : prefix_(prefix), help_text_(help_text), handler_with_server_(handler_with_server),
-          removable_(removable), mutates_server_state_(mutates_server_state),
-          requires_server_(true) {}
-
     const std::string prefix_;
     const std::string help_text_;
     const HandlerCb handler_;
-    const HandlerWithServerCb handler_with_server_;
     const bool removable_;
     const bool mutates_server_state_;
-    const bool requires_server_;
   };
 
   /**
@@ -269,12 +255,6 @@ private:
   void writeClustersAsText(Buffer::Instance& response);
 
   /**
-   * Helper methods for the /listeners url handler.
-   */
-  void writeListenersAsJson(Buffer::Instance& response);
-  void writeListenersAsText(Buffer::Instance& response);
-
-  /**
    * Helper methods for the /config_dump url handler.
    */
   void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
@@ -326,9 +306,6 @@ private:
   Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&);
-  Http::Code handlerListenerInfo(absl::string_view path_and_query,
-                                 Http::ResponseHeaderMap& response_headers,
-                                 Buffer::Instance& response, AdminStream&);
   Http::Code handlerLogging(absl::string_view path_and_query,
                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                             AdminStream&);
@@ -339,25 +316,15 @@ private:
   Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, AdminStream&);
-  Http::Code handlerDrainListeners(absl::string_view path_and_query,
-                                   Http::ResponseHeaderMap& response_headers,
-                                   Buffer::Instance& response, AdminStream&);
   Http::Code handlerServerInfo(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
   Http::Code handlerReady(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
-  Http::Code handlerRuntime(absl::string_view path_and_query,
-                            Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                            AdminStream&);
-  Http::Code handlerRuntimeModify(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
-                                  Buffer::Instance& response, AdminStream&);
   Http::Code handlerReopenLogs(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
-  bool isFormUrlEncoded(const Http::HeaderEntry* content_type) const;
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
   public:
@@ -457,6 +424,9 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;
+  Server::StatsHandler stats_handler_;
+  Server::RuntimeHandler runtime_handler_;
+  Server::ListenersHandler listeners_handler_;
   std::list<UrlHandler> handlers_;
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   const uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};

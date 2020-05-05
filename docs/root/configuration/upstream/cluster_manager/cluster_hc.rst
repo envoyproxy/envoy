@@ -6,7 +6,7 @@ Health checking
 * Health checking :ref:`architecture overview <arch_overview_health_checking>`.
 * If health checking is configured for a cluster, additional statistics are emitted. They are
   documented :ref:`here <config_cluster_manager_cluster_stats>`.
-* :ref:`v2 API documentation <envoy_api_msg_core.HealthCheck>`.
+* :ref:`v3 API documentation <envoy_v3_api_msg_config.core.v3.HealthCheck>`.
 
 .. _config_cluster_manager_cluster_hc_tcp_health_checking:
 
