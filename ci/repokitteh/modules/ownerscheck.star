@@ -50,7 +50,7 @@ def _get_relevant_specs(specs, changed_files):
     files = [f for f in changed_files if match(path_match, f['filename'])]
     allow_global_approval = spec.get("allow_global_approval", True)
     if files:
-      relevant.append(struct(files=files, path_match=path_match, allow_global_approval=allow_global_approval, status_label=spec["github_status_label"], **spec))
+      relevant.append(struct(files=files, path_match=path_match, allow_global_approval=allow_global_approval, **spec))
 
   print("specs: %s" % relevant)
 
