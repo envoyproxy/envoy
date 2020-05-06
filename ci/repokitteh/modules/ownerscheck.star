@@ -47,7 +47,7 @@ def _get_relevant_specs(specs, changed_files):
   for spec in specs:
     match = spec["path"]
 
-    files = [f for f in changed_files if text.match(match, f['filename'])]
+    files = [f for f in changed_files if match(match, f['filename'])]
     allow_global_approval = spec.get("allow_global_approval", True)
     if files:
       relevant.append(struct(files=files, match=match, allow_global_approval=allow_global_approval, **spec))
