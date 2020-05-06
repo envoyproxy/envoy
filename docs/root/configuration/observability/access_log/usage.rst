@@ -9,7 +9,7 @@ Configuration
 Access logs are configured as part of the :ref:`HTTP connection manager config
 <config_http_conn_man>` or :ref:`TCP Proxy <config_network_filters_tcp_proxy>`.
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.accesslog.v2.AccessLog>`
+* :ref:`v3 API reference <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
 
 .. _config_access_log_format:
 
@@ -257,7 +257,7 @@ The following command operators are supported:
     * **UF**: Upstream connection failure in addition to 503 response code.
     * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
     * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
-    * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_api_field_route.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.max_connect_attempts>` was reached.
+    * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` was reached.
   HTTP only
     * **DC**: Downstream connection termination.
     * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
@@ -271,9 +271,10 @@ The following command operators are supported:
     * **UAEX**: The request was denied by the external authorization service.
     * **RLSE**: The request was rejected because there was an error in rate limit service.
     * **IH**: The request was rejected because it set an invalid value for a
-      :ref:`strictly-checked header <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>` in addition to 400 response code.
+      :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` in addition to 400 response code.
     * **SI**: Stream idle timeout in addition to 408 response code.
     * **DPE**: The downstream request had an HTTP protocol error.
+    * **UMSDR**: The upstream request reached to max stream duration.
 
 %ROUTE_NAME%
   Name of the route.
@@ -306,7 +307,7 @@ The following command operators are supported:
   .. note::
 
     This may not be the physical remote address of the peer if the address has been inferred from
-    :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+    :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
@@ -316,7 +317,7 @@ The following command operators are supported:
   .. note::
 
     This may not be the physical remote address of the peer if the address has been inferred from
-    :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+    :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS%
@@ -326,7 +327,7 @@ The following command operators are supported:
   .. note::
 
     This is always the physical remote address of the peer even if the downstream remote address has
-    been inferred from :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>`
+    been inferred from :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
@@ -336,7 +337,7 @@ The following command operators are supported:
   .. note::
 
     This is always the physical remote address of the peer even if the downstream remote address has
-    been inferred from :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>`
+    been inferred from :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_LOCAL_ADDRESS%
@@ -383,7 +384,7 @@ The following command operators are supported:
 
 %DYNAMIC_METADATA(NAMESPACE:KEY*):Z%
   HTTP
-    :ref:`Dynamic Metadata <envoy_api_msg_core.Metadata>` info,
+    :ref:`Dynamic Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
     where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
     lookup up key in the namespace with the option of specifying nested keys separated by ':',
     and Z is an optional parameter denoting string truncation up to Z characters long. Dynamic Metadata

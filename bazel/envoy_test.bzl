@@ -121,7 +121,7 @@ def envoy_cc_fuzz_test(
             ],
         }),
         size = size,
-        tags = tags,
+        tags = ["fuzz_target"] + tags,
     )
 
     # This target exists only for

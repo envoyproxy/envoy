@@ -4,7 +4,7 @@ gRPC-JSON transcoder
 ====================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.transcoder.v2.GrpcJsonTranscoder>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder>`
 * This filter should be configured with the name *envoy.filters.http.grpc_json_transcoder*.
 
 This is a filter which allows a RESTful JSON API client to send requests to Envoy over HTTP
@@ -110,7 +110,7 @@ gRPC or RESTful JSON requests to localhost:51051.
       - filters:
         - name: envoy.filters.network.http_connection_manager
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
             stat_prefix: grpc_json
             codec_type: AUTO
             route_config:
@@ -126,7 +126,7 @@ gRPC or RESTful JSON requests to localhost:51051.
             http_filters:
             - name: envoy.filters.http.grpc_json_transcoder
               typed_config:
-                "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+                "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
                 proto_descriptor: "/tmp/envoy/proto.pb"
                 services: ["helloworld.Greeter"]
                 print_options:

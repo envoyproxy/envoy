@@ -1,6 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "common/buffer/buffer_impl.h"
+
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -8,6 +10,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "utility.h"
 
 namespace Envoy {
 namespace {
@@ -73,25 +76,6 @@ TEST_P(XdsIntegrationTestTypedStruct, RouterRequestAndResponseWithBodyNoBuffer) 
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
-// TODO(lambdai): Extend RawConnectionDriver with SSL and delete this one.
-class SslClient {
-public:
-  SslClient(Network::ClientConnectionPtr ssl_conn, Event::Dispatcher& dispatcher)
-      : ssl_conn_(std::move(ssl_conn)),
-        payload_reader_(std::make_shared<WaitForPayloadReader>(dispatcher)) {
-    ssl_conn_->addConnectionCallbacks(connect_callbacks_);
-    ssl_conn_->addReadFilter(payload_reader_);
-    ssl_conn_->connect();
-    while (!connect_callbacks_.connected()) {
-      dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-    }
-  }
-  Network::ClientConnectionPtr ssl_conn_;
-  MockWatermarkBuffer* client_write_buffer;
-  std::shared_ptr<WaitForPayloadReader> payload_reader_;
-  ConnectionStatusCallbacks connect_callbacks_;
-};
-
 class LdsInplaceUpdateTcpProxyIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public BaseIntegrationTest {
@@ -143,16 +127,20 @@ public:
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   }
 
-  std::unique_ptr<SslClient> connect(const std::string& alpn) {
-    Network::Address::InstanceConstSharedPtr address =
-        Ssl::getSslAddress(version_, lookupPort("tcp"));
-    auto ssl_conn = dispatcher_->createClientConnection(
-        address, Network::Address::InstanceConstSharedPtr(),
+  std::unique_ptr<RawConnectionDriver> createConnectionAndWrite(const std::string& alpn,
+                                                                const std::string& request,
+                                                                std::string& response) {
+    Buffer::OwnedImpl buffer(request);
+    return std::make_unique<RawConnectionDriver>(
+        lookupPort("tcp"), buffer,
+        [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+          response.append(data.toString());
+        },
+        version_, *dispatcher_,
         context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-            absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})),
-        nullptr);
-    return std::make_unique<SslClient>(std::move(ssl_conn), *dispatcher_);
+            absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})));
   }
+
   std::unique_ptr<Ssl::ContextManager> context_manager_;
   Network::TransportSocketFactoryPtr context_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
@@ -162,12 +150,15 @@ public:
 TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain) {
   setUpstreamCount(2);
   initialize();
-
-  auto client_0 = connect("alpn0");
+  std::string response_0;
+  auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
+  client_conn_0->waitForConnection();
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
-  auto client_1 = connect("alpn1");
+  std::string response_1;
+  auto client_conn_1 = createConnectionAndWrite("alpn1", "dummy", response_1);
+  client_conn_1->waitForConnection();
   FakeRawConnectionPtr fake_upstream_connection_1;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_1));
 
@@ -181,23 +172,21 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
 
-  while (!client_1->connect_callbacks_.closed()) {
+  while (!client_conn_1->closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
+  ASSERT_EQ(response_1, "");
 
-  Buffer::OwnedImpl buffer("hello");
-  client_0->ssl_conn_->write(buffer, false);
-  client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
   std::string observed_data_0;
   ASSERT_TRUE(fake_upstream_connection_0->waitForData(5, &observed_data_0));
   EXPECT_EQ("hello", observed_data_0);
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
-  client_0->payload_reader_->set_data_to_wait_for("world");
-  client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  client_0->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
-
-  while (!client_0->connect_callbacks_.closed()) {
+  while (response_0.find("world") == std::string::npos) {
+    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  client_conn_0->close();
+  while (!client_conn_0->closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 }
@@ -208,7 +197,9 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
   setUpstreamCount(2);
   initialize();
 
-  auto client_0 = connect("alpn0");
+  std::string response_0;
+  auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
+  client_conn_0->waitForConnection();
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
@@ -226,39 +217,34 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
 
-  auto client_2 = connect("alpn2");
+  std::string response_2;
+  auto client_conn_2 = createConnectionAndWrite("alpn2", "hello2", response_2);
+  client_conn_2->waitForConnection();
   FakeRawConnectionPtr fake_upstream_connection_2;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_2));
-
-  Buffer::OwnedImpl buffer_2("hello");
-  client_2->ssl_conn_->write(buffer_2, false);
-  client_2->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
   std::string observed_data_2;
-  ASSERT_TRUE(fake_upstream_connection_2->waitForData(5, &observed_data_2));
-  EXPECT_EQ("hello", observed_data_2);
+  ASSERT_TRUE(fake_upstream_connection_2->waitForData(6, &observed_data_2));
+  EXPECT_EQ("hello2", observed_data_2);
 
-  ASSERT_TRUE(fake_upstream_connection_2->write("world"));
-  client_2->payload_reader_->set_data_to_wait_for("world");
-  client_2->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  client_2->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
-
-  while (!client_2->connect_callbacks_.closed()) {
+  ASSERT_TRUE(fake_upstream_connection_2->write("world2"));
+  while (response_2.find("world2") == std::string::npos) {
+    client_conn_2->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  client_conn_2->close();
+  while (!client_conn_2->closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  Buffer::OwnedImpl buffer_0("hello");
-  client_0->ssl_conn_->write(buffer_0, false);
-  client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
   std::string observed_data_0;
   ASSERT_TRUE(fake_upstream_connection_0->waitForData(5, &observed_data_0));
   EXPECT_EQ("hello", observed_data_0);
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
-  client_0->payload_reader_->set_data_to_wait_for("world");
-  client_0->ssl_conn_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  client_0->ssl_conn_->close(Network::ConnectionCloseType::NoFlush);
-
-  while (!client_0->connect_callbacks_.closed()) {
+  while (response_0.find("world") == std::string::npos) {
+    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  client_conn_0->close();
+  while (!client_conn_0->closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 }

@@ -29,11 +29,11 @@ in the configuration snippet below:
   - filters:
     - name: envoy.filters.network.zookeeper_proxy
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.network.zookeeper_proxy.v1alpha1.ZooKeeperProxy
+        "@type": type.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy
         stat_prefix: zookeeper
     - name: envoy.filters.network.tcp_proxy
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+        "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
         stat_prefix: tcp
         cluster: ...
 
