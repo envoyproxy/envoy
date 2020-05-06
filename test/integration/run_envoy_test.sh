@@ -2,12 +2,9 @@
 
 source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh"
 
-# Use a non-default base id to prevent problems in coverage and whens runs-per-test is set.
-if [[ -z "${TEST_RANDOM_SEED}" ]]; then
-    BASE_ID=$$
-else
-    BASE_ID="${TEST_RANDOM_SEED}"
-fi
+# When runs-per-test is set, use TEST_RANDOM_SEED.
+# In coverage, use TEST_SHARD_INDEX. Default to 1.
+BASE_ID="${TEST_RANDOM_SEED:-${TEST_SHARD_INDEX:-1}}"
 
 function expect_fail_with_error() {
   log="${TEST_TMPDIR}/envoy.log"
