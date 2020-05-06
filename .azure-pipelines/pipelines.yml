@@ -130,24 +130,9 @@ jobs:
     pool:
       vmImage: "windows-latest"
     steps:
-      - powershell: |
-          .\ci\windows_ci_setup.ps1
-          Write-Host "##vso[task.prependpath]$env:TOOLS_BIN_DIR\usr\bin"
-          Write-Host "##vso[task.prependpath]$env:VC_TOOLS_BIN_X64;$env:VC_CMAKE_PATH\CMake\bin;$env:VC_CMAKE_PATH\Ninja"
-          Write-Host "##vso[task.prependpath]$env:TOOLS_BIN_DIR"
-        displayName: "Install dependencies"
-        env:
-          TOOLS_BIN_DIR: $(Pipeline.Workspace)\bin
-          VC_CMAKE_PATH: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake"
-          VC_TOOLS_BIN_X64: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\VC\\Tools\\MSVC\\14.25.28610\\bin\\HostX64\\x64"
-
-      - bash: ci/windows_ci_steps.sh
+      - bash: ci/run_envoy_docker_windows.sh ci/windows_ci_steps.sh
         displayName: "Run Windows CI"
         env:
-          BAZEL_VC: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\VC"
-          BAZEL_SH: $(Pipeline.Workspace)/bin/usr/bin/bash.exe
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-          MSYS2_ARG_CONV_EXCL: "*"
-          TMPDIR: $(Agent.TempDirectory)
