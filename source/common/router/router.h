@@ -265,6 +265,7 @@ public:
                                UpstreamRequest& upstream_request) PURE;
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
   virtual void onPerTryTimeout(UpstreamRequest& upstream_request) PURE;
+  virtual void onStreamMaxDurationReached(UpstreamRequest& upstream_request) PURE;
 
   virtual Http::StreamDecoderFilterCallbacks* callbacks() PURE;
   virtual Upstream::ClusterInfoConstSharedPtr cluster() PURE;
@@ -432,6 +433,7 @@ public:
                        UpstreamRequest& upstream_request) override;
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override;
   void onPerTryTimeout(UpstreamRequest& upstream_request) override;
+  void onStreamMaxDurationReached(UpstreamRequest& upstream_request) override;
   Http::StreamDecoderFilterCallbacks* callbacks() override { return callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
   FilterConfig& config() override { return config_; }

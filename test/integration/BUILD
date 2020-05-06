@@ -783,25 +783,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "ratelimit_integration_test",
-    srcs = ["ratelimit_integration_test.cc"],
-    tags = ["fails_on_windows"],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/buffer:zero_copy_input_stream_lib",
-        "//source/common/grpc:codec_lib",
-        "//source/common/grpc:common_lib",
-        "//source/extensions/filters/http/ratelimit:config",
-        "//test/common/grpc:grpc_client_integration_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
     name = "rtds_integration_test",
     srcs = ["rtds_integration_test.cc"],
     tags = ["fails_on_windows"],

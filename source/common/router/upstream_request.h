@@ -107,6 +107,7 @@ public:
   UpstreamRequest* upstreamRequest() override { return this; }
 
   void clearRequestEncoder();
+  void onStreamMaxDurationReached();
 
   struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks {
     DownstreamWatermarkManager(UpstreamRequest& parent) : parent_(parent) {}
@@ -188,6 +189,8 @@ private:
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
   // and if so, if the per-try histogram should record a value.
   bool record_timeout_budget_ : 1;
+
+  Event::TimerPtr max_stream_duration_timer_;
 };
 
 class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
