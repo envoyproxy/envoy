@@ -45,12 +45,12 @@ def _get_relevant_specs(specs, changed_files):
   relevant = []
 
   for spec in specs:
-    match = spec["path"]
+    path_match = spec["path"]
 
-    files = [f for f in changed_files if match(match, f['filename'])]
+    files = [f for f in changed_files if match(path_match, f['filename'])]
     allow_global_approval = spec.get("allow_global_approval", True)
     if files:
-      relevant.append(struct(files=files, match=match, allow_global_approval=allow_global_approval, **spec))
+      relevant.append(struct(files=files, path_match=path_match, allow_global_approval=allow_global_approval, **spec))
 
   print("specs: %s" % relevant)
 
@@ -94,11 +94,11 @@ def _is_approved(spec, approvers):
   return False
 
 
-def _update_status(owner, match, approved):
+def _update_status(owner, path_match, approved):
   github.create_status(
     state=approved and 'success' or 'pending',
     context='%s must approve' % owner,
-    description='changes to %s' % (match or '/'),
+    description='changes to %s' % (path_match or '/'),
   )
 
 def _get_specs(config):
@@ -124,7 +124,7 @@ def _reconcile(config, specs=None):
     results.append((spec, approved))
 
     if spec.owner[-1] == '!':
-      _update_status(spec.owner[:-1], spec.match, approved)
+      _update_status(spec.owner[:-1], spec.path_match, approved)
 
       if hasattr(spec, 'label'):
         if approved:
@@ -152,13 +152,13 @@ def _comment(config, results, force=False):
     if mention[-1] == '!':
       mention = mention[:-1]
 
-    match_description = spec.match
+    match_description = spec.path_match
     if match_description:
       match_description = ' for changes made to `' + match_description + '`'
 
     mode = spec.owner[-1] == '!' and 'approval' or 'fyi'
 
-    key = "ownerscheck/%s/%s" % (spec.owner, spec.match)
+    key = "ownerscheck/%s/%s" % (spec.owner, spec.path_match)
 
     if (not force) and (store_get(key) == mode):
       mode = 'skip'
