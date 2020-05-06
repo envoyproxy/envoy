@@ -913,7 +913,8 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
       connection, data, callbacks, server_.stats(), Http::Http1Settings(),
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions()),
-      maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+      maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
+      server_.httpContext());
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,

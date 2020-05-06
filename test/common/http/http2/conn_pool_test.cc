@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "common/event/dispatcher_impl.h"
+#include "common/http/context_impl.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -60,7 +61,9 @@ public:
 
   Http2ConnPoolImplTest()
       : api_(Api::createApiForTest(stats_store_)),
-        pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr) {
+        http_context_(stats_store_.symbolTable()),
+        pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr,
+              http_context_) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -133,6 +136,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
+  Http::ContextImpl http_context_;
   TestConnPoolImpl pool_;
   std::vector<TestCodecClient> test_clients_;
   NiceMock<Runtime::MockLoader> runtime_;

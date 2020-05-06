@@ -443,11 +443,11 @@ http_parser_settings ConnectionImpl::settings_{
 };
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                               const Context& context,
+                               const CodecStatNames& codec_stat_names,
                                http_parser_type type, uint32_t max_headers_kb,
                                const uint32_t max_headers_count,
                                HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers)
-    : connection_(connection), stats_(context.codecStatNames(), stats),
+    : connection_(connection), stats_(codec_stat_names, stats),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
       strict_header_validation_(
@@ -738,13 +738,13 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 
 ServerConnectionImpl::ServerConnectionImpl(
     Network::Connection& connection, Stats::Scope& stats,
-    const Context& stat_names,
+    const CodecStatNames& codec_stat_names,
     ServerConnectionCallbacks& callbacks,
     const Http1Settings& settings, uint32_t max_request_headers_kb,
     const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
-    : ConnectionImpl(connection, stats, stat_names, HTTP_REQUEST, max_request_headers_kb,
+    : ConnectionImpl(connection, stats, codec_stat_names, HTTP_REQUEST, max_request_headers_kb,
                      max_request_headers_count, formatter(settings), settings.enable_trailers_),
       callbacks_(callbacks), codec_settings_(settings),
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
@@ -993,7 +993,7 @@ void ServerConnectionImpl::checkHeaderNameForUnderscores() {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                                           const Context& stat_names,
+                                           const CodecStatNames& stat_names,
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, stat_names, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,

@@ -7,6 +7,7 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/http/codec_client.h"
 #include "common/http/http1/conn_pool.h"
+#include "common/http/context_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -47,9 +48,10 @@ class ConnPoolImplForTest : public ConnPoolImpl {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
                       Upstream::ClusterInfoConstSharedPtr cluster,
-                      NiceMock<Event::MockTimer>* upstream_ready_timer)
+                      NiceMock<Event::MockTimer>* upstream_ready_timer,
+                      Http::Context& http_context)
       : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
-                     Upstream::ResourcePriority::Default, nullptr, nullptr),
+                     Upstream::ResourcePriority::Default, nullptr, nullptr, http_context),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_timer_(upstream_ready_timer) {}
 
@@ -129,7 +131,8 @@ class Http1ConnPoolImplTest : public testing::Test {
 public:
   Http1ConnPoolImplTest()
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
-        conn_pool_(dispatcher_, cluster_, upstream_ready_timer_) {}
+        http_context_(cluster_->stats_store_.symbolTable()),
+        conn_pool_(dispatcher_, cluster_, upstream_ready_timer_, http_context_) {}
 
   ~Http1ConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
@@ -138,6 +141,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Event::MockTimer>* upstream_ready_timer_;
+  Http::ContextImpl http_context_;
   ConnPoolImplForTest conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
 };

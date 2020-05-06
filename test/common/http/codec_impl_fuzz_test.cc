@@ -11,6 +11,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/http/context_impl.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
@@ -419,6 +420,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
       headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   ClientConnectionPtr client;
   ServerConnectionPtr server;
+  Http::ContextImpl http_context(stats_store.symbolTable());
   const bool http2 = http_version == HttpVersion::Http2;
 
   if (http2) {
@@ -428,6 +430,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         Http2::ProdNghttp2SessionFactory::get());
   } else {
     client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, stats_store,
+                                                           http_context.codecStatNames(),
                                                            client_callbacks, client_http1settings,
                                                            max_response_headers_count);
   }
@@ -443,8 +446,9 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
     server = std::make_unique<Http1::ServerConnectionImpl>(
-        server_connection, stats_store, server_callbacks, server_http1settings,
-        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
+        server_connection, stats_store, http_context.codecStatNames(), server_callbacks,
+        server_http1settings, max_request_headers_kb, max_request_headers_count,
+        headers_with_underscores_action);
   }
 
   ReorderBuffer client_write_buf{*server};

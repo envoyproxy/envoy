@@ -6,6 +6,7 @@
 #include "envoy/http/codec.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/http/context_impl.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
@@ -57,10 +58,12 @@ Buffer::OwnedImpl createBufferWithNByteSlices(absl::string_view input, size_t ma
 
 class Http1ServerConnectionImplTest : public testing::Test {
 public:
+  Http1ServerConnectionImplTest() : http_context_(store_.symbolTable()) {}
+
   void initialize() {
     codec_ = std::make_unique<ServerConnectionImpl>(
-        connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, headers_with_underscores_action_);
+        connection_, store_, http_context_.codecStatNames(), callbacks_, codec_settings_,
+        max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
   }
 
   NiceMock<Network::MockConnection> connection_;
@@ -107,6 +110,7 @@ protected:
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
   Stats::TestUtil::TestStore store_;
+  Http::ContextImpl http_context_;
 };
 
 void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,
@@ -120,8 +124,9 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
     codec_ = std::make_unique<ServerConnectionImpl>(
-        connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        connection_, store_, http_context_.codecStatNames(), callbacks_, codec_settings_,
+        max_request_headers_kb_, max_request_headers_count_,
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   }
 
   MockRequestDecoder decoder;
@@ -149,8 +154,9 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
     codec_ = std::make_unique<ServerConnectionImpl>(
-        connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        connection_, store_, http_context_.codecStatNames(), callbacks_, codec_settings_,
+        max_request_headers_kb_, max_request_headers_count_,
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   }
 
   MockRequestDecoder decoder;
@@ -169,7 +175,7 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
   if (enable_trailers) {
     codec_settings_.enable_trailers_ = enable_trailers;
     codec_ = std::make_unique<ServerConnectionImpl>(
-        connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
+        connection_, store_, http_context_.codecStatNames(), callbacks_, codec_settings_, max_request_headers_kb_,
         max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   }
 
@@ -203,7 +209,7 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   // Make a new 'codec' with the right settings
   codec_settings_.enable_trailers_ = enable_trailers;
   codec_ = std::make_unique<ServerConnectionImpl>(
-      connection_, store_, callbacks_, codec_settings_, max_request_headers_kb_,
+      connection_, store_, http_context_.codecStatNames(), callbacks_, codec_settings_, max_request_headers_kb_,
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   std::string exception_reason;
   NiceMock<MockRequestDecoder> decoder;
@@ -1700,8 +1706,11 @@ TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
 
 class Http1ClientConnectionImplTest : public testing::Test {
 public:
+  Http1ClientConnectionImplTest() : http_context_(store_.symbolTable()) {}
+
   void initialize() {
-    codec_ = std::make_unique<ClientConnectionImpl>(connection_, store_, callbacks_,
+    codec_ = std::make_unique<ClientConnectionImpl>(connection_, store_,
+                                                    http_context_.codecStatNames(), callbacks_,
                                                     codec_settings_, max_response_headers_count_);
   }
 
@@ -1712,6 +1721,7 @@ public:
 
 protected:
   Stats::TestUtil::TestStore store_;
+  ContextImpl http_context_;
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
 };
 

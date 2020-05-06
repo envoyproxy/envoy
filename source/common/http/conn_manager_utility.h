@@ -37,12 +37,12 @@ public:
   static ServerConnectionPtr
   autoCreateCodec(Network::Connection& connection, const Buffer::Instance& data,
                   ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
-                  const Context& code_stats_names,
                   const Http1Settings& http1_settings,
                   const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                   uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                      headers_with_underscores_action);
+                  headers_with_underscores_action,
+                  Http::Context& http_context);
 
   /**
    * Mutates request headers in various ways. This functionality is broken out because of its

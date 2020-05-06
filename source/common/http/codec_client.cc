@@ -145,12 +145,12 @@ void CodecClient::onData(Buffer::Instance& data) {
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
-                                 Event::Dispatcher& dispatcher, const Context& stat_names)
+                                 Event::Dispatcher& dispatcher, const Context& context)
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case Type::HTTP1: {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        *connection_, host->cluster().statsScope(), stat_names, *this,
+        *connection_, host->cluster().statsScope(), context.codecStatNames(), *this,
         host->cluster().http1Settings(), host->cluster().maxResponseHeadersCount());
     break;
   }

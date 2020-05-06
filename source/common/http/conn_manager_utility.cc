@@ -43,20 +43,19 @@ std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection&
 ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
-    const Context& code_stats_names,
     const Http1Settings& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action) {
+    headers_with_underscores_action, Http::Context& http_context) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
     return std::make_unique<Http2::ServerConnectionImpl>(
         connection, callbacks, scope, http2_options, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
   } else {
     return std::make_unique<Http1::ServerConnectionImpl>(
-        connection, scope, code_stats_names, callbacks, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        connection, scope, http_context.codecStatNames(), callbacks, http1_settings,
+        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   }
 }
 

@@ -54,6 +54,7 @@ envoy_cc_test(
     tags = ["fails_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
+        "//source/common/http:context_lib",
         "//source/common/http/http2:conn_pool_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_includes",

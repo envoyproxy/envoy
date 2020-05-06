@@ -9,6 +9,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/http/context.h"
 #include "envoy/server/admin.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
@@ -119,10 +120,12 @@ std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-    Tracing::HttpTracerManager& http_tracer_manager) {
+    Tracing::HttpTracerManager& http_tracer_manager,
+    Http::Context& http_context) {
   return std::make_shared<HttpConnectionManagerConfig>(
       proto_config, context, date_provider, route_config_provider_manager,
-      scoped_routes_config_provider_manager, http_tracer_manager);
+      scoped_routes_config_provider_manager, http_tracer_manager,
+      http_context);
 }
 
 Network::FilterFactoryCb
@@ -134,7 +137,8 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
 
   auto filter_config = Utility::createConfig(
       proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
-      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_);
+      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_,
+      context.httpContext());
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
@@ -166,7 +170,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-    Tracing::HttpTracerManager& http_tracer_manager)
+    Tracing::HttpTracerManager& http_tracer_manager, Http::Context& http_context)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
@@ -217,7 +221,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #endif
       merge_slashes_(config.merge_slashes()),
       headers_with_underscores_action_(
-          config.common_http_protocol_options().headers_with_underscores_action()) {
+          config.common_http_protocol_options().headers_with_underscores_action()),
+      http_context_(http_context) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
@@ -475,12 +480,12 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
-        connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction());
+        connection, context_.scope(), http_context_.codecStatNames(), callbacks, http1_settings_,
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
-        connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction());
+        connection, callbacks, context_.scope(), http2_options_,
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
     // TODO(danzh) Add support to get the factory name from config, possibly
@@ -493,7 +498,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
+        http_context_);
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -573,7 +579,8 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
 
   auto filter_config = Utility::createConfig(
       proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
-      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_);
+      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_,
+      context.httpContext());
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.

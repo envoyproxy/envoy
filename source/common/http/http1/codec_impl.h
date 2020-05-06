@@ -209,7 +209,7 @@ public:
 
 protected:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                 const Context& stat_names, http_parser_type type,
+                 const CodecStatNames& codec_stat_names, http_parser_type type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
                  HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
 
@@ -390,7 +390,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                       const Context& stat_names,
+                       const CodecStatNames& codec_stat_names,
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -488,7 +488,7 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                       const Context& stat_names,
+                       const CodecStatNames& codec_stat_names,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
                        const uint32_t max_response_headers_count);
 
