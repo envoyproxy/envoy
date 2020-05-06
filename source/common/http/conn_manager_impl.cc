@@ -1493,10 +1493,10 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(response_headers_ == nullptr);
   // For early error handling, do a best-effort attempt to create a filter chain
-  // to ensure access logging.
-  if (!state_.created_filter_chain_) {
-    createFilterChain();
-  }
+  // to ensure access logging. If the filter chain already exists this will be
+  // a no-op.
+  createFilterChain();
+
   stream_info_.setResponseCodeDetails(details);
   Utility::sendLocalReply(
       is_grpc_request,
