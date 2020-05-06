@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
-class NullValidationVisitorImpl : public NullValidationVisitor {
+class NullValidationVisitorImpl : public ValidationVisitor {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view) override {}

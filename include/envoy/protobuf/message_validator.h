@@ -41,8 +41,6 @@ public:
   virtual bool skipValidation() PURE;
 };
 
-class NullValidationVisitor : public ValidationVisitor {};
-
 class ValidationContext {
 public:
   virtual ~ValidationContext() = default;
