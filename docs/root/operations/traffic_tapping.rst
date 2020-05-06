@@ -7,9 +7,9 @@ Envoy currently provides two experimental extensions that can tap traffic:
 
   * :ref:`HTTP tap filter <config_http_filters_tap>`. See the linked filter documentation for more
     information.
-  * :ref:`Tap transport socket extension <envoy_api_msg_core.TransportSocket>` that can intercept
+  * :ref:`Tap transport socket extension <envoy_v3_api_msg_config.core.v3.TransportSocket>` that can intercept
     traffic and write to a :ref:`protobuf trace file
-    <envoy_api_msg_data.tap.v2alpha.TraceWrapper>`. The remainder of this document describes
+    <envoy_v3_api_msg_data.tap.v3.TraceWrapper>`. The remainder of this document describes
     the configuration of the tap transport socket.
 
 Tap transport socket configuration
@@ -22,12 +22,12 @@ Tap transport socket configuration
   Capabilities will be expanded over time and the configuration structures are likely to change.
 
 Tapping can be configured on :ref:`Listener
-<envoy_api_field_listener.FilterChain.transport_socket>` and :ref:`Cluster
-<envoy_api_field_Cluster.transport_socket>` transport sockets, providing the ability to interpose on
+<envoy_v3_api_field_config.listener.v3.FilterChain.transport_socket>` and :ref:`Cluster
+<envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>` transport sockets, providing the ability to interpose on
 downstream and upstream L4 connections respectively.
 
 To configure traffic tapping, add an `envoy.transport_sockets.tap` transport socket
-:ref:`configuration <envoy_api_msg_config.transport_socket.tap.v2alpha.Tap>` to the listener
+:ref:`configuration <envoy_v3_api_msg_extensions.filters.http.tap.v3.Tap>` to the listener
 or cluster. For a plain text socket this might look like:
 
 .. code-block:: yaml
@@ -35,7 +35,7 @@ or cluster. For a plain text socket this might look like:
   transport_socket:
     name: envoy.transport_sockets.tap
     typed_config:
-      "@type": type.googleapis.com/envoy.config.transport_socket.tap.v2alpha.Tap
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tap.v3.Tap
       common_config:
         static_config:
           match_config:
@@ -55,7 +55,7 @@ For a TLS socket, this will be:
   transport_socket:
     name: envoy.transport_sockets.tap
     typed_config:
-      "@type": type.googleapis.com/envoy.config.transport_socket.tap.v2alpha.Tap
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tap.v3.Tap
       common_config:
         static_config:
           match_config:
@@ -70,8 +70,8 @@ For a TLS socket, this will be:
         typed_config: <TLS context>
 
 where the TLS context configuration replaces any existing :ref:`downstream
-<envoy_api_msg_auth.DownstreamTlsContext>` or :ref:`upstream
-<envoy_api_msg_auth.UpstreamTlsContext>`
+<envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` or :ref:`upstream
+<envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`
 TLS configuration on the listener or cluster, respectively.
 
 Each unique socket instance will generate a trace file prefixed with `path_prefix`. E.g.
@@ -83,22 +83,22 @@ Buffered data limits
 For buffered socket taps, Envoy will limit the amount of body data that is tapped to avoid OOM
 situations. The default limit is 1KiB for both received and transmitted data.
 This is configurable via the :ref:`max_buffered_rx_bytes
-<envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_rx_bytes>` and
+<envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_rx_bytes>` and
 :ref:`max_buffered_tx_bytes
-<envoy_api_field_service.tap.v2alpha.OutputConfig.max_buffered_tx_bytes>` settings. When a buffered
+<envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_tx_bytes>` settings. When a buffered
 socket tap is truncated, the trace will indicate truncation via the :ref:`read_truncated
-<envoy_api_field_data.tap.v2alpha.SocketBufferedTrace.read_truncated>` and :ref:`write_truncated
-<envoy_api_field_data.tap.v2alpha.SocketBufferedTrace.write_truncated>` fields as well as the body
-:ref:`truncated <envoy_api_field_data.tap.v2alpha.Body.truncated>` field.
+<envoy_v3_api_field_data.tap.v3.SocketBufferedTrace.read_truncated>` and :ref:`write_truncated
+<envoy_v3_api_field_data.tap.v3.SocketBufferedTrace.write_truncated>` fields as well as the body
+:ref:`truncated <envoy_v3_api_field_data.tap.v3.Body.truncated>` field.
 
 Streaming
 ---------
 
 The tap transport socket supports both buffered and streaming, controlled by the :ref:`streaming
-<envoy_api_field_service.tap.v2alpha.OutputConfig.streaming>` setting. When buffering,
-:ref:`SocketBufferedTrace <envoy_api_msg_data.tap.v2alpha.SocketBufferedTrace>` messages are
+<envoy_v3_api_field_config.tap.v3.OutputConfig.streaming>` setting. When buffering,
+:ref:`SocketBufferedTrace <envoy_v3_api_msg_data.tap.v3.SocketBufferedTrace>` messages are
 emitted. When streaming, a series of :ref:`SocketStreamedTraceSegment
-<envoy_api_msg_data.tap.v2alpha.SocketStreamedTraceSegment>` are emitted.
+<envoy_v3_api_msg_data.tap.v3.SocketStreamedTraceSegment>` are emitted.
 
 See the :ref:`HTTP tap filter streaming <config_http_filters_tap_streaming>` documentation for more
 information. Most of the concepts overlap between the HTTP filter and the transport socket.

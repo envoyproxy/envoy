@@ -32,6 +32,28 @@
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
+namespace Http {
+namespace Utility {
+Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
+                               Buffer::Instance& data) {
+  Http::Status status;
+  try {
+    status = dispatch(data);
+    // TODO(#10878): Remove this when exception removal is complete. It is currently in migration,
+    // so dispatch may either return an error status or throw an exception. Soon we won't need to
+    // catch these exceptions, as all codec errors will be migrated to using error statuses that are
+    // returned from dispatch.
+  } catch (FrameFloodException& e) {
+    status = bufferFloodError(e.what());
+  } catch (CodecProtocolException& e) {
+    status = codecProtocolError(e.what());
+  } catch (PrematureResponseException& e) {
+    status = prematureResponseError(e.what(), e.responseCode());
+  }
+  return status;
+}
+} // namespace Utility
+} // namespace Http
 namespace Http2 {
 namespace Utility {
 
@@ -185,9 +207,8 @@ namespace Http {
 
 static const char kDefaultPath[] = "/";
 
-bool Utility::Url::initialize(absl::string_view absolute_url) {
+bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   struct http_parser_url u;
-  const bool is_connect = false;
   http_parser_url_init(&u);
   const int result =
       http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
@@ -211,12 +232,11 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
 
   // RFC allows the absolute-uri to not end in /, but the absolute path form
   // must start with
-  uint64_t path_len =
-      absolute_url.length() - (u.field_data[UF_HOST].off + host_and_port().length());
+  uint64_t path_len = absolute_url.length() - (u.field_data[UF_HOST].off + hostAndPort().length());
   if (path_len > 0) {
-    uint64_t path_beginning = u.field_data[UF_HOST].off + host_and_port().length();
+    uint64_t path_beginning = u.field_data[UF_HOST].off + hostAndPort().length();
     path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_len);
-  } else {
+  } else if (!is_connect) {
     path_and_query_params_ = absl::string_view(kDefaultPath, 1);
   }
   return true;
@@ -382,7 +402,8 @@ bool Utility::isUpgrade(const RequestOrResponseHeaderMap& headers) {
 bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
   return headers.Method() &&
          headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect &&
-         headers.Protocol() && !headers.Protocol()->value().empty();
+         headers.Protocol() && !headers.Protocol()->value().empty() &&
+         headers.Protocol()->value() != Headers::get().ProtocolValues.Bytestream;
 }
 
 bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {

@@ -13,6 +13,8 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
+#include "common/http/exception.h"
+#include "common/http/status.h"
 #include "common/json/json_loader.h"
 
 #include "absl/strings/string_view.h"
@@ -20,6 +22,17 @@
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
+namespace Http {
+namespace Utility {
+
+// This is a wrapper around dispatch calls that may throw an exception or may return an error status
+// while exception removal is in migration.
+// TODO(#10878): Remove this.
+Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
+                               Buffer::Instance& data);
+} // namespace Utility
+} // namespace Http
+
 namespace Http2 {
 namespace Utility {
 
@@ -101,10 +114,10 @@ namespace Utility {
  */
 class Url {
 public:
-  bool initialize(absl::string_view absolute_url);
+  bool initialize(absl::string_view absolute_url, bool is_connect_request);
   absl::string_view scheme() { return scheme_; }
-  absl::string_view host_and_port() { return host_and_port_; }
-  absl::string_view path_and_query_params() { return path_and_query_params_; }
+  absl::string_view hostAndPort() { return host_and_port_; }
+  absl::string_view pathAndQueryParams() { return path_and_query_params_; }
 
 private:
   absl::string_view scheme_;

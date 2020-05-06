@@ -1,6 +1,6 @@
 #include "extensions/tracers/datadog/datadog_tracer_impl.h"
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/datadog.pb.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"

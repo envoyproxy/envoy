@@ -75,7 +75,7 @@ public:
   ~MockServerConnection() override;
 
   // Http::Connection
-  MOCK_METHOD(void, dispatch, (Buffer::Instance & data));
+  MOCK_METHOD(Status, dispatch, (Buffer::Instance & data));
   MOCK_METHOD(void, goAway, ());
   MOCK_METHOD(Protocol, protocol, ());
   MOCK_METHOD(void, shutdownNotice, ());
@@ -92,7 +92,7 @@ public:
   ~MockClientConnection() override;
 
   // Http::Connection
-  MOCK_METHOD(void, dispatch, (Buffer::Instance & data));
+  MOCK_METHOD(Status, dispatch, (Buffer::Instance & data));
   MOCK_METHOD(void, goAway, ());
   MOCK_METHOD(Protocol, protocol, ());
   MOCK_METHOD(void, shutdownNotice, ());
@@ -382,6 +382,7 @@ public:
   MOCK_METHOD(void, sendData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, sendTrailers, (RequestTrailerMap & trailers));
   MOCK_METHOD(void, reset, ());
+  MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const));
 };
 
 class MockFilterChainFactoryCallbacks : public Http::FilterChainFactoryCallbacks {

@@ -1,5 +1,6 @@
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/dynamic_ot.pb.h"
+#include "envoy/config/trace/v3/dynamic_ot.pb.validate.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 
 #include "extensions/tracers/dynamic_ot/config.h"
 

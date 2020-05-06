@@ -84,6 +84,7 @@ ENOTSUP
 ENV
 EOF
 EOS
+EOY
 EPOLLRDHUP
 EQ
 ERANGE
@@ -117,6 +118,7 @@ GETting
 GLB
 GOAWAY
 GRPC
+GSS
 GTEST
 GURL
 Grabbit
@@ -172,10 +174,12 @@ MB
 MD
 MERCHANTABILITY
 MGET
+MQ
 MSET
 MSVC
 MTLS
 MTU
+MULTIFRAME
 NACK
 NACKed
 NACKs
@@ -221,7 +225,10 @@ PostCBs
 PREBIND
 PRNG
 PROT
+Postgre
+Postgres
 Prereq
+QDCOUNT
 QUIC
 QoS
 RAII
@@ -754,6 +761,7 @@ mutexes
 mux
 muxed
 mysql
+nameserver
 namespace
 namespaces
 namespacing
@@ -828,6 +836,8 @@ pos
 posix
 postfix
 postfixes
+postgres
+postgresql
 pre
 preallocate
 preallocating
@@ -909,6 +919,7 @@ reimplements
 rele
 releasor
 reloadable
+remoting
 reparse
 repeatability
 reperform
@@ -930,6 +941,7 @@ resync
 retriable
 retriggers
 rmdir
+rocketmq
 rollout
 roundtrip
 rpcs

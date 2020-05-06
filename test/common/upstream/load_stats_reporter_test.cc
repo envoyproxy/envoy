@@ -52,6 +52,7 @@ public:
       const std::vector<envoy::config::endpoint::v3::ClusterStats>& expected_cluster_stats) {
     envoy::service::load_stats::v3::LoadStatsRequest expected_request;
     expected_request.mutable_node()->MergeFrom(local_info_.node());
+    expected_request.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
     std::copy(expected_cluster_stats.begin(), expected_cluster_stats.end(),
               Protobuf::RepeatedPtrFieldBackInserter(expected_request.mutable_cluster_stats()));
     EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));

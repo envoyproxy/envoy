@@ -74,6 +74,7 @@ envoy_cc_library(
         "//include/envoy/stats:timespan_interface",
         "//source/common/common:linked_object",
         "//source/common/common:non_copyable",
+        "//source/common/event:deferred_task",
         "//source/common/network:connection_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -269,6 +270,7 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -483,6 +485,7 @@ envoy_cc_library(
         "//source/server:overload_manager_lib",
         "//source/server/http:admin_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
