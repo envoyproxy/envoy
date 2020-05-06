@@ -15,9 +15,9 @@ envoy_cc_library(
     deps = [
         ":admin_filter_lib",
         ":config_tracker_lib",
+        ":listeners_handler_lib",
         ":logs_handler_lib",
         ":profiling_handler_lib",
-        ":listeners_handler_lib",
         ":runtime_handler_lib",
         ":stats_handler_lib",
         ":utils_lib",

@@ -693,8 +693,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
-      logs_handler_(server), profiling_handler_(profile_path),
-      runtime_handler_(server), listeners_handler_(server),
+      logs_handler_(server), profiling_handler_(profile_path), runtime_handler_(server),
+      listeners_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -749,8 +749,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            false, false},
           {"/runtime_modify", "modify runtime values",
            MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true},
-          {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false,
-           true},
+          {"/reopen_logs", "reopen access logs",
+           MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true},
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
