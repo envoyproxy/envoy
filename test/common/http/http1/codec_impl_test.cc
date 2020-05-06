@@ -1846,6 +1846,11 @@ TEST_F(Http1ClientConnectionImplTest, FlowControlReadDisabledReenable) {
 
   MockResponseDecoder response_decoder;
   Http::RequestEncoder* request_encoder = &codec_->newStream(response_decoder);
+  // Manually read disable.
+  EXPECT_CALL(connection_, readDisable(true)).Times(2);
+  RequestEncoderImpl* encoder = dynamic_cast<RequestEncoderImpl*>(request_encoder);
+  encoder->readDisable(true);
+  encoder->readDisable(true);
 
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
@@ -1856,13 +1861,8 @@ TEST_F(Http1ClientConnectionImplTest, FlowControlReadDisabledReenable) {
   EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
   output.clear();
 
-  // Simulate the underlying connection being backed up. Ensure that it is
-  // read-enabled when the final response completes.
-  EXPECT_CALL(connection_, readEnabled())
-      .Times(2)
-      .WillOnce(Return(false))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(connection_, readDisable(false));
+  // When the response is sent, the read disable should be unwound.
+  EXPECT_CALL(connection_, readDisable(false)).Times(2);
 
   // Response.
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
