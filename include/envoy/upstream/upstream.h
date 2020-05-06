@@ -541,6 +541,8 @@ public:
   COUNTER(update_failure)                                                                          \
   COUNTER(update_no_rebuild)                                                                       \
   COUNTER(update_success)                                                                          \
+  /* Number of times a buffer overflow happened while the router added data into                   \
+   * buffered_request_body before an upstream connection was ready */                              \
   COUNTER(upstream_buffered_request_body_buffer_overflow_total)                                    \
   COUNTER(upstream_cx_close_notify)                                                                \
   COUNTER(upstream_cx_connect_attempts_exceeded)                                                   \
@@ -564,7 +566,6 @@ public:
   COUNTER(upstream_cx_total)                                                                       \
   COUNTER(upstream_cx_tx_bytes_total)                                                              \
   COUNTER(upstream_flow_control_backed_up_total)                                                   \
-  COUNTER(upstream_flow_control_downstream_buffer_overflow_total)                                  \
   COUNTER(upstream_flow_control_drained_total)                                                     \
   COUNTER(upstream_flow_control_paused_reading_total)                                              \
   COUNTER(upstream_flow_control_resumed_reading_total)                                             \

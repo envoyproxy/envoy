@@ -296,7 +296,7 @@ StreamInfo::StreamInfo& Filter::getStreamInfo() {
 
 void Filter::DownstreamCallbacks::onAboveWriteBufferOverflowWatermark() {
   // TODO(adip): Test counters
-  ENVOY_CONN_LOG(warn, "TCP filter downstream buffer overflow",
+  ENVOY_CONN_LOG(debug, "TCP filter downstream buffer overflow",
                  parent_.read_callbacks_->connection());
   // Downstream write buffer overflowing.
   parent_.config_->stats().downstream_buffer_overflow_total_.inc();
@@ -328,7 +328,7 @@ void Filter::UpstreamCallbacks::onAboveWriteBufferOverflowWatermark() {
   if (parent_ != nullptr) {
     // TODO(adip): Test counters
     // Upstream write buffer overflowing.
-    ENVOY_CONN_LOG(warn, "TCP filter upstream buffer overflow",
+    ENVOY_CONN_LOG(debug, "TCP filter upstream buffer overflow",
                    parent_->read_callbacks_->connection());
     parent_->config_->stats().upstream_buffer_overflow_total_.inc();
   }

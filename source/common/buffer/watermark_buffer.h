@@ -20,9 +20,7 @@ public:
                   std::function<void()> above_high_watermark,
                   std::function<void()> above_overflow_watermark)
       : below_low_watermark_(below_low_watermark), above_high_watermark_(above_high_watermark),
-        above_overflow_watermark_(above_overflow_watermark),
-        overflow_watermark_multiplier_(Runtime::getInteger("envoy.buffer.overflow_multiplier", 2)) {
-  }
+        above_overflow_watermark_(above_overflow_watermark) {}
 
   // Override all functions from Instance which can result in changing the size
   // of the underlying buffer.
@@ -57,8 +55,6 @@ private:
   uint32_t high_watermark_{0};
   uint32_t low_watermark_{0};
   uint32_t overflow_watermark_{0};
-  // Multiplier of high_watermark_ that determines the overflow_watermark_ value
-  uint32_t overflow_watermark_multiplier_{0};
   // Tracks the latest state of watermark callbacks.
   // True between the time above_high_watermark_ has been called until above_high_watermark_ has
   // been called.

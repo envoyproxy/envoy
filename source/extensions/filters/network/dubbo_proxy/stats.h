@@ -14,6 +14,7 @@ namespace DubboProxy {
  * All dubbo filter stats. @see stats_macros.h
  */
 #define ALL_DUBBO_FILTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                          \
+  /* Total number of times a buffer overflow was detected by the underlying connection */          \
   COUNTER(cx_buffer_overflow_total)                                                                \
   COUNTER(cx_destroy_local_with_active_rq)                                                         \
   COUNTER(cx_destroy_remote_with_active_rq)                                                        \

@@ -1959,7 +1959,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
 }
 
 void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferOverflowWatermark() {
-  ENVOY_STREAM_LOG(warn, "Downstream buffer overflow detected, notifying upstream stream", *this);
+  ENVOY_STREAM_LOG(debug, "Downstream buffer uperflow detected, notifying upstream stream", *this);
   callOverflowWatermarkCallbacks();
 }
 
@@ -2011,8 +2011,7 @@ void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
 }
 
 void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
-  ENVOY_STREAM_LOG(debug, "setting buffer limit to {} and overflow threshold to {}", *this,
-                   new_limit, new_limit + 1);
+  ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", *this, new_limit);
   buffer_limit_ = new_limit;
   if (buffered_request_data_) {
     buffered_request_data_->setWatermarks(buffer_limit_);
@@ -2347,8 +2346,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
     onDecoderFilterAboveWriteBufferOverflowWatermark() {
-  ENVOY_STREAM_LOG(warn, "Decoder streaming filter buffer overflow detected.", parent_);
-  parent_.connection_manager_.stats_.named_.dec_buffer_overflow_total_.inc();
+  ENVOY_STREAM_LOG(debug, "Decoder streaming filter buffer overflow detected.", parent_);
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
@@ -2492,8 +2490,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedMetadata(
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::
     onEncoderFilterAboveWriteBufferOverflowWatermark() {
-  ENVOY_STREAM_LOG(warn, "Encoder streaming filter buffer overflow detected.", parent_);
-  parent_.connection_manager_.stats_.named_.enc_buffer_overflow_total_.inc();
+  ENVOY_STREAM_LOG(debug, "Encoder streaming filter buffer overflow detected.", parent_);
   parent_.callOverflowWatermarkCallbacks();
 }
 
@@ -2513,7 +2510,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::continueEncoding() { comm
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataOverflow() {
   parent_.connection_manager_.stats_.named_.rs_buffer_overflow_total_.inc();
-  ENVOY_STREAM_LOG(warn, "Response data buffer overflow watermark exceeded", *this);
+  ENVOY_STREAM_LOG(debug, "Response data buffer overflow watermark exceeded", *this);
   onEncoderFilterAboveWriteBufferOverflowWatermark();
 }
 

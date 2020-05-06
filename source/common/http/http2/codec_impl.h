@@ -48,10 +48,12 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
   COUNTER(inbound_window_update_frames_flood)                                                      \
   COUNTER(outbound_control_flood)                                                                  \
   COUNTER(outbound_flood)                                                                          \
+  /* Total number of times pending receive buffer overflowed */                                    \
   COUNTER(recv_buffer_overflow)                                                                    \
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(rx_messaging_error)                                                                      \
   COUNTER(rx_reset)                                                                                \
+  /* Total number of times pending send buffer overflowed */                                       \
   COUNTER(send_buffer_overflow)                                                                    \
   COUNTER(too_many_header_frames)                                                                  \
   COUNTER(trailers)                                                                                \

@@ -445,12 +445,10 @@ void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferOverflowWate
   // downstream connection, or 2) the watermark was hit due to THIS filter
   // instance writing back the "winning" upstream request.
   // In both cases the downstream connection is overflowing, and we keep track
-  // of this here.
-  ASSERT(!parent_.parent_.finalUpstreamRequest() ||
-         &parent_ == parent_.parent_.finalUpstreamRequest());
-  ENVOY_STREAM_LOG(warn, "upstream request received downstream buffer overflow",
+  // of this here. At the moment does nothing as this is a notification of an
+  // overflow that happened in downstream.
+  ENVOY_STREAM_LOG(debug, "upstream request notified on downstream buffer overflow",
                    *parent_.parent_.callbacks());
-  parent_.parent_.cluster()->stats().upstream_flow_control_downstream_buffer_overflow_total_.inc();
 }
 
 void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
@@ -516,7 +514,7 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
 
 void UpstreamRequest::overflowDataFromDownstream() {
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
-  ENVOY_STREAM_LOG(warn, "Upstream buffered request body buffer overflow", *parent_.callbacks());
+  ENVOY_STREAM_LOG(debug, "Upstream buffered request body buffer overflow", *parent_.callbacks());
   parent_.cluster()->stats().upstream_buffered_request_body_buffer_overflow_total_.inc();
   parent_.callbacks()->onDecoderFilterAboveWriteBufferOverflowWatermark();
 }

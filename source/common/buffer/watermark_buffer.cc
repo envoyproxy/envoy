@@ -70,15 +70,18 @@ Api::IoCallUint64Result WatermarkBuffer::write(Network::IoHandle& io_handle) {
 
 void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
   ASSERT(low_watermark < high_watermark || (high_watermark == 0 && low_watermark == 0));
-  if (overflow_watermark_multiplier_ > 0 &&
-      (overflow_watermark_multiplier_ * high_watermark) < high_watermark) {
-    ENVOY_LOG_MISC(error, "Error setting overflow threshold: overflow_waterflow_multiplier * "
+  uint32_t overflow_watermark_multiplier =
+      Runtime::getInteger("envoy.buffer.overflow_multiplier", 2);
+  if (overflow_watermark_multiplier > 0 &&
+      (static_cast<uint64_t>(overflow_watermark_multiplier) * high_watermark) >
+          std::numeric_limits<uint32_t>::max()) {
+    ENVOY_LOG_MISC(debug, "Error setting overflow threshold: envoy.buffer.overflow_multiplier * "
                           "high_watermark is overflowing. Disabling overflow watermark.");
-    overflow_watermark_multiplier_ = 0;
+    overflow_watermark_multiplier = 0;
   }
   low_watermark_ = low_watermark;
   high_watermark_ = high_watermark;
-  overflow_watermark_ = overflow_watermark_multiplier_ * high_watermark;
+  overflow_watermark_ = overflow_watermark_multiplier * high_watermark;
   checkHighAndOverflowWatermarks();
   checkLowWatermark();
 }

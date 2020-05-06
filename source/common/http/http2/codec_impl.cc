@@ -249,7 +249,7 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferOverflowWatermark() {
   parent_.stats_.recv_buffer_overflow_.inc();
-  ENVOY_CONN_LOG(warn, "recv buffer overflowing ", parent_.connection_);
+  ENVOY_CONN_LOG(debug, "recv buffer overflowing ", parent_.connection_);
 }
 
 void ConnectionImpl::ClientStreamImpl::decodeHeaders(bool allow_waiting_for_informational_headers) {
@@ -306,7 +306,7 @@ void ConnectionImpl::StreamImpl::pendingSendBufferLowWatermark() {
 
 void ConnectionImpl::StreamImpl::pendingSendBufferOverflowWatermark() {
   parent_.stats_.send_buffer_overflow_.inc();
-  ENVOY_CONN_LOG(warn, "send buffer overflowing ", parent_.connection_);
+  ENVOY_CONN_LOG(debug, "send buffer overflowing ", parent_.connection_);
   runOverflowWatermarkCallbacks();
 }
 

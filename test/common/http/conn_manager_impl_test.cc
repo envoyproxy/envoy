@@ -3852,10 +3852,6 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_EQ(2U, stats_.named_.downstream_flow_control_paused_reading_total_.value());
 
-  // Verify the overflow watermark stats are updated
-  decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferOverflowWatermark();
-  EXPECT_EQ(1U, stats_.named_.dec_buffer_overflow_total_.value());
-
   // Send a full response.
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
@@ -4065,7 +4061,6 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   // Add a large response data to the buffer causing an overflow.
   // The overflow callbacks should be called.
   EXPECT_EQ(0U, stats_.named_.rs_buffer_overflow_total_.value());
-  EXPECT_EQ(0U, stats_.named_.enc_buffer_overflow_total_.value());
   EXPECT_CALL(callbacks, onAboveWriteBufferOverflowWatermark());
   EXPECT_CALL(callbacks2, onAboveWriteBufferOverflowWatermark());
   Buffer::OwnedImpl fake_long_response("A long enough string to go over watermarks");
@@ -4073,7 +4068,6 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
       .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
   decoder_filters_[0]->callbacks_->encodeData(fake_long_response, false);
   EXPECT_EQ(1U, stats_.named_.rs_buffer_overflow_total_.value());
-  EXPECT_EQ(1U, stats_.named_.enc_buffer_overflow_total_.value());
 
   // unregister callbacks2
   decoder_filters_[0]->callbacks_->removeDownstreamWatermarkCallbacks(callbacks2);

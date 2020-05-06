@@ -20,7 +20,6 @@ namespace Http {
  * All stats for the connection manager. @see stats_macros.h
  */
 #define ALL_HTTP_CONN_MAN_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
-  COUNTER(dec_buffer_overflow_total)                                                               \
   COUNTER(downstream_cx_delayed_close_timeout)                                                     \
   COUNTER(downstream_cx_destroy)                                                                   \
   COUNTER(downstream_cx_destroy_active_rq)                                                         \
@@ -48,6 +47,7 @@ namespace Http {
   COUNTER(downstream_rq_3xx)                                                                       \
   COUNTER(downstream_rq_4xx)                                                                       \
   COUNTER(downstream_rq_5xx)                                                                       \
+  /* Total number of buffer overflows in the streaming decoder filter request buffer */            \
   COUNTER(downstream_rq_buffer_overflow_total)                                                     \
   COUNTER(downstream_rq_completed)                                                                 \
   COUNTER(downstream_rq_http1_total)                                                               \
@@ -64,7 +64,7 @@ namespace Http {
   COUNTER(downstream_rq_tx_reset)                                                                  \
   COUNTER(downstream_rq_max_duration_reached)                                                      \
   COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
-  COUNTER(enc_buffer_overflow_total)                                                               \
+  /* Total number of buffer overflows in the streaming encoder filter response buffer */           \
   COUNTER(rs_buffer_overflow_total)                                                                \
   COUNTER(rs_too_large)                                                                            \
   GAUGE(downstream_cx_active, Accumulate)                                                          \

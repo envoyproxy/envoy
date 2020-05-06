@@ -28,11 +28,13 @@ namespace Http1 {
  * All stats for the HTTP/1 codec. @see stats_macros.h
  */
 #define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
+  /* Total number of times buffer overflow detected on client connection output buffer */          \
   COUNTER(client_cx_buffer_overflow)                                                               \
   COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(metadata_not_supported_error)                                                            \
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(response_flood)                                                                          \
+  /* Total number of times buffer overflow detected on server connection output buffer */          \
   COUNTER(server_cx_buffer_overflow)
 
 /**

@@ -446,8 +446,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
                      [&]() -> void { this->onAboveOverflowWatermark(); }),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
 
-  const uint32_t connection_buffer_limit = connection.bufferLimit();
-  output_buffer_.setWatermarks(connection_buffer_limit);
+  output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
 }
@@ -940,7 +939,7 @@ void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
 
 void ServerConnectionImpl::onAboveOverflowWatermark() {
   if (active_request_.has_value()) {
-    ENVOY_CONN_LOG(warn,
+    ENVOY_CONN_LOG(debug,
                    "Server connection output buffer or underlying connection overflow detected",
                    connection_);
     stats_.server_cx_buffer_overflow_.inc();
@@ -1136,7 +1135,8 @@ void ClientConnectionImpl::sendProtocolError(absl::string_view details) {
 
 void ClientConnectionImpl::onAboveOverflowWatermark() {
   // This should never happen without an active stream/request.
-  ENVOY_CONN_LOG(warn, "Client connection output buffer or underlying connection overflow detected",
+  ENVOY_CONN_LOG(debug,
+                 "Client connection output buffer or underlying connection overflow detected",
                  connection_);
   stats_.client_cx_buffer_overflow_.inc();
   pending_response_.value().encoder_.runOverflowWatermarkCallbacks();

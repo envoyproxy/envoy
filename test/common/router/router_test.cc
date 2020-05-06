@@ -5818,11 +5818,6 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
                     .counter("upstream_flow_control_resumed_reading_total")
                     .value());
 
-  watermark_callbacks->onAboveWriteBufferOverflowWatermark();
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_flow_control_downstream_buffer_overflow_total")
-                    .value());
-
   Buffer::OwnedImpl data;
   EXPECT_CALL(encoder_, getStream()).Times(2).WillRepeatedly(ReturnRef(stream_));
   response_decoder_->decodeData(data, true);
