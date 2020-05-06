@@ -16,6 +16,9 @@
 
 namespace Envoy {
 namespace Grpc {
+namespace {
+static constexpr int DefaultBufferLimitBytes = 1024 * 1024;
+}
 
 GoogleAsyncClientThreadLocal::GoogleAsyncClientThreadLocal(Api::Api& api)
     : completion_thread_(api.threadFactory().createThread([this] { completionThread(); })) {}
@@ -77,7 +80,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       initial_metadata_(config.initial_metadata()), scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config.google_grpc(), per_stream_buffer_limit_bytes, 1024 * 1024)) {
+          config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive

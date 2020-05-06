@@ -221,6 +221,9 @@ public:
   void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) override;
   void closeStream() override;
   void resetStream() override;
+  // While the Google-gRPC code doesn't use Envoy watermark buffers, the logical
+  // analog is to make sure that the aren't too many bytes in the pending write
+  // queue.
   bool isAboveWriteBufferHighWatermark() const override {
     return bytes_in_write_pending_queue_ > parent_.perStreamBufferLimitBytes();
   }

@@ -52,7 +52,7 @@ bool GrpcAccessLoggerImpl::canLogMore() {
     stats_.logs_written_.inc();
     return true;
   }
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_unbounded_access_logs")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.disallow_unbounded_access_logs")) {
     stats_.logs_dropped_.inc();
     return false;
   }

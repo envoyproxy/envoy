@@ -203,7 +203,7 @@ TEST_F(GrpcAccessLoggerImplTest, WatermarksOverrun) {
 TEST_F(GrpcAccessLoggerImplTest, WatermarksLegacy) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.allow_unbounded_access_logs", "false"}});
+      {{"envoy.reloadable_features.disallow_unbounded_access_logs", "false"}});
 
   InSequence s;
   initLogger(FlushInterval, 1);
