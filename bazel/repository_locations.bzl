@@ -291,9 +291,11 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_nodejs_llhttp = dict(
-        sha256 = "76100c5b7948c8e49e8afa8c658e2a477bcb831e18854cf134aa3bfd44a5c669",
-        strip_prefix = "llhttp-release-v2.0.1",
-        urls = ["https://github.com/nodejs/llhttp/archive/release/v2.0.1.tar.gz"],
+        sha256 = "48f882f0b6cecc48aec8f81072ee4d80fe9a4b5e1bce009e3cf8aecbe5892c1a",
+        strip_prefix = "llhttp-release-v2.0.5",
+        urls = ["https://github.com/nodejs/llhttp/archive/release/v2.0.5.tar.gz"],
+        use_category = ["dataplane"],
+        cpe = "N/A",
     ),
     com_github_pallets_jinja = dict(
         sha256 = "db49236731373e4f3118af880eb91bb0aa6978bc0cf8b35760f6a026f1a9ffc4",
