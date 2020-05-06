@@ -32,4 +32,8 @@ message QuicProtocolOptions {
   // Connection timeout in milliseconds before the crypto handshake is finished.
   // 20000ms if not specified.
   google.protobuf.Duration crypto_handshake_timeout = 3;
+
+  // Runtime flag that controls whether the listener is enabled or not. If not specified, defaults
+  // to enabled.
+  core.v3.RuntimeFeatureFlag enabled = 4;  
 }
