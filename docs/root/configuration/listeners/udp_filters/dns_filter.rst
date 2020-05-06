@@ -75,7 +75,7 @@ matching records for the query type, each configured address is returned. This i
 AAAA records. Only A and AAAA records are supported. If the filter parses other queries for other
 record types, the filter immediately responds indicating that the query is not supported.
 
-The filter can also consume its domain configuration from an external dns table. The same entities
+The filter can also consume its domain configuration from an external DNS table. The same entities
 appearing in the static configuration can be stored as JSON or YAML in a separate file and referenced
 using the :ref:`external_dns_table DataSource <envoy_api_msg_core.DataSource>` directive:
 
