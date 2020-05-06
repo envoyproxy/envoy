@@ -28,7 +28,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Bootstrap]
-// Test v2 change....
+// Test v2 change.....
 // This proto is supplied via the :option:`-c` CLI flag and acts as the root
 // of the Envoy v2 configuration. See the :ref:`v2 configuration overview
 // <config_overview_bootstrap>` for more detail.
