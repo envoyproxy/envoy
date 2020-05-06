@@ -14,7 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
-#include "common/http/codec_stat_names.h"
+#include "envoy/http/context.h"
 #include "common/http/codec_wrappers.h"
 #include "common/network/filter_impl.h"
 
@@ -245,7 +245,7 @@ class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
                   Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
-                  const CodecStatNames& stat_names);
+                  const Context& stat_names);
 };
 
 } // namespace Http

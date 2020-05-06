@@ -4,7 +4,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/http/codec_stat_names.h"
+#include "envoy/http/context.h"
 #include "common/http/codec_wrappers.h"
 #include "common/http/conn_pool_base.h"
 
@@ -24,7 +24,7 @@ public:
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-               const CodecStatNames& codec_stat_names);
+               const Context& http_context);
 
   ~ConnPoolImpl() override;
 
@@ -86,7 +86,7 @@ protected:
 
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};
-  const CodecStatNames& codec_stat_names_;
+  const Context& http_context_;
 };
 
 /**
@@ -98,9 +98,9 @@ public:
                    Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                   const CodecStatNames& codec_stat_names)
+                   const Context& http_context)
       : ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options,
-                     codec_stat_names) {}
+                     http_context) {}
 
   // ConnPoolImpl
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
@@ -111,7 +111,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr hos
                  Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                 const CodecStatNames& codec_stat_names);
+                 const Context& http_context);
 
 } // namespace Http1
 } // namespace Http

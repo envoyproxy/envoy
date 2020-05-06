@@ -47,7 +47,8 @@ public:
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
              Runtime::RandomGenerator& random, Singleton::Manager& singleton_manager,
              ThreadLocal::SlotAllocator& tls,
-             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+             Http::Context& http_context);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -86,6 +87,7 @@ private:
   ClusterInfoConstSharedPtr info_;
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Http::Context& http_context_;
 };
 
 using HdsClusterPtr = std::shared_ptr<HdsCluster>;
@@ -122,7 +124,8 @@ public:
               ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,
               ClusterManager& cm, const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
               Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+              Http::Context& http_context);
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
@@ -190,6 +193,7 @@ private:
 
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
+  Http::Context& http_context_;
 };
 
 using HdsDelegatePtr = std::unique_ptr<HdsDelegate>;

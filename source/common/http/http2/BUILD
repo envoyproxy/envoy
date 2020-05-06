@@ -68,7 +68,7 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/http:codec_client_lib",
-        "//source/common/http:codec_stat_names_lib",
+        "//include/envoy/http:context_interface",
         "//source/common/http:conn_pool_base_lib",
     ],
 )

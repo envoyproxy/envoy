@@ -7,7 +7,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/config/utility.h"
-#include "common/http/codec_stat_names.h"
+#include "envoy/http/context.h"
 #include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -145,7 +145,7 @@ void CodecClient::onData(Buffer::Instance& data) {
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
-                                 Event::Dispatcher& dispatcher, const CodecStatNames& stat_names)
+                                 Event::Dispatcher& dispatcher, const Context& stat_names)
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case Type::HTTP1: {

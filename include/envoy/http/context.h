@@ -8,6 +8,7 @@
 namespace Envoy {
 namespace Http {
 
+struct CodecStatNames;
 struct UserAgentContext;
 
 /**
@@ -28,6 +29,7 @@ public:
   virtual const envoy::config::trace::v3::Tracing& defaultTracingConfig() PURE;
 
   virtual CodeStats& codeStats() PURE;
+  virtual const CodecStatNames& codecStatNames() const PURE;
   virtual const UserAgentContext& userAgentContext() const PURE;
 };
 

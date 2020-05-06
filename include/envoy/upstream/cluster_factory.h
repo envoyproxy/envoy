@@ -13,6 +13,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/context.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
@@ -27,10 +28,6 @@
 #include "envoy/upstream/outlier_detection.h"
 
 namespace Envoy {
-
-namespace Http {
-struct CodecStatNames;
-}
 
 namespace Upstream {
 
@@ -124,7 +121,10 @@ public:
    */
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 
-  virtual const Http::CodecStatNames& codecStatNames() PURE;
+  /**
+   * @return Context for HTTP-related structures.
+   */
+  virtual Http::Context& httpContext() PURE;
 };
 
 /**

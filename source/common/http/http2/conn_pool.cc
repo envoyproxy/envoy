@@ -16,10 +16,10 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                           const CodecStatNames& codec_stat_names)
+                           const Context& http_context)
     : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
                        transport_socket_options),
-      codec_stat_names_(codec_stat_names) {}
+      http_context_(http_context) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
@@ -91,7 +91,7 @@ RequestEncoder& ConnPoolImpl::ActiveClient::newStreamEncoder(ResponseDecoder& re
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP2, std::move(data.connection_),
                                            data.host_description_, dispatcher_,
-                                           codec_stat_names_)};
+                                           http_context_)};
   return codec;
 }
 
@@ -100,9 +100,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr hos
                  Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                 const CodecStatNames& codec_stat_names) {
+                 const Context& http_context) {
   return std::make_unique<Http::Http2::ProdConnPoolImpl>(dispatcher, host, priority, options,
-                                                         transport_socket_options, codec_stat_names);
+                                                         transport_socket_options, http_context);
 }
 
 } // namespace Http2

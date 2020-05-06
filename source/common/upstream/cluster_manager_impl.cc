@@ -1340,13 +1340,13 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   if (protocol == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, host, priority, options,
-                                         transport_socket_options);
+                                         transport_socket_options, http_context_);
   } else if (protocol == Http::Protocol::Http3) {
     // Quic connection pool is not implemented.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   } else {
     return Http::Http1::allocateConnPool(dispatcher, host, priority, options,
-                                         transport_socket_options);
+                                         transport_socket_options, http_context_);
   }
 }
 
@@ -1367,7 +1367,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
       outlier_event_logger, added_via_api,
       added_via_api ? validation_context_.dynamicValidationVisitor()
                     : validation_context_.staticValidationVisitor(),
-      api_);
+      api_, http_context_);
 }
 
 CdsApiPtr

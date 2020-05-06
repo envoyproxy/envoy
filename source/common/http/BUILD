@@ -54,6 +54,7 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/http:codec_interface",
+        "//include/envoy/http:context_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
@@ -61,7 +62,6 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
-        "//source/common/http:codec_stat_names_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/http3:quic_codec_factory_lib",
@@ -122,6 +122,7 @@ envoy_cc_library(
     srcs = ["context_impl.cc"],
     hdrs = ["context_impl.h"],
     deps = [
+        ":codec_stat_names_lib",
         ":codes_lib",
         ":user_agent_lib",
         "//include/envoy/http:context_interface",
@@ -169,7 +170,6 @@ envoy_cc_library(
         "conn_manager_utility.h",
     ],
     deps = [
-        ":codec_stat_names_lib",
         ":codes_lib",
         ":conn_manager_config_interface",
         ":exception_lib",

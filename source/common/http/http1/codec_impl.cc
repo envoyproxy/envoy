@@ -11,6 +11,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/http/codec_stat_names.h"
 #include "common/http/exception.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
@@ -442,11 +443,11 @@ http_parser_settings ConnectionImpl::settings_{
 };
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                               const CodecStatNames& stat_names,
+                               const Context& context,
                                http_parser_type type, uint32_t max_headers_kb,
                                const uint32_t max_headers_count,
                                HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers)
-    : connection_(connection), stats_(stat_names, stats),
+    : connection_(connection), stats_(context.codecStatNames(), stats),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
       strict_header_validation_(
@@ -737,7 +738,7 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 
 ServerConnectionImpl::ServerConnectionImpl(
     Network::Connection& connection, Stats::Scope& stats,
-    const CodecStatNames& stat_names,
+    const Context& stat_names,
     ServerConnectionCallbacks& callbacks,
     const Http1Settings& settings, uint32_t max_request_headers_kb,
     const uint32_t max_request_headers_count,
@@ -992,7 +993,7 @@ void ServerConnectionImpl::checkHeaderNameForUnderscores() {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                                           const CodecStatNames& stat_names,
+                                           const Context& stat_names,
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, stat_names, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,

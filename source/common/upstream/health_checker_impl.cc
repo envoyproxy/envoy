@@ -90,7 +90,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
     Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager,
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-    const Http::CodecStatNames& codec_stat_names) {
+    Http::Context& http_context) {
   HealthCheckEventLoggerPtr event_logger;
   if (!health_check_config.event_log_path().empty()) {
     event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
@@ -100,7 +100,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     return std::make_shared<ProdHttpHealthCheckerImpl>(cluster, health_check_config, dispatcher,
                                                        runtime, random, std::move(event_logger),
-                                                       codec_stat_names);
+                                                       http_context);
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kTcpHealthCheck:
     return std::make_shared<TcpHealthCheckerImpl>(cluster, health_check_config, dispatcher, runtime,
                                                   random, std::move(event_logger));
@@ -111,7 +111,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
     }
     return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, health_check_config, dispatcher,
                                                        runtime, random, std::move(event_logger),
-                                                       codec_stat_names);
+                                                       http_context);
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
@@ -133,7 +133,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger,
-                                             const Http::CodecStatNames& codec_stat_names)
+                                             Http::Context& http_context)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
       request_headers_parser_(
@@ -145,7 +145,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
           codecClientType(config.http_health_check().hidden_envoy_deprecated_use_http2()
                               ? envoy::type::v3::HTTP2
                           : config.http_health_check().codec_client_type())),
-      codec_stat_names_(codec_stat_names) {
+      http_context_(http_context) {
   // The deprecated service_name field was previously being used to compare with the health checked
   // cluster name using a StartsWith comparison. Since StartsWith is essentially a prefix
   // comparison, representing the intent by using a StringMatcher prefix is a more natural way.
@@ -404,7 +404,7 @@ HttpHealthCheckerImpl::codecClientType(const envoy::type::v3::CodecClientType& t
 Http::CodecClient*
 ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return new Http::CodecClientProd(codec_client_type_, std::move(data.connection_),
-                                   data.host_description_, dispatcher_, codec_stat_names_);
+                                   data.host_description_, dispatcher_, http_context_);
 }
 
 TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
@@ -546,11 +546,11 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger,
-                                             const Http::CodecStatNames& codec_stat_names)
+                                             Http::Context& http_context)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "grpc.health.v1.Health.Check")),
-      codec_stat_names_(codec_stat_names) {
+      http_context_(http_context) {
   if (!config.grpc_health_check().service_name().empty()) {
     service_name_ = config.grpc_health_check().service_name();
   }
@@ -828,7 +828,7 @@ ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionDat
   return std::make_unique<Http::CodecClientProd>(Http::CodecClient::Type::HTTP2,
                                                  std::move(data.connection_),
                                                  data.host_description_, dispatcher_,
-                                                 codec_stat_names_);
+                                                 http_context_);
 }
 
 std::ostream& operator<<(std::ostream& out, HealthState state) {

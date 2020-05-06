@@ -32,7 +32,8 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
                          AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
                          const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
                          Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                         Http::Context& http_context)
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")),
@@ -41,7 +42,7 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
       ssl_context_manager_(ssl_context_manager), random_(random), info_factory_(info_factory),
       access_log_manager_(access_log_manager), cm_(cm), local_info_(local_info), admin_(admin),
       singleton_manager_(singleton_manager), tls_(tls), validation_visitor_(validation_visitor),
-      api_(api) {
+      api_(api), http_context_(http_context) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMilliseconds,
@@ -172,7 +173,8 @@ void HdsDelegate::processMessage(
     hds_clusters_.emplace_back(new HdsCluster(admin_, runtime_, cluster_config, bind_config,
                                               store_stats_, ssl_context_manager_, false,
                                               info_factory_, cm_, local_info_, dispatcher_, random_,
-                                              singleton_manager_, tls_, validation_visitor_, api_));
+                                              singleton_manager_, tls_, validation_visitor_, api_,
+                                              http_context_));
 
     hds_clusters_.back()->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_,
                                             api_);
@@ -221,10 +223,12 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                        const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, Singleton::Manager& singleton_manager,
                        ThreadLocal::SlotAllocator& tls,
-                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                       Http::Context& http_context)
     : runtime_(runtime), cluster_(cluster), bind_config_(bind_config), stats_(stats),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
-      initial_hosts_(new HostVector()), validation_visitor_(validation_visitor) {
+      initial_hosts_(new HostVector()), validation_visitor_(validation_visitor),
+      http_context_(http_context) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
 
@@ -271,7 +275,8 @@ void HdsCluster::startHealthchecks(AccessLog::AccessLogManager& access_log_manag
   for (auto& health_check : cluster_.health_checks()) {
     health_checkers_.push_back(
         Upstream::HealthCheckerFactory::create(health_check, *this, runtime, random, dispatcher,
-                                               access_log_manager, validation_visitor_, api));
+                                               access_log_manager, validation_visitor_, api,
+                                               http_context_));
     health_checkers_.back()->start();
   }
 }

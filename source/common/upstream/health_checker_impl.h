@@ -4,6 +4,7 @@
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
+#include "envoy/http/context.h"
 #include "envoy/grpc/status.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
@@ -11,7 +12,6 @@
 #include "common/common/logger.h"
 #include "common/grpc/codec.h"
 #include "common/http/codec_client.h"
-#include "common/http/codec_stat_names.h"
 #include "common/router/header_parser.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/health_checker_base_impl.h"
@@ -42,7 +42,7 @@ public:
          Upstream::Cluster& cluster, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
          Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-         const Http::CodecStatNames& codec_stat_names);
+         Http::Context& http_context);
 };
 
 /**
@@ -53,7 +53,7 @@ public:
   HttpHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger,
-                        const Http::CodecStatNames& codec_stat_names);
+                        Http::Context& http_context);
 
   /**
    * Utility class checking if given http status matches configured expectations.
@@ -152,7 +152,7 @@ private:
 
 protected:
   const Http::CodecClient::Type codec_client_type_;
-  const Http::CodecStatNames& codec_stat_names_;
+  Http::Context& http_context_;
 };
 
 /**
@@ -291,7 +291,7 @@ public:
   GrpcHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger,
-                        const Http::CodecStatNames& codec_stat_names);
+                        Http::Context& http_context);
 
 private:
   struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,
@@ -380,7 +380,7 @@ private:
   absl::optional<std::string> authority_value_;
 
  protected:
-  const Http::CodecStatNames& codec_stat_names_;
+  Http::Context& http_context_;
 };
 
 /**

@@ -2,6 +2,7 @@
 
 #include "envoy/http/context.h"
 
+#include "common/http/codec_stat_names.h"
 #include "common/http/codes.h"
 #include "common/http/user_agent.h"
 
@@ -21,6 +22,7 @@ public:
   }
 
   CodeStats& codeStats() override { return code_stats_; }
+  const CodecStatNames& codecStatNames() const override { return codec_stat_names_; }
 
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) {
     default_tracing_config_ = tracing_config;
@@ -31,6 +33,7 @@ public:
 private:
   CodeStatsImpl code_stats_;
   UserAgentContext user_agent_context_;
+  CodecStatNames codec_stat_names_;
   envoy::config::trace::v3::Tracing default_tracing_config_;
 };
 

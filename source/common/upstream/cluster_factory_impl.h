@@ -35,7 +35,7 @@
 #include "common/config/metadata.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
-#include "common/http/codec_stat_names.h"
+#include "envoy/http/context.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/isolated_store_impl.h"
@@ -61,14 +61,15 @@ public:
                             const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
                             Singleton::Manager& singleton_manager,
                             Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
-                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                            Http::Context& http_context)
       : cluster_manager_(cluster_manager), stats_(stats), tls_(tls),
         dns_resolver_(std::move(dns_resolver)), ssl_context_manager_(ssl_context_manager),
         runtime_(runtime), random_(random), dispatcher_(dispatcher), log_manager_(log_manager),
         local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager),
         outlier_event_logger_(std::move(outlier_event_logger)), added_via_api_(added_via_api),
         validation_visitor_(validation_visitor), api_(api),
-        codec_stat_names_(stats.symbolTable()) {}
+        http_context_(http_context) {}
 
   ClusterManager& clusterManager() override { return cluster_manager_; }
   Stats::Store& stats() override { return stats_; }
@@ -88,7 +89,7 @@ public:
     return validation_visitor_;
   }
   Api::Api& api() override { return api_; }
-  const Http::CodecStatNames& codecStatNames() override { return codec_stat_names_; }
+  Http::Context& httpContext() override { return http_context_; }
 
 private:
   ClusterManager& cluster_manager_;
@@ -107,7 +108,7 @@ private:
   const bool added_via_api_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
-  Http::CodecStatNames codec_stat_names_;
+  Http::Context& http_context_;
 };
 
 /**
@@ -128,7 +129,8 @@ public:
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
          Server::Admin& admin, Singleton::Manager& singleton_manager,
          Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
-         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+         Http::Context& http_context);
 
   /**
    * Create a dns resolver to be used by the cluster.

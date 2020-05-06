@@ -6,7 +6,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
-#include "common/http/codec_stat_names.h"
+#include "envoy/http/context.h"
 #include "common/http/conn_manager_impl.h"
 
 namespace Envoy {
@@ -37,7 +37,7 @@ public:
   static ServerConnectionPtr
   autoCreateCodec(Network::Connection& connection, const Buffer::Instance& data,
                   ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
-                  const CodecStatNames& code_stats_names,
+                  const Context& code_stats_names,
                   const Http1Settings& http1_settings,
                   const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                   uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
