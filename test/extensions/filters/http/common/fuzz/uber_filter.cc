@@ -45,7 +45,7 @@ void UberFilterFuzzer::decode(Http::StreamDecoderFilter* filter, const test::fuz
   if (data.body_case() == test::fuzz::HttpData::BODY_NOT_SET && !data.has_trailers()) {
     end_stream = true;
   }
-  ENVOY_LOG_MISC(debug, "Decoding headers: {} ", data.headers().DebugString());
+  ENVOY_LOG_MISC(debug, "Decoding headers (end_stream={}): {} ", end_stream, data.headers().DebugString());
   const auto& headersStatus = filter->decodeHeaders(headers, end_stream);
   if (headersStatus != Http::FilterHeadersStatus::Continue &&
       headersStatus != Http::FilterHeadersStatus::StopIteration) {
@@ -58,21 +58,21 @@ void UberFilterFuzzer::decode(Http::StreamDecoderFilter* filter, const test::fuz
         end_stream = true;
       }
       Buffer::OwnedImpl buffer(data.http_body().data(i));
-      ENVOY_LOG_MISC(debug, "Decoding http data: {} ", buffer.toString());
+      ENVOY_LOG_MISC(debug, "Decoding http data (end_stream={}): {} ", end_stream, buffer.toString());
       if (filter->decodeData(buffer, end_stream) != Http::FilterDataStatus::Continue) {
         return;
       }
     }
   } else if (data.has_proto_body()) {
-    const std::string serialized = data.proto_body().message().SerializeAsString();
-    const std::vector<std::string> serialized_chunks = absl::StrSplit(serialized, absl::ByLength(data.proto_body().chuck_size()));
+    const std::string serialized = data.proto_body().message().value();
+    const std::vector<std::string> serialized_chunks = absl::StrSplit(serialized, absl::ByLength(data.proto_body().chunk_size()));
 
     for (size_t i = 0; i < serialized_chunks.size(); i++) {
       if (!data.has_trailers() && i == serialized_chunks.size() - 1) {
         end_stream = true;
       }
       Buffer::OwnedImpl buffer(serialized_chunks[i]);
-      ENVOY_LOG_MISC(debug, "Decoding proto http data: {} ", buffer.toString());
+      ENVOY_LOG_MISC(debug, "Decoding serialized proto data (end_stream={}): {} ", end_stream, buffer.toString());
       if (filter->decodeData(buffer, end_stream) != Http::FilterDataStatus::Continue) {
         return;
       }
