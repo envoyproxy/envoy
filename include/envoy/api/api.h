@@ -63,7 +63,7 @@ public:
   /**
    * @return a reference to the stats symbol table.
    */
-  virtual const Stats::SymbolTable& symbolTable() PURE;
+  virtual Stats::SymbolTable& symbolTable() PURE;
 
   /**
    * @return an optional reference to the ProcessContext

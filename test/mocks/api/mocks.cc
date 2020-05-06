@@ -8,6 +8,7 @@
 
 using testing::_;
 using testing::Invoke;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Api {
@@ -15,6 +16,7 @@ namespace Api {
 MockApi::MockApi() {
   ON_CALL(*this, fileSystem()).WillByDefault(ReturnRef(file_system_));
   ON_CALL(*this, rootScope()).WillByDefault(ReturnRef(stats_store_));
+  ON_CALL(*this, symbolTable()).WillByDefault(ReturnRef(stats_store_.symbolTable()));
 }
 
 MockApi::~MockApi() = default;

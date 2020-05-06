@@ -5,6 +5,7 @@
 #include "envoy/service/health/v3/hds.pb.h"
 #include "envoy/type/v3/http.pb.h"
 
+#include "common/http/context_impl.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
@@ -51,6 +52,7 @@ protected:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),
         async_client_(new Grpc::MockAsyncClient()), api_(Api::createApiForTest(stats_store_)),
+        http_context_(api_->symbolTable()),
         ssl_context_manager_(api_->timeSource()) {
     node_.set_id("hds-node");
   }
@@ -72,7 +74,7 @@ protected:
         stats_store_, Grpc::RawAsyncClientPtr(async_client_),
         envoy::config::core::v3::ApiVersion::AUTO, dispatcher_, runtime_, stats_store_,
         ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_, admin_,
-        singleton_manager_, tls_, validation_visitor_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_, http_context_);
   }
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
@@ -125,6 +127,7 @@ protected:
   Runtime::MockLoader runtime_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
+  Http::ContextImpl http_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;

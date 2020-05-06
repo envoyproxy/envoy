@@ -202,6 +202,7 @@ envoy_cc_test(
     name = "hds_test",
     srcs = ["hds_test.cc"],
     deps = [
+        "//source/common/http:context_lib",
         "//source/common/upstream:health_discovery_service_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/access_log:access_log_mocks",

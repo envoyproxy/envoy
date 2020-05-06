@@ -232,7 +232,8 @@ public:
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
       fake_upstream_ = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2,
-                                                      ipVersion(), test_time_.timeSystem());
+                                                      ipVersion(), test_time_.timeSystem(),
+                                                      http_context_);
     }
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
@@ -287,7 +288,8 @@ public:
     EXPECT_CALL(*mock_host_, cluster()).WillRepeatedly(ReturnRef(*cluster_info_ptr_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
     http_conn_pool_ = std::make_unique<Http::Http2::ProdConnPoolImpl>(
-        *dispatcher_, host_ptr_, Upstream::ResourcePriority::Default, nullptr, nullptr);
+        *dispatcher_, host_ptr_, Upstream::ResourcePriority::Default, nullptr, nullptr,
+        http_context_);
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
@@ -506,7 +508,7 @@ public:
         mock_host_description_->socket_factory_->createTransportSocket(nullptr);
     fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
                                                     FakeHttpConnection::Type::HTTP2, ipVersion(),
-                                                    test_time_.timeSystem());
+                                                    test_time_.timeSystem(), http_context_);
 
     GrpcClientIntegrationTest::initialize();
   }
