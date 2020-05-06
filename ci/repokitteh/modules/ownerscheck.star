@@ -49,8 +49,9 @@ def _get_relevant_specs(specs, changed_files):
 
     files = [f for f in changed_files if match(path_match, f['filename'])]
     allow_global_approval = spec.get("allow_global_approval", True)
+    status_label = spec.get("github_status_label", "")
     if files:
-      relevant.append(struct(files=files, path_match=path_match, allow_global_approval=allow_global_approval, **spec))
+      relevant.append(struct(files=files, path_match=path_match, allow_global_approval=allow_global_approval, status_label=status_label, **spec))
 
   print("specs: %s" % relevant)
 
@@ -125,7 +126,7 @@ def _reconcile(config, specs=None):
     results.append((spec, approved))
 
     if spec.owner[-1] == '!':
-      _update_status(spec.owner[:-1], spec["github_status_label"], spec.path_match, approved)
+      _update_status(spec.owner[:-1], spec.status_label, spec.path_match, approved)
 
       if hasattr(spec, 'label'):
         if approved:
