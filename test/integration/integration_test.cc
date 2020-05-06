@@ -347,8 +347,6 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   upstream_request_->encodeData(1024 * 65, false);
-  // As it has read a full request it will read disable until the full response is sent.
-  ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   response->waitForEndStream();

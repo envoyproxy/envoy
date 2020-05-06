@@ -428,6 +428,8 @@ protected:
     bool remote_complete_{};
   };
   absl::optional<ActiveRequest>& activeRequest() { return active_request_; }
+  // ConnectionImpl
+  void onMessageComplete() override;
 
 private:
   /**
@@ -448,7 +450,6 @@ private:
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
   bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
-  void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;

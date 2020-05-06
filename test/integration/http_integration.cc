@@ -625,7 +625,6 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
   codec_client_->close();
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
-    ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
