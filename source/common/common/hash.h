@@ -74,7 +74,7 @@ private:
     return result;
   }
 
-  static inline uint64_t shift_mix(uint64_t v) { return v ^ (v >> 47); }
+  static inline uint64_t shiftMix(uint64_t v) { return v ^ (v >> 47); }
 };
 
 using SharedString = std::shared_ptr<std::string>;
