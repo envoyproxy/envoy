@@ -98,7 +98,7 @@ def _update_status(owner, path_match, approved):
   changes_to = (path_match or '/')
   github.create_status(
     state=approved and 'success' or 'pending',
-    context='%s must approve changes to ' % (owner, changes_to),
+    context='%s must approve changes to %s' % (owner, changes_to),
     description=owner,
   )
 
