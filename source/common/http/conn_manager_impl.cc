@@ -37,6 +37,7 @@
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
+#include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/timespan_impl.h"
 
@@ -760,6 +761,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
+
+  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path() &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.stop_faking_paths")) {
+    request_headers_->setPath("/");
+  }
 
   // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
   if (connection_manager_.config_.isRoutable()) {
