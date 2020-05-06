@@ -50,7 +50,7 @@ def _get_relevant_specs(specs, changed_files):
     files = [f for f in changed_files if match(path_match, f['filename'])]
     allow_global_approval = spec.get("allow_global_approval", True)
     if files:
-      relevant.append(struct(files=files, path_match=path_match, allow_global_approval=allow_global_approval, **spec))
+      relevant.append(struct(files=files, path_match=path_match, allow_global_approval=allow_global_approval, status_label=spec["github_status_label"], **spec))
 
   print("specs: %s" % relevant)
 
@@ -94,12 +94,12 @@ def _is_approved(spec, approvers):
   return False
 
 
-def _update_status(owner, path_match, approved):
+def _update_status(owner, status_label, path_match, approved):
   changes_to = (path_match or '/')
   github.create_status(
     state=approved and 'success' or 'pending',
-    context='%s must approve changes to %s' % (owner, changes_to),
-    description=owner,
+    context='%s must approve for %s' % (owner, status_label),
+    description='changes to %s' % changes_to,
   )
 
 def _get_specs(config):
@@ -125,7 +125,7 @@ def _reconcile(config, specs=None):
     results.append((spec, approved))
 
     if spec.owner[-1] == '!':
-      _update_status(spec.owner[:-1], spec.path_match, approved)
+      _update_status(spec.owner[:-1], spec.status_label, spec.path_match, approved)
 
       if hasattr(spec, 'label'):
         if approved:
