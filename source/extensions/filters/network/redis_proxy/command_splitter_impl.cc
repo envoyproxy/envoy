@@ -523,19 +523,9 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
-  ENVOY_LOG(debug, "redis: splitting '{}'", request->toString());
-  handler->command_stats_.total_.inc();
-
   // Fault Injection Check
   absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>> fault =
       fault_manager_->getFaultForCommand(to_lower_string);
-
-  // No fault case
-  if (!fault.has_value()) {
-    SplitRequestPtr request_ptr = handler->handler_.get().startRequest(
-        std::move(request), callbacks, handler->command_stats_, time_source_);
-    return request_ptr;
-  }
 
   // Check if delay, which determines which callbacks to use. If a delay fault is enabled,
   // the delay fault itself wraps the request (or other fault) and the delay fault itself
@@ -552,6 +542,8 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   // downstream metrics reflect any faults added (with special fault metrics) or extra latency from
   // a delay. 2) we use a ternary operator for the callback parameter- we want to use the
   // delay_fault as callback if there is a delay per the earlier comment.
+  ENVOY_LOG(debug, "redis: splitting '{}'", request->toString());
+  handler->command_stats_.total_.inc();
 
   SplitRequestPtr request_ptr;
   if (fault.has_value() && fault.value().first == Common::Redis::FaultType::Error) {
