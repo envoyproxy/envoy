@@ -215,6 +215,16 @@ By default Clang drops some debug symbols that are required for pretty printing 
 More information can be found [here](https://bugs.llvm.org/show_bug.cgi?id=24202). The easy solution
 is to set ```--copt=-fno-limit-debug-info``` on the CLI or in your .bazelrc file.
 
+## Removing debug info
+
+If you don't want your debug or release binaries to contain debug info
+to reduce binary size, pass `--define=no_debug_info=1` when building.
+This is primarily useful when building envoy as a static library. When
+building a linked envoy binary you can build the implicit `.stripped`
+target from [`cc_binary`](https://docs.bazel.build/versions/master/be/c-cpp.html#cc_binary)
+or pass [`--strip=always`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--strip)
+instead.
+
 # Testing Envoy with Bazel
 
 All the Envoy tests can be built and run with:
@@ -686,7 +696,7 @@ that the Go toolchain can find the necessary dependencies):
 go run github.com/buchgr/bazel-remote --dir ${HOME}/bazel_cache --host 127.0.0.1 --port 28080 --max_size 64
 ```
 
-See [Bazel remote cache](github.com/buchgr/bazel-remote) for more information on the parameters.
+See [Bazel remote cache](https://github.com/buchgr/bazel-remote) for more information on the parameters.
 The command above will setup a maximum 64 GiB cache at `~/bazel_cache` on port 28080. You might
 want to setup a larger cache if you run ASAN builds.
 

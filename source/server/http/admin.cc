@@ -3,9 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
-#include <regex>
 #include <string>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -13,19 +11,15 @@
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/listeners.pb.h"
 #include "envoy/admin/v3/memory.pb.h"
 #include "envoy/admin/v3/metrics.pb.h"
 #include "envoy/admin/v3/mutex_stats.pb.h"
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/filesystem/filesystem.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -43,7 +37,6 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/json/json_loader.h"
 #include "common/memory/stats.h"
 #include "common/memory/utils.h"
 #include "common/network/listen_socket_impl.h"
@@ -52,7 +45,6 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
-#include "common/stats/histogram_impl.h"
 #include "common/upstream/host_utility.h"
 
 #include "server/http/utils.h"
@@ -133,48 +125,14 @@ const char AdminHtmlEnd[] = R"(
 </body>
 )";
 
-const std::regex PromRegex("[^a-zA-Z0-9_]");
-
-const uint64_t RecentLookupsCapacity = 100;
-
-// Helper method to get filter parameter, or report an error for an invalid regex.
-bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
-                 absl::optional<std::regex>& regex) {
-  auto p = params.find("filter");
-  if (p != params.end()) {
-    const std::string& pattern = p->second;
-    try {
-      regex = std::regex(pattern);
-    } catch (std::regex_error& error) {
-      // Include the offending pattern in the log, but not the error message.
-      response.add(fmt::format("Invalid regex: \"{}\"\n", error.what()));
-      ENVOY_LOG_MISC(error, "admin: Invalid regex: \"{}\": {}", error.what(), pattern);
-      return false;
-    }
-  }
-  return true;
-}
-
-// Helper method to get a query parameter.
-absl::optional<std::string> queryParam(const Http::Utility::QueryParams& params,
-                                       const std::string& key) {
-  return (params.find(key) != params.end()) ? absl::optional<std::string>{params.at(key)}
-                                            : absl::nullopt;
-}
-
-// Helper method to get the format parameter.
-absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params) {
-  return queryParam(params, "format");
-}
-
 // Helper method to get the resource parameter.
 absl::optional<std::string> resourceParam(const Http::Utility::QueryParams& params) {
-  return queryParam(params, "resource");
+  return Utility::queryParam(params, "resource");
 }
 
 // Helper method to get the mask parameter.
 absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) {
-  return queryParam(params, "mask");
+  return Utility::queryParam(params, "mask");
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
@@ -526,29 +484,11 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
   }
 }
 
-void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
-  envoy::admin::v3::Listeners listeners;
-  for (const auto& listener : server_.listenerManager().listeners()) {
-    envoy::admin::v3::ListenerStatus& listener_status = *listeners.add_listener_statuses();
-    listener_status.set_name(listener.get().name());
-    Network::Utility::addressToProtobufAddress(*listener.get().listenSocketFactory().localAddress(),
-                                               *listener_status.mutable_local_address());
-  }
-  response.add(MessageUtil::getJsonStringFromMessage(listeners, true)); // pretty-print
-}
-
-void AdminImpl::writeListenersAsText(Buffer::Instance& response) {
-  for (const auto& listener : server_.listenerManager().listeners()) {
-    response.add(fmt::format("{}::{}\n", listener.get().name(),
-                             listener.get().listenSocketFactory().localAddress()->asString()));
-  }
-}
-
 Http::Code AdminImpl::handlerClusters(absl::string_view url,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  const auto format_value = formatParam(query_params);
+  const auto format_value = Utility::formatParam(query_params);
 
   if (format_value.has_value() && format_value.value() == "json") {
     writeClustersAsJson(response);
@@ -795,65 +735,6 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::ResponseHeaderMap& 
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::ResponseHeaderMap&,
-                                            Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  ListenerManager::StopListenersType stop_listeners_type =
-      params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
-                                                 : ListenerManager::StopListenersType::All;
-  server_.listenerManager().stopListeners(stop_listeners_type);
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::ResponseHeaderMap&,
-                                           Buffer::Instance& response, AdminStream&) {
-  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    counter->reset();
-  }
-  server_.stats().symbolTable().clearRecentLookups();
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerStatsRecentLookups(absl::string_view, Http::ResponseHeaderMap&,
-                                                Buffer::Instance& response, AdminStream&) {
-  Stats::SymbolTable& symbol_table = server_.stats().symbolTable();
-  std::string table;
-  const uint64_t total =
-      symbol_table.getRecentLookups([&table](absl::string_view name, uint64_t count) {
-        table += fmt::format("{:8d} {}\n", count, name);
-      });
-  if (table.empty() && symbol_table.recentLookupCapacity() == 0) {
-    table = "Lookup tracking is not enabled. Use /stats/recentlookups/enable to enable.\n";
-  } else {
-    response.add("   Count Lookup\n");
-  }
-  response.add(absl::StrCat(table, "\ntotal: ", total, "\n"));
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerStatsRecentLookupsClear(absl::string_view, Http::ResponseHeaderMap&,
-                                                     Buffer::Instance& response, AdminStream&) {
-  server_.stats().symbolTable().clearRecentLookups();
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerStatsRecentLookupsDisable(absl::string_view, Http::ResponseHeaderMap&,
-                                                       Buffer::Instance& response, AdminStream&) {
-  server_.stats().symbolTable().setRecentLookupCapacity(0);
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerStatsRecentLookupsEnable(absl::string_view, Http::ResponseHeaderMap&,
-                                                      Buffer::Instance& response, AdminStream&) {
-  server_.stats().symbolTable().setRecentLookupCapacity(RecentLookupsCapacity);
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::ResponseHeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   const std::time_t current_time =
@@ -891,289 +772,10 @@ Http::Code AdminImpl::handlerReady(absl::string_view, Http::ResponseHeaderMap&,
   return code;
 }
 
-Http::Code AdminImpl::handlerStats(absl::string_view url, Http::ResponseHeaderMap& response_headers,
-                                   Buffer::Instance& response, AdminStream& admin_stream) {
-  Http::Code rc = Http::Code::OK;
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-
-  const bool used_only = params.find("usedonly") != params.end();
-  absl::optional<std::regex> regex;
-  if (!filterParam(params, response, regex)) {
-    return Http::Code::BadRequest;
-  }
-
-  std::map<std::string, uint64_t> all_stats;
-  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    if (shouldShowMetric(*counter, used_only, regex)) {
-      all_stats.emplace(counter->name(), counter->value());
-    }
-  }
-
-  for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
-    if (shouldShowMetric(*gauge, used_only, regex)) {
-      ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-      all_stats.emplace(gauge->name(), gauge->value());
-    }
-  }
-
-  std::map<std::string, std::string> text_readouts;
-  for (const auto& text_readout : server_.stats().textReadouts()) {
-    if (shouldShowMetric(*text_readout, used_only, regex)) {
-      text_readouts.emplace(text_readout->name(), text_readout->value());
-    }
-  }
-
-  if (const auto format_value = formatParam(params)) {
-    if (format_value.value() == "json") {
-      response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-      response.add(AdminImpl::statsAsJson(all_stats, text_readouts, server_.stats().histograms(),
-                                          used_only, regex));
-    } else if (format_value.value() == "prometheus") {
-      return handlerPrometheusStats(url, response_headers, response, admin_stream);
-    } else {
-      response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
-      response.add("\n");
-      rc = Http::Code::NotFound;
-    }
-  } else { // Display plain stats if format query param is not there.
-    for (const auto& text_readout : text_readouts) {
-      response.add(fmt::format("{}: \"{}\"\n", text_readout.first,
-                               Html::Utility::sanitize(text_readout.second)));
-    }
-    for (const auto& stat : all_stats) {
-      response.add(fmt::format("{}: {}\n", stat.first, stat.second));
-    }
-    // TODO(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
-    // multimap here. This makes sure that duplicate histograms get output. When shared storage is
-    // implemented this can be switched back to a normal map.
-    std::multimap<std::string, std::string> all_histograms;
-    for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
-      if (shouldShowMetric(*histogram, used_only, regex)) {
-        all_histograms.emplace(histogram->name(), histogram->quantileSummary());
-      }
-    }
-    for (const auto& histogram : all_histograms) {
-      response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
-    }
-  }
-  return rc;
-}
-
-Http::Code AdminImpl::handlerPrometheusStats(absl::string_view path_and_query,
-                                             Http::ResponseHeaderMap&, Buffer::Instance& response,
-                                             AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(path_and_query);
-  const bool used_only = params.find("usedonly") != params.end();
-  absl::optional<std::regex> regex;
-  if (!filterParam(params, response, regex)) {
-    return Http::Code::BadRequest;
-  }
-  PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              server_.stats().histograms(), response, used_only,
-                                              regex);
-  return Http::Code::OK;
-}
-
-std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
-  // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
-  // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
-  std::string stats_name = std::regex_replace(name, PromRegex, "_");
-  if (stats_name[0] >= '0' && stats_name[0] <= '9') {
-    return absl::StrCat("_", stats_name);
-  } else {
-    return stats_name;
-  }
-}
-
-std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
-  std::vector<std::string> buf;
-  buf.reserve(tags.size());
-  for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), tag.value_));
-  }
-  return absl::StrJoin(buf, ",");
-}
-
-std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name) {
-  // Add namespacing prefix to avoid conflicts, as per best practice:
-  // https://prometheus.io/docs/practices/naming/#metric-names
-  // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
-  return sanitizeName(fmt::format("envoy_{0}", extracted_name));
-}
-
-// TODO(efimki): Add support of text readouts stats.
-uint64_t PrometheusStatsFormatter::statsAsPrometheus(
-    const std::vector<Stats::CounterSharedPtr>& counters,
-    const std::vector<Stats::GaugeSharedPtr>& gauges,
-    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
-    const bool used_only, const absl::optional<std::regex>& regex) {
-  std::unordered_set<std::string> metric_type_tracker;
-  for (const auto& counter : counters) {
-    if (!shouldShowMetric(*counter, used_only, regex)) {
-      continue;
-    }
-
-    const std::string tags = formattedTags(counter->tags());
-    const std::string metric_name = metricName(counter->tagExtractedName());
-    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
-      metric_type_tracker.insert(metric_name);
-      response.add(fmt::format("# TYPE {0} counter\n", metric_name));
-    }
-    response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, counter->value()));
-  }
-
-  for (const auto& gauge : gauges) {
-    if (!shouldShowMetric(*gauge, used_only, regex)) {
-      continue;
-    }
-
-    const std::string tags = formattedTags(gauge->tags());
-    const std::string metric_name = metricName(gauge->tagExtractedName());
-    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
-      metric_type_tracker.insert(metric_name);
-      response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
-    }
-    response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
-  }
-
-  for (const auto& histogram : histograms) {
-    if (!shouldShowMetric(*histogram, used_only, regex)) {
-      continue;
-    }
-
-    const std::string tags = formattedTags(histogram->tags());
-    const std::string hist_tags = histogram->tags().empty() ? EMPTY_STRING : (tags + ",");
-
-    const std::string metric_name = metricName(histogram->tagExtractedName());
-    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
-      metric_type_tracker.insert(metric_name);
-      response.add(fmt::format("# TYPE {0} histogram\n", metric_name));
-    }
-
-    const Stats::HistogramStatistics& stats = histogram->cumulativeStatistics();
-    const std::vector<double>& supported_buckets = stats.supportedBuckets();
-    const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
-    for (size_t i = 0; i < supported_buckets.size(); ++i) {
-      double bucket = supported_buckets[i];
-      uint64_t value = computed_buckets[i];
-      // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
-      // doesn't have a specific modifier to format as a fixed-point value only so we use the
-      // 'g' operator which prints the number in general fixed point format or scientific format
-      // with precision 50 to round the number up to 32 significant digits in fixed point format
-      // which should cover pretty much all cases
-      response.add(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n", metric_name, hist_tags,
-                               bucket, value));
-    }
-
-    response.add(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", metric_name, hist_tags,
-                             stats.sampleCount()));
-    response.add(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", metric_name, tags, stats.sampleSum()));
-    response.add(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
-  }
-
-  return metric_type_tracker.size();
-}
-
-std::string
-AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                       const std::map<std::string, std::string>& text_readouts,
-                       const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                       const bool used_only, const absl::optional<std::regex> regex,
-                       const bool pretty_print) {
-
-  ProtobufWkt::Struct document;
-  std::vector<ProtobufWkt::Value> stats_array;
-  for (const auto& text_readout : text_readouts) {
-    ProtobufWkt::Struct stat_obj;
-    auto* stat_obj_fields = stat_obj.mutable_fields();
-    (*stat_obj_fields)["name"] = ValueUtil::stringValue(text_readout.first);
-    (*stat_obj_fields)["value"] = ValueUtil::stringValue(text_readout.second);
-    stats_array.push_back(ValueUtil::structValue(stat_obj));
-  }
-  for (const auto& stat : all_stats) {
-    ProtobufWkt::Struct stat_obj;
-    auto* stat_obj_fields = stat_obj.mutable_fields();
-    (*stat_obj_fields)["name"] = ValueUtil::stringValue(stat.first);
-    (*stat_obj_fields)["value"] = ValueUtil::numberValue(stat.second);
-    stats_array.push_back(ValueUtil::structValue(stat_obj));
-  }
-
-  ProtobufWkt::Struct histograms_obj;
-  auto* histograms_obj_fields = histograms_obj.mutable_fields();
-
-  ProtobufWkt::Struct histograms_obj_container;
-  auto* histograms_obj_container_fields = histograms_obj_container.mutable_fields();
-  std::vector<ProtobufWkt::Value> computed_quantile_array;
-
-  bool found_used_histogram = false;
-  for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    if (shouldShowMetric(*histogram, used_only, regex)) {
-      if (!found_used_histogram) {
-        // It is not possible for the supported quantiles to differ across histograms, so it is ok
-        // to send them once.
-        Stats::HistogramStatisticsImpl empty_statistics;
-        std::vector<ProtobufWkt::Value> supported_quantile_array;
-        for (double quantile : empty_statistics.supportedQuantiles()) {
-          supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
-        }
-        (*histograms_obj_fields)["supported_quantiles"] =
-            ValueUtil::listValue(supported_quantile_array);
-        found_used_histogram = true;
-      }
-
-      ProtobufWkt::Struct computed_quantile;
-      auto* computed_quantile_fields = computed_quantile.mutable_fields();
-      (*computed_quantile_fields)["name"] = ValueUtil::stringValue(histogram->name());
-
-      std::vector<ProtobufWkt::Value> computed_quantile_value_array;
-      for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
-        ProtobufWkt::Struct computed_quantile_value;
-        auto* computed_quantile_value_fields = computed_quantile_value.mutable_fields();
-        const auto& interval = histogram->intervalStatistics().computedQuantiles()[i];
-        const auto& cumulative = histogram->cumulativeStatistics().computedQuantiles()[i];
-        (*computed_quantile_value_fields)["interval"] =
-            std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
-        (*computed_quantile_value_fields)["cumulative"] =
-            std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
-
-        computed_quantile_value_array.push_back(ValueUtil::structValue(computed_quantile_value));
-      }
-      (*computed_quantile_fields)["values"] = ValueUtil::listValue(computed_quantile_value_array);
-      computed_quantile_array.push_back(ValueUtil::structValue(computed_quantile));
-    }
-  }
-
-  if (found_used_histogram) {
-    (*histograms_obj_fields)["computed_quantiles"] = ValueUtil::listValue(computed_quantile_array);
-    (*histograms_obj_container_fields)["histograms"] = ValueUtil::structValue(histograms_obj);
-    stats_array.push_back(ValueUtil::structValue(histograms_obj_container));
-  }
-
-  auto* document_fields = document.mutable_fields();
-  (*document_fields)["stats"] = ValueUtil::listValue(stats_array);
-
-  return MessageUtil::getJsonStringFromMessage(document, pretty_print, true);
-}
-
 Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::ResponseHeaderMap&,
                                           Buffer::Instance& response, AdminStream&) {
   server_.shutdown();
   response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerListenerInfo(absl::string_view url,
-                                          Http::ResponseHeaderMap& response_headers,
-                                          Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  const auto format_value = formatParam(query_params);
-
-  if (format_value.has_value() && format_value.value() == "json") {
-    writeListenersAsJson(response);
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  } else {
-    writeListenersAsText(response);
-  }
   return Http::Code::OK;
 }
 
@@ -1195,106 +797,6 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::ResponseHeaderMap& r
     }
   });
   response.add(MessageUtil::getJsonStringFromMessage(certificates, true, true));
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerRuntime(absl::string_view url,
-                                     Http::ResponseHeaderMap& response_headers,
-                                     Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-
-  // TODO(jsedgwick): Use proto to structure this output instead of arbitrary JSON.
-  const auto& layers = server_.runtime().snapshot().getLayers();
-
-  std::vector<ProtobufWkt::Value> layer_names;
-  layer_names.reserve(layers.size());
-  std::map<std::string, std::vector<std::string>> entries;
-  for (const auto& layer : layers) {
-    layer_names.push_back(ValueUtil::stringValue(layer->name()));
-    for (const auto& value : layer->values()) {
-      const auto found = entries.find(value.first);
-      if (found == entries.end()) {
-        entries.emplace(value.first, std::vector<std::string>{});
-      }
-    }
-  }
-
-  for (const auto& layer : layers) {
-    for (auto& entry : entries) {
-      const auto found = layer->values().find(entry.first);
-      const auto& entry_value =
-          found == layer->values().end() ? EMPTY_STRING : found->second.raw_string_value_;
-      entry.second.push_back(entry_value);
-    }
-  }
-
-  ProtobufWkt::Struct layer_entries;
-  auto* layer_entry_fields = layer_entries.mutable_fields();
-  for (const auto& entry : entries) {
-    std::vector<ProtobufWkt::Value> layer_entry_values;
-    layer_entry_values.reserve(entry.second.size());
-    std::string final_value;
-    for (const auto& value : entry.second) {
-      if (!value.empty()) {
-        final_value = value;
-      }
-      layer_entry_values.push_back(ValueUtil::stringValue(value));
-    }
-
-    ProtobufWkt::Struct layer_entry_value;
-    auto* layer_entry_value_fields = layer_entry_value.mutable_fields();
-
-    (*layer_entry_value_fields)["final_value"] = ValueUtil::stringValue(final_value);
-    (*layer_entry_value_fields)["layer_values"] = ValueUtil::listValue(layer_entry_values);
-    (*layer_entry_fields)[entry.first] = ValueUtil::structValue(layer_entry_value);
-  }
-
-  ProtobufWkt::Struct runtime;
-  auto* fields = runtime.mutable_fields();
-
-  (*fields)["layers"] = ValueUtil::listValue(layer_names);
-  (*fields)["entries"] = ValueUtil::structValue(layer_entries);
-
-  response.add(MessageUtil::getJsonStringFromMessage(runtime, true, true));
-  return Http::Code::OK;
-}
-
-bool AdminImpl::isFormUrlEncoded(const Http::HeaderEntry* content_type) const {
-  if (content_type == nullptr) {
-    return false;
-  }
-
-  return content_type->value().getStringView() ==
-         Http::Headers::get().ContentTypeValues.FormUrlEncoded;
-}
-
-Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::ResponseHeaderMap&,
-                                           Buffer::Instance& response, AdminStream& admin_stream) {
-  Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  if (params.empty()) {
-    // Check if the params are in the request's body.
-    if (admin_stream.getRequestBody() != nullptr &&
-        isFormUrlEncoded(admin_stream.getRequestHeaders().ContentType())) {
-      params = Http::Utility::parseFromBody(admin_stream.getRequestBody()->toString());
-    }
-
-    if (params.empty()) {
-      response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
-      response.add("       or send the parameters as form values\n");
-      response.add("use an empty value to remove a previously added override");
-      return Http::Code::BadRequest;
-    }
-  }
-  std::unordered_map<std::string, std::string> overrides;
-  overrides.insert(params.begin(), params.end());
-  try {
-    server_.runtime().mergeValues(overrides);
-  } catch (const EnvoyException& e) {
-    response.add(e.what());
-    return Http::Code::ServiceUnavailable;
-  }
-  response.add("OK\n");
   return Http::Code::OK;
 }
 
@@ -1342,7 +844,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
-      scoped_route_config_provider_(server.timeSource()),
+      scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
+      runtime_handler_(server), listeners_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -1372,29 +875,31 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
            true},
           {"/reset_counters", "reset all counters to zero",
-           MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
-          {"/drain_listeners", "drain listeners", MAKE_ADMIN_HANDLER(handlerDrainListeners), false,
-           true},
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true},
+          {"/drain_listeners", "drain listeners",
+           MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
            MAKE_ADMIN_HANDLER(handlerReady), false, false},
-          {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
-          {"/stats/prometheus", "print server stats in prometheus format",
-           MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
-          {"/stats/recentlookups", "Show recent stat-name lookups",
-           MAKE_ADMIN_HANDLER(handlerStatsRecentLookups), false, false},
-          {"/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
-           MAKE_ADMIN_HANDLER(handlerStatsRecentLookupsClear), false, true},
-          {"/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
-           MAKE_ADMIN_HANDLER(handlerStatsRecentLookupsDisable), false, true},
-          {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
-           MAKE_ADMIN_HANDLER(handlerStatsRecentLookupsEnable), false, true},
-          {"/listeners", "print listener info", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
+          {"/stats", "print server stats", MAKE_ADMIN_HANDLER(stats_handler_.handlerStats), false,
            false},
-          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
-          {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
-           false, true},
+          {"/stats/prometheus", "print server stats in prometheus format",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false},
+          {"/stats/recentlookups", "Show recent stat-name lookups",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false},
+          {"/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsClear), false, true},
+          {"/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable), false, true},
+          {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true},
+          {"/listeners", "print listener info",
+           MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo), false, false},
+          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime),
+           false, false},
+          {"/runtime_modify", "modify runtime values",
+           MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true},
           {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false,
            true},
       },

@@ -218,6 +218,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:api_version_lib",
         "//source/common/config:config_provider_lib",
+        "//source/common/config:resource_name_lib",
         "//source/common/config:subscription_base_interface",
         "//source/common/config:version_converter_lib",
         "//source/common/init:manager_lib",
@@ -308,6 +309,7 @@ envoy_cc_library(
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:load_balancer_lib",
+        "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
     ],
 )

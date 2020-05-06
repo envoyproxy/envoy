@@ -274,6 +274,15 @@ void ConnPoolImplBase::onConnectionEvent(ConnPoolImplBase::ActiveClient& client,
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
+      ConnectionPool::PoolFailureReason reason;
+      if (client.timed_out_) {
+        reason = ConnectionPool::PoolFailureReason::Timeout;
+      } else if (event == Network::ConnectionEvent::RemoteClose) {
+        reason = ConnectionPool::PoolFailureReason::RemoteConnectionFailure;
+      } else {
+        reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
+      }
+
       // Raw connect failures should never happen under normal circumstances. If we have an upstream
       // that is behaving badly, requests can get stuck here in the pending state. If we see a
       // connect failure, we purge all pending requests so that calling code can determine what to
@@ -281,7 +290,7 @@ void ConnPoolImplBase::onConnectionEvent(ConnPoolImplBase::ActiveClient& client,
       // NOTE: We move the existing pending requests to a temporary list. This is done so that
       //       if retry logic submits a new request to the pool, we don't fail it inline.
       purgePendingRequests(client.real_host_description_,
-                           client.codec_client_->connectionFailureReason());
+                           client.codec_client_->connectionFailureReason(), reason);
     }
 
     // We need to release our resourceManager() resources before checking below for
@@ -342,7 +351,7 @@ ConnPoolImplBase::newPendingRequest(ResponseDecoder& decoder,
 
 void ConnPoolImplBase::purgePendingRequests(
     const Upstream::HostDescriptionConstSharedPtr& host_description,
-    absl::string_view failure_reason) {
+    absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason) {
   // NOTE: We move the existing pending requests to a temporary list. This is done so that
   //       if retry logic submits a new request to the pool, we don't fail it inline.
   pending_requests_to_purge_ = std::move(pending_requests_);
@@ -350,8 +359,7 @@ void ConnPoolImplBase::purgePendingRequests(
     PendingRequestPtr request =
         pending_requests_to_purge_.front()->removeFromList(pending_requests_to_purge_);
     host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
-    request->callbacks_.onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                      failure_reason, host_description);
+    request->callbacks_.onPoolFailure(reason, failure_reason, host_description);
   }
 }
 
@@ -428,6 +436,7 @@ void ConnPoolImplBase::ActiveClient::releaseResources() {
 void ConnPoolImplBase::ActiveClient::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", *codec_client_);
   parent_.host_->cluster().stats().upstream_cx_connect_timeout_.inc();
+  timed_out_ = true;
   close();
 }
 

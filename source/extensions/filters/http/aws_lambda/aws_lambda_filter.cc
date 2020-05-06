@@ -251,9 +251,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
   }
 
   ENVOY_LOG(trace, "Tranforming JSON payload to HTTP response.");
-  if (!encoder_callbacks_->encodingBuffer()) {
-    encoder_callbacks_->addEncodedData(data, false);
-  }
+  encoder_callbacks_->addEncodedData(data, false);
   const Buffer::Instance& encoding_buffer = *encoder_callbacks_->encodingBuffer();
   encoder_callbacks_->modifyEncodingBuffer([this](Buffer::Instance& enc_buf) {
     Buffer::OwnedImpl body;
@@ -298,8 +296,11 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
       &json_req);
 
   // Wrap the Query String
-  for (auto&& kv_pair : Http::Utility::parseQueryString(headers.Path()->value().getStringView())) {
-    json_req.mutable_query_string_parameters()->insert({kv_pair.first, kv_pair.second});
+  if (headers.Path()) {
+    for (auto&& kv_pair :
+         Http::Utility::parseQueryString(headers.Path()->value().getStringView())) {
+      json_req.mutable_query_string_parameters()->insert({kv_pair.first, kv_pair.second});
+    }
   }
 
   // Wrap the body

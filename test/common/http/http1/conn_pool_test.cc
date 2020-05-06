@@ -357,6 +357,7 @@ TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
   EXPECT_CALL(callbacks2.pool_failure_, ready());
   Http::ConnectionPool::Cancellable* handle2 = conn_pool_.newStream(outer_decoder2, callbacks2);
   EXPECT_EQ(nullptr, handle2);
+  EXPECT_EQ(callbacks2.reason_, ConnectionPool::PoolFailureReason::Overflow);
 
   EXPECT_EQ(1U, cluster_->circuit_breakers_stats_.rq_pending_open_.value());
 
@@ -900,9 +901,10 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
 
   Buffer::OwnedImpl empty_data;
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, dispatch(BufferEqual(&empty_data)))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         // Simulate the onResponseComplete call to decodeData since dispatch is mocked out.
         inner_decoder->decodeData(data, true);
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(*conn_pool_.test_clients_[0].connection_,

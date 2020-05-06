@@ -240,6 +240,7 @@ message ResponseFlagFilter {
         in: "SI"
         in: "IH"
         in: "DPE"
+        in: "UMSDR"
       }
     }
   }];

@@ -51,6 +51,7 @@ envoy_cc_library(
     deps = [
         ":codec_wrappers_lib",
         ":exception_lib",
+        ":status_lib",
         ":utility_lib",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/http:codec_interface",
@@ -134,18 +135,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "conn_pool_base_legacy_lib",
-    srcs = ["conn_pool_base_legacy.cc"],
-    hdrs = ["conn_pool_base_legacy.h"],
-    deps = [
-        "//include/envoy/http:conn_pool_interface",
-        "//include/envoy/stats:timespan_interface",
-        "//source/common/common:linked_object",
-        "//source/common/stats:timespan_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "conn_manager_config_interface",
     hdrs = ["conn_manager_config.h"],
     deps = [
@@ -155,6 +144,7 @@ envoy_cc_library(
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/router:rds_interface",
         "//source/common/network:utility_lib",
+        "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
@@ -178,6 +168,7 @@ envoy_cc_library(
         ":header_utility_lib",
         ":headers_lib",
         ":path_utility_lib",
+        ":status_lib",
         ":user_agent_lib",
         ":utility_lib",
         "//include/envoy/access_log:access_log_interface",
@@ -327,6 +318,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//include/envoy/stats:timespan_interface",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 
@@ -422,5 +414,6 @@ envoy_cc_library(
     ],
     deps = [
         "//include/envoy/http:codes_interface",
+        "//source/common/common:assert_lib",
     ],
 )
