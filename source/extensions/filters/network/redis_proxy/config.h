@@ -30,10 +30,6 @@ public:
     return Config::DataSource::read(auth_password_, true, api);
   }
 
-  const envoy::config::core::v3::DataSource& auth_password_datasource() const {
-    return auth_password_;
-  }
-
   static const std::string auth_password(const Upstream::ClusterInfoConstSharedPtr info,
                                          Api::Api& api) {
     auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
