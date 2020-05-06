@@ -147,10 +147,11 @@ private:
     const Http::RequestHeaderMap* downstreamHeaders() const override {
       return wrapped_->downstreamHeaders();
     }
-    const HealthyAndDegradedLoad&
-    determinePriorityLoad(const PrioritySet& priority_set,
-                          const HealthyAndDegradedLoad& original_priority_load) override {
-      return wrapped_->determinePriorityLoad(priority_set, original_priority_load);
+    const HealthyAndDegradedLoad& determinePriorityLoad(
+        const PrioritySet& priority_set, const HealthyAndDegradedLoad& original_priority_load,
+        const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) override {
+      return wrapped_->determinePriorityLoad(priority_set, original_priority_load,
+                                             priority_mapping_func);
     }
     bool shouldSelectAnotherHost(const Host& host) override {
       return wrapped_->shouldSelectAnotherHost(host);
