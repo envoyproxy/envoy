@@ -42,7 +42,7 @@ void UberFilterFuzzer::decode(Http::StreamDecoderFilter* filter, const test::fuz
     headers.setHost("foo.com");
   }
 
-  if (data.data().empty() && !data.has_trailers()) {
+  if (data.body_case() == test::fuzz::HttpData::BODY_NOT_SET && !data.has_trailers()) {
     end_stream = true;
   }
   ENVOY_LOG_MISC(debug, "Decoding headers: {} ", data.headers().DebugString());
@@ -52,14 +52,30 @@ void UberFilterFuzzer::decode(Http::StreamDecoderFilter* filter, const test::fuz
     return;
   }
 
-  for (int i = 0; i < data.data().size(); i++) {
-    if (i == data.data().size() - 1 && !data.has_trailers()) {
-      end_stream = true;
+  if (data.has_http_body()) {
+    for (int i = 0; i < data.http_body().data_size(); i++) {
+      if (i == data.http_body().data_size() - 1 && !data.has_trailers()) {
+        end_stream = true;
+      }
+      Buffer::OwnedImpl buffer(data.http_body().data(i));
+      ENVOY_LOG_MISC(debug, "Decoding http data: {} ", buffer.toString());
+      if (filter->decodeData(buffer, end_stream) != Http::FilterDataStatus::Continue) {
+        return;
+      }
     }
-    Buffer::OwnedImpl buffer(data.data().Get(i));
-    ENVOY_LOG_MISC(debug, "Decoding data: {} ", buffer.toString());
-    if (filter->decodeData(buffer, end_stream) != Http::FilterDataStatus::Continue) {
-      return;
+  } else if (data.has_proto_body()) {
+    const std::string serialized = data.proto_body().message().SerializeAsString();
+    const std::vector<std::string> serialized_chunks = absl::StrSplit(serialized, absl::ByLength(data.proto_body().chuck_size()));
+
+    for (size_t i = 0; i < serialized_chunks.size(); i++) {
+      if (!data.has_trailers() && i == serialized_chunks.size() - 1) {
+        end_stream = true;
+      }
+      Buffer::OwnedImpl buffer(serialized_chunks[i]);
+      ENVOY_LOG_MISC(debug, "Decoding proto http data: {} ", buffer.toString());
+      if (filter->decodeData(buffer, end_stream) != Http::FilterDataStatus::Continue) {
+        return;
+      }
     }
   }
 
