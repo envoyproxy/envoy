@@ -13,13 +13,13 @@ use(
       "(api/envoy[\w/]*/(v1alpha\d?|v1|v2alpha\d?|v2))|(api/envoy/type/(matcher/)?\w+.proto)",
       "label": "v2-freeze",
       "allow_global_approval": False,
-      "github_status_label": "v2 APIs",
+      "github_status_label": "v2 freeze violating API changes",
     },
     {
       "owner": "envoyproxy/api-shepherds!",
       "path": "api/",
       "label": "api",
-      "github_status_label": "APIs",
+      "github_status_label": "any API change",
     },
     {
       "owner": "envoyproxy/api-watchers",
