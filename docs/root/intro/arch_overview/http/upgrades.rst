@@ -95,7 +95,7 @@ upgrade requests or responses with bodies.
 .. proxy multiplexed TCP over pre-warmed secure connections and amortize the cost of any TLS handshake.
 .. An example set up proxying SMTP would look something like this
 ..
-.. [SMTP Upstream] --- raw STMP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2  --- [L1 Envoy]  --- SMTP  --- [Client]
+.. [SMTP Upstream] --- raw SMTP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2  --- [L1 Envoy]  --- raw SMTP  --- [Client]
 ..
 .. Examples of such a set up can be found in the Envoy example config `directory <https://github.com/envoyproxy/envoy/tree/master/configs/>`
 .. If you run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_connect.yaml --base-id 1`
