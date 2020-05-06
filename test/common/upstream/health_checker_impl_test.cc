@@ -568,6 +568,7 @@ public:
   void expectClientCreate(size_t index, const HostWithHealthCheckMap& health_check_map) {
     TestSession& test_session = *test_sessions_[index];
     test_session.codec_ = new NiceMock<Http::MockClientConnection>();
+    ON_CALL(*test_session.codec_, protocol()).WillByDefault(Return(Http::Protocol::Http11));
     test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
     connection_index_.push_back(index);
     codec_index_.push_back(index);
@@ -625,7 +626,7 @@ public:
                                 service_cluster.value());
     }
     if (conn_close) {
-      response_headers->addCopy("connection", "close");
+      response_headers->addCopy("connection", "foo,close");
     }
     if (proxy_close) {
       response_headers->addCopy("proxy-connection", "close");

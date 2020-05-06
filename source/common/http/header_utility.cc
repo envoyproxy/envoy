@@ -191,18 +191,18 @@ HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
 }
 
 bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
-                                          const RequestHeaderMap& request_headers) {
+                                          const RequestOrResponseHeaderMap& headers) {
   // HTTP/1.0 defaults to single-use connections. Make sure the connection will be closed unless
   // Keep-Alive is present.
   if (protocol == Protocol::Http10 &&
-      (!request_headers.Connection() ||
-       !Envoy::StringUtil::caseFindToken(request_headers.Connection()->value().getStringView(), ",",
+      (!headers.Connection() ||
+       !Envoy::StringUtil::caseFindToken(headers.Connection()->value().getStringView(), ",",
                                          Http::Headers::get().ConnectionValues.KeepAlive))) {
     return true;
   }
 
-  if (protocol == Protocol::Http11 && request_headers.Connection() &&
-      Envoy::StringUtil::caseFindToken(request_headers.Connection()->value().getStringView(), ",",
+  if (protocol == Protocol::Http11 && headers.Connection() &&
+      Envoy::StringUtil::caseFindToken(headers.Connection()->value().getStringView(), ",",
                                        Http::Headers::get().ConnectionValues.Close)) {
     return true;
   }
@@ -210,9 +210,9 @@ bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
   // Note: Proxy-Connection is not a standard header, but is supported here
   // since it is supported by http-parser the underlying parser for http
   // requests.
-  if (protocol < Protocol::Http2 && request_headers.ProxyConnection() &&
-      Envoy::StringUtil::caseFindToken(request_headers.ProxyConnection()->value().getStringView(),
-                                       ",", Http::Headers::get().ConnectionValues.Close)) {
+  if (protocol < Protocol::Http2 && headers.ProxyConnection() &&
+      Envoy::StringUtil::caseFindToken(headers.ProxyConnection()->value().getStringView(), ",",
+                                       Http::Headers::get().ConnectionValues.Close)) {
     return true;
   }
   return false;

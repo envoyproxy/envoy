@@ -139,12 +139,13 @@ public:
 
   /**
    * Determines if the response should be framed by Connection: Close based on protocol
-   * and request headers.
+   * and headers.
    * @param protocol the protocol of the request
-   * @param headers the request headers
+   * @param headers the request or response headers
    * @return if the response should be framed by Connection: Close
    */
-  static bool shouldCloseConnection(Http::Protocol protocol, const RequestHeaderMap& headers);
+  static bool shouldCloseConnection(Http::Protocol protocol,
+                                    const RequestOrResponseHeaderMap& headers);
 };
 } // namespace Http
 } // namespace Envoy

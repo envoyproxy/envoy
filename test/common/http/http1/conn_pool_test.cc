@@ -719,10 +719,11 @@ TEST_F(Http1ConnPoolImplTest, ProxyConnectionCloseHeader) {
   callbacks.outer_encoder_->encodeHeaders(
       TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
 
-  // Response with 'proxy-connection: close' which should cause the connection to go away.
+  // Response with 'proxy-connection: close' which should cause the connection to go away, even if
+  // there are other tokens in that header.
   EXPECT_CALL(conn_pool_, onClientDestroy());
   ResponseHeaderMapPtr response_headers(
-      new TestResponseHeaderMapImpl{{":status", "200"}, {"Proxy-Connection", "Close"}});
+      new TestResponseHeaderMapImpl{{":status", "200"}, {"Proxy-Connection", "Close, foo"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 

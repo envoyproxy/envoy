@@ -779,15 +779,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   // Both saw_connection_close_ and is_head_request_ affect local replies: set
   // them as early as possible.
-  Protocol protocol = connection_manager_.codec_->protocol();
-  bool fixed_connection_close =
+  const Protocol protocol = connection_manager_.codec_->protocol();
+  const bool fixed_connection_close =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close");
   if (fixed_connection_close) {
     state_.saw_connection_close_ =
         HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
   }
-  if (Http::Headers::get().MethodValues.Head ==
-      request_headers_->Method()->value().getStringView()) {
+  if (request_headers_->Method() && Http::Headers::get().MethodValues.Head ==
+                                        request_headers_->Method()->value().getStringView()) {
     state_.is_head_request_ = true;
   }
 
