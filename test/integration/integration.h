@@ -208,13 +208,11 @@ public:
                                     const std::vector<std::string>& port_names,
                                     bool allow_unknown_static_fields,
                                     bool reject_unknown_dynamic_fields,
-                                    bool ignore_unknown_dynamic_fields,
-                                    bool allow_lds_rejection);
+                                    bool ignore_unknown_dynamic_fields, bool allow_lds_rejection);
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                            const std::vector<std::string>& port_names,
                            bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
-                           bool ignore_unknown_dynamic_fields,
-                           bool allow_lds_rejection);
+                           bool ignore_unknown_dynamic_fields, bool allow_lds_rejection);
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 

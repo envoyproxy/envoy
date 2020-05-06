@@ -30,7 +30,7 @@ namespace Upstream {
 
 class EdsSpeedTest {
 public:
-  EdsSpeedTest() : api_(Api::createApiForTest(stats_)) { }
+  EdsSpeedTest() : api_(Api::createApiForTest(stats_)) {}
 
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
@@ -83,9 +83,9 @@ public:
     uint32_t port = 1000;
     for (int i = 0; i < num_hosts; ++i) {
       auto* socket_address = endpoints->add_lb_endpoints()
-                             ->mutable_endpoint()
-                             ->mutable_address()
-                             ->mutable_socket_address();
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
       socket_address->set_address("10.0.1." + std::to_string(i / 60000));
       socket_address->set_port_value((port + i) % 60000);
     }

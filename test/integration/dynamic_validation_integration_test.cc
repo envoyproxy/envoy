@@ -87,8 +87,8 @@ private:
 
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, DynamicValidationIntegrationTest,
-    testing::Combine(
-        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool(), testing::Bool()),
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool(),
+                     testing::Bool()),
     dynamicValidationTestParamsToString);
 
 // Protocol options in CDS with unknown fields are rejected if and only if strict.

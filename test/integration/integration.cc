@@ -459,8 +459,8 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
   test_server_ = IntegrationTestServer::create(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
       timeSystem(), *api_, defer_listener_finalization_, process_object_,
-      allow_unknown_static_fields, reject_unknown_dynamic_fields,
-      ignore_unknown_dynamic_fields, concurrency_);
+      allow_unknown_static_fields, reject_unknown_dynamic_fields, ignore_unknown_dynamic_fields,
+      concurrency_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 

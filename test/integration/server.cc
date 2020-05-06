@@ -33,8 +33,7 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
                                   Network::Address::IpVersion ip_version,
                                   bool allow_unknown_static_fields,
                                   bool reject_unknown_dynamic_fields,
-                                  bool ignore_unknown_dynamic_fields,
-                                  uint32_t concurrency) {
+                                  bool ignore_unknown_dynamic_fields, uint32_t concurrency) {
   OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
 
   test_options.setConfigPath(config_path);
@@ -59,8 +58,7 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     std::function<void()> on_server_init_function, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, bool allow_unknown_static_fields,
-    bool reject_unknown_dynamic_fields, bool ignore_unknown_dynamic_fields,
-    uint32_t concurrency) {
+    bool reject_unknown_dynamic_fields, bool ignore_unknown_dynamic_fields, uint32_t concurrency) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
   if (server_ready_function != nullptr) {
@@ -88,8 +86,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   ProcessObjectOptRef process_object,
                                   bool allow_unknown_static_fields,
                                   bool reject_unknown_dynamic_fields,
-                                  bool ignore_unknown_dynamic_fields,
-                                  uint32_t concurrency) {
+                                  bool ignore_unknown_dynamic_fields, uint32_t concurrency) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_ = api_.threadFactory().createThread(
@@ -175,11 +172,9 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
                                           bool reject_unknown_dynamic_fields,
                                           bool ignore_unknown_dynamic_fields,
                                           uint32_t concurrency) {
-  OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version,
-                                                    allow_unknown_static_fields,
-                                                    reject_unknown_dynamic_fields,
-                                                    ignore_unknown_dynamic_fields,
-                                                    concurrency));
+  OptionsImpl options(Server::createTestOptionsImpl(
+      config_path_, "", version, allow_unknown_static_fields, reject_unknown_dynamic_fields,
+      ignore_unknown_dynamic_fields, concurrency));
   Thread::MutexBasicLockable lock;
 
   Runtime::RandomGeneratorPtr random_generator;
