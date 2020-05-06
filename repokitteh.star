@@ -12,6 +12,10 @@ use(
       "path": "api/",
       "label": "api",
     },
+    {
+      "owner": "envoyproxy/api-watchers",
+      "path": "api/",
+    },
   ],
 )
 

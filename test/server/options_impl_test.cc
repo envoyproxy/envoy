@@ -27,6 +27,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -46,6 +47,11 @@ public:
     std::vector<std::string> words = TestUtility::split(args, ' ');
     return std::make_unique<OptionsImpl>(
         std::move(words), [](bool) { return "1"; }, spdlog::level::warn);
+  }
+
+  std::unique_ptr<OptionsImpl> createOptionsImpl(std::vector<std::string> args) {
+    return std::make_unique<OptionsImpl>(
+        std::move(args), [](bool) { return "1"; }, spdlog::level::warn);
   }
 };
 
@@ -89,7 +95,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(1U, options->restartEpoch());
   EXPECT_EQ(spdlog::level::info, options->logLevel());
   EXPECT_EQ(2, options->componentLogLevels().size());
-  EXPECT_EQ("[%v]", options->logFormat());
+  EXPECT_EQ("[[%g:%#] %v]", options->logFormat());
   EXPECT_EQ("/foo/bar", options->logPath());
   EXPECT_EQ("cluster", options->serviceClusterName());
   EXPECT_EQ("node", options->serviceNodeName());
@@ -255,7 +261,8 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // 4. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
   // 5. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
   // 6. hot restart version - print the hot restart version and exit.
-  EXPECT_EQ(options->count() - 6, command_line_options->GetDescriptor()->field_count());
+  // 7. log-format-prefix-with-location - short-term override for rollout of dynamic log format.
+  EXPECT_EQ(options->count() - 7, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, OptionsFromArgv) {
@@ -400,6 +407,30 @@ TEST_F(OptionsImplTest, SetCpusetOnly) {
   EXPECT_NE(options->concurrency(), 0);
 }
 
+TEST_F(OptionsImplTest, LogFormatDefault) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl({"envoy", "-c", "hello"});
+  EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
+}
+
+TEST_F(OptionsImplTest, LogFormatDefaultNoPrefix) {
+  std::unique_ptr<OptionsImpl> options =
+      createOptionsImpl({"envoy", "-c", "hello", "--log-format-prefix-with-location", "0"});
+  EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] %v");
+}
+
+TEST_F(OptionsImplTest, LogFormatOverride) {
+  std::unique_ptr<OptionsImpl> options =
+      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
+  EXPECT_EQ(options->logFormat(), "%%v [%g:%#] %v %t [%g:%#] %v");
+}
+
+TEST_F(OptionsImplTest, LogFormatOverrideNoPrefix) {
+  std::unique_ptr<OptionsImpl> options =
+      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v",
+                         "--log-format-prefix-with-location 0"});
+  EXPECT_EQ(options->logFormat(), "%%v %v %t %v");
+}
+
 #if defined(__linux__)
 
 using testing::DoAll;
@@ -486,7 +517,7 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
 
 class TestFactory : public Config::TypedFactory {
 public:
-  virtual ~TestFactory() = default;
+  ~TestFactory() override = default;
   std::string category() const override { return "test"; }
   std::string configType() override { return "google.protobuf.StringValue"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -501,7 +532,7 @@ public:
 
 class TestingFactory : public Config::TypedFactory {
 public:
-  virtual ~TestingFactory() = default;
+  ~TestingFactory() override = default;
   std::string category() const override { return "testing"; }
   std::string configType() override { return "google.protobuf.StringValue"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -514,10 +545,16 @@ public:
   std::string name() const override { return "test"; }
 };
 
-REGISTER_FACTORY(TestTestFactory, TestFactory){"test-1", "test-2"};
-REGISTER_FACTORY(TestTestingFactory, TestingFactory){"test-1", "test-2"};
-
 TEST(DisableExtensions, DEPRECATED_FEATURE_TEST(IsDisabled)) {
+  TestTestFactory testTestFactory;
+  Registry::InjectFactoryCategory<TestFactory> testTestCategory(testTestFactory);
+  Registry::InjectFactory<TestFactory> testTestRegistration(testTestFactory, {"test-1", "test-2"});
+
+  TestTestingFactory testTestingFactory;
+  Registry::InjectFactoryCategory<TestingFactory> testTestingCategory(testTestingFactory);
+  Registry::InjectFactory<TestingFactory> testTestingRegistration(testTestingFactory,
+                                                                  {"test-1", "test-2"});
+
   EXPECT_LOG_CONTAINS("warning", "failed to disable invalid extension name 'not.a.factory'",
                       OptionsImpl::disableExtensions({"not.a.factory"}));
 
@@ -535,6 +572,10 @@ TEST(DisableExtensions, DEPRECATED_FEATURE_TEST(IsDisabled)) {
   EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
 
   OptionsImpl::disableExtensions({"test/test", "testing/test-2"});
+
+  // Simulate the initial construction of the type mappings.
+  testTestRegistration.resetTypeMappings();
+  testTestingRegistration.resetTypeMappings();
 
   // When we disable an extension, all its aliases should also be disabled.
   EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test"), nullptr);

@@ -1,5 +1,6 @@
 #include "extensions/filters/http/lua/lua_filter.h"
 
+#include <atomic>
 #include <memory>
 
 #include "envoy/http/codes.h"
@@ -16,6 +17,57 @@ namespace HttpFilters {
 namespace Lua {
 
 namespace {
+
+const std::string DEPRECATED_LUA_NAME = "envoy.lua";
+
+std::atomic<bool>& deprecatedNameLogged() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<bool>, false);
+}
+
+// Checks if deprecated metadata names are allowed. On the first check only it will log either
+// a warning (indicating the name should be updated) or an error (the feature is off and the
+// name is not allowed). When warning, the deprecated feature stat is incremented. Subsequent
+// checks do not log since this check is done in potentially high-volume request paths.
+bool allowDeprecatedMetadataName() {
+  if (!deprecatedNameLogged().exchange(true)) {
+    // Have not logged yet, so use the logging test.
+    return Extensions::Common::Utility::ExtensionNameUtil::allowDeprecatedExtensionName(
+        "http filter", DEPRECATED_LUA_NAME, Extensions::HttpFilters::HttpFilterNames::get().Lua);
+  }
+
+  // We have logged (or another thread will do so momentarily), so just check whether the
+  // deprecated name is allowed.
+  auto status = Extensions::Common::Utility::ExtensionNameUtil::deprecatedExtensionNameStatus();
+  return status == Extensions::Common::Utility::ExtensionNameUtil::Status::Warn;
+}
+
+const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
+  if (callbacks->route() == nullptr || callbacks->route()->routeEntry() == nullptr) {
+    return ProtobufWkt::Struct::default_instance();
+  }
+  const auto& metadata = callbacks->route()->routeEntry()->metadata();
+
+  {
+    const auto& filter_it = metadata.filter_metadata().find(HttpFilterNames::get().Lua);
+    if (filter_it != metadata.filter_metadata().end()) {
+      return filter_it->second;
+    }
+  }
+
+  // TODO(zuercher): Remove this block when deprecated filter names are removed.
+  {
+    const auto& filter_it = metadata.filter_metadata().find(DEPRECATED_LUA_NAME);
+    if (filter_it != metadata.filter_metadata().end()) {
+      // Use the non-throwing check here because this happens at request time.
+      if (allowDeprecatedMetadataName()) {
+        return filter_it->second;
+      }
+    }
+  }
+
+  return ProtobufWkt::Struct::default_instance();
+}
+
 // Okay to return non-const reference because this doesn't ever get changed.
 NoopCallbacks& noopCallbacks() {
   static NoopCallbacks* callbacks = new NoopCallbacks();
@@ -243,7 +295,8 @@ int StreamHandleWrapper::luaHttpCallAsynchronous(lua_State* state) {
   return 0;
 }
 
-void StreamHandleWrapper::onSuccess(Http::ResponseMessagePtr&& response) {
+void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
+                                    Http::ResponseMessagePtr&& response) {
   ASSERT(state_ == State::HttpCall || state_ == State::Running);
   ENVOY_LOG(debug, "async HTTP response complete");
   http_request_ = nullptr;
@@ -289,7 +342,8 @@ void StreamHandleWrapper::onSuccess(Http::ResponseMessagePtr&& response) {
   }
 }
 
-void StreamHandleWrapper::onFailure(Http::AsyncClient::FailureReason) {
+void StreamHandleWrapper::onFailure(const Http::AsyncClient::Request& request,
+                                    Http::AsyncClient::FailureReason) {
   ASSERT(state_ == State::HttpCall || state_ == State::Running);
   ENVOY_LOG(debug, "async HTTP failure");
 
@@ -299,7 +353,7 @@ void StreamHandleWrapper::onFailure(Http::AsyncClient::FailureReason) {
           {{Http::Headers::get().Status,
             std::to_string(enumToInt(Http::Code::ServiceUnavailable))}})));
   response_message->body() = std::make_unique<Buffer::OwnedImpl>("upstream failure");
-  onSuccess(std::move(response_message));
+  onSuccess(request, std::move(response_message));
 }
 
 int StreamHandleWrapper::luaHeaders(lua_State* state) {
@@ -646,11 +700,19 @@ void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buf
   }
 }
 
+const ProtobufWkt::Struct& Filter::DecoderCallbacks::metadata() const {
+  return getMetadata(callbacks_);
+}
+
 void Filter::EncoderCallbacks::respond(Http::ResponseHeaderMapPtr&&, Buffer::Instance*,
                                        lua_State* state) {
   // TODO(mattklein123): Support response in response path if nothing has been continued
   // yet.
   luaL_error(state, "respond not currently supported in the response path");
+}
+
+const ProtobufWkt::Struct& Filter::EncoderCallbacks::metadata() const {
+  return getMetadata(callbacks_);
 }
 
 } // namespace Lua

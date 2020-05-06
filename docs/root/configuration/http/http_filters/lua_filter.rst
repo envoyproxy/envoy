@@ -17,6 +17,12 @@ and response flows. `LuaJIT <https://luajit.org/>`_ is used as the runtime. Beca
 supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT documentation
 <https://luajit.org/extensions.html>`_ for more details.
 
+.. note::
+
+  `moonjit <https://github.com/moonjit/moonjit/>`_ is a continuation of LuaJIT development, which
+  supports more 5.2 features and additional architectures. Envoy can be built with moonjit support
+  by using the following bazel option: ``--//source/extensions/filters/common/lua:moonjit=1``.
+
 The filter only supports loading Lua code in-line in the configuration. If local filesystem code
 is desired, a trivial in-line script can be used to load the rest of the code from the local
 environment.
@@ -29,7 +35,7 @@ The design of the filter and Lua support at a high level is as follows:
 * All scripts are run as coroutines. This means that they are written in a synchronous style even
   though they may perform complex asynchronous tasks. This makes the scripts substantially easier
   to write. All network/async processing is performed by Envoy via a set of APIs. Envoy will
-  yield the script as appropriate and resume it when async tasks are complete.
+  suspend execution of the script as appropriate and resume it when async tasks are complete.
 * **Do not perform blocking operations from scripts.** It is critical for performance that
   Envoy APIs are used for all IO.
 
@@ -54,7 +60,7 @@ API.
 Configuration
 -------------
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.lua.v2.Lua>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`
 * This filter should be configured with the name *envoy.filters.http.lua*.
 
 Script examples
@@ -145,8 +151,9 @@ script defines:
   end
 
 A script can define either or both of these functions. During the request path, Envoy will
-run *envoy_on_request* as a coroutine, passing an API handle. During the response path, Envoy will
-run *envoy_on_response* as a coroutine, passing an API handle.
+run *envoy_on_request* as a coroutine, passing a handle to the request API. During the
+response path, Envoy will run *envoy_on_response* as a coroutine, passing handle to the
+response API.
 
 .. attention::
 
@@ -161,7 +168,7 @@ headers()
 
 .. code-block:: lua
 
-  headers = handle:headers()
+  local headers = handle:headers()
 
 Returns the stream's headers. The headers can be modified as long as they have not been sent to
 the next filter in the header chain. For example, they can be modified after an *httpCall()* or
@@ -175,11 +182,12 @@ body()
 
 .. code-block:: lua
 
-  body = handle:body()
+  local body = handle:body()
 
-Returns the stream's body. This call will cause Envoy to yield the script until the entire body
-has been buffered. Note that all buffering must adhere to the flow control policies in place.
-Envoy will not buffer more data than is allowed by the connection manager.
+Returns the stream's body. This call will cause Envoy to suspend execution of the script until
+the entire body has been received in a buffer. Note that all buffering must adhere to the
+flow-control policies in place. Envoy will not buffer more data than is allowed by the connection
+manager.
 
 Returns a :ref:`buffer object <config_http_filters_lua_buffer_wrapper>`.
 
@@ -188,11 +196,11 @@ bodyChunks()
 
 .. code-block:: lua
 
-  iterator = handle:bodyChunks()
+  local iterator = handle:bodyChunks()
 
 Returns an iterator that can be used to iterate through all received body chunks as they arrive.
-Envoy will yield the script in between chunks, but *will not buffer* them. This can be used by
-a script to inspect data as it is streaming by.
+Envoy will suspend executing the script in between chunks, but *will not buffer* them. This can be
+used by a script to inspect data as it is streaming by.
 
 .. code-block:: lua
 
@@ -207,7 +215,7 @@ trailers()
 
 .. code-block:: lua
 
-  trailers = handle:trailers()
+  local trailers = handle:trailers()
 
 Returns the stream's trailers. May return nil if there are no trailers. The trailers may be
 modified before they are sent to the next filter.
@@ -233,7 +241,7 @@ httpCall()
 
 .. code-block:: lua
 
-  headers, body = handle:httpCall(cluster, headers, body, timeout, asynchronous)
+  local headers, body = handle:httpCall(cluster, headers, body, timeout, asynchronous)
 
 Makes an HTTP call to an upstream host. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
 is a table of key/value pairs to send (the value can be a string or table of strings). Note that
@@ -241,7 +249,7 @@ the *:method*, *:path*, and *:authority* headers must be set. *body* is an optio
 data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
 
 *asynchronous* is a boolean flag. If asynchronous is set to true, Envoy will make the HTTP request and continue,
-regardless of response success or failure. If this is set to false, or not set, Envoy will yield the script
+regardless of response success or failure. If this is set to false, or not set, Envoy will suspend executing the script
 until the call completes or has an error.
 
 Returns *headers* which is a table of response headers. Returns *body* which is the string response
@@ -277,11 +285,11 @@ metadata()
 
 .. code-block:: lua
 
-  metadata = handle:metadata()
+  local metadata = handle:metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
 under the filter name i.e. *envoy.filters.http.lua*. Below is an example of a *metadata* in a
-:ref:`route entry <envoy_api_msg_route.Route>`.
+:ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
 
 .. code-block:: yaml
 
@@ -300,7 +308,7 @@ streamInfo()
 
 .. code-block:: lua
 
-  streamInfo = handle:streamInfo()
+  local streamInfo = handle:streamInfo()
 
 Returns :repo:`information <include/envoy/stream_info/stream_info.h>` related to the current request.
 
@@ -311,7 +319,7 @@ connection()
 
 .. code-block:: lua
 
-  connection = handle:connection()
+  local connection = handle:connection()
 
 Returns the current request's underlying :repo:`connection <include/envoy/network/connection.h>`.
 
@@ -322,7 +330,7 @@ importPublicKey()
 
 .. code-block:: lua
 
-  pubkey = handle:importPublicKey(keyder, keyderLength)
+  local pubkey = handle:importPublicKey(keyder, keyderLength)
 
 Returns public key which is used by :ref:`verifySignature <verify_signature>` to verify digital signature.
 
@@ -333,7 +341,7 @@ verifySignature()
 
 .. code-block:: lua
 
-  ok, error = verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
+  local ok, error = verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
 
 Verify signature using provided parameters. *hashFunction* is the variable for hash function which be used
 for verifying signature. *SHA1*, *SHA224*, *SHA256*, *SHA384* and *SHA512* are supported.
@@ -414,7 +422,7 @@ length()
 
 .. code-block:: lua
 
-  size = buffer:length()
+  local size = buffer:length()
 
 Gets the size of the buffer in bytes. Returns an integer.
 
@@ -516,7 +524,7 @@ its keys can only be *string* or *numeric*.
   function envoy_on_request(request_handle)
     local headers = request_handle:headers()
     request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.lua", "request.info", {
-      auth: headers:get("authorization),
+      auth: headers:get("authorization"),
       token: headers:get("x-request-token"),
     })
   end

@@ -84,7 +84,7 @@ public:
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&mock_dispatcher_);
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-    test_client.client_dispatcher_ = api_->allocateDispatcher();
+    test_client.client_dispatcher_ = api_->allocateDispatcher("test_thread");
     Network::ClientConnectionPtr connection{test_client.connection_};
     test_client.codec_client_ = new CodecClientForTest(
         CodecClient::Type::HTTP1, std::move(connection), test_client.codec_,
@@ -357,6 +357,7 @@ TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
   EXPECT_CALL(callbacks2.pool_failure_, ready());
   Http::ConnectionPool::Cancellable* handle2 = conn_pool_.newStream(outer_decoder2, callbacks2);
   EXPECT_EQ(nullptr, handle2);
+  EXPECT_EQ(callbacks2.reason_, ConnectionPool::PoolFailureReason::Overflow);
 
   EXPECT_EQ(1U, cluster_->circuit_breakers_stats_.rq_pending_open_.value());
 
@@ -413,13 +414,13 @@ TEST_F(Http1ConnPoolImplTest, MeasureConnectTime) {
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::Pending);
 
   // Move time forward and start the second connect attempt.
-  simulated_time.sleep(std::chrono::milliseconds(sleep1_ms));
+  simulated_time.advanceTimeWait(std::chrono::milliseconds(sleep1_ms));
   conn_pool_.expectClientCreate();
   ActiveTestRequest r2(*this, 1, ActiveTestRequest::Type::Pending);
 
   // Move time forward, signal that the first connect completed and verify the time to connect.
   uint64_t upstream_cx_connect_ms1 = 0;
-  simulated_time.sleep(std::chrono::milliseconds(sleep2_ms));
+  simulated_time.advanceTimeWait(std::chrono::milliseconds(sleep2_ms));
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _))
       .WillOnce(SaveArg<1>(&upstream_cx_connect_ms1));
@@ -430,7 +431,7 @@ TEST_F(Http1ConnPoolImplTest, MeasureConnectTime) {
 
   // Move time forward, signal that the second connect completed and verify the time to connect.
   uint64_t upstream_cx_connect_ms2 = 0;
-  simulated_time.sleep(std::chrono::milliseconds(sleep3_ms));
+  simulated_time.advanceTimeWait(std::chrono::milliseconds(sleep3_ms));
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _))
       .WillOnce(SaveArg<1>(&upstream_cx_connect_ms2));
@@ -900,9 +901,10 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
 
   Buffer::OwnedImpl empty_data;
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, dispatch(BufferEqual(&empty_data)))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         // Simulate the onResponseComplete call to decodeData since dispatch is mocked out.
         inner_decoder->decodeData(data, true);
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(*conn_pool_.test_clients_[0].connection_,

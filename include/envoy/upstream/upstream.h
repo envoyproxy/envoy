@@ -107,9 +107,10 @@ public:
    * connection.
    * @return the connection data.
    */
-  virtual CreateConnectionData createHealthCheckConnection(
-      Event::Dispatcher& dispatcher,
-      Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
+  virtual CreateConnectionData
+  createHealthCheckConnection(Event::Dispatcher& dispatcher,
+                              Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                              const envoy::config::core::v3::Metadata* metadata) const PURE;
 
   /**
    * @return host specific gauges.
@@ -570,11 +571,13 @@ public:
   COUNTER(upstream_rq_cancelled)                                                                   \
   COUNTER(upstream_rq_completed)                                                                   \
   COUNTER(upstream_rq_maintenance_mode)                                                            \
+  COUNTER(upstream_rq_max_duration_reached)                                                        \
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
   COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_rx_reset)                                                                    \
@@ -720,10 +723,17 @@ public:
   virtual const Http::Http1Settings& http1Settings() const PURE;
 
   /**
-   * @return const Http::Http2Settings& for HTTP/2 connections created on behalf of this cluster.
-   *         @see Http::Http2Settings.
+   * @return const envoy::config::core::v3::Http2ProtocolOptions& for HTTP/2 connections
+   * created on behalf of this cluster.
+   *         @see envoy::config::core::v3::Http2ProtocolOptions.
    */
-  virtual const Http::Http2Settings& http2Settings() const PURE;
+  virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::HttpProtocolOptions for all of HTTP versions.
+   */
+  virtual const envoy::config::core::v3::HttpProtocolOptions&
+  commonHttpProtocolOptions() const PURE;
 
   /**
    * @param name std::string containing the well-known name of the extension for which protocol

@@ -30,6 +30,8 @@ const Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
     AsyncStreamImpl::RouteEntryImpl::typed_metadata_({});
 const AsyncStreamImpl::NullPathMatchCriterion
     AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
+const absl::optional<envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig>
+    AsyncStreamImpl::RouteEntryImpl::connect_config_nullopt_;
 const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
@@ -133,7 +135,7 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
     is_head_request_ = true;
   }
 
-  is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+  is_grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
   headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {
     Utility::appendXff(headers, *parent_.config_.local_info_.address());
@@ -248,9 +250,11 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
   } else {
     child_span_ = std::make_unique<Tracing::NullSpan>();
   }
+  child_span_->setSampled(options.sampled_);
 }
 
 void AsyncRequestImpl::initialize() {
+  child_span_->injectContext(request_->headers());
   sendHeaders(request_->headers(), !request_->body());
   if (request_->body()) {
     // It's possible this will be a no-op due to a local response synchronously generated in
@@ -265,7 +269,7 @@ void AsyncRequestImpl::onComplete() {
                                                    response_->trailers(), streamInfo(),
                                                    Tracing::EgressConfig::get());
 
-  callbacks_.onSuccess(std::move(response_));
+  callbacks_.onSuccess(*this, std::move(response_));
 }
 
 void AsyncRequestImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
@@ -300,7 +304,7 @@ void AsyncRequestImpl::onReset() {
 
   if (!cancelled_) {
     // In this case we don't have a valid response so we do need to raise a failure.
-    callbacks_.onFailure(AsyncClient::FailureReason::Reset);
+    callbacks_.onFailure(*this, AsyncClient::FailureReason::Reset);
   }
 }
 

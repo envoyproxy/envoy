@@ -95,7 +95,7 @@ public:
   void incRefCount(const StatName&) override {}
   StoragePtr encode(absl::string_view name) override { return encodeHelper(name); }
   StoragePtr makeDynamicStorage(absl::string_view name) override { return encodeHelper(name); }
-  SymbolTable::StoragePtr join(const std::vector<StatName>& names) const override {
+  SymbolTable::StoragePtr join(const StatNameVec& names) const override {
     std::vector<absl::string_view> strings;
     for (StatName name : names) {
       if (!name.empty()) {
@@ -122,6 +122,7 @@ public:
   void clearRecentLookups() override {}
   void setRecentLookupCapacity(uint64_t) override {}
   uint64_t recentLookupCapacity() const override { return 0; }
+  DynamicSpans getDynamicSpans(StatName) const override { return DynamicSpans(); }
 
 private:
   absl::string_view toStringView(const StatName& stat_name) const {

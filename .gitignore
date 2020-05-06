@@ -28,6 +28,8 @@ TAGS
 .vimrc
 .vs
 .vscode
+clang-tidy-fixes.yaml
+.gdb_history
 clang.bazelrc
 user.bazelrc
 CMakeLists.txt

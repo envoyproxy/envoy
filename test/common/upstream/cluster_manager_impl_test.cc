@@ -33,13 +33,16 @@ std::string clustersJson(const std::vector<std::string>& clusters) {
 class ClusterManagerImplTest : public testing::Test {
 public:
   ClusterManagerImplTest()
-      : api_(Api::createApiForTest()), http_context_(factory_.stats_.symbolTable()) {}
+      : api_(Api::createApiForTest()), http_context_(factory_.stats_.symbolTable()),
+        grpc_context_(factory_.stats_.symbolTable()) {}
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *api_, http_context_);
+        *api_, http_context_, grpc_context_);
+    cluster_manager_->setPrimaryClustersInitializedCb(
+        [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -74,7 +77,7 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *api_, local_cluster_update_, local_hosts_removed_, http_context_);
+        *api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -124,6 +127,7 @@ public:
   MockLocalClusterUpdate local_cluster_update_;
   MockLocalHostsRemoved local_hosts_removed_;
   Http::ContextImpl http_context_;
+  Grpc::ContextImpl grpc_context_;
 };
 
 envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
@@ -343,7 +347,7 @@ static_resources:
       ->second.get()
       .info()
       ->statsScope()
-      .counter("foo")
+      .counterFromString("foo")
       .inc();
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster.cluster_name.foo").value());
 }
@@ -2471,7 +2475,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
   // The first update should be applied immediately, because even though it's mergeable
   // it's outside the default merge window of 3 seconds (found in debugger as value of
   // cluster.info()->lbConfig().update_merge_window() in ClusterManagerImpl::scheduleUpdate.
-  time_system_.sleep(std::chrono::seconds(60));
+  time_system_.advanceTimeWait(std::chrono::seconds(60));
   cluster.prioritySet().updateHosts(
       0,
       updateHostsParams(hosts, hosts_per_locality,
@@ -2498,7 +2502,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
   // 3 seconds (found in debugger as value of cluster.info()->lbConfig().update_merge_window()
   // in ClusterManagerImpl::scheduleUpdate. Note that initially the update-time is
   // default-initialized to a monotonic time of 0, as is SimulatedTimeSystem::monotonic_time_.
-  time_system_.sleep(std::chrono::seconds(2));
+  time_system_.advanceTimeWait(std::chrono::seconds(2));
   cluster.prioritySet().updateHosts(
       0,
       updateHostsParams(hosts, hosts_per_locality,
@@ -2827,6 +2831,7 @@ TEST_F(ClusterManagerInitHelperTest, ImmediateInitialize) {
   cluster1.initialize_callback_();
 
   init_helper_.onStaticLoadComplete();
+  init_helper_.startInitializingSecondaryClusters();
 
   ReadyWatcher cm_initialized;
   EXPECT_CALL(cm_initialized, ready());
@@ -2847,8 +2852,10 @@ TEST_F(ClusterManagerInitHelperTest, StaticSdsInitialize) {
   ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
-  EXPECT_CALL(cluster1, initialize(_));
   init_helper_.onStaticLoadComplete();
+
+  EXPECT_CALL(cluster1, initialize(_));
+  init_helper_.startInitializingSecondaryClusters();
 
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
@@ -2861,6 +2868,9 @@ TEST_F(ClusterManagerInitHelperTest, StaticSdsInitialize) {
 TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
   InSequence s;
 
+  ReadyWatcher primary_clusters_initialized;
+  init_helper_.setPrimaryClustersInitializedCb(
+      [&]() -> void { primary_clusters_initialized.ready(); });
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
@@ -2881,8 +2891,11 @@ TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
   init_helper_.removeCluster(cluster1);
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster2)));
-  EXPECT_CALL(cm_initialized, ready());
+  EXPECT_CALL(primary_clusters_initialized, ready());
   cluster2.initialize_callback_();
+
+  EXPECT_CALL(cm_initialized, ready());
+  init_helper_.startInitializingSecondaryClusters();
 }
 
 // If secondary clusters initialization triggered outside of CdsApiImpl::onConfigUpdate()'s
@@ -2892,6 +2905,9 @@ TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
 TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
   InSequence s;
 
+  ReadyWatcher primary_clusters_initialized;
+  init_helper_.setPrimaryClustersInitializedCb(
+      [&]() -> void { primary_clusters_initialized.ready(); });
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
@@ -2899,8 +2915,10 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
   ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
-  EXPECT_CALL(cluster1, initialize(_));
+  EXPECT_CALL(primary_clusters_initialized, ready());
   init_helper_.onStaticLoadComplete();
+  EXPECT_CALL(cluster1, initialize(_));
+  init_helper_.startInitializingSecondaryClusters();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
   EXPECT_CALL(cm_initialized, ready());
@@ -2914,6 +2932,9 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
 TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithEdsPaused) {
   InSequence s;
 
+  ReadyWatcher primary_clusters_initialized;
+  init_helper_.setPrimaryClustersInitializedCb(
+      [&]() -> void { primary_clusters_initialized.ready(); });
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
@@ -2921,8 +2942,11 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithEdsPaused) {
   ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
-  EXPECT_CALL(cluster1, initialize(_));
+  EXPECT_CALL(primary_clusters_initialized, ready());
   init_helper_.onStaticLoadComplete();
+
+  EXPECT_CALL(cluster1, initialize(_));
+  init_helper_.startInitializingSecondaryClusters();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
   EXPECT_CALL(cm_initialized, ready());
@@ -2932,6 +2956,9 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithEdsPaused) {
 TEST_F(ClusterManagerInitHelperTest, AddSecondaryAfterSecondaryInit) {
   InSequence s;
 
+  ReadyWatcher primary_clusters_initialized;
+  init_helper_.setPrimaryClustersInitializedCb(
+      [&]() -> void { primary_clusters_initialized.ready(); });
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
@@ -2947,8 +2974,10 @@ TEST_F(ClusterManagerInitHelperTest, AddSecondaryAfterSecondaryInit) {
   init_helper_.onStaticLoadComplete();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
+  EXPECT_CALL(primary_clusters_initialized, ready());
   EXPECT_CALL(cluster2, initialize(_));
   cluster1.initialize_callback_();
+  init_helper_.startInitializingSecondaryClusters();
 
   NiceMock<MockClusterMockPrioritySet> cluster3;
   ON_CALL(cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
@@ -2970,6 +2999,9 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
   ON_CALL(cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster);
 
+  // onStaticLoadComplete() must not initialize secondary clusters
+  init_helper_.onStaticLoadComplete();
+
   // Set up the scenario seen in Issue 903 where initialize() ultimately results
   // in the removeCluster() call. In the real bug this was a long and complex call
   // chain.
@@ -2977,9 +3009,9 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
     init_helper_.removeCluster(cluster);
   }));
 
-  // Now call onStaticLoadComplete which will exercise maybeFinishInitialize()
+  // Now call initializeSecondaryClusters which will exercise maybeFinishInitialize()
   // which calls initialize() on the members of the secondary init list.
-  init_helper_.onStaticLoadComplete();
+  init_helper_.startInitializingSecondaryClusters();
 }
 
 // Validate that when options are set in the ClusterManager and/or Cluster, we see the socket option

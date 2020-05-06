@@ -38,10 +38,18 @@ public:
 
   /**
    * @param headers the headers to parse.
+   * @return bool indicating whether the header is a gRPC request header.
+   * Currently headers are considered gRPC request headers if they have the gRPC
+   * content type, and have a path header.
+   */
+  static bool isGrpcRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
    * @param bool indicating whether the header is at end_stream.
    * @return bool indicating whether the header is a gRPC response header
    */
-  static bool isGrpcResponseHeader(const Http::ResponseHeaderMap& headers, bool end_stream);
+  static bool isGrpcResponseHeaders(const Http::ResponseHeaderMap& headers, bool end_stream);
 
   /**
    * Returns the GrpcStatus code from a given set of trailers, if present.
@@ -152,6 +160,20 @@ public:
    * @return bool true if the parse was successful.
    */
   static bool parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto);
+
+  struct RequestNames {
+    absl::string_view service_;
+    absl::string_view method_;
+  };
+
+  /**
+   * Resolve the gRPC service and method from the HTTP2 :path header.
+   * @param path supplies the :path header.
+   * @return if both gRPC serve and method have been resolved successfully returns
+   *   a populated RequestNames, otherwise returns an empty optional.
+   * @note The return value is only valid as long as `path` is still valid and unmodified.
+   */
+  static absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path);
 
 private:
   static void checkForHeaderOnlyError(Http::ResponseMessage& http_response);

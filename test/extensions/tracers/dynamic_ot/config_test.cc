@@ -1,5 +1,6 @@
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/dynamic_ot.pb.h"
+#include "envoy/config/trace/v3/dynamic_ot.pb.validate.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 
 #include "extensions/tracers/dynamic_ot/config.h"
 
@@ -45,7 +46,7 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   DynamicOpenTracingTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  const Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, context);
+  const Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, tracer);
 }
 

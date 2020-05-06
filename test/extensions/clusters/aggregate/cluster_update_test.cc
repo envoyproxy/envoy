@@ -31,13 +31,16 @@ envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class AggregateClusterUpdateTest : public testing::Test {
 public:
-  AggregateClusterUpdateTest() : http_context_(stats_store_.symbolTable()) {}
+  AggregateClusterUpdateTest()
+      : http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()) {}
 
   void initialize(const std::string& yaml_config) {
+    auto bootstrap = parseBootstrapFromV2Yaml(yaml_config);
     cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
-        parseBootstrapFromV2Yaml(yaml_config), factory_, factory_.stats_, factory_.tls_,
-        factory_.runtime_, factory_.random_, factory_.local_info_, log_manager_,
-        factory_.dispatcher_, admin_, validation_context_, *api_, http_context_);
+        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
+        *api_, http_context_, grpc_context_);
+    cluster_manager_->initializeSecondaryClusters(bootstrap);
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
     cluster_ = cluster_manager_->get("aggregate_cluster");
   }
@@ -53,6 +56,7 @@ public:
   std::unique_ptr<Upstream::TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   Http::ContextImpl http_context_;
+  Grpc::ContextImpl grpc_context_;
 
   const std::string default_yaml_config_ = R"EOF(
  static_resources:
@@ -255,10 +259,12 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
         - secondary
   )EOF";
 
+  auto bootstrap = parseBootstrapFromV2Yaml(config);
   cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
-      parseBootstrapFromV2Yaml(config), factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
-      factory_.random_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-      validation_context_, *api_, http_context_);
+      bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
+      factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_, *api_,
+      http_context_, grpc_context_);
+  cluster_manager_->initializeSecondaryClusters(bootstrap);
   EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
   cluster_ = cluster_manager_->get("aggregate_cluster");
   auto primary = cluster_manager_->get("primary");

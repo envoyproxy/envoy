@@ -10,6 +10,7 @@
 #include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
 #include "extensions/filters/network/dubbo_proxy/message_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/extensions/filters/network/dubbo_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
@@ -308,7 +309,7 @@ public:
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   DubboFilterStats stats_;
   ConfigDubboProxy proto_config_;
 

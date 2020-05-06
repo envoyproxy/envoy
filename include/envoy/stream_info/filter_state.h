@@ -10,6 +10,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace StreamInfo {
@@ -30,21 +31,16 @@ public:
   //
   // - FilterChain has the shortest life span, which is as long as the filter chain lives.
   //
-  // - DownstreamRequest is longer than FilterChain. When internal redirect is enabled, one
-  //   downstream request may create multiple filter chains. DownstreamRequest allows an object to
-  //   survive across filter chains for bookkeeping needs.
+  // - Request is longer than FilterChain. When internal redirect is enabled, one
+  //   downstream request may create multiple filter chains. Request allows an object to
+  //   survive across filter chains for bookkeeping needs. This is not used for the upstream case.
   //
-  // - DownstreamConnection makes an object survive the entire duration of a downstream connection.
+  // - Connection makes an object survive the entire duration of a connection.
   //   Any stream within this connection can see the same object.
   //
   // Note that order matters in this enum because it's assumed that life span grows as enum number
   // grows.
-  enum LifeSpan {
-    FilterChain,
-    DownstreamRequest,
-    DownstreamConnection,
-    TopSpan = DownstreamConnection
-  };
+  enum LifeSpan { FilterChain, Request, Connection, TopSpan = Connection };
 
   class Object {
   public:
@@ -56,6 +52,13 @@ public:
      * logging. nullptr if the filter state cannot be serialized or serialization is not supported.
      */
     virtual ProtobufTypes::MessagePtr serializeAsProto() const { return nullptr; }
+
+    /**
+     * @return absl::optional<std::string> a optional string to the serialization of the filter
+     * state. No value if the filter state cannot be serialized or serialization is not supported.
+     * This method can be used to get an unstructured serialization result.
+     */
+    virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
   };
 
   virtual ~FilterState() = default;
@@ -65,7 +68,7 @@ public:
    * @param data an owning pointer to the data to be stored.
    * @param state_type indicates whether the object is mutable or not.
    * @param life_span indicates the life span of the object: bound to the filter chain, a
-   * downstream request, or a downstream connection.
+   * request, or a connection.
    *
    * Note that it is an error to call setData() twice with the same
    * data_name, if the existing object is immutable. Similarly, it is an

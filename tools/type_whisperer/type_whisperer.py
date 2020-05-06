@@ -7,6 +7,7 @@ from tools.api_proto_plugin import visitor
 
 from tools.type_whisperer.types_pb2 import Types
 from udpa.annotations import migrate_pb2
+from udpa.annotations import status_pb2
 
 
 class TypeWhispererVisitor(visitor.Visitor):
@@ -25,9 +26,12 @@ class TypeWhispererVisitor(visitor.Visitor):
   def VisitEnum(self, enum_proto, type_context):
     type_desc = self._types.types[type_context.name]
     type_desc.next_version_upgrade = any(v.options.deprecated for v in enum_proto.value)
+    type_desc.deprecated_type = type_context.deprecated
 
   def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
     type_desc = self._types.types[type_context.name]
+    type_desc.map_entry = msg_proto.options.map_entry
+    type_desc.deprecated_type = type_context.deprecated
     type_deps = set([])
     for f in msg_proto.field:
       if f.type_name.startswith('.'):
@@ -37,12 +41,14 @@ class TypeWhispererVisitor(visitor.Visitor):
     type_desc.type_dependencies.extend(type_deps)
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
-    next_version_package = ""
+    next_version_package = ''
     if file_proto.options.HasExtension(migrate_pb2.file_migrate):
       next_version_package = file_proto.options.Extensions[migrate_pb2.file_migrate].move_to_package
     for t in self._types.types.values():
       t.qualified_package = file_proto.package
       t.proto_path = file_proto.name
+      t.active = file_proto.options.Extensions[
+          status_pb2.file_status].package_version_status == status_pb2.ACTIVE
       if next_version_package:
         t.next_version_package = next_version_package
         t.next_version_upgrade = True

@@ -31,6 +31,8 @@ envoy_cc_library(
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
     external_deps = [
+        "abseil_hash",
+        "abseil_node_hash_map",
         "abseil_optional",
         "abseil_synchronization",
         "ssl",
@@ -108,6 +110,7 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",

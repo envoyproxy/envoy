@@ -38,7 +38,7 @@ public:
   MOCK_METHOD(bool, ShouldCreateOutgoingUnidirectionalStream, ());
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
-               quic::StreamSendingState state, bool is_retransmission,
+               quic::StreamSendingState state, quic::TransmissionType type,
                quiche::QuicheOptional<quic::EncryptionLevel> level));
 
   absl::string_view requestedServerName() const override {
@@ -81,7 +81,7 @@ public:
   MOCK_METHOD(bool, ShouldCreateOutgoingUnidirectionalStream, ());
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
-               quic::StreamSendingState state, bool is_retransmission,
+               quic::StreamSendingState state, quic::TransmissionType type,
                quiche::QuicheOptional<quic::EncryptionLevel> level));
 
   absl::string_view requestedServerName() const override {

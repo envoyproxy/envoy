@@ -89,7 +89,9 @@ public:
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
   MOCK_METHOD(uint64_t, features, (), (const));
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
-  MOCK_METHOD(const Http::Http2Settings&, http2Settings, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Http2ProtocolOptions&, http2Options, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::HttpProtocolOptions&, commonHttpProtocolOptions, (),
+              (const));
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
@@ -130,7 +132,8 @@ public:
   std::string name_{"fake_cluster"};
   absl::optional<std::string> eds_service_name_;
   Http::Http1Settings http1_settings_;
-  Http::Http2Settings http2_settings_;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options_;
+  envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   ProtocolOptionsConfigConstSharedPtr extension_protocol_options_;
   uint64_t max_requests_per_connection_{};
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
@@ -158,6 +161,7 @@ public:
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
+  absl::optional<std::chrono::milliseconds> max_stream_duration_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {

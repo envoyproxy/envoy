@@ -361,7 +361,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, UpstreamAsyncHttpCall) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -525,7 +525,7 @@ typed_config:
       local sig = request_handle:headers():get("signature")
       local rawsig = sig:fromhex()
       local data = request_handle:headers():get("message")
-      local ok, error = request_handle:verifySignature(hash, pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
+      local ok, error = request_handle:verifySignature(hash, pubkey, rawsig, string.len(rawsig), data, string.len(data))
 
       if ok then
         request_handle:headers():add("signature_verification", "approved")

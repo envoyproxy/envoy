@@ -41,7 +41,7 @@ public:
 
     envoy::extensions::filters::network::ratelimit::v3::RateLimit proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
-    config_.reset(new Config(proto_config, stats_store_, runtime_));
+    config_ = std::make_shared<Config>(proto_config, stats_store_, runtime_);
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -86,7 +86,7 @@ stat_prefix: name
 failure_mode_deny: true
 )EOF";
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   ConfigSharedPtr config_;
   Filters::Common::RateLimit::MockClient* client_;

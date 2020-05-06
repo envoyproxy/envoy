@@ -25,16 +25,15 @@ using testing::MatchesRegex;
 using testing::NiceMock;
 
 namespace Envoy {
-namespace {
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
 
 void TcpProxyIntegrationTest::initialize() {
   config_helper_.renameListener("tcp_proxy");
   BaseIntegrationTest::initialize();
 }
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Test upstream writing before downstream downstream does.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
@@ -253,8 +252,15 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log_config.set_path(access_log_path);
     access_log_config.set_format(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
-        "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%\n");
+        "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
+        "sent=%BYTES_SENT% received=%BYTES_RECEIVED%\n");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
+    auto* runtime_filter = access_log->mutable_filter()->mutable_runtime_filter();
+    runtime_filter->set_runtime_key("unused-key");
+    auto* percent_sampled = runtime_filter->mutable_percent_sampled();
+    percent_sampled->set_numerator(100);
+    percent_sampled->set_denominator(
+        envoy::type::FractionalPercent::DenominatorType::FractionalPercent_DenominatorType_HUNDRED);
     config_blob->PackFrom(tcp_proxy_config);
   });
   initialize();
@@ -295,8 +301,9 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
   EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={1}\r?\n.*",
-                                       ip_port_regex, ip_regex)));
+              MatchesRegex(fmt::format(
+                  "upstreamlocal={0} upstreamhost={0} downstream={1} sent=5 received=0\r?\n.*",
+                  ip_port_regex, ip_regex)));
 }
 
 // Test that the server shuts down without crashing when connections are open.
@@ -385,7 +392,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
 
 class TcpProxyMetadataMatchIntegrationTest : public TcpProxyIntegrationTest {
 public:
-  void initialize();
+  void initialize() override;
 
   void expectEndpointToMatchRoute();
   void expectEndpointNotToMatchRoute();
@@ -676,7 +683,7 @@ void TcpProxySslIntegrationTest::initialize() {
 
   context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
-  payload_reader_.reset(new WaitForPayloadReader(*dispatcher_));
+  payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 }
 
 void TcpProxySslIntegrationTest::setupConnections() {
@@ -805,5 +812,4 @@ TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
 }
 
-} // namespace
 } // namespace Envoy

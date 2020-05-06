@@ -65,6 +65,21 @@ public:
     EXPECT_EQ(response->body(), std::string(content_length, 'a'));
   }
 
+  const std::string deprecated_full_config{R"EOF(
+      name: gzip
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.http.gzip.v2.Gzip
+        memory_level: 3
+        window_bits: 10
+        compression_level: best
+        compression_strategy: rle
+        disable_on_etag_header: true
+        content_length: 100
+        content_type:
+          - text/html
+          - application/json
+    )EOF"};
+
   const std::string full_config{R"EOF(
       name: gzip
       typed_config:
@@ -73,11 +88,12 @@ public:
         window_bits: 10
         compression_level: best
         compression_strategy: rle
-        content_length: 100
-        content_type:
-          - text/html
-          - application/json
-        disable_on_etag_header: true
+        compressor:
+          disable_on_etag_header: true
+          content_length: 100
+          content_type:
+            - text/html
+            - application/json
     )EOF"};
 
   const std::string default_config{"name: envoy.filters.http.gzip"};
@@ -104,6 +120,21 @@ TEST_P(GzipIntegrationTest, AcceptanceDefaultConfigTest) {
                           Http::TestResponseHeaderMapImpl{{":status", "200"},
                                                           {"content-length", "4400"},
                                                           {"content-type", "text/xml"}});
+}
+
+/**
+ * Exercises gzip compression with deprecated full configuration.
+ */
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(AcceptanceDeprecatedFullConfigTest)) {
+  initializeFilter(deprecated_full_config);
+  doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                         {":path", "/test/long/url"},
+                                                         {":scheme", "http"},
+                                                         {":authority", "host"},
+                                                         {"accept-encoding", "deflate, gzip"}},
+                          Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                          {"content-length", "4400"},
+                                                          {"content-type", "application/json"}});
 }
 
 /**

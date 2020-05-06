@@ -4,11 +4,13 @@ package envoy.type.matcher;
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.matcher";
 option java_outer_classname = "RegexProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Regex matcher]
 
@@ -22,7 +24,10 @@ message RegexMatcher {
     // compiled regex is to evaluate. A regex that has a program size greater than the configured
     // value will fail to compile. In this case, the configured max program size can be increased
     // or the regex can be simplified. If not specified, the default is 100.
-    google.protobuf.UInt32Value max_program_size = 1;
+    //
+    // This field is deprecated; regexp validation should be performed on the management server
+    // instead of being done by each individual client.
+    google.protobuf.UInt32Value max_program_size = 1 [deprecated = true];
   }
 
   oneof engine_type {

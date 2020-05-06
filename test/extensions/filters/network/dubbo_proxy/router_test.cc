@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "extensions/filters/network/dubbo_proxy/app_exception.h"
 #include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
 #include "extensions/filters/network/dubbo_proxy/message_impl.h"
@@ -93,7 +95,7 @@ public:
   void initializeMetadata(MessageType msg_type) {
     msg_type_ = msg_type;
 
-    metadata_.reset(new MessageMetadata());
+    metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMessageType(msg_type_);
     metadata_->setRequestId(1);
 
@@ -245,7 +247,7 @@ TEST_F(DubboRouterTest, PoolRemoteConnectionFailure) {
   startRequest(MessageType::Request);
 
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
 TEST_F(DubboRouterTest, PoolTimeout) {
@@ -260,8 +262,7 @@ TEST_F(DubboRouterTest, PoolTimeout) {
       }));
   startRequest(MessageType::Request);
 
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::Timeout);
+  context_.cluster_manager_.tcp_conn_pool_.poolFailure(ConnectionPool::PoolFailureReason::Timeout);
 }
 
 TEST_F(DubboRouterTest, PoolOverflowFailure) {
@@ -276,8 +277,7 @@ TEST_F(DubboRouterTest, PoolOverflowFailure) {
       }));
   startRequest(MessageType::Request);
 
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::Overflow);
+  context_.cluster_manager_.tcp_conn_pool_.poolFailure(ConnectionPool::PoolFailureReason::Overflow);
 }
 
 TEST_F(DubboRouterTest, ClusterMaintenanceMode) {
@@ -332,7 +332,7 @@ TEST_F(DubboRouterTest, PoolConnectionFailureWithOnewayMessage) {
   EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
 
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   destroyRouter();
 }

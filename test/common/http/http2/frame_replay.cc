@@ -2,6 +2,7 @@
 
 #include "common/common/hex.h"
 #include "common/common/macros.h"
+#include "common/http/utility.h"
 
 #include "test/common/http/common.h"
 #include "test/test_common/environment.h"
@@ -58,13 +59,9 @@ void FrameUtils::fixupHeaders(Frame& frame) {
 }
 
 CodecFrameInjector::CodecFrameInjector(const std::string& injector_name)
-    : injector_name_(injector_name) {
-  settings_.hpack_table_size_ = Http2Settings::DEFAULT_HPACK_TABLE_SIZE;
-  settings_.max_concurrent_streams_ = Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS;
-  settings_.initial_stream_window_size_ = Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
-  settings_.initial_connection_window_size_ = Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
-  settings_.allow_metadata_ = false;
-}
+    : options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions())),
+      injector_name_(injector_name) {}
 
 ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("server") {
   ON_CALL(client_connection_, write(_, _))
@@ -92,13 +89,16 @@ ServerCodecFrameInjector::ServerCodecFrameInjector() : CodecFrameInjector("clien
       }));
 }
 
-void CodecFrameInjector::write(const Frame& frame, Http::Connection& connection) {
+Http::Status CodecFrameInjector::write(const Frame& frame, Http::Connection& connection) {
   Buffer::OwnedImpl buffer;
   buffer.add(frame.data(), frame.size());
   ENVOY_LOG_MISC(trace, "{} write: {}", injector_name_, Hex::encode(frame.data(), frame.size()));
-  while (buffer.length() > 0) {
-    connection.dispatch(buffer);
+  auto status = Http::okStatus();
+  while (buffer.length() > 0 && status.ok()) {
+    status = connection.dispatch(buffer);
   }
+  ENVOY_LOG_MISC(trace, "Status: {}", status.message());
+  return status;
 }
 
 } // namespace Http2

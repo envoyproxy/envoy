@@ -106,6 +106,9 @@ protected:
       const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
         return parent_.parent_.address();
       }
+      const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+        return parent_.parent_.address();
+      }
       absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
       unixSocketPeerCredentials() const override {
         return absl::nullopt;

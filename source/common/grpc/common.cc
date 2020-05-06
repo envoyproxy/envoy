@@ -14,6 +14,7 @@
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
@@ -37,7 +38,14 @@ bool Common::hasGrpcContentType(const Http::RequestOrResponseHeaderMap& headers)
                   .getStringView()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
-bool Common::isGrpcResponseHeader(const Http::ResponseHeaderMap& headers, bool end_stream) {
+bool Common::isGrpcRequestHeaders(const Http::RequestHeaderMap& headers) {
+  if (!headers.Path()) {
+    return false;
+  }
+  return hasGrpcContentType(headers);
+}
+
+bool Common::isGrpcResponseHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
   if (end_stream) {
     // Trailers-only response, only grpc-status is required.
     return headers.GrpcStatus() != nullptr;
@@ -295,6 +303,22 @@ void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
 bool Common::parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto) {
   Buffer::ZeroCopyInputStreamImpl stream(std::move(buffer));
   return proto.ParseFromZeroCopyStream(&stream);
+}
+
+absl::optional<Common::RequestNames>
+Common::resolveServiceAndMethod(const Http::HeaderEntry* path) {
+  absl::optional<RequestNames> request_names;
+  if (path == nullptr) {
+    return request_names;
+  }
+  absl::string_view str = path->value().getStringView();
+  str = str.substr(0, str.find('?'));
+  const auto parts = StringUtil::splitToken(str, "/");
+  if (parts.size() != 2) {
+    return request_names;
+  }
+  request_names = RequestNames{parts[0], parts[1]};
+  return request_names;
 }
 
 } // namespace Grpc

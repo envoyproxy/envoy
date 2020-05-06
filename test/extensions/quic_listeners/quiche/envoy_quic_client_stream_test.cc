@@ -18,15 +18,14 @@ namespace Quic {
 
 using testing::_;
 using testing::Invoke;
-using testing::Return;
 
 class EnvoyQuicClientStreamTest : public testing::TestWithParam<bool> {
 public:
   EnvoyQuicClientStreamTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_t099, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -39,7 +38,7 @@ public:
             createConnectionSocket(peer_addr_, self_addr_, nullptr))),
         quic_session_(quic_config_, {quic_version_}, quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
-        stream_id_(quic_version_.transport_version == quic::QUIC_VERSION_99 ? 4u : 5u),
+        stream_id_(quic_version_.transport_version == quic::QUIC_VERSION_IETF_DRAFT_27 ? 4u : 5u),
         quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}} {
     quic_stream_->setResponseDecoder(stream_decoder_);
@@ -68,7 +67,7 @@ public:
 
     trailers_.OnHeaderBlockStart();
     trailers_.OnHeader("key1", "value1");
-    if (quic_version_.transport_version != quic::QUIC_VERSION_99) {
+    if (quic_version_.transport_version != quic::QUIC_VERSION_IETF_DRAFT_27) {
       // ":final-offset" is required and stripped off by quic.
       trailers_.OnHeader(":final-offset", absl::StrCat("", response_body_.length()));
     }
@@ -111,6 +110,7 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientStreamTests, EnvoyQuicClientStreamTest,
                          testing::ValuesIn({true, false}));
 
 TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
+  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   quic_stream_->encodeHeaders(request_headers_, false);
   quic_stream_->encodeData(request_body_, true);
 
@@ -135,7 +135,7 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
         EXPECT_EQ(0, buffer.length());
       }));
   std::string data = response_body_;
-  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+  if (quic_version_.transport_version == quic::QUIC_VERSION_IETF_DRAFT_27) {
     std::unique_ptr<char[]> data_buffer;
     quic::QuicByteCount data_frame_header_length =
         quic::HttpEncoder::SerializeDataFrameHeader(response_body_.length(), &data_buffer);
@@ -173,7 +173,7 @@ TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
   quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(), trailers_);
 
   std::string data = response_body_;
-  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+  if (quic_version_.transport_version == quic::QUIC_VERSION_IETF_DRAFT_27) {
     std::unique_ptr<char[]> data_buffer;
     quic::QuicByteCount data_frame_header_length =
         quic::HttpEncoder::SerializeDataFrameHeader(response_body_.length(), &data_buffer);

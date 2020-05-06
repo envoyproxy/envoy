@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.route.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
@@ -14,14 +15,15 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/versioning.proto";
-
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.route.v3";
 option java_outer_classname = "RouteComponentsProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP route components]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
@@ -32,7 +34,7 @@ option java_multiple_files = true;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 19]
+// [#next-free-field: 21]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -77,7 +79,7 @@ message VirtualHost {
   // Domains cannot contain control characters. This is validated by the well_known_regex HTTP_HEADER_VALUE.
   repeated string domains = 2 [(validate.rules).repeated = {
     min_items: 1
-    items {string {well_known_regex: HTTP_HEADER_VALUE}}
+    items {string {well_known_regex: HTTP_HEADER_VALUE strict: false}}
   }];
 
   // The list of routes that will be matched, in order, for incoming requests.
@@ -107,7 +109,9 @@ message VirtualHost {
 
   // Specifies a list of HTTP headers that should be removed from each request
   // handled by this virtual host.
-  repeated string request_headers_to_remove = 13;
+  repeated string request_headers_to_remove = 13 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Specifies a list of HTTP headers that should be added to each response
   // handled by this virtual host. Headers specified at this level are applied
@@ -140,12 +144,31 @@ message VirtualHost {
   // This header is unaffected by the
   // :ref:`suppress_envoy_headers
   // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
+  //
+  // [#next-major-version: rename to include_attempt_count_in_request.]
   bool include_request_attempt_count = 14;
+
+  // Decides whether the :ref:`x-envoy-attempt-count
+  // <config_http_filters_router_x-envoy-attempt-count>` header should be included
+  // in the downstream response. Setting this option will cause the router to override any existing header
+  // value, so in the case of two Envoys on the request path with this option enabled, the downstream
+  // will see the attempt count as perceived by the Envoy closest upstream from itself. Defaults to false.
+  // This header is unaffected by the
+  // :ref:`suppress_envoy_headers
+  // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
+  bool include_attempt_count_in_response = 19;
 
   // Indicates the retry policy for all routes in this virtual host. Note that setting a
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
   RetryPolicy retry_policy = 16;
+
+  // [#not-implemented-hide:]
+  // Specifies the configuration for retry policy extension. Note that setting a route level entry
+  // will take precedence over this config and it'll be treated independently (e.g.: values are not
+  // inherited). :ref:`Retry policy <envoy_api_field_config.route.v3.VirtualHost.retry_policy>` should not be
+  // set if this field is used.
+  google.protobuf.Any retry_policy_typed_config = 20;
 
   // Indicates the hedge policy for all routes in this virtual host. Note that setting a
   // route level entry will take precedence over this config and it'll be treated
@@ -232,7 +255,9 @@ message Route {
 
   // Specifies a list of HTTP headers that should be removed from each request
   // matching this route.
-  repeated string request_headers_to_remove = 12;
+  repeated string request_headers_to_remove = 12 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Specifies a set of headers that will be added to responses to requests
   // matching this route. Headers specified at this level are applied before
@@ -346,7 +371,7 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -366,6 +391,11 @@ message RouteMatch {
     // If specified, the route will match against whether or not a certificate is validated.
     // If not specified, certificate validation status (true or false) will not be considered when route matching.
     google.protobuf.BoolValue validated = 2;
+  }
+
+  // [#not-implemented-hide:]
+  // An extensible message for matching CONNECT requests.
+  message ConnectMatcher {
   }
 
   reserved 5, 3;
@@ -396,6 +426,16 @@ message RouteMatch {
     // on :path, etc. The issue with that is it is unclear how to generically deal with query string
     // stripping. This needs more thought.]
     type.matcher.v3.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
+
+    // [#not-implemented-hide:]
+    // If this is used as the matcher, the matcher will only match CONNECT requests.
+    // Note that this will not match HTTP/2 upgrade-style CONNECT requests
+    // (WebSocket and the like) as they are normalized in Envoy as HTTP/1.1 style
+    // upgrades.
+    // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2,
+    // where CONNECT requests may have a path, the path matchers will work if
+    // there is a path present.
+    ConnectMatcher connect_matcher = 12;
   }
 
   // Indicates that prefix/path matching should be case insensitive. The default
@@ -496,7 +536,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -546,11 +586,14 @@ message RouteAction {
     // number is <= the value of the numerator N, or if the key is not present, the default
     // value, the request will be mirrored.
     core.v3.RuntimeFractionalPercent runtime_fraction = 3;
+
+    // Determines if the trace span should be sampled. Defaults to true.
+    google.protobuf.BoolValue trace_sampled = 4;
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
   // <arch_overview_load_balancing_types>`.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message HashPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.HashPolicy";
@@ -561,8 +604,9 @@ message RouteAction {
 
       // The name of the request header that will be used to obtain the hash
       // key. If the request header is not present, no hash will be produced.
-      string header_name = 1
-          [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
+      string header_name = 1 [
+        (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
+      ];
     }
 
     // Envoy supports two types of cookie affinity:
@@ -616,6 +660,16 @@ message RouteAction {
       string name = 1 [(validate.rules).string = {min_bytes: 1}];
     }
 
+    message FilterState {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.route.RouteAction.HashPolicy.FilterState";
+
+      // The name of the Object in the per-request filterState, which is an
+      // Envoy::Http::Hashable object. If there is no data associated with the key,
+      // or the stored object is not Envoy::Http::Hashable, no hash will be produced.
+      string key = 1 [(validate.rules).string = {min_bytes: 1}];
+    }
+
     oneof policy_specifier {
       option (validate.required) = true;
 
@@ -630,6 +684,9 @@ message RouteAction {
 
       // Query parameter hash policy.
       QueryParameter query_parameter = 5;
+
+      // Filter state hash policy.
+      FilterState filter_state = 6;
     }
 
     // The flag that short-circuits the hash computing. This field provides a
@@ -664,13 +721,27 @@ message RouteAction {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.UpgradeConfig";
 
+    // [#not-implemented-hide:]
+    // Configuration for sending data upstream as a raw data payload. This is used for
+    // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+    message ConnectConfig {
+      // If present, the proxy protocol header will be prepended to the CONNECT payload sent upstream.
+      core.v3.ProxyProtocolConfig proxy_protocol_config = 1;
+    }
+
     // The case-insensitive name of this upgrade, e.g. "websocket".
     // For each upgrade type present in upgrade_configs, requests with
     // Upgrade: [upgrade_type] will be proxied upstream.
-    string upgrade_type = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE}];
+    string upgrade_type = 1
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
+
+    // [#not-implemented-hide:]
+    // Configuration for sending data upstream as a raw data payload. This is used for
+    // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+    ConnectConfig connect_config = 3;
   }
 
   reserved 12, 18, 19, 16, 22, 21, 10;
@@ -694,7 +765,7 @@ message RouteAction {
     //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
     //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
     string cluster_header = 2
-        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
+        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
@@ -747,7 +818,8 @@ message RouteAction {
   //
   //   Having above entries in the config, requests to */prefix* will be stripped to */*, while
   //   requests to */prefix/etc* will be stripped to */etc*.
-  string prefix_rewrite = 5;
+  string prefix_rewrite = 5
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // Indicates that during forwarding, portions of the path that match the
   // pattern should be rewritten, even allowing the substitution of capture
@@ -782,7 +854,8 @@ message RouteAction {
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
     // this value.
-    string host_rewrite_literal = 6;
+    string host_rewrite_literal = 6
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
@@ -799,7 +872,8 @@ message RouteAction {
     //
     //   Pay attention to the potential security implications of using this option. Provided header
     //   must come from trusted source.
-    string host_rewrite_header = 29;
+    string host_rewrite_header = 29
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
@@ -839,6 +913,13 @@ message RouteAction {
   // it'll take precedence over the virtual host level retry policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   RetryPolicy retry_policy = 9;
+
+  // [#not-implemented-hide:]
+  // Specifies the configuration for retry policy extension. Note that if this is set, it'll take
+  // precedence over the virtual host level retry policy entirely (e.g.: policies are not merged,
+  // most internal one becomes the enforced policy). :ref:`Retry policy <envoy_api_field_config.route.v3.VirtualHost.retry_policy>`
+  // should not be set if this field is used.
+  google.protobuf.Any retry_policy_typed_config = 33;
 
   // Indicates that the route has request mirroring policies.
   repeated RequestMirrorPolicy request_mirror_policies = 30;
@@ -1104,14 +1185,16 @@ message RedirectAction {
   }
 
   // The host portion of the URL will be swapped with this value.
-  string host_redirect = 1;
+  string host_redirect = 1
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // The port value of the URL will be swapped with this value.
   uint32 port_redirect = 8;
 
   oneof path_rewrite_specifier {
     // The path portion of the URL will be swapped with this value.
-    string path_redirect = 2;
+    string path_redirect = 2
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Indicates that during redirection, the matched prefix (or path)
     // should be swapped with this value. This option allows redirect URLs be dynamically created
@@ -1121,7 +1204,8 @@ message RedirectAction {
     //
     //   Pay attention to the use of trailing slashes as mentioned in
     //   :ref:`RouteAction's prefix_rewrite <envoy_api_field_config.route.v3.RouteAction.prefix_rewrite>`.
-    string prefix_rewrite = 5;
+    string prefix_rewrite = 5
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
   }
 
   // The HTTP status code to use in the redirect response. The default response
@@ -1215,7 +1299,7 @@ message Tracing {
 // statistics are perfect in the sense that they are emitted on the downstream
 // side such that they include network level failures.
 //
-// Documentation for :ref:`virtual cluster statistics <config_http_filters_router_stats>`.
+// Documentation for :ref:`virtual cluster statistics <config_http_filters_router_vcluster_stats>`.
 //
 // .. note::
 //
@@ -1295,8 +1379,9 @@ message RateLimit {
       // The header name to be queried from the request headers. The header’s
       // value is used to populate the value of the descriptor entry for the
       // descriptor_key.
-      string header_name = 1
-          [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
+      string header_name = 1 [
+        (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
+      ];
 
       // The key to use in the descriptor entry.
       string descriptor_key = 2 [(validate.rules).string = {min_bytes: 1}];
@@ -1429,7 +1514,8 @@ message HeaderMatcher {
   reserved "regex_match";
 
   // Specifies the name of the header in the request.
-  string name = 1 [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
+  string name = 1
+      [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {

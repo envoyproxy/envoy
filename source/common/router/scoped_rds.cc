@@ -15,10 +15,11 @@
 #include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
-#include "common/config/resources.h"
+#include "common/config/resource_name.h"
 #include "common/config/version_converter.h"
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
+#include "common/router/rds_impl.h"
 
 #include "absl/strings/str_join.h"
 
@@ -98,16 +99,19 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     ScopedRoutesConfigProviderManager& config_provider_manager)
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
+      Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration>(
+          rds_config_source.resource_api_version()),
       factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
       rds_config_source_(std::move(rds_config_source)),
       validation_visitor_(factory_context.messageValidationContext().dynamicValidationVisitor()),
       stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager) {
+  const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          scoped_rds.scoped_rds_config_source(),
-          loadTypeUrl(rds_config_source_.resource_api_version()), *scope_, *this);
+          scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
+          *this);
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>(
@@ -232,16 +236,17 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   std::unique_ptr<Cleanup> resume_rds;
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
+    const auto type_url = Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+        envoy::config::core::v3::ApiVersion::V2);
     noop_init_manager =
         std::make_unique<Init::ManagerImpl>(fmt::format("SRDS {}:{}", name_, version_info));
     // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
     // In the case if factory_context_.init_manager() is uninitialized, RDS is already paused
     // either by Server init or LDS init.
     if (factory_context_.clusterManager().adsMux()) {
-      factory_context_.clusterManager().adsMux()->pause(
-          Envoy::Config::TypeUrl::get().RouteConfiguration);
+      factory_context_.clusterManager().adsMux()->pause(type_url);
     }
-    resume_rds = std::make_unique<Cleanup>([this, &noop_init_manager, version_info] {
+    resume_rds = std::make_unique<Cleanup>([this, &noop_init_manager, version_info, type_url] {
       // For new RDS subscriptions created after listener warming up, we don't wait for them to
       // warm up.
       Init::WatcherImpl noop_watcher(
@@ -253,8 +258,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       // Note in the case of partial acceptance, accepted RDS subscriptions should be started
       // despite of any error.
       if (factory_context_.clusterManager().adsMux()) {
-        factory_context_.clusterManager().adsMux()->resume(
-            Envoy::Config::TypeUrl::get().RouteConfiguration);
+        factory_context_.clusterManager().adsMux()->resume(type_url);
       }
     });
   }
@@ -343,22 +347,6 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     *to_remove_repeated.Add() = scoped_route.first;
   }
   onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
-}
-
-std::string
-ScopedRdsConfigSubscription::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3::ApiVersion::AUTO:
-  case envoy::config::core::v3::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()));
-  case envoy::config::core::v3::ApiVersion::V3:
-    return Grpc::Common::typeUrl(API_NO_BOOST(
-        envoy::config::route::v3::ScopedRouteConfiguration().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
 }
 
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(

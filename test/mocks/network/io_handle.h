@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/network/io_handle.h"
 
 #include "gmock/gmock.h"
@@ -10,9 +11,9 @@ namespace Network {
 class MockIoHandle : public IoHandle {
 public:
   MockIoHandle();
-  ~MockIoHandle();
+  ~MockIoHandle() override;
 
-  MOCK_METHOD(int, fd, (), (const));
+  MOCK_METHOD(os_fd_t, fd, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, readv,
@@ -25,6 +26,9 @@ public:
   MOCK_METHOD(Api::IoCallUint64Result, recvmsg,
               (Buffer::RawSlice * slices, const uint64_t num_slice, uint32_t self_port,
                RecvMsgOutput& output));
+  MOCK_METHOD(Api::IoCallUint64Result, recvmmsg,
+              (RawSliceArrays & slices, uint32_t self_port, RecvMsgOutput& output));
+  MOCK_METHOD(bool, supportsMmsg, (), (const));
 };
 
 } // namespace Network

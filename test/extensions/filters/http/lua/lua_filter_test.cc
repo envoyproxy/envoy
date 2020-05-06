@@ -13,6 +13,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -70,7 +71,7 @@ public:
   ~LuaHttpFilterTest() override { filter_->onDestroy(); }
 
   void setup(const std::string& lua_code) {
-    config_.reset(new FilterConfig(lua_code, tls_, cluster_manager_));
+    config_ = std::make_shared<FilterConfig>(lua_code, tls_, cluster_manager_);
     setupFilter();
   }
 
@@ -796,7 +797,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 }
 
 // Basic HTTP request flow. Asynchronous flag set to false.
@@ -859,7 +860,7 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 }
 
 // Basic asynchronous, fire-and-forget HTTP request flow.
@@ -989,14 +990,14 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
             callbacks = &cb;
             return &request;
           }));
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 
   response_message = std::make_unique<Http::ResponseMessageImpl>(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "403"}}});
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 403")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no body")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
@@ -1060,7 +1061,7 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no body")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 }
 
 // HTTP call followed by immediate response.
@@ -1113,7 +1114,7 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
                                            {"set-cookie", "flavor=chocolate; Path=/"},
                                            {"set-cookie", "variant=chewy; Path=/"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 }
 
 // HTTP call with script error after resume.
@@ -1161,7 +1162,7 @@ TEST_F(LuaHttpFilterTest, HttpCallErrorAfterResumeSuccess) {
               scriptLog(spdlog::level::err,
                         StrEq("[string \"...\"]:14: attempt to index local 'foo' (a nil value)")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onSuccess(std::move(response_message));
+  callbacks->onSuccess(request, std::move(response_message));
 }
 
 // HTTP call failure.
@@ -1206,7 +1207,7 @@ TEST_F(LuaHttpFilterTest, HttpCallFailure) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 503")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("upstream failure")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onFailure(Http::AsyncClient::FailureReason::Reset);
+  callbacks->onFailure(request, Http::AsyncClient::FailureReason::Reset);
 }
 
 // HTTP call reset.
@@ -1282,7 +1283,9 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateFailure) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            cb.onFailure(Http::AsyncClient::FailureReason::Reset);
+            cb.onFailure(request, Http::AsyncClient::FailureReason::Reset);
+            // Intentionally return nullptr (instead of request handle) to trigger a particular
+            // code path.
             return nullptr;
           }));
 
@@ -1617,6 +1620,46 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandle) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("baz")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bat")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Test that the deprecated filter name works for metadata.
+TEST_F(LuaHttpFilterTest, DEPRECATED_FEATURE_TEST(GetMetadataFromHandleUsingDeprecatedName)) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:metadata():get("foo.bar")["name"])
+      request_handle:logTrace(request_handle:metadata():get("foo.bar")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      envoy.lua:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupMetadata(METADATA);
+
+  // Logs deprecation warning the first time.
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
+  EXPECT_LOG_CONTAINS(
+      "warn",
+      "Using deprecated http filter extension name 'envoy.lua' for 'envoy.filters.http.lua'",
+      filter_->decodeHeaders(request_headers, true));
+
+  // Doesn't log deprecation warning the second time.
+  setupMetadata(METADATA);
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
+  EXPECT_LOG_NOT_CONTAINS(
+      "warn",
+      "Using deprecated http filter extension name 'envoy.lua' for 'envoy.filters.http.lua'",
+      filter_->decodeHeaders(request_headers, true));
 }
 
 // No available metadata on route.

@@ -13,7 +13,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::ContainerEq;
 using testing::Return;
 
 namespace Envoy {
@@ -585,23 +584,36 @@ TEST_F(OwnedImplTest, AppendSliceForTest) {
   static constexpr size_t NumInputs = 3;
   static constexpr const char* Inputs[] = {"one", "2", "", "four", ""};
   Buffer::OwnedImpl buffer;
-  RawSlice slices[NumInputs];
-  EXPECT_EQ(0, buffer.getRawSlices(slices, NumInputs));
+  EXPECT_EQ(0, buffer.getRawSlices().size());
+  EXPECT_EQ(0, buffer.getRawSlices(NumInputs).size());
   for (const auto& input : Inputs) {
     buffer.appendSliceForTest(input);
   }
-  // getRawSlices will only return the 3 slices with nonzero length.
-  EXPECT_EQ(3, buffer.getRawSlices(slices, NumInputs));
+  // getRawSlices(max_slices) will only return the 3 slices with nonzero length.
+  RawSliceVector slices = buffer.getRawSlices(/*max_slices=*/NumInputs);
+  EXPECT_EQ(3, slices.size());
+
+  // Verify edge case where max_slices is -1 and +1 the actual non-empty slice count.
+  EXPECT_EQ(2, buffer.getRawSlices(/*max_slices=*/NumInputs - 1).size());
+  EXPECT_EQ(3, buffer.getRawSlices(/*max_slices=*/NumInputs + 1).size());
 
   auto expectSlice = [](const RawSlice& slice, const char* expected) {
     size_t length = strlen(expected);
-    EXPECT_EQ(length, slice.len_);
+    EXPECT_EQ(length, slice.len_) << expected;
     EXPECT_EQ(0, memcmp(slice.mem_, expected, length));
   };
 
   expectSlice(slices[0], "one");
   expectSlice(slices[1], "2");
   expectSlice(slices[2], "four");
+
+  // getRawSlices returns only the slices with nonzero length.
+  RawSliceVector slices_vector = buffer.getRawSlices();
+  EXPECT_EQ(3, slices_vector.size());
+
+  expectSlice(slices_vector[0], "one");
+  expectSlice(slices_vector[1], "2");
+  expectSlice(slices_vector[2], "four");
 }
 
 // Regression test for oss-fuzz issue
@@ -637,19 +649,24 @@ TEST_F(OwnedImplTest, ReserveZeroCommit) {
     slices[i].len_ = 0;
   }
   buf.commit(slices, allocated_slices);
-  int pipe_fds[2] = {0, 0};
-  ASSERT_EQ(::pipe(pipe_fds), 0);
+  os_fd_t pipe_fds[2] = {0, 0};
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+#ifdef WIN32
+  ASSERT_EQ(os_sys_calls.socketpair(AF_INET, SOCK_STREAM, 0, pipe_fds).rc_, 0);
+#else
+  ASSERT_EQ(pipe(pipe_fds), 0);
+#endif
   Network::IoSocketHandleImpl io_handle(pipe_fds[0]);
-  ASSERT_EQ(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK), 0);
-  ASSERT_EQ(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK), 0);
+  ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[0], false).rc_, 0);
+  ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[1], false).rc_, 0);
   const uint32_t max_length = 1953;
   std::string data(max_length, 'e');
-  const ssize_t rc = ::write(pipe_fds[1], data.data(), max_length);
+  const ssize_t rc = os_sys_calls.write(pipe_fds[1], data.data(), max_length).rc_;
   ASSERT_GT(rc, 0);
   const uint32_t previous_length = buf.length();
   Api::IoCallUint64Result result = buf.read(io_handle, max_length);
   ASSERT_EQ(result.rc_, static_cast<uint64_t>(rc));
-  ASSERT_EQ(::close(pipe_fds[1]), 0);
+  ASSERT_EQ(os_sys_calls.close(pipe_fds[1]).rc_, 0);
   ASSERT_EQ(previous_length, buf.search(data.data(), rc, previous_length));
   EXPECT_EQ("bbbbb", buf.toString().substr(0, 5));
   expectSlices({{5, 0, 4056}, {1953, 2103, 4056}}, buf);
@@ -660,19 +677,24 @@ TEST_F(OwnedImplTest, ReadReserveAndCommit) {
   Buffer::OwnedImpl buf;
   buf.add("bbbbb");
 
-  int pipe_fds[2] = {0, 0};
-  ASSERT_EQ(::pipe(pipe_fds), 0);
+  os_fd_t pipe_fds[2] = {0, 0};
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+#ifdef WIN32
+  ASSERT_EQ(os_sys_calls.socketpair(AF_INET, SOCK_STREAM, 0, pipe_fds).rc_, 0);
+#else
+  ASSERT_EQ(pipe(pipe_fds), 0);
+#endif
   Network::IoSocketHandleImpl io_handle(pipe_fds[0]);
-  ASSERT_EQ(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK), 0);
-  ASSERT_EQ(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK), 0);
+  ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[0], false).rc_, 0);
+  ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[1], false).rc_, 0);
 
   const uint32_t read_length = 32768;
   std::string data = "e";
-  const ssize_t rc = ::write(pipe_fds[1], data.data(), data.size());
+  const ssize_t rc = os_sys_calls.write(pipe_fds[1], data.data(), data.size()).rc_;
   ASSERT_GT(rc, 0);
   Api::IoCallUint64Result result = buf.read(io_handle, read_length);
   ASSERT_EQ(result.rc_, static_cast<uint64_t>(rc));
-  ASSERT_EQ(::close(pipe_fds[1]), 0);
+  ASSERT_EQ(os_sys_calls.close(pipe_fds[1]).rc_, 0);
   EXPECT_EQ("bbbbbe", buf.toString());
   expectSlices({{6, 4050, 4056}}, buf);
 }
@@ -694,14 +716,14 @@ void TestBufferMove(uint64_t buffer1_length, uint64_t buffer2_length,
                     uint64_t expected_slice_count) {
   Buffer::OwnedImpl buffer1;
   buffer1.add(std::string(buffer1_length, 'a'));
-  EXPECT_EQ(1, buffer1.getRawSlices(nullptr, 0));
+  EXPECT_EQ(1, buffer1.getRawSlices().size());
 
   Buffer::OwnedImpl buffer2;
   buffer2.add(std::string(buffer2_length, 'b'));
-  EXPECT_EQ(1, buffer2.getRawSlices(nullptr, 0));
+  EXPECT_EQ(1, buffer2.getRawSlices().size());
 
   buffer1.move(buffer2);
-  EXPECT_EQ(expected_slice_count, buffer1.getRawSlices(nullptr, 0));
+  EXPECT_EQ(expected_slice_count, buffer1.getRawSlices().size());
   EXPECT_EQ(buffer1_length + buffer2_length, buffer1.length());
   // Make sure `buffer2` was drained.
   EXPECT_EQ(0, buffer2.length());

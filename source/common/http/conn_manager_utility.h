@@ -36,8 +36,11 @@ public:
   static ServerConnectionPtr
   autoCreateCodec(Network::Connection& connection, const Buffer::Instance& data,
                   ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
-                  const Http1Settings& http1_settings, const Http2Settings& http2_settings,
-                  uint32_t max_request_headers_kb, uint32_t max_request_headers_count);
+                  const Http1Settings& http1_settings,
+                  const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                  uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+                  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+                      headers_with_underscores_action);
 
   /**
    * Mutates request headers in various ways. This functionality is broken out because of its
@@ -53,15 +56,16 @@ public:
   static Network::Address::InstanceConstSharedPtr
   mutateRequestHeaders(RequestHeaderMap& request_headers, Network::Connection& connection,
                        ConnectionManagerConfig& config, const Router::Config& route_config,
-                       Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
+                       const LocalInfo::LocalInfo& local_info);
 
   static void mutateResponseHeaders(ResponseHeaderMap& response_headers,
                                     const RequestHeaderMap* request_headers,
-                                    const std::string& via);
+                                    ConnectionManagerConfig& config, const std::string& via);
 
-  // Sanitize the path in the header map if forced by config.
+  // Sanitize the path in the header map if the path exists and it is forced by config.
   // Side affect: the string view of Path header is invalidated.
   // Return false if error happens during the sanitization.
+  // Returns true if there is no path.
   static bool maybeNormalizePath(RequestHeaderMap& request_headers,
                                  const ConnectionManagerConfig& config);
 

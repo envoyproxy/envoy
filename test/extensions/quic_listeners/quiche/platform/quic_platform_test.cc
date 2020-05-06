@@ -730,7 +730,7 @@ TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str2(1024, 'a');
   // str2 is copied.
   buffer.add(str2);
-  EXPECT_EQ(1u, buffer.getRawSlices(nullptr, 0));
+  EXPECT_EQ(1u, buffer.getRawSlices().size());
   buffer.addBufferFragment(fragment);
 
   quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer, str2.length())};

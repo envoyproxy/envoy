@@ -16,6 +16,7 @@
 #include "extensions/transport_sockets/tls/context_impl.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/types/optional.h"
 #include "openssl/ssl.h"
@@ -74,6 +75,7 @@ public:
   uint16_t ciphersuiteId() const override;
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
+  absl::optional<std::string> x509Extension(absl::string_view extension_name) const override;
 
   SSL* rawSslForTest() const { return ssl_.get(); }
 

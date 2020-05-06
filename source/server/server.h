@@ -98,8 +98,6 @@ public:
  */
 class InstanceUtil : Logger::Loggable<Logger::Id::main> {
 public:
-  enum class BootstrapVersion { V2 };
-
   /**
    * Default implementation of runtime loader creation used in the real server and in most
    * integration tests where a mock runtime is not needed.
@@ -115,17 +113,16 @@ public:
   static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store);
 
   /**
-   * Load a bootstrap config from either v1 or v2 and perform validation.
+   * Load a bootstrap config and perform validation.
    * @param bootstrap supplies the bootstrap to fill.
-   * @param config_path supplies the config path.
-   * @param v2_only supplies whether to attempt v1 fallback.
+   * @param options supplies the server options.
    * @param api reference to the Api object
    * @param validation_visitor message validation visitor instance.
-   * @return BootstrapVersion to indicate which version of the API was parsed.
    */
-  static BootstrapVersion
-  loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
-                      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+  static void loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                  const Options& options,
+                                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                                  Api::Api& api);
 };
 
 /**
@@ -172,6 +169,7 @@ public:
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
+  Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
@@ -267,6 +265,10 @@ public:
     return validation_context_;
   }
 
+  void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
+    http_context_.setDefaultTracingConfig(tracing_config);
+  }
+
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
   ServerLifecycleNotifier::HandlePtr
@@ -283,6 +285,8 @@ private:
   void terminate();
   void notifyCallbacksForStage(
       Stage stage, Event::PostCb completion_cb = [] {});
+  void onRuntimeReady();
+  void onClusterManagerPrimaryInitializationComplete();
 
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
@@ -303,6 +307,9 @@ private:
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   TimeSource& time_source_;
+  // Delete local_info_ as late as possible as some members below may reference it during their
+  // destruction.
+  LocalInfo::LocalInfoPtr local_info_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;
@@ -326,7 +333,6 @@ private:
   Configuration::MainImpl config_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
-  LocalInfo::LocalInfoPtr local_info_;
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
@@ -379,6 +385,9 @@ public:
   const std::vector<std::reference_wrapper<const Stats::ParentHistogram>>& histograms() override {
     return histograms_;
   }
+  const std::vector<std::reference_wrapper<const Stats::TextReadout>>& textReadouts() override {
+    return text_readouts_;
+  }
 
 private:
   std::vector<Stats::CounterSharedPtr> snapped_counters_;
@@ -387,6 +396,8 @@ private:
   std::vector<std::reference_wrapper<const Stats::Gauge>> gauges_;
   std::vector<Stats::ParentHistogramSharedPtr> snapped_histograms_;
   std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
+  std::vector<Stats::TextReadoutSharedPtr> snapped_text_readouts_;
+  std::vector<std::reference_wrapper<const Stats::TextReadout>> text_readouts_;
 };
 
 } // namespace Server

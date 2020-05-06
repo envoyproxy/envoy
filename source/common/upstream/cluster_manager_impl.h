@@ -39,19 +39,17 @@ namespace Upstream {
  */
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
-  ProdClusterManagerFactory(Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-                            ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
-                            Network::DnsResolverSharedPtr dns_resolver,
-                            Ssl::ContextManager& ssl_context_manager,
-                            Event::Dispatcher& main_thread_dispatcher,
-                            const LocalInfo::LocalInfo& local_info,
-                            Secret::SecretManager& secret_manager,
-                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                            Http::Context& http_context, AccessLog::AccessLogManager& log_manager,
-                            Singleton::Manager& singleton_manager)
+  ProdClusterManagerFactory(
+      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
+      ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
+      Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
+      Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
+      Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
+      Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+      AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager)
       : main_thread_dispatcher_(main_thread_dispatcher), validation_context_(validation_context),
-        api_(api), http_context_(http_context), admin_(admin), runtime_(runtime), stats_(stats),
-        tls_(tls), random_(random), dns_resolver_(dns_resolver),
+        api_(api), http_context_(http_context), grpc_context_(grpc_context), admin_(admin),
+        runtime_(runtime), stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), local_info_(local_info),
         secret_manager_(secret_manager), log_manager_(log_manager),
         singleton_manager_(singleton_manager) {}
@@ -80,6 +78,7 @@ protected:
   ProtobufMessage::ValidationContext& validation_context_;
   Api::Api& api_;
   Http::Context& http_context_;
+  Grpc::Context& grpc_context_;
   Server::Admin& admin_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
@@ -111,15 +110,22 @@ public:
       : cm_(cm), per_cluster_init_callback_(per_cluster_init_callback) {}
 
   enum class State {
-    // Initial state. During this state all static clusters are loaded. Any phase 1 clusters
-    // are immediately initialized.
+    // Initial state. During this state all static clusters are loaded. Any primary clusters
+    // immediately begin initialization.
     Loading,
-    // During this state we wait for all static clusters to fully initialize. This requires
-    // completing phase 1 clusters, initializing phase 2 clusters, and then waiting for them.
-    WaitingForStaticInitialize,
-    // If CDS is configured, this state tracks waiting for the first CDS response to populate
-    // clusters.
-    WaitingForCdsInitialize,
+    // In this state cluster manager waits for all primary clusters to finish initialization.
+    // This state may immediately transition to the next state iff all clusters are STATIC and
+    // without health checks enabled or health checks have failed immediately, since their
+    // initialization completes immediately.
+    WaitingForPrimaryInitializationToComplete,
+    // During this state cluster manager waits to start initializing secondary clusters. In this
+    // state all primary clusters have completed initialization. Initialization of the
+    // secondary clusters is started by the `initializeSecondaryClusters` method.
+    WaitingToStartSecondaryInitialization,
+    // In this state cluster manager waits for all secondary clusters (if configured) to finish
+    // initialization. Then, if CDS is configured, this state tracks waiting for the first CDS
+    // response to populate dynamically configured clusters.
+    WaitingToStartCdsInitialization,
     // During this state, all CDS populated clusters are undergoing either phase 1 or phase 2
     // initialization.
     CdsInitialized,
@@ -131,8 +137,11 @@ public:
   void onStaticLoadComplete();
   void removeCluster(Cluster& cluster);
   void setCds(CdsApi* cds);
-  void setInitializedCb(std::function<void()> callback);
+  void setPrimaryClustersInitializedCb(ClusterManager::PrimaryClustersReadyCallback callback);
+  void setInitializedCb(ClusterManager::InitializationCompleteCallback callback);
   State state() const { return state_; }
+
+  void startInitializingSecondaryClusters();
 
 private:
   // To enable invariant assertions on the cluster lists.
@@ -145,7 +154,8 @@ private:
   ClusterManager& cm_;
   std::function<void(Cluster& cluster)> per_cluster_init_callback_;
   CdsApi* cds_{};
-  std::function<void()> initialized_callback_;
+  ClusterManager::PrimaryClustersReadyCallback primary_clusters_initialized_callback_;
+  ClusterManager::InitializationCompleteCallback initialized_callback_;
   std::list<Cluster*> primary_init_clusters_;
   std::list<Cluster*> secondary_init_clusters_;
   State state_{State::Loading};
@@ -186,14 +196,19 @@ public:
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                     Http::Context& http_context);
+                     Http::Context& http_context, Grpc::Context& grpc_context);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
                           const std::string& version_info) override;
-  void setInitializedCb(std::function<void()> callback) override {
+
+  void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) override {
+    init_helper_.setPrimaryClustersInitializedCb(callback);
+  }
+
+  void setInitializedCb(InitializationCompleteCallback callback) override {
     init_helper_.setInitializedCb(callback);
   }
 
@@ -242,6 +257,9 @@ public:
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
   Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
+
+  void
+  initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
 protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,
