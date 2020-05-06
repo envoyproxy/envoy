@@ -364,23 +364,6 @@ INSTANTIATE_TEST_SUITE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
 
 class RedisSingleServerRequestWithFaultTest : public RedisSingleServerRequestTest {
 public:
-  void makeRequest(const std::string& hash_key, Common::Redis::RespValuePtr&& request,
-                   int delay_ms) {
-    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-    EXPECT_CALL(*conn_pool_, makeRequest_(hash_key, RespVariantEq(*request), _))
-        .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
-
-    if (delay_ms > 0) {
-      timer_ = new NiceMock<Event::MockTimer>();
-      EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-        timer_cb_ = timer_cb;
-        return timer_;
-      }));
-    }
-
-    handle_ = splitter_.makeRequest(std::move(request), callbacks_);
-  }
-
   NiceMock<Event::MockTimer>* timer_;
   Event::TimerCb timer_cb_;
 };
@@ -392,19 +375,14 @@ TEST_P(RedisSingleServerRequestWithFaultTest, ErrorFault) {
   int delay_ms = 0;
   absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>> fault =
       std::make_pair(Common::Redis::FaultType::Error, std::chrono::milliseconds(delay_ms));
-  ON_CALL(*fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault));
 
   std::string lower_command = absl::AsciiStrToLower(GetParam());
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {GetParam(), "hello"});
 
-  // Error fault calls onResponse immediately, so latency is zero.
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name,
-                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
-                          0));
+  EXPECT_CALL(*fault_manager_, getFaultForCommand(_)).WillOnce(Return(fault));
   EXPECT_CALL(callbacks_, onResponse_(_));
   handle_ = splitter_.makeRequest(std::move(request), callbacks_);
   EXPECT_NE(nullptr, handle_);
@@ -422,7 +400,6 @@ TEST_P(RedisSingleServerRequestWithFaultTest, ErrorWithDelayFault) {
   int delay_ms = 13;
   absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>> fault =
       std::make_pair(Common::Redis::FaultType::Error, std::chrono::milliseconds(delay_ms));
-  ON_CALL(*fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault));
 
   std::string lower_command = absl::AsciiStrToLower(GetParam());
 
@@ -431,6 +408,8 @@ TEST_P(RedisSingleServerRequestWithFaultTest, ErrorWithDelayFault) {
 
   // As error faults have zero latency, recorded latency is equal to the delay.
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*fault_manager_, getFaultForCommand(_)).WillOnce(Return(fault));
+
   if (delay_ms > 0) {
     timer_ = new NiceMock<Event::MockTimer>();
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
@@ -463,14 +442,28 @@ TEST_P(RedisSingleServerRequestWithFaultTest, DelayFault) {
   int delay_ms = 15;
   absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>> fault =
       std::make_pair(Common::Redis::FaultType::Delay, std::chrono::milliseconds(delay_ms));
-  ON_CALL(*fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault));
 
   std::string lower_command = absl::AsciiStrToLower(GetParam());
+  std::string hash_key = "hello";
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {GetParam(), "hello"});
 
-  makeRequest("hello", std::move(request), delay_ms);
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*fault_manager_, getFaultForCommand(_)).WillOnce(Return(fault));
+  EXPECT_CALL(*conn_pool_, makeRequest_(hash_key, RespVariantEq(*request), _))
+      .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
+
+  if (delay_ms > 0) {
+    timer_ = new NiceMock<Event::MockTimer>();
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+      timer_cb_ = timer_cb;
+      return timer_;
+    }));
+  }
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_);
+
   EXPECT_NE(nullptr, handle_);
 
   EXPECT_CALL(store_, deliverHistogramToSinks(
