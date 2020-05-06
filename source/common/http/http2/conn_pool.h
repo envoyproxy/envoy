@@ -5,6 +5,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/http/codec_client.h"
+#include "common/http/codec_stat_names.h"
 #include "common/http/conn_pool_base.h"
 
 namespace Envoy {
@@ -21,7 +22,8 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+               const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+               const CodecStatNames& codec_stat_names);
 
   ~ConnPoolImpl() override;
 
@@ -66,6 +68,8 @@ protected:
   // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
   // side we do 2^29.
   static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
+
+  const CodecStatNames& codec_stat_names_;
 };
 
 /**
@@ -83,7 +87,8 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                  Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 const CodecStatNames& codec_stat_names);
 
 } // namespace Http2
 } // namespace Http

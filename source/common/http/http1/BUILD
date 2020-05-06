@@ -31,6 +31,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:codec_helper_lib",
+        "//source/common/http:codec_stat_names_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
@@ -39,6 +40,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/http/http1:header_formatter_lib",
         "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -56,6 +58,7 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/http:codec_client_lib",
+        "//source/common/http:codec_stat_names_lib",
         "//source/common/http:codec_wrappers_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:conn_pool_base_lib",

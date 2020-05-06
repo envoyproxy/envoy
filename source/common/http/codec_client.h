@@ -14,6 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/http/codec_stat_names.h"
 #include "common/http/codec_wrappers.h"
 #include "common/network/filter_impl.h"
 
@@ -243,7 +244,8 @@ using CodecClientPtr = std::unique_ptr<CodecClient>;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
+                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+                  const CodecStatNames& stat_names);
 };
 
 } // namespace Http

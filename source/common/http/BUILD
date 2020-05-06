@@ -61,11 +61,20 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
+        "//source/common/http:codec_stat_names_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/http3:quic_codec_factory_lib",
         "//source/common/http/http3:well_known_names",
         "//source/common/network:filter_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "codec_stat_names_lib",
+    hdrs = ["codec_stat_names.h"],
+    deps = [
+        "//source/common/stats:symbol_table_lib",
     ],
 )
 
@@ -160,6 +169,7 @@ envoy_cc_library(
         "conn_manager_utility.h",
     ],
     deps = [
+        ":codec_stat_names_lib",
         ":codes_lib",
         ":conn_manager_config_interface",
         ":exception_lib",

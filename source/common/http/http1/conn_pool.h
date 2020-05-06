@@ -4,6 +4,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/http/codec_stat_names.h"
 #include "common/http/codec_wrappers.h"
 #include "common/http/conn_pool_base.h"
 
@@ -22,7 +23,8 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+               const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+               const CodecStatNames& codec_stat_names);
 
   ~ConnPoolImpl() override;
 
@@ -84,6 +86,7 @@ protected:
 
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};
+  const CodecStatNames& codec_stat_names_;
 };
 
 /**
@@ -94,8 +97,10 @@ public:
   ProdConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                    Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-      : ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options) {}
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const CodecStatNames& codec_stat_names)
+      : ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options,
+                     codec_stat_names) {}
 
   // ConnPoolImpl
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
@@ -105,7 +110,8 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                  Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 const CodecStatNames& codec_stat_names);
 
 } // namespace Http1
 } // namespace Http

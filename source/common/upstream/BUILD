@@ -158,6 +158,7 @@ envoy_cc_library(
         "//include/envoy/server:health_checker_config_interface",
         "//source/common/grpc:codec_lib",
         "//source/common/http:codec_client_lib",
+        "//source/common/http:codec_stat_names_lib",
         "//source/common/upstream:host_utility_lib",
     ],
 )
@@ -535,6 +536,7 @@ envoy_cc_library(
         "//include/envoy/upstream:health_checker_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "//source/common/http:codec_stat_names_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
@@ -577,6 +579,7 @@ envoy_cc_library(
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
+        "//source/common/http:codec_stat_names_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/clusters:well_known_names",

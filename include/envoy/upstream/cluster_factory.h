@@ -27,6 +27,11 @@
 #include "envoy/upstream/outlier_detection.h"
 
 namespace Envoy {
+
+namespace Http {
+struct CodecStatNames;
+}
+
 namespace Upstream {
 
 /**
@@ -118,6 +123,8 @@ public:
    *         messages.
    */
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  virtual const Http::CodecStatNames& codecStatNames() PURE;
 };
 
 /**

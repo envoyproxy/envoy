@@ -11,6 +11,7 @@
 #include "common/common/logger.h"
 #include "common/grpc/codec.h"
 #include "common/http/codec_client.h"
+#include "common/http/codec_stat_names.h"
 #include "common/router/header_parser.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/health_checker_base_impl.h"
@@ -40,7 +41,8 @@ public:
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
          Upstream::Cluster& cluster, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
          Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
-         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+         const Http::CodecStatNames& codec_stat_names);
 };
 
 /**
@@ -50,7 +52,8 @@ class HttpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   HttpHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger,
+                        const Http::CodecStatNames& codec_stat_names);
 
   /**
    * Utility class checking if given http status matches configured expectations.
@@ -149,6 +152,7 @@ private:
 
 protected:
   const Http::CodecClient::Type codec_client_type_;
+  const Http::CodecStatNames& codec_stat_names_;
 };
 
 /**
@@ -286,7 +290,8 @@ class GrpcHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   GrpcHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger,
+                        const Http::CodecStatNames& codec_stat_names);
 
 private:
   struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,
@@ -373,6 +378,9 @@ private:
   const Protobuf::MethodDescriptor& service_method_;
   absl::optional<std::string> service_name_;
   absl::optional<std::string> authority_value_;
+
+ protected:
+  const Http::CodecStatNames& codec_stat_names_;
 };
 
 /**

@@ -16,6 +16,7 @@
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
 #include "common/http/codec_helper.h"
+#include "common/http/codec_stat_names.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/header_formatter.h"
@@ -24,20 +25,13 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 
-/**
- * All stats for the HTTP/1 codec. @see stats_macros.h
- */
-#define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
-  COUNTER(dropped_headers_with_underscores)                                                        \
-  COUNTER(metadata_not_supported_error)                                                            \
-  COUNTER(requests_rejected_with_underscores_in_headers)                                           \
-  COUNTER(response_flood)
-
-/**
- * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
- */
 struct CodecStats {
-  ALL_HTTP1_CODEC_STATS(GENERATE_COUNTER_STRUCT)
+  CodecStats(const CodecStatNames& stat_names, Stats::Scope& scope);
+
+  Stats::Counter& dropped_headers_with_underscores_;
+  Stats::Counter& metadata_not_supported_error_;
+  Stats::Counter& requests_rejected_with_underscores_in_headers_;
+  Stats::Counter& response_flood_;
 };
 
 class ConnectionImpl;
@@ -214,7 +208,8 @@ public:
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
 protected:
-  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
+  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                 const CodecStatNames& stat_names, http_parser_type type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
                  HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
 
@@ -395,6 +390,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                       const CodecStatNames& stat_names,
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -492,6 +488,7 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                       const CodecStatNames& stat_names,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
                        const uint32_t max_response_headers_count);
 
