@@ -104,7 +104,7 @@ public:
     auto message_ptr = admin_.config_tracker_.config_tracker_callbacks_["clusters"]();
     const auto& clusters_config_dump =
         dynamic_cast<const envoy::admin::v3::ClustersConfigDump&>(*message_ptr);
-
+   
     envoy::admin::v3::ClustersConfigDump expected_clusters_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_clusters_config_dump);
     EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());
@@ -198,7 +198,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   checkConfigDump(R"EOF(
 static_clusters:
   - cluster:
-      "@type": type.googleapis.com/envoy.admin.v3.config_dump
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
@@ -950,12 +950,11 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
  version_info: version3
  static_clusters:
   - cluster:
-      "@type": type.googleapis.com/envoy.admin.v3.config_dump
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cds_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
       load_assignment:
-        cluster_name: cds_cluster
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -967,12 +966,11 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       seconds: 1234567891
       nanos: 234000000
   - cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
       load_assignment:
-        cluster_name: fake_cluster
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -984,12 +982,11 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       seconds: 1234567891
       nanos: 234000000
   - cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster2"
       type: "STATIC"
       connect_timeout: 0.25s
       load_assignment:
-        cluster_name: fake_cluster2
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -1001,14 +998,13 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       seconds: 1234567891
       nanos: 234000000
  dynamic_active_clusters:
-  - version_info: "version3"
+  - version_info: "version1"
     cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster3"
       type: "STATIC"
       connect_timeout: 0.25s
       load_assignment:
-        cluster_name: cluster3
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -1019,14 +1015,13 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
     last_updated:
       seconds: 1234567891
       nanos: 234000000
-  - version_info: "version3"
+  - version_info: "version2"
     cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster4"
       type: "STATIC"
       connect_timeout: 0.25s
       load_assignment:
-        cluster_name: cluster4
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -1039,12 +1034,11 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       nanos: 234000000
   - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster5"
       type: "STATIC"
       connect_timeout: 0.25s
       load_assignment:
-        cluster_name: cluster5
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -1158,12 +1152,11 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
 dynamic_warming_clusters:
   - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster"
       type: STATIC
       connect_timeout: 0.25s
       load_assignment:
-        cluster_name: fake_cluster
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -1206,12 +1199,11 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version3"
      cluster:
-       "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+       "@type": type.googleapis.com/envoy.api.v2.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
        load_assignment:
-         cluster_name: fake_cluster
          endpoints:
          - lb_endpoints:
            - endpoint:
@@ -1244,12 +1236,11 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version3"
      cluster:
-       "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+       "@type": type.googleapis.com/envoy.api.v2.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
        load_assignment:
-         cluster_name: fake_cluster
          endpoints:
          - lb_endpoints:
            - endpoint:

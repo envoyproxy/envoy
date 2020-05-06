@@ -32,7 +32,14 @@ constexpr static const char* kDefaultStaticClusterTmpl = R"EOF(
       {
         "lb_endpoints": [
           {
-            %s
+            "endpoint":
+            {
+              "address":
+              {
+                  %s  
+               }
+            }
+            
           }
         ]
       }
@@ -40,6 +47,7 @@ constexpr static const char* kDefaultStaticClusterTmpl = R"EOF(
   }
   }
   )EOF";
+
 
 inline std::string defaultStaticClusterJson(const std::string& name) {
   return fmt::sprintf(kDefaultStaticClusterTmpl, name, R"EOF(
