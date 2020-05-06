@@ -729,7 +729,6 @@ TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
-  EXPECT_EQ("foobar", server_->runtime().snapshot().getLayers()[3]->name());
 }
 
 // Validate that a runtime absent an admin layer will fail mutating operations
@@ -746,6 +745,22 @@ TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
       Http::Code::ServiceUnavailable,
       server_->admin().request("/runtime_modify?foo=bar", "POST", response_headers, response_body));
   EXPECT_EQ("No admin layer specified", response_body);
+}
+
+// Verify that bootstrap fails if RTDS is configured through an EDS cluster
+TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughEdsFails) {
+  options_.service_cluster_name_ = "some_service";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/runtime_bootstrap_eds.yaml"),
+                          EnvoyException, "must have a statically defined non-EDS cluster");
+}
+
+// Verify that bootstrap fails if RTDS is configured through an ADS using EDS cluster
+TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
+  options_.service_cluster_name_ = "some_service";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/runtime_bootstrap_ads_eds.yaml"),
+                          EnvoyException, "Unknown gRPC client cluster");
 }
 
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(InvalidLegacyBootstrapRuntime)) {

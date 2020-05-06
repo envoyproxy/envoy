@@ -494,12 +494,20 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
   return true;
 }
 
-void ConnectionImpl::dispatch(Buffer::Instance& data) {
+Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
+  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
+  // throw an exception or return an error status. The utility wrapper catches exceptions and
+  // converts them to error statuses.
+  return Utility::exceptionToStatus(
+      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
+}
+
+Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
   ASSERT(buffered_body_.length() == 0);
 
   if (maybeDirectDispatch(data)) {
-    return;
+    return Http::okStatus();
   }
 
   // Always unpause before dispatch.
@@ -528,6 +536,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
   // If an upgrade has been handled and there is body data or early upgrade
   // payload to send on, send it on.
   maybeDirectDispatch(data);
+  return Http::okStatus();
 }
 
 size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {

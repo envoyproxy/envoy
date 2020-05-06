@@ -34,6 +34,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/path_utility.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
@@ -279,7 +280,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   return **streams_.begin();
 }
 
-void ConnectionManagerImpl::handleCodecException(const char* error) {
+void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
   read_callbacks_->connection().streamInfo().setResponseCodeDetails(
       absl::StrCat("codec error: ", error));
@@ -323,14 +324,15 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   do {
     redispatch = false;
 
-    try {
-      codec_->dispatch(data);
-    } catch (const FrameFloodException& e) {
-      handleCodecException(e.what());
+    const Status status = codec_->dispatch(data);
+
+    ASSERT(!isPrematureResponseError(status));
+    if (isBufferFloodError(status)) {
+      handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
-    } catch (const CodecProtocolException& e) {
+    } else if (isCodecProtocolError(status)) {
       stats_.named_.downstream_cx_protocol_error_.inc();
-      handleCodecException(e.what());
+      handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
     }
 
@@ -695,6 +697,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
     StreamDecoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
+  // Note: configured decoder filters are appended to decoder_filters_.
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
+  //   http_filters:
+  //     - A
+  //     - B
+  //     - C
+  // The decoder filter chain will iterate through filters A, B, C.
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
@@ -702,6 +712,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
+  // Note: configured encoder filters are prepended to encoder_filters_.
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
+  //   http_filters:
+  //     - A
+  //     - B
+  //     - C
+  // The encoder filter chain will iterate through filters C, B, A.
   wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
 }
 
