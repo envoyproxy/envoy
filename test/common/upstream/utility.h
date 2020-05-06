@@ -27,11 +27,17 @@ constexpr static const char* kDefaultStaticClusterTmpl = R"EOF(
     "connect_timeout": "0.250s",
     "type": "static",
     "lb_policy": "round_robin",
-    "hosts": [
+    "load_assignment": {
+    "endpoints": [
       {
-        %s,
+        "lb_endpoints": [
+          {
+            %s
+          }
+        ]
       }
     ]
+  }
   }
   )EOF";
 

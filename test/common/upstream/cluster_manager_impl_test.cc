@@ -198,7 +198,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   checkConfigDump(R"EOF(
 static_clusters:
   - cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.admin.v3.config_dump
       name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
@@ -381,7 +381,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
   - name: cluster_1
     connect_timeout: 0.250s
     type: static
-    lb_policy: cluster_provided
+    lb_policy: original_dst_lb
     load_assignment:
       cluster_name: cluster_1
       endpoints:
@@ -503,7 +503,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerOriginalDstRestriction) {
   - name: cluster_1
     connect_timeout: 0.250s
     type: original_dst
-    lb_policy: cluster_provided
+    lb_policy: original_dst_lb
     lb_subset_config:
       fallback_policy: ANY_ENDPOINT
       subset_selectors:
@@ -868,7 +868,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
     "dynamic_resources": {
       "cds_config": {
         "api_config_source": {
-          "api_type": "DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE",
+          "api_type": "UNSUPPORTED_REST_LEGACY",
           "refresh_delay": "30s",
           "cluster_names": ["cds_cluster"]
         }
@@ -950,7 +950,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
  version_info: version3
  static_clusters:
   - cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.admin.v3.config_dump
       name: "cds_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
