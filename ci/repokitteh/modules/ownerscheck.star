@@ -197,7 +197,7 @@ def _lgtm_by_comment(config, comment_id, command, sender, sha):
   labels = command.args
 
   if len(labels) != 1:
-    react(comment_id, 'please specifiy a single label can be specified')
+    react(comment_id, 'please specify a single label can be specified')
     return
 
   label = labels[0]
