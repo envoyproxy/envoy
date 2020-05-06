@@ -102,7 +102,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
 
   if (cluster_ != nullptr) {
     // Treat an update as a removal followed by an add.
-    onClusterRemoval(cluster_name_);
+    ThreadLocalPool::onClusterRemoval(cluster_name_);
   }
 
   ASSERT(cluster_ == nullptr);
