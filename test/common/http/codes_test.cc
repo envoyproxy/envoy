@@ -53,6 +53,7 @@ public:
 };
 
 TEST_F(CodeUtilityTest, GroupStrings) {
+  EXPECT_EQ("1xx", CodeUtility::groupStringForResponseCode(Code::SwitchingProtocols));
   EXPECT_EQ("2xx", CodeUtility::groupStringForResponseCode(Code::OK));
   EXPECT_EQ("3xx", CodeUtility::groupStringForResponseCode(Code::Found));
   EXPECT_EQ("4xx", CodeUtility::groupStringForResponseCode(Code::NotFound));
