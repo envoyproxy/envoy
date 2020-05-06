@@ -95,10 +95,11 @@ def _is_approved(spec, approvers):
 
 
 def _update_status(owner, path_match, approved):
+  changes_to = (path_match or '/')
   github.create_status(
     state=approved and 'success' or 'pending',
-    context='%s must approve' % owner,
-    description='changes to %s' % (path_match or '/'),
+    context='%s must approve changes to ' % (owner, changes_to),
+    description=owner,
   )
 
 def _get_specs(config):
