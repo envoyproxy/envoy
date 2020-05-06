@@ -31,7 +31,7 @@ public:
   }
 
   static const std::string authPassword(const Upstream::ClusterInfoConstSharedPtr info,
-                                         Api::Api& api) {
+                                        Api::Api& api) {
     auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
     if (options) {
