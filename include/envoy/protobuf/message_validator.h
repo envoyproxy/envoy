@@ -38,7 +38,7 @@ public:
    * If true, skip this validation visitor in the interest of speed when
    * possible.
    **/
-  virtual bool skipValidation() { return false; }
+  virtual bool skipValidation() PURE;
 };
 
 class NullValidationVisitor : public ValidationVisitor {};

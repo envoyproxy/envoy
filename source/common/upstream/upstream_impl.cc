@@ -1415,18 +1415,16 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
   // Remove hosts from current_priority_hosts that were matched to an existing host in the previous
   // loop.
-  auto erase_from_itr = current_priority_hosts.end();
-  for (auto itr = current_priority_hosts.begin(); itr != erase_from_itr;) {
+  for (auto itr = current_priority_hosts.begin(); itr != current_priority_hosts.end();) {
     auto existing_itr = existing_hosts_for_current_priority.find((*itr)->address()->asString());
 
     if (existing_itr != existing_hosts_for_current_priority.end()) {
       existing_hosts_for_current_priority.erase(existing_itr);
-      *itr = *(--erase_from_itr);
+      itr = current_priority_hosts.erase(itr);
     } else {
       itr++;
     }
   }
-  current_priority_hosts.erase(erase_from_itr, current_priority_hosts.end());
 
   // If we saw existing hosts during this iteration from a different priority, then we've moved
   // a host from another priority into this one, so we should mark the priority as having changed.
@@ -1444,8 +1442,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
-    erase_from_itr = current_priority_hosts.end();
-    for (auto i = current_priority_hosts.begin(); i != erase_from_itr;) {
+    for (auto i = current_priority_hosts.begin(); i != current_priority_hosts.end();) {
       if (!((*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
             (*i)->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
         if ((*i)->weight() > max_host_weight) {
@@ -1455,12 +1452,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         final_hosts.push_back(*i);
         updated_hosts[(*i)->address()->asString()] = *i;
         (*i)->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
-        *i = *(--erase_from_itr);
+        i = current_priority_hosts.erase(i);
       } else {
         i++;
       }
     }
-    current_priority_hosts.erase(erase_from_itr, current_priority_hosts.end());
   }
 
   // At this point we've accounted for all the new hosts as well the hosts that previously

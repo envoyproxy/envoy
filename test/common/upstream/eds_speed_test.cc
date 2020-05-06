@@ -30,57 +30,7 @@ namespace Upstream {
 
 class EdsSpeedTest {
 public:
-  EdsSpeedTest() : api_(Api::createApiForTest(stats_)) { resetCluster(); }
-
-  void resetCluster() {
-    resetCluster(R"EOF(
-      name: name
-      connect_timeout: 0.25s
-      type: EDS
-      lb_policy: ROUND_ROBIN
-      eds_cluster_config:
-        service_name: fare
-        eds_config:
-          api_config_source:
-            api_type: REST
-            cluster_names:
-            - eds
-            refresh_delay: 1s
-    )EOF",
-                 Cluster::InitializePhase::Secondary);
-  }
-
-  void resetClusterDrainOnHostRemoval() {
-    resetCluster(R"EOF(
-        name: name
-        connect_timeout: 0.25s
-        type: EDS
-        lb_policy: ROUND_ROBIN
-        drain_connections_on_host_removal: true
-        eds_cluster_config:
-          service_name: fare
-          eds_config:
-            api_config_source:
-              api_type: REST
-              cluster_names:
-              - eds
-              refresh_delay: 1s
-    )EOF",
-                 Cluster::InitializePhase::Secondary);
-  }
-
-  void resetClusterLoadedFromFile() {
-    resetCluster(R"EOF(
-      name: name
-      connect_timeout: 0.25s
-      type: EDS
-      lb_policy: ROUND_ROBIN
-      eds_cluster_config:
-        eds_config:
-          path: "eds path"
-    )EOF",
-                 Cluster::InitializePhase::Primary);
-  }
+  EdsSpeedTest() : api_(Api::createApiForTest(stats_)) { }
 
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
@@ -102,13 +52,6 @@ public:
     cluster_->initialize([this] { initialized_ = true; });
   }
 
-  void doOnConfigUpdateVerifyNoThrow(
-      const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
-    resources.Add()->PackFrom(cluster_load_assignment);
-    VERBOSE_EXPECT_NO_THROW(eds_callbacks_->onConfigUpdate(resources, ""));
-  }
-
   // Set up an EDS config with multiple priorities, localities, weights and make sure
   // they are loaded and reloaded as expected.
   void priorityAndLocalityWeightedHelper(bool ignore_unknown_dynamic_fields, int num_hosts) {
@@ -118,53 +61,42 @@ public:
       name: name
       connect_timeout: 0.25s
       type: EDS
-      lb_policy: ROUND_ROBIN
-      common_lb_config:
-        locality_weighted_lb_config: {}
       eds_cluster_config:
         service_name: fare
         eds_config:
           api_config_source:
-            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
     )EOF",
                  Envoy::Upstream::Cluster::InitializePhase::Secondary);
 
+    // Add a whole bunch of hosts in a single place:
+    auto* endpoints = cluster_load_assignment.add_endpoints();
+    endpoints->set_priority(1);
+    auto* locality = endpoints->mutable_locality();
+    locality->set_region("region");
+    locality->set_zone("zone");
+    locality->set_sub_zone("sub_zone");
+    endpoints->mutable_load_balancing_weight()->set_value(1);
+
     uint32_t port = 1000;
-    auto add_hosts_to_locality_and_priority =
-        [&cluster_load_assignment, &port](const std::string& region, const std::string& zone,
-                                          const std::string& sub_zone, uint32_t priority,
-                                          uint32_t n, uint32_t weight) {
-          auto* endpoints = cluster_load_assignment.add_endpoints();
-          endpoints->set_priority(priority);
-          auto* locality = endpoints->mutable_locality();
-          locality->set_region(region);
-          locality->set_zone(zone);
-          locality->set_sub_zone(sub_zone);
-          endpoints->mutable_load_balancing_weight()->set_value(weight);
+    for (int i = 0; i < num_hosts; ++i) {
+      auto* socket_address = endpoints->add_lb_endpoints()
+                             ->mutable_endpoint()
+                             ->mutable_address()
+                             ->mutable_socket_address();
+      socket_address->set_address("10.0.1." + std::to_string(i / 60000));
+      socket_address->set_port_value((port + i) % 60000);
+    }
 
-          for (uint32_t i = 0; i < n; ++i) {
-            auto* socket_address = endpoints->add_lb_endpoints()
-                                       ->mutable_endpoint()
-                                       ->mutable_address()
-                                       ->mutable_socket_address();
-
-            socket_address->set_address("10.0.1." + std::to_string(i / 60000));
-            socket_address->set_port_value((port + i) % 60000);
-          }
-        };
-
-    // Set up both priority 0 and priority 1 with 2 localities.
-    add_hosts_to_locality_and_priority("oceania", "koala", "ingsoc", 0, num_hosts, 25);
-    // add_hosts_to_locality_and_priority("oceania", "koala", "ingsoc", 0, 2, 25);
-    add_hosts_to_locality_and_priority("", "us-east-1a", "", 0, 1, 75);
-    add_hosts_to_locality_and_priority("", "us-east-1a", "", 1, 8, 60);
-    add_hosts_to_locality_and_priority("foo", "bar", "eep", 1, 2, 40);
+    // this is what we're actually testing:
     validation_visitor_.setSkipValidation(ignore_unknown_dynamic_fields);
+
     initialize();
-    doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+    resources.Add()->PackFrom(cluster_load_assignment);
+    eds_callbacks_->onConfigUpdate(resources, "");
     ASSERT(initialized_);
   }
 

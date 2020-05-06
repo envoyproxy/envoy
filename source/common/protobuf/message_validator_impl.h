@@ -29,6 +29,9 @@ public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
 
+  // Envoy::ProtobufMessage::ValidationVisitor
+  bool skipValidation() override { return false; }
+
 private:
   // Track hashes of descriptions we've seen, to avoid log spam. A hash is used here to avoid
   // wasting memory with unused strings.
@@ -43,6 +46,9 @@ class StrictValidationVisitorImpl : public ValidationVisitor {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
+
+  // Envoy::ProtobufMessage::ValidationVisitor
+  bool skipValidation() override { return false; }
 };
 
 ValidationVisitor& getStrictValidationVisitor();

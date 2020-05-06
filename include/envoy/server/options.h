@@ -102,7 +102,7 @@ public:
   virtual bool rejectUnknownDynamicFields() const PURE;
 
   /**
-   * GENERA write the comment.
+   * @return bool ignore unknown fields in the dynamic configuration?
    **/
   virtual bool ignoreUnknownDynamicFields() const PURE;
 

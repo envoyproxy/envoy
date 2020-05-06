@@ -103,6 +103,7 @@ envoy_cc_benchmark_binary(
         "benchmark",
     ],
     deps = [
+        ":eds_test",
         ":utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/upstream:eds_lib",
