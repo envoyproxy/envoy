@@ -36,7 +36,7 @@ private:
 class AutonomousHttpConnection : public FakeHttpConnection {
 public:
   AutonomousHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store,
-                           Type type, AutonomousUpstream& upstream);
+                           Type type, AutonomousUpstream& upstream, Http::Context& http_context);
 
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
 
@@ -52,16 +52,18 @@ class AutonomousUpstream : public FakeUpstream {
 public:
   AutonomousUpstream(const Network::Address::InstanceConstSharedPtr& address,
                      FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
-                     bool allow_incomplete_streams)
-      : FakeUpstream(address, type, time_system),
+                     Http::Context& http_context, bool allow_incomplete_streams)
+      : FakeUpstream(address, type, time_system, http_context),
         allow_incomplete_streams_(allow_incomplete_streams),
         response_headers_(std::make_unique<Http::TestResponseHeaderMapImpl>(
             Http::TestHeaderMapImpl({{":status", "200"}}))) {}
 
   AutonomousUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
                      FakeHttpConnection::Type type, Network::Address::IpVersion version,
-                     Event::TestTimeSystem& time_system, bool allow_incomplete_streams)
-      : FakeUpstream(std::move(transport_socket_factory), port, type, version, time_system),
+                     Event::TestTimeSystem& time_system,
+                     Http::Context& http_context, bool allow_incomplete_streams)
+      : FakeUpstream(std::move(transport_socket_factory), port, type, version, time_system,
+                     http_context),
         allow_incomplete_streams_(allow_incomplete_streams),
         response_headers_(std::make_unique<Http::TestResponseHeaderMapImpl>(
             Http::TestHeaderMapImpl({{":status", "200"}}))) {}

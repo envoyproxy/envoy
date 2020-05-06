@@ -12,6 +12,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/grpc/common.h"
+#include "common/http/context_impl.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
@@ -68,10 +69,11 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   Api::MockApi api;
+  Http::ContextImpl http_context(api.symbolTable());
 
   EXPECT_THROW_WITH_MESSAGE(
       HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime, random,
-                                   dispatcher, log_manager, validation_visitor, api),
+                                   dispatcher, log_manager, validation_visitor, api, http_context),
       EnvoyException, "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
 
@@ -87,11 +89,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   Api::MockApi api;
+  Http::ContextImpl http_context(api.rootScope().symbolTable());
 
   EXPECT_NE(nullptr, dynamic_cast<GrpcHealthCheckerImpl*>(
                          HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
                                                       runtime, random, dispatcher, log_manager,
-                                                      validation_visitor, api)
+                                                      validation_visitor, api, http_context)
                              .get()));
 }
 

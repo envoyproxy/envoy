@@ -61,6 +61,11 @@ public:
   virtual const Stats::Scope& rootScope() PURE;
 
   /**
+   * @return a reference to the stats symbol table.
+   */
+  virtual const Stats::SymbolTable& symbolTable() PURE;
+
+  /**
    * @return an optional reference to the ProcessContext
    */
   virtual ProcessContextOptRef processContext() PURE;

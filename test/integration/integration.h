@@ -214,6 +214,7 @@ public:
                            bool allow_lds_rejection);
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
+  Http::Context& httpContext() { return test_server_->server().httpContext(); }
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;

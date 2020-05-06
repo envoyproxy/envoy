@@ -28,6 +28,7 @@ public:
   Filesystem::Instance& fileSystem() override { return file_system_; }
   TimeSource& timeSource() override { return time_system_; }
   const Stats::Scope& rootScope() override { return store_; }
+  Stats::SymbolTable& symbolTable() override { return store_.symbolTable(); }
   ProcessContextOptRef processContext() override { return process_context_; }
 
 private:

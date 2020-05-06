@@ -12,6 +12,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/http/context_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/network/utility.h"
@@ -65,6 +66,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                    const std::string& host, const std::string& content_type) {
 
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
+  Http::ContextImpl http_context(mock_stats_store.symbolTable());
   Event::GlobalTimeSystem time_system;
   Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
                 Filesystem::fileSystemForTest());
@@ -76,7 +78,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       type,
       dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
                                          Network::Test::createRawBufferSocket(), nullptr),
-      host_description, *dispatcher);
+      host_description, *dispatcher, http_context);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
     client.close();
     dispatcher->exit();

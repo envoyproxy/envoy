@@ -424,7 +424,8 @@ public:
                      Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
                      uint32_t max_request_headers_count,
                      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                         headers_with_underscores_action);
+                     headers_with_underscores_action,
+                     Http::Context& http_context);
 
   // By default waitForNewStream assumes the next event is a new stream and
   // returns AssertionFailure if an unexpected event occurs. If a caller truly
@@ -469,6 +470,7 @@ private:
 
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_;
+  Http::Context& http_context_;
 };
 
 using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
@@ -547,18 +549,20 @@ class FakeUpstream : Logger::Loggable<Logger::Id::testing>,
 public:
   // Creates a fake upstream bound to the specified unix domain socket path.
   FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
-               Event::TestTimeSystem& time_system);
+               Event::TestTimeSystem& time_system, Http::Context& http_context);
   // Creates a fake upstream bound to the specified |address|.
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
+               Http::Context& http_context,
                bool enable_half_close = false, bool udp_fake_upstream = false);
 
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
-               Event::TestTimeSystem& time_system, bool enable_half_close = false);
+               Event::TestTimeSystem& time_system,
+               Http::Context& http_context, bool enable_half_close = false);
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
                FakeHttpConnection::Type type, Network::Address::IpVersion version,
-               Event::TestTimeSystem& time_system);
+               Event::TestTimeSystem& time_system, Http::Context& http_context);
   ~FakeUpstream() override;
 
   FakeHttpConnection::Type httpType() { return http_type_; }
@@ -620,11 +624,13 @@ public:
 protected:
   Stats::IsolatedStoreImpl stats_store_;
   const FakeHttpConnection::Type http_type_;
+  Http::Context& http_context_;
 
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                Network::SocketPtr&& connection, FakeHttpConnection::Type type,
-               Event::TestTimeSystem& time_system, bool enable_half_close);
+               Event::TestTimeSystem& time_system,
+               Http::Context& http_context, bool enable_half_close);
 
   class FakeListenSocketFactory : public Network::ListenSocketFactory {
   public:

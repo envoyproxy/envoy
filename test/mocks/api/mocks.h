@@ -41,6 +41,7 @@ public:
   MOCK_METHOD(Filesystem::Instance&, fileSystem, ());
   MOCK_METHOD(Thread::ThreadFactory&, threadFactory, ());
   MOCK_METHOD(const Stats::Scope&, rootScope, ());
+  MOCK_METHOD(Stats::SymbolTable&, symbolTable, ());
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
 
   testing::NiceMock<Filesystem::MockInstance> file_system_;

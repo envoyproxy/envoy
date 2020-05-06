@@ -547,6 +547,7 @@ envoy_cc_test_library(
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codec_client_lib",
+        "//source/common/http:context_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http/http1:codec_lib",

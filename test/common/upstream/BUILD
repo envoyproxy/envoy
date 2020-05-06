@@ -104,6 +104,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/http:context_lib",
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",

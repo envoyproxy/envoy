@@ -226,14 +226,17 @@ FakeHttpConnection::FakeHttpConnection(
     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
     uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
-    : FakeConnectionBase(shared_connection, time_system) {
+    headers_with_underscores_action,
+    Http::Context& http_context)
+    : FakeConnectionBase(shared_connection, time_system),
+      http_context_(http_context) {
   if (type == Type::HTTP1) {
     Http::Http1Settings http1_settings;
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
     codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
-        shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
+        shared_connection_.connection(), store, http_context_.codecStatNames(), *this,
+        http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
   } else {
     envoy::config::core::v3::Http2ProtocolOptions http2_options =
@@ -360,11 +363,11 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
 }
 
 FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
-                           Event::TestTimeSystem& time_system)
+                           Event::TestTimeSystem& time_system, Http::Context& http_context)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
                    Network::SocketPtr{new Network::UdsListenSocket(
                        std::make_shared<Network::Address::PipeInstance>(uds_path))},
-                   type, time_system, false) {
+                   type, time_system, http_context, false) {
   ENVOY_LOG(info, "starting fake server on unix domain socket {}", uds_path);
 }
 
@@ -390,10 +393,11 @@ makeUdpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
 
 FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                            FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
+                           Http::Context& http_context,
                            bool enable_half_close, bool udp_fake_upstream)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
                    udp_fake_upstream ? makeUdpListenSocket(address) : makeTcpListenSocket(address),
-                   type, time_system, enable_half_close) {
+                   type, time_system, http_context, enable_half_close) {
   ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
             address->ip()->addressAsString(), address->ip()->port(),
             Network::Test::addressVersionAsString(address->ip()->version()), udp_fake_upstream);
@@ -401,26 +405,30 @@ FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& addre
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
                            Network::Address::IpVersion version, Event::TestTimeSystem& time_system,
-                           bool enable_half_close)
+                           Http::Context& http_context, bool enable_half_close)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
-                   makeTcpListenSocket(port, version), type, time_system, enable_half_close) {
+                   makeTcpListenSocket(port, version), type, time_system, http_context,
+                   enable_half_close) {
   ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
             localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            uint32_t port, FakeHttpConnection::Type type,
-                           Network::Address::IpVersion version, Event::TestTimeSystem& time_system)
+                           Network::Address::IpVersion version, Event::TestTimeSystem& time_system,
+                           Http::Context& http_context)
     : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version), type,
-                   time_system, false) {
+                   time_system, http_context, false) {
   ENVOY_LOG(info, "starting fake SSL server on port {}. Address version is {}",
             localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
-                           Event::TestTimeSystem& time_system, bool enable_half_close)
-    : http_type_(type), socket_(Network::SocketSharedPtr(listen_socket.release())),
+                           Event::TestTimeSystem& time_system,
+                           Http::Context& http_context, bool enable_half_close)
+    : http_type_(type), http_context_(http_context),
+      socket_(Network::SocketSharedPtr(listen_socket.release())),
       socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
       dispatcher_(api_->allocateDispatcher("fake_upstream")),
@@ -498,8 +506,9 @@ AssertionResult FakeUpstream::waitForHttpConnection(
       return AssertionFailure() << "Got a new connection event, but didn't create a connection.";
     }
     connection = std::make_unique<FakeHttpConnection>(
-        consumeConnection(), stats_store_, http_type_, time_system, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        consumeConnection(), stats_store_, http_type_, time_system,
+        max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action, http_context_);
   }
   VERIFY_ASSERTION(connection->initialize());
   if (read_disable_on_new_connection_) {
@@ -532,7 +541,8 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         connection = std::make_unique<FakeHttpConnection>(
             upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_,
             upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-            Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+            Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+            upstream.http_context_);
         lock.release();
         VERIFY_ASSERTION(connection->initialize());
         VERIFY_ASSERTION(connection->readDisable(false));
