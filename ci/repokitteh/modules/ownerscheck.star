@@ -20,6 +20,7 @@
 #    this module's maintained commit status. This approval is automatically revoked
 #    if any further changes are done to the relevant files in this spec.
 
+load("text", "match")
 load("github.com/repokitteh/modules/lib/utils.star", "react")
 
 def _store_partial_approval(who, files):
@@ -44,11 +45,12 @@ def _get_relevant_specs(specs, changed_files):
   relevant = []
 
   for spec in specs:
-    prefix = spec["path"]
+    match = spec["path"]
 
-    files = [f for f in changed_files if f['filename'].startswith(prefix)]
+    files = [f for f in changed_files if text.match(match, f['filename'])]
+    allow_global_approval = spec.get("allow_global_approval", True)
     if files:
-      relevant.append(struct(files=files, prefix=prefix, **spec))
+      relevant.append(struct(files=files, match=match, allow_global_approval=allow_global_approval, **spec))
 
   print("specs: %s" % relevant)
 
@@ -81,7 +83,7 @@ def _is_approved(spec, approvers):
     print("team %s(%d) = %s" % (team_name, team_id, required))
 
   for r in required:
-    if any([a for a in approvers if a == r]):
+    if spec.allow_global_approval and any([a for a in approvers if a == r]):
       print("global approver: %s" % r)
       return True
 
@@ -92,11 +94,11 @@ def _is_approved(spec, approvers):
   return False
 
 
-def _update_status(owner, prefix, approved):
+def _update_status(owner, match, approved):
   github.create_status(
     state=approved and 'success' or 'pending',
     context='%s must approve' % owner,
-    description='changes to %s' % (prefix or '/'),
+    description='changes to %s' % (match or '/'),
   )
 
 def _get_specs(config):
@@ -122,7 +124,7 @@ def _reconcile(config, specs=None):
     results.append((spec, approved))
 
     if spec.owner[-1] == '!':
-      _update_status(spec.owner[:-1], spec.prefix, approved)
+      _update_status(spec.owner[:-1], spec.match, approved)
 
       if hasattr(spec, 'label'):
         if approved:
@@ -150,13 +152,13 @@ def _comment(config, results, force=False):
     if mention[-1] == '!':
       mention = mention[:-1]
 
-    prefix = spec.prefix
-    if prefix:
-      prefix = ' for changes made to `' + prefix + '`'
+    match_description = spec.match
+    if match_description:
+      match_description = ' for changes made to `' + match_description + '`'
 
     mode = spec.owner[-1] == '!' and 'approval' or 'fyi'
 
-    key = "ownerscheck/%s/%s" % (spec.owner, spec.prefix)
+    key = "ownerscheck/%s/%s" % (spec.owner, spec.match)
 
     if (not force) and (store_get(key) == mode):
       mode = 'skip'
@@ -164,9 +166,9 @@ def _comment(config, results, force=False):
       store_put(key, mode)
 
     if mode == 'approval':
-      lines.append('CC %s: Your approval is needed%s.' % (mention, prefix))
+      lines.append('CC %s: Your approval is needed%s.' % (mention, match_description))
     elif mode == 'fyi':
-      lines.append('CC %s: FYI only%s.' % (mention, prefix))
+      lines.append('CC %s: FYI only%s.' % (mention, match_description))
 
   if lines:
     github.issue_create_comment('\n'.join(lines))

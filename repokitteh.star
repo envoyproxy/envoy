@@ -9,6 +9,12 @@ use(
   paths=[
     {
       "owner": "envoyproxy/api-shepherds!",
+      "path": "(api/envoy[\w/]*/(v1alpha\d?|v1|v2alpha\d?|v2))|(api/envoy/type/(matcher/)?\w+.proto)"
+      "label": "v2-freeze",
+      "allow_global_approval": False,
+    },
+    {
+      "owner": "envoyproxy/api-shepherds!",
       "path": "api/",
       "label": "api",
     },
