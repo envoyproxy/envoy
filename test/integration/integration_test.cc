@@ -590,25 +590,23 @@ TEST_P(IntegrationTest, Pipeline) {
   initialize();
   std::string response;
 
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHost: host\r\n\r\nGET / HTTP/1.1\r\n\r\n");
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
+  auto connection = createConnectionDriver(
+      lookupPort("http"), "GET / HTTP/1.1\r\nHost: host\r\n\r\nGET / HTTP/1.1\r\n\r\n",
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-      },
-      version_);
+      });
   // First response should be success.
   while (response.find("200") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
 
   // Second response should be 400 (no host)
   while (response.find("400") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
-  connection.close();
+  connection->close();
 }
 
 // Checks to ensure that we reject the third request that is pipelined in the
@@ -639,30 +637,27 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
                           "trailer2:t3\r\n"
                           "\r\n");
 
-  Buffer::OwnedImpl buffer(absl::StrCat(good_request, good_request, bad_request));
-
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      lookupPort("http"), absl::StrCat(good_request, good_request, bad_request),
+      [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-      },
-      version_);
+      });
 
   // First response should be success.
   size_t pos;
   while ((pos = response.find("200")) == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
   while (response.find("200", pos + 1) == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   while (response.find("400") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
-  connection.close();
+  connection->close();
 }
 
 // Add a pipeline test where complete request headers in the first request merit
@@ -673,24 +668,22 @@ TEST_P(IntegrationTest, PipelineInline) {
   initialize();
   std::string response;
 
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\nGET / HTTP/1.0\r\n\r\n");
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      lookupPort("http"), "GET / HTTP/1.1\r\n\r\nGET / HTTP/1.0\r\n\r\n",
+      [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-      },
-      version_);
+      });
 
   while (response.find("400") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 
   while (response.find("426") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 426 Upgrade Required\r\n"));
-  connection.close();
+  connection->close();
 }
 
 TEST_P(IntegrationTest, NoHost) {
@@ -993,7 +986,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
   // Issue a local close and check that the client did not pick up a remote close which can happen
   // when delayed close semantics are disabled.
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::LocalClose);
 }
 
 // Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
@@ -1030,7 +1023,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
   // Therefore, avoid checking response code/payload here and instead simply look for the remote
   // close.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
 }
 
 // Test that delay closed connections are eventually force closed when the timeout triggers.
@@ -1064,7 +1057,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   response->waitForEndStream();
   // The delayed close timeout should trigger since client is not closing the connection.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(2000)));
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
 }
@@ -1336,8 +1329,10 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
       });
   initialize();
 
+  // Send the payload early so we can regression test that body data does not
+  // get proxied until after the response headers are sent.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\nHost: host\r\n\r\n", false);
+  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\nHost: host\r\n\r\npayload", false);
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -1347,6 +1342,8 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   // No transfer-encoding: chunked or connection: close
   EXPECT_FALSE(absl::StrContains(data, "hunked")) << data;
   EXPECT_FALSE(absl::StrContains(data, "onnection")) << data;
+  // The payload should not be present as the response headers have not been sent.
+  EXPECT_FALSE(absl::StrContains(data, "payload")) << data;
 
   ASSERT_TRUE(fake_upstream_connection->write(
       "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n"));
@@ -1356,8 +1353,7 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   EXPECT_TRUE(absl::StrContains(tcp_client->data(), "\r\n\r\nb\r\nHello World\r\n0\r\n\r\n"))
       << tcp_client->data();
 
-  // Make sure the following payload is proxied without chunks or any other modifications.
-  tcp_client->write("payload");
+  // Make sure the early payload is proxied without chunks or any other modifications.
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\npayload")));
 

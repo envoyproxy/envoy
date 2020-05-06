@@ -221,6 +221,30 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
       Http::TestHeaderMapImpl{{"grpc-status", std::to_string(static_cast<uint32_t>(status))}});
 }
 
+// The TestHttp1ServerConnectionImpl outlives its underlying Network::Connection
+// so must not access the Connection on teardown. To achieve this, clear the
+// read disable calls to avoid checking / editing the Connection blocked state.
+class TestHttp1ServerConnectionImpl : public Http::Http1::ServerConnectionImpl {
+public:
+  using Http::Http1::ServerConnectionImpl::ServerConnectionImpl;
+
+  void onMessageComplete() override {
+    ServerConnectionImpl::onMessageComplete();
+
+    if (activeRequest().has_value() && activeRequest().value().request_decoder_) {
+      // Undo the read disable from the base class - we have many tests which
+      // waitForDisconnect after a full request has been read which will not
+      // receive the disconnect if reading is disabled.
+      activeRequest().value().response_encoder_.readDisable(false);
+    }
+  }
+  ~TestHttp1ServerConnectionImpl() override {
+    if (activeRequest().has_value()) {
+      activeRequest().value().response_encoder_.clearReadDisableCallsForTests();
+    }
+  }
+};
+
 FakeHttpConnection::FakeHttpConnection(
     SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
@@ -232,7 +256,7 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http1Settings http1_settings;
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
-    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
+    codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
   } else {

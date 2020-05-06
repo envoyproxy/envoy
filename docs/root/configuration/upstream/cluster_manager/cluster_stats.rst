@@ -69,13 +69,14 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_cancelled, Counter, Total requests cancelled before obtaining a connection pool connection
   upstream_rq_maintenance_mode, Counter, Total requests that resulted in an immediate 503 due to :ref:`maintenance mode<config_http_filters_router_runtime_maintenance_mode>`
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
+  upstream_rq_max_duration_reached, Counter, Total requests closed due to max duration reached
   upstream_rq_per_try_timeout, Counter, Total requests that hit the per try timeout
   upstream_rq_rx_reset, Counter, Total requests that were reset remotely
   upstream_rq_tx_reset, Counter, Total requests that were reset locally
   upstream_rq_retry, Counter, Total request retries
   upstream_rq_retry_limit_exceeded, Counter, Total requests not retried due to exceeding :ref:`the configured number of maximum retries <config_http_filters_router_x-envoy-max-retries>`
   upstream_rq_retry_success, Counter, Total request retry successes
-  upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the :ref:`retry budget <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>`
+  upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the :ref:`retry budget <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`
   upstream_flow_control_paused_reading_total, Counter, Total number of times flow control paused reading from upstream
   upstream_flow_control_resumed_reading_total, Counter, Total number of times flow control resumed reading from upstream
   upstream_flow_control_backed_up_total, Counter, Total number of times the upstream connection backed up and paused reads from downstream
@@ -134,16 +135,16 @@ statistics will be rooted at *cluster.<name>.outlier_detection.* and contain the
   ejections_overflow, Counter, Number of ejections aborted due to the max ejection %
   ejections_enforced_consecutive_5xx, Counter, Number of enforced consecutive 5xx ejections
   ejections_detected_consecutive_5xx, Counter, Number of detected consecutive 5xx ejections (even if unenforced)
-  ejections_enforced_success_rate, Counter, Number of enforced success rate outlier ejections. Exact meaning of this counter depends on :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` config item. Refer to :ref:`Outlier Detection documentation<arch_overview_outlier_detection>` for details.
-  ejections_detected_success_rate, Counter, Number of detected success rate outlier ejections (even if unenforced). Exact meaning of this counter depends on :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` config item. Refer to :ref:`Outlier Detection documentation<arch_overview_outlier_detection>` for details.
+  ejections_enforced_success_rate, Counter, Number of enforced success rate outlier ejections. Exact meaning of this counter depends on :ref:`outlier_detection.split_external_local_origin_errors<envoy_v3_api_field_config.cluster.v3.OutlierDetection.split_external_local_origin_errors>` config item. Refer to :ref:`Outlier Detection documentation<arch_overview_outlier_detection>` for details.
+  ejections_detected_success_rate, Counter, Number of detected success rate outlier ejections (even if unenforced). Exact meaning of this counter depends on :ref:`outlier_detection.split_external_local_origin_errors<envoy_v3_api_field_config.cluster.v3.OutlierDetection.split_external_local_origin_errors>` config item. Refer to :ref:`Outlier Detection documentation<arch_overview_outlier_detection>` for details.
   ejections_enforced_consecutive_gateway_failure, Counter, Number of enforced consecutive gateway failure ejections
   ejections_detected_consecutive_gateway_failure, Counter, Number of detected consecutive gateway failure ejections (even if unenforced)
   ejections_enforced_consecutive_local_origin_failure, Counter, Number of enforced consecutive local origin failure ejections
   ejections_detected_consecutive_local_origin_failure, Counter, Number of detected consecutive local origin failure ejections (even if unenforced)
   ejections_enforced_local_origin_success_rate, Counter, Number of enforced success rate outlier ejections for locally originated failures
   ejections_detected_local_origin_success_rate, Counter, Number of detected success rate outlier ejections for locally originated failures (even if unenforced)
-  ejections_enforced_failure_percentage, Counter, Number of enforced failure percentage outlier ejections. Exact meaning of this counter depends on :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` config item. Refer to :ref:`Outlier Detection documentation<arch_overview_outlier_detection>` for details.
-  ejections_detected_failure_percentage, Counter, Number of detected failure percentage outlier ejections (even if unenforced). Exact meaning of this counter depends on :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` config item. Refer to :ref:`Outlier Detection documentation<arch_overview_outlier_detection>` for details.
+  ejections_enforced_failure_percentage, Counter, Number of enforced failure percentage outlier ejections. Exact meaning of this counter depends on :ref:`outlier_detection.split_external_local_origin_errors<envoy_v3_api_field_config.cluster.v3.OutlierDetection.split_external_local_origin_errors>` config item. Refer to :ref:`Outlier Detection documentation<arch_overview_outlier_detection>` for details.
+  ejections_detected_failure_percentage, Counter, Number of detected failure percentage outlier ejections (even if unenforced). Exact meaning of this counter depends on :ref:`outlier_detection.split_external_local_origin_errors<envoy_v3_api_field_config.cluster.v3.OutlierDetection.split_external_local_origin_errors>` config item. Refer to :ref:`Outlier Detection documentation<arch_overview_outlier_detection>` for details.
   ejections_enforced_failure_percentage_local_origin, Counter, Number of enforced failure percentage outlier ejections for locally originated failures
   ejections_detected_failure_percentage_local_origin, Counter, Number of detected failure percentage outlier ejections for locally originated failures (even if unenforced)
   ejections_total, Counter, Deprecated. Number of ejections due to any outlier type (even if unenforced)
@@ -175,7 +176,7 @@ Circuit breakers statistics will be rooted at *cluster.<name>.circuit_breakers.<
 Timeout budget statistics
 -------------------------
 
-If :ref:`timeout budget statistic tracking <envoy_api_field_Cluster.track_timeout_budgets>` is
+If :ref:`timeout budget statistic tracking <envoy_v3_api_field_config.cluster.v3.Cluster.track_timeout_budgets>` is
 turned on, statistics will be added to *cluster.<name>* and contain the following:
 
 .. csv-table::

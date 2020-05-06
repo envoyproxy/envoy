@@ -13,6 +13,8 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
+#include "common/http/exception.h"
+#include "common/http/status.h"
 #include "common/json/json_loader.h"
 
 #include "absl/strings/string_view.h"
@@ -20,6 +22,17 @@
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
+namespace Http {
+namespace Utility {
+
+// This is a wrapper around dispatch calls that may throw an exception or may return an error status
+// while exception removal is in migration.
+// TODO(#10878): Remove this.
+Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
+                               Buffer::Instance& data);
+} // namespace Utility
+} // namespace Http
+
 namespace Http2 {
 namespace Utility {
 
