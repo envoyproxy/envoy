@@ -83,6 +83,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "logs_handler_test",
+    srcs = ["logs_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "profiling_handler_test",
+    srcs = ["profiling_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "config_tracker_impl_test",
     srcs = ["config_tracker_impl_test.cc"],
     deps = [
