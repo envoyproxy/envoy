@@ -184,7 +184,7 @@ public:
                            const Http::AsyncClient::StreamOptions& options) override;
 
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
-  uint64_t per_stream_buffer_limit_bytes() const { return per_stream_buffer_limit_bytes_; }
+  uint64_t perStreamBufferLimitBytes() const { return per_stream_buffer_limit_bytes_; }
 
 private:
   Event::Dispatcher& dispatcher_;
@@ -222,7 +222,7 @@ public:
   void closeStream() override;
   void resetStream() override;
   bool isAboveWriteBufferHighWatermark() const override {
-    return bytes_in_write_pending_queue_ > parent_.per_stream_buffer_limit_bytes();
+    return bytes_in_write_pending_queue_ > parent_.perStreamBufferLimitBytes();
   }
 
 protected:
