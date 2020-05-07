@@ -71,7 +71,7 @@ is:
 3. Add a `requirements("<package name")` in the `BUILD` file that depends on
    this package.
 
-You can use [`tools/config_validation/BUILD`](tools/config_validation/BUILD) as an example
+You can use [`tools/config_validation/BUILD`](../tools/config_validation/BUILD) as an example
 for this flow. See also the [`rules_python`](https://github.com/bazelbuild/rules_python)
 documentation for further references.
 
