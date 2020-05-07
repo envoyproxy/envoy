@@ -545,12 +545,25 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
   ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
 }
 
-std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename) {
+size_t entryIndex(const std::string& file, uint32_t entry) {
+  size_t index = 0;
+  for (uint32_t i = 0; i < entry; ++i) {
+    index = file.find('\n', index);
+    if (index == std::string::npos || index == file.length()) {
+      return file.length();
+    }
+    ++index;
+  }
+  return index;
+}
+
+std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry) {
   // Wait a max of 1s for logs to flush to disk.
   for (int i = 0; i < 1000; ++i) {
     std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
-    if (contents.length() > 0) {
-      return contents;
+    size_t index = entryIndex(contents, entry);
+    if (contents.length() > index) {
+      return contents.substr(index);
     }
     absl::SleepFor(absl::Milliseconds(1));
   }
