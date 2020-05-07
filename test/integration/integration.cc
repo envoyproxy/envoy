@@ -545,6 +545,9 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
   ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
 }
 
+// Assuming logs are newline delineated, return the start index of the nth entry.
+// If there are not n entries, it will return file.length() (end of the string
+// index)
 size_t entryIndex(const std::string& file, uint32_t entry) {
   size_t index = 0;
   for (uint32_t i = 0; i < entry; ++i) {

@@ -73,7 +73,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   }
 
   // Advance time, to verify the original date header is preserved.
-  simTime().setSystemTime(std::chrono::hours(1) + std::chrono::seconds(10));
+  simTime().advanceTimeAsync(std::chrono::seconds(10));
 
   // Send second request, and get response from cache.
   IntegrationStreamDecoderPtr request = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -83,7 +83,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   EXPECT_EQ(request->body(), std::string(42, 'a'));
   EXPECT_NE(request->headers().get(Http::Headers::get().Age), nullptr);
   // Advance time to force a log flush.
-  simTime().setSystemTime(std::chrono::hours(1) + std::chrono::seconds(11));
+  simTime().advanceTimeAsync(std::chrono::seconds(1));
   EXPECT_EQ(waitForAccessLog(access_log_name_, 1), "RFCF cache.response_from_cache_filter\n");
 }
 
