@@ -94,9 +94,9 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
                               false /* do_boosting */);
     data_source_loaded = true;
   } catch (const ProtobufMessage::UnknownProtoFieldException& e) {
-    ENVOY_LOG(warn, "Invalid field in datasource configuration: {}", e.what());
+    ENVOY_LOG(warn, "Invalid field in DNS Filter datasource configuration: {}", e.what());
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
+    ENVOY_LOG(warn, "Filesystem DNS Filter config update failure: {}", e.what());
   }
   return data_source_loaded;
 }
