@@ -37,7 +37,10 @@ public:
               (UpdateCallbacks & callbacks));
 
   MOCK_METHOD((absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>), hosts, ());
-  MOCK_METHOD(DnsCacheResourceManager*, dnsCacheResourceManager, ());
+  MOCK_METHOD(DnsCacheResourceManagerPtr&, dnsCacheResourceManager, ());
+
+private:
+  DnsCacheResourceManagerPtr resource_manager_;
 };
 
 class MockLoadDnsCacheEntryHandle : public DnsCache::LoadDnsCacheEntryHandle {

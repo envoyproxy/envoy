@@ -9,7 +9,7 @@ DnsCacheResourceManager::DnsCacheResourceManager(
     DnsCacheCircuitBreakersStats& cb_stats, Runtime::Loader& loader, const std::string& config_name,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers&
         cb_config) {
-  const auto& max_requests = cb_config.threshold().max_pending_requests().value();
+  const auto& max_requests = cb_config.max_pending_requests().value();
   const auto runtime_key = fmt::format("dns_cache.{}.circuit_breakers", config_name);
 
   pending_requests_ =

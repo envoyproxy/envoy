@@ -39,6 +39,9 @@ public:
   bool canCreate() override { return current_ < max(); }
   void inc() override {
     current_++;
+    std::cout << "inc" << std::endl;
+    std::cout << max_ << std::endl;
+    std::cout << current_ << std::endl;
     remaining_.set(max() > current_ ? max() - current_ : 0);
     opening_.set(max() > current_ ? 0 : 1);
   }
@@ -48,6 +51,9 @@ public:
   void decBy(uint64_t amount) override {
     ASSERT(current_ >= amount);
     current_ -= amount;
+    std::cout << "dec" << std::endl;
+    std::cout << max_ << std::endl;
+    std::cout << current_ << std::endl;
     remaining_.set(max() > current_ ? max() - current_ : 0);
     opening_.set(max() > current_ ? 0 : 1);
   }
@@ -82,6 +88,8 @@ public:
 private:
   std::unique_ptr<DnsResource> pending_requests_;
 };
+
+using DnsCacheResourceManagerPtr = std::unique_ptr<DnsCacheResourceManager>;
 
 } // namespace DynamicForwardProxy
 } // namespace Common

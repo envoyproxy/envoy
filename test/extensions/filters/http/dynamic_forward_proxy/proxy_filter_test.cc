@@ -12,6 +12,7 @@ using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -53,8 +54,7 @@ public:
                     POOL_GAUGE_PREFIX(store_, "circuit_breakers"))});
     envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers cb_config;
     std::string config_yaml = R"EOF(
-      threshold:
-        max_pending_requests: 1
+      max_pending_requests: 1
     )EOF";
     TestUtility::loadFromYaml(config_yaml, cb_config);
 
@@ -190,7 +190,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
   EXPECT_CALL(*(dns_cache_manager_->dns_cache_), dnsCacheResourceManager())
-      .WillOnce(Return(dns_cache_resource_manager_.get()));
+      .WillOnce(ReturnRef(dns_cache_resource_manager_));
 
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
@@ -210,7 +210,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
   EXPECT_CALL(*(dns_cache_manager_->dns_cache_), dnsCacheResourceManager())
-      .WillOnce(Return(dns_cache_resource_manager_.get()));
+      .WillOnce(ReturnRef(dns_cache_resource_manager_));
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable,
                                          Eq("Dynamic forward proxy pending request overflow"), _, _,
                                          Eq("Dynamic forward proxy pending request overflow")));

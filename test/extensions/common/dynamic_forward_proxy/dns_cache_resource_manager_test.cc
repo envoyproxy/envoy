@@ -48,8 +48,7 @@ public:
 
 TEST_F(DnsCacheResourceManagerTest, CheckDnsResource) {
   std::string config_yaml = R"EOF(
-    threshold:
-      max_pending_requests: 3
+    max_pending_requests: 3
   )EOF";
   setupResourceManager(config_yaml);
 

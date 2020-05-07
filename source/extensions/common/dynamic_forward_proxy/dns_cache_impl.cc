@@ -35,8 +35,8 @@ DnsCacheImpl::DnsCacheImpl(
 
   if (config.has_dns_cache_circuit_breaker()) {
     auto cb_stats = generateDnsCacheCircuitBreakersStats(*scope_);
-    resource_manager_ = new DnsCacheResourceManager(cb_stats, loader, config.name(),
-                                                    config.dns_cache_circuit_breaker());
+    resource_manager_ = std::make_unique<DnsCacheResourceManager>(
+        cb_stats, loader, config.name(), config.dns_cache_circuit_breaker());
   }
 }
 
@@ -50,13 +50,11 @@ DnsCacheImpl::~DnsCacheImpl() {
   for (auto update_callbacks : update_callbacks_) {
     update_callbacks->cancel();
   }
-
-  delete resource_manager_;
 }
 
 DnsCacheCircuitBreakersStats
 DnsCacheImpl::generateDnsCacheCircuitBreakersStats(Stats::Scope& scope) {
-  std::string stat_prefix = "circuit_breaker";
+  std::string stat_prefix = "circuit_breakers";
   return {ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, stat_prefix),
                                                POOL_GAUGE_PREFIX(scope, stat_prefix))};
 }

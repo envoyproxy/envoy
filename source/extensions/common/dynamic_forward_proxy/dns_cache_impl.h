@@ -48,7 +48,7 @@ public:
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
-  DnsCacheResourceManager* dnsCacheResourceManager() override { return resource_manager_; }
+  DnsCacheResourceManagerPtr& dnsCacheResourceManager() override { return resource_manager_; }
 
 private:
   using TlsHostMap = absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>;
@@ -140,7 +140,7 @@ private:
   DnsCacheStats stats_;
   std::list<AddUpdateCallbacksHandleImpl*> update_callbacks_;
   absl::flat_hash_map<std::string, PrimaryHostInfoPtr> primary_hosts_;
-  DnsCacheResourceManager* resource_manager_;
+  DnsCacheResourceManagerPtr resource_manager_;
   const std::chrono::milliseconds refresh_interval_;
   const BackOffStrategyPtr failure_backoff_strategy_;
   const std::chrono::milliseconds host_ttl_;

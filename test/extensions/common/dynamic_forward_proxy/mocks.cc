@@ -11,7 +11,7 @@ namespace Common {
 namespace DynamicForwardProxy {
 
 MockDnsCache::MockDnsCache() {
-  ON_CALL(*this, dnsCacheResourceManager()).WillByDefault(Return(nullptr));
+  ON_CALL(*this, dnsCacheResourceManager()).WillByDefault(ReturnRef(resource_manager_));
 }
 MockDnsCache::~MockDnsCache() = default;
 
