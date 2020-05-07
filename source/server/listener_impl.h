@@ -347,10 +347,6 @@ private:
   void buildProxyProtocolListenerFilter();
   void buildTlsInspectorListenerFilter();
 
-  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
-    ensureSocketOptions();
-    listen_socket_options_->emplace_back(std::move(option));
-  }
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();
     Network::Socket::appendOptions(listen_socket_options_, options);
