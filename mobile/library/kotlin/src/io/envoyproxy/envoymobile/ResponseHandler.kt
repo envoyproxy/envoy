@@ -19,8 +19,12 @@ class ResponseHandler(val executor: Executor) {
     internal var onDataClosure: (
       byteBuffer: ByteBuffer, endStream: Boolean
     ) -> Unit = { _, _ -> Unit }
-    internal var onTrailersClosure: (trailers: Map<String, List<String>>) -> Unit = { Unit }
-    internal var onErrorClosure: (errorCode: Int, message: String, attemptCount: Int) -> Unit = { _, _, _ -> Unit }
+    internal var onTrailersClosure: (
+      trailers: Map<String, List<String>>
+    ) -> Unit = { Unit }
+    internal var onErrorClosure: (
+      errorCode: Int, message: String, attemptCount: Int
+    ) -> Unit = { _, _, _ -> Unit }
     internal var onCancelClosure: () -> Unit = { Unit }
 
     override fun getExecutor(): Executor {

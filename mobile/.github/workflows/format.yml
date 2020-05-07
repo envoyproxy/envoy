@@ -43,17 +43,20 @@ jobs:
       image: norionomura/swiftlint:0.33.0_swift-5.0
     steps:
       - uses: actions/checkout@v1
-      - name: 'Run SwiftLint'
+      - name: 'Run Swift Lint (SwiftLint)'
         run: swiftlint lint --strict
   kotlinlint:
     name: kotlin_lint
     runs-on: ubuntu-18.04
     timeout-minutes: 45
-    container:
-      image: openjdk:8-jdk
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - name: 'Run Kotlin lint'
-        run: ./ci/kotlin_lint.sh
+      - name: 'Install dependencies'
+        run: ./ci/linux_ci_setup.sh
+      - name: 'Run Kotlin Lint (Detekt)'
+        run: |
+          bazel build \
+            //library/kotlin/src/io/envoyproxy/envoymobile:envoy_lib_lint \
+            //examples/kotlin/hello_world:hello_envoy_kt_lint

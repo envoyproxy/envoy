@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load("//bazel:aar_with_jni.bzl", "aar_with_jni")
 load("//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
+load("@rules_detekt//detekt:defs.bzl", "detekt")
 
 aar_with_jni(
     name = "android_aar",
@@ -59,4 +60,11 @@ envoy_mobile_kt_library(
     deps = [
         "//library/java/src/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
     ],
+)
+
+detekt(
+    name = "envoy_lib_lint",
+    srcs = glob(["*.kt"]),
+    build_upon_default_config = True,
+    cfgs = ["//:kotlin_lint_config"],
 )

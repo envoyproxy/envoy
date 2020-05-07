@@ -168,6 +168,25 @@ kotlin_repositories()
 
 kt_register_toolchains()
 
+rules_detekt_version = "0.3.0"
+
+rules_detekt_sha = "b1b4c8a3228f880a169ab60a817619bc4cf254443196e7e108ece411cb9c580e"
+
+http_archive(
+    name = "rules_detekt",
+    sha256 = rules_detekt_sha,
+    strip_prefix = "bazel_rules_detekt-{v}".format(v = rules_detekt_version),
+    url = "https://github.com/buildfoundation/bazel_rules_detekt/archive/v{v}.tar.gz".format(v = rules_detekt_version),
+)
+
+load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
+
+rules_detekt_dependencies()
+
+load("@rules_detekt//detekt:toolchains.bzl", "rules_detekt_toolchains")
+
+rules_detekt_toolchains(detekt_version = "1.8.0")
+
 # gRPC java for @rules_proto_grpc
 # The current 0.2.0 uses v1.23.0 of gRPC java which has a buggy version of the grpc_java_repositories
 # where it tries to bind the zlib and errors out

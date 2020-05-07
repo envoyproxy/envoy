@@ -83,3 +83,9 @@ define_kt_toolchain(
     name = "kotlin_toolchain",
     jvm_target = "1.8",
 )
+
+filegroup(
+    name = "kotlin_lint_config",
+    srcs = [".kotlinlint.yml"],
+    visibility = ["//visibility:public"],
+)
