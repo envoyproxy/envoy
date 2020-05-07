@@ -2624,7 +2624,12 @@ TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
                                                              {":path", "/"},
                                                              {"connection", "Upgrade"},
                                                              {"upgrade", "websocket"}}};
-    decoder->decodeHeaders(std::move(headers), true);
+    decoder->decodeHeaders(std::move(headers), false);
+    // Try sending trailers after the headers which will be rejected, just to
+    // test the HCM logic that further decoding will not be passed to the
+    // filters once the early response path is kicked off.
+    RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"bazzz", "bar"}}};
+    decoder->decodeTrailers(std::move(trailers));
     data.drain(4);
     return Http::okStatus();
   }));
@@ -3949,14 +3954,6 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true));
   EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
-  // When the stream ends, the manager should check to see if the connection is
-  // read disabled, and keep calling readDisable(false) until readEnabled()
-  // returns true.
-  EXPECT_CALL(filter_callbacks_.connection_, readEnabled())
-      .Times(2)
-      .WillOnce(Return(false))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
   expectOnDestroy();
   decoder_filters_[1]->callbacks_->encodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
@@ -5065,6 +5062,9 @@ TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
 
   ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::NotTraceableRequestId, tracing_stats);
   EXPECT_EQ(1UL, tracing_stats.not_traceable_.value());
+
+  ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::Sampling, tracing_stats);
+  EXPECT_EQ(1UL, tracing_stats.random_sampling_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
