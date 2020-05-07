@@ -7,11 +7,13 @@
 #       "owner": "envoyproxy/api-shepherds!",
 #       "path": "api/",
 #       "label": "api",
+#       "allow_global_approval": True,
+#       "github_status_label" = "any API change",
 #     },
 #   ],
 # )
 #
-# This module will maintain a commit status per specified path (also aka as spec).
+# This module will maintain a commit status per specified path regex (also aka as spec).
 #
 # Two types of approvals:
 # 1. Global approvals, done by approving the PR using Github's review approval feature.
@@ -19,6 +21,12 @@
 #    associated with the path. This does not affect GitHub's PR approve status, only
 #    this module's maintained commit status. This approval is automatically revoked
 #    if any further changes are done to the relevant files in this spec.
+#
+# By default, 'allow_global_approval' is true and either (1) or (2) above can unblock
+# merges. If 'allow_global_approval' is set false, then only (2) will unblock a merge.
+#
+# 'label' refers to a GitHub label applied to any matching PR. The GitHub check status
+# can be customized with `github_status_label`.
 
 load("text", "match")
 load("github.com/repokitteh/modules/lib/utils.star", "react")
@@ -51,9 +59,10 @@ def _get_relevant_specs(specs, changed_files):
     allow_global_approval = spec.get("allow_global_approval", True)
     status_label = spec.get("github_status_label", "")
     if files:
-      relevant.append(struct(files=files, path_match=path_match,
+      relevant.append(struct(files=files,
+                             path_match=path_match,
                              allow_global_approval=allow_global_approval,
-                             status_label=status_label, **spec))
+                             status_label=status_label))
 
   print("specs: %s" % relevant)
 
@@ -98,7 +107,7 @@ def _is_approved(spec, approvers):
 
 
 def _update_status(owner, status_label, path_match, approved):
-  changes_to = (path_match or '/')
+  changes_to = path_match or '/'
   github.create_status(
     state=approved and 'success' or 'pending',
     context='%s must approve for %s' % (owner, status_label),
