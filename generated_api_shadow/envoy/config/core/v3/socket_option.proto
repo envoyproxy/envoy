@@ -40,17 +40,17 @@ message SocketOption {
   // The numeric name as passed to setsockopt
   int64 name = 3;
 
-  // Because many sockopts take an int value.
-  SocketState state = 6 [(validate.rules).enum = {defined_only: true}];
-
   oneof value {
     option (validate.required) = true;
 
-    // Otherwise it's a byte buffer.
+    // Because many sockopts take an int value.
     int64 int_value = 4;
 
-    // The state in which the option will be applied. When used in BindConfig
-    // STATE_PREBIND is currently the only valid value.
+    // Otherwise it's a byte buffer.
     bytes buf_value = 5;
   }
+
+  // The state in which the option will be applied. When used in BindConfig
+  // STATE_PREBIND is currently the only valid value.
+  SocketState state = 6 [(validate.rules).enum = {defined_only: true}];
 }

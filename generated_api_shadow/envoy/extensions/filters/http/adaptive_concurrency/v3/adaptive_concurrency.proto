@@ -93,15 +93,15 @@ message AdaptiveConcurrency {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency";
 
-  // Gradient concurrency control will be used.
-  config.core.v3.RuntimeFeatureFlag enabled = 2;
-
   oneof concurrency_controller_config {
     option (validate.required) = true;
 
-    // If set to false, the adaptive concurrency filter will operate as a pass-through filter. If the
-    // message is unspecified, the filter will be enabled.
+    // Gradient concurrency control will be used.
     GradientControllerConfig gradient_controller_config = 1
         [(validate.rules).message = {required: true}];
   }
+
+  // If set to false, the adaptive concurrency filter will operate as a pass-through filter. If the
+  // message is unspecified, the filter will be enabled.
+  config.core.v3.RuntimeFeatureFlag enabled = 2;
 }

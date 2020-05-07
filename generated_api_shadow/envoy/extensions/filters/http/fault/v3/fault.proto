@@ -36,22 +36,22 @@ message FaultAbort {
 
   reserved 1;
 
-  // HTTP status code to use to abort the HTTP request.
-  type.v3.FractionalPercent percentage = 3;
-
   oneof error_type {
     option (validate.required) = true;
 
-    // gRPC status code to use to abort the gRPC request.
+    // HTTP status code to use to abort the HTTP request.
     uint32 http_status = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
-    // Fault aborts are controlled via an HTTP header (if applicable).
+    // gRPC status code to use to abort the gRPC request.
     uint32 grpc_status = 5;
 
-    // The percentage of requests/operations/connections that will be aborted with the error code
-    // provided.
+    // Fault aborts are controlled via an HTTP header (if applicable).
     HeaderAbort header_abort = 4;
   }
+
+  // The percentage of requests/operations/connections that will be aborted with the error code
+  // provided.
+  type.v3.FractionalPercent percentage = 3;
 }
 
 // [#next-free-field: 15]
