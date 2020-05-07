@@ -444,8 +444,7 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       split_keys_sum_result_handler_(*router_),
-      error_fault_handler_(*router_), stats_{ALL_COMMAND_SPLITTER_STATS(
-                                          POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
+      stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       time_source_(time_source), dispatcher_(dispatcher), fault_manager_(fault_manager) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
@@ -465,8 +464,6 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 
   addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mset(), latency_in_micros,
              mset_handler_);
-
-  addHandler(scope, stat_prefix, ERROR_FAULT, latency_in_micros, error_fault_handler_);
 }
 
 SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
@@ -547,9 +544,13 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
 
   SplitRequestPtr request_ptr;
   if (fault.has_value() && fault.value().first == Common::Redis::FaultType::Error) {
-    request_ptr = error_fault_handler_.startRequest(std::move(request),
-                                                    has_delay_fault ? *delay_fault_ptr : callbacks,
-                                                    handler->command_stats_, time_source_);
+    request_ptr = ErrorFaultRequest::create(*router_, std::move(request),
+                                            has_delay_fault ? *delay_fault_ptr : callbacks,
+                                            handler->command_stats_, time_source_);
+    // request_ptr = error_fault.startRequest(std::move(request),
+    //                                                 has_delay_fault ? *delay_fault_ptr :
+    //                                                 callbacks, handler->command_stats_,
+    //                                                 time_source_);
   } else {
     request_ptr = handler->handler_.get().startRequest(
         std::move(request), has_delay_fault ? *delay_fault_ptr : callbacks, handler->command_stats_,

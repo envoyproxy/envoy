@@ -91,3 +91,30 @@ If a delay is injected, the delay is additive- if the request took 400ms and a d
 is injected, then the total request latency is 500ms. Also, due to implementation of the redis protocol,
 a delayed request will delay everything that comes in after it, due to the proxy's need to respect the 
 order of commands it receives.
+
+Note that faults must have a `fault_enabled` field, and are not enabled by default (if no default value
+or runtime key are set).
+
+Example configuration:
+
+.. code-block:: yaml
+
+  faults:
+  - fault_type: ERROR
+    fault_enabled:
+      default_value:
+        numerator: 10
+        denominator: HUNDRED
+      runtime_key: "bogus_key"
+      commands:
+      - GET
+    - fault_type: DELAY
+      fault_enabled:
+        default_value:
+          numerator: 10
+          denominator: HUNDRED
+        runtime_key: "bogus_key"
+      delay: 2s
+
+This creates two faults- an error, applying only to GET commands at 10%, and a delay, applying to all
+commands at 10%. This means that 20% of GET commands will have a fault applied, as discussed earlier.

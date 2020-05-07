@@ -25,22 +25,19 @@ Fault::Fault(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_Re
   }
 
   // Get the default value/runtime key
-  if (base_fault.has_fault_enabled()) {
-    if (base_fault.fault_enabled().has_default_value()) {
-      if (base_fault.fault_enabled().default_value().denominator() ==
-          envoy::type::v3::FractionalPercent::HUNDRED) {
-        default_value_ = base_fault.fault_enabled().default_value().numerator();
-      } else {
-        auto denominator = ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-            base_fault.fault_enabled().default_value().denominator());
-        default_value_ =
-            (base_fault.fault_enabled().default_value().numerator() * 100) / denominator;
-      }
+  if (base_fault.fault_enabled().has_default_value()) {
+    if (base_fault.fault_enabled().default_value().denominator() ==
+        envoy::type::v3::FractionalPercent::HUNDRED) {
+      default_value_ = base_fault.fault_enabled().default_value().numerator();
     } else {
-      default_value_ = 0;
+      auto denominator = ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+          base_fault.fault_enabled().default_value().denominator());
+      default_value_ = (base_fault.fault_enabled().default_value().numerator() * 100) / denominator;
     }
-    runtime_key_ = base_fault.fault_enabled().runtime_key();
+  } else {
+    default_value_ = 0;
   }
+  runtime_key_ = base_fault.fault_enabled().runtime_key();
 };
 
 std::vector<std::string> Fault::buildCommands(

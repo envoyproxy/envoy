@@ -199,7 +199,8 @@ message RedisProxy {
     RedisFaultType fault_type = 1 [(validate.rules).enum = {defined_only: true}];
 
     // Percentage of requests fault applies to.
-    config.core.v3.RuntimeFractionalPercent fault_enabled = 2;
+    config.core.v3.RuntimeFractionalPercent fault_enabled = 2
+        [(validate.rules).message = {required: true}];
 
     // Delay for all faults. If not set, defaults to zero
     google.protobuf.Duration delay = 3;
