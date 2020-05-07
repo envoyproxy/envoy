@@ -922,11 +922,12 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
 
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
   }));
 
   // Kick off the incoming data.
@@ -943,11 +944,12 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   const std::string original_host = "host:443";
   const std::string normalized_host = "host";
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
     decoder->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
   }));
 
   const std::string fake_cluster_name = "fake_cluster";
