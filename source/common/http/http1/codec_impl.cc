@@ -479,6 +479,7 @@ int ConnectionImpl::completeLastHeader() {
     sendProtocolError(Http1ResponseCodeDetails::get().TooManyHeaders);
     const absl::string_view header_type =
         processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
+    ASSERT(codec_status_.ok());
     codec_status_ = codecProtocolError(absl::StrCat(header_type, " size exceeds limit"));
     return HTTP_PARSER_ERROR;
   }
@@ -559,15 +560,15 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
 }
 
 Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
-  ASSERT(codec_status_.ok());
+  ASSERT(codec_status_.ok() && dispatching_);
   ssize_t rc = http_parser_execute(&parser_, &settings_, slice, len);
   if (!codec_status_.ok()) {
     return codec_status_;
   }
   if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
+    sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError);
     // Avoid overwriting the codec_status_ set in the callbacks.
     ASSERT(codec_status_.ok());
-    sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError);
     codec_status_ = codecProtocolError("http/1.1 protocol error: " +
                                        std::string(http_errno_name(HTTP_PARSER_ERRNO(&parser_))));
     return codec_status_;
