@@ -51,7 +51,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 10]
+// [#next-free-field: 12]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -159,35 +159,47 @@ message JwtProvider {
   //
   string payload_in_metadata = 9;
 
+  // This field specifies the header name to forward a successfully verified JWT payload to the
+  // backend. The forwarded data is::
+  //
+  //    base64url_encoded(jwt_payload_in_JSON)
+  //
+  // If it is not specified, the payload will not be forwarded.
+  uint32 nbf_slack = 10;
+
+  // If non empty, successfully verified JWT payloads will be written to StreamInfo DynamicMetadata
+  // in the format as: *namespace* is the jwt_authn filter name as **envoy.filters.http.jwt_authn**
+  // The value is the *protobuf::Struct*. The value of this field will be the key for its *fields*
+  // and the value is the *protobuf::Struct* converted from JWT JSON payload.
+  //
+  // For example, if payload_in_metadata is *my_payload*:
+  //
+  // .. code-block:: yaml
+  //
+  //   envoy.filters.http.jwt_authn:
+  //     my_payload:
+  //       iss: https://example.com
+  //       sub: test@example.com
+  //       aud: https://example.com
+  //       exp: 1501281058
+  //
+  uint32 exp_slack = 11;
+
   // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
   // validate signature of a JWT. This field specifies where to fetch JWKS.
   oneof jwks_source_specifier {
     option (validate.required) = true;
 
-    // This field specifies the header name to forward a successfully verified JWT payload to the
-    // backend. The forwarded data is::
-    //
-    //    base64url_encoded(jwt_payload_in_JSON)
-    //
-    // If it is not specified, the payload will not be forwarded.
+    // The two below fields define the amount of slack in seconds that will be used
+    // when determining if a JWT is valid or has expired. Validity is determined by
+    // the formula: VALID_FROM("iat") + nbf_slack <= NOW <= VALID_TO("exp") + exp_slack
+    // which aims to provide a remedy in the following case:
+    // Some load balancer performinc OIDC authentication receives a request and determines that the
+    // existing access token is valid (for another 1 second). It forwards the request to Istio Ingressgateway
+    // and subsequently to some pod with an envoy sidecar. Meanwhile, 1 second has passed and when envoy checks
+    // the token it finds that it has expired.
     RemoteJwks remote_jwks = 3;
 
-    // If non empty, successfully verified JWT payloads will be written to StreamInfo DynamicMetadata
-    // in the format as: *namespace* is the jwt_authn filter name as **envoy.filters.http.jwt_authn**
-    // The value is the *protobuf::Struct*. The value of this field will be the key for its *fields*
-    // and the value is the *protobuf::Struct* converted from JWT JSON payload.
-    //
-    // For example, if payload_in_metadata is *my_payload*:
-    //
-    // .. code-block:: yaml
-    //
-    //   envoy.filters.http.jwt_authn:
-    //     my_payload:
-    //       iss: https://example.com
-    //       sub: test@example.com
-    //       aud: https://example.com
-    //       exp: 1501281058
-    //
     config.core.v3.DataSource local_jwks = 4;
   }
 }

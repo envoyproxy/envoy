@@ -6,10 +6,9 @@
 #include "extensions/filters/http/jwt_authn/extractor.h"
 #include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
+#include "absl/time/clock.h"
 #include "jwt_verify_lib/check_audience.h"
 #include "jwt_verify_lib/status.h"
-
-#include "absl/time/clock.h"
 
 namespace Envoy {
 namespace Extensions {

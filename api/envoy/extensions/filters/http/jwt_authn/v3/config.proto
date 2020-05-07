@@ -51,7 +51,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 10]
+// [#next-free-field: 12]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -195,11 +195,12 @@ message JwtProvider {
   // when determining if a JWT is valid or has expired. Validity is determined by
   // the formula: VALID_FROM("iat") + nbf_slack <= NOW <= VALID_TO("exp") + exp_slack
   // which aims to provide a remedy in the following case:
-  // Some load balancer performinc OIDC authentication receives a request and determines that the 
-  // existing access token is valid (for another 1 second). It forwards the request to Istio Ingressgateway 
-  // and subsequently to some pod with an envoy sidecar. Meanwhile, 1 second has passed and when envoy checks 
+  // Some load balancer performinc OIDC authentication receives a request and determines that the
+  // existing access token is valid (for another 1 second). It forwards the request to Istio Ingressgateway
+  // and subsequently to some pod with an envoy sidecar. Meanwhile, 1 second has passed and when envoy checks
   // the token it finds that it has expired.
   uint32 nbf_slack = 10;
+
   uint32 exp_slack = 11;
 }
 

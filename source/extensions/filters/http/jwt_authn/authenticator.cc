@@ -164,12 +164,14 @@ void AuthenticatorImpl::startVerify() {
   // when determining if a JWT is valid or has expired. Validity is determined by
   // the formula: VALID_FROM("iat") + nbf_slack <= NOW <= VALID_TO("exp") + exp_slack
   // which aims to provide a remedy in the following case:
-  // Some load balancer performinc OIDC authentication receives a request and determines that the 
-  // existing access token is valid (for another 1 second). It forwards the request to Istio Ingressgateway 
-  // and subsequently to some pod with an envoy sidecar. Meanwhile, 1 second has passed and when envoy checks 
-  // the token it finds that it has expired.
-  const uint64_t now = std::chrono::time_point_cast<std::chrono::seconds>(timeSource().systemTime()).time_since_epoch().count();
-  
+  // Some load balancer performinc OIDC authentication receives a request and determines that the
+  // existing access token is valid (for another 1 second). It forwards the request to Istio
+  // Ingressgateway and subsequently to some pod with an envoy sidecar. Meanwhile, 1 second has
+  // passed and when envoy checks the token it finds that it has expired.
+  const uint64_t now = std::chrono::time_point_cast<std::chrono::seconds>(timeSource().systemTime())
+                           .time_since_epoch()
+                           .count();
+
   const uint32_t nbf_slack = jwks_data_->getJwtProvider().nbf_slack();
   const uint32_t exp_slack = jwks_data_->getJwtProvider().exp_slack();
 
@@ -243,7 +245,8 @@ void AuthenticatorImpl::onDestroy() {
 
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
-  const Status status = ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
+  const Status status =
+      ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
