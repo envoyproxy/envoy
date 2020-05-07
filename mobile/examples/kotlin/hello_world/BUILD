@@ -1,6 +1,7 @@
 licenses(["notice"])  # Apache 2
 
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
+load("@rules_detekt//detekt:defs.bzl", "detekt")
 
 android_binary(
     name = "hello_envoy_kt",
@@ -28,4 +29,11 @@ kt_android_library(
         "@androidsdk//com.android.support:appcompat-v7-25.0.0",
         "@androidsdk//com.android.support:recyclerview-v7-25.0.0",
     ],
+)
+
+detekt(
+    name = "hello_envoy_kt_lint",
+    srcs = glob(["*.kt"]),
+    build_upon_default_config = True,
+    cfgs = ["//:kotlin_lint_config"],
 )
