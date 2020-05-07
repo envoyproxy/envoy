@@ -1,9 +1,12 @@
+.. _control_plane:
+
 How do I support multiple xDS API major versions in my control plane?
 =====================================================================
 
 Where possible, it is highly recommended that control planes support a single major version at a
 given point in time for simplicity. This works in situations where control planes need to only
-support a window of Envoy versions which spans less than a year.
+support a window of Envoy versions which spans less than a year. Temporary support for multiple
+versions during rollout in this scenario is described :ref:`here <control_plane_version_support>`.
 
 For control planes that need to support a wider range of versions, there are a few approaches:
 
