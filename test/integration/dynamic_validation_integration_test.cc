@@ -69,8 +69,9 @@ public:
 
   void createEnvoy() override {
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    createApiTestServer(api_filesystem_config_, {"http"}, reject_unknown_dynamic_fields_,
-                        reject_unknown_dynamic_fields_, ignore_unknown_dynamic_fields_,
+    createApiTestServer(api_filesystem_config_, {"http"},
+                        {reject_unknown_dynamic_fields_, reject_unknown_dynamic_fields_,
+                         ignore_unknown_dynamic_fields_},
                         allow_lds_rejection_);
   }
 

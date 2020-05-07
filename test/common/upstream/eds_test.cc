@@ -236,7 +236,7 @@ TEST_F(EdsTest, ValidateIgnored) {
   initialize();
   envoy::config::endpoint::v3::ClusterLoadAssignment resource;
   resource.set_cluster_name("fare");
-  auto unknown = resource.GetReflection()->MutableUnknownFields(&resource);
+  auto* unknown = resource.GetReflection()->MutableUnknownFields(&resource);
   // add a field that doesn't exist in the proto definition:
   unknown->AddFixed32(1000, 1);
 

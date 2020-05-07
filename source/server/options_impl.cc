@@ -82,7 +82,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                                  "reject unknown fields in dynamic configuration",
                                                  cmd, false);
   TCLAP::SwitchArg ignore_unknown_dynamic_fields("", "ignore-unknown-dynamic-fields",
-                                                 "GENERA more words.", cmd, false);
+                                                 "ignore unknown fields in dynamic configuration",
+                                                 cmd, false);
 
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
