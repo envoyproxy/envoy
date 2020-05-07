@@ -36,6 +36,7 @@ message ClusterLoadAssignment {
   // Load balancing policy settings.
   // [#next-free-field: 6]
   message Policy {
+    // [#not-implemented-hide:]
     message DropOverload {
       // Identifier for the policy specifying the drop.
       string category = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -65,6 +66,7 @@ message ClusterLoadAssignment {
     //    "throttle"_drop = 60%
     //    "lb"_drop = 20%  // 50% of the remaining 'actual' load, which is 40%.
     //    actual_outgoing_load = 20% // remaining after applying all categories.
+    // [#not-implemented-hide:]
     repeated DropOverload drop_overloads = 2;
 
     // Priority levels and localities are considered overprovisioned with this
