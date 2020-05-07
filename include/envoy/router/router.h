@@ -323,7 +323,7 @@ public:
    * Returns a reference to the PriorityLoad that should be used for the next retry.
    * @param priority_set current priority set.
    * @param original_priority_load original priority load.
-   * @param priority_mapping_func see @Upstream::RetryPriority::PriorityMappingFunc
+   * @param priority_mapping_func see @Upstream::RetryPriority::PriorityMappingFunc.
    * @return HealthyAndDegradedLoad that should be used to select a priority for the next retry.
    */
   virtual const Upstream::HealthyAndDegradedLoad& priorityLoadForRetry(

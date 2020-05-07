@@ -53,7 +53,7 @@ public:
    *
    * @param priority_state current priority state of the cluster being being load balanced.
    * @param original_priority_load the cached priority load for the cluster being load balanced.
-   * @param priority_mapping_func see @Upstream::RetryPriority::PriorityMappingFunc
+   * @param priority_mapping_func see @Upstream::RetryPriority::PriorityMappingFunc.
    * @return a reference to the priority load data that should be used to select a priority.
    *
    */
