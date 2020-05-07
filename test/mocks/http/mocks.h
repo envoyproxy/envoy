@@ -76,7 +76,7 @@ public:
   ~MockServerConnection() override;
 
   // Http::Connection
-  MOCK_METHOD(void, dispatch, (Buffer::Instance & data));
+  MOCK_METHOD(Status, dispatch, (Buffer::Instance & data));
   MOCK_METHOD(void, goAway, ());
   MOCK_METHOD(Protocol, protocol, ());
   MOCK_METHOD(void, shutdownNotice, ());
@@ -94,7 +94,7 @@ public:
   ~MockClientConnection() override;
 
   // Http::Connection
-  MOCK_METHOD(void, dispatch, (Buffer::Instance & data));
+  MOCK_METHOD(Status, dispatch, (Buffer::Instance & data));
   MOCK_METHOD(void, goAway, ());
   MOCK_METHOD(Protocol, protocol, ());
   MOCK_METHOD(void, shutdownNotice, ());
