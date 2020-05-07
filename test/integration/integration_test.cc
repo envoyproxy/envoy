@@ -1364,4 +1364,9 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
+TEST_P(IntegrationTest, QuitQuitQuit) {
+  initialize();
+  test_server_->useAdminInterfaceToQuit(true);
+}
+
 } // namespace Envoy

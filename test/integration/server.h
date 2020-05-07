@@ -349,6 +349,8 @@ public:
   virtual Server::Instance& server() PURE;
   virtual Stats::Store& stat_store() PURE;
   virtual Network::Address::InstanceConstSharedPtr admin_address() PURE;
+  void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
+  bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
 
 protected:
   IntegrationTestServer(Event::TestTimeSystem& time_system, Api::Api& api,
@@ -392,6 +394,7 @@ private:
   std::function<void()> on_worker_listener_removed_cb_;
   TcpDumpPtr tcp_dump_;
   std::function<void(IntegrationTestServer&)> on_server_ready_cb_;
+  bool use_admin_interface_to_quit_{};
 };
 
 // Default implementation of IntegrationTestServer
