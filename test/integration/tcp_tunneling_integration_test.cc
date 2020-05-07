@@ -171,6 +171,30 @@ TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
   ASSERT_FALSE(response_->reset());
 }
 
+TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_stream_duration()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+  });
+
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  setUpConnection();
+  sendBidirectionalData();
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    codec_client_->waitForDisconnect();
+  } else {
+    response_->waitForReset();
+    codec_client_->close();
+  }
+}
+
 // For this class, forward the CONNECT request upstream
 class ProxyingConnectIntegrationTest : public HttpProtocolIntegrationTest {
 public:
