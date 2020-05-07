@@ -164,6 +164,8 @@ private:
     }                                                                                              \
   } while (false)
 
+// Enables users in a test to temporarily force new symbol tables to be real or
+// fake, restoring the state on destruction of the class.
 class SymbolTableCreatorTestPeer {
 public:
   ~SymbolTableCreatorTestPeer() { SymbolTableCreator::setUseFakeSymbolTables(save_use_fakes_); }
@@ -174,6 +176,13 @@ public:
 
 private:
   const bool save_use_fakes_{SymbolTableCreator::useFakeSymbolTables()};
+};
+
+// Mix-in for test-classes to establish the symbol-table mode before other
+// test-classes get constructed.
+template <bool use_fakes> class SymbolTableUseFakes : public SymbolTableCreatorTestPeer {
+public:
+  SymbolTableUseFakes() { setUseFakeSymbolTables(use_fakes); }
 };
 
 // Serializes a number into a uint8_t array, and check that it de-serializes to
