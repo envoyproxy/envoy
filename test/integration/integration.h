@@ -12,6 +12,7 @@
 #include "common/config/api_version.h"
 #include "common/config/version_converter.h"
 #include "common/http/codec_client.h"
+#include "common/http/context_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
@@ -214,11 +215,12 @@ public:
                            bool allow_lds_rejection);
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
-  Http::Context& httpContext() { return test_server_->server().httpContext(); }
+  Http::Context& httpContext() { return http_context_; }
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  Api::ApiPtr api_for_server_stat_store_;
+  //Api::ApiPtr api_for_server_stat_store_;
+  Http::ContextImpl http_context_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
 
   // Enable the listener access log

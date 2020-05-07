@@ -251,6 +251,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
                                          Network::Address::IpVersion version,
                                          const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
+      http_context_(stats_store_.symbolTable()),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(api_->allocateDispatcher("test_thread",
                                            Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
