@@ -9,15 +9,13 @@ namespace Http {
 
 class HeaderListView {
 public:
-  using HeaderKeyValuePairWrapper =
-      std::vector<std::pair<std::reference_wrapper<const HeaderString>,
-                            std::reference_wrapper<const HeaderString>>>;
   HeaderListView(const HeaderMap& header_map);
-  std::vector<std::reference_wrapper<const HeaderString>> keys() const;
-  std::vector<std::reference_wrapper<const HeaderString>> values() const;
+  std::vector<std::reference_wrapper<const HeaderString>> keys() const { return keys_; }
+  std::vector<std::reference_wrapper<const HeaderString>> values() const { return values_; }
 
 private:
-  HeaderKeyValuePairWrapper map_;
+  std::vector<std::reference_wrapper<const HeaderString>> keys_;
+  std::vector<std::reference_wrapper<const HeaderString>> values_;
 };
 
 } // namespace Http
