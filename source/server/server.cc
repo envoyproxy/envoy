@@ -370,7 +370,9 @@ void InstanceImpl::initialize(const Options& options,
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
-  if (initial_config.admin().address()) {
+  if (bootstrap_.admin().has_listener()) {
+    // handled below
+  } else if (initial_config.admin().address()) {
     if (initial_config.admin().accessLogPath().empty()) {
       throw EnvoyException("An admin access log path is required for a listening server.");
     }
@@ -403,6 +405,9 @@ void InstanceImpl::initialize(const Options& options,
   // Workers get created first so they register for thread local updates.
   listener_manager_ = std::make_unique<ListenerManagerImpl>(
       *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats());
+
+  // TODO: where should this go?
+  listener_manager_->addOrUpdateListener(bootstrap_.admin().listener(), "", false);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.

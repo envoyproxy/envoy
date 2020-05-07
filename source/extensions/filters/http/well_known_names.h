@@ -12,6 +12,8 @@ namespace HttpFilters {
  */
 class HttpFilterNameValues {
 public:
+  // Admin filter
+  const std::string Admin = "envoy.filters.http.admin";
   // Buffer filter
   const std::string Buffer = "envoy.filters.http.buffer";
   // Cache filter

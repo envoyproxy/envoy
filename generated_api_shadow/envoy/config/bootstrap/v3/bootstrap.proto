@@ -182,6 +182,7 @@ message Bootstrap {
 
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
+// [#next-free-field: 6]
 message Admin {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v2.Admin";
 
@@ -201,6 +202,9 @@ message Admin {
   // Additional socket options that may not be present in Envoy source code or
   // precompiled binaries.
   repeated core.v3.SocketOption socket_options = 4;
+
+  // Static :ref:`Listener <envoy_api_msg_config.listener.v3.Listener>`.
+  listener.v3.Listener listener = 5;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.

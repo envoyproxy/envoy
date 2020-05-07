@@ -36,6 +36,11 @@
 #include "common/router/scoped_config_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "extensions/filters/http/common/factory_base.h"
+#include "extensions/filters/http/well_known_names.h"
+#include "envoy/extensions/filters/http/admin/v3/admin.pb.h"
+#include "envoy/extensions/filters/http/admin/v3/admin.pb.validate.h"
+
 #include "server/http/admin_filter.h"
 #include "server/http/config_tracker_impl.h"
 #include "server/http/listeners_handler.h"
@@ -48,6 +53,22 @@
 
 namespace Envoy {
 namespace Server {
+
+/**
+ * Config registration for the Admin filter. @see NamedHttpFilterConfigFactory.
+ */
+class AdminFilterConfig : public Extensions::HttpFilters::Common::FactoryBase<
+                              envoy::extensions::filters::http::admin::v3::Admin> {
+public:
+  AdminFilterConfig() : FactoryBase(Extensions::HttpFilters::HttpFilterNames::get().Admin) {}
+
+private:
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::admin::v3::Admin& proto_config, const std::string&,
+      Server::Configuration::FactoryContext& context) override;
+
+  bool isTerminalFilter() override { return true; }
+};
 
 class AdminInternalAddressConfig : public Http::InternalAddressConfig {
   bool isInternalAddress(const Network::Address::Instance&) const override { return false; }

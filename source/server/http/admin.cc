@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -58,6 +59,19 @@
 
 namespace Envoy {
 namespace Server {
+
+Http::FilterFactoryCb AdminFilterConfig::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::admin::v3::Admin&, const std::string&,
+    Server::Configuration::FactoryContext& context) {
+
+  return [&context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    // TODO: figure out how to handle this without downcasting
+    callbacks.addStreamDecoderFilter(std::make_shared<AdminFilter>(
+        dynamic_cast<AdminImpl&>(context.admin()).createCallbackFunction()));
+  };
+}
+
+REGISTER_FACTORY(AdminFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 namespace {
 
