@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.clusters.redis",
     deps = [
         "//source/common/event:dispatcher_lib",
+        "//source/common/http:context_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/redis:redis_cluster",

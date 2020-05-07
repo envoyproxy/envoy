@@ -128,10 +128,11 @@ public:
     HttpIntegrationTest::initialize();
 
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_,
-                                                  timeSystem(), enable_half_close_));
+                                                  timeSystem(), httpContext(),
+                                                  enable_half_close_));
     fake_upstreams_[FirstUpstreamIndex]->set_allow_unexpected_disconnects(false);
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_,
-                                                  timeSystem(), enable_half_close_));
+                                                  timeSystem(), httpContext(), enable_half_close_));
     fake_upstreams_[SecondUpstreamIndex]->set_allow_unexpected_disconnects(false);
     cluster1_ = ConfigHelper::buildCluster(
         FirstClusterName, fake_upstreams_[FirstUpstreamIndex]->localAddress()->ip()->port(),

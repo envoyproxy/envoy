@@ -149,11 +149,12 @@ require_client_certificate: true
       if (isTLSUpstream(i)) {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
             createUpstreamSslContext(), endpoint->ip()->port(), FakeHttpConnection::Type::HTTP1,
-            endpoint->ip()->version(), timeSystem(), false));
+            endpoint->ip()->version(), timeSystem(), httpContext(), false));
       } else {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
             Network::Test::createRawBufferSocketFactory(), endpoint->ip()->port(),
-            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(), false));
+            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(),
+            httpContext(), false));
       }
     }
   }

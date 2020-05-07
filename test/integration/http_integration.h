@@ -20,7 +20,7 @@ class IntegrationCodecClient : public Http::CodecClientProd {
 public:
   IntegrationCodecClient(Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
                          Upstream::HostDescriptionConstSharedPtr host_description,
-                         Http::CodecClient::Type type);
+                         Http::CodecClient::Type type, Http::Context& http_context);
 
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,

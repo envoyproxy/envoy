@@ -61,9 +61,10 @@ typeToCodecType(Http::CodecClient::Type type) {
 
 IntegrationCodecClient::IntegrationCodecClient(
     Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
-    Upstream::HostDescriptionConstSharedPtr host_description, CodecClient::Type type)
-    : CodecClientProd(type, std::move(conn), host_description, dispatcher), dispatcher_(dispatcher),
-      callbacks_(*this), codec_callbacks_(*this) {
+    Upstream::HostDescriptionConstSharedPtr host_description, CodecClient::Type type,
+    Http::Context& http_context)
+    : CodecClientProd(type, std::move(conn), host_description, dispatcher, http_context),
+      dispatcher_(dispatcher), callbacks_(*this), codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -212,7 +213,7 @@ HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) 
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
   return std::make_unique<IntegrationCodecClient>(*dispatcher_, std::move(conn), host_description,
-                                                  downstream_protocol_);
+                                                  downstream_protocol_, httpContext());
 }
 
 IntegrationCodecClientPtr

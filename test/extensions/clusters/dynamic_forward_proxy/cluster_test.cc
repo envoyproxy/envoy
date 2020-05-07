@@ -2,6 +2,7 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
+#include "common/http/context_impl.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/cluster_factory_impl.h"
 
@@ -205,7 +206,7 @@ protected:
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
         cm_, stats_store_, tls_, nullptr, ssl_context_manager_, runtime_, random_, dispatcher_,
         log_manager_, local_info_, admin_, singleton_manager_, nullptr, true, validation_visitor_,
-        *api_);
+        *api_, http_context_);
     std::unique_ptr<Upstream::ClusterFactory> cluster_factory = std::make_unique<ClusterFactory>();
 
     std::tie(cluster_, thread_aware_lb_) =
@@ -214,6 +215,7 @@ protected:
 
 private:
   Stats::IsolatedStoreImpl stats_store_;
+  Http::ContextImpl http_context_{stats_store_.symbolTable()};
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockRandomGenerator> random_;

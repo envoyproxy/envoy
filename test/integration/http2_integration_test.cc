@@ -1253,7 +1253,7 @@ Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
 void Http2RingHashIntegrationTest::createUpstreams() {
   for (int i = 0; i < num_upstreams_; i++) {
     fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem(), httpContext()));
   }
 }
 

@@ -75,10 +75,10 @@ public:
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
     // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
+                                                  timeSystem(), httpContext(), enable_half_close_));
     fake_upstreams_[UpstreamIndex1]->set_allow_unexpected_disconnects(false);
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
+                                                  timeSystem(), httpContext(), enable_half_close_));
     fake_upstreams_[UpstreamIndex2]->set_allow_unexpected_disconnects(false);
     cluster1_ = ConfigHelper::buildCluster(
         ClusterName1, fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),

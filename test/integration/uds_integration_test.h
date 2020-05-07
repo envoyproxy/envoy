@@ -27,7 +27,7 @@ public:
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(
         TestEnvironment::unixDomainSocketPath("udstest.1.sock", abstract_namespace_),
-        FakeHttpConnection::Type::HTTP1, timeSystem()));
+        FakeHttpConnection::Type::HTTP1, timeSystem(), httpContext()));
 
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {

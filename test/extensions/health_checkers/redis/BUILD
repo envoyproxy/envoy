@@ -36,6 +36,7 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.health_checkers.redis",
     deps = [
+        "//source/common/http:context_lib",
         "//source/common/upstream:health_checker_lib",
         "//source/extensions/health_checkers/redis:config",
         "//test/common/upstream:utility_lib",

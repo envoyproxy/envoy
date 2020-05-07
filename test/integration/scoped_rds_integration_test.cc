@@ -108,10 +108,10 @@ fragments:
     HttpIntegrationTest::createUpstreams();
     // Create the SRDS upstream.
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
+                                                  timeSystem(), httpContext(), enable_half_close_));
     // Create the RDS upstream.
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
+                                                  timeSystem(), httpContext(), enable_half_close_));
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {

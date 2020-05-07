@@ -80,7 +80,7 @@ typed_config:
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(
         Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_, factory_context_),
-        0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+        0, FakeHttpConnection::Type::HTTP1, version_, timeSystem(), httpContext()));
   }
 
   Network::ClientConnectionPtr
