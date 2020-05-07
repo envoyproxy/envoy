@@ -239,7 +239,7 @@ message ResponseFlagFilter {
         in: "IH"
         in: "DPE"
         in: "UMSDR"
-        in: "RFC"
+        in: "RFCF"
       }
     }
   }];

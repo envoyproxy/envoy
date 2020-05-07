@@ -38,7 +38,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::InvalidEnvoyRequestHeaders, "IH"),
       std::make_pair(ResponseFlag::DownstreamProtocolError, "DPE"),
       std::make_pair(ResponseFlag::UpstreamMaxStreamDurationReached, "UMSDR"),
-      std::make_pair(ResponseFlag::ResponseFromCache, "RFC")};
+      std::make_pair(ResponseFlag::ResponseFromCacheFilter, "RFCF")};
 
   for (const auto& test_case : expected) {
     NiceMock<MockStreamInfo> stream_info;
@@ -89,7 +89,7 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
       std::make_pair("IH", ResponseFlag::InvalidEnvoyRequestHeaders),
       std::make_pair("DPE", ResponseFlag::DownstreamProtocolError),
       std::make_pair("UMSDR", ResponseFlag::UpstreamMaxStreamDurationReached),
-      std::make_pair("RFC", ResponseFlag::ResponseFromCache)};
+      std::make_pair("RFCF", ResponseFlag::ResponseFromCacheFilter)};
 
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());
 

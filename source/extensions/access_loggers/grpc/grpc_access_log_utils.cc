@@ -119,8 +119,8 @@ void Utility::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached)) {
     common_access_log.mutable_response_flags()->set_upstream_max_stream_duration_reached(true);
   }
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::ResponseFromCache)) {
-    common_access_log.mutable_response_flags()->set_response_from_cache(true);
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::ResponseFromCacheFilter)) {
+    common_access_log.mutable_response_flags()->set_response_from_cache_filter(true);
   }
 }
 

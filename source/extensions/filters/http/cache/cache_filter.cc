@@ -10,7 +10,7 @@ namespace HttpFilters {
 namespace Cache {
 
 struct CacheResponseCodeDetailValues {
-  const absl::string_view ResponseFromCache = "cache.response_from_cache";
+  const absl::string_view ResponseFromCacheFilter = "cache.response_from_cache_filter";
 };
 
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
@@ -119,9 +119,10 @@ void CacheFilter::onHeaders(LookupResult&& result) {
     const bool end_stream = (result.content_length_ == 0 && !response_has_trailers_);
     // TODO(toddmgreer): Calculate age per https://httpwg.org/specs/rfc7234.html#age.calculations
     result.headers_->addReferenceKey(Http::Headers::get().Age, 0);
-    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::ResponseFromCache);
+    decoder_callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::ResponseFromCacheFilter);
     decoder_callbacks_->streamInfo().setResponseCodeDetails(
-        CacheResponseCodeDetails::get().ResponseFromCache);
+        CacheResponseCodeDetails::get().ResponseFromCacheFilter);
     decoder_callbacks_->encodeHeaders(std::move(result.headers_), end_stream);
     if (end_stream) {
       return;

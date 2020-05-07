@@ -1633,7 +1633,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMap& headers,
                                                                 bool end_stream) {
   // Base headers.
-  if (!stream_info_.hasResponseFlag(StreamInfo::ResponseFlag::ResponseFromCache)) {
+  if (!stream_info_.hasResponseFlag(StreamInfo::ResponseFlag::ResponseFromCacheFilter)) {
     connection_manager_.config_.dateProvider().setDateHeader(headers);
   }
   // Following setReference() is safe because serverName() is constant for the life of the listener.

@@ -946,7 +946,7 @@ filter:
       - IH
       - DPE
       - UMSDR
-      - RFC
+      - RFCF
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null
@@ -976,7 +976,7 @@ typed_config:
       StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders,
       StreamInfo::ResponseFlag::DownstreamProtocolError,
       StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached,
-      StreamInfo::ResponseFlag::ResponseFromCache};
+      StreamInfo::ResponseFlag::ResponseFromCacheFilter};
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
@@ -1008,7 +1008,8 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFC\"]]): name: \"accesslog\"\nfilter {\n  "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\"]]): name: \"accesslog\"\nfilter {\n "
+      " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
       "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  "
       "}\n}\n");
@@ -1034,7 +1035,8 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFC\"]]): name: \"accesslog\"\nfilter {\n  "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\"]]): name: \"accesslog\"\nfilter {\n "
+      " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
       "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  "
       "}\n}\n");
