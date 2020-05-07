@@ -43,6 +43,8 @@ envoy_cc_fuzz_test(
     name = "codec_fuzz_test",
     srcs = ["codec_fuzz_test.cc"],
     corpus = "codec_corpus",
+    # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
+    tags = ["no_fuzz"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/grpc:codec_lib",

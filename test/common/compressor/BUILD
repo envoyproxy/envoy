@@ -13,6 +13,8 @@ envoy_cc_fuzz_test(
     name = "compressor_fuzz_test",
     srcs = ["compressor_fuzz_test.cc"],
     corpus = "compressor_corpus",
+    # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
+    tags = ["no_fuzz"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
