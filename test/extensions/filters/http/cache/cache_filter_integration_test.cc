@@ -83,7 +83,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   EXPECT_EQ(request->body(), std::string(42, 'a'));
   EXPECT_NE(request->headers().get(Http::Headers::get().Age), nullptr);
   // Advance time to force a log flush.
-  simTime().advanceTimeAsync(std::chrono::seconds(1));
+  simTime().advanceTimeWait(std::chrono::seconds(1));
   EXPECT_EQ(waitForAccessLog(access_log_name_, 1), "RFCF cache.response_from_cache_filter\n");
 }
 
