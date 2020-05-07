@@ -48,15 +48,15 @@ namespace Quic {
 
 class ActiveQuicListenerPeer {
 public:
-  static EnvoyQuicDispatcher* quic_dispatcher(ActiveQuicListener& listener) {
+  static EnvoyQuicDispatcher* quicDispatcher(ActiveQuicListener& listener) {
     return listener.quic_dispatcher_.get();
   }
 
-  static quic::QuicCryptoServerConfig& crypto_config(ActiveQuicListener& listener) {
+  static quic::QuicCryptoServerConfig& cryptoConfig(ActiveQuicListener& listener) {
     return *listener.crypto_config_;
   }
 
-  static bool enabled_(ActiveQuicListener& listener) { return listener.enabled_.enabled(); }
+  static bool enabled(ActiveQuicListener& listener) { return listener.enabled_.enabled(); }
 };
 
 class ActiveQuicListenerFactoryPeer {
@@ -79,7 +79,7 @@ protected:
         connection_handler_(*dispatcher_) {}
 
   template <typename A, typename B>
-  std::unique_ptr<A> static_unique_pointer_cast(std::unique_ptr<B>&& source) {
+  std::unique_ptr<A> staticUniquePointerCast(std::unique_ptr<B>&& source) {
     return std::unique_ptr<A>{static_cast<A*>(source.release())};
   }
 
@@ -104,9 +104,9 @@ protected:
 
     listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
     quic_listener_ =
-        static_unique_pointer_cast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
+        staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
             connection_handler_, *dispatcher_, listener_config_));
-    quic_dispatcher_ = ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
+    quic_dispatcher_ = ActiveQuicListenerPeer::quicDispatcher(*quic_listener_);
 
     simulated_time_system_.advanceTimeWait(std::chrono::milliseconds(100));
   }
@@ -171,7 +171,7 @@ protected:
     client_sockets_.push_back(std::make_unique<Socket>(local_address_, nullptr, /*bind*/ false));
     quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
         &clock_, quic::AllSupportedVersions()[0].transport_version,
-        &ActiveQuicListenerPeer::crypto_config(*quic_listener_));
+        &ActiveQuicListenerPeer::cryptoConfig(*quic_listener_));
     chlo.SetVector(quic::kCOPT, quic::QuicTagVector{quic::kREJ});
     quic::CryptoHandshakeMessage full_chlo;
     quic::QuicReferenceCountedPointer<quic::QuicSignedServerConfig> signed_config(
@@ -179,7 +179,7 @@ protected:
     quic::QuicCompressedCertsCache cache(
         quic::QuicCompressedCertsCache::kQuicCompressedCertsCacheSize);
     quic::test::crypto_test_utils::GenerateFullCHLO(
-        chlo, &ActiveQuicListenerPeer::crypto_config(*quic_listener_),
+        chlo, &ActiveQuicListenerPeer::cryptoConfig(*quic_listener_),
         envoyAddressInstanceToQuicSocketAddress(local_address_),
         envoyAddressInstanceToQuicSocketAddress(local_address_),
         quic::AllSupportedVersions()[0].transport_version, &clock_, signed_config, &cache,
@@ -354,7 +354,7 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabled) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // If listener was enabled, there should have been session created for active connection.
   EXPECT_TRUE(quic_dispatcher_->session_map().empty());
-  EXPECT_FALSE(ActiveQuicListenerPeer::enabled_(*quic_listener_));
+  EXPECT_FALSE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 }
 
 TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
@@ -363,13 +363,13 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // If listener was enabled, there should have been session created for active connection.
   EXPECT_TRUE(quic_dispatcher_->session_map().empty());
-  EXPECT_FALSE(ActiveQuicListenerPeer::enabled_(*quic_listener_));
+  EXPECT_FALSE(ActiveQuicListenerPeer::enabled(*quic_listener_));
   Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " true"}});
   configureMocks(/* connection_count = */ 1);
   sendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(quic_dispatcher_->session_map().empty());
-  EXPECT_TRUE(ActiveQuicListenerPeer::enabled_(*quic_listener_));
+  EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 }
 
 class ActiveQuicListenerEmptyFlagConfigTest : public ActiveQuicListenerTest {
@@ -394,7 +394,7 @@ TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_FALSE(quic_dispatcher_->session_map().empty());
-  EXPECT_TRUE(ActiveQuicListenerPeer::enabled_(*quic_listener_));
+  EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
   ReadFromClientSockets();
 }
 
