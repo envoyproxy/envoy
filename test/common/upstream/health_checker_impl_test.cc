@@ -130,8 +130,8 @@ public:
 
   HttpHealthCheckerImplTest()
       : cluster_(new NiceMock<MockClusterMockPrioritySet>()),
-        event_logger_(new MockHealthCheckEventLogger()),
-        http_context_(stats_store_.symbolTable()) {}
+        event_logger_(new MockHealthCheckEventLogger()), http_context_(stats_store_.symbolTable()) {
+  }
 
   void setupNoServiceValidationHCWithHttp2() {
     const std::string yaml = R"EOF(
@@ -3658,8 +3658,8 @@ public:
   void setupHC() {
     const auto config = createGrpcHealthCheckConfig();
     health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
-        *cluster_, config, dispatcher_, runtime_, random_,
-        HealthCheckEventLoggerPtr(event_logger_), http_context_);
+        *cluster_, config, dispatcher_, runtime_, random_, HealthCheckEventLoggerPtr(event_logger_),
+        http_context_);
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -3670,8 +3670,8 @@ public:
     auto config = createGrpcHealthCheckConfig();
     config.mutable_unhealthy_threshold()->set_value(value);
     health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
-        *cluster_, config, dispatcher_, runtime_, random_,
-        HealthCheckEventLoggerPtr(event_logger_), http_context_);
+        *cluster_, config, dispatcher_, runtime_, random_, HealthCheckEventLoggerPtr(event_logger_),
+        http_context_);
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -3685,8 +3685,8 @@ public:
       config.mutable_grpc_health_check()->set_authority(authority.value());
     }
     health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
-        *cluster_, config, dispatcher_, runtime_, random_,
-        HealthCheckEventLoggerPtr(event_logger_), http_context_);
+        *cluster_, config, dispatcher_, runtime_, random_, HealthCheckEventLoggerPtr(event_logger_),
+        http_context_);
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -3697,8 +3697,8 @@ public:
     auto config = createGrpcHealthCheckConfig();
     config.mutable_reuse_connection()->set_value(false);
     health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
-        *cluster_, config, dispatcher_, runtime_, random_,
-        HealthCheckEventLoggerPtr(event_logger_), http_context_);
+        *cluster_, config, dispatcher_, runtime_, random_, HealthCheckEventLoggerPtr(event_logger_),
+        http_context_);
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -3716,8 +3716,8 @@ public:
     config.mutable_unhealthy_threshold()->set_value(3);
     config.mutable_healthy_threshold()->set_value(3);
     health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
-        *cluster_, config, dispatcher_, runtime_, random_,
-        HealthCheckEventLoggerPtr(event_logger_), http_context_);
+        *cluster_, config, dispatcher_, runtime_, random_, HealthCheckEventLoggerPtr(event_logger_),
+        http_context_);
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);

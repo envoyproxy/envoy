@@ -4,10 +4,10 @@
 #include <memory>
 
 #include "envoy/http/codec.h"
+#include "envoy/http/context.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/config/utility.h"
-#include "envoy/http/context.h"
 #include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"

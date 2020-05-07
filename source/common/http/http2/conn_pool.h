@@ -2,10 +2,10 @@
 
 #include <cstdint>
 
+#include "envoy/http/context.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/http/codec_client.h"
-#include "envoy/http/context.h"
 #include "common/http/conn_pool_base.h"
 
 namespace Envoy {

@@ -390,9 +390,9 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                       const CodecStatNames& codec_stat_names,
-                       ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
-                       uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
+                       const CodecStatNames& codec_stat_names, ServerConnectionCallbacks& callbacks,
+                       const Http1Settings& settings, uint32_t max_request_headers_kb,
+                       const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action);
 
@@ -488,9 +488,8 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                       const CodecStatNames& codec_stat_names,
-                       ConnectionCallbacks& callbacks, const Http1Settings& settings,
-                       const uint32_t max_response_headers_count);
+                       const CodecStatNames& codec_stat_names, ConnectionCallbacks& callbacks,
+                       const Http1Settings& settings, const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;

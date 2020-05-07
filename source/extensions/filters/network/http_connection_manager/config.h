@@ -282,8 +282,7 @@ public:
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-      Tracing::HttpTracerManager& http_tracer_manager,
-      Http::Context& http_context);
+      Tracing::HttpTracerManager& http_tracer_manager, Http::Context& http_context);
 };
 
 } // namespace HttpConnectionManager

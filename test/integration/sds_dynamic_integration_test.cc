@@ -319,9 +319,9 @@ public:
 
   void createUpstreams() override {
     // Fake upstream with SSL/TLS for the first cluster.
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem(),
-        httpContext()));
+    fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(), 0,
+                                                  FakeHttpConnection::Type::HTTP1, version_,
+                                                  timeSystem(), httpContext()));
     create_xds_upstream_ = true;
   }
 

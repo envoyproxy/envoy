@@ -250,8 +250,7 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
-    : api_(Api::createApiForTest(stats_store_)),
-      http_context_(stats_store_.symbolTable()),
+    : api_(Api::createApiForTest(stats_store_)), http_context_(stats_store_.symbolTable()),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(api_->allocateDispatcher("test_thread",
                                            Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
@@ -311,9 +310,9 @@ void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
-      fake_upstreams_.emplace_back(new AutonomousUpstream(
-          endpoint, upstream_protocol_, *time_system_, httpContext(),
-          autonomous_allow_incomplete_streams_));
+      fake_upstreams_.emplace_back(new AutonomousUpstream(endpoint, upstream_protocol_,
+                                                          *time_system_, httpContext(),
+                                                          autonomous_allow_incomplete_streams_));
     } else {
       fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_protocol_, *time_system_,
                                                     httpContext(), enable_half_close_,
@@ -566,8 +565,8 @@ void BaseIntegrationTest::createXdsUpstream() {
     return;
   }
   if (tls_xds_upstream_ == false) {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem(), httpContext()));
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
+                                                  timeSystem(), httpContext()));
   } else {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
@@ -583,9 +582,9 @@ void BaseIntegrationTest::createXdsUpstream() {
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        std::move(context), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem(),
-        httpContext()));
+    fake_upstreams_.emplace_back(new FakeUpstream(std::move(context), 0,
+                                                  FakeHttpConnection::Type::HTTP2, version_,
+                                                  timeSystem(), httpContext()));
   }
   xds_upstream_ = fake_upstreams_[1].get();
   // Don't ASSERT fail if an xDS reconnect ends up unparented.

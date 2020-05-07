@@ -1692,10 +1692,9 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   auto hcm_config = parseHttpConnectionManagerFromV2Yaml(basic_config_);
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     http_context_);
+  HttpConnectionManagerConfig config(
+      hcm_config, context_, date_provider_, route_config_provider_manager_,
+      scoped_routes_config_provider_manager_, http_tracer_manager_, http_context_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   // Check the case where WebSockets are configured in the HCM, and no router
@@ -1740,10 +1739,9 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
   hcm_config.mutable_upgrade_configs(0)->mutable_enabled()->set_value(false);
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     http_context_);
+  HttpConnectionManagerConfig config(
+      hcm_config, context_, date_provider_, route_config_provider_manager_,
+      scoped_routes_config_provider_manager_, http_tracer_manager_, http_context_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   // Check the case where WebSockets are off in the HCM, and no router config is present.
@@ -1795,10 +1793,9 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
                                              "\x19"
                                              "envoy.filters.http.router");
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     http_context_);
+  HttpConnectionManagerConfig config(
+      hcm_config, context_, date_provider_, route_config_provider_manager_,
+      scoped_routes_config_provider_manager_, http_tracer_manager_, http_context_);
 
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
@@ -1840,10 +1837,9 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
                                              "encoder-decoder-buffer-filter");
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                  route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                  http_context_),
+      HttpConnectionManagerConfig(
+          hcm_config, context_, date_provider_, route_config_provider_manager_,
+          scoped_routes_config_provider_manager_, http_tracer_manager_, http_context_),
       EnvoyException,
       "Error: terminal filter named envoy.filters.http.router of type envoy.filters.http.router "
       "must be the last filter in a http upgrade filter chain.");
@@ -1854,12 +1850,12 @@ TEST_F(FilterChainTest, InvalidConfig) {
   hcm_config.add_upgrade_configs()->set_upgrade_type("WEBSOCKET");
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                  route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                  http_context_),
-      EnvoyException, "Error: multiple upgrade configs with the same name: 'websocket'");
+  EXPECT_THROW_WITH_MESSAGE(HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                                        route_config_provider_manager_,
+                                                        scoped_routes_config_provider_manager_,
+                                                        http_tracer_manager_, http_context_),
+                            EnvoyException,
+                            "Error: multiple upgrade configs with the same name: 'websocket'");
 }
 
 class HcmUtilityTest : public testing::Test {

@@ -4,8 +4,8 @@
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
-#include "envoy/http/context.h"
 #include "envoy/grpc/status.h"
+#include "envoy/http/context.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
@@ -379,7 +379,7 @@ private:
   absl::optional<std::string> service_name_;
   absl::optional<std::string> authority_value_;
 
- protected:
+protected:
   Http::Context& http_context_;
 };
 

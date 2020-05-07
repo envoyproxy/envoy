@@ -13,9 +13,9 @@ struct CodecStatNames {
       : pool_(symbol_table),
         dropped_headers_with_underscores_(pool_.add("dropped_headers_with_underscores")),
         metadata_not_supported_error_(pool_.add("metadata_not_supported_error")),
-        requests_rejected_with_underscores_in_headers_(pool_.add("requests_rejected_with_underscores_in_headers")),
-        response_flood_(pool_.add("response_flood")),
-        http1_(pool_.add("http1")) {}
+        requests_rejected_with_underscores_in_headers_(
+            pool_.add("requests_rejected_with_underscores_in_headers")),
+        response_flood_(pool_.add("response_flood")), http1_(pool_.add("http1")) {}
 
   Stats::StatNamePool pool_;
   Stats::StatName dropped_headers_with_underscores_;

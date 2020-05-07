@@ -175,8 +175,9 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
   if (enable_trailers) {
     codec_settings_.enable_trailers_ = enable_trailers;
     codec_ = std::make_unique<ServerConnectionImpl>(
-        connection_, store_, http_context_.codecStatNames(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        connection_, store_, http_context_.codecStatNames(), callbacks_, codec_settings_,
+        max_request_headers_kb_, max_request_headers_count_,
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   }
 
   InSequence sequence;
@@ -209,8 +210,9 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   // Make a new 'codec' with the right settings
   codec_settings_.enable_trailers_ = enable_trailers;
   codec_ = std::make_unique<ServerConnectionImpl>(
-      connection_, store_, http_context_.codecStatNames(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      connection_, store_, http_context_.codecStatNames(), callbacks_, codec_settings_,
+      max_request_headers_kb_, max_request_headers_count_,
+      envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   std::string exception_reason;
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _))

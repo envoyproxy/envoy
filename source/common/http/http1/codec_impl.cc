@@ -67,14 +67,14 @@ const std::string StreamEncoderImpl::CRLF = "\r\n";
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 
 CodecStats::CodecStats(const CodecStatNames& stat_names, Stats::Scope& scope)
-    : dropped_headers_with_underscores_(Stats::Utility::counterFromStatNames(scope, {
-          stat_names.http1_, stat_names.dropped_headers_with_underscores_})),
-      metadata_not_supported_error_(Stats::Utility::counterFromStatNames(scope, {
-            stat_names.http1_, stat_names.metadata_not_supported_error_})),
-      requests_rejected_with_underscores_in_headers_(Stats::Utility::counterFromStatNames(scope, {
-            stat_names.http1_, stat_names.requests_rejected_with_underscores_in_headers_})),
-      response_flood_(Stats::Utility::counterFromStatNames(scope, {
-            stat_names.http1_, stat_names.response_flood_})) {}
+    : dropped_headers_with_underscores_(Stats::Utility::counterFromStatNames(
+          scope, {stat_names.http1_, stat_names.dropped_headers_with_underscores_})),
+      metadata_not_supported_error_(Stats::Utility::counterFromStatNames(
+          scope, {stat_names.http1_, stat_names.metadata_not_supported_error_})),
+      requests_rejected_with_underscores_in_headers_(Stats::Utility::counterFromStatNames(
+          scope, {stat_names.http1_, stat_names.requests_rejected_with_underscores_in_headers_})),
+      response_flood_(Stats::Utility::counterFromStatNames(
+          scope, {stat_names.http1_, stat_names.response_flood_})) {}
 
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
@@ -443,9 +443,8 @@ http_parser_settings ConnectionImpl::settings_{
 };
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                               const CodecStatNames& codec_stat_names,
-                               http_parser_type type, uint32_t max_headers_kb,
-                               const uint32_t max_headers_count,
+                               const CodecStatNames& codec_stat_names, http_parser_type type,
+                               uint32_t max_headers_kb, const uint32_t max_headers_count,
                                HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers)
     : connection_(connection), stats_(codec_stat_names, stats),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
@@ -737,11 +736,9 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 }
 
 ServerConnectionImpl::ServerConnectionImpl(
-    Network::Connection& connection, Stats::Scope& stats,
-    const CodecStatNames& codec_stat_names,
-    ServerConnectionCallbacks& callbacks,
-    const Http1Settings& settings, uint32_t max_request_headers_kb,
-    const uint32_t max_request_headers_count,
+    Network::Connection& connection, Stats::Scope& stats, const CodecStatNames& codec_stat_names,
+    ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
+    uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
     : ConnectionImpl(connection, stats, codec_stat_names, HTTP_REQUEST, max_request_headers_kb,
@@ -993,8 +990,8 @@ void ServerConnectionImpl::checkHeaderNameForUnderscores() {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                                           const CodecStatNames& stat_names,
-                                           ConnectionCallbacks&, const Http1Settings& settings,
+                                           const CodecStatNames& stat_names, ConnectionCallbacks&,
+                                           const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, stat_names, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
                      max_response_headers_count, formatter(settings), settings.enable_trailers_) {}

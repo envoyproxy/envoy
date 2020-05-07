@@ -170,11 +170,10 @@ void HdsDelegate::processMessage(
     ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config.DebugString());
 
     // Create HdsCluster
-    hds_clusters_.emplace_back(new HdsCluster(admin_, runtime_, cluster_config, bind_config,
-                                              store_stats_, ssl_context_manager_, false,
-                                              info_factory_, cm_, local_info_, dispatcher_, random_,
-                                              singleton_manager_, tls_, validation_visitor_, api_,
-                                              http_context_));
+    hds_clusters_.emplace_back(new HdsCluster(
+        admin_, runtime_, cluster_config, bind_config, store_stats_, ssl_context_manager_, false,
+        info_factory_, cm_, local_info_, dispatcher_, random_, singleton_manager_, tls_,
+        validation_visitor_, api_, http_context_));
 
     hds_clusters_.back()->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_,
                                             api_);
@@ -273,10 +272,9 @@ void HdsCluster::startHealthchecks(AccessLog::AccessLogManager& access_log_manag
                                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                    Event::Dispatcher& dispatcher, Api::Api& api) {
   for (auto& health_check : cluster_.health_checks()) {
-    health_checkers_.push_back(
-        Upstream::HealthCheckerFactory::create(health_check, *this, runtime, random, dispatcher,
-                                               access_log_manager, validation_visitor_, api,
-                                               http_context_));
+    health_checkers_.push_back(Upstream::HealthCheckerFactory::create(
+        health_check, *this, runtime, random, dispatcher, access_log_manager, validation_visitor_,
+        api, http_context_));
     health_checkers_.back()->start();
   }
 }

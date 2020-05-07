@@ -2,9 +2,9 @@
 
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/context.h"
 #include "envoy/upstream/upstream.h"
 
-#include "envoy/http/context.h"
 #include "common/http/codec_wrappers.h"
 #include "common/http/conn_pool_base.h"
 
@@ -99,8 +99,7 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    const Context& http_context)
-      : ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options,
-                     http_context) {}
+      : ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options, http_context) {}
 
   // ConnPoolImpl
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;

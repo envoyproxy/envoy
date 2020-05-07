@@ -60,8 +60,7 @@ public:
   };
 
   Http2ConnPoolImplTest()
-      : api_(Api::createApiForTest(stats_store_)),
-        http_context_(stats_store_.symbolTable()),
+      : api_(Api::createApiForTest(stats_store_)), http_context_(stats_store_.symbolTable()),
         pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr,
               http_context_) {
     // Default connections to 1024 because the tests shouldn't be relying on the

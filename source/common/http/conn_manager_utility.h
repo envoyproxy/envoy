@@ -3,10 +3,10 @@
 #include <atomic>
 #include <cstdint>
 
+#include "envoy/http/context.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
-#include "envoy/http/context.h"
 #include "common/http/conn_manager_impl.h"
 
 namespace Envoy {
@@ -41,7 +41,7 @@ public:
                   const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                   uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                  headers_with_underscores_action,
+                      headers_with_underscores_action,
                   Http::Context& http_context);
 
   /**

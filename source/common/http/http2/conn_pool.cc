@@ -90,8 +90,7 @@ RequestEncoder& ConnPoolImpl::ActiveClient::newStreamEncoder(ResponseDecoder& re
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP2, std::move(data.connection_),
-                                           data.host_description_, dispatcher_,
-                                           http_context_)};
+                                           data.host_description_, dispatcher_, http_context_)};
   return codec;
 }
 

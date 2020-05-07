@@ -7,6 +7,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/context.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/upstream/upstream.h"
@@ -14,7 +15,6 @@
 #include "common/common/assert.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
-#include "envoy/http/context.h"
 #include "common/http/codec_wrappers.h"
 #include "common/network/filter_impl.h"
 

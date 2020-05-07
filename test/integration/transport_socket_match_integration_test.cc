@@ -151,10 +151,10 @@ require_client_certificate: true
             createUpstreamSslContext(), endpoint->ip()->port(), FakeHttpConnection::Type::HTTP1,
             endpoint->ip()->version(), timeSystem(), httpContext(), false));
       } else {
-        fake_upstreams_.emplace_back(new AutonomousUpstream(
-            Network::Test::createRawBufferSocketFactory(), endpoint->ip()->port(),
-            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(),
-            httpContext(), false));
+        fake_upstreams_.emplace_back(
+            new AutonomousUpstream(Network::Test::createRawBufferSocketFactory(),
+                                   endpoint->ip()->port(), FakeHttpConnection::Type::HTTP1,
+                                   endpoint->ip()->version(), timeSystem(), httpContext(), false));
       }
     }
   }

@@ -50,8 +50,8 @@ public:
 
 class ClusterFactoryTestBase {
 protected:
-  ClusterFactoryTestBase() : api_(Api::createApiForTest(stats_)),
-                             http_context_(stats_.symbolTable()) {
+  ClusterFactoryTestBase()
+      : api_(Api::createApiForTest(stats_)), http_context_(stats_.symbolTable()) {
     outlier_event_logger_ = std::make_shared<Outlier::MockEventLogger>();
     dns_resolver_ = std::make_shared<Network::MockDnsResolver>();
   }

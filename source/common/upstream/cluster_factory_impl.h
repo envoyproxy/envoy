@@ -14,6 +14,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/timer.h"
+#include "envoy/http/context.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
@@ -35,7 +36,6 @@
 #include "common/config/metadata.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
-#include "envoy/http/context.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/isolated_store_impl.h"
@@ -68,8 +68,7 @@ public:
         runtime_(runtime), random_(random), dispatcher_(dispatcher), log_manager_(log_manager),
         local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager),
         outlier_event_logger_(std::move(outlier_event_logger)), added_via_api_(added_via_api),
-        validation_visitor_(validation_visitor), api_(api),
-        http_context_(http_context) {}
+        validation_visitor_(validation_visitor), api_(api), http_context_(http_context) {}
 
   ClusterManager& clusterManager() override { return cluster_manager_; }
   Stats::Store& stats() override { return stats_; }

@@ -32,8 +32,8 @@ public:
   HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem(), httpContext()));
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
+                                                  timeSystem(), httpContext()));
     hds_upstream_ = fake_upstreams_.back().get();
     hds_upstream_->set_allow_unexpected_disconnects(true);
     HttpIntegrationTest::createUpstreams();
@@ -58,12 +58,10 @@ public:
     HttpIntegrationTest::initialize();
 
     // Endpoint connections
-    host_upstream_ =
-        std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem(),
-                                       httpContext());
-    host2_upstream_ =
-        std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem(),
-                                       httpContext());
+    host_upstream_ = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_,
+                                                    timeSystem(), httpContext());
+    host2_upstream_ = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_,
+                                                     timeSystem(), httpContext());
   }
 
   // Sets up a connection between Envoy and the management server.

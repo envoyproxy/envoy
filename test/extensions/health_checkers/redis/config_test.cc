@@ -164,12 +164,12 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
   NiceMock<Api::MockApi> api;
   Http::ContextImpl http_context(api.symbolTable());
 
-  EXPECT_NE(nullptr,
-            dynamic_cast<CustomRedisHealthChecker*>(
-                Upstream::HealthCheckerFactory::create(
-                    Upstream::parseHealthCheckFromV2Yaml(yaml), cluster, runtime, random,
-                    dispatcher, log_manager, ProtobufMessage::getStrictValidationVisitor(), api,
-                    http_context).get()));
+  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
+                         Upstream::HealthCheckerFactory::create(
+                             Upstream::parseHealthCheckFromV2Yaml(yaml), cluster, runtime, random,
+                             dispatcher, log_manager, ProtobufMessage::getStrictValidationVisitor(),
+                             api, http_context)
+                             .get()));
 }
 } // namespace
 } // namespace RedisHealthChecker

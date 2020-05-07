@@ -141,8 +141,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr hos
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                  const Context& http_context) {
   return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, options,
-                                                         transport_socket_options,
-                                                         http_context);
+                                                         transport_socket_options, http_context);
 }
 
 } // namespace Http1

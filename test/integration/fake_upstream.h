@@ -424,7 +424,7 @@ public:
                      Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
                      uint32_t max_request_headers_count,
                      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                     headers_with_underscores_action,
+                         headers_with_underscores_action,
                      Http::Context& http_context);
 
   // By default waitForNewStream assumes the next event is a new stream and
@@ -553,13 +553,13 @@ public:
   // Creates a fake upstream bound to the specified |address|.
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
-               Http::Context& http_context,
-               bool enable_half_close = false, bool udp_fake_upstream = false);
+               Http::Context& http_context, bool enable_half_close = false,
+               bool udp_fake_upstream = false);
 
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
-               Event::TestTimeSystem& time_system,
-               Http::Context& http_context, bool enable_half_close = false);
+               Event::TestTimeSystem& time_system, Http::Context& http_context,
+               bool enable_half_close = false);
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
                FakeHttpConnection::Type type, Network::Address::IpVersion version,
                Event::TestTimeSystem& time_system, Http::Context& http_context);
@@ -629,8 +629,8 @@ protected:
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                Network::SocketPtr&& connection, FakeHttpConnection::Type type,
-               Event::TestTimeSystem& time_system,
-               Http::Context& http_context, bool enable_half_close);
+               Event::TestTimeSystem& time_system, Http::Context& http_context,
+               bool enable_half_close);
 
   class FakeListenSocketFactory : public Network::ListenSocketFactory {
   public:

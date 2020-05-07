@@ -231,9 +231,8 @@ public:
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
-      fake_upstream_ = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2,
-                                                      ipVersion(), test_time_.timeSystem(),
-                                                      http_context_);
+      fake_upstream_ = std::make_unique<FakeUpstream>(
+          0, FakeHttpConnection::Type::HTTP2, ipVersion(), test_time_.timeSystem(), http_context_);
     }
     switch (clientType()) {
     case ClientType::EnvoyGrpc:

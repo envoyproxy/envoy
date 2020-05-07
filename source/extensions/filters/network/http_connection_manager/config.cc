@@ -120,12 +120,10 @@ std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-    Tracing::HttpTracerManager& http_tracer_manager,
-    Http::Context& http_context) {
+    Tracing::HttpTracerManager& http_tracer_manager, Http::Context& http_context) {
   return std::make_shared<HttpConnectionManagerConfig>(
       proto_config, context, date_provider, route_config_provider_manager,
-      scoped_routes_config_provider_manager, http_tracer_manager,
-      http_context);
+      scoped_routes_config_provider_manager, http_tracer_manager, http_context);
 }
 
 Network::FilterFactoryCb
@@ -484,8 +482,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
-        connection, callbacks, context_.scope(), http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+        connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
+        maxRequestHeadersCount(), headersWithUnderscoresAction());
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
     // TODO(danzh) Add support to get the factory name from config, possibly

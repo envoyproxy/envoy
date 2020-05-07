@@ -20,10 +20,10 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem(), httpContext()));
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem(), httpContext()));
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_,
+                                                  timeSystem(), httpContext()));
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_,
+                                                  timeSystem(), httpContext()));
   }
 
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {

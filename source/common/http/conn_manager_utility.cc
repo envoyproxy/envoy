@@ -42,12 +42,12 @@ std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection&
 
 ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     Network::Connection& connection, const Buffer::Instance& data,
-    ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
-    const Http1Settings& http1_settings,
+    ServerConnectionCallbacks& callbacks, Stats::Scope& scope, const Http1Settings& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-    headers_with_underscores_action, Http::Context& http_context) {
+        headers_with_underscores_action,
+    Http::Context& http_context) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
     return std::make_unique<Http2::ServerConnectionImpl>(
         connection, callbacks, scope, http2_options, max_request_headers_kb,
