@@ -51,6 +51,7 @@ envoy_cc_library(
     deps = [
         ":codec_wrappers_lib",
         ":exception_lib",
+        ":status_lib",
         ":utility_lib",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/http:codec_interface",
@@ -167,6 +168,7 @@ envoy_cc_library(
         ":header_utility_lib",
         ":headers_lib",
         ":path_utility_lib",
+        ":status_lib",
         ":user_agent_lib",
         ":utility_lib",
         "//include/envoy/access_log:access_log_interface",
